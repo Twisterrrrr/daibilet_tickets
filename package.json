@@ -1,0 +1,36 @@
+{
+  "name": "daibilet",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Дайбилет — агрегатор билетов на экскурсии, музеи и мероприятия по городам РФ",
+  "scripts": {
+    "dev:backend": "pnpm --filter @daibilet/backend dev",
+    "dev:frontend": "pnpm --filter @daibilet/frontend dev",
+    "dev": "concurrently -n backend,frontend -c blue,green \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "build": "pnpm --filter @daibilet/shared build && pnpm --filter @daibilet/backend build && pnpm --filter @daibilet/frontend build",
+    "lint": "pnpm -r lint",
+    "db:generate": "pnpm --filter @daibilet/backend db:generate",
+    "db:migrate": "pnpm --filter @daibilet/backend db:migrate",
+    "db:seed": "pnpm --filter @daibilet/backend db:seed",
+    "db:studio": "pnpm --filter @daibilet/backend db:studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "@nestjs/core",
+      "sharp",
+      "msgpackr-extract"
+    ]
+  }
+}

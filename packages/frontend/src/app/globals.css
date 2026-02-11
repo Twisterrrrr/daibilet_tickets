@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-background: #ffffff;
+    --color-foreground: #0f172a;
+  }
+
+  body {
+    @apply bg-white text-slate-900 antialiased;
+    /* iOS safe areas */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Minimum touch target sizes (44px WCAG) — only standalone buttons and selects */
+  button:not(.inline-btn),
+  select {
+    min-height: 44px;
+  }
+
+  /* Prevent text inflation on mobile */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-primary-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 active:scale-[0.98] sm:px-6;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-[0.98] sm:px-6;
+  }
+
+  .card {
+    @apply overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar but keep scroll functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Ticketscloud inline widget styling */
+.tc-widget-container {
+  min-height: 80px;
+}
+
+.tc-widget-container iframe {
+  max-width: 100% !important;
+  border-radius: 12px;
+}
+
+/* TC widget button overrides */
+button[data-tc-event] {
+  width: 100%;
+  font-family: inherit !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+  padding: 14px 24px !important;
+  min-height: 48px;
+}

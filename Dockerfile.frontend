@@ -1,0 +1,78 @@
+# ============================================
+# Дайбилет — Frontend (Next.js)
+# Multi-stage build, standalone output
+# ============================================
+
+# --- Stage 1: Install dependencies ---
+FROM node:22-alpine AS deps
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# Копируем конфиги workspace
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Копируем package.json всех пакетов
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/frontend/package.json ./packages/frontend/
+
+# Устанавливаем зависимости
+RUN pnpm install --frozen-lockfile
+
+# --- Stage 2: Build ---
+FROM node:22-alpine AS builder
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# Копируем node_modules из deps
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=deps /app/packages/frontend/node_modules ./packages/frontend/node_modules
+
+# Копируем workspace конфиги
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Копируем исходники
+COPY packages/shared/ ./packages/shared/
+COPY packages/frontend/ ./packages/frontend/
+
+# Build-time env (не содержат секретов)
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Собираем Next.js (standalone output)
+RUN pnpm --filter @daibilet/frontend build
+
+# --- Stage 3: Production image ---
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
+
+# Пользователь без root
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Копируем standalone output
+COPY --from=builder /app/packages/frontend/.next/standalone ./
+COPY --from=builder /app/packages/frontend/.next/static ./packages/frontend/.next/static
+
+# Public (если есть)
+# COPY --from=builder /app/packages/frontend/public ./packages/frontend/public
+
+USER nextjs
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:3000/ || exit 1
+
+# Standalone server.js находится в packages/frontend/
+CMD ["node", "packages/frontend/server.js"]

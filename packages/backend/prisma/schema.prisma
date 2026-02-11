@@ -1,0 +1,385 @@
+// ==============================================
+// Дайбилет — Prisma Schema
+// ==============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================
+// Enums
+// ========================
+
+enum EventSource {
+  TC        // Ticketscloud
+  TEPLOHOD  // teplohod.info
+}
+
+enum EventCategory {
+  EXCURSION
+  MUSEUM
+  EVENT
+}
+
+enum TagCategory {
+  THEME    // "Романтика", "Гастро", "Фото"
+  AUDIENCE // "С детьми", "Для двоих", "Для компании"
+  SEASON   // "Зимой", "Летом", "Белые ночи"
+  SPECIAL  // "Новинка", "Хит продаж", "Скидка"
+}
+
+enum Intensity {
+  RELAXED
+  NORMAL
+  ACTIVE
+}
+
+enum DaySlot {
+  MORNING   // 09:00-12:00
+  AFTERNOON // 13:00-17:00
+  EVENING   // 18:00-22:00
+}
+
+enum PackageStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PAID
+  FULFILLING
+  FULFILLED
+  PARTIALLY_FULFILLED
+  FAILED
+  REFUNDED
+}
+
+enum PackageItemStatus {
+  PENDING
+  BOOKED
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+// ========================
+// Города
+// ========================
+
+model City {
+  id              String   @id @default(uuid()) @db.Uuid
+  slug            String   @unique
+  name            String
+  description     String?  @db.Text
+  heroImage       String?
+  lat             Decimal? @db.Decimal(10, 7)
+  lng             Decimal? @db.Decimal(10, 7)
+  timezone        String   @default("Europe/Moscow")
+  metaTitle       String?
+  metaDescription String?  @db.Text
+  isFeatured      Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  events       Event[]
+  packages     Package[]
+  articles     Article[]
+  landingPages LandingPage[]
+  comboPages   ComboPage[]
+
+  @@map("cities")
+}
+
+// ========================
+// События (из Ticketscloud / teplohod.info)
+// ========================
+
+model Event {
+  id               String        @id @default(uuid()) @db.Uuid
+  source           EventSource   @default(TC)
+  tcEventId        String        @unique // TC: "6980...", Teplohod: "tep-282"
+  cityId           String        @db.Uuid
+  title            String
+  slug             String        @unique
+  description      String?       @db.Text
+  shortDescription String?
+  category         EventCategory
+  subcategory      String?
+  minAge           Int           @default(0)
+  durationMinutes  Int?
+  lat              Decimal?      @db.Decimal(10, 7)
+  lng              Decimal?      @db.Decimal(10, 7)
+  address          String?
+  indoor           Boolean?
+  rating           Decimal       @default(0) @db.Decimal(2, 1)
+  reviewCount      Int           @default(0)
+  imageUrl         String?
+  galleryUrls      String[]
+  priceFrom        Int?          // в копейках
+  isActive         Boolean       @default(true)
+  tcData           Json?         // оригинальные данные из TC
+  lastSyncAt       DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  city          City           @relation(fields: [cityId], references: [id])
+  sessions      EventSession[]
+  tags          EventTag[]
+  packageItems  PackageItem[]
+  articleEvents ArticleEvent[]
+
+  @@index([cityId, category])
+  @@index([slug])
+  @@map("events")
+}
+
+model EventSession {
+  id               String   @id @default(uuid()) @db.Uuid
+  eventId          String   @db.Uuid
+  tcSessionId      String   @unique
+  startsAt         DateTime
+  endsAt           DateTime?
+  availableTickets Int      @default(0)
+  prices           Json     // [{type: "adult", price: 150000}, ...]
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  packageItems PackageItem[]
+
+  @@index([startsAt])
+  @@index([eventId])
+  @@map("event_sessions")
+}
+
+// ========================
+// Теги и лендинги
+// ========================
+
+model Tag {
+  id              String      @id @default(uuid()) @db.Uuid
+  slug            String      @unique
+  name            String
+  category        TagCategory
+  description     String?     @db.Text
+  heroImage       String?
+  metaTitle       String?
+  metaDescription String?     @db.Text
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  events      EventTag[]
+  articleTags ArticleTag[]
+
+  @@map("tags")
+}
+
+model EventTag {
+  eventId String @db.Uuid
+  tagId   String @db.Uuid
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, tagId])
+  @@map("event_tags")
+}
+
+// ========================
+// Пакеты (Trip Planner)
+// ========================
+
+model Package {
+  id           String        @id @default(uuid()) @db.Uuid
+  code         String        @unique // "PKG-2026-ABCD12"
+  email        String
+  phone        String?
+  customerName String
+  cityId       String        @db.Uuid
+  dateFrom     DateTime      @db.Date
+  dateTo       DateTime      @db.Date
+  adults       Int
+  children     Int           @default(0)
+  childrenAges Int[]
+  intensity    Intensity
+  variantName  String?       // "Оптимальный"
+  totalPrice   Int           // в копейках
+  serviceFee   Int           @default(0) // в копейках
+  status       PackageStatus @default(DRAFT)
+  paymentId    String?       // YooKassa payment ID
+  paidAt       DateTime?
+  fulfilledAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  city    City          @relation(fields: [cityId], references: [id])
+  items   PackageItem[]
+  voucher Voucher?
+
+  @@index([email])
+  @@index([status])
+  @@map("packages")
+}
+
+model PackageItem {
+  id            String            @id @default(uuid()) @db.Uuid
+  packageId     String            @db.Uuid
+  eventId       String            @db.Uuid
+  sessionId     String            @db.Uuid
+  dayNumber     Int
+  slot          DaySlot
+  slotTime      String            // "10:00"
+  adultTickets  Int
+  childTickets  Int               @default(0)
+  subtotal      Int               // в копейках
+  tcOrderId     String?           // TC order ID после создания
+  tcOrderStatus String?
+  status        PackageItemStatus @default(PENDING)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  package Package      @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  event   Event        @relation(fields: [eventId], references: [id])
+  session EventSession @relation(fields: [sessionId], references: [id])
+
+  @@index([packageId])
+  @@map("package_items")
+}
+
+// ========================
+// Ваучеры
+// ========================
+
+model Voucher {
+  id        String   @id @default(uuid()) @db.Uuid
+  packageId String   @unique @db.Uuid
+  shortCode String   @unique // "V-ABCD12"
+  qrCodeUrl String?
+  pdfUrl    String?
+  publicUrl String   // https://daibilet.ru/v/V-ABCD12
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@map("vouchers")
+}
+
+// ========================
+// Блог
+// ========================
+
+model Article {
+  id              String    @id @default(uuid()) @db.Uuid
+  slug            String    @unique
+  title           String
+  content         String    @db.Text // Markdown
+  excerpt         String?
+  cityId          String?   @db.Uuid
+  coverImage      String?
+  metaTitle       String?
+  metaDescription String?   @db.Text
+  isPublished     Boolean   @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  city          City?          @relation(fields: [cityId], references: [id])
+  articleEvents ArticleEvent[]
+  articleTags   ArticleTag[]
+
+  @@map("articles")
+}
+
+model ArticleEvent {
+  articleId String @db.Uuid
+  eventId   String @db.Uuid
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, eventId])
+  @@map("article_events")
+}
+
+model ArticleTag {
+  articleId String @db.Uuid
+  tagId     String @db.Uuid
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+  @@map("article_tags")
+}
+
+// ========================
+// Combo-страницы (готовые программы, индексируемые)
+// ========================
+
+model ComboPage {
+  id              String   @id @default(uuid()) @db.Uuid
+  slug            String   @unique              // URL: /combo/:slug
+  cityId          String   @db.Uuid
+  title           String                        // "Романтический Петербург за 2 дня"
+  subtitle        String?
+  description     String?  @db.Text             // SEO-текст
+  heroImage       String?
+  intensity       Intensity @default(NORMAL)
+  dayCount        Int                            // 1, 2, 3...
+  // Курируемый набор событий (id → порядок/слот)
+  curatedEvents   Json                           // [{eventId, dayNumber, slot, time}]
+  suggestedPrice  Int?                           // Ориентировочная цена (копейки)
+  features        Json?                          // [{icon, title, text}] — USP
+  includes        Json?                          // ["Билеты на 3 события", "Гид"]
+  faq             Json?                          // [{question, answer}]
+  metaTitle       String?
+  metaDescription String?  @db.Text
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  city City @relation(fields: [cityId], references: [id])
+
+  @@index([cityId])
+  @@map("combo_pages")
+}
+
+// ========================
+// Посадочные страницы (лендинги)
+// ========================
+
+model LandingPage {
+  id              String   @id @default(uuid()) @db.Uuid
+  slug            String   @unique              // URL: /cities/:citySlug/:slug
+  cityId          String   @db.Uuid
+  filterTag       String                        // slug тега для фильтрации событий
+  additionalFilters Json?                       // {category?, source?, minDuration?, maxDuration?, features[]?}
+  title           String                        // H1
+  subtitle        String?
+  heroText        String?  @db.Text
+  howToChoose     Json?                          // [{title, text}]
+  infoBlocks      Json?                          // [{title, text}]
+  faq             Json?                          // [{question, answer}]
+  reviews         Json?                          // [{text, author, rating}]
+  stats           Json?                          // {soldTickets, avgRating}
+  relatedLinks    Json?                          // [{title, href}]
+  legalText       String?  @db.Text
+  metaTitle       String?
+  metaDescription String?  @db.Text
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  city City @relation(fields: [cityId], references: [id])
+
+  @@index([cityId])
+  @@map("landing_pages")
+}
