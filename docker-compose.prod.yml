@@ -35,7 +35,7 @@ services:
     networks:
       - daibilet-net
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-}', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,6 +58,10 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379
       TC_API_TOKEN: ${TC_API_TOKEN}
       TC_WIDGET_TOKEN: ${TC_WIDGET_TOKEN}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://daibilet.ru,https://admin.daibilet.ru}
+      ADMIN_INITIAL_EMAIL: ${ADMIN_INITIAL_EMAIL:-admin@daibilet.ru}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?ADMIN_INITIAL_PASSWORD is required}
       PORT: 4000
     networks:
       - daibilet-net
@@ -78,6 +82,19 @@ services:
       NEXT_PUBLIC_API_URL: /api/v1
       NEXT_PUBLIC_APP_URL: ${APP_URL:-https://daibilet.ru}
       NEXT_PUBLIC_TC_WIDGET_TOKEN: ${TC_WIDGET_TOKEN}
+      NEXT_PUBLIC_YM_ID: ${NEXT_PUBLIC_YM_ID:-}
+    networks:
+      - daibilet-net
+
+  # --- Admin Panel (Vite SPA → Nginx) ---
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: daibilet-admin
+    restart: unless-stopped
+    depends_on:
+      - backend
     networks:
       - daibilet-net
 
@@ -89,6 +106,7 @@ services:
     depends_on:
       - frontend
       - backend
+      - admin
     ports:
       - '80:80'
       - '443:443'
@@ -106,8 +124,7 @@ services:
     volumes:
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/certbot
-    # Запускается вручную или по cron:
-    # docker compose -f docker-compose.prod.yml run --rm certbot certonly --webroot -w /var/www/certbot -d daibilet.ru -d www.daibilet.ru
+    # Автоматический renewal каждые 12 часов
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
 volumes:

@@ -3,12 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CacheService, CACHE_TTL } from '../cache/cache.service';
 import { EventsQueryDto } from './dto/events-query.dto';
 import { Prisma } from '@prisma/client';
+import { EventOverrideService } from '../admin/event-override.service';
 
 @Injectable()
 export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly overrideService: EventOverrideService,
   ) {}
 
   // --- Города ---
@@ -23,7 +25,18 @@ export class CatalogService {
           ...(featured !== undefined && { isFeatured: featured }),
         },
         include: {
-          _count: { select: { events: { where: { isActive: true } } } },
+          _count: {
+            select: {
+              events: {
+                where: {
+                  isActive: true,
+                  sessions: {
+                    some: { isActive: true, startsAt: { gte: new Date() } },
+                  },
+                },
+              },
+            },
+          },
           landingPages: {
             where: { isActive: true },
             orderBy: { sortOrder: 'asc' },
@@ -45,13 +58,18 @@ export class CatalogService {
       where: { slug },
       include: {
         events: {
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            sessions: {
+              some: { isActive: true, startsAt: { gte: new Date() } },
+            },
+          },
           orderBy: { rating: 'desc' },
           take: 20,
           include: {
             tags: { include: { tag: true } },
             sessions: {
-              where: { isActive: true },
+              where: { isActive: true, startsAt: { gte: new Date() } },
               orderBy: { startsAt: 'asc' },
               take: 1,
             },
@@ -67,20 +85,23 @@ export class CatalogService {
 
     if (!city) throw new NotFoundException(`Город "${slug}" не найден`);
 
-    // Статистика по категориям
+    // Статистика по категориям (только события с будущими сеансами)
+    const hasFutureSessions = {
+      sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
+    };
     const [excursionCount, museumCount, eventCount, totalCount] =
       await Promise.all([
         this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, category: 'EXCURSION' },
+          where: { cityId: city.id, isActive: true, category: 'EXCURSION', ...hasFutureSessions },
         }),
         this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, category: 'MUSEUM' },
+          where: { cityId: city.id, isActive: true, category: 'MUSEUM', ...hasFutureSessions },
         }),
         this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, category: 'EVENT' },
+          where: { cityId: city.id, isActive: true, category: 'EVENT', ...hasFutureSessions },
         }),
         this.prisma.event.count({
-          where: { cityId: city.id, isActive: true },
+          where: { cityId: city.id, isActive: true, ...hasFutureSessions },
         }),
       ]);
 
@@ -122,26 +143,29 @@ export class CatalogService {
 
     const where: Prisma.EventWhereInput = {
       isActive: true,
-      ...(city && { city: { slug: city } }),
+      // Только события из активных городов
+      city: {
+        isActive: true,
+        ...(city && { slug: city }),
+      },
+      // Показываем только события с будущими активными сеансами
+      sessions: {
+        some: {
+          isActive: true,
+          startsAt: {
+            gte: dateFrom ? new Date(dateFrom) : new Date(),
+            ...(dateTo && { lte: new Date(dateTo) }),
+          },
+        },
+      },
       ...(category && { category }),
       ...(subcategory && { subcategory }),
       ...(tag && { tags: { some: { tag: { slug: tag } } } }),
-      ...(dateFrom && {
-        sessions: {
-          some: {
-            startsAt: {
-              gte: new Date(dateFrom),
-              ...(dateTo && { lte: new Date(dateTo) }),
-            },
-            isActive: true,
-          },
-        },
-      }),
     };
 
     const orderBy = this.getEventsSort(sort);
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
         where,
         orderBy,
@@ -154,6 +178,9 @@ export class CatalogService {
       }),
       this.prisma.event.count({ where }),
     ]);
+
+    // Применяем overrides (мерж данных, фильтрация скрытых)
+    const items = await this.overrideService.applyOverrides(rawItems);
 
     return {
       items,
@@ -184,13 +211,16 @@ export class CatalogService {
 
     if (!event) throw new NotFoundException(`Событие "${slug}" не найдено`);
 
-    // Похожие события (тот же город + категория)
+    // Похожие события (тот же город + категория, только с будущими сеансами)
     const relatedEvents = await this.prisma.event.findMany({
       where: {
         cityId: event.cityId,
         category: event.category,
         isActive: true,
         id: { not: event.id },
+        sessions: {
+          some: { isActive: true, startsAt: { gte: new Date() } },
+        },
       },
       orderBy: { rating: 'desc' },
       take: 6,

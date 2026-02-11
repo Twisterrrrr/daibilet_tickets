@@ -1,20 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { TcApiService } from './tc-api.service';
+import { TcGrpcService, TcGrpcEvent, TcGrpcMetaEvent, TcGrpcVenue, TcGrpcCity, TcGrpcTicketSet } from './tc-grpc.service';
 import { EventCategory } from '@prisma/client';
 
 /**
  * Сервис синхронизации данных из Ticketscloud в нашу БД.
  *
- * ДЕДУПЛИКАЦИЯ: в TC каждый сеанс мероприятия — отдельный «event» с уникальным ID.
- * Мы объединяем все TC-записи с одинаковым title + city в ОДНО Event,
- * а каждый TC-event становится отдельной EventSession.
+ * Два режима (TC_SYNC_MODE):
+ *   "grpc"  — через gRPC tc-simple (MetaEvent-based группировка, рекомендуется)
+ *   "rest"  — через REST v1 (title-based дедупликация, fallback)
  *
- * Master-event:
- * - tcEventId = первый (или лучший) TC event ID
- * - priceFrom = минимум из всех сеансов
- * - rating, reviewCount = максимум
- * - imageUrl, description = из лучшей записи
+ * gRPC-режим:
+ *   - События группируются по MetaEvent ID (нативная группировка TC)
+ *   - Одиночные события (без meta) — отдельные Event
+ *   - Venue и City загружаются отдельными gRPC-стримами
+ *
+ * REST-режим (legacy):
+ *   - Группировка по normalizeTitle(title) + cityGeoId
  */
 @Injectable()
 export class TcSyncService {
@@ -33,7 +37,13 @@ export class TcSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tcApi: TcApiService,
+    private readonly tcGrpc: TcGrpcService,
+    private readonly config: ConfigService,
   ) {}
+
+  // ============================================================
+  // Публичные методы
+  // ============================================================
 
   /**
    * Полный сброс.
@@ -52,15 +62,11 @@ export class TcSyncService {
   }
 
   /**
-   * Полная синхронизация с дедупликацией.
-   *
-   * 1. Загружаем ВСЕ события из TC API.
-   * 2. Группируем по normalizedTitle + cityGeoId.
-   * 3. Для каждой группы создаём/обновляем ОДНО Event.
-   * 4. Каждый TC-event в группе → EventSession.
+   * Полная синхронизация — диспатчер по режиму.
    */
   async syncAll(): Promise<{
     status: string;
+    mode: string;
     tcEventsFound: number;
     uniqueEvents: number;
     sessionsSynced: number;
@@ -68,12 +74,552 @@ export class TcSyncService {
     newCitiesCreated: string[];
     errors: string[];
   }> {
-    this.logger.log('=== Начинаю полную синхронизацию (с дедупликацией) ===');
+    const mode = this.config.get<string>('TC_SYNC_MODE', 'grpc');
+
+    if (mode === 'grpc' && this.tcGrpc.isReady()) {
+      this.logger.log('=== Синхронизация через gRPC tc-simple ===');
+      try {
+        return await this.syncAllGrpc();
+      } catch (err: any) {
+        this.logger.warn(`gRPC sync failed, fallback на REST: ${err.message}`);
+        return await this.syncAllRest();
+      }
+    }
+
+    if (mode === 'grpc' && !this.tcGrpc.isReady()) {
+      this.logger.warn('gRPC-клиент не готов, fallback на REST v1');
+    }
+
+    return await this.syncAllRest();
+  }
+
+  // ============================================================
+  // gRPC Sync (MetaEvent-based)
+  // ============================================================
+
+  private async syncAllGrpc(): Promise<{
+    status: string;
+    mode: string;
+    tcEventsFound: number;
+    uniqueEvents: number;
+    sessionsSynced: number;
+    citiesTotal: number;
+    newCitiesCreated: string[];
+    errors: string[];
+  }> {
     const errors: string[] = [];
     const newCitiesCreated: string[] = [];
     this.cityCache.clear();
 
-    // Step 1: Загружаем все TC events
+    // Step 1: Параллельно загружаем данные из gRPC
+    this.logger.log('gRPC: загрузка данных...');
+
+    const [grpcEvents, grpcMetas, grpcVenues, grpcCities] = await Promise.all([
+      this.tcGrpc.fetchEvents({ status: 2 }), // PUBLIC only
+      this.tcGrpc.fetchMetaEvents(),
+      this.tcGrpc.fetchVenues(),
+      this.tcGrpc.fetchCities(),
+    ]);
+
+    this.logger.log(
+      `gRPC: ${grpcEvents.length} events, ${grpcMetas.length} metas, ` +
+      `${grpcVenues.length} venues, ${grpcCities.length} cities`,
+    );
+
+    if (grpcEvents.length === 0) {
+      return {
+        status: 'empty',
+        mode: 'grpc',
+        tcEventsFound: 0,
+        uniqueEvents: 0,
+        sessionsSynced: 0,
+        citiesTotal: 0,
+        newCitiesCreated: [],
+        errors: ['gRPC вернул 0 событий'],
+      };
+    }
+
+    // Step 2: Строим lookup-таблицы
+    const metaMap = new Map<string, TcGrpcMetaEvent>();
+    for (const m of grpcMetas) {
+      metaMap.set(m.id, m);
+    }
+
+    const venueMap = new Map<string, TcGrpcVenue>();
+    for (const v of grpcVenues) {
+      venueMap.set(v.id, v);
+    }
+
+    const cityMap = new Map<number, TcGrpcCity>();
+    for (const c of grpcCities) {
+      cityMap.set(c.id, c);
+    }
+
+    // Step 3: Создаём города в БД
+    const seenGeoIds = new Set<number>();
+    for (const ev of grpcEvents) {
+      const venue = venueMap.get(ev.venue);
+      if (!venue) continue;
+      const geoId = venue.city;
+      if (geoId && !seenGeoIds.has(geoId)) {
+        seenGeoIds.add(geoId);
+        const grpcCity = cityMap.get(geoId);
+        const created = await this.ensureCityGrpc(geoId, grpcCity, venue);
+        if (created) newCitiesCreated.push(created);
+      }
+    }
+
+    this.logger.log(`Городов: ${this.cityCache.size}, новых: ${newCitiesCreated.length}`);
+
+    // Step 4: Группируем события по MetaEvent ID
+    const metaGroups = new Map<string, TcGrpcEvent[]>(); // meta ID → events
+    const standaloneEvents: TcGrpcEvent[] = [];
+
+    for (const ev of grpcEvents) {
+      if (ev.meta) {
+        if (!metaGroups.has(ev.meta)) metaGroups.set(ev.meta, []);
+        metaGroups.get(ev.meta)!.push(ev);
+      } else {
+        standaloneEvents.push(ev);
+      }
+    }
+
+    this.logger.log(
+      `Группировка: ${metaGroups.size} MetaEvent-групп + ${standaloneEvents.length} одиночных`,
+    );
+
+    // Step 5: Синхронизируем MetaEvent-группы
+    let uniqueCount = 0;
+    let sessionCount = 0;
+
+    for (const [metaId, events] of metaGroups) {
+      try {
+        const meta = metaMap.get(metaId);
+        const sessions = await this.syncGrpcEventGroup(events, meta, venueMap);
+        uniqueCount++;
+        sessionCount += sessions;
+      } catch (err: any) {
+        errors.push(`[meta:${metaId}]: ${err.message}`);
+        this.logger.warn(`Ошибка MetaEvent ${metaId}: ${err.message}`);
+      }
+    }
+
+    // Step 6: Синхронизируем одиночные события
+    for (const ev of standaloneEvents) {
+      try {
+        const sessions = await this.syncGrpcEventGroup([ev], undefined, venueMap);
+        uniqueCount++;
+        sessionCount += sessions;
+      } catch (err: any) {
+        errors.push(`[event:${ev.id}]: ${err.message}`);
+        this.logger.warn(`Ошибка одиночного события ${ev.id}: ${err.message}`);
+      }
+    }
+
+    this.logger.log(`=== gRPC Sync: ${uniqueCount} событий, ${sessionCount} сессий ===`);
+
+    // Step 7: Retag
+    let retagResult = { eventsProcessed: 0, tagsLinked: 0 };
+    try {
+      retagResult = await this.retagAll();
+      this.logger.log(`Retag: ${retagResult.eventsProcessed} событий, ${retagResult.tagsLinked} тегов`);
+    } catch (err: any) {
+      this.logger.warn(`Retag ошибка (не критично): ${err.message}`);
+      errors.push(`retag: ${err.message}`);
+    }
+
+    return {
+      status: 'ok',
+      mode: 'grpc',
+      tcEventsFound: grpcEvents.length,
+      uniqueEvents: uniqueCount,
+      sessionsSynced: sessionCount,
+      citiesTotal: this.cityCache.size,
+      newCitiesCreated,
+      errors,
+    };
+  }
+
+  /**
+   * Синхронизация группы gRPC Events (общий MetaEvent) → одно наше Event + N сессий.
+   */
+  private async syncGrpcEventGroup(
+    events: TcGrpcEvent[],
+    meta: TcGrpcMetaEvent | undefined,
+    venueMap: Map<string, TcGrpcVenue>,
+  ): Promise<number> {
+    if (events.length === 0) return 0;
+
+    // Сортируем: PUBLIC и с билетами — первые
+    events.sort((a, b) => {
+      if (a.status === 1 && b.status !== 1) return -1; // PUBLIC first
+      if (a.status !== 1 && b.status === 1) return 1;
+      return (b.tickets_amount_vacant || 0) - (a.tickets_amount_vacant || 0);
+    });
+
+    const best = events[0];
+    const tcId = best.id;
+    const tcMetaEventId = meta?.id || null;
+
+    // Заголовок: из MetaEvent (если есть), иначе из лучшего Event
+    const title = (meta?.name || best.name || '').trim();
+    if (!title) return 0;
+
+    // Описание
+    const description = meta?.description || best.description || null;
+
+    // Venue → город
+    const venue = venueMap.get(best.venue);
+    if (!venue) return 0;
+    const geoId = venue.city;
+    const cityId = this.cityCache.get(geoId);
+    if (!cityId) return 0;
+
+    // Медиа
+    const imageUrl = this.findBestGrpcImage(events, meta) || null;
+
+    // Адрес и координаты из venue
+    const address = venue.address || null;
+    const lat = venue.coordinates?.latitude || null;
+    const lng = venue.coordinates?.longitude || null;
+
+    // Категория
+    const category = this.mapCategoryGrpc(best, title, description);
+
+    // Возрастной рейтинг
+    const minAge = this.parseAgeRating(meta?.age_rating || best.age_rating);
+
+    // Длительность из первого события
+    const durationMinutes = this.extractDurationGrpc(best);
+
+    // Минимальная цена из всех событий группы
+    const allPrices: number[] = [];
+    for (const ev of events) {
+      const p = this.extractMinPriceGrpc(ev.sets);
+      if (p) allPrices.push(p);
+    }
+    const priceFrom = allPrices.length > 0 ? Math.min(...allPrices) : null;
+
+    const isActive = events.some((ev) => ev.status === 1); // PUBLIC
+
+    // Ищем существующее событие: сначала по tcMetaEventId, потом по tcEventId, потом по title+city
+    let event = tcMetaEventId
+      ? await this.prisma.event.findFirst({ where: { tcMetaEventId, source: 'TC' } })
+      : null;
+
+    if (!event) {
+      event = await this.prisma.event.findFirst({
+        where: { tcEventId: tcId, source: 'TC' },
+      });
+    }
+
+    if (!event) {
+      // Fallback: по title + cityId (для миграции со старых данных)
+      event = await this.prisma.event.findFirst({
+        where: {
+          cityId,
+          title: { equals: title, mode: 'insensitive' },
+          source: 'TC',
+        },
+      });
+    }
+
+    if (event) {
+      await this.prisma.event.update({
+        where: { id: event.id },
+        data: {
+          tcEventId: tcId,
+          tcMetaEventId,
+          description: description || event.description,
+          category,
+          minAge,
+          durationMinutes:
+            durationMinutes && durationMinutes > 0 && durationMinutes < 2880
+              ? durationMinutes
+              : event.durationMinutes,
+          lat: lat ?? event.lat,
+          lng: lng ?? event.lng,
+          address: address || event.address,
+          imageUrl: imageUrl || event.imageUrl,
+          priceFrom,
+          isActive,
+          tcData: best as any,
+          lastSyncAt: new Date(),
+        },
+      });
+    } else {
+      const slug = await this.generateUniqueSlug(title, tcId);
+      event = await this.prisma.event.create({
+        data: {
+          tcEventId: tcId,
+          tcMetaEventId,
+          cityId,
+          title,
+          slug,
+          description,
+          category,
+          minAge,
+          durationMinutes:
+            durationMinutes && durationMinutes > 0 && durationMinutes < 2880
+              ? durationMinutes
+              : null,
+          lat,
+          lng,
+          address,
+          imageUrl,
+          priceFrom,
+          isActive,
+          tcData: best as any,
+          lastSyncAt: new Date(),
+        },
+      });
+    }
+
+    // Синхронизируем сессии
+    let sessionCount = 0;
+    for (const ev of events) {
+      const ok = await this.syncGrpcSession(event.id, ev);
+      if (ok) sessionCount++;
+    }
+
+    // Синхронизируем теги (из gRPC tag IDs + keyword matching)
+    const allTagIds = new Set<string>();
+    for (const ev of events) {
+      for (const tagId of ev.tags || []) {
+        allTagIds.add(tagId);
+      }
+    }
+    await this.syncTags(event.id, [...allTagIds], title, description || undefined);
+
+    return sessionCount;
+  }
+
+  /**
+   * Создать/обновить сессию из gRPC Event.
+   */
+  private async syncGrpcSession(eventId: string, ev: TcGrpcEvent): Promise<boolean> {
+    const dates = this.parseGrpcLifetime(ev.lifetime);
+    if (!dates.start) return false;
+
+    const tcSessionId = `${ev.id}-main`;
+    const availableTickets = ev.tickets_amount_vacant || 0;
+    const prices = this.extractPricesGrpc(ev.sets);
+    const isActive = ev.status === 1 && availableTickets > 0; // PUBLIC + есть билеты
+
+    await this.prisma.eventSession.upsert({
+      where: { tcSessionId },
+      update: {
+        eventId,
+        startsAt: dates.start,
+        endsAt: dates.finish,
+        availableTickets,
+        prices,
+        isActive,
+      },
+      create: {
+        eventId,
+        tcSessionId,
+        startsAt: dates.start,
+        endsAt: dates.finish,
+        availableTickets,
+        prices,
+        isActive,
+      },
+    });
+
+    return true;
+  }
+
+  // ============================================================
+  // gRPC Города
+  // ============================================================
+
+  private async ensureCityGrpc(
+    geoId: number,
+    grpcCity: TcGrpcCity | undefined,
+    venue: TcGrpcVenue,
+  ): Promise<string | null> {
+    if (this.cityCache.has(geoId)) return null;
+
+    let slug = this.CITY_MAP[geoId] || null;
+    const cityName = grpcCity?.name || `City-${geoId}`;
+
+    if (!slug) {
+      slug = this.transliterate(cityName).slice(0, 60) || `city-${geoId}`;
+    }
+
+    let city = await this.prisma.city.findUnique({ where: { slug } });
+    if (!city) {
+      city = await this.prisma.city.findFirst({
+        where: { name: { equals: cityName, mode: 'insensitive' } },
+      });
+    }
+
+    if (city) {
+      this.cityCache.set(geoId, city.id);
+      return null;
+    }
+
+    const timezone = grpcCity?.timezone || 'Europe/Moscow';
+    const lat = grpcCity?.coordinates?.latitude || venue.coordinates?.latitude || null;
+    const lng = grpcCity?.coordinates?.longitude || venue.coordinates?.longitude || null;
+
+    try {
+      city = await this.prisma.city.create({
+        data: {
+          slug,
+          name: cityName,
+          timezone,
+          lat: lat ?? null,
+          lng: lng ?? null,
+          isActive: true,
+        },
+      });
+      this.cityCache.set(geoId, city.id);
+      this.logger.log(`+ Город (gRPC): ${cityName} (${slug})`);
+      return slug;
+    } catch {
+      const fallbackSlug = `${slug}-${geoId}`;
+      city = await this.prisma.city.create({
+        data: {
+          slug: fallbackSlug,
+          name: cityName,
+          timezone,
+          lat: lat ?? null,
+          lng: lng ?? null,
+          isActive: true,
+        },
+      });
+      this.cityCache.set(geoId, city.id);
+      return fallbackSlug;
+    }
+  }
+
+  // ============================================================
+  // gRPC Хелперы
+  // ============================================================
+
+  /** Парсинг protobuf Lifetime → Date */
+  private parseGrpcLifetime(
+    lifetime?: { start?: { seconds: string | number }; finish?: { seconds: string | number } },
+  ): { start: Date | null; finish: Date | null } {
+    if (!lifetime) return { start: null, finish: null };
+
+    const start = lifetime.start?.seconds
+      ? new Date(Number(lifetime.start.seconds) * 1000)
+      : null;
+    const finish = lifetime.finish?.seconds
+      ? new Date(Number(lifetime.finish.seconds) * 1000)
+      : null;
+
+    return { start, finish };
+  }
+
+  /** Длительность из gRPC Event */
+  private extractDurationGrpc(ev: TcGrpcEvent): number | null {
+    const dates = this.parseGrpcLifetime(ev.lifetime);
+    if (dates.start && dates.finish) {
+      const min = Math.round((dates.finish.getTime() - dates.start.getTime()) / 60000);
+      return min > 0 && min < 2880 ? min : null;
+    }
+    return null;
+  }
+
+  /** Минимальная цена из gRPC TicketSets (в копейках) */
+  private extractMinPriceGrpc(sets: TcGrpcTicketSet[]): number | null {
+    if (!sets?.length) return null;
+    const prices: number[] = [];
+    for (const set of sets) {
+      for (const rule of set.rules || []) {
+        if (rule.simple?.price) {
+          const p = Number(rule.simple.price);
+          if (p > 0) prices.push(p); // gRPC цены в копейках уже
+        }
+      }
+    }
+    return prices.length > 0 ? Math.min(...prices) : null;
+  }
+
+  /** Цены из gRPC TicketSets → JSON для EventSession.prices */
+  private extractPricesGrpc(sets: TcGrpcTicketSet[]): any[] {
+    if (!sets?.length) return [];
+    return sets
+      .map((set) => {
+        // Берём текущее правило (последнее активное)
+        let priceCopecks = 0;
+        for (const rule of set.rules || []) {
+          if (rule.simple?.price) {
+            priceCopecks = Number(rule.simple.price);
+          }
+        }
+        return {
+          setId: set.id,
+          name: set.name || 'standard',
+          price: priceCopecks,
+          priceOrg: 0,
+          priceExtra: 0,
+          amount: set.amount || 0,
+          amountVacant: set.amount_vacant || 0,
+          withSeats: set.with_seats || false,
+        };
+      })
+      .filter((p) => p.price > 0);
+  }
+
+  /** Лучшее изображение из группы gRPC events */
+  private findBestGrpcImage(events: TcGrpcEvent[], meta?: TcGrpcMetaEvent): string | null {
+    // Сначала обложка из MetaEvent
+    if (meta?.media) {
+      const url = meta.media.cover_original || meta.media.cover || meta.media.cover_small;
+      if (url) return url;
+    }
+    // Потом из событий
+    for (const ev of events) {
+      const url = ev.media?.cover_original || ev.media?.cover || ev.media?.cover_small;
+      if (url) return url;
+    }
+    return null;
+  }
+
+  /** Категория из gRPC Event */
+  private mapCategoryGrpc(ev: TcGrpcEvent, title: string, description: string | null): EventCategory {
+    const text = `${title} ${description || ''}`.toLowerCase();
+
+    const museumWords = ['музей', 'музеи', 'выставк', 'галерея', 'gallery', 'exhibition', 'museum'];
+    if (museumWords.some((w) => text.includes(w))) return EventCategory.MUSEUM;
+
+    const excursionWords = ['экскурси', 'excursion', 'тур', 'tour', 'прогулк', 'walk', 'квест', 'quest'];
+    if (excursionWords.some((w) => text.includes(w))) return EventCategory.EXCURSION;
+
+    return EventCategory.EVENT;
+  }
+
+  /** Парсинг возрастного рейтинга */
+  private parseAgeRating(rating: string | undefined): number {
+    if (!rating) return 0;
+    const match = rating.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
+  }
+
+  // ============================================================
+  // REST v1 Sync (legacy fallback)
+  // ============================================================
+
+  private async syncAllRest(): Promise<{
+    status: string;
+    mode: string;
+    tcEventsFound: number;
+    uniqueEvents: number;
+    sessionsSynced: number;
+    citiesTotal: number;
+    newCitiesCreated: string[];
+    errors: string[];
+  }> {
+    this.logger.log('=== Синхронизация через REST v1 (fallback) ===');
+    const errors: string[] = [];
+    const newCitiesCreated: string[] = [];
+    this.cityCache.clear();
+
     let allTcEvents: any[] = [];
     try {
       allTcEvents = await this.tcApi.getEvents();
@@ -82,6 +628,7 @@ export class TcSyncService {
       this.logger.error(`Ошибка загрузки: ${err.message}`);
       return {
         status: 'error',
+        mode: 'rest',
         tcEventsFound: 0,
         uniqueEvents: 0,
         sessionsSynced: 0,
@@ -94,6 +641,7 @@ export class TcSyncService {
     if (allTcEvents.length === 0) {
       return {
         status: 'empty',
+        mode: 'rest',
         tcEventsFound: 0,
         uniqueEvents: 0,
         sessionsSynced: 0,
@@ -103,7 +651,7 @@ export class TcSyncService {
       };
     }
 
-    // Step 2: Создаём недостающие города
+    // Создаём недостающие города
     const seenGeoIds = new Set<number>();
     for (const ev of allTcEvents) {
       const geoId = ev?.venue?.city?.id;
@@ -114,9 +662,7 @@ export class TcSyncService {
       }
     }
 
-    this.logger.log(`Городов: ${this.cityCache.size}, новых: ${newCitiesCreated.length}`);
-
-    // Step 3: Группируем TC-events по (normalizedTitle, cityGeoId)
+    // Группируем по title + cityGeoId
     const groups = new Map<string, any[]>();
     for (const tc of allTcEvents) {
       const title = tc.title?.text?.trim() || '';
@@ -129,11 +675,6 @@ export class TcSyncService {
       groups.get(key)!.push(tc);
     }
 
-    this.logger.log(
-      `Группировка: ${allTcEvents.length} TC-записей → ${groups.size} уникальных событий`,
-    );
-
-    // Step 4: Синхронизируем каждую группу
     let uniqueCount = 0;
     let sessionCount = 0;
 
@@ -144,28 +685,19 @@ export class TcSyncService {
         sessionCount += sessions;
       } catch (err: any) {
         errors.push(`[${key}]: ${err.message}`);
-        this.logger.warn(`Ошибка группы ${key}: ${err.message}`);
       }
     }
 
-    this.logger.log(
-      `=== Синхронизация: ${uniqueCount} событий, ${sessionCount} сессий ===`,
-    );
-
-    // Step 5: Автоматический retag — привязываем теги ко всем событиям
-    let retagResult = { eventsProcessed: 0, tagsLinked: 0 };
+    // Retag
     try {
-      retagResult = await this.retagAll();
-      this.logger.log(
-        `=== Retag: ${retagResult.eventsProcessed} событий, ${retagResult.tagsLinked} тегов ===`,
-      );
+      await this.retagAll();
     } catch (err: any) {
-      this.logger.warn(`Retag ошибка (не критично): ${err.message}`);
       errors.push(`retag: ${err.message}`);
     }
 
     return {
       status: 'ok',
+      mode: 'rest',
       tcEventsFound: allTcEvents.length,
       uniqueEvents: uniqueCount,
       sessionsSynced: sessionCount,
@@ -175,10 +707,12 @@ export class TcSyncService {
     };
   }
 
+  // ============================================================
+  // REST v1 Legacy методы (сохранены для fallback)
+  // ============================================================
+
   /**
-   * Дедупликация: удаляет дубли из БД прямо сейчас.
-   * Для каждой группы (title + cityId) оставляет одно мастер-событие,
-   * переносит сессии из дублей в мастер, удаляет дубли.
+   * Дедупликация существующих событий в БД.
    */
   async deduplicateExisting(): Promise<{
     groupsProcessed: number;
@@ -187,14 +721,12 @@ export class TcSyncService {
   }> {
     this.logger.log('=== Запуск дедупликации существующих событий ===');
 
-    // Находим все события, группируем по нормализованному title + cityId
     const allEvents = await this.prisma.event.findMany({
       where: { isActive: true },
       select: { id: true, title: true, cityId: true, rating: true, reviewCount: true },
       orderBy: [{ rating: 'desc' }, { reviewCount: 'desc' }],
     });
 
-    // Группируем по нормализованному названию + cityId
     const normalizedGroups = new Map<string, typeof allEvents>();
     for (const ev of allEvents) {
       const key = `${this.normalizeTitle(ev.title)}:::${ev.cityId}`;
@@ -202,12 +734,9 @@ export class TcSyncService {
       normalizedGroups.get(key)!.push(ev);
     }
 
-    // Фильтруем только группы с дублями
     const dupeGroups = [...normalizedGroups.entries()]
       .filter(([, events]) => events.length > 1)
       .map(([key, events]) => ({ key, events }));
-
-    this.logger.log(`Найдено ${dupeGroups.length} групп дублей (с нормализацией эмодзи)`);
 
     this.logger.log(`Найдено ${dupeGroups.length} групп дублей`);
 
@@ -216,72 +745,43 @@ export class TcSyncService {
     let sessionsMerged = 0;
 
     for (const group of dupeGroups) {
-      // Загружаем полные данные для группы
       const eventIds = group.events.map((e) => e.id);
       const events = await this.prisma.event.findMany({
         where: { id: { in: eventIds } },
-        include: {
-          sessions: true,
-          tags: true,
-        },
+        include: { sessions: true, tags: true },
         orderBy: [{ rating: 'desc' }, { reviewCount: 'desc' }],
       });
 
       if (events.length <= 1) continue;
 
-      const master = events[0]; // лучший по рейтингу
+      const master = events[0];
       const duplicates = events.slice(1);
 
-      // Переносим сессии из дублей в мастер
       for (const dupe of duplicates) {
-        // Переносим сессии
         for (const session of dupe.sessions) {
-          // Проверяем: нет ли уже сессии с таким tcSessionId у мастера
-          const existingSession = await this.prisma.eventSession.findUnique({
-            where: { tcSessionId: session.tcSessionId },
+          await this.prisma.eventSession.update({
+            where: { id: session.id },
+            data: { eventId: master.id },
           });
-          if (existingSession) {
-            // Обновляем eventId на мастер
-            await this.prisma.eventSession.update({
-              where: { id: session.id },
-              data: { eventId: master.id },
-            });
-          } else {
-            await this.prisma.eventSession.update({
-              where: { id: session.id },
-              data: { eventId: master.id },
-            });
-          }
           sessionsMerged++;
         }
 
-        // Переносим теги
         for (const et of dupe.tags) {
           await this.prisma.eventTag
             .upsert({
-              where: {
-                eventId_tagId: { eventId: master.id, tagId: et.tagId },
-              },
+              where: { eventId_tagId: { eventId: master.id, tagId: et.tagId } },
               update: {},
               create: { eventId: master.id, tagId: et.tagId },
             })
             .catch(() => {});
         }
 
-        // Удаляем связи дубля
-        await this.prisma.eventTag.deleteMany({
-          where: { eventId: dupe.id },
-        });
-        await this.prisma.articleEvent.deleteMany({
-          where: { eventId: dupe.id },
-        });
-
-        // Удаляем дубль
+        await this.prisma.eventTag.deleteMany({ where: { eventId: dupe.id } });
+        await this.prisma.articleEvent.deleteMany({ where: { eventId: dupe.id } });
         await this.prisma.event.delete({ where: { id: dupe.id } });
         duplicatesRemoved++;
       }
 
-      // Обновляем мастер: пересчитываем priceFrom
       const allSessions = await this.prisma.eventSession.findMany({
         where: { eventId: master.id },
       });
@@ -295,7 +795,6 @@ export class TcSyncService {
         where: { id: master.id },
         data: {
           priceFrom: minPrice,
-          // Убедимся что slug чистый (без суффикса)
           slug: await this.getCleanSlug(master.title, master.id),
         },
       });
@@ -304,24 +803,15 @@ export class TcSyncService {
     }
 
     this.logger.log(
-      `Дедупликация: ${groupsProcessed} групп, удалено ${duplicatesRemoved} дублей, перенесено ${sessionsMerged} сессий`,
+      `Дедупликация: ${groupsProcessed} групп, ${duplicatesRemoved} дублей удалено, ${sessionsMerged} сессий перенесено`,
     );
-
     return { groupsProcessed, duplicatesRemoved, sessionsMerged };
   }
 
-  // ============================
-  // Sync с дедупликацией
-  // ============================
-
-  /**
-   * Синхронизация группы TC-events как одного нашего Event + N сессий.
-   * Возвращает количество созданных/обновлённых сессий.
-   */
+  /** REST v1: синхронизация группы TC events */
   private async syncEventGroup(tcEvents: any[]): Promise<number> {
     if (tcEvents.length === 0) return 0;
 
-    // Сортируем: больше всего билетов, публичные первые
     tcEvents.sort((a, b) => {
       const aVacant = a.tickets_amount_vacant || 0;
       const bVacant = b.tickets_amount_vacant || 0;
@@ -330,19 +820,17 @@ export class TcSyncService {
       return bVacant - aVacant;
     });
 
-    const best = tcEvents[0]; // лучший TC event для данных мастер-записи
+    const best = tcEvents[0];
     const tcId = String(best.id);
     const title = best.title?.text?.trim() || '';
     const description = best.title?.desc || null;
     const category = this.mapCategory(best);
-    const minAge =
-      typeof best.age_rating === 'number' ? best.age_rating : 0;
+    const minAge = typeof best.age_rating === 'number' ? best.age_rating : 0;
 
     const cityGeoId = best?.venue?.city?.id;
     const cityId = this.cityCache.get(cityGeoId);
     if (!cityId) return 0;
 
-    // Медиа — берём первую не-null обложку
     const imageUrl =
       this.findBestImage(tcEvents) ||
       best.media?.cover_original?.url ||
@@ -354,7 +842,6 @@ export class TcSyncService {
     const lng = coords?.[0] || null;
     const lat = coords?.[1] || null;
 
-    // Минимальная цена из ВСЕХ TC events в группе
     const allPrices: number[] = [];
     for (const tc of tcEvents) {
       const p = this.extractMinPrice(tc.sets);
@@ -365,20 +852,15 @@ export class TcSyncService {
     const durationMinutes = this.extractDuration(best);
     const isActive = tcEvents.some((tc) => tc.status === 'public');
 
-    // Ищем существующее событие: по title + cityId (дедупликация)
     let event = await this.prisma.event.findFirst({
-      where: {
-        cityId,
-        title: { equals: title, mode: 'insensitive' },
-      },
+      where: { cityId, title: { equals: title, mode: 'insensitive' } },
     });
 
     if (event) {
-      // Обновляем мастер
       await this.prisma.event.update({
         where: { id: event.id },
         data: {
-          tcEventId: tcId, // обновляем на лучший TC ID
+          tcEventId: tcId,
           description: description || event.description,
           category,
           minAge,
@@ -397,7 +879,6 @@ export class TcSyncService {
         },
       });
     } else {
-      // Создаём новое событие
       const slug = await this.generateUniqueSlug(title, tcId);
       event = await this.prisma.event.create({
         data: {
@@ -424,14 +905,12 @@ export class TcSyncService {
       });
     }
 
-    // Синхронизируем сессии — одна на каждый TC event
     let sessionCount = 0;
     for (const tc of tcEvents) {
       const ok = await this.syncSession(event.id, tc);
       if (ok) sessionCount++;
     }
 
-    // Синхронизируем теги из всех TC events
     const allTags = new Set<string>();
     for (const tc of tcEvents) {
       for (const tag of tc.tags || []) {
@@ -443,10 +922,7 @@ export class TcSyncService {
     return sessionCount;
   }
 
-  /**
-   * Создать/обновить сессию для события.
-   * Каждый TC event ID → одна сессия.
-   */
+  /** REST v1: сессия */
   private async syncSession(eventId: string, tc: any): Promise<boolean> {
     const tcId = String(tc.id);
     const dates = this.parseVevent(tc.lifetime);
@@ -459,33 +935,17 @@ export class TcSyncService {
 
     await this.prisma.eventSession.upsert({
       where: { tcSessionId },
-      update: {
-        eventId, // важно: может быть перенесена от дубля
-        startsAt: dates.start,
-        endsAt: dates.finish,
-        availableTickets,
-        prices,
-        isActive,
-      },
-      create: {
-        eventId,
-        tcSessionId,
-        startsAt: dates.start,
-        endsAt: dates.finish,
-        availableTickets,
-        prices,
-        isActive,
-      },
+      update: { eventId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices, isActive },
+      create: { eventId, tcSessionId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices, isActive },
     });
 
     return true;
   }
 
-  /**
-   * Маппинг TC-тегов на наши слаги.
-   * TC присылает: Детям, Кино, Концерты, Музеи, Театры, Шоу, Экскурсии.
-   * Наши теги: belye-nochi, gastro, diskoteka, s-detmi, и т.д.
-   */
+  // ============================================================
+  // Общие методы (используются обоими режимами)
+  // ============================================================
+
   private static readonly TC_TAG_MAP: Record<string, string[]> = {
     'детям': ['s-detmi'],
     'шоу': ['shou-programma'],
@@ -496,9 +956,6 @@ export class TcSyncService {
     'кино': [],
   };
 
-  /**
-   * Ключевые слова в названии/описании → наши теги (slug).
-   */
   private static readonly KEYWORD_TAG_MAP: Record<string, string[]> = {
     'теплоход': ['panoramnyi'],
     'прогулка по неве': ['panoramnyi'],
@@ -548,7 +1005,6 @@ export class TcSyncService {
     'бестселлер': ['hit-prodazh'],
     'новинк': ['novinka'],
     'премьер': ['novinka'],
-    // Лендинги
     'развод мостов': ['nochnye-mosty', 'nochnye'],
     'разводные мосты': ['nochnye-mosty', 'nochnye'],
     'развод': ['nochnye-mosty'],
@@ -565,7 +1021,6 @@ export class TcSyncService {
     'куршск': ['kurshskaya-kosa'],
     'коса': ['kurshskaya-kosa'],
     'танцующий лес': ['kurshskaya-kosa'],
-    // Нижний Новгород
     'стрелка': ['progulki-volga-nn'],
     'волга': ['progulki-volga-nn'],
     'ока': ['progulki-volga-nn'],
@@ -575,15 +1030,9 @@ export class TcSyncService {
     'бор': ['kanatka-nn'],
   };
 
-  /**
-   * Связать теги с событием.
-   * 1. Прямой маппинг TC-тегов → наши теги
-   * 2. Поиск ключевых слов в названии/описании → наши теги
-   */
   private async syncTags(eventId: string, tagNames: string[], title?: string, description?: string): Promise<void> {
     const slugsToLink = new Set<string>();
 
-    // 1. Маппинг TC-тегов
     for (const tcTag of tagNames || []) {
       const mapped = TcSyncService.TC_TAG_MAP[tcTag.toLowerCase()];
       if (mapped) {
@@ -591,7 +1040,6 @@ export class TcSyncService {
       }
     }
 
-    // 2. Ключевые слова в названии и описании
     const text = `${title || ''} ${description || ''}`.toLowerCase();
     for (const [keyword, slugs] of Object.entries(TcSyncService.KEYWORD_TAG_MAP)) {
       if (text.includes(keyword)) {
@@ -601,12 +1049,8 @@ export class TcSyncService {
 
     if (slugsToLink.size === 0) return;
 
-    // Находим теги по slug и привязываем
     for (const slug of slugsToLink) {
-      const tag = await this.prisma.tag.findFirst({
-        where: { slug, isActive: true },
-      });
-
+      const tag = await this.prisma.tag.findFirst({ where: { slug, isActive: true } });
       if (tag) {
         await this.prisma.eventTag
           .upsert({
@@ -619,10 +1063,6 @@ export class TcSyncService {
     }
   }
 
-  /**
-   * Пересвязать теги для всех существующих событий
-   * на основе маппинга TC-тегов и ключевых слов.
-   */
   async retagAll(): Promise<{ eventsProcessed: number; tagsLinked: number }> {
     this.logger.log('=== RETAG: пересвязываю теги для всех событий ===');
 
@@ -645,14 +1085,11 @@ export class TcSyncService {
     return { eventsProcessed: events.length, tagsLinked };
   }
 
-  // ============================
-  // Города
-  // ============================
+  // ============================================================
+  // REST v1 Города (legacy)
+  // ============================================================
 
-  private async ensureCity(
-    geoId: number,
-    sampleEvent: any,
-  ): Promise<string | null> {
+  private async ensureCity(geoId: number, sampleEvent: any): Promise<string | null> {
     if (this.cityCache.has(geoId)) return null;
 
     let slug = this.CITY_MAP[geoId] || null;
@@ -680,14 +1117,7 @@ export class TcSyncService {
 
     try {
       city = await this.prisma.city.create({
-        data: {
-          slug,
-          name: cityName,
-          timezone,
-          lat: coords?.[1] || null,
-          lng: coords?.[0] || null,
-          isActive: true,
-        },
+        data: { slug, name: cityName, timezone, lat: coords?.[1] || null, lng: coords?.[0] || null, isActive: true },
       });
       this.cityCache.set(geoId, city.id);
       this.logger.log(`+ Город: ${cityName} (${slug})`);
@@ -695,95 +1125,61 @@ export class TcSyncService {
     } catch {
       const fallbackSlug = `${slug}-${geoId}`;
       city = await this.prisma.city.create({
-        data: {
-          slug: fallbackSlug,
-          name: cityName,
-          timezone,
-          lat: coords?.[1] || null,
-          lng: coords?.[0] || null,
-          isActive: true,
-        },
+        data: { slug: fallbackSlug, name: cityName, timezone, lat: coords?.[1] || null, lng: coords?.[0] || null, isActive: true },
       });
       this.cityCache.set(geoId, city.id);
       return fallbackSlug;
     }
   }
 
-  // ============================
-  // Парсеры и хелперы
-  // ============================
+  // ============================================================
+  // Общие хелперы
+  // ============================================================
 
-  /** Нормализация названия для группировки */
   private normalizeTitle(title: string): string {
     return title
-      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // убрать эмодзи
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
       .replace(/[🔞🌐🎭🎪🎉🎊🎶🎵🎤🎬🎨🎭🏛️🚶]/g, '')
       .trim()
       .toLowerCase();
   }
 
-  /** Найти лучшее изображение из группы TC events */
   private findBestImage(tcEvents: any[]): string | null {
     for (const tc of tcEvents) {
-      const url =
-        tc.media?.cover_original?.url ||
-        tc.media?.cover?.url ||
-        tc.media?.cover_small?.url;
+      const url = tc.media?.cover_original?.url || tc.media?.cover?.url || tc.media?.cover_small?.url;
       if (url) return url;
     }
     return null;
   }
 
-  /** Извлечь длительность из VEVENT */
   private extractDuration(tc: any): number | null {
     const dates = this.parseVevent(tc.lifetime);
     if (dates.start && dates.finish) {
-      const min = Math.round(
-        (dates.finish.getTime() - dates.start.getTime()) / 60000,
-      );
+      const min = Math.round((dates.finish.getTime() - dates.start.getTime()) / 60000);
       return min > 0 && min < 2880 ? min : null;
     }
     return null;
   }
 
-  /** Получить «чистый» slug без суффикса TC ID */
-  private async getCleanSlug(
-    title: string,
-    currentEventId: string,
-  ): Promise<string> {
+  private async getCleanSlug(title: string, currentEventId: string): Promise<string> {
     const base = this.transliterate(title).slice(0, 80) || 'event';
-    const existing = await this.prisma.event.findUnique({
-      where: { slug: base },
-    });
+    const existing = await this.prisma.event.findUnique({ where: { slug: base } });
     if (!existing || existing.id === currentEventId) return base;
-    // Slug занят другим событием — оставляем как есть
-    const current = await this.prisma.event.findUnique({
-      where: { id: currentEventId },
-    });
+    const current = await this.prisma.event.findUnique({ where: { id: currentEventId } });
     return current?.slug || base;
   }
 
-  private parseVevent(
-    vevent: string | null,
-  ): { start: Date | null; finish: Date | null } {
+  private parseVevent(vevent: string | null): { start: Date | null; finish: Date | null } {
     if (!vevent) return { start: null, finish: null };
     let start: Date | null = null;
     let finish: Date | null = null;
-    const startMatch = vevent.match(
-      /DTSTART[^:]*:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?/,
-    );
+    const startMatch = vevent.match(/DTSTART[^:]*:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?/);
     if (startMatch) {
-      start = new Date(
-        `${startMatch[1]}-${startMatch[2]}-${startMatch[3]}T${startMatch[4]}:${startMatch[5]}:${startMatch[6]}Z`,
-      );
+      start = new Date(`${startMatch[1]}-${startMatch[2]}-${startMatch[3]}T${startMatch[4]}:${startMatch[5]}:${startMatch[6]}Z`);
     }
-    const endMatch = vevent.match(
-      /DTEND[^:]*:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?/,
-    );
+    const endMatch = vevent.match(/DTEND[^:]*:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?/);
     if (endMatch) {
-      finish = new Date(
-        `${endMatch[1]}-${endMatch[2]}-${endMatch[3]}T${endMatch[4]}:${endMatch[5]}:${endMatch[6]}Z`,
-      );
+      finish = new Date(`${endMatch[1]}-${endMatch[2]}-${endMatch[3]}T${endMatch[4]}:${endMatch[5]}:${endMatch[6]}Z`);
     }
     return { start, finish };
   }
@@ -794,16 +1190,11 @@ export class TcSyncService {
     const desc = String(tc.title?.desc || '').toLowerCase();
     const text = `${title} ${desc} ${tags.join(' ')}`;
 
-    const museumWords = [
-      'музей', 'музеи', 'выставк', 'галерея', 'gallery', 'exhibition', 'museum',
-    ];
+    const museumWords = ['музей', 'музеи', 'выставк', 'галерея', 'gallery', 'exhibition', 'museum'];
     if (museumWords.some((w) => text.includes(w))) return EventCategory.MUSEUM;
 
-    const excursionWords = [
-      'экскурси', 'excursion', 'тур', 'tour', 'прогулк', 'walk', 'квест', 'quest',
-    ];
-    if (excursionWords.some((w) => text.includes(w)))
-      return EventCategory.EXCURSION;
+    const excursionWords = ['экскурси', 'excursion', 'тур', 'tour', 'прогулк', 'walk', 'квест', 'quest'];
+    if (excursionWords.some((w) => text.includes(w))) return EventCategory.EXCURSION;
 
     return EventCategory.EVENT;
   }
@@ -837,15 +1228,9 @@ export class TcSyncService {
         let priceExtra = 0;
         const currentRule = set.rules?.find((r: any) => r.current);
         if (currentRule) {
-          priceCopecks = Math.round(
-            parseFloat(currentRule.price || '0') * 100,
-          );
-          priceOrg = Math.round(
-            parseFloat(currentRule.price_org || '0') * 100,
-          );
-          priceExtra = Math.round(
-            parseFloat(currentRule.price_extra || '0') * 100,
-          );
+          priceCopecks = Math.round(parseFloat(currentRule.price || '0') * 100);
+          priceOrg = Math.round(parseFloat(currentRule.price_org || '0') * 100);
+          priceExtra = Math.round(parseFloat(currentRule.price_extra || '0') * 100);
         } else if (set.price) {
           priceCopecks = Math.round(parseFloat(set.price) * 100);
         }
@@ -869,20 +1254,12 @@ export class TcSyncService {
     return tcCity.name.ru || tcCity.name.default || tcCity.name.en || 'unknown';
   }
 
-  private async generateUniqueSlug(
-    title: string,
-    fallbackId: string,
-  ): Promise<string> {
-    const base =
-      this.transliterate(title).slice(0, 80) || `event-${fallbackId.slice(-8)}`;
-    const existing = await this.prisma.event.findUnique({
-      where: { slug: base },
-    });
+  private async generateUniqueSlug(title: string, fallbackId: string): Promise<string> {
+    const base = this.transliterate(title).slice(0, 80) || `event-${fallbackId.slice(-8)}`;
+    const existing = await this.prisma.event.findUnique({ where: { slug: base } });
     if (!existing) return base;
     const slug8 = `${base.slice(0, 70)}-${fallbackId.slice(-8)}`;
-    const existing2 = await this.prisma.event.findUnique({
-      where: { slug: slug8 },
-    });
+    const existing2 = await this.prisma.event.findUnique({ where: { slug: slug8 } });
     if (!existing2) return slug8;
     return `${base.slice(0, 56)}-${fallbackId}`;
   }

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package v2;
+
+message ArtistsRequest {
+ repeated string ids = 1; // фильтр по id артиста
+}
+
+message Artist {
+ string id = 1; // id артиста
+ string name = 2; // название артиста
+}

@@ -592,4 +592,218 @@
 
 ---
 
+## 2026-02-11 — Админ-панель: полная реализация
+
+### Наблюдения
+- В проекте не было ни одного auth-модуля, CRUD-контроллера для админки, ни frontend-admin пакета.
+- 14 моделей Prisma — ни одна не имела полного CRUD через API.
+- Для solo-использования достаточно JWT без ролей.
+
+### Решения
+
+**Backend (NestJS):**
+1. Модель `AdminUser` (email, passwordHash, name, lastLoginAt) + миграция.
+2. `AuthModule`: JWT + bcrypt, 3 endpoint'а (login, refresh, me).
+3. `JwtAuthGuard` — декоратор на все `/admin/*` маршруты.
+4. 9 admin-контроллеров:
+   - `AdminDashboardController` — агрегированная статистика (события, заказы, выручка за 30 дн).
+   - `AdminCitiesController` — list + get + update (без create/delete — города из sync).
+   - `AdminEventsController` — list с 6 фильтрами + get + update (whitelist полей для override).
+   - `AdminTagsController` — полный CRUD.
+   - `AdminLandingsController` — полный CRUD.
+   - `AdminCombosController` — полный CRUD.
+   - `AdminArticlesController` — полный CRUD с пагинацией.
+   - `AdminOrdersController` — list + get + безопасные переходы статуса.
+   - `AdminSettingsController` — sync status + cache invalidation.
+5. CORS обновлён для поддержки нескольких origin (через запятую).
+6. Seed: admin user создаётся из `ADMIN_INITIAL_EMAIL` / `ADMIN_INITIAL_PASSWORD`.
+
+**Frontend-admin (Vite + React 19 + Tailwind + React Router 7):**
+1. Новый пакет `packages/frontend-admin/` — полностью отдельный от Next.js.
+2. API client с auto-refresh JWT и redirect на login при 401.
+3. Layout: sidebar с 9 навигационными пунктами + header с logout.
+4. Login page с формой и error handling.
+5. Dashboard с 8 stat cards (события, города, лендинги, combo, теги, статьи, заказы, выручка).
+6. 16 страниц: EventsList, EventEdit, CitiesList, CityEdit, TagsList, TagEdit, LandingsList, LandingEdit, CombosList, ComboEdit, ArticlesList, ArticleEdit, OrdersList, OrderDetail, Settings.
+7. Reusable компоненты: DataTable, Badge.
+8. JSON-поля (FAQ, reviews, features) — textarea с pretty-print.
+9. Vite proxy `/api` → `localhost:4000` для dev.
+
+### Проблемы
+- `bcrypt` требует `pnpm approve-builds` — обошли через `pnpm rebuild bcrypt`.
+- DTO-поля без `!` вызывали TS2564 — исправлено добавлением definite assignment assertion.
+- `import.meta.env` требовал `vite-env.d.ts` — добавлен.
+
+---
+
+---
+
+## 2026-02-11 — Admin Panel Hardening Refactor
+
+### Наблюдения
+Первая версия админки была функциональной, но архитектурно хрупкой: нет ролей, нет аудита, Event редактируется напрямую (sync затрёт), upsells/pricing захардкожены, JSON без схем, нет optimistic locking. Принято решение провести полный рефакторинг до накопления технического долга.
+
+### Решения
+
+**Prisma Schema (одна большая миграция):**
+- `AdminRole` enum (ADMIN | EDITOR | VIEWER) + поля `role`, `isActive`, `refreshTokenHash` в AdminUser
+- `AuditLog` — кто/что/когда/before/after JSON
+- `EventOverride` — правки поверх sync-данных (title, description, imageUrl, isHidden, manualRating, tagsAdd/Remove)
+- `PricingConfig` (singleton) — serviceFee, peakMarkup, lastMinute, tcCommission, peakRanges из БД
+- `UpsellItem` — upsells из БД вместо hardcoded массива
+- `OpsStatus` (singleton) — lastFullSyncAt, lastRetagAt, lastPopulateAt и т.д.
+- `version Int @default(0)` на City, Tag, LandingPage, ComboPage, Article
+- `isDeleted Boolean @default(false)` + `deletedAt` на Tag, LandingPage, ComboPage, Article
+
+**Auth Hardening:**
+- Access token 15min (было 24h), refresh token 30d в HttpOnly cookie (было localStorage)
+- `refreshTokenHash` в БД — при logout инвалидируется
+- Ротация refresh token при каждом /refresh
+- `RolesGuard` + `@Roles('ADMIN')` decorator — RBAC на контроллерах
+- isActive проверка в JwtStrategy — деактивированные аккаунты отсекаются
+
+**Audit Log:**
+- `AuditService.log()` — userId, action (CREATE|UPDATE|DELETE), entity, entityId, before/after JSON
+- `AuditInterceptor` — автоматически логирует POST/PATCH/DELETE на /admin/*
+- `AdminAuditController GET /admin/audit` — фильтрация по entity, userId, action, пагинация
+- Frontend: страница Аудит с таблицей, фильтрами и раскрывающимися деталями
+
+**Optimistic Locking + Transactions:**
+- Все PATCH контроллеры проверяют `version` через `updateMany({ where: { id, version } })`
+- ConflictException при несовпадении — "Данные были изменены другим пользователем"
+- Landing/Combo/Article сохраняются через `$transaction` с записью аудита
+- PUT → PATCH во всех мутирующих эндпоинтах
+- Soft delete (isDeleted + deletedAt) вместо hard delete для Tag, Landing, Combo, Article
+
+**EventOverride (вместо прямого редактирования Event):**
+- `EventOverrideService` — upsert/remove/toggleHidden/applyOverrides
+- `CatalogService` — при чтении событий мержит overrides, фильтрует isHidden
+- Admin: `PATCH /admin/events/:id/override`, `DELETE /admin/events/:id/override`, `PATCH /admin/events/:id/hide`
+
+**PricingConfig + UpsellItem в БД:**
+- `PricingService` читает конфигурацию из PricingConfig вместо env/hardcode
+- Кэширует в Redis (TTL 5min)
+- `getUpsells()` читает из UpsellItem таблицы
+- Admin: `GET/PATCH /admin/settings/pricing`, CRUD `/admin/upsells`
+- Seed перенёс все hardcoded upsells в базу
+
+**JSON Validation (Zod):**
+- `json-schemas.ts` — схемы для FAQ, Reviews, Stats, RelatedLinks, HowToChoose, InfoBlocks, Features, CuratedEvents, Includes, PeakRanges
+- `validateJson()` хелпер с человекочитаемыми ошибками
+- Валидация в LandingsController и CombosController перед save → BadRequestException
+- Frontend: `<JsonEditor>` компонент с подсветкой ошибок и prettify
+
+**Ops Controls:**
+- `POST /admin/ops/sync/full|incremental|retag|populate-combos|cache/flush`
+- `GET /admin/ops/status` — OpsStatus из БД
+- `PATCH /admin/settings/pricing` — конфигурация цен
+- Frontend: Settings page с кнопками управления, статусами операций, формой pricing
+
+**Frontend Admin обновления:**
+- Auth: access token в localStorage (short-lived 15min), refresh через HttpOnly cookie
+- `credentials: 'include'` на всех fetch
+- Logout через POST /auth/logout + clear cookie
+- Sidebar: добавлены Upsells и Аудит
+- API client: добавлен `patch()` метод
+- Новые страницы: AuditLog, UpsellsList, UpsellEdit
+
+### Проблемы
+- `cookie-parser` import: `import * as` не работает с ESM-совместимым модулем — использован default import.
+- `ZodError.errors` → `ZodError.issues` — API Zod отличается от ожидаемого.
+- `buildVariant()` в PlannerService стал async из-за async `calculateBreakdown` — пришлось пробросить await через всю цепочку.
+- PricingModule теперь зависит от PrismaModule и RedisCacheModule (Global) — добавлены в imports.
+
+---
+
+## 2026-02-11 — Деплой-конфигурация: admin-панель + Timeweb Cloud
+
+### Наблюдения
+
+Проект готов к production-деплою на Timeweb Cloud VPS. Основная инфраструктура (docker-compose.prod.yml, Dockerfile.backend/frontend, nginx, deploy.sh) была создана ранее, но отсутствовал ключевой компонент — контейнеризация admin-панели и её интеграция в production-окружение.
+
+**Выбор тарифа:** Timeweb Cloud MSK 50+ (2 CPU, 4 GB RAM, 50 GB NVMe, ~1100 руб/мес) — оптимален для MVP. Все сервисы (PostgreSQL, Redis, NestJS, Next.js, Admin, Nginx) помещаются в одном Docker Compose. При росте трафика рекомендуется переход на VPS + Managed PostgreSQL.
+
+**Архитектурное решение для admin-панели:** Vite SPA не требует отдельного Node.js runtime — собирается в статические файлы и раздаётся через встроенный Nginx на порту 5173. Отдельный домен `admin.daibilet.ru` вместо sub-path `/admin` выбран для:
+- Изоляции CSP/security headers (DENY vs SAMEORIGIN для X-Frame-Options)
+- Упрощения CORS (отдельный origin в whitelist)
+- Возможности ограничения доступа по IP в будущем
+
+### Решения
+
+**Dockerfile.admin (новый):**
+- Multi-stage: `node:22-alpine` builder → `nginx:alpine` runner
+- pnpm workspace-aware: копирует shared + frontend-admin
+- SPA fallback: `try_files $uri /index.html` в Nginx конфигурации
+- Кэш `/assets/` с `immutable` заголовком (Vite хэширует имена файлов)
+- Healthcheck через wget на порт 5173
+
+**nginx/default.conf (обновлён):**
+- Добавлен `upstream admin` → `server admin:5173`
+- Новый server block для `admin.daibilet.ru` (HTTPS)
+- HTTP→HTTPS redirect теперь включает `admin.daibilet.ru`
+- Более строгие security headers для admin (X-Frame-Options: DENY, CSP)
+- Отдельная rate-limit zone `admin_zone` (20r/s)
+- SAN-сертификат: один сертификат для всех доменов
+
+**docker-compose.prod.yml (обновлён):**
+- Добавлен сервис `admin` (Dockerfile.admin, container: daibilet-admin)
+- Backend: добавлены `JWT_SECRET`, `CORS_ORIGIN`, `ADMIN_INITIAL_EMAIL`, `ADMIN_INITIAL_PASSWORD` в environment (все required в prod)
+- Frontend: добавлен `NEXT_PUBLIC_YM_ID`
+- Redis healthcheck исправлен: добавлен `-a ${REDIS_PASSWORD}` для auth
+- Nginx `depends_on` теперь включает `admin`
+- `JWT_SECRET` и `ADMIN_INITIAL_PASSWORD` помечены как `required` (:? синтаксис)
+
+**deploy.sh (обновлён):**
+- `REPO_URL` заполнен: `https://github.com/Twisterrrrr/daibilet_tickets.git`
+- `ADMIN_DOMAIN` добавлен как переменная
+- Certbot выпускает SAN-сертификат для 3 доменов (daibilet.ru, www, admin)
+- Автоматическая генерация паролей при первом запуске (openssl rand)
+- Проверка: если сертификат не содержит admin-домен → `certbot --expand`
+- Добавлен seed (`npx prisma db seed`) после миграций
+- UFW файрвол: автоматическая настройка (22, 80, 443)
+- Cron для SSL renewal добавляется автоматически
+- Health check с timeout вместо `sleep 10`
+- Проверка обязательных TC-токенов перед запуском
+- 9 шагов вместо 8
+
+**.env.example (обновлён):**
+- Добавлен Production Checklist в шапке файла
+- Команды генерации паролей в комментариях
+
+### Проблемы
+- SAN-сертификат: при добавлении admin-домена к существующему сертификату нужен `--expand` флаг Certbot.
+- Redis healthcheck в предыдущей версии не учитывал пароль — `redis-cli ping` не работает при `requirepass`.
+- CSP для admin-панели: `unsafe-inline` для script-src и style-src необходим, т.к. Vite инлайнит стили и скрипты при сборке.
+
+---
+
+## 2026-02-12 — Миграция каталога TC: REST v1 → gRPC tc-simple
+
+### Наблюдения
+- Ticketscloud предоставляет gRPC-сервис `tc-simple` (endpoint: `simple.ticketscloud.com:443`) как альтернативу REST API v1 для получения каталога событий.
+- gRPC API даёт **MetaEvents** — нативную группировку повторяющихся мероприятий, вместо нашей ручной дедупликации по `normalizeTitle(title) + cityGeoId`.
+- Кроме событий, gRPC отдаёт Venues, Cities, Tags, Categories, Artists отдельными стримами.
+- Авторизация: metadata `authorization: {api_key}`, предпочтительный язык: metadata `preferred-language: ru`.
+- Первый тест sync: 2127 events, 89 MetaEvent-групп, 23464 площадок, 127739 городов из gRPC.
+- Группировка: 87 MetaEvent-групп + 194 одиночных = 281 уникальное событие.
+
+### Решения
+1. **Новый сервис `TcGrpcService`** — gRPC-клиент с SSL, загрузка proto-файлов через `@grpc/proto-loader`, streaming RPC для всех сущностей.
+2. **Proto-файлы** скопированы из `ticketscloud/docs/proto` в `packages/backend/proto/tc-simple/` (11 файлов).
+3. **`TcSyncService` переписан** с двумя режимами:
+   - `TC_SYNC_MODE=grpc` — MetaEvent-based группировка через gRPC (по умолчанию).
+   - `TC_SYNC_MODE=rest` — fallback на REST v1 (title-based дедупликация).
+   - При ошибке gRPC автоматически переключается на REST.
+4. **Prisma**: добавлено поле `tcMetaEventId` (nullable) в модель Event + индекс.
+5. **Поиск событий** при sync: сначала по `tcMetaEventId`, потом по `tcEventId`, потом по `title+city` (обратная совместимость).
+6. REST v2 для заказов и TC JS Widget для покупки — без изменений.
+
+### Проблемы
+- gRPC Cities stream отдаёт 127k+ городов — много данных. В будущем можно фильтровать по стране/id.
+- gRPC Venues stream: 23k+ площадок. Аналогично, можно фильтровать по venue IDs из events.
+- protobufjs build scripts были заблокированы pnpm — работает в fallback (pure JS) режиме без нативных оптимизаций.
+- Цены в gRPC TicketSet: `rule.simple.price` — формат может быть в копейках (uint64). Нужно уточнить у TC, если цены будут неверными.
+
+---
+
 *Следующая запись будет добавлена при дальнейшей разработке.*

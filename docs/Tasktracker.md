@@ -26,12 +26,26 @@
 - [x] **Критический**: `next.config.ts` — `output: 'standalone'`, условные rewrites (только dev)
 - [x] **Критический**: `Dockerfile.backend` — multi-stage, monorepo-aware, prisma generate
 - [x] **Критический**: `Dockerfile.frontend` — multi-stage, standalone output, non-root user
-- [x] **Критический**: `nginx/default.conf` — reverse proxy, SSL, gzip, rate limiting, security headers
-- [x] **Критический**: `docker-compose.prod.yml` — 6 сервисов (pg, redis, backend, frontend, nginx, certbot)
-- [x] **Высокий**: `.env.example` — обновлён с продакшен-переменными
-- [x] **Высокий**: `deploy.sh` — скрипт первоначальной настройки VPS (Docker, SSL, миграции)
-- [ ] **Высокий**: Заполнить `REPO_URL` в deploy.sh после создания git-репозитория
+- [x] **Критический**: `Dockerfile.admin` — multi-stage Vite SPA build, Nginx static, SPA fallback, healthcheck
+- [x] **Критический**: `nginx/default.conf` — reverse proxy, SSL, gzip, rate limiting, security headers + admin.daibilet.ru
+- [x] **Критический**: `docker-compose.prod.yml` — 7 сервисов (pg, redis, backend, frontend, admin, nginx, certbot)
+- [x] **Высокий**: `.env.example` — обновлён с production checklist и командами генерации
+- [x] **Высокий**: `deploy.sh` — полный скрипт: Docker, Git, UFW, SAN-SSL, авто-пароли, миграции, seed, cron
+- [x] **Высокий**: `REPO_URL` заполнен в deploy.sh (github.com/Twisterrrrr/daibilet_tickets.git)
 - [ ] **Средний**: CI/CD: GitHub Actions для автодеплоя на VPS
+
+### 1.5 Деплой на Timeweb Cloud
+
+- [ ] **Критический**: Создать VPS на Timeweb Cloud (Ubuntu 22.04/24.04, 2 CPU, 4 GB RAM, 50 GB NVMe)
+- [ ] **Критический**: Настроить DNS A-записи: daibilet.ru, www.daibilet.ru, admin.daibilet.ru → IP VPS
+- [ ] **Критический**: SSH на сервер, запустить `deploy.sh` (первый раз — создаст .env с паролями)
+- [ ] **Критический**: Заполнить TC_API_TOKEN и TC_WIDGET_TOKEN в .env на сервере
+- [ ] **Критический**: Перезапустить deploy.sh — сборка контейнеров, миграции, seed
+- [ ] **Высокий**: Проверить https://daibilet.ru (публичный сайт)
+- [ ] **Высокий**: Проверить https://admin.daibilet.ru (админ-панель, логин с credentials из deploy output)
+- [ ] **Высокий**: Проверить https://daibilet.ru/api/v1/health (API health check)
+- [ ] **Средний**: Проверить SSL-сертификат (SAN: 3 домена, auto-renewal cron)
+- [ ] **Средний**: Первый бэкап БД: `docker exec daibilet-postgres pg_dump -U daibilet daibilet > backup.sql`
 
 ### 1.4 Посадочные страницы (лендинги)
 
@@ -73,6 +87,21 @@
 - [ ] **Высокий**: Redis-кэш: списки событий (TTL 10 мин), детали (TTL 5 мин), сессии (TTL 3 мин)
 - [ ] **Средний**: Автоматическое определение координат по адресу (Яндекс Геокодер или ручное)
 - [ ] **Средний**: Полный API teplohod.info (с расписанием) — требует белый IP
+
+### 1.3.1 gRPC tc-simple (миграция каталога TC)
+
+- [x] **Критический**: Установить `@grpc/grpc-js` + `@grpc/proto-loader` в backend
+- [x] **Критический**: Скопировать proto-файлы из ticketscloud/docs в `packages/backend/proto/tc-simple/`
+- [x] **Критический**: `TcGrpcService` — gRPC-клиент к `simple.ticketscloud.com:443` (SSL, авторизация через metadata)
+- [x] **Критический**: Методы: fetchEvents, fetchMetaEvents, fetchVenues, fetchCities, fetchTags, fetchCategories
+- [x] **Критический**: Переписать `TcSyncService.syncAll()` — MetaEvent-based группировка вместо title-based дедупликации
+- [x] **Критический**: Prisma: добавить поле `tcMetaEventId` в модель Event + индекс + миграция
+- [x] **Высокий**: Переменные: `TC_GRPC_ENDPOINT`, `TC_SYNC_MODE` (grpc/rest)
+- [x] **Высокий**: Fallback: при ошибке gRPC автоматически переключается на REST v1
+- [x] **Высокий**: Зарегистрировать `TcGrpcService` в `CatalogModule`
+- [x] **Высокий**: Тест: 2127 events → 87 MetaEvent-групп + 194 одиночных = 281 уникальных (0 ошибок)
+- [ ] **Средний**: Оптимизация: фильтровать Cities/Venues по нужным ID вместо загрузки всех
+- [ ] **Низкий**: gRPC Seats — наличие конкретных мест (для мероприятий с рассадкой)
 
 ### 1.4 Frontend (Next.js)
 
@@ -312,4 +341,79 @@
 - [ ] Партнёрская программа (реферальные ссылки)
 - [ ] Мультиязычность (EN) для иностранных туристов
 - [ ] Интеграция с другими билетными системами (не только TC)
-- [ ] Админ-панель для управления контентом, событиями, статьями
+- [x] Админ-панель для управления контентом, событиями, статьями (реализована — см. ниже)
+
+---
+
+## Админ-панель (packages/frontend-admin + backend/admin)
+
+### Auth
+- [x] **Критический**: Prisma модель `AdminUser` + миграция
+- [x] **Критический**: `AuthModule` (JWT + bcrypt): login, refresh, me
+- [x] **Критический**: `JwtAuthGuard` на все `/admin/*` маршруты
+- [x] **Критический**: Seed admin user (email/пароль из `.env`)
+
+### Auth Hardening (v2)
+- [x] **Критический**: RBAC — `AdminRole` enum (ADMIN | EDITOR | VIEWER), `RolesGuard`, `@Roles()` decorator
+- [x] **Критический**: Access token 15min, refresh token 30d в HttpOnly cookie
+- [x] **Критический**: `refreshTokenHash` в БД, ротация при refresh
+- [x] **Критический**: `POST /auth/logout` — инвалидация refresh token
+- [x] **Критический**: `isActive` проверка в JwtStrategy
+- [x] **Высокий**: `cookie-parser` middleware в main.ts
+
+### Backend CRUD (NestJS `/admin/*`)
+- [x] **Критический**: `AdminDashboardController` — stats (события, заказы, выручка)
+- [x] **Высокий**: `AdminCitiesController` — list, get, PATCH с optimistic lock
+- [x] **Высокий**: `AdminEventsController` — list (фильтры), get, override/hide (через EventOverride)
+- [x] **Высокий**: `AdminTagsController` — full CRUD + soft delete + optimistic lock
+- [x] **Высокий**: `AdminLandingsController` — full CRUD + JSON validation + transactions + optimistic lock
+- [x] **Высокий**: `AdminCombosController` — full CRUD + JSON validation + transactions + optimistic lock
+- [x] **Высокий**: `AdminArticlesController` — full CRUD + soft delete + optimistic lock + transactions
+- [x] **Высокий**: `AdminOrdersController` — list, get, status transitions (безопасные)
+- [x] **Средний**: `AdminSettingsController` — sync status, pricing config, ops controls, cache management
+
+### Audit Log
+- [x] **Высокий**: `AuditLog` Prisma model (userId, action, entity, entityId, before/after JSON)
+- [x] **Высокий**: `AuditService` — log + findMany с фильтрацией и пагинацией
+- [x] **Высокий**: `AuditInterceptor` — автологирование POST/PATCH/DELETE на /admin/*
+- [x] **Высокий**: `AdminAuditController` GET /admin/audit (только ADMIN)
+
+### EventOverride
+- [x] **Высокий**: `EventOverride` Prisma model (eventId, title, description, imageUrl, isHidden, manualRating, tagsAdd/Remove)
+- [x] **Высокий**: `EventOverrideService` — upsert, remove, toggleHidden, applyOverrides
+- [x] **Высокий**: Admin endpoints: PATCH override, DELETE override, PATCH hide
+- [x] **Высокий**: CatalogService интеграция — merge overrides, фильтрация isHidden
+
+### PricingConfig + UpsellItem в БД
+- [x] **Высокий**: `PricingConfig` Prisma model (singleton) — serviceFee, peakMarkup, lastMinute, tcCommission, peakRanges
+- [x] **Высокий**: `UpsellItem` Prisma model — citySlug, title, price, category, icon, isActive, sortOrder
+- [x] **Высокий**: `PricingService` refactor — читает из БД, кэширует в Redis (5min TTL)
+- [x] **Высокий**: Admin: GET/PATCH /admin/settings/pricing
+- [x] **Высокий**: `AdminUpsellsController` — full CRUD для UpsellItem
+- [x] **Средний**: Seed: PricingConfig defaults + hardcoded upsells → БД
+
+### JSON Validation (Zod)
+- [x] **Высокий**: `json-schemas.ts` — Zod схемы для FAQ, Reviews, Stats, RelatedLinks, HowToChoose, InfoBlocks, Features, CuratedEvents, Includes, PeakRanges
+- [x] **Высокий**: `validateJson()` helper с человекочитаемыми ошибками → BadRequestException
+- [x] **Высокий**: Валидация в LandingsController и CombosController перед save
+- [x] **Средний**: Frontend `<JsonEditor>` компонент с подсветкой ошибок и prettify
+
+### Ops Controls
+- [x] **Высокий**: `OpsStatus` Prisma model (singleton) — lastFullSyncAt, lastIncrSyncAt, lastRetagAt, lastPopulateAt, lastCacheFlush, lastError
+- [x] **Высокий**: POST endpoints: sync/full, sync/incremental, retag, populate-combos, cache/flush
+- [x] **Высокий**: GET /admin/ops/status — статусы последних операций
+
+### Frontend Admin (Vite + React + Tailwind + React Router)
+- [x] **Критический**: Login page + JWT auth + HttpOnly cookie refresh
+- [x] **Критический**: Layout (sidebar + header + logout via POST)
+- [x] **Высокий**: Dashboard (stats cards: события, города, заказы, выручка)
+- [x] **Высокий**: Events — таблица с фильтрами + override через EventOverride
+- [x] **Высокий**: Cities — таблица + форма (featured, active, meta) с optimistic lock
+- [x] **Высокий**: Tags — таблица + CRUD-форма (create/edit/delete) с soft delete
+- [x] **Высокий**: Landings — таблица + CRUD-форма с JSON-редакторами и валидацией
+- [x] **Высокий**: Combos — таблица + CRUD-форма с JSON-редакторами и валидацией
+- [x] **Высокий**: Articles — таблица + CRUD-форма (Markdown content, published toggle)
+- [x] **Высокий**: Orders — таблица + детальная карточка + смена статуса
+- [x] **Высокий**: Upsells — таблица + CRUD-форма (цена, категория, город, иконка)
+- [x] **Высокий**: Аудит — таблица с фильтрами (entity, action) + раскрытие before/after JSON
+- [x] **Высокий**: Settings — sync status, ops кнопки, pricing config форма
