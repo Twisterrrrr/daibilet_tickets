@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package v2;
+
+import "generic.proto";
+
+message VenuesRequest {
+ repeated string ids = 1; // фильтр по id площадки
+}
+
+message Venue {
+ string id = 1; // id площадки
+ string name = 2; // название площадки
+ string description = 3; // [O] описание площадки
+ int32 city = 4; // id города
+ string address = 5; // [O] адрес площадки
+ Coordinates coordinates = 6; // [O] координаты площадки
+ bool with_mosbilet = 41; // признак наличия интеграции с mosbilet.ru
+}
+
+message MapsRequest {
+ repeated string ids = 1; // фильтр по id схемы зала
+ string venue = 2; // фильтр по id площадки
+}
+
+message Map {
+ message Sector {
+ string id = 1; // id сектора
+ string name = 2; // название сектора
+ string description = 3; // [O] описание сектора
+ bool with_seats = 4; // признак сектора с рассадкой
+ }
+
+ message Seat {
+ message Point {
+ int32 x = 1;
+ int32 y = 2;
+ int32 r = 3;
+ }
+ string sector = 1;
+ string row = 2;
+ string number = 3;
+ Point point = 4;
+ }
+
+ string id = 1; // id схемы зала
+ string name = 2; // название схемы зала
+ string description = 3; // [O] описание схемы зала
+ string venue = 4; // id площадки
+
+ repeated Sector sectors = 5;
+ repeated Seat seats = 6;
+ map<string, bytes> svg = 7;
+}

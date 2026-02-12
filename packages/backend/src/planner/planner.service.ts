@@ -126,7 +126,7 @@ export class PlannerService {
     const variants = [];
 
     for (const tier of tiers) {
-      const variant = this.buildVariant(
+      const variant = await this.buildVariant(
         tier, events, start, dayCount, iConfig, adults, children || 0, city, dateFrom,
       );
       if (variant && variant.days.some(d => d.slots.length > 0)) {
@@ -139,7 +139,7 @@ export class PlannerService {
 
     return {
       variants: uniqueVariants,
-      upsells: this.pricing.getUpsells(city),
+      upsells: await this.pricing.getUpsells(city),
       meta: {
         city,
         dateFrom,
@@ -208,7 +208,7 @@ export class PlannerService {
       0,
     );
 
-    const breakdown = this.pricing.calculateBreakdown(totalPrice, slot.tickets.adult.count + slot.tickets.child.count);
+    const breakdown = await this.pricing.calculateBreakdown(totalPrice, slot.tickets.adult.count + slot.tickets.child.count);
 
     body.variant.totalPrice = breakdown.basePrice;
     body.variant.serviceFee = breakdown.serviceFee;
@@ -222,7 +222,7 @@ export class PlannerService {
   // Построение варианта
   // ==========================================
 
-  private buildVariant(
+  private async buildVariant(
     tier: VariantTier,
     allEvents: any[],
     startDate: Date,
@@ -292,7 +292,7 @@ export class PlannerService {
       daysUntilTrip,
     };
 
-    const breakdown = this.pricing.calculateBreakdown(
+    const breakdown = await this.pricing.calculateBreakdown(
       totalBasePrice, totalPersons, [], markupContext,
     );
 

@@ -9,13 +9,13 @@ export class PricingController {
 
   @Get('config')
   @ApiOperation({ summary: 'Текущая конфигурация pricing (для отладки)' })
-  getConfig() {
-    return this.pricing.getConfig();
+  async getConfig() {
+    return this.pricing.getConfigPublic();
   }
 
   @Get('upsells')
   @ApiOperation({ summary: 'Каталог upsell-услуг' })
-  getUpsells(@Query('city') city?: string) {
+  async getUpsells(@Query('city') city?: string) {
     return this.pricing.getUpsells(city);
   }
 }

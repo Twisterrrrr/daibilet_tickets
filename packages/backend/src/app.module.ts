@@ -13,6 +13,8 @@ import { PricingModule } from './pricing/pricing.module';
 import { ComboModule } from './combo/combo.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { RedisCacheModule } from './cache/cache.module';
+import { AuthModule } from './auth/auth.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { RedisCacheModule } from './cache/cache.module';
     LandingModule,
     ComboModule,
     SchedulerModule,
+    AuthModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

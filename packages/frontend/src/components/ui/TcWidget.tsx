@@ -69,7 +69,7 @@ export function TcWidgetButton({
       data-tc-token={TC_TOKEN}
       {...(isMeta && { 'data-tc-meta': 'true' })}
       onClick={() => trackWidgetOpen(widgetEventId)}
-      className="tc-background-yellow flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-semibold"
+      className="tc-buy-btn tc-background-yellow flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-semibold"
     >
       {children}
     </button>
@@ -109,23 +109,23 @@ export function TcSessionSlot({
       data-tc-event={tcEventId}
       data-tc-token={TC_TOKEN}
       onClick={() => trackWidgetOpen(tcEventId)}
-      className="group flex w-full items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5 transition-colors hover:bg-primary-50 hover:ring-1 hover:ring-primary-200 cursor-pointer"
+      className="tc-session-slot group"
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-100 text-xs font-bold text-primary-700 group-hover:bg-primary-200">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-bold text-slate-600 ring-1 ring-slate-200 group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:ring-blue-200">
           {weekday}
         </div>
         <div className="text-left">
-          <p className="text-sm font-medium text-slate-900">{date}</p>
-          <p className="text-xs text-slate-500">{time}</p>
+          <p className="text-sm font-medium text-slate-800">{date}</p>
+          <p className="text-xs text-slate-400">{time}</p>
         </div>
       </div>
       {session.availableTickets > 0 ? (
-        <span className="text-xs font-medium text-slate-500">
+        <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-600">
           {session.availableTickets} мест
         </span>
       ) : (
-        <span className="text-xs font-medium text-red-400">
+        <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500">
           Распродано
         </span>
       )}
@@ -156,11 +156,11 @@ function SessionRowContent({
         </div>
       </div>
       {session.availableTickets > 0 ? (
-        <span className="text-xs font-medium text-slate-500">
+        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">
           {session.availableTickets} мест
         </span>
       ) : (
-        <span className="text-xs font-medium text-red-400">
+        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-500">
           Распродано
         </span>
       )}

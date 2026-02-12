@@ -79,12 +79,36 @@
   border-radius: 12px;
 }
 
-/* TC widget button overrides */
-button[data-tc-event] {
+/* TC widget button overrides — основная кнопка «Купить билет» */
+.tc-buy-btn[data-tc-event] {
   width: 100%;
   font-family: inherit !important;
   border-radius: 12px !important;
   font-size: 16px !important;
   padding: 14px 24px !important;
   min-height: 48px;
+}
+
+/* TC widget session slot — кликабельные строки сеансов.
+   Сбрасываем стили tc-widget-button.css, который красит [data-tc-event] в зелёный. */
+.tc-session-slot[data-tc-event] {
+  all: unset !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  padding: 10px 12px !important;
+  border-radius: 8px !important;
+  background-color: #f8fafc !important; /* slate-50 */
+  cursor: pointer !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.15s, box-shadow 0.15s !important;
+  min-height: auto !important;
+}
+
+.tc-session-slot[data-tc-event]:hover {
+  background-color: #eff6ff !important; /* blue-50 */
+  box-shadow: 0 0 0 1px #bfdbfe !important; /* ring blue-200 */
 }

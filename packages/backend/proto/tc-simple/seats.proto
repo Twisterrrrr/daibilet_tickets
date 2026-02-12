@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package v2;
+
+import "google/protobuf/timestamp.proto";
+
+message SeatsRequest {
+ enum Status {
+ ANY = 0; // любой статус билета
+ VACANT = 1; // билет доступен к продаже
+ RESERVED = 2; // билет забронирован
+ SOLD = 3; // билет продан
+ }
+
+ string sector = 2;
+ string row = 3;
+ string number = 4;
+
+ string event = 10; // фильтр по id мероприятия, обязательный параметр
+ repeated string sets = 11;
+ repeated string tickets = 12;
+ Status status = 13;
+}
+
+enum TicketStatus {
+ VACANT = 0; // билет доступен к продаже
+ RESERVED = 1; // билет забронирован
+ SOLD = 2; // билет продан
+}
+
+message Seat {
+ string sector = 2; // id сектора
+ string row = 3; // номер ряда
+ string number = 4; // номер места
+
+ string event = 10; // id мероприятия
+ string set = 11; // id категории билета
+ string ticket = 12; // id билета
+ TicketStatus status = 13; // статус билета
+ google.protobuf.Timestamp ticket_reserved_till = 14; // [O]
+}

@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package v2;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+
+import "generic.proto";
+
+
+message MetaEventsRequest {
+ repeated string ids = 1; // фильтр по id группы мероприятий
+}
+
+message MetaEvent {
+ string id = 1; // id группы мероприятий
+
+ string name = 2; // название группы мероприятий
+ string description = 3; // [O] описание группы мероприятий
+
+ string org = 4; // id организатора
+ string age_rating = 5; // [O] возвратной рейтинг мероприятия
+ Media media = 6; // обложка группы мероприятий
+
+ google.protobuf.Timestamp first_start = 7; // начало первого мероприятия в группе
+ google.protobuf.Timestamp last_finish = 8; // конец последнего мероприятия в группе
+
+ google.protobuf.Any additional = 255; // служебное поле
+}

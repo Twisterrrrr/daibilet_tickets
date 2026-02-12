@@ -1,9 +1,28 @@
 import { PrismaClient, TagCategory } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
+
+  // --- Admin User ---
+  const adminEmail = process.env.ADMIN_INITIAL_EMAIL || 'admin@daibilet.ru';
+  const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'changeme123';
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
+
+  await prisma.adminUser.upsert({
+    where: { email: adminEmail },
+    update: { role: 'ADMIN' },
+    create: {
+      email: adminEmail,
+      passwordHash,
+      name: 'Admin',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  });
+  console.log(`  ✓ Admin user: ${adminEmail} (role: ADMIN)`);
 
   // --- Города ---
 
@@ -640,6 +659,60 @@ async function main() {
     console.log(`  ✓ ${combos.length} combo-страниц`);
   } else {
     console.log('  ⚠ СПб/Москва не найдены — combo не созданы');
+  }
+
+  // ========================
+  // PricingConfig (singleton)
+  // ========================
+  const existingPricing = await prisma.pricingConfig.findFirst();
+  if (!existingPricing) {
+    await prisma.pricingConfig.create({
+      data: {
+        serviceFeePercent: 0,
+        peakMarkupPercent: 15,
+        lastMinutePercent: 10,
+        tcCommissionPercent: 5,
+        peakRanges: [],
+      },
+    });
+    console.log('  ✓ PricingConfig (defaults)');
+  } else {
+    console.log('  ✓ PricingConfig уже существует');
+  }
+
+  // ========================
+  // UpsellItems (из БД)
+  // ========================
+  const upsells = [
+    { title: 'Фотопакет', description: 'Профессиональная фотосессия на 15 минут в знаковом месте', priceKopecks: 300000, category: 'photo', icon: '📸', sortOrder: 1 },
+    { title: 'Сувенирный набор', description: 'Подборка локальных сувениров от местных мастеров', priceKopecks: 150000, category: 'souvenir', icon: '🎁', sortOrder: 2 },
+    { title: 'Ужин на теплоходе', description: 'Романтический ужин на теплоходе по Неве (2 часа)', priceKopecks: 450000, category: 'food', citySlug: 'saint-petersburg', icon: '🍽️', sortOrder: 1 },
+    { title: 'Трансфер из аэропорта', description: 'Комфортный трансфер Пулково → отель', priceKopecks: 200000, category: 'transport', citySlug: 'saint-petersburg', icon: '🚗', sortOrder: 2 },
+    { title: 'VIP-прогулка', description: 'Индивидуальная прогулка на катере (до 6 человек)', priceKopecks: 1200000, category: 'vip', citySlug: 'saint-petersburg', icon: '🛥️', sortOrder: 3 },
+    { title: 'Ужин на теплоходе', description: 'Ужин-круиз по Москве-реке с видом на Кремль (2,5 часа)', priceKopecks: 500000, category: 'food', citySlug: 'moscow', icon: '🍽️', sortOrder: 1 },
+    { title: 'Трансфер из аэропорта', description: 'Комфортный трансфер из любого аэропорта → отель', priceKopecks: 250000, category: 'transport', citySlug: 'moscow', icon: '🚗', sortOrder: 2 },
+    { title: 'Гастро-тур', description: 'Дегустация татарской кухни: чак-чак, эчпочмак, кыстыбый', priceKopecks: 250000, category: 'food', citySlug: 'kazan', icon: '🥟', sortOrder: 1 },
+    { title: 'Янтарный мастер-класс', description: 'Создайте украшение из балтийского янтаря', priceKopecks: 200000, category: 'souvenir', citySlug: 'kaliningrad', icon: '💎', sortOrder: 1 },
+    { title: 'Закатный круиз', description: 'Вечерняя прогулка по Волге на закате (1,5 часа)', priceKopecks: 200000, category: 'food', citySlug: 'nizhny-novgorod', icon: '🌅', sortOrder: 1 },
+  ];
+
+  for (const upsell of upsells) {
+    const existing = await prisma.upsellItem.findFirst({
+      where: { title: upsell.title, citySlug: upsell.citySlug ?? null },
+    });
+    if (!existing) {
+      await prisma.upsellItem.create({ data: upsell });
+    }
+  }
+  console.log(`  ✓ ${upsells.length} upsell items`);
+
+  // ========================
+  // OpsStatus (singleton)
+  // ========================
+  const existingOps = await prisma.opsStatus.findFirst();
+  if (!existingOps) {
+    await prisma.opsStatus.create({ data: {} });
+    console.log('  ✓ OpsStatus (initial)');
   }
 
   console.log('Seed completed!');

@@ -392,8 +392,8 @@ export class ComboService {
       0,
     );
 
-    const breakdown = this.pricing.calculateBreakdown(combo.suggestedPrice || totalBase * 2, 2);
-    const upsells = this.pricing.getUpsells(combo.city.slug);
+    const breakdown = await this.pricing.calculateBreakdown(combo.suggestedPrice || totalBase * 2, 2);
+    const upsells = await this.pricing.getUpsells(combo.city.slug);
 
     return {
       ...combo,
