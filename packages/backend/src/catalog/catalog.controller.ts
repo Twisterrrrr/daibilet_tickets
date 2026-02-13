@@ -1,6 +1,12 @@
-import { Controller, Get, Post, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller, Get, Post, Param, Query, Body, Req, Res,
+  UploadedFiles, UseInterceptors,
+} from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { Request, Response } from 'express';
 import { CatalogService } from './catalog.service';
+import { ReviewService } from './review.service';
 import { TcApiService } from './tc-api.service';
 import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
@@ -12,6 +18,7 @@ import { EventsQueryDto } from './dto/events-query.dto';
 export class CatalogController {
   constructor(
     private readonly catalogService: CatalogService,
+    private readonly reviewService: ReviewService,
     private readonly tcApi: TcApiService,
     private readonly tcSync: TcSyncService,
     private readonly tepApi: TepApiService,
@@ -74,6 +81,79 @@ export class CatalogController {
   @ApiQuery({ name: 'q', required: true })
   search(@Query('q') q: string, @Query('city') city?: string) {
     return this.catalogService.search(q, city);
+  }
+
+  // --- Отзывы ---
+
+  @Post('reviews')
+  @ApiOperation({ summary: 'Оставить отзыв на событие' })
+  createReview(
+    @Body() body: {
+      eventId: string;
+      rating: number;
+      title?: string;
+      text: string;
+      authorName: string;
+      authorEmail: string;
+      voucherCode?: string;
+      website?: string;
+      formStartedAt?: number;
+      reviewRequestToken?: string;
+    },
+    @Req() req: Request,
+  ) {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    return this.reviewService.create(body, ip);
+  }
+
+  @Get('reviews/verify')
+  @ApiOperation({ summary: 'Подтверждение email для отзыва' })
+  async verifyReview(@Query('token') token: string, @Res() res: Response) {
+    const result = await this.reviewService.verifyEmail(token);
+    // Редирект на страницу с сообщением
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    res.redirect(`${appUrl}/reviews/verified?message=${encodeURIComponent(result.message)}`);
+  }
+
+  @Get('events/:slug/reviews')
+  @ApiOperation({ summary: 'Одобренные отзывы события' })
+  getEventReviews(
+    @Param('slug') slug: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.reviewService.getByEventSlug(slug, Number(page) || 1, Number(limit) || 10);
+  }
+
+  @Post('reviews/:id/photos')
+  @ApiOperation({ summary: 'Добавить фото к отзыву' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FilesInterceptor('photos', 5, {
+    limits: { fileSize: 5 * 1024 * 1024 },
+  }))
+  uploadReviewPhotos(
+    @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('authorEmail') authorEmail?: string,
+  ) {
+    return this.reviewService.addPhotos(id, files, authorEmail);
+  }
+
+  @Post('reviews/:id/vote')
+  @ApiOperation({ summary: 'Голосовать за полезность отзыва' })
+  voteReview(
+    @Param('id') id: string,
+    @Body('helpful') helpful: boolean,
+    @Req() req: Request,
+  ) {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    return this.reviewService.vote(id, ip, helpful);
+  }
+
+  @Get('reviews/request-info')
+  @ApiOperation({ summary: 'Получить данные для pre-filled формы отзыва (по токену ReviewRequest)' })
+  async getReviewRequestInfo(@Query('token') token: string) {
+    return this.reviewService.getReviewRequestInfo(token);
   }
 
   // --- TC Sync ---

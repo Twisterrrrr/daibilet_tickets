@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsInt, Min, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { EventCategory } from '@prisma/client';
+import { EventCategory, EventAudience } from '@prisma/client';
 
 export class EventsQueryDto {
   @ApiPropertyOptional({ description: 'Slug города' })
@@ -18,6 +18,11 @@ export class EventsQueryDto {
   @IsOptional()
   @IsString()
   subcategory?: string;
+
+  @ApiPropertyOptional({ enum: EventAudience })
+  @IsOptional()
+  @IsEnum(EventAudience)
+  audience?: EventAudience;
 
   @ApiPropertyOptional({ description: 'Slug тега' })
   @IsOptional()
@@ -38,6 +43,34 @@ export class EventsQueryDto {
   @IsOptional()
   @IsString()
   sort?: string;
+
+  @ApiPropertyOptional({ description: 'Время суток: morning, day, evening, night' })
+  @IsOptional()
+  @IsString()
+  timeOfDay?: string;
+
+  @ApiPropertyOptional({ description: 'UUID или slug причала (startLocationId)' })
+  @IsOptional()
+  @IsString()
+  pier?: string;
+
+  @ApiPropertyOptional({ description: 'Макс. длительность в минутах' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  maxDuration?: number;
+
+  @ApiPropertyOptional({ description: 'Мин. длительность в минутах' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  minDuration?: number;
+
+  @ApiPropertyOptional({ description: 'Макс. минимальный возраст (minAge <= X)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  maxMinAge?: number;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

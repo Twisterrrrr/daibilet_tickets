@@ -53,6 +53,16 @@ export class LandingService {
 
     // Получаем события с сессиями
     const now = new Date();
+
+    // Применяем additionalFilters из настроек лендинга
+    const af = (landing.additionalFilters ?? {}) as Record<string, any>;
+    const extraWhere: Record<string, any> = {};
+    if (af.category) extraWhere.category = af.category;
+    if (af.subcategories?.length) extraWhere.subcategories = { hasSome: af.subcategories };
+    if (af.source) extraWhere.source = af.source;
+    if (af.minDuration) extraWhere.durationMinutes = { ...(extraWhere.durationMinutes || {}), gte: af.minDuration };
+    if (af.maxDuration) extraWhere.durationMinutes = { ...(extraWhere.durationMinutes || {}), lte: af.maxDuration };
+
     const events = tag
       ? await this.prisma.event.findMany({
           where: {
@@ -62,6 +72,7 @@ export class LandingService {
             sessions: {
               some: { isActive: true, startsAt: { gte: now } },
             },
+            ...extraWhere,
           },
           include: {
             sessions: {

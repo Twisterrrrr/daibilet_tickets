@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminApi } from '../../api/client';
-import { DataTable } from '../../components/ui/DataTable';
-import { Badge } from '../../components/ui/Badge';
+import { ColumnDef } from '@tanstack/react-table';
+import { adminApi } from '@/api/client';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface CityItem {
   id: string;
@@ -16,6 +19,58 @@ interface CityItem {
     combos?: number;
   };
 }
+
+const columns: ColumnDef<CityItem>[] = [
+  {
+    accessorKey: 'name',
+    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
+    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+  },
+  {
+    accessorKey: 'slug',
+    header: ({ column }) => <SortableHeader column={column}>Slug</SortableHeader>,
+    cell: ({ row }) => <span className="text-muted-foreground font-mono text-sm">{row.original.slug}</span>,
+  },
+  {
+    accessorKey: 'isFeatured',
+    header: 'В топе',
+    cell: ({ row }) => (
+      <Badge variant={row.original.isFeatured ? 'success' : 'secondary'}>
+        {row.original.isFeatured ? 'Да' : 'Нет'}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: 'isActive',
+    header: 'Активен',
+    cell: ({ row }) => (
+      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
+        {row.original.isActive ? 'Да' : 'Нет'}
+      </Badge>
+    ),
+  },
+  {
+    id: 'eventsCount',
+    header: 'Событий',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original._count?.events ?? 0}</span>
+    ),
+  },
+  {
+    id: 'landingsCount',
+    header: 'Лендингов',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original._count?.landings ?? 0}</span>
+    ),
+  },
+  {
+    id: 'combosCount',
+    header: 'Combo',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original._count?.combos ?? 0}</span>
+    ),
+  },
+];
 
 export function CitiesListPage() {
   const navigate = useNavigate();
@@ -47,69 +102,57 @@ export function CitiesListPage() {
     navigate(`/cities/${item.id}`);
   };
 
-  const columns = [
-    { key: 'name', label: 'Название' },
-    { key: 'slug', label: 'Slug' },
-    {
-      key: 'isFeatured',
-      label: 'В топе',
-      render: (item: CityItem) => (
-        <Badge variant={item.isFeatured ? 'success' : 'default'}>
-          {item.isFeatured ? 'Да' : 'Нет'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'isActive',
-      label: 'Активен',
-      render: (item: CityItem) => (
-        <Badge variant={item.isActive ? 'success' : 'default'}>
-          {item.isActive ? 'Да' : 'Нет'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'eventsCount',
-      label: 'Событий',
-      render: (item: CityItem) => item._count?.events ?? 0,
-    },
-    {
-      key: 'landingsCount',
-      label: 'Лендингов',
-      render: (item: CityItem) => item._count?.landings ?? 0,
-    },
-    {
-      key: 'combosCount',
-      label: 'Combo',
-      render: (item: CityItem) => item._count?.combos ?? 0,
-    },
-  ];
-
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-gray-900">Города</h1>
-
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Поиск..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        />
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Города</h1>
+        <p className="text-muted-foreground">
+          Управление городами для событий и лендингов
+        </p>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <Card className="border-destructive">
+          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+        </Card>
       )}
 
-      <DataTable
-        columns={columns}
-        data={items}
-        onRowClick={handleRowClick}
-        loading={loading}
-        emptyText="Нет городов"
-      />
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Фильтры</CardTitle>
+          <CardDescription>Поиск по названию или slug</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Input
+            type="text"
+            placeholder="Поиск..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Список городов</CardTitle>
+          <CardDescription>
+            {items.length} {items.length === 1 ? 'город' : items.length < 5 ? 'города' : 'городов'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={items}
+            onRowClick={handleRowClick}
+            loading={loading}
+            emptyText="Нет городов"
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

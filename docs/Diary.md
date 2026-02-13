@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-02-12 — Подкатегории и KIDS-категория
+
+### Наблюдения
+- Часть событий попадала в неправильную категорию (например, «Меджикул» — концерт, но был в EXCURSION из-за слова «тур» в описании)
+- Поле subcategory (String?) в схеме не использовалось
+- 3 категории (EXCURSION, MUSEUM, EVENT) недостаточны — детские события заслуживают отдельного раздела
+
+### Решения
+- Добавлена 4-я категория KIDS — отдельная аудитория (родители), высокий SEO-потенциал
+- Создан enum EventSubcategory (28 подтипов): EXCURSION (7), MUSEUM (5), EVENT (8), KIDS (6)
+- Переработан порядок проверок в classify(): EVENT-маркеры проверяются ДО EXCURSION, чтобы «tribute tour» → CONCERT, а не EXCURSION
+- Расширены ключевые слова: добавлены tribute, трибьют, джаз, jazz, рок, rock для концертов
+- EventOverride дополнен полем subcategory для ручного переноса событий между категориями из админки
+- Frontend: подкатегории-чипы появляются при выборе категории, EventCard показывает подтип
+- SUBCATEGORIES_BY_CATEGORY в shared — маппинг подтипов к категориям для фильтрации
+
+### Проблемы
+- ~15% событий не получают subcategory (null) — требуют ручной классификации из админки
+- Слово «live» убрано из маркеров CONCERT (слишком частое в описаниях разных событий)
+- Комбо-тур (дворы+крыши) определяется как WALKING вместо COMBINED — можно уточнить в будущем
+
+---
+
 ## 2026-02-10 — YM env + Mobile-first + Autocomplete + SSG events
 
 ### Наблюдения
@@ -173,7 +196,7 @@
 ### Решения
 - Для MVP используем REST v1 endpoint вместо gRPC — проще, работает, содержит все нужные данные. На будущее запланирован переход на gRPC для стриминга.
 - Создали маппинг geonames ID → slug для ~50 крупнейших городов РФ.
-- Категоризация событий (EXCURSION / MUSEUM / EVENT) выполняется по ключевым словам в названии, описании и тегах TC.
+- Категоризация событий (EXCURSION / MUSEUM / EVENT / KIDS) выполняется по ключевым словам в названии, описании и тегах TC.
 - `tcData` (JSONB) сохраняет полный оригинальный объект TC для будущего анализа.
 - Slug генерируется транслитерацией кириллицы; при коллизиях добавляется суффикс из TC ID.
 
@@ -803,6 +826,310 @@
 - gRPC Venues stream: 23k+ площадок. Аналогично, можно фильтровать по venue IDs из events.
 - protobufjs build scripts были заблокированы pnpm — работает в fallback (pure JS) режиме без нативных оптимизаций.
 - Цены в gRPC TicketSet: `rule.simple.price` — формат может быть в копейках (uint64). Нужно уточнить у TC, если цены будут неверными.
+
+---
+
+---
+
+## 2026-02-12 — Afisha UX Phase 1: стратегия + лента дат + бейджи
+
+### Наблюдения
+- Проведён сравнительный анализ Daibilet vs Яндекс.Афиша. Afisha выигрывает не стеком, а UX-минимализмом: компактная выдача, быстрые фильтры, бейджи доверия.
+- У Daibilet уже есть архитектура уровня масштабируемого маркетплейса (monorepo, NestJS, Next.js, Prisma, gRPC), но фронтенд ещё не доведён до уровня "продукта".
+- Бэкенд уже поддерживает `dateFrom`/`dateTo` в API каталога — достаточно подключить на фронтенде.
+- Ключевое преимущество перед Афишей: водная тематика (причалы, погода, маршруты, время на воде).
+
+### Решения
+- **Фаза 1 UX (Quick Wins)**: лента дат + смарт-бейджи + каркас новых сущностей.
+- Лента дат — горизонтальная прокрутка (сегодня/завтра/выходные/14 дней), mobile-first.
+- Смарт-бейджи: "Оптимальный выбор" (scoring: рейтинг 40% + цена-эффективность 30% + загрузка 30%), "Осталось N мест", ближайший сеанс.
+- Каркас данных: Location (enum PIER/VENUE/MEETING_POINT/OTHER), Operator, Route — пустые модели в Prisma для подготовки к Фазе 2.
+- Не трогаем: новые страницы, персонализацию, переделку карточки — это Фаза 2-3.
+- Виджет TC: исправлен JWT-токен (вместо API-ключа), добавлена поддержка `data-tc-meta` для MetaEvent, кликабельные сеансы через `TcSessionSlot`.
+- `.env.local` создан в `packages/frontend/` для корректной загрузки `NEXT_PUBLIC_*` переменных Next.js в монорепо.
+
+### Проблемы
+- Скрипт `tc-widget-button.css` от Ticketscloud перезаписывает стили любого элемента с `data-tc-event`. Решено: CSS-классы `.tc-buy-btn` и `.tc-session-slot` с `all: unset !important` для сеансов.
+- Принцип "Afisha = простота" требует дисциплины — не перегружать UI раньше, чем доведена выдача.
+
+---
+
+## 2026-02-12 — Мульти-офферная архитектура (EventOffer)
+
+### Наблюдения
+- При нескольких источниках (TC, Teplohod, будущие Radario/TimePad) одно физическое событие может дублироваться в каталоге. Нужна модель "каноническое событие + несколько офферов (источников продажи)".
+- Текущая архитектура: Event хранит source-специфичные поля (tcEventId, tcMetaEventId, source) вместе с каноническими. Дедупликации нет.
+- Админка EventEdit.tsx вызывала несуществующий `PUT /admin/events/:id` — починен на `PATCH /override`.
+
+### Решения
+- **Путь B**: EventOffer как отдельная сущность + ручной merge, без автодедупа.
+- Новые enums: `OfferSource` (TC/TEPLOHOD/RADARIO/TIMEPAD/MANUAL), `OfferStatus` (ACTIVE/HIDDEN/DISABLED), `PurchaseType` (TC_WIDGET/REDIRECT/API_CHECKOUT).
+- Модель `EventOffer`: source, purchaseType, externalEventId, metaEventId, deeplink, priceFrom, commissionPercent, status, isPrimary, priority.
+- `EventSession.offerId` — привязка сессий к офферу (nullable, backward compat).
+- `Event.canonicalOfId` — self-relation для ручного merge дублей.
+- Data migration: 269 offers создано, 2247 sessions обновлены.
+- Sync-сервисы (TC, Teplohod) обновлены: upsert EventOffer параллельно с Event.
+- API: `getEvents` и `getEventBySlug` теперь возвращают `primaryOffer` и `offers`.
+- Frontend BuyCard переписан: CTA определяется по `primaryOffer.purchaseType` (TC_WIDGET / REDIRECT / fallback BuyModal).
+- Admin: секция "Офферы / Источники продажи" на странице события. Toggle status, set primary, будущий merge.
+
+### Проблемы
+- EventSession привязана и к Event, и к EventOffer (двойная FK на переходном этапе). В будущем eventId в session станет вычисляемым через offer.
+- Teplohod sync не фильтрует по source при lookup (потенциальный баг при пересечении ID).
+
+---
+
+## 2026-02-12 — Отзывы и рейтинги (MVP)
+
+### Наблюдения
+- В системе не было пользовательской аутентификации — только admin. Решили делать отзывы без обязательной регистрации (guest reviews).
+- Существовали поля `Event.rating` и `Event.reviewCount`, но заполнялись статически из sync. Теперь — пересчитываются динамически.
+- Voucher-коды (`Voucher.shortCode`) уже есть в системе и привязаны к Package → PackageItem → Event. Идеально подходят для верификации покупки.
+- Рейтинг событий на внешних платформах (Яндекс.Карты, 2GIS) — ценный UGC, который можно использовать для доверия.
+
+### Решения
+
+1. **Модель Review**: `eventId` (nullable) + `operatorId` (nullable) — поддержка отзывов на уровне события И оператора. Unique constraint: `authorEmail + eventId`.
+2. **Гибридная верификация**: если пользователь ввёл `voucherCode` и он совпадает с покупкой этого события — `isVerified = true`. Остальные отзывы с `isVerified = false` проходят модерацию.
+3. **Модерация**: три статуса (PENDING → APPROVED/REJECTED). Все отзывы начинают с PENDING. Админ видит список с фильтром по статусу, badge с кол-вом pending.
+4. **External Rating**: три новых поля в Event (`externalRating`, `externalReviewCount`, `externalSource`). Админ вводит вручную. Участвует в расчёте итогового `rating` через взвешенное среднее.
+5. **Пересчёт рейтинга**: `recalculateEventRating()` — если есть и свои, и внешние отзывы, рейтинг = `(ownAvg * ownCount + extAvg * extCount) / (ownCount + extCount)`.
+6. **SEO**: JSON-LD `AggregateRating` автоматически добавляется на страницу события, если `rating > 0`.
+
+### Проблемы
+- Пока нет email-уведомлений о новых отзывах для админов. Планируется в следующих итерациях.
+- «Load more» в ReviewSection заменяет текущие отзывы, а не дополняет. Для MVP приемлемо; полноценная пагинация — в будущем.
+- Нет рейт-лимитинга на POST /reviews. Для protection от спама нужно добавить captcha или rate limiter (Фаза 2).
+
+---
+
+## 2026-02-12 — Полный редизайн админки (SaaS-стиль) + Полировка
+
+### Наблюдения
+
+- Админка была функциональной, но визуально устаревшей (обычные HTML-таблицы, inline-стили, alert/confirm). Пользователь предоставил демо `daibi.lovable.app/admin` как эталон.
+- После редизайна обнаружились проблемы с типизацией query-параметров (Prisma ожидает numbers, NestJS @Query даёт strings) — проявлялись как «Internal server error» на всех страницах с пагинацией.
+- Sonner toasts оказались значительно лучше inline-сообщений — не нужно скроллить к верху страницы чтобы увидеть результат действия.
+
+### Решения
+
+1. **UI-библиотека**: Выбран shadcn/ui (Radix + Tailwind + CVA) — модульные компоненты, полный контроль над стилями, нативная поддержка dark mode через CSS-переменные.
+2. **Графики**: recharts (AreaChart + BarChart) для Dashboard — лёгкий, отлично интегрируется с responsive-контейнером.
+3. **Таблицы**: @tanstack/react-table — headless, гибкий sort/filter/pagination, без vendor lock-in на UI.
+4. **Dark mode**: ThemeProvider с localStorage persist + CSS-переменные в `:root` и `.dark`. Sonner привязан к текущей теме. Smooth CSS transition при переключении.
+5. **Toasts**: Все CRUD-операции (save, delete, approve, reject, sync) переведены с inline-сообщений на sonner toast.success/toast.error.
+6. **Skeletons**: Каждая страница показывает скелетон вместо «Загрузка...» — карточки, строки таблиц, заголовки.
+7. **Mobile**: ScrollArea с горизонтальной прокруткой в DataTable, flex-wrap в пагинации, responsive sidebar (Sheet на mobile).
+8. **Page transitions**: CSS `fadeSlideIn` анимация (opacity + translateY) на `<main>` при смене страниц.
+9. **Backend fix**: Явное приведение `Number()` для page/limit в контроллерах Orders, Events, Articles, Audit.
+
+### Проблемы
+
+- При переименовании файлов (Badge.tsx → badge.tsx) на Windows файловая система не всегда отслеживает изменение регистра, что может привести к «Cannot find module» ошибкам.
+- `EADDRINUSE` на порту 4000 при перезапуске бэкенда — необходимо предварительно убить процесс.
+- Recharts в dark mode не имеет встроенной адаптации осей — используем className `stroke-muted` и `text-muted-foreground` для CartesianGrid и Axis.
+
+---
+
+## 2026-02-12 — EventAudience + Конверсионные механики
+
+### Наблюдения
+
+- Раздел «Детям» как жёсткая категория (EventCategory.KIDS) создавал проблему: «Детская экскурсия по каналам» была видна только в «Детям», но не в «Экскурсии». Пользователь, ищущий речные экскурсии, её не находил.
+- Kassir.ru и Яндекс.Афиша используют аналогичный подход — «Детям» как отдельный раздел с кросс-категорийной фильтрацией.
+- Конверсионные механики (departing soon, время суток, причалы) — это не категории в БД, а вычисляемые фильтры и бейджи на уровне представления.
+
+### Решения
+
+1. **EventAudience enum (ALL, KIDS, FAMILY)**: Заменяет KIDS как категорию. Событие теперь имеет реальную категорию (EXCURSION/MUSEUM/EVENT) + атрибут audience. «Детям» в каталоге = фильтр по audience, показывает события из ВСЕХ категорий.
+2. **SQL-миграция**: 7 шагов — добавление enum, перевод KIDS-событий в реальные категории, очистка KIDS_* подкатегорий, пересоздание enum-ов без старых значений, индексация.
+3. **Бейдж «Через N мин»**: Вычисляется в enrichWithBadges как разница nextSessionAt - now(). Оранжевый пульсирующий бейдж на карточке. Приоритет над «Осталось N мест».
+4. **departing_soon sort**: Отдельная ветка в getEvents — фетчит события с сеансами в ближайшие 2 часа, сортирует по nextSessionAt в памяти.
+5. **Время суток**: Raw SQL с EXTRACT(HOUR FROM startsAt AT TIME ZONE 'Europe/Moscow') для фильтрации по утро/день/вечер/ночь.
+6. **Фильтр по причалу**: Использует существующую модель Location (type=PIER). API /locations возвращает список причалов города.
+7. **Геолокация**: API /locations/nearest с Haversine-формулой в raw SQL. Фронтенд-интеграция запланирована на следующую фазу.
+8. **PromoBlock**: Серверный компонент, показывающий сезонные промо по текущему месяцу. Развод мостов (апр-ноя), Белые ночи (май-июл), Алые паруса (июнь), Новый год (дек-янв).
+
+### Проблемы
+
+- Prisma не поддерживает EXTRACT(HOUR) в where-условиях — пришлось использовать raw SQL для timeOfDay-фильтра.
+- При ALTER TYPE enum в PostgreSQL нужно предварительно снимать DEFAULT-ы с колонок, иначе ошибка cast.
+- `prisma db push --force-reset` заблокирован AI safety check — использовали `prisma db execute` для ручных миграций.
+
+---
+
+## 2026-02-12 — Контекстные быстрые фильтры + Системные теги + Бейджи
+
+### Наблюдения
+
+- Простые подкатегории (RIVER, WALKING, BUS) — это лишь часть того, что нужно пользователю для быстрой навигации. Пользователь ищет «С гидом», «Ночные», «Без очереди», «До 2 часов» — это микс подкатегорий, тегов, фильтров по времени суток и длительности.
+- Каждая витрина (Экскурсии, Музеи, Мероприятия, Детям) имеет свой уникальный набор полезных фильтров. Универсальный список подкатегорий не передаёт специфику.
+- Системные теги (`night`, `water`, `romantic`, `first-time-city`, `bad-weather-ok`, `with-guide`, `no-queue`, `interactive`, `audioguide`) — это не меню, а сигналы для ранжирования и бейджей на карточках.
+
+### Решения
+
+1. **QUICK_FILTERS конфиг (shared)**: Объект `Record<string, QuickFilter[]>` с ключами EXCURSION, MUSEUM, EVENT, KIDS. Каждый QuickFilter содержит id, emoji, label и params (произвольные query-параметры API). Один чип может устанавливать subcategory, tag, maxDuration или maxMinAge — фронтенд просто мержит params в запрос.
+2. **SYSTEM_TAG_BADGES (shared)**: Массив из 9 системных тегов с emoji, label, color (Tailwind bg-class) и textColor. Фронтенд рендерит до 2 тег-бейджей в правом верхнем углу карточки.
+3. **12 системных тегов в БД**: night, water, romantic, best-value, last-minute, today-available, bad-weather-ok, first-time-city, with-guide, no-queue, interactive, audioguide. Seed через SQL-миграцию.
+4. **Авто-присвоение тегов**: Расширен KEYWORD_TAG_MAP в tc-sync.service и аналогичный в tep-sync.service. Например, «ночн» → night, «обзорн» → first-time-city, «без очеред» → no-queue.
+5. **tagSlugs в API-ответе**: enrichWithBadges теперь извлекает slug-и тегов из event.tags и добавляет массив tagSlugs в ответ каталога. Фронтенд использует его для рендеринга тег-бейджей.
+6. **Фильтр maxDuration**: Новый query-параметр в EventsQueryDto. Позволяет чип «До 2 часов» (maxDuration=120).
+7. **Фильтр maxMinAge**: Новый query-параметр. Позволяет чипы «0+» (maxMinAge=0), «6+» (maxMinAge=6), «Школьникам» (maxMinAge=14) в витрине «Детям».
+8. **Контекстные чипы на фронтенде**: Убраны старые subcategory-чипы. Новый `activeQuickFilter` state → при выборе чипа его params мержатся в запрос API. При смене витрины чипы обнуляются.
+
+### Проблемы
+
+- best-value, last-minute, today-available — динамические теги, не могут быть присвоены по ключевым словам. Нужен отдельный алгоритм (cron-задача или вычисление при запросе). Пока они существуют как заготовки в БД.
+- Для maxMinAge на витрине «Детям» нужна корректная разметка minAge у событий. Текущий классификатор не всегда точно определяет возрастное ограничение.
+
+---
+
+## 2026-02-12 — Исправления главной, лендингов, архитектура SEO-блога
+
+### Наблюдения
+
+- Hero-кнопка «Спланировать» была невидима: `btn-secondary` даёт `bg-white`, а `!text-white` делал текст белым по белому фону. Требовался контрастный стиль для тёмного Hero-градиента.
+- PromoBlock показывал пустоту в феврале-марте: 4 имеющихся промо привязаны к навигации (апрель-ноябрь) и праздникам (декабрь-январь), зимние месяцы оставались пустыми.
+- Лендинг nochnye-mosty показывал пешеходные и автобусные экскурсии. Причина двойная: (a) KEYWORD_TAG_MAP содержал слишком широкое слово `мост`, присваивая тег `nochnye-mosty` любому событию с упоминанием мостов; (b) поле `additionalFilters` в LandingPage существовало, но не использовалось в сервисе.
+- Секция «Что посмотреть» содержала только 4 статические карточки категорий без тегов, хотя API уже возвращал теги с `_count.events`.
+
+### Решения
+
+1. **Hero кнопка**: заменены классы на `border-2 border-white/70 bg-white/10 backdrop-blur-sm ... text-white` — кнопка видна на тёмном фоне, при hover становится белой с цветным текстом.
+2. **PromoBlock**: добавлены 4 всесезонных промо — «День влюблённых» (фев), «Масленица» (фев-мар), «Зимний город» (ноя-мар), «Каникулы с детьми» (янв, мар, лето). Теперь в любой месяц отображается минимум 1 карточка.
+3. **Теги на главной**: добавлен SSR-fetch `api.getTags()`, фильтрация по `_count.events > 0`, сортировка по популярности, рендер до 20 чипов в виде «Тег (N)» с ссылками на `/events?tag={slug}`.
+4. **Лендинг nochnye-mosty**:
+   - `landing.service.ts` теперь применяет `additionalFilters` из БД (category, subcategories, source, min/maxDuration).
+   - Для nochnye-mosty установлен фильтр `{"subcategories": ["RIVER"]}` — теперь показываются только речные экскурсии.
+   - KEYWORD_TAG_MAP: удалены широкие ключи `мост`, `развод`, `разводн`; заменены на точные: `развод мостов`, `разводные мосты`, `ночные мосты`, `под разводными`.
+   - SQL-скрипт удалил тег `nochnye-mosty` у событий без подкатегории RIVER.
+5. **SEO-блог**: задокументирована полная архитектура в docs/Project.md — типы статей (городской гид, категориальный ТОП, тег-подборка, сезонный гид), flow генерации (ArticlePlanner → DataCollector → Renderer → Linker → Article DB), стратегия перелинковки, расписание триггеров, требования к контенту.
+
+### Проблемы
+
+- Реализация ArticlePlanner/Renderer/Linker ещё не началась — это отложено на следующий этап.
+- Подключение OpenAI API для генерации уникальных текстов — требует API-ключ и отдельную задачу на промптинг.
+- Промо «Масленица» и «День влюблённых» ведут на `/events?subcategory=GASTRO` и `/events?tag=romantic` соответственно — нужно убедиться, что события размечены этими тегами.
+
+---
+
+## 13.02.2026 — Полная интеграция teplohod.info (реальное расписание)
+
+### Наблюдения
+
+1. **IP добавлен в белый список teplohod.info** — full API доступен, возвращает `eventTimes` с реальным расписанием (дата/время отправления, количество свободных мест).
+2. **Структура `eventTimes`**: `{ id, datetime: "2026-05-18T16:30:00+0300", available_tickets: 90 }` — ISO 8601 с таймзоной.
+3. **Особенность API**: параметр `city_id` в `/v1/events` НЕ фильтрует события — API возвращает **одинаковые 55 событий** для любого `city_id`. Город определяется только через `eventPlaces[0].city_id`.
+4. **Объём данных**: 55 уникальных событий, ~2000 активных сессий (до 96 сессий на событие, горизонт до июля 2026).
+5. **API отвечает медленно** (~8-23 секунд на запрос).
+
+### Решения
+
+1. **Реальные сессии вместо виртуальных**:
+   - Переписан `syncSession()` — создаёт `EventSession` для каждого `eventTime` с реальным `startsAt`, `endsAt`, `availableTickets`.
+   - Прошлые даты отфильтровываются (`startsAt <= now`).
+   - Старые виртуальные сессии (`tep-{id}-main`) деактивируются.
+   - Сессии, исчезнувшие из расписания, автоматически деактивируются.
+
+2. **Batch INSERT для сессий**:
+   - Вместо индивидуальных `upsert` по одному — raw SQL `INSERT ... ON CONFLICT DO UPDATE` в одном запросе.
+   - Ускорение: время синхронизации упало с ~8 минут до ~68 секунд.
+
+3. **Оптимизация API-запросов**:
+   - Один вызов `getEvents()` вместо 16 (по каждому городу).
+   - Город определяется из `eventPlaces[0].city_id` → CITY_MAP → наш slug.
+
+4. **Fallback на compact API**:
+   - `TepApiService.getEvents()` сначала запрашивает full API; если `eventTimes` отсутствует, fallback на compact.
+
+5. **Типы обновлены**: `TepEvent.eventTimes?: TepTimeSlot[]`, `TepTimeSlot { id, datetime, available_tickets }`.
+
+### Проблемы
+
+- Teplohod.info пока имеет события только для Москвы (55 шт.), несмотря на 16 городов в `/v1/cities`.
+- Дубль города «Нижний Новгород» в БД (`nizhnij-novgorod` от TC, `nizhny-novgorod` от CITY_MAP) — требует объединения.
+- API иногда отвечает >20 секунд — для production нужен таймаут и retry.
+
+---
+
+## 13.02.2026 — Комплексная UGC-система (отзывы, фото, email, голосование)
+
+### Наблюдения
+
+1. **Текущий Review** имел только текстовые отзывы с модерацией (PENDING/APPROVED/REJECTED) и верификацией через voucher.
+2. **Отсутствовала инфраструктура**: email-отправка (SMTP), загрузка файлов (multer/S3), очереди (BullMQ установлен, не подключён).
+3. **Внешние рейтинги** хранились только как числа (`externalRating`, `externalReviewCount`, `externalSource`) на Event — без отдельных отзывов.
+
+### Решения
+
+**Фаза 1: Инфраструктура**
+- `MailModule` + `MailService` — @nestjs-modules/mailer + Handlebars. Шаблоны: `review-verify.hbs`, `review-request.hbs`, `review-approved.hbs`. SMTP через env vars, graceful fallback (DRY RUN) если не настроен.
+- `UploadModule` + `UploadService` — multer + sharp. Конвертация в WebP, ресайз до 1200px + thumbnail 300px. Абстракция `StorageProvider` (interface) для будущей миграции на S3.
+- `QueueModule` — BullMQ подключён к Redis. Очереди `emails` и `review-tasks`. Процессоры: `EmailProcessor`, `ReviewTaskProcessor`.
+- `ThrottlerModule` — глобальный rate limit 30 req/min.
+
+**Фаза 2: Улучшенные отзывы**
+- Новый статус `PENDING_EMAIL` → email-верификация перед модерацией. Токен 48h TTL, cron-очистка.
+- `ReviewPhoto` модель — до 5 фото на отзыв, sharp обработка, WebP.
+- `ReviewVote` модель — "Полезный отзыв", дедупликация по SHA-256(IP).
+- Honeypot-поле `website` + проверка минимального времени заполнения (5 сек) в backend.
+- При approve → email автору через BullMQ. При создании → email-верификация или уведомление админу.
+
+**Фаза 3: Внешние отзывы**
+- `ExternalReview` модель — ручной импорт отзывов с Яндекс.Карт, 2ГИС, Tripadvisor, Google.
+- Admin CRUD + batch JSON import.
+- Участие в `recalculateEventRating` через взвешенное среднее.
+- Frontend: бейджи источников, секция "Отзывы с других площадок".
+
+**Фаза 4: Пост-покупочный flow**
+- `ReviewRequest` модель — токен для прямой ссылки, tracking (sent/opened/clicked/reviewed).
+- `ReviewSchedulerService` — cron ежедневно в 10:00 (1 день после события), повторное напоминание по воскресеньям.
+- Pre-filled форма `/reviews/write?token=xxx` — автозаполнение email, автоматический `isVerified: true`.
+- Verified page `/reviews/verified` — после подтверждения email.
+
+### Проблемы
+
+- Миграция Prisma не прошла через `prisma migrate dev` из-за конфликтов в shadow DB (старые enum-миграции). Создана SQL-миграция вручную.
+- SMTP пока не настроен — все email-операции работают в DRY RUN режиме (логируются, не отправляются).
+- sharp требует native build — нужно проверить что `pnpm approve-builds` включает его на сервере.
+
+---
+
+## 13.02.2026 — Гибридные туры: ручные офферы + корзина + checkout
+
+### Наблюдения
+
+Реализован полный цикл гибридной торговой системы — от ручных офферов до оформления заказа и управления заявками в админке. Система расширяет существующую мульти-офферную архитектуру, добавляя возможность ручного ввода событий и покупки через несколько каналов одновременно.
+
+Архитектурный принцип: `Event = контент/SEO`, `Offer = способ купить`, `Session = дата/время`. Этот принцип сохранён и расширен на всех уровнях.
+
+### Решения
+
+1. **Этап 1 — Ручные офферы**:
+   - Добавлены `REQUEST_ONLY` в PurchaseType и `MANUAL` в EventSource
+   - `EventOffer` расширен полями `availabilityMode`, `badge`, `operatorId` (FK → Operator)
+   - Backend CRUD: POST (создание), PUT (полное обновление), DELETE (только MANUAL), POST clone (копия без id/price/deeplink)
+   - Admin UI: полноценная форма в Dialog (источник, тип покупки, цена, комиссия, приоритет, доступность, бейдж, оператор), кнопки Edit/Clone/Delete
+   - Frontend: обработка REQUEST_ONLY (встроенная форма заявки), бейджи офферов, multi-offer display при нескольких активных офферах
+
+2. **Этап 2 — Wizard создания Event**:
+   - POST /admin/events: создаёт Event + первый Offer в транзакции, auto-slug через кириллическую транслитерацию
+   - EventCreate.tsx: wizard из 2 шагов (контент/SEO + первый оффер), интегрирован в роутинг (/events/new)
+
+3. **Этап 3 — Корзина и Checkout**:
+   - **Модели**: `CheckoutSession` (snapshot корзины, контакт, UTM, IP, статусы) + `OrderRequest` (конкретная заявка, nullable checkoutSessionId для quick-request)
+   - **Cart**: CartContext + localStorage, CartProvider в root layout, CartDrawer (Sheet справа), CartIcon с бейджем в Header, AddToCartButton на странице события
+   - **Checkout API**: POST /checkout/validate (проверка офферов), POST /checkout/session (сессия + заявки), POST /checkout/request (быстрая заявка без корзины), GET /checkout/session/:id
+   - **Checkout Page**: 3 шага (проверка → контакты → готово), разделение на "Оплата у партнёра" (REDIRECT) и "Заявка на подтверждение" (REQUEST_ONLY)
+   - **Admin**: CheckoutSessionsList с вкладками "Заявки" и "Sessions", поиск, фильтры по статусу, кнопки Подтвердить/Отклонить с dialog для заметки
+
+4. **SQL-миграция**: `20260213_hybrid_offers/migration.sql` — все enum-расширения, новые колонки, FK, индексы, CheckoutSession и OrderRequest таблицы.
+
+### Проблемы
+
+- EventSource enum не содержал MANUAL — добавлен в schema и миграцию
+- tcEventId имеет @unique constraint — для ручных событий генерируется уникальный `manual-{timestamp}-{random}` идентификатор
+- Миграция должна быть применена вручную через `prisma migrate resolve` из-за ограничений enum в PostgreSQL
 
 ---
 

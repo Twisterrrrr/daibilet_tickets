@@ -1,6 +1,7 @@
-import { Controller, Post, Get, Param, Body } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { CheckoutService } from './checkout.service';
+import { Request } from 'express';
 
 @ApiTags('checkout')
 @Controller('checkout')
@@ -83,5 +84,40 @@ export class CheckoutController {
   @ApiOperation({ summary: 'Статус пакета после оплаты' })
   getStatus(@Param('packageId') packageId: string) {
     return this.checkoutService.getStatus(packageId);
+  }
+
+  // ============================
+  // Cart Checkout (новые endpoints)
+  // ============================
+
+  @Post('validate')
+  @ApiOperation({ summary: 'Валидировать корзину (проверка наличия/цен)' })
+  validateCart(@Body() body: { items: any[] }) {
+    return this.checkoutService.validateCart(body.items);
+  }
+
+  @Post('session')
+  @ApiOperation({ summary: 'Создать checkout session + order requests' })
+  createSession(@Body() body: any, @Req() req: Request) {
+    return this.checkoutService.createCheckoutSession({
+      items: body.items,
+      customer: body.customer,
+      utm: body.utm,
+      referrer: req.headers.referer || body.referrer,
+      userAgent: req.headers['user-agent'],
+      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip,
+    });
+  }
+
+  @Get('session/:id')
+  @ApiOperation({ summary: 'Статус checkout session' })
+  getSession(@Param('id') id: string) {
+    return this.checkoutService.getCheckoutSession(id);
+  }
+
+  @Post('request')
+  @ApiOperation({ summary: 'Быстрая заявка (без корзины, для REQUEST_ONLY)' })
+  createQuickRequest(@Body() body: { eventId: string; offerId?: string; name: string; email: string; phone: string; comment?: string }) {
+    return this.checkoutService.createQuickRequest(body);
   }
 }

@@ -1,22 +1,42 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { adminApi } from '../../api/client';
-import { DataTable } from '../../components/ui/DataTable';
-import { Badge } from '../../components/ui/Badge';
+import { useNavigate, Link } from 'react-router-dom';
+import { ColumnDef } from '@tanstack/react-table';
+import { RefreshCw, Eye, EyeOff, Star, MoreHorizontal, Plus } from 'lucide-react';
+import { adminApi } from '@/api/client';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
-type EventCategory = 'EXCURSION' | 'MUSEUM' | 'EVENT';
-type EventSource = 'TC' | 'TEPLOHOD';
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface EventItem {
   id: string;
   title: string;
-  category: EventCategory;
-  source: EventSource;
+  category: string;
+  source: string;
   rating: number | null;
   isActive: boolean;
   updatedAt: string;
   city?: { name: string };
   _count?: { sessions?: number };
+  override?: { isHidden?: boolean } | null;
 }
 
 interface EventsResponse {
@@ -26,23 +46,122 @@ interface EventsResponse {
   pages: number;
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  EXCURSION: 'Экскурсии',
+  MUSEUM: 'Музеи',
+  EVENT: 'Мероприятия',
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  TC: 'TicketsCloud',
+  TEPLOHOD: 'Теплоход',
+};
+
+// ─── Columns ─────────────────────────────────────────────────────────────────
+
+const columns: ColumnDef<EventItem>[] = [
+  {
+    accessorKey: 'title',
+    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
+    cell: ({ row }) => (
+      <div className="max-w-[300px]">
+        <p className="font-medium truncate">{row.original.title}</p>
+        <p className="text-xs text-muted-foreground">{row.original.city?.name ?? '—'}</p>
+      </div>
+    ),
+  },
+  {
+    accessorKey: 'category',
+    header: 'Категория',
+    cell: ({ row }) => (
+      <Badge variant="secondary">
+        {CATEGORY_LABELS[row.original.category] || row.original.category}
+      </Badge>
+    ),
+    filterFn: 'equals',
+  },
+  {
+    accessorKey: 'source',
+    header: 'Источник',
+    cell: ({ row }) => (
+      <Badge variant="outline">
+        {SOURCE_LABELS[row.original.source] || row.original.source}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: 'rating',
+    header: ({ column }) => <SortableHeader column={column}>Рейтинг</SortableHeader>,
+    cell: ({ row }) => {
+      const r = row.original.rating;
+      if (r != null && Number(r) > 0) {
+        return (
+          <div className="flex items-center gap-1">
+            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+            <span className="text-sm font-medium">{Number(r).toFixed(1)}</span>
+          </div>
+        );
+      }
+      return <span className="text-xs text-muted-foreground">—</span>;
+    },
+  },
+  {
+    id: 'status',
+    header: 'Статус',
+    cell: ({ row }) => {
+      const isHidden = row.original.override?.isHidden ?? false;
+      if (isHidden) {
+        return <Badge variant="destructive"><EyeOff className="mr-1 h-3 w-3" />Скрыт</Badge>;
+      }
+      return row.original.isActive ? (
+        <Badge variant="success"><Eye className="mr-1 h-3 w-3" />Активен</Badge>
+      ) : (
+        <Badge variant="secondary">Неактивен</Badge>
+      );
+    },
+  },
+  {
+    id: 'sessions',
+    header: 'Сеансы',
+    cell: ({ row }) => (
+      <span className="text-sm tabular-nums">{row.original._count?.sessions ?? 0}</span>
+    ),
+  },
+  {
+    accessorKey: 'updatedAt',
+    header: ({ column }) => <SortableHeader column={column}>Обновлено</SortableHeader>,
+    cell: ({ row }) =>
+      row.original.updatedAt
+        ? new Date(row.original.updatedAt).toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: '2-digit',
+          })
+        : '—',
+  },
+];
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
 export function EventsListPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<EventsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const [filters, setFilters] = useState({
     city: '',
     category: '',
     source: '',
     active: '',
+    hidden: '',
     search: '',
     page: 1,
-    limit: 20,
+    limit: 50,
   });
 
-  useEffect(() => {
+  const fetchEvents = () => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
@@ -50,6 +169,7 @@ export function EventsListPage() {
     if (filters.category) params.set('category', filters.category);
     if (filters.source) params.set('source', filters.source);
     if (filters.active) params.set('active', filters.active);
+    if (filters.hidden) params.set('hidden', filters.hidden);
     if (filters.search) params.set('search', filters.search);
     params.set('page', String(filters.page));
     params.set('limit', String(filters.limit));
@@ -59,142 +179,162 @@ export function EventsListPage() {
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, [filters]);
-
-  const handleRowClick = (item: EventItem) => {
-    navigate(`/events/${item.id}`);
   };
 
-  const columns = [
-    { key: 'title', label: 'Название' },
-    {
-      key: 'city.name',
-      label: 'Город',
-      render: (item: EventItem) => item.city?.name ?? '—',
-    },
-    { key: 'category', label: 'Категория' },
-    { key: 'source', label: 'Источник' },
-    {
-      key: 'rating',
-      label: 'Рейтинг',
-      render: (item: EventItem) => (item.rating != null ? String(item.rating) : '—'),
-    },
-    {
-      key: 'isActive',
-      label: 'Активен',
-      render: (item: EventItem) => (
-        <Badge variant={item.isActive ? 'success' : 'default'}>
-          {item.isActive ? 'Да' : 'Нет'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'sessionsCount',
-      label: 'Сессий',
-      render: (item: EventItem) => item._count?.sessions ?? 0,
-    },
-    {
-      key: 'updatedAt',
-      label: 'Обновлено',
-      render: (item: EventItem) =>
-        item.updatedAt
-          ? new Date(item.updatedAt).toLocaleDateString('ru-RU', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            })
-          : '—',
-    },
-  ];
+  useEffect(() => {
+    fetchEvents();
+  }, [filters]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await adminApi.post('/admin/sync');
+      // Refetch after sync
+      fetchEvents();
+    } catch {
+      // ignore
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-gray-900">События</h1>
-
-      <div className="mb-4 flex flex-wrap gap-4">
-        <input
-          type="text"
-          placeholder="Поиск..."
-          value={filters.search}
-          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        />
-        <select
-          value={filters.city}
-          onChange={(e) => setFilters((f) => ({ ...f, city: e.target.value, page: 1 }))}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        >
-          <option value="">Все города</option>
-          <option value="moscow">Москва</option>
-          <option value="spb">Санкт-Петербург</option>
-          <option value="kazan">Казань</option>
-          <option value="kaliningrad">Калининград</option>
-        </select>
-        <select
-          value={filters.category}
-          onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value, page: 1 }))}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        >
-          <option value="">Все категории</option>
-          <option value="EXCURSION">EXCURSION</option>
-          <option value="MUSEUM">MUSEUM</option>
-          <option value="EVENT">EVENT</option>
-        </select>
-        <select
-          value={filters.source}
-          onChange={(e) => setFilters((f) => ({ ...f, source: e.target.value, page: 1 }))}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        >
-          <option value="">Все источники</option>
-          <option value="TC">TC</option>
-          <option value="TEPLOHOD">TEPLOHOD</option>
-        </select>
-        <select
-          value={filters.active}
-          onChange={(e) => setFilters((f) => ({ ...f, active: e.target.value, page: 1 }))}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        >
-          <option value="">Все</option>
-          <option value="true">Активные</option>
-          <option value="false">Неактивные</option>
-        </select>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">События</h1>
+          <p className="text-muted-foreground">
+            {data ? `${data.total} событий в базе` : <Skeleton className="h-4 w-32 inline-block" />}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button asChild>
+            <Link to="/events/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Создать событие
+            </Link>
+          </Button>
+          <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            Синхронизация
+          </Button>
+        </div>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <Card className="border-destructive">
+          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+        </Card>
       )}
 
+      {/* Filters */}
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              type="text"
+              placeholder="Поиск по названию..."
+              value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
+              className="max-w-[250px]"
+            />
+            <Select
+              value={filters.city || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Все города" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все города</SelectItem>
+                <SelectItem value="moscow">Москва</SelectItem>
+                <SelectItem value="spb">Санкт-Петербург</SelectItem>
+                <SelectItem value="kazan">Казань</SelectItem>
+                <SelectItem value="kaliningrad">Калининград</SelectItem>
+                <SelectItem value="vladimir">Владимир</SelectItem>
+                <SelectItem value="yaroslavl">Ярославль</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.category || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, category: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Все категории" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все категории</SelectItem>
+                <SelectItem value="EXCURSION">Экскурсии</SelectItem>
+                <SelectItem value="MUSEUM">Музеи</SelectItem>
+                <SelectItem value="EVENT">Мероприятия</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.source || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, source: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Источник" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все источники</SelectItem>
+                <SelectItem value="TC">TicketsCloud</SelectItem>
+                <SelectItem value="TEPLOHOD">Теплоход</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.active || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, active: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="Статус" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все</SelectItem>
+                <SelectItem value="true">Активные</SelectItem>
+                <SelectItem value="false">Неактивные</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
       <DataTable
         columns={columns}
         data={data?.items ?? []}
-        onRowClick={handleRowClick}
         loading={loading}
-        emptyText="Нет событий"
+        emptyText="Нет событий, соответствующих фильтрам"
+        onRowClick={(item) => navigate(`/events/${item.id}`)}
       />
 
+      {/* Server pagination */}
       {data && data.pages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
             Показано {data.items.length} из {data.total}
           </p>
-          <div className="flex gap-2">
-            <button
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
               disabled={filters.page <= 1}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
             >
               Назад
-            </button>
-            <span className="flex items-center px-2 text-sm text-gray-600">
+            </Button>
+            <span className="text-sm tabular-nums text-muted-foreground">
               {filters.page} / {data.pages}
             </span>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
               disabled={filters.page >= data.pages}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
             >
               Вперёд
-            </button>
+            </Button>
           </div>
         </div>
       )}

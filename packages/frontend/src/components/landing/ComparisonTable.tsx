@@ -1,7 +1,7 @@
 'use client';
 
 import { TcWidgetButton } from '@/components/ui/TcWidget';
-import { Star, Users, Clock, MapPin, ExternalLink } from 'lucide-react';
+import { Star, Users, Clock, MapPin, ExternalLink, Ship } from 'lucide-react';
 
 interface Variant {
   sessionId: string;
@@ -50,7 +50,8 @@ function formatPrice(kopecks: number): string {
 
 function getPrice(v: Variant): number {
   const p = v.prices?.[0];
-  return p?.amount ?? p?.price ?? v.event.priceFrom ?? 0;
+  const sessionPrice = p?.amount || p?.price || 0;
+  return sessionPrice > 0 ? sessionPrice : (v.event.priceFrom ?? 0);
 }
 
 function formatDuration(minutes: number | undefined): string {
@@ -67,7 +68,6 @@ function shortenAddress(address: string | undefined): string {
   return address.replace(/^(причал|наб\.|набережная)\s*/i, '').slice(0, 40);
 }
 
-// Извлекаем название судна из заголовка события
 function extractVessel(title: string): string {
   const patterns = [
     /теплоход[еу]?\s+[«"]?([^»"]+)[»"]?/i,
@@ -78,15 +78,29 @@ function extractVessel(title: string): string {
     const m = title.match(p);
     if (m) return m[1].trim().slice(0, 25);
   }
-  return title.slice(0, 30);
+  return title.slice(0, 35);
+}
+
+function Pill({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-tight ${className}`}
+    >
+      {children}
+    </span>
+  );
 }
 
 export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps) {
   if (variants.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
-        <p className="text-lg text-slate-500">
-          Нет доступных рейсов по выбранным фильтрам
+      <div className="hidden rounded-2xl border border-slate-200 bg-white p-12 text-center md:block">
+        <Ship className="mx-auto h-12 w-12 text-slate-300" />
+        <p className="mt-3 text-lg font-semibold text-slate-500">
+          Нет рейсов по выбранным фильтрам
+        </p>
+        <p className="mt-1 text-sm text-slate-400">
+          Попробуйте сбросить фильтры или выбрать другую дату
         </p>
       </div>
     );
@@ -96,14 +110,12 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
     <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <th className="px-4 py-3">Дата / Время</th>
-            <th className="px-4 py-3">Причал</th>
-            <th className="px-4 py-3">Длительность</th>
-            <th className="px-4 py-3">Судно</th>
-            <th className="px-4 py-3 text-right">Цена</th>
-            <th className="px-4 py-3 text-center">Мест</th>
-            <th className="px-4 py-3"></th>
+          <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <th className="w-[110px] px-4 py-3">Время</th>
+            <th className="px-4 py-3">Причал / оператор</th>
+            <th className="px-4 py-3">Опции</th>
+            <th className="w-[130px] px-4 py-3 text-right">Цена</th>
+            <th className="w-[110px] px-4 py-3 text-right"></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -115,91 +127,91 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
             return (
               <tr
                 key={v.sessionId}
-                className={`transition-colors hover:bg-slate-50 ${
-                  isBest ? 'bg-amber-50/60' : ''
+                className={`transition-colors ${
+                  isBest
+                    ? 'bg-gradient-to-r from-primary-50/60 to-transparent'
+                    : 'hover:bg-slate-50/50'
                 } ${isSoldOut ? 'opacity-50' : ''}`}
               >
-                {/* Дата / Время */}
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {isBest && (
-                      <Star className="h-4 w-4 flex-shrink-0 fill-amber-400 text-amber-400" />
-                    )}
-                    <div>
-                      <div className="font-semibold text-slate-900">
-                        {formatTime(v.startsAt)}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {formatDate(v.startsAt)}
-                      </div>
+                {/* Время */}
+                <td className="px-4 py-3.5">
+                  {isBest && (
+                    <div className="mb-1 inline-flex items-center gap-1 text-[11px] font-bold text-primary-700">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      Оптимальный
                     </div>
+                  )}
+                  <div className="text-lg font-black text-slate-900 leading-none">
+                    {formatTime(v.startsAt)}
+                  </div>
+                  <div className="mt-0.5 text-[12px] text-slate-400">
+                    {formatDate(v.startsAt)} · {formatDuration(v.event.durationMinutes)}
                   </div>
                 </td>
 
-                {/* Причал */}
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1 text-slate-700">
-                    <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
-                    <span className="truncate">{shortenAddress(v.event.address)}</span>
+                {/* Причал / оператор */}
+                <td className="px-4 py-3.5">
+                  <div className="font-bold text-slate-900">
+                    {shortenAddress(v.event.address)}
                   </div>
-                </td>
-
-                {/* Длительность */}
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1 text-slate-600">
-                    <Clock className="h-3.5 w-3.5 text-slate-400" />
-                    {formatDuration(v.event.durationMinutes)}
-                  </div>
-                </td>
-
-                {/* Судно */}
-                <td className="max-w-[180px] px-4 py-3">
-                  <span className="truncate text-slate-700">
+                  <div className="mt-0.5 text-[12px] text-slate-500">
                     {extractVessel(v.event.title)}
-                  </span>
+                  </div>
+                </td>
+
+                {/* Опции (pills) */}
+                <td className="px-4 py-3.5">
+                  <div className="flex flex-wrap gap-1.5">
+                    <Pill className="border-slate-200 bg-slate-50 text-slate-600">
+                      <Clock className="h-3 w-3" />
+                      {formatDuration(v.event.durationMinutes)}
+                    </Pill>
+                    {Number(v.event.rating) > 0 && (
+                      <Pill className="border-amber-200 bg-amber-50 text-amber-700">
+                        <Star className="h-3 w-3 fill-amber-400" />
+                        {Number(v.event.rating).toFixed(1)}
+                      </Pill>
+                    )}
+                    {isSoldOut ? (
+                      <Pill className="border-red-200 bg-red-50 text-red-600">
+                        Нет мест
+                      </Pill>
+                    ) : v.availableTickets <= 10 ? (
+                      <Pill className="border-orange-200 bg-orange-50 text-orange-700">
+                        <Users className="h-3 w-3" />
+                        Осталось {v.availableTickets}
+                      </Pill>
+                    ) : (
+                      <Pill className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                        <Users className="h-3 w-3" />
+                        Есть места
+                      </Pill>
+                    )}
+                  </div>
                 </td>
 
                 {/* Цена */}
-                <td className="px-4 py-3 text-right">
-                  <span className="text-base font-bold text-slate-900">
-                    {price > 0 ? `${formatPrice(price)} \u20BD` : '—'}
-                  </span>
-                </td>
-
-                {/* Остаток мест */}
-                <td className="px-4 py-3 text-center">
-                  {isSoldOut ? (
-                    <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
-                      Распродано
-                    </span>
-                  ) : v.availableTickets <= 10 ? (
-                    <span className="flex items-center justify-center gap-1 text-amber-600">
-                      <Users className="h-3.5 w-3.5" />
-                      <span className="text-xs font-medium">
-                        {v.availableTickets}
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="text-xs text-slate-400">
-                      Есть
-                    </span>
-                  )}
+                <td className="px-4 py-3.5 text-right">
+                  <div className="text-base font-black text-slate-900">
+                    {price > 0 ? `${formatPrice(price)} ₽` : '—'}
+                  </div>
+                  <div className="text-[11px] text-slate-400">взрослый</div>
                 </td>
 
                 {/* Кнопка */}
-                <td className="px-4 py-3">
+                <td className="px-4 py-3.5 text-right">
                   {v.event.source === 'TC' && !isSoldOut ? (
-                    <div className="w-[120px]">
-                      <TcWidgetButton tcEventId={v.event.tcEventId} />
+                    <div className="w-[100px] ml-auto">
+                      <TcWidgetButton tcEventId={v.event.tcEventId} compact />
                     </div>
                   ) : v.event.source === 'TEPLOHOD' && !isSoldOut ? (
                     <a
                       href={`https://teplohod.info/event/${v.event.tcEventId.replace('tep-', '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+                      className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-colors"
                     >
-                      Купить <ExternalLink className="h-3.5 w-3.5" />
+                      Купить <ExternalLink className="h-3 w-3" />
                     </a>
                   ) : null}
                 </td>

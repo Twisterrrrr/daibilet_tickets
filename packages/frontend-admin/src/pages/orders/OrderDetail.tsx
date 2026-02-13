@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { adminApi } from '../../api/client';
-import { DataTable } from '../../components/ui/DataTable';
-import { Badge } from '../../components/ui/Badge';
+import { ArrowLeft, ExternalLink, CreditCard, Users, MapPin, Calendar } from 'lucide-react';
+import { adminApi } from '@/api/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
-type OrderStatus =
-  | 'DRAFT'
-  | 'PENDING_PAYMENT'
-  | 'PAID'
-  | 'FULFILLING'
-  | 'FULFILLED'
-  | 'PARTIALLY_FULFILLED'
-  | 'FAILED'
-  | 'REFUNDED';
+// ─── Types ───────────────────────────────────────────────────────────────────
 
+type OrderStatus = 'DRAFT' | 'PENDING_PAYMENT' | 'PAID' | 'FULFILLING' | 'FULFILLED' | 'PARTIALLY_FULFILLED' | 'FAILED' | 'REFUNDED';
 type PackageItemStatus = 'PENDING' | 'BOOKED' | 'CONFIRMED' | 'FAILED' | 'REFUNDED';
 
 interface PackageItem {
@@ -30,13 +35,7 @@ interface PackageItem {
   session: { id: string; startsAt: string };
 }
 
-interface Voucher {
-  id: string;
-  shortCode: string;
-  publicUrl: string;
-}
-
-interface OrderDetail {
+interface OrderDetailData {
   id: string;
   code: string;
   email: string;
@@ -56,299 +55,265 @@ interface OrderDetail {
   paidAt: string | null;
   city: { id: string; name: string; slug: string };
   items: PackageItem[];
-  voucher: Voucher | null;
+  voucher: { id: string; shortCode: string; publicUrl: string } | null;
 }
 
-const STATUS_BADGE: Record<OrderStatus, 'success' | 'warning' | 'danger' | 'info' | 'default' | 'orange'> = {
-  DRAFT: 'default',
-  PENDING_PAYMENT: 'warning',
-  PAID: 'success',
-  FULFILLING: 'info',
-  FULFILLED: 'success',
-  PARTIALLY_FULFILLED: 'info',
-  FAILED: 'danger',
-  REFUNDED: 'orange',
+const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'destructive' | 'secondary'> = {
+  DRAFT: 'secondary', PENDING_PAYMENT: 'warning', PAID: 'success',
+  FULFILLING: 'success', FULFILLED: 'success', PARTIALLY_FULFILLED: 'warning',
+  FAILED: 'destructive', REFUNDED: 'destructive',
 };
 
-const ITEM_STATUS_BADGE: Record<PackageItemStatus, 'success' | 'warning' | 'danger' | 'info' | 'default' | 'orange'> = {
-  PENDING: 'default',
-  BOOKED: 'info',
-  CONFIRMED: 'success',
-  FAILED: 'danger',
-  REFUNDED: 'orange',
+const ITEM_STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'destructive' | 'secondary'> = {
+  PENDING: 'secondary', BOOKED: 'default', CONFIRMED: 'success',
+  FAILED: 'destructive', REFUNDED: 'destructive',
 };
 
-// Безопасные переходы статуса из бэкенда
-const SAFE_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  DRAFT: ['PENDING_PAYMENT'],
-  PENDING_PAYMENT: ['PAID', 'FAILED'],
-  PAID: ['FULFILLING', 'REFUNDED'],
-  FULFILLING: ['FULFILLED', 'PARTIALLY_FULFILLED', 'FAILED'],
-  FULFILLED: [],
-  PARTIALLY_FULFILLED: [],
-  FAILED: ['REFUNDED'],
-  REFUNDED: [],
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Черновик', PENDING_PAYMENT: 'Ожидает оплаты', PAID: 'Оплачен',
+  FULFILLING: 'В исполнении', FULFILLED: 'Исполнен', PARTIALLY_FULFILLED: 'Частично',
+  FAILED: 'Ошибка', REFUNDED: 'Возврат',
+};
+
+const SAFE_TRANSITIONS: Record<string, string[]> = {
+  DRAFT: ['PENDING_PAYMENT'], PENDING_PAYMENT: ['PAID', 'FAILED'],
+  PAID: ['FULFILLING', 'REFUNDED'], FULFILLING: ['FULFILLED', 'PARTIALLY_FULFILLED', 'FAILED'],
+  FULFILLED: [], PARTIALLY_FULFILLED: [], FAILED: ['REFUNDED'], REFUNDED: [],
 };
 
 function formatPrice(kopecks: number): string {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    minimumFractionDigits: 0,
-  }).format(kopecks / 100);
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(kopecks / 100);
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  DRAFT: 'Черновик',
-  PENDING_PAYMENT: 'Ожидает оплаты',
-  PAID: 'Оплачен',
-  FULFILLING: 'В исполнении',
-  FULFILLED: 'Исполнен',
-  PARTIALLY_FULFILLED: 'Частично исполнен',
-  FAILED: 'Ошибка',
-  REFUNDED: 'Возврат',
-};
+// ─── Info Field ──────────────────────────────────────────────────────────────
+
+function InfoField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-medium">{value || '—'}</p>
+    </div>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [order, setOrder] = useState<OrderDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchOrder = () => {
+  useEffect(() => {
     if (!id) return;
     setLoading(true);
     setError(null);
     adminApi
-      .get<OrderDetail>(`/admin/orders/${id}`)
+      .get<OrderDetailData>(`/admin/orders/${id}`)
       .then(setOrder)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    fetchOrder();
   }, [id]);
 
-  const handleStatusChange = (newStatus: OrderStatus) => {
+  const handleStatusChange = (newStatus: string) => {
     if (!id || !order) return;
     setUpdating(true);
     setError(null);
     adminApi
-      .put<OrderDetail | { error: string }>(`/admin/orders/${id}/status`, { status: newStatus })
+      .put<OrderDetailData | { error: string }>(`/admin/orders/${id}/status`, { status: newStatus })
       .then((res) => {
-        if ('error' in res) {
-          setError(res.error);
-        } else {
-          setOrder(res);
-        }
+        if ('error' in res) setError((res as any).error);
+        else setOrder(res as OrderDetailData);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка смены статуса'))
+      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
       .finally(() => setUpdating(false));
   };
 
-  const itemColumns = [
-    {
-      key: 'event.title',
-      label: 'Событие',
-      render: (item: PackageItem) => item.event?.title ?? '—',
-    },
-    {
-      key: 'session.startsAt',
-      label: 'Начало',
-      render: (item: PackageItem) =>
-        item.session?.startsAt ? formatDateTime(item.session.startsAt) : '—',
-    },
-    { key: 'dayNumber', label: 'День' },
-    { key: 'slot', label: 'Слот' },
-    { key: 'adultTickets', label: 'Взрослых' },
-    { key: 'childTickets', label: 'Детей' },
-    {
-      key: 'subtotal',
-      label: 'Сумма',
-      render: (item: PackageItem) => formatPrice(item.subtotal),
-    },
-    { key: 'tcOrderId', label: 'TC Order' },
-    {
-      key: 'status',
-      label: 'Статус',
-      render: (item: PackageItem) => (
-        <Badge variant={ITEM_STATUS_BADGE[item.status]}>{item.status}</Badge>
-      ),
-    },
-  ];
-
   if (loading) {
     return (
-      <div className="flex h-40 items-center justify-center text-gray-400">Загрузка...</div>
-    );
-  }
-  if (!order) {
-    return (
-      <div>
-        <Link
-          to="/orders"
-          className="mb-4 inline-block rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-        >
-          ← Назад
-        </Link>
-        <div className="rounded-lg bg-red-50 p-4 text-red-700">{error || 'Заказ не найден'}</div>
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-[300px] w-full" />
       </div>
     );
   }
 
-  const allowedTransitions = SAFE_TRANSITIONS[order.status] ?? [];
+  if (!order) {
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-destructive">{error || 'Заказ не найден'}</p>
+        <Button variant="outline" className="mt-4" asChild>
+          <Link to="/orders">Назад</Link>
+        </Button>
+      </Card>
+    );
+  }
+
+  const transitions = SAFE_TRANSITIONS[order.status] ?? [];
 
   return (
-    <div>
-      <div className="mb-6 flex items-center gap-4">
-        <Link
-          to="/orders"
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-        >
-          ← Назад
-        </Link>
-        <h1 className="text-xl font-bold text-gray-900">
-          Заказ {order.code}
-        </h1>
-        <Badge variant={STATUS_BADGE[order.status]}>{STATUS_LABELS[order.status]}</Badge>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/orders"><ArrowLeft className="h-4 w-4" /></Link>
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Заказ {order.code}</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant={STATUS_VARIANT[order.status] || 'secondary'}>
+                {STATUS_LABELS[order.status] || order.status}
+              </Badge>
+              <span className="text-xs text-muted-foreground">{order.city?.name}</span>
+            </div>
+          </div>
+        </div>
+        {transitions.length > 0 && (
+          <div className="flex items-center gap-2">
+            {transitions.map((status) => (
+              <Button
+                key={status}
+                variant="outline"
+                size="sm"
+                onClick={() => handleStatusChange(status)}
+                disabled={updating}
+              >
+                {STATUS_LABELS[status] || status}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <Card className="border-destructive">
+          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+        </Card>
       )}
 
-      <div className="space-y-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="mb-4 text-sm font-semibold text-gray-700">Информация о заказе</h2>
-          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <dt className="text-xs text-gray-500">Клиент</dt>
-              <dd className="font-medium">{order.customerName}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Email</dt>
-              <dd className="font-medium">{order.email}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Телефон</dt>
-              <dd className="font-medium">{order.phone ?? '—'}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Город</dt>
-              <dd className="font-medium">{order.city?.name ?? '—'}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Даты</dt>
-              <dd className="font-medium">
-                {formatDate(order.dateFrom)} — {formatDate(order.dateTo)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Взрослых / Детей</dt>
-              <dd className="font-medium">
-                {order.adults} / {order.children}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Интенсивность</dt>
-              <dd className="font-medium">{order.intensity}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Вариант</dt>
-              <dd className="font-medium">{order.variantName ?? '—'}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Итого</dt>
-              <dd className="font-medium">{formatPrice(order.totalPrice)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Сервисный сбор</dt>
-              <dd className="font-medium">{formatPrice(order.serviceFee)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Payment ID</dt>
-              <dd className="font-mono text-sm">{order.paymentId ?? '—'}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Оплачен</dt>
-              <dd className="font-medium">
-                {order.paidAt ? formatDateTime(order.paidAt) : '—'}
-              </dd>
-            </div>
-          </dl>
+      {/* Info cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Customer */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              Клиент
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            <InfoField label="Имя" value={order.customerName} />
+            <InfoField label="Email" value={order.email} />
+            <InfoField label="Телефон" value={order.phone} />
+          </CardContent>
+        </Card>
 
-          {allowedTransitions.length > 0 && (
-            <div className="mt-4 flex gap-2">
-              {allowedTransitions.map((status) => (
-                <button
-                  key={status}
-                  onClick={() => handleStatusChange(status)}
-                  disabled={updating}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
-                >
-                  → {STATUS_LABELS[status]}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Trip */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              Поездка
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            <InfoField label="Город" value={order.city?.name} />
+            <InfoField label="Даты" value={`${formatDate(order.dateFrom)} — ${formatDate(order.dateTo)}`} />
+            <InfoField label="Состав" value={`${order.adults} взр. + ${order.children} дет.`} />
+            <InfoField label="Интенсивность" value={order.intensity} />
+          </CardContent>
+        </Card>
 
-        {order.items && order.items.length > 0 && (
-          <div>
-            <h2 className="mb-2 text-sm font-semibold text-gray-700">Позиции</h2>
-            <DataTable
-              columns={itemColumns}
-              data={order.items}
-              emptyText="Нет позиций"
-            />
-          </div>
-        )}
-
-        {order.voucher && (
-          <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h2 className="mb-4 text-sm font-semibold text-gray-700">Ваучер</h2>
-            <dl className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <dt className="text-xs text-gray-500">Код</dt>
-                <dd className="font-mono">{order.voucher.shortCode}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Ссылка</dt>
-                <dd>
-                  <a
-                    href={order.voucher.publicUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary-600 underline hover:text-primary-700"
-                  >
-                    {order.voucher.publicUrl}
-                  </a>
-                </dd>
-              </div>
-            </dl>
-          </div>
-        )}
+        {/* Payment */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              Оплата
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            <InfoField label="Итого" value={<span className="text-lg font-bold">{formatPrice(order.totalPrice)}</span>} />
+            <InfoField label="Сервисный сбор" value={formatPrice(order.serviceFee)} />
+            <InfoField label="Payment ID" value={<span className="font-mono text-xs">{order.paymentId}</span>} />
+            <InfoField label="Оплачен" value={order.paidAt ? formatDateTime(order.paidAt) : null} />
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Items */}
+      {order.items && order.items.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Позиции заказа</CardTitle>
+            <CardDescription>{order.items.length} мероприятий</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Событие</TableHead>
+                  <TableHead>Начало</TableHead>
+                  <TableHead>День</TableHead>
+                  <TableHead>Слот</TableHead>
+                  <TableHead>Билеты</TableHead>
+                  <TableHead className="text-right">Сумма</TableHead>
+                  <TableHead>TC Order</TableHead>
+                  <TableHead>Статус</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {order.items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium max-w-[200px] truncate">{item.event?.title ?? '—'}</TableCell>
+                    <TableCell className="text-sm">{item.session?.startsAt ? formatDateTime(item.session.startsAt) : '—'}</TableCell>
+                    <TableCell className="tabular-nums">{item.dayNumber}</TableCell>
+                    <TableCell>{item.slot}</TableCell>
+                    <TableCell className="tabular-nums">{item.adultTickets}+{item.childTickets}</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{formatPrice(item.subtotal)}</TableCell>
+                    <TableCell className="font-mono text-xs">{item.tcOrderId || '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant={ITEM_STATUS_VARIANT[item.status] || 'secondary'}>
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Voucher */}
+      {order.voucher && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Ваучер</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 sm:grid-cols-2">
+            <InfoField label="Код" value={<span className="font-mono text-lg">{order.voucher.shortCode}</span>} />
+            <InfoField
+              label="Ссылка"
+              value={
+                <a href={order.voucher.publicUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                  Открыть <ExternalLink className="h-3 w-3" />
+                </a>
+              }
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

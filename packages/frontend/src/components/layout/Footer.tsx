@@ -11,7 +11,8 @@ const footerLinks = {
     { name: 'Москва', href: '/cities/moscow' },
     { name: 'Санкт-Петербург', href: '/cities/saint-petersburg' },
     { name: 'Казань', href: '/cities/kazan' },
-    { name: 'Калининград', href: '/cities/kaliningrad' },
+    { name: 'Владимир', href: '/cities/vladimir' },
+    { name: 'Ярославль', href: '/cities/yaroslavl' },
   ],
   'Компания': [
     { name: 'О сервисе', href: '/about' },

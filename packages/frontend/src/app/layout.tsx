@@ -3,6 +3,7 @@ import Script from 'next/script';
 import './globals.css';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { CartProvider } from '@/lib/cart';
 
 export const metadata: Metadata = {
   title: {
@@ -27,9 +28,11 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className="flex min-h-screen flex-col">
+        <CartProvider>
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
+        </CartProvider>
 
         {/* Ticketscloud — скрипт виджета покупки билетов */}
         <Script

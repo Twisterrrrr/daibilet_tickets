@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { adminApi } from '../../api/client';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Intensity = 'RELAXED' | 'NORMAL' | 'ACTIVE';
 
@@ -160,7 +162,7 @@ export function ComboEditPage() {
         navigate('/combos');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+      toast.error(e instanceof Error ? e.message : 'Ошибка сохранения');
       setSaving(false);
     }
   };
@@ -173,14 +175,17 @@ export function ComboEditPage() {
       await adminApi.delete(`/admin/combos/${id}`);
       navigate('/combos');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка удаления');
+      toast.error(e instanceof Error ? e.message : 'Ошибка удаления');
       setSaving(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex h-40 items-center justify-center text-gray-400">Загрузка...</div>
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-[400px] w-full" />
+      </div>
     );
   }
 

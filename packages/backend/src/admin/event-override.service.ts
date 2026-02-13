@@ -75,6 +75,8 @@ export class EventOverrideService {
           description: override.description ?? event.description,
           imageUrl: override.imageUrl ?? event.imageUrl,
           category: override.category ?? event.category,
+          audience: override.audience ?? event.audience,
+          subcategories: override.subcategories?.length ? override.subcategories : event.subcategories,
           minAge: override.minAge ?? event.minAge,
           rating: override.manualRating ?? event.rating,
           _hasOverride: true,

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Menu, X, MapPin, Compass } from 'lucide-react';
 import { SearchAutocomplete } from './SearchAutocomplete';
+import { CartIcon } from '@/components/ui/CartDrawer';
 
 const navigation = [
   { name: 'Экскурсии', href: '/events?category=EXCURSION' },
@@ -40,9 +41,10 @@ export function Header() {
           ))}
         </div>
 
-        {/* Right side: search + planner + mobile menu */}
+        {/* Right side: search + cart + planner + mobile menu */}
         <div className="flex items-center gap-1 sm:gap-2">
           <SearchAutocomplete />
+          <CartIcon />
 
           <Link
             href="/planner"

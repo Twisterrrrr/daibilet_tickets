@@ -18,9 +18,11 @@ export class AdminAuditController {
     @Query('entityId') entityId?: string,
     @Query('userId') userId?: string,
     @Query('action') action?: string,
-    @Query('page') page = 1,
-    @Query('limit') limit = 50,
+    @Query('page') pageRaw = '1',
+    @Query('limit') limitRaw = '50',
   ) {
+    const page = Number(pageRaw) || 1;
+    const limit = Number(limitRaw) || 50;
     return this.audit.findMany({ entity, entityId, userId, action, page, limit });
   }
 }

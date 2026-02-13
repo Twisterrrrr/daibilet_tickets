@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
 import { CatalogModule } from './catalog/catalog.module';
@@ -15,6 +16,9 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { RedisCacheModule } from './cache/cache.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
+import { MailModule } from './mail/mail.module';
+import { UploadModule } from './upload/upload.module';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -26,8 +30,15 @@ import { AdminModule } from './admin/admin.module';
         '.env',                                         // cwd
       ],
     }),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,  // 60 секунд
+      limit: 30,   // 30 запросов в минуту (глобальный лимит)
+    }]),
     PrismaModule,
     RedisCacheModule,
+    MailModule,
+    UploadModule,
+    QueueModule,
     PricingModule,
     CatalogModule,
     PlannerModule,

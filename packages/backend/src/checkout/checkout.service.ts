@@ -2,17 +2,24 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { TcApiService } from '../catalog/tc-api.service';
 
+/** Cart item from frontend */
+interface CartItemDto {
+  eventId: string;
+  offerId: string;
+  sessionId?: string;
+  quantity: number;
+  eventTitle: string;
+  eventSlug: string;
+  imageUrl?: string;
+  priceFrom: number;
+  purchaseType: string;
+  source: string;
+  deeplink?: string;
+  badge?: string;
+}
+
 /**
- * Checkout Service — покупка билетов.
- *
- * Флоу для TC событий:
- * 1. Клиент выбирает билеты → POST /checkout/tc
- * 2. Бэкенд создаёт заказ в TC API v2 (билеты зарезервированы на 15 мин)
- * 3. Бэкенд возвращает данные заказа + ссылку на оплату (YooKassa)
- * 4. Клиент оплачивает → webhook → подтверждение заказа в TC
- * 5. TC отправляет билеты на email
- *
- * Пока YooKassa не подключена — возвращаем данные заказа для подтверждения.
+ * Checkout Service — покупка билетов + корзина + заявки.
  */
 @Injectable()
 export class CheckoutService {
@@ -217,6 +224,230 @@ export class CheckoutService {
       );
     }
   }
+
+  // ============================
+  // Cart: Validate
+  // ============================
+
+  /**
+   * Валидировать корзину: проверить наличие/актуальность цен офферов.
+   */
+  async validateCart(items: CartItemDto[]) {
+    if (!items || items.length === 0) {
+      throw new BadRequestException('Корзина пуста');
+    }
+
+    const validated: Array<CartItemDto & { valid: boolean; currentPrice: number | null; reason?: string }> = [];
+
+    for (const item of items) {
+      const offer = await this.prisma.eventOffer.findFirst({
+        where: { id: item.offerId, eventId: item.eventId, status: 'ACTIVE' },
+        include: { event: { select: { id: true, title: true, slug: true, imageUrl: true, isActive: true } } },
+      });
+
+      if (!offer) {
+        validated.push({ ...item, valid: false, currentPrice: null, reason: 'Оффер не найден или неактивен' });
+        continue;
+      }
+
+      if (!offer.event.isActive) {
+        validated.push({ ...item, valid: false, currentPrice: null, reason: 'Событие неактивно' });
+        continue;
+      }
+
+      // Check availability
+      if (offer.availabilityMode === 'SOLD_OUT') {
+        validated.push({ ...item, valid: false, currentPrice: offer.priceFrom, reason: 'Распродано' });
+        continue;
+      }
+
+      validated.push({
+        ...item,
+        valid: true,
+        currentPrice: offer.priceFrom,
+        eventTitle: offer.event.title,
+        eventSlug: offer.event.slug,
+        imageUrl: offer.event.imageUrl || item.imageUrl,
+      });
+    }
+
+    const allValid = validated.every((v) => v.valid);
+    const totalPrice = validated
+      .filter((v) => v.valid)
+      .reduce((sum, v) => sum + (v.currentPrice || v.priceFrom) * v.quantity, 0);
+
+    return { items: validated, allValid, totalPrice };
+  }
+
+  // ============================
+  // Cart: Create Checkout Session
+  // ============================
+
+  /**
+   * Создать CheckoutSession + OrderRequests для REQUEST_ONLY items.
+   */
+  async createCheckoutSession(data: {
+    items: CartItemDto[];
+    customer: { name: string; email: string; phone: string };
+    utm?: { source?: string; medium?: string; campaign?: string };
+    referrer?: string;
+    userAgent?: string;
+    ip?: string;
+  }) {
+    if (!data.items || data.items.length === 0) {
+      throw new BadRequestException('Корзина пуста');
+    }
+
+    // Validate first
+    const validation = await this.validateCart(data.items);
+    if (!validation.allValid) {
+      throw new BadRequestException('Некоторые позиции недоступны. Обновите корзину.');
+    }
+
+    const shortCode = `CS-${Date.now().toString(36).toUpperCase()}`;
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min TTL
+
+    // Separate items by type
+    const requestItems = data.items.filter((i) => i.purchaseType === 'REQUEST_ONLY' || i.purchaseType === 'API_CHECKOUT');
+    const redirectItems = data.items.filter((i) => i.purchaseType === 'REDIRECT');
+
+    const session = await this.prisma.$transaction(async (tx) => {
+      // Create checkout session
+      const cs = await tx.checkoutSession.create({
+        data: {
+          shortCode,
+          cartSnapshot: data.items as any,
+          validatedSnapshot: validation.items as any,
+          customerName: data.customer.name,
+          customerEmail: data.customer.email,
+          customerPhone: data.customer.phone,
+          status: requestItems.length > 0 ? 'PENDING_CONFIRMATION' : 'REDIRECTED',
+          totalPrice: validation.totalPrice,
+          expiresAt,
+          utmSource: data.utm?.source || null,
+          utmMedium: data.utm?.medium || null,
+          utmCampaign: data.utm?.campaign || null,
+          referrer: data.referrer || null,
+          userAgent: data.userAgent || null,
+          ip: data.ip || null,
+        },
+      });
+
+      // Create OrderRequests for REQUEST_ONLY items
+      for (const item of requestItems) {
+        await tx.orderRequest.create({
+          data: {
+            checkoutSessionId: cs.id,
+            eventOfferId: item.offerId,
+            eventId: item.eventId,
+            sessionId: item.sessionId || null,
+            quantity: item.quantity,
+            priceSnapshot: item.priceFrom * item.quantity,
+            customerName: data.customer.name,
+            customerEmail: data.customer.email,
+            customerPhone: data.customer.phone,
+            status: 'PENDING',
+            expiresAt,
+          },
+        });
+      }
+
+      return cs;
+    });
+
+    this.logger.log(`Created checkout session ${shortCode} with ${requestItems.length} request items and ${redirectItems.length} redirect items`);
+
+    return {
+      sessionId: session.id,
+      shortCode,
+      status: session.status,
+      expiresAt: session.expiresAt,
+      requestItems: requestItems.length,
+      redirectItems: redirectItems.map((item) => ({
+        offerId: item.offerId,
+        eventTitle: item.eventTitle,
+        deeplink: item.deeplink,
+        priceFrom: item.priceFrom,
+      })),
+    };
+  }
+
+  // ============================
+  // Quick Request (no cart)
+  // ============================
+
+  /**
+   * Быстрая заявка с одной страницы события (без корзины).
+   */
+  async createQuickRequest(data: {
+    eventId: string;
+    offerId?: string;
+    name: string;
+    email: string;
+    phone: string;
+    comment?: string;
+  }) {
+    // Find event
+    const event = await this.prisma.event.findUnique({
+      where: { id: data.eventId },
+      include: { offers: { where: { status: 'ACTIVE' }, orderBy: { isPrimary: 'desc' } } },
+    });
+
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    // Find offer
+    let offer = data.offerId
+      ? event.offers.find((o) => o.id === data.offerId)
+      : event.offers[0];
+
+    if (!offer) throw new BadRequestException('Активный оффер не найден');
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h TTL
+
+    const request = await this.prisma.orderRequest.create({
+      data: {
+        eventOfferId: offer.id,
+        eventId: event.id,
+        quantity: 1,
+        priceSnapshot: offer.priceFrom || 0,
+        customerName: data.name,
+        customerEmail: data.email,
+        customerPhone: data.phone,
+        customerComment: data.comment || null,
+        status: 'PENDING',
+        expiresAt,
+      },
+    });
+
+    this.logger.log(`Created quick request ${request.id} for event ${event.title}`);
+
+    return {
+      requestId: request.id,
+      message: 'Заявка отправлена! Оператор свяжется с вами для подтверждения.',
+      event: { id: event.id, title: event.title },
+    };
+  }
+
+  // ============================
+  // Get Checkout Session Status
+  // ============================
+
+  async getCheckoutSession(sessionId: string) {
+    const session = await this.prisma.checkoutSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        orderRequests: true,
+      },
+    });
+
+    if (!session) throw new NotFoundException('Сессия не найдена');
+
+    return session;
+  }
+
+  // ============================
+  // Trip Planner (legacy)
+  // ============================
 
   async create(body: any) {
     // TODO: Реализовать создание Package + платёж YooKassa (Trip Planner)

@@ -1,10 +1,11 @@
-import { Controller, Get, Patch, Delete, Param, Body, Query, UseGuards, UseInterceptors, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, UseInterceptors, Request, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { EventOverrideService } from './event-override.service';
+import { ReviewService } from '../catalog/review.service';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -15,6 +16,7 @@ export class AdminEventsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly overrideService: EventOverrideService,
+    private readonly reviewService: ReviewService,
   ) {}
 
   @Get()
@@ -25,9 +27,11 @@ export class AdminEventsController {
     @Query('active') active?: string,
     @Query('hidden') hidden?: string,
     @Query('search') search?: string,
-    @Query('page') page = 1,
-    @Query('limit') limit = 50,
+    @Query('page') pageRaw = '1',
+    @Query('limit') limitRaw = '50',
   ) {
+    const page = Number(pageRaw) || 1;
+    const limit = Number(limitRaw) || 50;
     const where: any = {};
     if (city) where.city = { slug: city };
     if (category) where.category = category;
@@ -45,7 +49,7 @@ export class AdminEventsController {
         where,
         include: {
           city: { select: { slug: true, name: true } },
-          _count: { select: { sessions: true, tags: true } },
+          _count: { select: { sessions: true, tags: true, offers: true } },
           override: true,
         },
         orderBy: { updatedAt: 'desc' },
@@ -66,6 +70,125 @@ export class AdminEventsController {
     return { items: filtered, total, page, pages: Math.ceil(total / limit) };
   }
 
+  /**
+   * Создать новое событие (ручное) + опционально первый оффер.
+   */
+  @Post()
+  @Roles('ADMIN', 'EDITOR')
+  async createEvent(
+    @Body() data: {
+      title: string;
+      cityId: string;
+      category: string;
+      subcategories?: string[];
+      audience?: string;
+      description?: string;
+      shortDescription?: string;
+      imageUrl?: string;
+      galleryUrls?: string[];
+      durationMinutes?: number;
+      address?: string;
+      lat?: number;
+      lng?: number;
+      minAge?: number;
+      // First offer (optional)
+      offer?: {
+        source?: string;
+        purchaseType: string;
+        deeplink?: string;
+        priceFrom?: number;
+        commissionPercent?: number;
+        availabilityMode?: string;
+        badge?: string;
+        operatorId?: string;
+      };
+    },
+  ) {
+    // Auto-generate slug from title via transliteration
+    const slug = this.transliterate(data.title);
+
+    // Check uniqueness
+    const existing = await this.prisma.event.findUnique({ where: { slug } });
+    if (existing) {
+      throw new BadRequestException(`Событие со slug "${slug}" уже существует`);
+    }
+
+    // Verify city exists
+    const city = await this.prisma.city.findUnique({ where: { id: data.cityId } });
+    if (!city) throw new NotFoundException('Город не найден');
+
+    // Create in transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Create event — generate a unique tcEventId for manual events
+      const event = await tx.event.create({
+        data: {
+          source: 'MANUAL' as any,
+          tcEventId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          cityId: data.cityId,
+          title: data.title,
+          slug,
+          description: data.description || null,
+          shortDescription: data.shortDescription || null,
+          category: data.category as any,
+          subcategories: data.subcategories || [],
+          audience: (data.audience as any) || 'ALL',
+          minAge: data.minAge || 0,
+          durationMinutes: data.durationMinutes || null,
+          address: data.address || null,
+          lat: data.lat || null,
+          lng: data.lng || null,
+          imageUrl: data.imageUrl || null,
+          galleryUrls: data.galleryUrls || [],
+          priceFrom: data.offer?.priceFrom || null,
+          isActive: true,
+        },
+      });
+
+      // Create first offer if provided
+      let offer = null;
+      if (data.offer) {
+        offer = await tx.eventOffer.create({
+          data: {
+            eventId: event.id,
+            source: (data.offer.source as any) || 'MANUAL',
+            purchaseType: data.offer.purchaseType as any,
+            deeplink: data.offer.deeplink || null,
+            priceFrom: data.offer.priceFrom || null,
+            commissionPercent: data.offer.commissionPercent || null,
+            availabilityMode: data.offer.availabilityMode || null,
+            badge: data.offer.badge || null,
+            operatorId: data.offer.operatorId || null,
+            isPrimary: true,
+            status: 'ACTIVE',
+          },
+        });
+      }
+
+      return { event, offer };
+    });
+
+    return result;
+  }
+
+  /** Транслитерация заголовка в slug */
+  private transliterate(text: string): string {
+    const map: Record<string, string> = {
+      'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+      'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'j', 'к': 'k', 'л': 'l', 'м': 'm',
+      'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+      'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+      'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    };
+    return text
+      .toLowerCase()
+      .split('')
+      .map((c) => map[c] ?? c)
+      .join('')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 120);
+  }
+
   @Get(':id')
   async get(@Param('id') id: string) {
     return this.prisma.event.findUniqueOrThrow({
@@ -74,13 +197,22 @@ export class AdminEventsController {
         city: { select: { slug: true, name: true } },
         sessions: { where: { isActive: true }, orderBy: { startsAt: 'asc' }, take: 20 },
         tags: { include: { tag: true } },
+        offers: {
+          orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
+          include: {
+            _count: { select: { sessions: true } },
+            operator: { select: { id: true, name: true, slug: true } },
+          },
+        },
         override: true,
       },
     });
   }
 
+  // --- Override endpoints ---
+
   /**
-   * Создать/обновить override для события (вместо прямого PUT).
+   * Создать/обновить override для события.
    */
   @Patch(':id/override')
   @Roles('ADMIN', 'EDITOR')
@@ -105,5 +237,339 @@ export class AdminEventsController {
   @Roles('ADMIN', 'EDITOR')
   async toggleHide(@Param('id') id: string, @Body('isHidden') isHidden: boolean, @Request() req: any) {
     return this.overrideService.toggleHidden(id, isHidden, req.user.id);
+  }
+
+  // --- External rating (ручной ввод из Яндекс/2GIS) ---
+
+  @Patch(':id/external-rating')
+  @Roles('ADMIN', 'EDITOR')
+  async updateExternalRating(
+    @Param('id') id: string,
+    @Body() data: { externalRating?: number; externalReviewCount?: number; externalSource?: string },
+  ) {
+    const event = await this.prisma.event.findUnique({ where: { id } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    const updated = await this.prisma.event.update({
+      where: { id },
+      data: {
+        externalRating: data.externalRating ?? null,
+        externalReviewCount: data.externalReviewCount ?? null,
+        externalSource: data.externalSource ?? null,
+      },
+      select: {
+        id: true,
+        externalRating: true,
+        externalReviewCount: true,
+        externalSource: true,
+        rating: true,
+        reviewCount: true,
+      },
+    });
+
+    // Пересчитать итоговый рейтинг
+    await this.reviewService.recalculateEventRating(id);
+
+    return updated;
+  }
+
+  // --- Offer endpoints ---
+
+  /**
+   * Список офферов для события.
+   */
+  @Get(':id/offers')
+  async listOffers(@Param('id') id: string) {
+    return this.prisma.eventOffer.findMany({
+      where: { eventId: id },
+      orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
+      include: {
+        _count: { select: { sessions: true } },
+        operator: { select: { id: true, name: true, slug: true } },
+      },
+    });
+  }
+
+  /**
+   * Создать новый оффер для события.
+   */
+  @Post(':id/offers')
+  @Roles('ADMIN', 'EDITOR')
+  async createOffer(
+    @Param('id') eventId: string,
+    @Body() data: {
+      source: string;
+      purchaseType: string;
+      externalEventId?: string;
+      metaEventId?: string;
+      deeplink?: string;
+      priceFrom?: number;
+      commissionPercent?: number;
+      priority?: number;
+      isPrimary?: boolean;
+      status?: string;
+      availabilityMode?: string;
+      badge?: string;
+      operatorId?: string;
+    },
+  ) {
+    // Verify event exists
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    // If setting isPrimary, unset others
+    if (data.isPrimary) {
+      await this.prisma.eventOffer.updateMany({
+        where: { eventId },
+        data: { isPrimary: false },
+      });
+    }
+
+    const offer = await this.prisma.eventOffer.create({
+      data: {
+        eventId,
+        source: data.source as any,
+        purchaseType: data.purchaseType as any,
+        externalEventId: data.externalEventId || null,
+        metaEventId: data.metaEventId || null,
+        deeplink: data.deeplink || null,
+        priceFrom: data.priceFrom ?? null,
+        commissionPercent: data.commissionPercent ?? null,
+        priority: data.priority ?? 0,
+        isPrimary: data.isPrimary ?? false,
+        status: (data.status as any) || 'ACTIVE',
+        availabilityMode: data.availabilityMode || null,
+        badge: data.badge || null,
+        operatorId: data.operatorId || null,
+      },
+      include: {
+        _count: { select: { sessions: true } },
+        operator: { select: { id: true, name: true, slug: true } },
+      },
+    });
+
+    // Update event priceFrom if this offer has a lower price
+    if (data.priceFrom && (!event.priceFrom || data.priceFrom < event.priceFrom)) {
+      await this.prisma.event.update({
+        where: { id: eventId },
+        data: { priceFrom: data.priceFrom },
+      });
+    }
+
+    return offer;
+  }
+
+  /**
+   * Полное обновление оффера.
+   */
+  @Put(':id/offers/:offerId')
+  @Roles('ADMIN', 'EDITOR')
+  async fullUpdateOffer(
+    @Param('id') eventId: string,
+    @Param('offerId') offerId: string,
+    @Body() data: {
+      source?: string;
+      purchaseType?: string;
+      externalEventId?: string;
+      metaEventId?: string;
+      deeplink?: string;
+      priceFrom?: number;
+      commissionPercent?: number;
+      priority?: number;
+      isPrimary?: boolean;
+      status?: string;
+      availabilityMode?: string;
+      badge?: string;
+      operatorId?: string;
+    },
+  ) {
+    const offer = await this.prisma.eventOffer.findFirst({
+      where: { id: offerId, eventId },
+    });
+    if (!offer) throw new NotFoundException('Оффер не найден');
+
+    // If setting isPrimary, unset others
+    if (data.isPrimary === true) {
+      await this.prisma.eventOffer.updateMany({
+        where: { eventId, id: { not: offerId } },
+        data: { isPrimary: false },
+      });
+    }
+
+    const updated = await this.prisma.eventOffer.update({
+      where: { id: offerId },
+      data: {
+        ...(data.source && { source: data.source as any }),
+        ...(data.purchaseType && { purchaseType: data.purchaseType as any }),
+        ...(data.externalEventId !== undefined && { externalEventId: data.externalEventId || null }),
+        ...(data.metaEventId !== undefined && { metaEventId: data.metaEventId || null }),
+        ...(data.deeplink !== undefined && { deeplink: data.deeplink || null }),
+        ...(data.priceFrom !== undefined && { priceFrom: data.priceFrom ?? null }),
+        ...(data.commissionPercent !== undefined && { commissionPercent: data.commissionPercent ?? null }),
+        ...(data.priority !== undefined && { priority: data.priority }),
+        ...(data.isPrimary !== undefined && { isPrimary: data.isPrimary }),
+        ...(data.status && { status: data.status as any }),
+        ...(data.availabilityMode !== undefined && { availabilityMode: data.availabilityMode || null }),
+        ...(data.badge !== undefined && { badge: data.badge || null }),
+        ...(data.operatorId !== undefined && { operatorId: data.operatorId || null }),
+      },
+      include: {
+        _count: { select: { sessions: true } },
+        operator: { select: { id: true, name: true, slug: true } },
+      },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Частичное обновление оффера (статус, primary, priority, комиссия).
+   */
+  @Patch(':id/offers/:offerId')
+  @Roles('ADMIN', 'EDITOR')
+  async updateOffer(
+    @Param('id') eventId: string,
+    @Param('offerId') offerId: string,
+    @Body() data: { status?: string; isPrimary?: boolean; priority?: number; commissionPercent?: number },
+  ) {
+    const offer = await this.prisma.eventOffer.findFirst({
+      where: { id: offerId, eventId },
+    });
+    if (!offer) throw new NotFoundException('Оффер не найден');
+
+    // Если ставим isPrimary — сбросить у остальных
+    if (data.isPrimary === true) {
+      await this.prisma.eventOffer.updateMany({
+        where: { eventId, id: { not: offerId } },
+        data: { isPrimary: false },
+      });
+    }
+
+    return this.prisma.eventOffer.update({
+      where: { id: offerId },
+      data: {
+        ...(data.status && { status: data.status as any }),
+        ...(data.isPrimary !== undefined && { isPrimary: data.isPrimary }),
+        ...(data.priority !== undefined && { priority: data.priority }),
+        ...(data.commissionPercent !== undefined && { commissionPercent: data.commissionPercent }),
+      },
+    });
+  }
+
+  /**
+   * Удалить оффер (только MANUAL-источники).
+   */
+  @Delete(':id/offers/:offerId')
+  @Roles('ADMIN', 'EDITOR')
+  async deleteOffer(
+    @Param('id') eventId: string,
+    @Param('offerId') offerId: string,
+  ) {
+    const offer = await this.prisma.eventOffer.findFirst({
+      where: { id: offerId, eventId },
+    });
+    if (!offer) throw new NotFoundException('Оффер не найден');
+
+    if (offer.source !== 'MANUAL') {
+      throw new BadRequestException('Удалять можно только MANUAL-офферы. Синхронизированные офферы скрывайте через статус DISABLED.');
+    }
+
+    // Delete related sessions first
+    await this.prisma.eventSession.deleteMany({ where: { offerId } });
+
+    await this.prisma.eventOffer.delete({ where: { id: offerId } });
+
+    return { message: 'Оффер удалён' };
+  }
+
+  /**
+   * Клонировать оффер (копия всех полей кроме id, priceFrom, deeplink).
+   */
+  @Post(':id/offers/:offerId/clone')
+  @Roles('ADMIN', 'EDITOR')
+  async cloneOffer(
+    @Param('id') eventId: string,
+    @Param('offerId') offerId: string,
+  ) {
+    const offer = await this.prisma.eventOffer.findFirst({
+      where: { id: offerId, eventId },
+    });
+    if (!offer) throw new NotFoundException('Оффер не найден');
+
+    const clone = await this.prisma.eventOffer.create({
+      data: {
+        eventId,
+        source: 'MANUAL',
+        purchaseType: offer.purchaseType,
+        externalEventId: null,
+        metaEventId: null,
+        deeplink: null,
+        priceFrom: null,
+        commissionPercent: offer.commissionPercent,
+        priority: offer.priority,
+        isPrimary: false,
+        status: 'HIDDEN',
+        availabilityMode: offer.availabilityMode,
+        badge: offer.badge,
+        operatorId: offer.operatorId,
+      },
+      include: {
+        _count: { select: { sessions: true } },
+        operator: { select: { id: true, name: true, slug: true } },
+      },
+    });
+
+    return clone;
+  }
+
+  /**
+   * Ручной merge: привязать оффер к другому каноническому событию.
+   * Исходное событие помечается как дубль (canonicalOfId = target).
+   */
+  @Post(':id/offers/:offerId/merge')
+  @Roles('ADMIN', 'EDITOR')
+  async mergeOffer(
+    @Param('id') sourceEventId: string,
+    @Param('offerId') offerId: string,
+    @Body('targetEventId') targetEventId: string,
+  ) {
+    if (!targetEventId) throw new NotFoundException('targetEventId обязателен');
+    if (sourceEventId === targetEventId) throw new NotFoundException('Нельзя объединить событие с самим собой');
+
+    // Проверить что target существует
+    const target = await this.prisma.event.findUnique({ where: { id: targetEventId } });
+    if (!target) throw new NotFoundException('Целевое событие не найдено');
+
+    // Проверить что оффер существует
+    const offer = await this.prisma.eventOffer.findFirst({
+      where: { id: offerId, eventId: sourceEventId },
+    });
+    if (!offer) throw new NotFoundException('Оффер не найден');
+
+    // Перенести оффер к target
+    await this.prisma.eventOffer.update({
+      where: { id: offerId },
+      data: { eventId: targetEventId, isPrimary: false },
+    });
+
+    // Перенести сессии оффера
+    await this.prisma.eventSession.updateMany({
+      where: { offerId },
+      data: { eventId: targetEventId },
+    });
+
+    // Если у source не осталось офферов — пометить как дубль
+    const remainingOffers = await this.prisma.eventOffer.count({
+      where: { eventId: sourceEventId },
+    });
+
+    if (remainingOffers === 0) {
+      await this.prisma.event.update({
+        where: { id: sourceEventId },
+        data: { canonicalOfId: targetEventId },
+      });
+    }
+
+    return { message: 'Оффер перенесён', targetEventId, remainingOffers };
   }
 }

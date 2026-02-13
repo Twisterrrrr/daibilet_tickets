@@ -1,6 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { adminApi } from '../../api/client';
+import { toast } from 'sonner';
+import { adminApi } from '@/api/client';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+const CATEGORY_OPTIONS = [
+  { value: 'food', label: 'food' },
+  { value: 'transport', label: 'transport' },
+  { value: 'vip', label: 'vip' },
+  { value: 'photo', label: 'photo' },
+  { value: 'souvenir', label: 'souvenir' },
+];
 
 export function UpsellEditPage() {
   const { id } = useParams();
@@ -19,7 +40,6 @@ export function UpsellEditPage() {
   });
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!isNew) {
@@ -40,7 +60,6 @@ export function UpsellEditPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    setError('');
     try {
       const payload = { ...form, citySlug: form.citySlug || null };
       if (isNew) {
@@ -48,97 +67,174 @@ export function UpsellEditPage() {
       } else {
         await adminApi.patch(`/admin/upsells/${id}`, payload);
       }
+      toast.success('Сохранено');
       navigate('/upsells');
     } catch (e: any) {
-      setError(e.message);
+      toast.error(e.message || 'Ошибка сохранения');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <div className="text-gray-400">Загрузка...</div>;
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-48 w-full rounded-lg" />
+        ))}
+        <div className="flex gap-3">
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-20" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="mb-6 text-xl font-bold text-gray-900">
-        {isNew ? 'Новый Upsell' : 'Редактировать Upsell'}
-      </h1>
+    <div className="mx-auto max-w-2xl space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {isNew ? 'Новый Upsell' : 'Редактировать Upsell'}
+        </h1>
+        <p className="text-muted-foreground">Дополнительное предложение для бронирования</p>
+      </div>
 
-      <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Название</label>
-            <input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+      <Card>
+        <CardHeader>
+          <CardTitle>Основные данные</CardTitle>
+          <CardDescription>Название, иконка и описание</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="title">Название</Label>
+              <Input
+                id="title"
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="Название upsell"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="icon">Иконка</Label>
+              <Input
+                id="icon"
+                value={form.icon}
+                onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
+                placeholder="🍽️"
+              />
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Иконка</label>
-            <input value={form.icon} onChange={(e) => setForm(f => ({ ...f, icon: e.target.value }))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="🍽️" />
-          </div>
-        </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Описание</label>
-          <textarea value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-            rows={3} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="description">Описание</Label>
+            <Textarea
+              id="description"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              rows={3}
+              placeholder="Описание предложения"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Цена (коп.)</label>
-            <input type="number" value={form.priceKopecks}
-              onChange={(e) => setForm(f => ({ ...f, priceKopecks: Number(e.target.value) }))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-            <p className="mt-0.5 text-xs text-gray-400">{(form.priceKopecks / 100).toLocaleString('ru-RU')} ₽</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Цена и категория</CardTitle>
+          <CardDescription>Стоимость, категория и привязка к городу</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="priceKopecks">Цена (коп.)</Label>
+              <Input
+                id="priceKopecks"
+                type="number"
+                value={form.priceKopecks}
+                onChange={(e) => setForm((f) => ({ ...f, priceKopecks: Number(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                {(form.priceKopecks / 100).toLocaleString('ru-RU')} ₽
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Категория</Label>
+              <Select
+                value={form.category}
+                onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
+              >
+                <SelectTrigger id="category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="citySlug">Город (slug)</Label>
+              <Input
+                id="citySlug"
+                value={form.citySlug}
+                onChange={(e) => setForm((f) => ({ ...f, citySlug: e.target.value }))}
+                placeholder="Пусто = все"
+              />
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Категория</label>
-            <select value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-              <option value="food">food</option>
-              <option value="transport">transport</option>
-              <option value="vip">vip</option>
-              <option value="photo">photo</option>
-              <option value="souvenir">souvenir</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Город (slug)</label>
-            <input value={form.citySlug} onChange={(e) => setForm(f => ({ ...f, citySlug: e.target.value }))}
-              placeholder="Пусто = все" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-          </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Порядок сортировки</label>
-            <input type="number" value={form.sortOrder}
-              onChange={(e) => setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+      <Card>
+        <CardHeader>
+          <CardTitle>Настройки</CardTitle>
+          <CardDescription>Порядок сортировки и активность</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="sortOrder">Порядок сортировки</Label>
+              <Input
+                id="sortOrder"
+                type="number"
+                value={form.sortOrder}
+                onChange={(e) => setForm((f) => ({ ...f, sortOrder: Number(e.target.value) }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Статус</Label>
+              <Select
+                value={form.isActive ? 'true' : 'false'}
+                onValueChange={(v) => setForm((f) => ({ ...f, isActive: v === 'true' }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Активен</SelectItem>
+                  <SelectItem value="false">Выключен</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.isActive}
-                onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))}
-                className="rounded" />
-              Активен
-            </label>
-          </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-
-        <div className="flex gap-3 pt-2">
-          <button onClick={handleSave} disabled={saving}
-            className="rounded-lg bg-primary-600 px-6 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50">
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </button>
-          <button onClick={() => navigate('/upsells')}
-            className="rounded-lg border border-gray-300 px-6 py-2 text-sm text-gray-600 hover:bg-gray-50">
-            Отмена
-          </button>
-        </div>
+      <div className="flex gap-3">
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </Button>
+        <Button variant="outline" onClick={() => navigate('/upsells')}>
+          Отмена
+        </Button>
       </div>
     </div>
   );

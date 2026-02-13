@@ -1,8 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { adminApi } from '../../api/client';
-import { DataTable } from '../../components/ui/DataTable';
-import { Badge } from '../../components/ui/Badge';
+import { ColumnDef } from '@tanstack/react-table';
+import { Plus } from 'lucide-react';
+import { adminApi } from '@/api/client';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 type TagCategory = 'THEME' | 'AUDIENCE' | 'SEASON' | 'SPECIAL';
 
@@ -15,8 +27,8 @@ interface TagItem {
   _count?: { events?: number };
 }
 
-const CATEGORY_VARIANTS: Record<TagCategory, 'success' | 'warning' | 'info' | 'default'> = {
-  THEME: 'info',
+const CATEGORY_VARIANTS: Record<TagCategory, 'success' | 'warning' | 'secondary' | 'default'> = {
+  THEME: 'secondary',
   AUDIENCE: 'success',
   SEASON: 'warning',
   SPECIAL: 'default',
@@ -28,6 +40,44 @@ const CATEGORY_LABELS: Record<TagCategory, string> = {
   SEASON: 'Сезон',
   SPECIAL: 'Специальный',
 };
+
+const columns: ColumnDef<TagItem>[] = [
+  {
+    accessorKey: 'name',
+    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
+    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+  },
+  {
+    accessorKey: 'slug',
+    header: ({ column }) => <SortableHeader column={column}>Slug</SortableHeader>,
+    cell: ({ row }) => <span className="text-muted-foreground font-mono text-sm">{row.original.slug}</span>,
+  },
+  {
+    accessorKey: 'category',
+    header: 'Категория',
+    cell: ({ row }) => (
+      <Badge variant={CATEGORY_VARIANTS[row.original.category] ?? 'default'}>
+        {CATEGORY_LABELS[row.original.category] ?? row.original.category}
+      </Badge>
+    ),
+  },
+  {
+    id: 'eventsCount',
+    header: 'Событий',
+    cell: ({ row }) => (
+      <span className="tabular-nums">{row.original._count?.events ?? 0}</span>
+    ),
+  },
+  {
+    accessorKey: 'isActive',
+    header: 'Активен',
+    cell: ({ row }) => (
+      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
+        {row.original.isActive ? 'Да' : 'Нет'}
+      </Badge>
+    ),
+  },
+];
 
 export function TagsListPage() {
   const navigate = useNavigate();
@@ -55,77 +105,80 @@ export function TagsListPage() {
     navigate(`/tags/${item.id}`);
   };
 
-  const columns = [
-    { key: 'name', label: 'Название' },
-    { key: 'slug', label: 'Slug' },
-    {
-      key: 'category',
-      label: 'Категория',
-      render: (item: TagItem) => (
-        <Badge variant={CATEGORY_VARIANTS[item.category] ?? 'default'}>
-          {CATEGORY_LABELS[item.category] ?? item.category}
-        </Badge>
-      ),
-    },
-    {
-      key: 'eventsCount',
-      label: 'Событий',
-      render: (item: TagItem) => item._count?.events ?? 0,
-    },
-    {
-      key: 'isActive',
-      label: 'Активен',
-      render: (item: TagItem) => (
-        <Badge variant={item.isActive ? 'success' : 'default'}>{item.isActive ? 'Да' : 'Нет'}</Badge>
-      ),
-    },
-  ];
-
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Теги</h1>
-        <Link
-          to="/tags/new"
-          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-        >
-          Создать
-        </Link>
-      </div>
-
-      <div className="mb-4 flex flex-wrap gap-4">
-        <input
-          type="text"
-          placeholder="Поиск по названию или slug..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        />
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        >
-          <option value="">Все категории</option>
-          {(Object.keys(CATEGORY_LABELS) as TagCategory[]).map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABELS[c]}
-            </option>
-          ))}
-        </select>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Теги</h1>
+          <p className="text-muted-foreground">
+            Управление тегами для категоризации событий
+          </p>
+        </div>
+        <Button asChild>
+          <Link to="/tags/new">
+            <Plus className="mr-2 h-4 w-4" />
+            Создать
+          </Link>
+        </Button>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <Card className="border-destructive">
+          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+        </Card>
       )}
 
-      <DataTable
-        columns={columns}
-        data={data}
-        onRowClick={handleRowClick}
-        loading={loading}
-        emptyText="Нет тегов"
-      />
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Фильтры</CardTitle>
+          <CardDescription>Поиск и фильтрация по категории</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <Input
+              type="text"
+              placeholder="Поиск по названию или slug..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            <Select value={category || '__all__'} onValueChange={(v) => setCategory(v === '__all__' ? '' : v)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Все категории" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все категории</SelectItem>
+                {(Object.keys(CATEGORY_LABELS) as TagCategory[]).map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {CATEGORY_LABELS[c]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Список тегов</CardTitle>
+          <CardDescription>
+            {data.length} {data.length === 1 ? 'тег' : data.length < 5 ? 'тега' : 'тегов'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={data}
+            onRowClick={handleRowClick}
+            loading={loading}
+            emptyText="Нет тегов"
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

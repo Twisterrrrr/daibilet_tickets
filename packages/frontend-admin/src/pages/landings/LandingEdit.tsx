@@ -1,6 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { adminApi } from '../../api/client';
+import { toast } from 'sonner';
+import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { adminApi } from '@/api/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface CityItem {
   id: string;
@@ -69,6 +88,8 @@ function safeJsonParse<T>(str: string, fallback: T): T {
   }
 }
 
+// ─── Page ────────────────────────────────────────────────────────────────────
+
 export function LandingEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -84,7 +105,7 @@ export function LandingEditPage() {
     adminApi
       .get<CityItem[] | { items: CityItem[] }>('/admin/cities')
       .then((res) => {
-        const list = Array.isArray(res) ? res : (res as any).items ?? [];
+        const list = Array.isArray(res) ? res : (res as { items: CityItem[] }).items ?? [];
         setCities(list);
       })
       .catch(() => {});
@@ -98,20 +119,20 @@ export function LandingEditPage() {
     setLoading(true);
     setError(null);
     adminApi
-      .get<any>(`/admin/landings/${id}`)
+      .get<Record<string, unknown>>(`/admin/landings/${id}`)
       .then((data) => {
         setForm({
-          slug: data.slug ?? '',
-          cityId: data.cityId ?? '',
-          filterTag: data.filterTag ?? '',
-          title: data.title ?? '',
-          subtitle: data.subtitle ?? '',
-          heroText: data.heroText ?? '',
-          metaTitle: data.metaTitle ?? '',
-          metaDescription: data.metaDescription ?? '',
-          legalText: data.legalText ?? '',
-          isActive: data.isActive ?? true,
-          sortOrder: data.sortOrder ?? 0,
+          slug: (data.slug as string) ?? '',
+          cityId: (data.cityId as string) ?? '',
+          filterTag: (data.filterTag as string) ?? '',
+          title: (data.title as string) ?? '',
+          subtitle: (data.subtitle as string) ?? '',
+          heroText: (data.heroText as string) ?? '',
+          metaTitle: (data.metaTitle as string) ?? '',
+          metaDescription: (data.metaDescription as string) ?? '',
+          legalText: (data.legalText as string) ?? '',
+          isActive: (data.isActive as boolean) ?? true,
+          sortOrder: (data.sortOrder as number) ?? 0,
           howToChoose: JSON.stringify(data.howToChoose ?? [], null, 2),
           infoBlocks: JSON.stringify(data.infoBlocks ?? [], null, 2),
           faq: JSON.stringify(data.faq ?? [], null, 2),
@@ -162,7 +183,7 @@ export function LandingEditPage() {
         navigate('/landings');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+      toast.error(e instanceof Error ? e.message : 'Ошибка сохранения');
       setSaving(false);
     }
   };
@@ -175,187 +196,247 @@ export function LandingEditPage() {
       await adminApi.delete(`/admin/landings/${id}`);
       navigate('/landings');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка удаления');
+      toast.error(e instanceof Error ? e.message : 'Ошибка удаления');
       setSaving(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex h-40 items-center justify-center text-gray-400">Загрузка...</div>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+        </div>
+        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[300px] w-full" />
+      </div>
     );
   }
 
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-gray-900">
-        {isCreate ? 'Новый лендинг' : 'Редактирование лендинга'}
-      </h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isCreate ? 'Новый лендинг' : 'Редактирование лендинга'}
+          </h1>
+          <p className="text-muted-foreground">
+            {isCreate
+              ? 'Создайте новый лендинг для города и тега'
+              : 'Изменения сохранятся при нажатии «Сохранить»'}
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => navigate('/landings')} className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Назад
+        </Button>
+      </div>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <Card className="border-destructive">
+          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+        </Card>
       )}
 
-      <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Slug</label>
-          <input
-            type="text"
-            value={form.slug}
-            onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-            required
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Город</label>
-          <select
-            value={form.cityId}
-            onChange={(e) => setForm((f) => ({ ...f, cityId: e.target.value }))}
-            required
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          >
-            <option value="">Выберите город</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Фильтр-тег (slug)</label>
-          <input
-            type="text"
-            value={form.filterTag}
-            onChange={(e) => setForm((f) => ({ ...f, filterTag: e.target.value }))}
-            required
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Заголовок (H1)</label>
-          <input
-            type="text"
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            required
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Подзаголовок</label>
-          <input
-            type="text"
-            value={form.subtitle}
-            onChange={(e) => setForm((f) => ({ ...f, subtitle: e.target.value }))}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Hero текст</label>
-          <textarea
-            value={form.heroText}
-            onChange={(e) => setForm((f) => ({ ...f, heroText: e.target.value }))}
-            rows={3}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Meta Title</label>
-          <input
-            type="text"
-            value={form.metaTitle}
-            onChange={(e) => setForm((f) => ({ ...f, metaTitle: e.target.value }))}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Meta Description</label>
-          <textarea
-            value={form.metaDescription}
-            onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))}
-            rows={2}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Юридический текст</label>
-          <textarea
-            value={form.legalText}
-            onChange={(e) => setForm((f) => ({ ...f, legalText: e.target.value }))}
-            rows={2}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div className="flex gap-4">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isActive"
-              checked={form.isActive}
-              onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <label htmlFor="isActive" className="text-sm text-gray-700">
-              Активен
-            </label>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Порядок (sortOrder)</label>
-            <input
-              type="number"
-              value={form.sortOrder}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))
-              }
-              className="w-24 rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
-          </div>
-        </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basic info */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Основные данные</CardTitle>
+            <CardDescription>Slug, город, фильтр-тег и заголовки</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="slug">Slug</Label>
+                <Input
+                  id="slug"
+                  value={form.slug}
+                  onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="city">Город</Label>
+                <Select
+                  value={form.cityId || '__none__'}
+                  onValueChange={(v) =>
+                    setForm((f) => ({ ...f, cityId: v === '__none__' ? '' : v }))
+                  }
+                  required
+                >
+                  <SelectTrigger id="city">
+                    <SelectValue placeholder="Выберите город" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Выберите город</SelectItem>
+                    {cities.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="filterTag">Фильтр-тег (slug)</Label>
+              <Input
+                id="filterTag"
+                value={form.filterTag}
+                onChange={(e) => setForm((f) => ({ ...f, filterTag: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="title">Заголовок (H1)</Label>
+                <Input
+                  id="title"
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subtitle">Подзаголовок</Label>
+                <Input
+                  id="subtitle"
+                  value={form.subtitle}
+                  onChange={(e) => setForm((f) => ({ ...f, subtitle: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="heroText">Hero текст</Label>
+              <Textarea
+                id="heroText"
+                value={form.heroText}
+                onChange={(e) => setForm((f) => ({ ...f, heroText: e.target.value }))}
+                rows={3}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={form.isActive}
+                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                  className={cn(
+                    'h-4 w-4 rounded border-input accent-primary',
+                  )}
+                />
+                <Label htmlFor="isActive" className="cursor-pointer font-normal">
+                  Активен
+                </Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sortOrder">Порядок</Label>
+                <Input
+                  id="sortOrder"
+                  type="number"
+                  className="w-24"
+                  value={form.sortOrder}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))
+                  }
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="border-t border-gray-200 pt-4">
-          <h2 className="mb-3 text-sm font-semibold text-gray-800">JSON-поля</h2>
-          <div className="space-y-4">
+        {/* SEO & legal */}
+        <Card>
+          <CardHeader>
+            <CardTitle>SEO и юридический текст</CardTitle>
+            <CardDescription>Meta-теги и правовая информация</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="metaTitle">Meta Title</Label>
+              <Input
+                id="metaTitle"
+                value={form.metaTitle}
+                onChange={(e) => setForm((f) => ({ ...f, metaTitle: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="metaDescription">Meta Description</Label>
+              <Textarea
+                id="metaDescription"
+                value={form.metaDescription}
+                onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))}
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="legalText">Юридический текст</Label>
+              <Textarea
+                id="legalText"
+                value={form.legalText}
+                onChange={(e) => setForm((f) => ({ ...f, legalText: e.target.value }))}
+                rows={2}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* JSON fields */}
+        <Card>
+          <CardHeader>
+            <CardTitle>JSON-поля</CardTitle>
+            <CardDescription>
+              howToChoose, infoBlocks, faq, reviews, stats, relatedLinks, additionalFilters
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {JSON_FIELDS.map((key) => (
-              <div key={key}>
-                <label className="mb-1 block text-sm font-medium text-gray-600">{key}</label>
-                <textarea
+              <div key={key} className="space-y-2">
+                <Label htmlFor={key}>{key}</Label>
+                <Textarea
+                  id={key}
                   value={form[key]}
                   onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                   rows={4}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className="font-mono text-sm"
                 />
               </div>
             ))}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="flex gap-3 pt-4">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-primary-700"
-          >
+        <Separator />
+
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" disabled={saving} className="gap-2">
+            <Save className="h-4 w-4" />
             {saving ? 'Сохранение...' : 'Сохранить'}
-          </button>
+          </Button>
           {!isCreate && (
-            <button
+            <Button
               type="button"
+              variant="destructive"
               onClick={handleDelete}
               disabled={saving}
-              className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+              className="gap-2"
             >
+              <Trash2 className="h-4 w-4" />
               Удалить
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => navigate('/landings')}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Назад
-          </button>
+            Отмена
+          </Button>
         </div>
       </form>
     </div>

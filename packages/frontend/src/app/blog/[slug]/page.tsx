@@ -150,6 +150,8 @@ export default async function ArticlePage({ params }: Props) {
                 imageUrl={event.imageUrl}
                 priceFrom={event.priceFrom}
                 rating={event.rating}
+                reviewCount={event.reviewCount ?? 0}
+                durationMinutes={event.durationMinutes ?? null}
                 compact
               />
             ))}

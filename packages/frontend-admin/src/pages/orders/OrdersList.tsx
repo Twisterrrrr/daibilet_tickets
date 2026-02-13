@@ -1,18 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminApi } from '../../api/client';
-import { DataTable } from '../../components/ui/DataTable';
-import { Badge } from '../../components/ui/Badge';
+import { ColumnDef } from '@tanstack/react-table';
+import { adminApi } from '@/api/client';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
-type OrderStatus =
-  | 'DRAFT'
-  | 'PENDING_PAYMENT'
-  | 'PAID'
-  | 'FULFILLING'
-  | 'FULFILLED'
-  | 'PARTIALLY_FULFILLED'
-  | 'FAILED'
-  | 'REFUNDED';
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type OrderStatus = 'DRAFT' | 'PENDING_PAYMENT' | 'PAID' | 'FULFILLING' | 'FULFILLED' | 'PARTIALLY_FULFILLED' | 'FAILED' | 'REFUNDED';
 
 interface OrderItem {
   id: string;
@@ -32,24 +38,82 @@ interface OrdersResponse {
   pages: number;
 }
 
-const STATUS_BADGE: Record<OrderStatus, 'success' | 'warning' | 'danger' | 'info' | 'default' | 'orange'> = {
-  DRAFT: 'default',
+const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'destructive' | 'secondary'> = {
+  DRAFT: 'secondary',
   PENDING_PAYMENT: 'warning',
   PAID: 'success',
-  FULFILLING: 'info',
+  FULFILLING: 'success',
   FULFILLED: 'success',
-  PARTIALLY_FULFILLED: 'info',
-  FAILED: 'danger',
-  REFUNDED: 'orange',
+  PARTIALLY_FULFILLED: 'warning',
+  FAILED: 'destructive',
+  REFUNDED: 'destructive',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Черновик',
+  PENDING_PAYMENT: 'Ожидает',
+  PAID: 'Оплачен',
+  FULFILLING: 'В обработке',
+  FULFILLED: 'Выполнен',
+  PARTIALLY_FULFILLED: 'Частично',
+  FAILED: 'Ошибка',
+  REFUNDED: 'Возврат',
 };
 
 function formatPrice(kopecks: number): string {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    minimumFractionDigits: 0,
-  }).format(kopecks / 100);
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(kopecks / 100);
 }
+
+// ─── Columns ─────────────────────────────────────────────────────────────────
+
+const columns: ColumnDef<OrderItem>[] = [
+  {
+    accessorKey: 'code',
+    header: ({ column }) => <SortableHeader column={column}>Код</SortableHeader>,
+    cell: ({ row }) => <span className="font-medium text-primary">{row.original.code}</span>,
+  },
+  {
+    accessorKey: 'customerName',
+    header: 'Клиент',
+    cell: ({ row }) => (
+      <div>
+        <p className="font-medium text-sm">{row.original.customerName}</p>
+        <p className="text-xs text-muted-foreground">{row.original.email}</p>
+      </div>
+    ),
+  },
+  {
+    id: 'city',
+    header: 'Город',
+    cell: ({ row }) => <span className="text-sm">{row.original.city?.name ?? '—'}</span>,
+  },
+  {
+    accessorKey: 'totalPrice',
+    header: ({ column }) => <SortableHeader column={column}>Сумма</SortableHeader>,
+    cell: ({ row }) => <span className="font-medium tabular-nums">{formatPrice(row.original.totalPrice)}</span>,
+  },
+  {
+    accessorKey: 'status',
+    header: 'Статус',
+    cell: ({ row }) => (
+      <Badge variant={STATUS_VARIANT[row.original.status] || 'secondary'}>
+        {STATUS_LABELS[row.original.status] || row.original.status}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: 'createdAt',
+    header: ({ column }) => <SortableHeader column={column}>Создан</SortableHeader>,
+    cell: ({ row }) =>
+      row.original.createdAt
+        ? new Date(row.original.createdAt).toLocaleString('ru-RU', {
+            day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit',
+          })
+        : '—',
+  },
+];
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export function OrdersListPage() {
   const navigate = useNavigate();
@@ -82,122 +146,82 @@ export function OrdersListPage() {
       .finally(() => setLoading(false));
   }, [filters]);
 
-  const handleRowClick = (item: OrderItem) => {
-    navigate(`/orders/${item.id}`);
-  };
-
-  const columns = [
-    { key: 'code', label: 'Код' },
-    { key: 'customerName', label: 'Клиент' },
-    { key: 'email', label: 'Email' },
-    {
-      key: 'city.name',
-      label: 'Город',
-      render: (item: OrderItem) => item.city?.name ?? '—',
-    },
-    {
-      key: 'status',
-      label: 'Статус',
-      render: (item: OrderItem) => (
-        <Badge variant={STATUS_BADGE[item.status]}>{item.status}</Badge>
-      ),
-    },
-    {
-      key: 'totalPrice',
-      label: 'Сумма',
-      render: (item: OrderItem) => formatPrice(item.totalPrice),
-    },
-    {
-      key: 'createdAt',
-      label: 'Создан',
-      render: (item: OrderItem) =>
-        item.createdAt
-          ? new Date(item.createdAt).toLocaleString('ru-RU', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '—',
-    },
-  ];
-
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-gray-900">Заказы</h1>
-
-      <div className="mb-4 flex flex-wrap gap-4">
-        <input
-          type="text"
-          placeholder="Поиск (код, email, имя)..."
-          value={filters.search}
-          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        />
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value, page: 1 }))}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        >
-          <option value="">Все статусы</option>
-          <option value="DRAFT">DRAFT</option>
-          <option value="PENDING_PAYMENT">PENDING_PAYMENT</option>
-          <option value="PAID">PAID</option>
-          <option value="FULFILLING">FULFILLING</option>
-          <option value="FULFILLED">FULFILLED</option>
-          <option value="PARTIALLY_FULFILLED">PARTIALLY_FULFILLED</option>
-          <option value="FAILED">FAILED</option>
-          <option value="REFUNDED">REFUNDED</option>
-        </select>
-        <select
-          value={filters.city}
-          onChange={(e) => setFilters((f) => ({ ...f, city: e.target.value, page: 1 }))}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        >
-          <option value="">Все города</option>
-          <option value="moscow">Москва</option>
-          <option value="spb">Санкт-Петербург</option>
-          <option value="kazan">Казань</option>
-          <option value="kaliningrad">Калининград</option>
-        </select>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Заказы</h1>
+        <p className="text-muted-foreground">
+          {data ? `${data.total} заказов` : <Skeleton className="h-4 w-24 inline-block" />}
+        </p>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <Card className="border-destructive">
+          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+        </Card>
       )}
+
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              placeholder="Поиск (код, email, имя)..."
+              value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
+              className="max-w-[250px]"
+            />
+            <Select
+              value={filters.status || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, status: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Все статусы" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все статусы</SelectItem>
+                {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.city || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Все города" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все города</SelectItem>
+                <SelectItem value="moscow">Москва</SelectItem>
+                <SelectItem value="spb">Санкт-Петербург</SelectItem>
+                <SelectItem value="kazan">Казань</SelectItem>
+                <SelectItem value="kaliningrad">Калининград</SelectItem>
+                <SelectItem value="vladimir">Владимир</SelectItem>
+                <SelectItem value="yaroslavl">Ярославль</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       <DataTable
         columns={columns}
         data={data?.items ?? []}
-        onRowClick={handleRowClick}
         loading={loading}
         emptyText="Нет заказов"
+        onRowClick={(item) => navigate(`/orders/${item.id}`)}
       />
 
       {data && data.pages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
             Показано {data.items.length} из {data.total}
           </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
-              disabled={filters.page <= 1}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
-            >
-              Назад
-            </button>
-            <span className="flex items-center px-2 text-sm text-gray-600">
-              {filters.page} / {data.pages}
-            </span>
-            <button
-              onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
-              disabled={filters.page >= data.pages}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
-            >
-              Вперёд
-            </button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))} disabled={filters.page <= 1}>Назад</Button>
+            <span className="text-sm tabular-nums text-muted-foreground">{filters.page} / {data.pages}</span>
+            <Button variant="outline" size="sm" onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))} disabled={filters.page >= data.pages}>Вперёд</Button>
           </div>
         </div>
       )}

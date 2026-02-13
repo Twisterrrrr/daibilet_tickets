@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { adminApi } from '../../api/client';
+import { Link, useNavigate } from 'react-router-dom';
+import { ColumnDef } from '@tanstack/react-table';
+import { Plus } from 'lucide-react';
+import { adminApi } from '@/api/client';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface Upsell {
   id: string;
@@ -14,7 +20,67 @@ interface Upsell {
   sortOrder: number;
 }
 
+const columns: ColumnDef<Upsell>[] = [
+  {
+    accessorKey: 'icon',
+    header: 'Icon',
+    cell: ({ row }) => <span className="text-lg">{row.original.icon || '—'}</span>,
+  },
+  {
+    accessorKey: 'title',
+    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
+    cell: ({ row }) => (
+      <span className="font-medium">{row.original.title}</span>
+    ),
+  },
+  {
+    accessorKey: 'category',
+    header: ({ column }) => <SortableHeader column={column}>Категория</SortableHeader>,
+    cell: ({ row }) => (
+      <Badge variant="secondary">{row.original.category}</Badge>
+    ),
+  },
+  {
+    accessorKey: 'citySlug',
+    header: 'Город',
+    cell: ({ row }) => (
+      <span className="text-muted-foreground">{row.original.citySlug || 'Все'}</span>
+    ),
+  },
+  {
+    accessorKey: 'priceKopecks',
+    header: ({ column }) => <SortableHeader column={column}>Цена</SortableHeader>,
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {(row.original.priceKopecks / 100).toLocaleString('ru-RU')} ₽
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'isActive',
+    header: 'Статус',
+    cell: ({ row }) =>
+      row.original.isActive ? (
+        <Badge variant="success">Активен</Badge>
+      ) : (
+        <Badge variant="secondary">Выкл</Badge>
+      ),
+  },
+  {
+    id: 'actions',
+    header: '',
+    cell: ({ row }) => (
+      <span onClick={(e) => e.stopPropagation()}>
+        <Button variant="link" size="sm" asChild>
+          <Link to={`/upsells/${row.original.id}`}>Ред.</Link>
+        </Button>
+      </span>
+    ),
+  },
+];
+
 export function UpsellsListPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<Upsell[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,58 +88,39 @@ export function UpsellsListPage() {
     adminApi.get<Upsell[]>('/admin/upsells').then(setItems).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-gray-400">Загрузка...</div>;
-
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Upsells</h1>
-        <Link
-          to="/upsells/new"
-          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-        >
-          + Добавить
-        </Link>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Upsells</h1>
+          <p className="text-muted-foreground">
+            {items.length} позиций
+          </p>
+        </div>
+        <Button asChild>
+          <Link to="/upsells/new" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Добавить
+          </Link>
+        </Button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Icon</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Название</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Категория</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Город</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Цена</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Статус</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 bg-white">
-            {items.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-lg">{u.icon || '-'}</td>
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">{u.title}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{u.category}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{u.citySlug || 'Все'}</td>
-                <td className="px-4 py-3 text-sm text-gray-700">
-                  {(u.priceKopecks / 100).toLocaleString('ru-RU')} ₽
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${u.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
-                    {u.isActive ? 'Активен' : 'Выкл'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <Link to={`/upsells/${u.id}`} className="text-sm text-primary-600 hover:text-primary-700">
-                    Ред.
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Список upsells</CardTitle>
+          <CardDescription>Дополнительные предложения для бронирования</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={items}
+            loading={loading}
+            emptyText="Нет upsells"
+            pageSize={20}
+            onRowClick={(row) => navigate(`/upsells/${row.id}`)}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

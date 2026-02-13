@@ -14,7 +14,9 @@ import { api } from '@/lib/api';
 import { EventCard } from '@/components/ui/EventCard';
 import { BuyButton } from '@/components/ui/BuyModal';
 import { TcWidgetButton, TcSessionSlot } from '@/components/ui/TcWidget';
-import { formatPrice, CATEGORY_LABELS } from '@daibilet/shared';
+import { ReviewSection, RatingBadge } from '@/components/ui/ReviewSection';
+import { AddToCartButton } from '@/components/ui/AddToCartButton';
+import { formatPrice, CATEGORY_LABELS, SUBCATEGORY_LABELS, type EventSubcategory } from '@daibilet/shared';
 
 // ISR: обновлять каждый час
 export const revalidate = 3600;
@@ -106,13 +108,21 @@ export default async function EventPage({ params }: Props) {
 
   const tags = event.tags?.map((t: any) => t.tag).filter(Boolean) || [];
   const venueName = getVenueName(event.tcData);
-  const buyUrl = event.tcEventId
-    ? getTcBuyUrl(event.tcMetaEventId || event.tcEventId)
-    : null;
+
+  // Offer-based: primaryOffer из API или fallback на event.source/tcEventId
+  const primaryOffer = event.primaryOffer || (event.offers && event.offers.length > 0 ? event.offers[0] : null);
+  const buyUrl = primaryOffer?.externalEventId
+    ? getTcBuyUrl(primaryOffer.metaEventId || primaryOffer.externalEventId)
+    : event.tcEventId
+      ? getTcBuyUrl(event.tcMetaEventId || event.tcEventId)
+      : null;
   const hasActiveSessions =
     event.sessions?.some((s: any) => s.isActive && s.availableTickets > 0) ?? false;
   const categoryLabel =
     CATEGORY_LABELS[event.category as keyof typeof CATEGORY_LABELS] || 'Событие';
+  const subcategoryLabels: string[] = (event.subcategories || [])
+    .map((s: string) => SUBCATEGORY_LABELS[s as EventSubcategory])
+    .filter(Boolean);
 
   // Ближайший сеанс
   const nextSession = event.sessions?.find((s: any) => {
@@ -161,14 +171,27 @@ export default async function EventPage({ params }: Props) {
 
           <div className="flex items-end justify-between gap-4">
             <div className="max-w-3xl">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
-                {categoryLabel}
-              </span>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                  {categoryLabel}
+                </span>
+                {subcategoryLabels.map((label: string) => (
+                  <span key={label} className="inline-flex items-center rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium text-white/90 backdrop-blur-sm">
+                    {label}
+                  </span>
+                ))}
+              </div>
               <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl lg:text-4xl leading-tight">
                 {event.title}
               </h1>
 
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/80">
+                {/* Рейтинг */}
+                {Number(event.rating) > 0 && (
+                  <a href="#reviews" className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-white transition hover:bg-white/25">
+                    <RatingBadge rating={Number(event.rating)} reviewCount={event.reviewCount} variant="light" />
+                  </a>
+                )}
                 {event.durationMinutes && (
                   <span className="flex items-center gap-1.5">
                     <Clock className="h-4 w-4" />
@@ -264,8 +287,16 @@ export default async function EventPage({ params }: Props) {
               </div>
             )}
 
+            {/* Отзывы */}
+            <ReviewSection
+              eventId={event.id}
+              eventSlug={event.slug}
+              externalRating={event.externalRating ? Number(event.externalRating) : undefined}
+              externalSource={event.externalSource || undefined}
+            />
+
             {/* Mobile buy button */}
-            {event.tcEventId && (
+            {(primaryOffer || event.tcEventId || event.offers?.some((o: any) => o.status === 'ACTIVE')) && (
               <div className="lg:hidden">
                 <BuyCard
                   event={event}
@@ -273,6 +304,7 @@ export default async function EventPage({ params }: Props) {
                   hasActiveSessions={hasActiveSessions}
                   categoryLabel={categoryLabel}
                   venueName={venueName}
+                  primaryOffer={primaryOffer}
                 />
               </div>
             )}
@@ -287,6 +319,7 @@ export default async function EventPage({ params }: Props) {
                 hasActiveSessions={hasActiveSessions}
                 categoryLabel={categoryLabel}
                 venueName={venueName}
+                primaryOffer={primaryOffer}
               />
             </div>
           </div>
@@ -357,6 +390,17 @@ export default async function EventPage({ params }: Props) {
               '@type': 'Organization',
               name: venueName || 'Организатор',
             },
+            ...(Number(event.rating) > 0 && event.reviewCount > 0
+              ? {
+                  aggregateRating: {
+                    '@type': 'AggregateRating',
+                    ratingValue: Number(event.rating).toFixed(1),
+                    reviewCount: event.reviewCount,
+                    bestRating: 5,
+                    worstRating: 1,
+                  },
+                }
+              : {}),
           }),
         }}
       />
@@ -400,21 +444,51 @@ export default async function EventPage({ params }: Props) {
 // Компоненты
 // ========================
 
-/** Карточка покупки (sidebar + mobile) */
+/** Бейдж оффера */
+function OfferBadge({ badge }: { badge?: string | null }) {
+  if (!badge) return null;
+  const BADGE_CONFIG: Record<string, { label: string; className: string }> = {
+    optimal: { label: 'Оптимальный', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    cheapest: { label: 'Лучшая цена', className: 'bg-amber-100 text-amber-700 border-amber-200' },
+    fastest: { label: 'Быстрее всего', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  };
+  const cfg = BADGE_CONFIG[badge] || { label: badge, className: 'bg-slate-100 text-slate-700 border-slate-200' };
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${cfg.className}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+/** Карточка покупки (sidebar + mobile) — offer-based */
 function BuyCard({
   event,
   buyUrl,
   hasActiveSessions,
   categoryLabel,
   venueName,
+  primaryOffer,
 }: {
   event: any;
   buyUrl: string | null;
   hasActiveSessions: boolean;
   categoryLabel: string;
   venueName: string | null;
+  primaryOffer?: any;
 }) {
-  const isTcSource = event.source === 'TC' || !event.source;
+  // Определяем тип покупки из primaryOffer или fallback на source
+  const purchaseType = primaryOffer?.purchaseType
+    || (event.source === 'TEPLOHOD' ? 'REDIRECT' : 'TC_WIDGET');
+  const isTcWidget = purchaseType === 'TC_WIDGET';
+  const isRequestOnly = purchaseType === 'REQUEST_ONLY';
+  const offerEventId = primaryOffer?.externalEventId || event.tcEventId;
+  const offerMetaId = primaryOffer?.metaEventId || event.tcMetaEventId;
+  const offerDeeplink = primaryOffer?.deeplink;
+  const offerSource = primaryOffer?.source || event.source;
+  const offerBadge = primaryOffer?.badge;
+
+  // All active offers for multi-offer display
+  const allOffers = (event.offers || []).filter((o: any) => o.status === 'ACTIVE');
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/50">
@@ -428,6 +502,69 @@ function BuyCard({
         <p className="text-lg font-semibold text-slate-600">Цена уточняется</p>
       )}
 
+      {/* Primary offer badge */}
+      {offerBadge && (
+        <div className="mt-2">
+          <OfferBadge badge={offerBadge} />
+        </div>
+      )}
+
+      {/* Multi-offer display: show alternative purchase options */}
+      {allOffers.length > 1 && (
+        <div className="mt-4 space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Варианты покупки
+          </h3>
+          {allOffers.map((offer: any) => (
+            <div
+              key={offer.id}
+              className={`flex items-center justify-between rounded-lg border px-3 py-2.5 transition ${
+                offer.isPrimary ? 'border-primary-300 bg-primary-50' : 'border-slate-200 bg-slate-50'
+              }`}
+            >
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-slate-900">
+                    {offer.priceFrom ? formatPrice(offer.priceFrom) : 'Уточняется'}
+                  </span>
+                  <OfferBadge badge={offer.badge} />
+                </div>
+                <span className="text-xs text-slate-500">
+                  {offer.source === 'TC' ? 'TicketsCloud' :
+                   offer.source === 'TEPLOHOD' ? 'Теплоход' :
+                   offer.operator?.name || 'Дайбилет'}
+                </span>
+              </div>
+              {offer.purchaseType === 'TC_WIDGET' && offer.externalEventId ? (
+                <TcWidgetButton
+                  tcEventId={offer.externalEventId}
+                  tcMetaEventId={offer.metaEventId}
+                  className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-700"
+                >
+                  Купить
+                </TcWidgetButton>
+              ) : offer.purchaseType === 'REDIRECT' && offer.deeplink ? (
+                <a
+                  href={offer.deeplink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-700"
+                >
+                  Купить
+                </a>
+              ) : offer.purchaseType === 'REQUEST_ONLY' ? (
+                <a
+                  href="#request-form"
+                  className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600"
+                >
+                  Заявка
+                </a>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Sessions preview — кликабельные для TC-событий */}
       {event.sessions && event.sessions.length > 0 && (
         <div className="mt-5">
@@ -435,7 +572,7 @@ function BuyCard({
             <Calendar className="h-3.5 w-3.5" />
             Ближайшие сеансы
           </h3>
-          {isTcSource && (
+          {isTcWidget && (
             <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс для покупки</p>
           )}
           <div className="mt-2.5 space-y-1.5">
@@ -443,7 +580,7 @@ function BuyCard({
               .filter((s: any) => s.isActive)
               .slice(0, 5)
               .map((session: any) =>
-                isTcSource ? (
+                isTcWidget ? (
                   <TcSessionSlot key={session.id} session={session} />
                 ) : (
                   <StaticSessionRow key={session.id} session={session} />
@@ -453,27 +590,48 @@ function BuyCard({
         </div>
       )}
 
-      {/* Buy button */}
-      {event.tcEventId ? (
+      {/* Buy button — per offer purchaseType */}
+      {isRequestOnly ? (
+        /* REQUEST_ONLY: форма заявки */
+        <RequestOfferForm event={event} offer={primaryOffer} />
+      ) : offerEventId ? (
         <div className="mt-5">
-          {(event.source === 'TC' || !event.source) ? (
-            /* TC: кнопка-виджет — по клику tcwidget.js откроет popup */
-            <TcWidgetButton tcEventId={event.tcEventId} tcMetaEventId={event.tcMetaEventId}>
+          {isTcWidget ? (
+            <TcWidgetButton tcEventId={offerEventId} tcMetaEventId={offerMetaId}>
               Купить билет
             </TcWidgetButton>
+          ) : purchaseType === 'REDIRECT' && offerDeeplink ? (
+            <a
+              href={offerDeeplink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
+            >
+              Купить на {offerSource === 'TEPLOHOD' ? 'teplohod.info' : 'сайте оператора'}
+            </a>
           ) : (
-            /* TEPLOHOD и другие: наша модалка */
             <BuyButton
               eventTitle={event.title}
               eventImage={event.imageUrl}
-              tcEventId={event.tcEventId}
-              source={event.source}
+              tcEventId={offerEventId}
+              source={offerSource}
               sessions={event.sessions || []}
               address={event.address}
               venueName={venueName}
               priceFrom={event.priceFrom}
             />
           )}
+        </div>
+      ) : primaryOffer?.deeplink && purchaseType === 'REDIRECT' ? (
+        <div className="mt-5">
+          <a
+            href={primaryOffer.deeplink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
+          >
+            Купить на сайте оператора
+          </a>
         </div>
       ) : (
         <button
@@ -482,6 +640,24 @@ function BuyCard({
         >
           Билеты недоступны
         </button>
+      )}
+
+      {/* Add to cart (for non-TC_WIDGET offers) */}
+      {primaryOffer && purchaseType !== 'TC_WIDGET' && !isRequestOnly && (
+        <div className="mt-3">
+          <AddToCartButton
+            eventId={event.id}
+            offerId={primaryOffer.id}
+            eventTitle={event.title}
+            eventSlug={event.slug}
+            imageUrl={event.imageUrl}
+            priceFrom={primaryOffer.priceFrom || event.priceFrom || 0}
+            purchaseType={purchaseType}
+            source={offerSource}
+            deeplink={offerDeeplink}
+            badge={offerBadge}
+          />
+        </div>
       )}
 
       {/* Planner CTA */}
@@ -499,9 +675,98 @@ function BuyCard({
       <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
         <Shield className="h-4 w-4 text-emerald-500" />
         <span className="text-xs text-slate-500">
-          Безопасная оплата через {event.source === 'TEPLOHOD' ? 'teplohod.info' : 'Дайбилет'}
+          {isRequestOnly
+            ? 'Заявка будет подтверждена оператором'
+            : `Безопасная оплата через ${offerSource === 'TEPLOHOD' ? 'teplohod.info' : 'Дайбилет'}`}
         </span>
       </div>
+    </div>
+  );
+}
+
+/** Форма заявки для REQUEST_ONLY офферов */
+function RequestOfferForm({ event, offer }: { event: any; offer: any }) {
+  return (
+    <div id="request-form" className="mt-5 space-y-3">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <p className="text-sm font-medium text-amber-800">Оставьте заявку</p>
+        <p className="text-xs text-amber-600 mt-0.5">
+          Оператор свяжется с вами для подтверждения и оплаты
+        </p>
+      </div>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const form = e.currentTarget;
+          const data = new FormData(form);
+          try {
+            const response = await fetch(
+              (typeof window === 'undefined'
+                ? (process.env.INTERNAL_API_URL || 'http://localhost:4000/api/v1')
+                : (process.env.NEXT_PUBLIC_API_URL || '/api/v1')) + '/checkout/request',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  eventId: event.id,
+                  offerId: offer?.id,
+                  name: data.get('name'),
+                  email: data.get('email'),
+                  phone: data.get('phone'),
+                  comment: data.get('comment'),
+                }),
+              }
+            );
+            if (!response.ok) {
+              const err = await response.json().catch(() => ({}));
+              throw new Error(err.message || 'Ошибка отправки');
+            }
+            form.reset();
+            const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+            if (submitBtn) {
+              submitBtn.textContent = 'Заявка отправлена!';
+              submitBtn.disabled = true;
+              submitBtn.className = submitBtn.className.replace('bg-amber-500 hover:bg-amber-600', 'bg-emerald-500');
+            }
+          } catch (err: any) {
+            alert(err.message || 'Ошибка отправки заявки');
+          }
+        }}
+        className="space-y-2.5"
+      >
+        <input
+          name="name"
+          required
+          placeholder="Ваше имя"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
+        />
+        <input
+          name="email"
+          type="email"
+          required
+          placeholder="Email"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
+        />
+        <input
+          name="phone"
+          type="tel"
+          required
+          placeholder="Телефон"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
+        />
+        <textarea
+          name="comment"
+          placeholder="Комментарий (необязательно)"
+          rows={2}
+          className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-none"
+        />
+        <button
+          type="submit"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-3.5 text-base font-medium text-white transition hover:bg-amber-600"
+        >
+          Оставить заявку
+        </button>
+      </form>
     </div>
   );
 }

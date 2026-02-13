@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { adminApi } from '../../api/client';
-import { transliterate } from '../../lib/transliterate';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
+import { adminApi } from '@/api/client';
+import { transliterate } from '@/lib/transliterate';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type TagCategory = 'THEME' | 'AUDIENCE' | 'SEASON' | 'SPECIAL';
 
@@ -90,7 +105,7 @@ export function TagEditPage() {
         navigate('/tags');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+      toast.error(e instanceof Error ? e.message : 'Ошибка сохранения');
       setSaving(false);
     }
   };
@@ -98,144 +113,192 @@ export function TagEditPage() {
   const handleDelete = async () => {
     if (!isCreate && !window.confirm('Удалить этот тег?')) return;
     setSaving(true);
-    setError(null);
     try {
       await adminApi.delete(`/admin/tags/${id}`);
       navigate('/tags');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка удаления');
+      toast.error(e instanceof Error ? e.message : 'Ошибка удаления');
       setSaving(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex h-40 items-center justify-center text-gray-400">Загрузка...</div>
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10" />
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        <Skeleton className="h-[300px] w-full" />
+        <Skeleton className="h-[200px] w-full" />
+      </div>
     );
   }
 
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-gray-900">
-        {isCreate ? 'Новый тег' : 'Редактирование тега'}
-      </h1>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link to="/tags">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isCreate ? 'Новый тег' : 'Редактирование тега'}
+          </h1>
+          <p className="text-muted-foreground">
+            {isCreate ? 'Создание нового тега' : form.name || 'Редактирование'}
+          </p>
+        </div>
+      </div>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <Card className="border-destructive">
+          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+        </Card>
       )}
 
-      <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Название</label>
-          <input
-            type="text"
-            value={form.name}
-            onChange={(e) => handleNameChange(e.target.value)}
-            required
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Slug</label>
-          <input
-            type="text"
-            value={form.slug}
-            onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-            required
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Категория</label>
-          <select
-            value={form.category}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, category: e.target.value as TagCategory }))
-            }
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          >
-            {CATEGORY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Описание</label>
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            rows={3}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Hero Image (URL)</label>
-          <input
-            type="text"
-            value={form.heroImage}
-            onChange={(e) => setForm((f) => ({ ...f, heroImage: e.target.value }))}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Meta Title</label>
-          <input
-            type="text"
-            value={form.metaTitle}
-            onChange={(e) => setForm((f) => ({ ...f, metaTitle: e.target.value }))}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Meta Description</label>
-          <textarea
-            value={form.metaDescription}
-            onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))}
-            rows={2}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="isActive"
-            checked={form.isActive}
-            onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-          />
-          <label htmlFor="isActive" className="text-sm text-gray-700">
-            Активен
-          </label>
-        </div>
+      <form onSubmit={handleSubmit}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Основные данные</CardTitle>
+            <CardDescription>Название, slug и категория тега</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="name">Название</Label>
+                <Input
+                  id="name"
+                  value={form.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="slug">Slug</Label>
+                <Input
+                  id="slug"
+                  value={form.slug}
+                  onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                  required
+                  className="font-mono"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Категория</Label>
+              <Select
+                value={form.category}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, category: v as TagCategory }))
+                }
+              >
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Выберите категорию" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={form.isActive}
+                onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                className="h-4 w-4 rounded border-input"
+              />
+              <Label htmlFor="isActive" className="cursor-pointer font-normal">
+                Активен
+              </Label>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="flex gap-3 pt-4">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-primary-700"
-          >
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </button>
-          {!isCreate && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={saving}
-              className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-            >
-              Удалить
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => navigate('/tags')}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Назад
-          </button>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Контент</CardTitle>
+            <CardDescription>Описание и медиа</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="description">Описание</Label>
+              <Textarea
+                id="description"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="heroImage">Hero Image (URL)</Label>
+              <Input
+                id="heroImage"
+                type="text"
+                value={form.heroImage}
+                onChange={(e) => setForm((f) => ({ ...f, heroImage: e.target.value }))}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>SEO</CardTitle>
+            <CardDescription>Мета-теги для поисковых систем</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="metaTitle">Meta Title</Label>
+              <Input
+                id="metaTitle"
+                value={form.metaTitle}
+                onChange={(e) => setForm((f) => ({ ...f, metaTitle: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="metaDescription">Meta Description</Label>
+              <Textarea
+                id="metaDescription"
+                value={form.metaDescription}
+                onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))}
+                rows={2}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardFooter className="flex flex-wrap gap-3 pt-6">
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Сохранение...' : 'Сохранить'}
+            </Button>
+            {!isCreate && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={saving}
+              >
+                Удалить
+              </Button>
+            )}
+            <Button type="button" variant="outline" onClick={() => navigate('/tags')}>
+              Назад
+            </Button>
+          </CardFooter>
+        </Card>
       </form>
     </div>
   );

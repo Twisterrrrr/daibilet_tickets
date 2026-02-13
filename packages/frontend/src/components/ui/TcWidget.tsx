@@ -36,17 +36,24 @@ function extractTcEventId(tcSessionId: string): string | null {
 export function TcWidgetButton({
   tcEventId,
   tcMetaEventId,
-  children = 'Купить билет',
+  children,
+  compact = false,
 }: {
   tcEventId: string;
   tcMetaEventId?: string | null;
   children?: React.ReactNode;
+  compact?: boolean;
 }) {
+  const label = children ?? (compact ? 'Купить' : 'Купить билет');
   // Если есть MetaEvent ID — виджет покажет выбор даты
   const widgetEventId = tcMetaEventId || tcEventId;
   const isMeta = !!tcMetaEventId;
 
   if (!widgetEventId) return null;
+
+  const sizeClasses = compact
+    ? 'rounded-lg px-3.5 py-2 text-sm font-bold'
+    : 'rounded-xl px-6 py-3 text-base font-semibold';
 
   // Если токен не настроен — показываем fallback-ссылку
   if (!TC_TOKEN) {
@@ -55,9 +62,9 @@ export function TcWidgetButton({
         href={`https://ticketscloud.com/v1/services/widget?event=${widgetEventId}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-3.5 text-base font-semibold text-slate-900 transition-colors hover:bg-amber-500"
+        className={`flex w-full items-center justify-center gap-1.5 bg-amber-400 text-slate-900 transition-colors hover:bg-amber-500 ${sizeClasses}`}
       >
-        {children}
+        {label}
       </a>
     );
   }
@@ -69,9 +76,9 @@ export function TcWidgetButton({
       data-tc-token={TC_TOKEN}
       {...(isMeta && { 'data-tc-meta': 'true' })}
       onClick={() => trackWidgetOpen(widgetEventId)}
-      className="tc-buy-btn tc-background-yellow flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-semibold"
+      className={`tc-buy-btn tc-background-yellow flex w-full items-center justify-center gap-1.5 ${sizeClasses}`}
     >
-      {children}
+      {label}
     </button>
   );
 }

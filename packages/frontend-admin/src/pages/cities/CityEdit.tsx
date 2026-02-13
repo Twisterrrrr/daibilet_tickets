@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { adminApi } from '../../api/client';
+import { ArrowLeft } from 'lucide-react';
+import { adminApi } from '@/api/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 
 interface CityDetail {
   id: string;
@@ -22,14 +30,12 @@ export function CityEditPage() {
   const [city, setCity] = useState<CityDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState<Partial<CityDetail>>({});
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    setError(null);
     adminApi
       .get<CityDetail>(`/admin/cities/${id}`)
       .then((data) => {
@@ -48,167 +54,222 @@ export function CityEditPage() {
           timezone: data.timezone ?? '',
         });
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+      .catch((e) => {
+        toast.error(e instanceof Error ? e.message : 'Ошибка загрузки');
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
   const handleSave = () => {
     if (!id) return;
     setSaving(true);
-    setError(null);
     adminApi
       .put(`/admin/cities/${id}`, form)
       .then(() => {
         setCity((prev) => (prev ? { ...prev, ...form } : null));
+        toast.success('Изменения сохранены');
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка сохранения'))
+      .catch((e) => toast.error(e instanceof Error ? e.message : 'Ошибка сохранения'))
       .finally(() => setSaving(false));
   };
 
-  if (loading) return <div className="text-gray-400">Загрузка...</div>;
-  if (!city) return <div className="text-red-500">{error || 'Город не найден'}</div>;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-40 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+  if (!city) {
+    return (
+      <div className="space-y-4">
+        <div className="text-destructive">Город не найден</div>
+        <Button variant="outline" asChild>
+          <Link to="/cities">← Назад</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="mb-6 flex items-center gap-4">
-        <Link
-          to="/cities"
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-        >
-          ← Назад
-        </Link>
-        <h1 className="text-xl font-bold text-gray-900">Редактировать город</h1>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link to="/cities">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Редактировать город</h1>
+          <p className="text-muted-foreground">{city.name}</p>
+        </div>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
-      )}
-
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Название</label>
-            <input
-              type="text"
-              value={form.name ?? ''}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
+      <Card>
+        <CardHeader>
+          <CardTitle>Основные данные</CardTitle>
+          <CardDescription>Название, slug и основные настройки города</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="name">Название</Label>
+              <Input
+                id="name"
+                value={form.name ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="slug">Slug</Label>
+              <Input
+                id="slug"
+                value={form.slug ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                className="font-mono"
+              />
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Slug</label>
-            <input
-              type="text"
-              value={form.slug ?? ''}
-              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
+          <div className="flex flex-wrap gap-6">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isFeatured"
+                checked={form.isFeatured ?? false}
+                onChange={(e) => setForm((f) => ({ ...f, isFeatured: e.target.checked }))}
+                className="h-4 w-4 rounded border-input"
+              />
+              <Label htmlFor="isFeatured" className="cursor-pointer font-normal">
+                В топе
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={form.isActive ?? false}
+                onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                className="h-4 w-4 rounded border-input"
+              />
+              <Label htmlFor="isActive" className="cursor-pointer font-normal">
+                Активен
+              </Label>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isFeatured"
-              checked={form.isFeatured ?? false}
-              onChange={(e) => setForm((f) => ({ ...f, isFeatured: e.target.checked }))}
-              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <label htmlFor="isFeatured" className="text-sm text-gray-700">
-              В топе
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isActive"
-              checked={form.isActive ?? false}
-              onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <label htmlFor="isActive" className="text-sm text-gray-700">
-              Активен
-            </label>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-xs text-gray-500">Описание</label>
-            <textarea
+          <div className="space-y-2">
+            <Label htmlFor="description">Описание</Label>
+            <Textarea
+              id="description"
               rows={3}
               value={form.description ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Hero изображение (URL)</label>
-            <input
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Медиа</CardTitle>
+          <CardDescription>Hero изображение для лендинга</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="heroImage">Hero изображение (URL)</Label>
+            <Input
+              id="heroImage"
               type="text"
               value={form.heroImage ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, heroImage: e.target.value }))}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Meta title</label>
-            <input
-              type="text"
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>SEO</CardTitle>
+          <CardDescription>Мета-теги для поисковых систем</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="metaTitle">Meta title</Label>
+            <Input
+              id="metaTitle"
               value={form.metaTitle ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, metaTitle: e.target.value }))}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
           </div>
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-xs text-gray-500">Meta description</label>
-            <textarea
+          <div className="space-y-2">
+            <Label htmlFor="metaDescription">Meta description</Label>
+            <Textarea
+              id="metaDescription"
               rows={2}
               value={form.metaDescription ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Широта (lat)</label>
-            <input
-              type="number"
-              step="any"
-              value={form.lat ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, lat: e.target.value ? Number(e.target.value) : null }))
-              }
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Геолокация</CardTitle>
+          <CardDescription>Координаты и часовой пояс</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="lat">Широта (lat)</Label>
+              <Input
+                id="lat"
+                type="number"
+                step="any"
+                value={form.lat ?? ''}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, lat: e.target.value ? Number(e.target.value) : null }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lng">Долгота (lng)</Label>
+              <Input
+                id="lng"
+                type="number"
+                step="any"
+                value={form.lng ?? ''}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, lng: e.target.value ? Number(e.target.value) : null }))
+                }
+              />
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Долгота (lng)</label>
-            <input
-              type="number"
-              step="any"
-              value={form.lng ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, lng: e.target.value ? Number(e.target.value) : null }))
-              }
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Часовой пояс</label>
-            <input
-              type="text"
+          <div className="space-y-2">
+            <Label htmlFor="timezone">Часовой пояс</Label>
+            <Input
+              id="timezone"
               placeholder="Europe/Moscow"
               value={form.timezone ?? ''}
               onChange={(e) => setForm((f) => ({ ...f, timezone: e.target.value }))}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
           </div>
-        </div>
-        <div className="mt-4">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-          >
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? 'Сохранение...' : 'Сохранить'}
-          </button>
-        </div>
-      </div>
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

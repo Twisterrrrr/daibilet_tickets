@@ -17,6 +17,7 @@ interface Variant {
     slug: string;
     address?: string;
     durationMinutes?: number;
+    imageUrl?: string;
     tcEventId: string;
     source: string;
     rating: number;
@@ -34,12 +35,13 @@ interface Filters {
 
 function getPrice(v: Variant): number {
   const p = v.prices?.[0];
-  return p?.amount ?? p?.price ?? v.event.priceFrom ?? 0;
+  // || вместо ?? — чтобы 0 проваливался в priceFrom
+  const sessionPrice = p?.amount || p?.price || 0;
+  return sessionPrice > 0 ? sessionPrice : (v.event.priceFrom ?? 0);
 }
 
 function getHourMinute(iso: string): { h: number; m: number } {
   const d = new Date(iso);
-  // Moscow timezone offset approximation
   const moscow = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
   return { h: moscow.getHours(), m: moscow.getMinutes() };
 }
@@ -48,30 +50,73 @@ function matchTimeSlot(iso: string, slot: string): boolean {
   if (!slot) return true;
   const { h, m } = getHourMinute(iso);
   const time = h * 60 + m;
-  // Обработка полуночного перехода: 23:30 = 1410, 00:30 = 30
-  if (slot === 'before-23:30') return time < 1410 && time >= 360; // 06:00-23:30
+  if (slot === 'before-23:30') return time < 1410 && time >= 360;
   if (slot === '23:30-00:30') return time >= 1410 || time <= 30;
-  if (slot === 'after-00:30') return time > 30 && time < 360; // 00:30-06:00
+  if (slot === 'after-00:30') return time > 30 && time < 360;
   return true;
 }
 
-/** Найти лучший вариант по цена/длительность */
-function findBestDeal(variants: Variant[]): number | null {
-  if (variants.length === 0) return null;
-  let bestIdx = 0;
-  let bestScore = Infinity;
+/** Оценка варианта для «Оптимального выбора» */
+function scoreOffer(v: Variant, allPrices: number[]): number {
+  const price = getPrice(v);
+  const { h, m } = getHourMinute(v.startsAt);
+  const timeMin = h * 60 + m;
+  // Нормализация: ночные рейсы после полуночи → +1440
+  const normTime = timeMin < 720 ? timeMin + 1440 : timeMin;
+
+  // Близость к полуночи (0:00 = 1440 нормализовано)
+  const distToMid = Math.abs(normTime - 1440);
+  const timeScore = 1 - Math.min(distToMid / 120, 1);
+
+  // Цена
+  const minP = Math.min(...allPrices);
+  const maxP = Math.max(...allPrices);
+  const priceScore = maxP === minP ? 1 : 1 - (price - minP) / (maxP - minP);
+
+  // Рейтинг
+  const ratingScore = Math.min(Number(v.event.rating) / 5, 1);
+
+  // Места
+  const seatScore = v.availableTickets <= 0 ? 0 : Math.min(v.availableTickets / 20, 1);
+
+  return 0.35 * timeScore + 0.30 * priceScore + 0.20 * ratingScore + 0.15 * seatScore;
+}
+
+function pickOptimal(variants: Variant[]): number | null {
+  const available = variants.filter((v) => v.availableTickets > 0);
+  if (available.length === 0) return null;
+  const prices = available.map(getPrice).filter((p) => p > 0);
+  if (prices.length === 0) return null;
+
+  let bestIdx = -1;
+  let bestScore = -1;
   for (let i = 0; i < variants.length; i++) {
     const v = variants[i];
     if (v.availableTickets <= 0) continue;
-    const price = getPrice(v);
-    const dur = v.event.durationMinutes || 60;
-    const score = price / dur; // kopecks per minute
-    if (price > 0 && score < bestScore) {
-      bestScore = score;
+    const s = scoreOffer(v, prices);
+    if (s > bestScore) {
+      bestScore = s;
       bestIdx = i;
     }
   }
-  return bestScore < Infinity ? bestIdx : null;
+  return bestIdx >= 0 ? bestIdx : null;
+}
+
+function sortVariants(variants: Variant[], sort: string): Variant[] {
+  const out = [...variants];
+  if (sort === 'price') {
+    out.sort((a, b) => getPrice(a) - getPrice(b));
+  } else if (sort === 'popular') {
+    out.sort((a, b) => Number(b.event.rating) - Number(a.event.rating));
+  } else {
+    // По времени (default), с нормализацией полуночи
+    out.sort((a, b) => {
+      const ta = new Date(a.startsAt).getTime();
+      const tb = new Date(b.startsAt).getTime();
+      return ta - tb;
+    });
+  }
+  return out;
 }
 
 export function LandingClient({
@@ -86,33 +131,41 @@ export function LandingClient({
     timeSlot: '',
     pier: '',
     maxPrice: null,
+    showSoldOut: false,
+    sort: 'time',
   });
 
   const filtered = useMemo(() => {
     return allVariants.filter((v) => {
-      // Date filter
+      // Sold out
+      if (!filterState.showSoldOut && v.availableTickets <= 0) return false;
+      // Date
       if (filterState.date) {
         const vDate = new Date(v.startsAt).toISOString().slice(0, 10);
         if (vDate !== filterState.date) return false;
       }
-      // Time slot filter
+      // Time slot
       if (filterState.timeSlot) {
         if (!matchTimeSlot(v.startsAt, filterState.timeSlot)) return false;
       }
-      // Pier filter
+      // Pier
       if (filterState.pier) {
         if (!v.event.address?.includes(filterState.pier)) return false;
       }
-      // Price filter
+      // Price
       if (filterState.maxPrice) {
-        const price = getPrice(v);
-        if (price > filterState.maxPrice) return false;
+        if (getPrice(v) > filterState.maxPrice) return false;
       }
       return true;
     });
   }, [allVariants, filterState]);
 
-  const bestDealIdx = useMemo(() => findBestDeal(filtered), [filtered]);
+  const sorted = useMemo(
+    () => sortVariants(filtered, filterState.sort),
+    [filtered, filterState.sort],
+  );
+
+  const bestDealIdx = useMemo(() => pickOptimal(sorted), [sorted]);
 
   return (
     <div className="space-y-4">
@@ -123,23 +176,23 @@ export function LandingClient({
         onFilterChange={setFilterState}
       />
 
-      {/* Количество результатов */}
-      <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>
-          {filtered.length > 0
-            ? `Найдено: ${filtered.length} ${filtered.length === 1 ? 'рейс' : filtered.length < 5 ? 'рейса' : 'рейсов'}`
-            : 'Ничего не найдено'}
+      {/* Количество и подсказка */}
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-slate-500">
+          {sorted.length > 0
+            ? `${sorted.length} ${sorted.length === 1 ? 'рейс' : sorted.length < 5 ? 'рейса' : 'рейсов'}`
+            : 'Нет рейсов по выбранным фильтрам'}
         </span>
-        {bestDealIdx !== null && filtered.length > 0 && (
-          <span className="text-amber-600">
-            Лучший выбор отмечен звездой
+        {bestDealIdx !== null && sorted.length > 0 && (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+            ⭐ Оптимальный выбор выделен
           </span>
         )}
       </div>
 
-      {/* Desktop: table, Mobile: cards */}
-      <ComparisonTable variants={filtered} bestDealIdx={bestDealIdx} />
-      <VariantCards variants={filtered} bestDealIdx={bestDealIdx} />
+      {/* Desktop table / Mobile cards */}
+      <ComparisonTable variants={sorted} bestDealIdx={bestDealIdx} />
+      <VariantCards variants={sorted} bestDealIdx={bestDealIdx} />
     </div>
   );
 }

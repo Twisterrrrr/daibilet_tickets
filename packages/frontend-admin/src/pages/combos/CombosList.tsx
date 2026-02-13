@@ -1,8 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { adminApi } from '../../api/client';
-import { DataTable } from '../../components/ui/DataTable';
-import { Badge } from '../../components/ui/Badge';
+import { ColumnDef } from '@tanstack/react-table';
+import { Plus } from 'lucide-react';
+import { adminApi } from '@/api/client';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type Intensity = 'RELAXED' | 'NORMAL' | 'ACTIVE';
 
@@ -29,6 +42,62 @@ const INTENSITY_LABELS: Record<Intensity, string> = {
   ACTIVE: 'Активный',
 };
 
+// ─── Columns ─────────────────────────────────────────────────────────────────
+
+const getColumns = (): ColumnDef<ComboItem>[] => [
+  {
+    accessorKey: 'title',
+    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
+    cell: ({ row }) => (
+      <div className="font-medium">{row.original.title}</div>
+    ),
+  },
+  {
+    id: 'city',
+    accessorFn: (row) => row.city?.name ?? '',
+    header: 'Город',
+    cell: ({ row }) => (
+      <span className="text-muted-foreground">
+        {row.original.city?.name ?? '—'}
+      </span>
+    ),
+  },
+  {
+    accessorKey: 'intensity',
+    header: 'Интенсивность',
+    cell: ({ row }) => (
+      <Badge variant="outline">
+        {INTENSITY_LABELS[row.original.intensity] ?? row.original.intensity}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: 'dayCount',
+    header: 'Дней',
+    cell: ({ row }) => (
+      <span className="tabular-nums text-sm">{row.original.dayCount}</span>
+    ),
+  },
+  {
+    accessorKey: 'isActive',
+    header: 'Активен',
+    cell: ({ row }) => (
+      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
+        {row.original.isActive ? 'Да' : 'Нет'}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: 'sortOrder',
+    header: ({ column }) => <SortableHeader column={column}>Порядок</SortableHeader>,
+    cell: ({ row }) => (
+      <span className="tabular-nums text-sm">{row.original.sortOrder}</span>
+    ),
+  },
+];
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
 export function CombosListPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<ComboItem[]>([]);
@@ -54,7 +123,7 @@ export function CombosListPage() {
     adminApi
       .get<CityItem[] | { items: CityItem[] }>('/admin/cities')
       .then((res) => {
-        const list = Array.isArray(res) ? res : (res as any).items ?? [];
+        const list = Array.isArray(res) ? res : (res as { items: CityItem[] }).items ?? [];
         setCities(list);
       })
       .catch(() => {});
@@ -64,70 +133,69 @@ export function CombosListPage() {
     navigate(`/combos/${item.id}`);
   };
 
-  const columns = [
-    { key: 'title', label: 'Название' },
-    {
-      key: 'city.name',
-      label: 'Город',
-      render: (item: ComboItem) => item.city?.name ?? '—',
-    },
-    {
-      key: 'intensity',
-      label: 'Интенсивность',
-      render: (item: ComboItem) =>
-        INTENSITY_LABELS[item.intensity] ?? item.intensity,
-    },
-    { key: 'dayCount', label: 'Дней' },
-    {
-      key: 'isActive',
-      label: 'Активен',
-      render: (item: ComboItem) => (
-        <Badge variant={item.isActive ? 'success' : 'default'}>
-          {item.isActive ? 'Да' : 'Нет'}
-        </Badge>
-      ),
-    },
-    { key: 'sortOrder', label: 'Порядок' },
-  ];
+  const columns = getColumns();
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Combo</h1>
-        <Link
-          to="/combos/new"
-          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-        >
-          Создать
-        </Link>
-      </div>
-
-      <div className="mb-4 flex flex-wrap gap-4">
-        <select
-          value={cityFilter}
-          onChange={(e) => setCityFilter(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        >
-          <option value="">Все города</option>
-          {cities.map((c) => (
-            <option key={c.id} value={c.slug}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Combo</h1>
+          <p className="text-muted-foreground">
+            Управление combo-страницами (маршруты, путешествия)
+          </p>
+        </div>
+        <Button asChild>
+          <Link to="/combos/new" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Создать
+          </Link>
+        </Button>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <Card className="border-destructive">
+          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+        </Card>
       )}
 
-      <DataTable
-        columns={columns}
-        data={data}
-        onRowClick={handleRowClick}
-        loading={loading}
-        emptyText="Нет combo"
-      />
+      {/* Filters & Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Список combo</CardTitle>
+          <CardDescription>
+            Выберите город для фильтрации или оставьте «Все города»
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Select
+              value={cityFilter || '__all__'}
+              onValueChange={(v) => setCityFilter(v === '__all__' ? '' : v)}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Все города" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все города</SelectItem>
+                {cities.map((c) => (
+                  <SelectItem key={c.id} value={c.slug}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={data}
+            onRowClick={handleRowClick}
+            loading={loading}
+            emptyText="Нет combo"
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

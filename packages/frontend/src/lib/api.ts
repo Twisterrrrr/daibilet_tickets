@@ -49,6 +49,22 @@ export const api = {
   getCityBySlug: (slug: string) =>
     fetchApi<any>(`/cities/${slug}`),
 
+  // Локации
+  getLocations: (city?: string, type?: string) => {
+    const params = new URLSearchParams();
+    if (city) params.set('city', city);
+    if (type) params.set('type', type);
+    const query = params.toString() ? `?${params}` : '';
+    return fetchApi<any[]>(`/locations${query}`);
+  },
+
+  getNearestLocations: (lat: number, lng: number, type?: string, limit?: number) => {
+    const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+    if (type) params.set('type', type);
+    if (limit) params.set('limit', String(limit));
+    return fetchApi<any[]>(`/locations/nearest?${params}`);
+  },
+
   // События
   getEvents: (params?: Record<string, string | number>) => {
     const query = params
@@ -140,4 +156,44 @@ export const api = {
   // Pricing / Upsells
   getUpsells: (city?: string) =>
     fetchApi<any[]>(city ? `/pricing/upsells?city=${city}` : '/pricing/upsells'),
+
+  // Отзывы
+  getEventReviews: (slug: string, page = 1) =>
+    fetchApi<any>(`/events/${slug}/reviews?page=${page}`),
+
+  submitReview: (data: {
+    eventId: string;
+    rating: number;
+    title?: string;
+    text: string;
+    authorName: string;
+    authorEmail: string;
+    voucherCode?: string;
+    website?: string;
+    formStartedAt?: number;
+    reviewRequestToken?: string;
+  }) =>
+    fetchApi<any>('/reviews', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  uploadReviewPhotos: async (reviewId: string, files: File[], authorEmail?: string) => {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('photos', f));
+    if (authorEmail) formData.append('authorEmail', authorEmail);
+    const url = `${isServer ? (process.env.INTERNAL_API_URL || 'http://localhost:4000/api/v1') : (process.env.NEXT_PUBLIC_API_URL || '/api/v1')}/reviews/${reviewId}/photos`;
+    const res = await fetch(url, { method: 'POST', body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Ошибка загрузки фото' }));
+      throw new Error(err.message || `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+
+  voteReview: (reviewId: string, helpful: boolean) =>
+    fetchApi<{ helpfulCount: number }>(`/reviews/${reviewId}/vote`, {
+      method: 'POST',
+      body: JSON.stringify({ helpful }),
+    }),
 };

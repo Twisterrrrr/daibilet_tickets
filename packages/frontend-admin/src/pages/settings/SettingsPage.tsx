@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { adminApi } from '../../api/client';
+import { toast } from 'sonner';
+import { adminApi } from '@/api/client';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 interface SyncStatus {
   lastSyncAt: string | null;
@@ -24,35 +31,56 @@ interface PricingConfig {
   peakRanges: any[];
 }
 
+function OpsButton({
+  label,
+  loading,
+  onClick,
+  variant,
+}: {
+  label: string;
+  loading: boolean;
+  onClick: () => void;
+  variant?: 'destructive';
+}) {
+  return (
+    <Button
+      variant={variant === 'destructive' ? 'destructive' : 'outline'}
+      onClick={onClick}
+      disabled={loading}
+    >
+      {loading ? `${label}...` : label}
+    </Button>
+  );
+}
+
 export function SettingsPage() {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [pricing, setPricing] = useState<PricingConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [opsLoading, setOpsLoading] = useState<string | null>(null);
   const [pricingSaving, setPricingSaving] = useState(false);
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
     Promise.all([
       adminApi.get<SyncStatus>('/admin/settings/sync-status'),
       adminApi.get<PricingConfig>('/admin/settings/pricing'),
-    ]).then(([s, p]) => {
-      setStatus(s);
-      setPricing(p);
-    }).finally(() => setLoading(false));
+    ])
+      .then(([s, p]) => {
+        setStatus(s);
+        setPricing(p);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const runOps = async (endpoint: string, label: string) => {
     setOpsLoading(label);
-    setMessage('');
     try {
       const result = await adminApi.post(endpoint);
-      setMessage((result as any).message || `${label} выполнено`);
-      // Обновляем статус
+      toast.success((result as any).message || `${label} выполнено`);
       const s = await adminApi.get<SyncStatus>('/admin/settings/sync-status');
       setStatus(s);
     } catch (e: any) {
-      setMessage(`Ошибка: ${e.message}`);
+      toast.error(e.message ? `Ошибка: ${e.message}` : 'Ошибка выполнения операции');
     } finally {
       setOpsLoading(null);
     }
@@ -65,9 +93,9 @@ export function SettingsPage() {
       const { id, ...data } = pricing;
       const result = await adminApi.patch('/admin/settings/pricing', data);
       setPricing(result as any);
-      setMessage('Pricing сохранён');
+      toast.success('Pricing сохранён');
     } catch (e: any) {
-      setMessage(`Ошибка: ${e.message}`);
+      toast.error(e.message ? `Ошибка: ${e.message}` : 'Ошибка сохранения');
     } finally {
       setPricingSaving(false);
     }
@@ -76,123 +104,185 @@ export function SettingsPage() {
   const formatDate = (d: string | null) =>
     d ? new Date(d).toLocaleString('ru-RU') : 'никогда';
 
-  if (loading) return <div className="text-gray-400">Загрузка...</div>;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <Skeleton className="h-48 w-full rounded-lg" />
+        <Skeleton className="h-32 w-full rounded-lg" />
+        <Skeleton className="h-40 w-full rounded-lg" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-xl font-bold text-gray-900">Настройки</h1>
-
-      {message && (
-        <div className="rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700">{message}</div>
-      )}
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Настройки</h1>
+        <p className="text-muted-foreground">Конфигурация синхронизации и ценообразования</p>
+      </div>
 
       {/* Sync Status */}
-      <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-gray-800">Статус синхронизации</h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <div>
-            <p className="text-xs text-gray-500">Последняя синхронизация</p>
-            <p className="font-medium text-gray-700">{formatDate(status?.lastSyncAt || null)}</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Статус синхронизации</CardTitle>
+          <CardDescription>Состояние данных из внешних источников</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+            <div className="space-y-1">
+              <Label className="text-muted-foreground">Последняя синхронизация</Label>
+              <p className="font-medium">{formatDate(status?.lastSyncAt || null)}</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-muted-foreground">События</Label>
+              <p className="font-medium">
+                {status?.events.active} / {status?.events.total}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-muted-foreground">Сессии</Label>
+              <p className="font-medium">
+                {status?.sessions.active} / {status?.sessions.total}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-muted-foreground">Last cache flush</Label>
+              <p className="font-medium">{formatDate(status?.ops?.lastCacheFlush || null)}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-gray-500">События</p>
-            <p className="font-medium text-gray-700">{status?.events.active} / {status?.events.total}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Сессии</p>
-            <p className="font-medium text-gray-700">{status?.sessions.active} / {status?.sessions.total}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Last cache flush</p>
-            <p className="font-medium text-gray-700">{formatDate(status?.ops?.lastCacheFlush || null)}</p>
-          </div>
-        </div>
 
-        {status?.ops && (
-          <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3 md:grid-cols-4">
-            <p className="text-xs text-gray-400">Full sync: {formatDate(status.ops.lastFullSyncAt)}</p>
-            <p className="text-xs text-gray-400">Incr sync: {formatDate(status.ops.lastIncrSyncAt)}</p>
-            <p className="text-xs text-gray-400">Retag: {formatDate(status.ops.lastRetagAt)}</p>
-            <p className="text-xs text-gray-400">Populate: {formatDate(status.ops.lastPopulateAt)}</p>
-          </div>
-        )}
+          {status?.ops && (
+            <>
+              <Separator />
+              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 md:grid-cols-4">
+                <p>Full sync: {formatDate(status.ops.lastFullSyncAt)}</p>
+                <p>Incr sync: {formatDate(status.ops.lastIncrSyncAt)}</p>
+                <p>Retag: {formatDate(status.ops.lastRetagAt)}</p>
+                <p>Populate: {formatDate(status.ops.lastPopulateAt)}</p>
+              </div>
+            </>
+          )}
 
-        {status?.ops?.lastError && (
-          <p className="mt-2 text-xs text-red-500">Последняя ошибка: {status.ops.lastError}</p>
-        )}
-      </section>
+          {status?.ops?.lastError && (
+            <p className="text-sm text-destructive">Последняя ошибка: {status.ops.lastError}</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Ops Controls */}
-      <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-gray-800">Управление операциями</h2>
-        <div className="flex flex-wrap gap-3">
-          <OpsButton label="Full Sync" loading={opsLoading === 'Full Sync'}
-            onClick={() => runOps('/admin/settings/ops/sync/full', 'Full Sync')} />
-          <OpsButton label="Incr Sync" loading={opsLoading === 'Incr Sync'}
-            onClick={() => runOps('/admin/settings/ops/sync/incremental', 'Incr Sync')} />
-          <OpsButton label="Retag" loading={opsLoading === 'Retag'}
-            onClick={() => runOps('/admin/settings/ops/retag', 'Retag')} />
-          <OpsButton label="Populate Combos" loading={opsLoading === 'Populate Combos'}
-            onClick={() => runOps('/admin/settings/ops/populate-combos', 'Populate Combos')} />
-          <OpsButton label="Flush Cache" loading={opsLoading === 'Flush Cache'} variant="red"
-            onClick={() => runOps('/admin/settings/ops/cache/flush', 'Flush Cache')} />
-        </div>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>Управление операциями</CardTitle>
+          <CardDescription>Запуск синхронизации и служебных задач</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <OpsButton
+              label="Full Sync"
+              loading={opsLoading === 'Full Sync'}
+              onClick={() => runOps('/admin/settings/ops/sync/full', 'Full Sync')}
+            />
+            <OpsButton
+              label="Incr Sync"
+              loading={opsLoading === 'Incr Sync'}
+              onClick={() => runOps('/admin/settings/ops/sync/incremental', 'Incr Sync')}
+            />
+            <OpsButton
+              label="Retag"
+              loading={opsLoading === 'Retag'}
+              onClick={() => runOps('/admin/settings/ops/retag', 'Retag')}
+            />
+            <OpsButton
+              label="Populate Combos"
+              loading={opsLoading === 'Populate Combos'}
+              onClick={() => runOps('/admin/settings/ops/populate-combos', 'Populate Combos')}
+            />
+            <OpsButton
+              label="Flush Cache"
+              loading={opsLoading === 'Flush Cache'}
+              variant="destructive"
+              onClick={() => runOps('/admin/settings/ops/cache/flush', 'Flush Cache')}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Pricing Config */}
       {pricing && (
-        <section className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold text-gray-800">Конфигурация цен</h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">Service Fee %</label>
-              <input type="number" step="0.1" value={pricing.serviceFeePercent}
-                onChange={(e) => setPricing(p => p ? { ...p, serviceFeePercent: Number(e.target.value) } : p)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <Card>
+          <CardHeader>
+            <CardTitle>Конфигурация цен</CardTitle>
+            <CardDescription>Проценты наценок и комиссий</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+              <div className="space-y-2">
+                <Label htmlFor="serviceFeePercent">Service Fee %</Label>
+                <Input
+                  id="serviceFeePercent"
+                  type="number"
+                  step="0.1"
+                  value={pricing.serviceFeePercent}
+                  onChange={(e) =>
+                    setPricing((p) =>
+                      p ? { ...p, serviceFeePercent: Number(e.target.value) } : p,
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="peakMarkupPercent">Peak Markup %</Label>
+                <Input
+                  id="peakMarkupPercent"
+                  type="number"
+                  step="0.1"
+                  value={pricing.peakMarkupPercent}
+                  onChange={(e) =>
+                    setPricing((p) =>
+                      p ? { ...p, peakMarkupPercent: Number(e.target.value) } : p,
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastMinutePercent">Last Minute %</Label>
+                <Input
+                  id="lastMinutePercent"
+                  type="number"
+                  step="0.1"
+                  value={pricing.lastMinutePercent}
+                  onChange={(e) =>
+                    setPricing((p) =>
+                      p ? { ...p, lastMinutePercent: Number(e.target.value) } : p,
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tcCommissionPercent">TC Commission %</Label>
+                <Input
+                  id="tcCommissionPercent"
+                  type="number"
+                  step="0.1"
+                  value={pricing.tcCommissionPercent}
+                  onChange={(e) =>
+                    setPricing((p) =>
+                      p ? { ...p, tcCommissionPercent: Number(e.target.value) } : p,
+                    )
+                  }
+                />
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">Peak Markup %</label>
-              <input type="number" step="0.1" value={pricing.peakMarkupPercent}
-                onChange={(e) => setPricing(p => p ? { ...p, peakMarkupPercent: Number(e.target.value) } : p)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">Last Minute %</label>
-              <input type="number" step="0.1" value={pricing.lastMinutePercent}
-                onChange={(e) => setPricing(p => p ? { ...p, lastMinutePercent: Number(e.target.value) } : p)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">TC Commission %</label>
-              <input type="number" step="0.1" value={pricing.tcCommissionPercent}
-                onChange={(e) => setPricing(p => p ? { ...p, tcCommissionPercent: Number(e.target.value) } : p)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-            </div>
-          </div>
-          <button onClick={savePricing} disabled={pricingSaving}
-            className="mt-4 rounded-lg bg-primary-600 px-6 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50">
-            {pricingSaving ? 'Сохранение...' : 'Сохранить pricing'}
-          </button>
-        </section>
+            <Button onClick={savePricing} disabled={pricingSaving}>
+              {pricingSaving ? 'Сохранение...' : 'Сохранить pricing'}
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
-  );
-}
-
-function OpsButton({ label, loading, onClick, variant }: {
-  label: string; loading: boolean; onClick: () => void; variant?: 'red';
-}) {
-  const base = variant === 'red'
-    ? 'border-red-300 text-red-600 hover:bg-red-50'
-    : 'border-gray-300 text-gray-600 hover:bg-gray-50';
-
-  return (
-    <button
-      onClick={onClick}
-      disabled={loading}
-      className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${base}`}
-    >
-      {loading ? `${label}...` : label}
-    </button>
   );
 }

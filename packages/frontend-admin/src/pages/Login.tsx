@@ -1,7 +1,12 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
-import { setToken } from '../lib/auth';
+import { Ticket } from 'lucide-react';
+import { api } from '@/api/client';
+import { setToken } from '@/lib/auth';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -20,7 +25,6 @@ export function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      // accessToken в localStorage, refreshToken приходит в HttpOnly cookie автоматически
       setToken(data.accessToken);
       navigate('/');
     } catch (err: any) {
@@ -31,49 +35,53 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm">
-        <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-          <h1 className="mb-1 text-center text-xl font-bold text-gray-900">DAIBILET</h1>
-          <p className="mb-6 text-center text-sm text-gray-500">Панель администратора</p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                placeholder="admin@daibilet.ru"
-              />
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="w-full max-w-sm px-4">
+        <Card>
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+              <Ticket className="h-6 w-6 text-primary-foreground" />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Пароль</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-              />
-            </div>
+            <CardTitle className="text-xl">DAIBILET</CardTitle>
+            <CardDescription>Панель администратора</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="admin@daibilet.ru"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Пароль</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
 
-            {error && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-            )}
+              {error && (
+                <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-50"
-            >
-              {loading ? 'Вход...' : 'Войти'}
-            </button>
-          </form>
-        </div>
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? 'Вход...' : 'Войти'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

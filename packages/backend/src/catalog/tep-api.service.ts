@@ -41,14 +41,30 @@ export class TepApiService {
   }
 
   /**
-   * События (compact — без расписания).
-   * Доступно публично, без авторизации.
+   * События с полными данными (включая расписание eventTimes).
+   * Требует белый IP. Fallback на compact если полные данные недоступны.
    */
   async getEvents(cityId?: number): Promise<TepEvent[]> {
-    const path = cityId
+    const fullPath = cityId
+      ? `/events?city_id=${cityId}`
+      : '/events';
+    try {
+      const events = await this.request<TepEvent[]>(fullPath);
+      // Проверяем, что получили полные данные (есть eventTimes)
+      if (events.length > 0 && events[0].eventTimes !== undefined) {
+        this.logger.log(`TEP full API: ${events.length} events with schedules`);
+        return events;
+      }
+      // Если eventTimes отсутствует — IP не в белом списке
+      this.logger.warn('TEP: eventTimes not found, IP may not be whitelisted. Fallback to compact.');
+    } catch (err: any) {
+      this.logger.warn(`TEP full API failed: ${err.message}. Fallback to compact.`);
+    }
+    // Fallback: compact
+    const compactPath = cityId
       ? `/events?compact&city_id=${cityId}`
       : '/events?compact';
-    return this.request<TepEvent[]>(path);
+    return this.request<TepEvent[]>(compactPath);
   }
 
   /**
@@ -137,10 +153,17 @@ export interface TepEvent {
   description: string;
   schedule_description: string;
   images: string[];
+  eventTimes?: TepTimeSlot[]; // расписание (доступно без compact и с белым IP)
   eventFeatures: TepFeature[];
   eventPlaces: TepPlace[];
   eventTickets: TepTicket[];
   hasSeats: boolean;
+}
+
+export interface TepTimeSlot {
+  id: number;
+  datetime: string; // "2026-05-18T16:30:00+0300"
+  available_tickets: number;
 }
 
 export interface TepScheduleItem {
@@ -151,5 +174,6 @@ export interface TepScheduleItem {
 }
 
 export interface TepEventFull extends TepEvent {
+  eventTimes?: TepTimeSlot[];
   schedules?: TepScheduleItem[];
 }

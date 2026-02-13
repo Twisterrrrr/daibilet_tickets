@@ -1,11 +1,55 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-02-12
+> Последнее обновление: 2026-02-12 (EventAudience + Conversion Mechanics)
 
 ## Легенда
 
 - **Приоритет**: Критический / Высокий / Средний / Низкий
 - **Статус**: `[ ]` не начато, `[~]` в работе, `[x]` выполнено, `[-]` отменено
+
+---
+
+## Фаза 1 UX: Afisha-inspired улучшения
+
+> Источник: сравнительный анализ с Яндекс.Афишей (2026-02-12)
+
+### Этап 1: Quick Wins (лента дат + бейджи)
+
+- [x] **Критический**: `DateRibbon` — горизонтальная лента дат (сегодня/завтра/выходные + 12 дней) на /events
+- [x] **Критический**: Интеграция ленты дат с `dateFrom`/`dateTo` в API (бэкенд уже поддерживает)
+- [x] **Высокий**: Расширить API `/events` — включить sessions summary (ближайший сеанс, свободные места)
+- [x] **Высокий**: `optimalScore` — алгоритм выбора (рейтинг 40% + цена/длительность 30% + загрузка 30%)
+- [x] **Высокий**: Смарт-бейджи на `EventCard`: "Оптимальный выбор", "Осталось N мест", ближайший сеанс
+- [x] **Средний**: Каркас Prisma: Location (PIER/VENUE/MEETING_POINT), Operator, Route + миграция
+
+### Мульти-офферная архитектура (EventOffer)
+
+- [x] **Критический**: Починить админку EventEdit.tsx: PATCH /override вместо PUT, isHidden toggle, фильтр скрытых
+- [x] **Критический**: Prisma: модель `EventOffer` (OfferSource, OfferStatus, PurchaseType) + `Event.canonicalOfId` + `EventSession.offerId`
+- [x] **Критический**: Data migration: 269 offers из существующих Event + 2247 sessions → offerId
+- [x] **Критический**: TC Sync + Teplohod Sync: upsert EventOffer параллельно с Event, offerId в sessions
+- [x] **Критический**: API `getEvents` / `getEventBySlug`: include offers, primaryOffer в ответе, фильтр дублей (canonicalOfId)
+- [x] **Высокий**: Admin: секция офферов (таблица, status toggle, set primary) + endpoints (GET/PATCH/POST merge)
+- [x] **Высокий**: Frontend BuyCard: CTA по primaryOffer.purchaseType (TC_WIDGET / REDIRECT / BuyModal)
+- [ ] **Средний**: Admin: UI для ручного merge дублей (поиск + выбор canonical event)
+- [ ] **Средний**: Автодедуп: fuzzy matching по названию + площадка + дата (Фаза будущая)
+- [ ] **Низкий**: Автовыбор primary по правилам (комиссия/цена/наличие)
+
+### Этап 2: SEO-машина + новые страницы (планируется)
+
+- [ ] **Высокий**: 5 SEO-подборок на город (развод мостов, лучшие по отзывам, дешёвые, поздние рейсы, с детьми)
+- [ ] **Высокий**: Страницы причалов (/cities/:slug/piers/:pier)
+- [ ] **Высокий**: Страницы маршрутов (/routes/:slug)
+- [ ] **Средний**: Перелинковка: событие — причал — маршрут — подборка
+- [ ] **Средний**: Улучшить карточку события: блок "как проходит", фото палуб, условия возврата
+
+### Этап 3: Персонализация + удержание (планируется)
+
+- [ ] **Высокий**: Геолокация: ближайший причал + время доезда
+- [ ] **Высокий**: Погодный бейдж: комфортно/ветрено + рекомендация
+- [ ] **Средний**: "Следить за ценой" — push/email при снижении
+- [ ] **Средний**: Постпокупочный слой: напоминание + чек-лист + "как найти причал"
+- [ ] **Средний**: TripCombo upsell: мосты + напиток/плед/фото
 
 ---
 
@@ -82,11 +126,11 @@
 - [x] **Высокий**: Эндпоинты: `GET /tep/discover`, `POST /tep/sync`, `POST /sync/all`
 - [ ] **Критический**: BullMQ job: `sync-events-full` (cron каждые 6 часов)
 - [ ] **Критический**: BullMQ job: `sync-events-incremental` (cron каждые 15 минут)
-- [x] **Высокий**: Маппинг категорий TC → наши (EXCURSION / MUSEUM / EVENT) по ключевым словам
+- [x] **Высокий**: Маппинг категорий TC → наши (EXCURSION / MUSEUM / EVENT / KIDS) по ключевым словам
 - [x] **Высокий**: Маппинг категорий teplohod.info → наши + фичи → теги
 - [ ] **Высокий**: Redis-кэш: списки событий (TTL 10 мин), детали (TTL 5 мин), сессии (TTL 3 мин)
 - [ ] **Средний**: Автоматическое определение координат по адресу (Яндекс Геокодер или ручное)
-- [ ] **Средний**: Полный API teplohod.info (с расписанием) — требует белый IP
+- [x] **Средний**: Полный API teplohod.info (с расписанием) — IP в белом списке, реальные сессии из eventTimes (55 событий, ~2000 сессий)
 
 ### 1.3.1 gRPC tc-simple (миграция каталога TC)
 
@@ -232,7 +276,7 @@
 - [x] **Высокий**: SEO-стабильность: populateAll не перезаписывает валидные curatedEvents (порог >30% невалидных)
 - [x] **Средний**: Фактор новизны в scoring: combo (+15 баллов / 30 дней) и planner (+8 баллов / 30 дней)
 - [x] **Средний**: Умный scheduler: O(1 count) проверка валидности, лог checked/changed
-- [ ] **Средний**: Combo для Казани, Калининграда, Нижнего Новгорода
+- [ ] **Средний**: Combo для Казани, Владимира, Ярославля, Нижнего Новгорода
 
 ---
 
@@ -325,7 +369,7 @@
 
 ### 6.3 Масштабирование
 
-- [ ] **Средний**: Добавить города: Екатеринбург, Калининград, Ярославль, Владивосток
+- [ ] **Средний**: Добавить города: Екатеринбург, Сочи, Владивосток, Калининград
 - [ ] **Средний**: Расширить подкатегории и теги
 - [ ] **Низкий**: Telegram-бот: алерты при ошибках оплаты, падении сервисов
 - [ ] **Низкий**: Telegram-канал: автопостинг популярных событий и статей
@@ -417,3 +461,164 @@
 - [x] **Высокий**: Upsells — таблица + CRUD-форма (цена, категория, город, иконка)
 - [x] **Высокий**: Аудит — таблица с фильтрами (entity, action) + раскрытие before/after JSON
 - [x] **Высокий**: Settings — sync status, ops кнопки, pricing config форма
+
+### Отзывы и рейтинги (MVP)
+- [x] **Критический**: Prisma — модель Review (eventId, operatorId, rating 1-5, text, authorName, authorEmail, isVerified, voucherCode, status PENDING/APPROVED/REJECTED, adminComment)
+- [x] **Критический**: Prisma — поля externalRating, externalReviewCount, externalSource в Event
+- [x] **Критический**: Миграция `add_reviews`
+- [x] **Высокий**: ReviewService — создание (с валидацией, дедупликацией по email+event, верификацией через voucher)
+- [x] **Высокий**: ReviewService — получение одобренных отзывов (пагинация, сортировка verified first)
+- [x] **Высокий**: ReviewService — рейтинг-сводка (среднее, распределение по звёздам, верифицированные)
+- [x] **Высокий**: ReviewService — пересчёт Event.rating (взвешенное среднее own + external)
+- [x] **Высокий**: ReviewService — admin CRUD (list, moderate approve/reject, delete)
+- [x] **Высокий**: Public API — POST /reviews, GET /events/:slug/reviews
+- [x] **Высокий**: Admin API — GET /admin/reviews, PATCH approve/reject, DELETE
+- [x] **Высокий**: Admin API — PATCH /admin/events/:id/external-rating
+- [x] **Высокий**: Frontend — ReviewSection (рейтинг-сводка + карточки отзывов + форма + пагинация)
+- [x] **Высокий**: Frontend — интеграция на страницу события (/events/[slug])
+- [x] **Средний**: Frontend — JSON-LD AggregateRating для SEO
+- [x] **Высокий**: Admin frontend — страница модерации отзывов (tabs, approve/reject/delete dialog)
+- [x] **Высокий**: Admin frontend — ExternalRatingSection в EventEdit (ручной ввод Яндекс/2GIS)
+- [x] **Средний**: Admin frontend — пункт «Отзывы» в сайдбар с badge pending count
+- [x] **Средний**: API client (frontend) — getEventReviews, submitReview
+
+### Подкатегории и улучшение классификации
+
+- [x] **Критический**: Prisma — новая категория KIDS в EventCategory, enum EventSubcategory (28 подтипов), миграция
+- [x] **Критический**: Shared — обновлены типы EventListItem, CATEGORY_LABELS, SUBCATEGORY_LABELS, SUBCATEGORIES_BY_CATEGORY
+- [x] **Высокий**: Backend — улучшенный классификатор classify() в tc-sync (EVENT проверяется раньше EXCURSION, новые маркеры: tribute, трибьют, jazz, rock)
+- [x] **Высокий**: Backend — классификатор classifyTep() в tep-sync с subcategory
+- [x] **Высокий**: Admin — override category + subcategory в EventEdit (select с зависимым списком подтипов)
+- [x] **Высокий**: Frontend — подкатегории-чипы в каталоге (появляются при выборе категории), таб «Детям»
+- [x] **Средний**: Frontend — EventCard показывает подкатегорию вместо категории если есть
+- [x] **Средний**: EventOverride — поддержка subcategory для ручного переноса событий
+- [x] **Средний**: Пересинхронизация всех событий с новым классификатором
+
+### Редизайн админки (SaaS-стиль, shadcn/ui)
+
+- [x] **Критический**: Установка shadcn/ui + tailwindcss-animate + CVA + clsx + tailwind-merge + Radix UI
+- [x] **Критический**: Подключение recharts для графиков Dashboard + @tanstack/react-table для DataTable
+- [x] **Критический**: Создание 17 базовых UI-компонентов (Button, Card, Badge, Input, Table, Dialog, Dropdown, Tabs, etc.)
+- [x] **Критический**: Редизайн Sidebar (секции, tooltip при сворачивании, mobile sheet)
+- [x] **Критический**: Редизайн Layout (sticky header, breadcrumbs, theme toggle, user dropdown, mobile menu)
+- [x] **Критический**: Dashboard — AreaChart выручки, BarChart категорий, TopEvents, RecentOrders, StatCards
+- [x] **Критический**: Backend /admin/dashboard/stats — полная аналитика (trends, revenueByDay, salesByCategory, topEvents)
+- [x] **Критический**: DataTable на @tanstack/react-table (sort, filter, pagination, skeletons)
+- [x] **Высокий**: Редизайн EventsList + EventEdit (фильтры, tabbed interface, offers/sessions/rating tabs)
+- [x] **Высокий**: Редизайн OrdersList + OrderDetail (фильтры статуса/города, Card-layout)
+- [x] **Высокий**: Редизайн всех вторичных страниц (Cities, Tags, Landings, Combos, Articles, Reviews, Upsells, Settings, Audit)
+- [x] **Высокий**: ThemeProvider (dark/light mode) + localStorage persist
+- [x] **Высокий**: Sonner toasts вместо inline success/error messages (все CRUD-страницы)
+- [x] **Высокий**: Skeleton loading states вместо «Загрузка...» на всех страницах
+- [x] **Средний**: Горизонтальная прокрутка таблиц на мобильных (ScrollArea в DataTable)
+- [x] **Средний**: CSS анимации: page transitions (fadeSlideIn), smooth theme switching
+- [x] **Средний**: Custom scrollbar стили, dark mode адаптация Sonner
+- [x] **Средний**: Fix backend: page/limit string→number conversion (Orders, Events, Articles, Audit controllers)
+
+### EventAudience — исправление раздела «Детям»
+
+- [x] **Критический**: Prisma — enum EventAudience (ALL, KIDS, FAMILY), поле audience в Event и EventOverride
+- [x] **Критический**: Удаление KIDS из EventCategory, удаление 6 KIDS_* из EventSubcategory
+- [x] **Критический**: SQL-миграция: перевод KIDS-событий в реальные категории + audience=KIDS
+- [x] **Критический**: Shared — обновление enum/labels/маппингов, audience в EventListItem
+- [x] **Высокий**: Backend classifiers — tc-sync и tep-sync: kids-маркеры ставят audience, не category
+- [x] **Высокий**: Backend API — audience параметр в EventsQueryDto, фильтр в catalog.service, override service
+- [x] **Высокий**: Frontend — таб «Детям» = audience фильтр, бейдж на EventCard, карточка на главной
+- [x] **Средний**: Admin — Select audience (ALL/KIDS/FAMILY) в EventEdit override
+
+### Конверсионные механики
+
+- [x] **Высокий**: Бейдж «Через N мин» в enrichWithBadges + EventCard (оранжевый пульсирующий)
+- [x] **Высокий**: Сортировка departing_soon (ближайшие отправления за 2 часа)
+- [x] **Высокий**: Блок «Отправляются скоро» на главной странице (SSR)
+- [x] **Высокий**: Событийные теги (bridges, salute, scarlet-sails, white-nights, new-year, city-day)
+- [x] **Высокий**: Авто-присвоение тегов в TC Sync по ключевым словам (развод мостов, салют, и т.д.)
+- [x] **Высокий**: PromoBlock компонент — сезонные промо-карточки на главной и каталоге
+- [x] **Средний**: Фильтр по времени суток (timeOfDay: morning/day/evening/night) — raw SQL + чипы в каталоге
+- [x] **Средний**: Фильтр по причалу (pier) — API /locations + Select в каталоге
+- [x] **Средний**: API /locations/nearest (Haversine) — подготовка для геолокации
+
+### Контекстные быстрые фильтры + Системные теги
+
+- [x] **Критический**: QUICK_FILTERS конфиг в shared — 4 витрины с emoji-чипами (EXCURSION: 10, MUSEUM: 7, EVENT: 8, KIDS: 5)
+- [x] **Критический**: SYSTEM_TAG_BADGES в shared — 9 системных тег-бейджей с emoji, цветами
+- [x] **Критический**: Frontend — контекстные быстрые фильтры по витрине (events page), замена старых subcategory-чипов
+- [x] **Критический**: Frontend — tagSlugs prop в EventCard, рендер до 2 тег-бейджей (правый верхний угол)
+- [x] **Высокий**: 12 системных тегов в БД (night, water, romantic, best-value, last-minute, today-available, bad-weather-ok, first-time-city, with-guide, no-queue, interactive, audioguide)
+- [x] **Высокий**: Авто-присвоение тегов в tc-sync и tep-sync через расширенный KEYWORD_TAG_MAP
+- [x] **Высокий**: tagSlugs в API-ответе каталога (enrichWithBadges)
+- [x] **Средний**: Фильтр maxDuration в EventsQueryDto + catalog.service (чип «До 2 часов»)
+- [x] **Средний**: Фильтр maxMinAge в EventsQueryDto + catalog.service (чипы возраста в «Детям»)
+- [ ] **Низкий**: Алгоритм динамических тегов (best-value, last-minute, today-available) — cron-задача
+- [ ] **Низкий**: Интеграция геолокации (nearest) на фронтенде с navigator.geolocation
+
+### Главная страница + Лендинги + SEO-блог (февраль 2026)
+
+- [x] **Высокий**: Hero кнопка «Спланировать» — контрастный стиль для тёмного фона (border-white, backdrop-blur)
+- [x] **Высокий**: PromoBlock — всесезонные промо (Зимний город, День влюблённых, Масленица, Каникулы с детьми)
+- [x] **Высокий**: «Что посмотреть» — блок «Популярные темы» (теги + счётчики событий из API, SSR)
+- [x] **Критический**: Лендинг nochnye-mosty — применение additionalFilters в landing.service.ts (subcategories RIVER)
+- [x] **Высокий**: KEYWORD_TAG_MAP — ужесточение ключевых слов: `мост` → `развод мостов`, `ночные мосты`; удалены `развод`, `разводн`
+- [x] **Высокий**: Очистка БД — удалён тег nochnye-mosty у нерелевантных (не-RIVER) событий
+- [x] **Средний**: Документация SEO-блога — архитектура автогенерации, типы статей, перелинковка (docs/Project.md)
+- [ ] **Средний**: Реализация ArticlePlanner + DataCollector + Renderer + Linker
+- [ ] **Средний**: Подключение OpenAI API для генерации уникального контента
+- [ ] **Низкий**: Admin UI для управления статьями (перегенерация, публикация, превью)
+
+### Комплексная UGC-система (февраль 2026)
+
+#### Фаза 1: Инфраструктура
+- [x] **Критический**: MailModule + MailService — @nestjs-modules/mailer + Handlebars шаблоны (review-verify, review-request, review-approved)
+- [x] **Критический**: UploadModule + UploadService — multer + sharp, WebP конвертация, StorageProvider interface (LocalStorage)
+- [x] **Критический**: QueueModule — BullMQ подключён к Redis, очереди emails + review-tasks, EmailProcessor + ReviewTaskProcessor
+- [x] **Критический**: ThrottlerModule — глобальный rate limit 30 req/min
+
+#### Фаза 2: Улучшенные отзывы
+- [x] **Критический**: ReviewPhoto модель — до 5 фото на отзыв, ресайз 1200px + thumbnail 300px, WebP
+- [x] **Критический**: Email-верификация — статус PENDING_EMAIL, verifyToken с 48h TTL, endpoint GET /reviews/verify
+- [x] **Критический**: Спам-защита — honeypot-поле, минимальное время заполнения (5 сек), throttler
+- [x] **Высокий**: ReviewVote модель — "Полезный отзыв", дедупликация по SHA-256(IP), POST /reviews/:id/vote
+- [x] **Высокий**: Frontend ReviewSection — фото-галерея с lightbox, кнопка "Полезный", загрузка фото в форме
+- [x] **Высокий**: Email-уведомления через BullMQ — верификация, одобрение, уведомление админу
+
+#### Фаза 3: Внешние отзывы
+- [x] **Высокий**: ExternalReview модель — source (yandex_maps, 2gis, tripadvisor, google), sourceUrl, publishedAt
+- [x] **Высокий**: Admin CRUD + batch JSON import (AdminExternalReviewsController)
+- [x] **Высокий**: Frontend — бейджи источников, секция "Отзывы с других площадок"
+- [x] **Средний**: Участие ExternalReview в recalculateEventRating (взвешенное среднее)
+
+#### Фаза 4: Пост-покупочный flow
+- [x] **Высокий**: ReviewRequest модель — токен, tracking (sent/opened/clicked/reviewed), reminderSentAt
+- [x] **Высокий**: ReviewSchedulerService — cron 10:00 ежедневно (review requests), воскресенье (reminders), 04:00 (cleanup)
+- [x] **Высокий**: Pre-filled форма /reviews/write?token=xxx — автозаполнение email, автоматический isVerified
+- [x] **Средний**: Frontend — /reviews/verified (страница подтверждения email)
+- [ ] **Средний**: Настройка SMTP для production (daibilet.ru)
+- [ ] **Низкий**: pnpm approve-builds для sharp на VPS
+- [ ] **Низкий**: Nginx location /uploads/ для раздачи статических файлов
+
+---
+
+### Гибридные туры: ручные офферы + корзина + checkout
+
+#### Этап 1: Ручные офферы к существующим Event
+- [x] **Критический**: Prisma schema — REQUEST_ONLY в PurchaseType, MANUAL в EventSource, availabilityMode/badge/operatorId в EventOffer
+- [x] **Критический**: Backend CRUD офферов — POST/PUT/DELETE/clone в admin-events.controller
+- [x] **Высокий**: Admin UI — форма создания/редактирования/клонирования оффера (Dialog в EventEdit, OffersSection)
+- [x] **Высокий**: Frontend — обработка REQUEST_ONLY (форма заявки), badge на оффере, multi-offer display
+
+#### Этап 2: Создание новых Event через wizard
+- [x] **Высокий**: Backend — POST /admin/events (ручной Event + первый offer в транзакции, auto-slug транслитерация)
+- [x] **Высокий**: Admin UI — EventCreate wizard (2 шага: контент/SEO + первый оффер), кнопка "Создать событие" в списке
+
+#### Этап 3: Корзина + Checkout
+- [x] **Критический**: Prisma — CheckoutSession + OrderRequest модели, CheckoutStatus enum
+- [x] **Критический**: Frontend — CartContext + localStorage, CartProvider в layout, CartDrawer (Sheet), CartIcon в Header
+- [x] **Критический**: Frontend — AddToCartButton компонент для страницы события
+- [x] **Критический**: Backend — POST /checkout/validate (проверка наличия/цен), POST /checkout/session (создание сессии + order requests), POST /checkout/request (быстрая заявка без корзины), GET /checkout/session/:id
+- [x] **Высокий**: Frontend — Checkout page (3 шага: проверка → контакты → готово, разделение на redirect/request блоки)
+- [x] **Высокий**: Admin — CheckoutSessionsList (вкладки Заявки/Sessions, поиск, фильтры, Подтвердить/Отклонить заявки)
+- [x] **Высокий**: Admin — AdminCheckoutController (GET/PATCH sessions, GET requests, POST confirm/reject)
+- [x] **Высокий**: Sidebar — пункт "Заявки" в секции "Основное"
+- [ ] **Средний**: Email-уведомления клиенту при подтверждении/отклонении заявки (через MailService)
+- [ ] **Средний**: Cron для автоматического истечения заявок (TTL 30 мин / 24ч)
+- [ ] **Низкий**: Подключение YooKassa для online-оплаты

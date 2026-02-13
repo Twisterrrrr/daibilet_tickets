@@ -1,7 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { adminApi } from '../../api/client';
-import { transliterate } from '../../lib/transliterate';
+import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
+import { adminApi } from '@/api/client';
+import { transliterate } from '@/lib/transliterate';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface City {
   id: string;
@@ -33,7 +56,6 @@ export function ArticleEditPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState<Partial<ArticleDetail>>({
     title: '',
@@ -73,7 +95,6 @@ export function ArticleEditPage() {
       return;
     }
     setLoading(true);
-    setError(null);
     adminApi
       .get<ArticleDetail>(`/admin/articles/${id}`)
       .then((data) => {
@@ -91,7 +112,7 @@ export function ArticleEditPage() {
           publishedAt: data.publishedAt,
         });
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
+      .catch((e) => toast.error(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   }, [id, isCreate]);
 
@@ -104,19 +125,22 @@ export function ArticleEditPage() {
   };
 
   const handleSave = () => {
-    setError(null);
     const payload = {
       ...form,
       cityId: form.cityId || null,
-      publishedAt: form.isPublished && !form.publishedAt ? new Date().toISOString() : form.publishedAt,
+      publishedAt:
+        form.isPublished && !form.publishedAt ? new Date().toISOString() : form.publishedAt,
     };
 
     if (isCreate) {
       setSaving(true);
       adminApi
         .post<ArticleDetail>('/admin/articles', payload)
-        .then((created) => navigate(`/articles/${created.id}`))
-        .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка сохранения'))
+        .then((created) => {
+          toast.success('Статья создана');
+          navigate(`/articles/${created.id}`);
+        })
+        .catch((e) => toast.error(e instanceof Error ? e.message : 'Ошибка сохранения'))
         .finally(() => setSaving(false));
     } else if (id) {
       setSaving(true);
@@ -124,8 +148,9 @@ export function ArticleEditPage() {
         .put(`/admin/articles/${id}`, payload)
         .then((updated) => {
           setArticle((prev) => (prev ? { ...prev, ...updated } : null));
+          toast.success('Сохранено');
         })
-        .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка сохранения'))
+        .catch((e) => toast.error(e instanceof Error ? e.message : 'Ошибка сохранения'))
         .finally(() => setSaving(false));
     }
   };
@@ -133,76 +158,87 @@ export function ArticleEditPage() {
   const handleDelete = () => {
     if (!id || isCreate || !confirm('Удалить статью?')) return;
     setDeleting(true);
-    setError(null);
     adminApi
       .delete(`/admin/articles/${id}`)
-      .then(() => navigate('/articles'))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка удаления'))
+      .then(() => {
+        toast.success('Статья удалена');
+        navigate('/articles');
+      })
+      .catch((e) => toast.error(e instanceof Error ? e.message : 'Ошибка удаления'))
       .finally(() => setDeleting(false));
   };
 
   if (loading) {
     return (
-      <div className="flex h-40 items-center justify-center text-gray-400">Загрузка...</div>
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
     );
   }
 
   return (
-    <div>
-      <div className="mb-6 flex items-center gap-4">
-        <Link
-          to="/articles"
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-        >
-          ← Назад
-        </Link>
-        <h1 className="text-xl font-bold text-gray-900">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/articles" className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Назад
+          </Link>
+        </Button>
+        <h1 className="text-2xl font-bold tracking-tight">
           {isCreate ? 'Новая статья' : 'Редактировать статью'}
         </h1>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
-      )}
-
-      <div className="space-y-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <h2 className="mb-4 text-sm font-semibold text-gray-700">Основные данные</h2>
+      <Card>
+        <CardHeader>
+          <CardTitle>Основные данные</CardTitle>
+          <CardDescription>
+            Заполните поля статьи. Slug генерируется автоматически при создании.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">Название</label>
-              <input
-                type="text"
+            <div className="space-y-2">
+              <Label htmlFor="title">Название</Label>
+              <Input
+                id="title"
                 value={form.title ?? ''}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                placeholder="Заголовок статьи"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">Slug</label>
-              <input
-                type="text"
+            <div className="space-y-2">
+              <Label htmlFor="slug">Slug</Label>
+              <Input
+                id="slug"
                 value={form.slug ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                placeholder="url-slug"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">Город</label>
-              <select
-                value={form.cityId ?? ''}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, cityId: e.target.value || null }))
+            <div className="space-y-2">
+              <Label htmlFor="city">Город</Label>
+              <Select
+                value={form.cityId ?? '__none__'}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, cityId: v === '__none__' ? null : v }))
                 }
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               >
-                <option value="">— Не привязан</option>
-                {cities.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="city">
+                  <SelectValue placeholder="Не привязан" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Не привязан</SelectItem>
+                  {cities.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-2 sm:col-span-2">
               <input
@@ -219,16 +255,20 @@ export function ArticleEditPage() {
                         : f.publishedAt,
                   }))
                 }
-                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                className={cn(
+                  'h-4 w-4 rounded border-input accent-primary',
+                  'focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                )}
               />
-              <label htmlFor="isPublished" className="text-sm text-gray-700">
+              <Label htmlFor="isPublished" className="cursor-pointer font-normal">
                 Опубликовано
-              </label>
+              </Label>
             </div>
             {form.isPublished && (
-              <div>
-                <label className="mb-1 block text-xs text-gray-500">Дата публикации</label>
-                <input
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="publishedAt">Дата публикации</Label>
+                <Input
+                  id="publishedAt"
                   type="datetime-local"
                   value={
                     form.publishedAt
@@ -238,79 +278,91 @@ export function ArticleEditPage() {
                   onChange={(e) =>
                     setForm((f) => ({
                       ...f,
-                      publishedAt: e.target.value ? new Date(e.target.value).toISOString() : null,
+                      publishedAt: e.target.value
+                        ? new Date(e.target.value).toISOString()
+                        : null,
                     }))
                   }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
                 />
               </div>
             )}
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs text-gray-500">Краткое описание (excerpt)</label>
-              <textarea
-                rows={2}
-                value={form.excerpt ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs text-gray-500">Обложка (URL)</label>
-              <input
-                type="text"
-                value={form.coverImage ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, coverImage: e.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs text-gray-500">Контент (Markdown)</label>
-              <textarea
-                rows={16}
-                value={form.content ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">metaTitle</label>
-              <input
-                type="text"
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label htmlFor="excerpt">Краткое описание (excerpt)</Label>
+            <Textarea
+              id="excerpt"
+              rows={2}
+              value={form.excerpt ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))}
+              placeholder="Краткое описание для превью"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="coverImage">Обложка (URL)</Label>
+            <Input
+              id="coverImage"
+              type="text"
+              value={form.coverImage ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, coverImage: e.target.value }))}
+              placeholder="https://..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="content">Контент (Markdown)</Label>
+            <Textarea
+              id="content"
+              rows={16}
+              value={form.content ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+              className="font-mono text-sm"
+              placeholder="# Заголовок..."
+            />
+          </div>
+
+          <Separator />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="metaTitle">metaTitle</Label>
+              <Input
+                id="metaTitle"
                 value={form.metaTitle ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, metaTitle: e.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                placeholder="SEO заголовок"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">metaDescription</label>
-              <input
-                type="text"
+            <div className="space-y-2">
+              <Label htmlFor="metaDescription">metaDescription</Label>
+              <Input
+                id="metaDescription"
                 value={form.metaDescription ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                placeholder="SEO описание"
               />
             </div>
           </div>
-          <div className="mt-6 flex gap-3">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-            >
+
+          <div className="flex gap-3 pt-4">
+            <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Сохранение...' : 'Сохранить'}
-            </button>
+            </Button>
             {!isCreate && (
-              <button
+              <Button
+                variant="destructive"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
               >
                 {deleting ? 'Удаление...' : 'Удалить'}
-              </button>
+              </Button>
             )}
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

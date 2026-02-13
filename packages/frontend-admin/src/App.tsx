@@ -4,6 +4,7 @@ import { LoginPage } from './pages/Login';
 import { DashboardPage } from './pages/Dashboard';
 import { EventsListPage } from './pages/events/EventsList';
 import { EventEditPage } from './pages/events/EventEdit';
+import { EventCreatePage } from './pages/events/EventCreate';
 import { CitiesListPage } from './pages/cities/CitiesList';
 import { CityEditPage } from './pages/cities/CityEdit';
 import { TagsListPage } from './pages/tags/TagsList';
@@ -18,6 +19,9 @@ import { OrdersListPage } from './pages/orders/OrdersList';
 import { OrderDetailPage } from './pages/orders/OrderDetail';
 import { UpsellsListPage } from './pages/upsells/UpsellsList';
 import { UpsellEditPage } from './pages/upsells/UpsellEdit';
+import { ReviewsListPage } from './pages/reviews/ReviewsList';
+import { ExternalReviewsListPage } from './pages/reviews/ExternalReviewsList';
+import { CheckoutSessionsListPage } from './pages/checkout/CheckoutSessionsList';
 import { AuditLogPage } from './pages/audit/AuditLog';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { isAuthenticated } from './lib/auth';
@@ -44,6 +48,7 @@ export default function App() {
         >
           <Route index element={<DashboardPage />} />
           <Route path="events" element={<EventsListPage />} />
+          <Route path="events/new" element={<EventCreatePage />} />
           <Route path="events/:id" element={<EventEditPage />} />
           <Route path="cities" element={<CitiesListPage />} />
           <Route path="cities/:id" element={<CityEditPage />} />
@@ -59,8 +64,11 @@ export default function App() {
           <Route path="articles" element={<ArticlesListPage />} />
           <Route path="articles/new" element={<ArticleEditPage />} />
           <Route path="articles/:id" element={<ArticleEditPage />} />
+          <Route path="reviews" element={<ReviewsListPage />} />
+          <Route path="external-reviews" element={<ExternalReviewsListPage />} />
           <Route path="orders" element={<OrdersListPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
+          <Route path="checkout" element={<CheckoutSessionsListPage />} />
           <Route path="upsells" element={<UpsellsListPage />} />
           <Route path="upsells/new" element={<UpsellEditPage />} />
           <Route path="upsells/:id" element={<UpsellEditPage />} />

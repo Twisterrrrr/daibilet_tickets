@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { TcApiService } from './tc-api.service';
 import { TcGrpcService, TcGrpcEvent, TcGrpcMetaEvent, TcGrpcVenue, TcGrpcCity, TcGrpcTicketSet } from './tc-grpc.service';
-import { EventCategory } from '@prisma/client';
+import { EventCategory, EventSubcategory, EventAudience } from '@prisma/client';
 
 /**
  * Сервис синхронизации данных из Ticketscloud в нашу БД.
@@ -29,6 +29,8 @@ export class TcSyncService {
     498817: 'saint-petersburg',
     551487: 'kazan',
     554234: 'kaliningrad',
+    545729: 'vladimir',
+    468902: 'yaroslavl',
   };
 
   /** Кэш geoId → cityId (UUID) */
@@ -283,8 +285,8 @@ export class TcSyncService {
     const lat = venue.coordinates?.latitude || null;
     const lng = venue.coordinates?.longitude || null;
 
-    // Категория
-    const category = this.mapCategoryGrpc(best, title, description);
+    // Категория + подкатегории
+    const { category, subcategories, audience } = this.classifyGrpc(best, title, description);
 
     // Возрастной рейтинг
     const minAge = this.parseAgeRating(meta?.age_rating || best.age_rating);
@@ -332,6 +334,8 @@ export class TcSyncService {
           tcMetaEventId,
           description: description || event.description,
           category,
+          subcategories,
+          audience,
           minAge,
           durationMinutes:
             durationMinutes && durationMinutes > 0 && durationMinutes < 2880
@@ -358,6 +362,8 @@ export class TcSyncService {
           slug,
           description,
           category,
+          subcategories,
+          audience,
           minAge,
           durationMinutes:
             durationMinutes && durationMinutes > 0 && durationMinutes < 2880
@@ -375,10 +381,36 @@ export class TcSyncService {
       });
     }
 
+    // Upsert EventOffer (мульти-офферная архитектура)
+    const offer = await this.prisma.eventOffer.upsert({
+      where: {
+        source_externalEventId: { source: 'TC', externalEventId: tcId },
+      },
+      update: {
+        eventId: event.id,
+        metaEventId: tcMetaEventId,
+        priceFrom,
+        externalData: best as any,
+        lastSyncAt: new Date(),
+      },
+      create: {
+        eventId: event.id,
+        source: 'TC',
+        purchaseType: 'TC_WIDGET',
+        externalEventId: tcId,
+        metaEventId: tcMetaEventId,
+        priceFrom,
+        isPrimary: true,
+        status: 'ACTIVE',
+        externalData: best as any,
+        lastSyncAt: new Date(),
+      },
+    });
+
     // Синхронизируем сессии
     let sessionCount = 0;
     for (const ev of events) {
-      const ok = await this.syncGrpcSession(event.id, ev);
+      const ok = await this.syncGrpcSession(event.id, ev, offer.id);
       if (ok) sessionCount++;
     }
 
@@ -397,7 +429,7 @@ export class TcSyncService {
   /**
    * Создать/обновить сессию из gRPC Event.
    */
-  private async syncGrpcSession(eventId: string, ev: TcGrpcEvent): Promise<boolean> {
+  private async syncGrpcSession(eventId: string, ev: TcGrpcEvent, offerId?: string): Promise<boolean> {
     const dates = this.parseGrpcLifetime(ev.lifetime);
     if (!dates.start) return false;
 
@@ -410,6 +442,7 @@ export class TcSyncService {
       where: { tcSessionId },
       update: {
         eventId,
+        offerId: offerId ?? undefined,
         startsAt: dates.start,
         endsAt: dates.finish,
         availableTickets,
@@ -418,6 +451,7 @@ export class TcSyncService {
       },
       create: {
         eventId,
+        offerId: offerId ?? undefined,
         tcSessionId,
         startsAt: dates.start,
         endsAt: dates.finish,
@@ -581,17 +615,79 @@ export class TcSyncService {
     return null;
   }
 
-  /** Категория из gRPC Event */
-  private mapCategoryGrpc(ev: TcGrpcEvent, title: string, description: string | null): EventCategory {
-    const text = `${title} ${description || ''}`.toLowerCase();
+  /** Классификация из gRPC Event */
+  private classifyGrpc(ev: TcGrpcEvent, title: string, description: string | null) {
+    return this.classify(title, description || '');
+  }
 
-    const museumWords = ['музей', 'музеи', 'выставк', 'галерея', 'gallery', 'exhibition', 'museum'];
-    if (museumWords.some((w) => text.includes(w))) return EventCategory.MUSEUM;
+  // ============================================================
+  // Универсальный классификатор category + subcategory
+  // ============================================================
 
-    const excursionWords = ['экскурси', 'excursion', 'тур', 'tour', 'прогулк', 'walk', 'квест', 'quest'];
-    if (excursionWords.some((w) => text.includes(w))) return EventCategory.EXCURSION;
+  /**
+   * Универсальный классификатор: определяет category, subcategories и audience.
+   * Audience (KIDS/FAMILY) отдельно от category — kids events получают реальную категорию (EXCURSION/MUSEUM/EVENT).
+   */
+  private classify(title: string, description: string, tags: string[] = []): {
+    category: EventCategory;
+    subcategories: EventSubcategory[];
+    audience: EventAudience;
+  } {
+    const text = `${title} ${description} ${tags.join(' ')}`.toLowerCase();
+    const subs: EventSubcategory[] = [];
 
-    return EventCategory.EVENT;
+    // --- Detect audience (kids/family) ---
+    const kidsMarkers = ['для детей', 'детский', 'детское', 'детская', 'детям', 'ребёнк', 'ребенк', 'малыш', 'kids', 'children', '0+', '3+', '4+', '5+', '6+'];
+    const familyMarkers = ['семейн', 'family', 'для всей семьи'];
+    let audience: EventAudience = 'ALL' as EventAudience;
+    if (kidsMarkers.some((w) => text.includes(w))) {
+      audience = 'KIDS' as EventAudience;
+    } else if (familyMarkers.some((w) => text.includes(w))) {
+      audience = 'FAMILY' as EventAudience;
+    }
+
+    // --- MUSEUM ---
+    if (this.has(text, ['музей', 'музеи', 'museum'])) subs.push(EventSubcategory.MUSEUM_CLASSIC);
+    if (this.has(text, ['выставк', 'exhibition', 'экспозиц'])) subs.push(EventSubcategory.EXHIBITION);
+    if (this.has(text, ['галерея', 'gallery'])) subs.push(EventSubcategory.GALLERY);
+    if (this.has(text, ['дворец', 'дворц', 'усадьб', 'palace', 'manor'])) subs.push(EventSubcategory.PALACE);
+    if (this.has(text, ['заповедник', 'ботаническ', 'парк-музей'])) subs.push(EventSubcategory.PARK);
+    if (subs.length > 0) return { category: EventCategory.MUSEUM, subcategories: subs, audience };
+
+    // --- EVENT ---
+    const isStandup = this.has(text, ['стендап', 'stand-up', 'stand up', 'комедия', 'comedy', 'комик']);
+    if (this.has(text, ['концерт', 'concert', 'выступлен', 'tribute', 'трибьют', 'джаз', 'jazz', 'рок ', 'rock '])) subs.push(EventSubcategory.CONCERT);
+    if (isStandup) subs.push(EventSubcategory.STANDUP);
+    if (this.has(text, ['театр', 'спектакл', 'theater', 'theatre', 'драм', 'опер', 'балет'])) subs.push(EventSubcategory.THEATER);
+    // Стендап — не шоу и не спорт; «шоу/show» в описании стендапа не означает подкатегорию ШОУ
+    if (!isStandup && this.has(text, ['шоу', 'show', 'представлен', 'цирк', 'иллюзион', 'магическ'])) subs.push(EventSubcategory.SHOW);
+    if (this.has(text, ['фестиваль', 'festival', 'fest '])) subs.push(EventSubcategory.FESTIVAL);
+    if (!isStandup && this.has(text, ['спорт', 'sport', 'матч', 'хоккей', 'футбол', 'баскетбол', 'бег', 'марафон'])) subs.push(EventSubcategory.SPORT);
+    if (this.has(text, ['мастер-класс', 'мастер класс', 'masterclass', 'workshop', 'мастер-'])) subs.push(EventSubcategory.MASTERCLASS);
+    if (this.has(text, ['вечеринк', 'party', 'дискотек', 'клуб '])) subs.push(EventSubcategory.PARTY);
+    if (subs.length > 0) return { category: EventCategory.EVENT, subcategories: subs, audience };
+
+    // --- EXCURSION ---
+    const isExcursion = this.has(text, ['экскурси', 'excursion', 'тур ', ' тур', 'tour', 'прогулк', 'обзорн']);
+    if (isExcursion || this.has(text, ['квест', 'quest'])) {
+      if (this.has(text, ['речн', 'теплоход', 'корабл', 'катер', 'яхт', 'водн', 'canal', 'boat', 'по неве', 'по реке', 'по каналам', 'развод мостов', 'разводные мосты'])) subs.push(EventSubcategory.RIVER);
+      if (this.has(text, ['автобус', 'bus'])) subs.push(EventSubcategory.BUS);
+      if (this.has(text, ['пешеходн', 'пешком', 'walking', 'двор', 'улиц', 'район'])) subs.push(EventSubcategory.WALKING);
+      if (this.has(text, ['гастро', 'еда', 'кухня', 'food', 'gastro', 'дегустац', 'бар ', 'пивн', 'вин'])) subs.push(EventSubcategory.GASTRO);
+      if (this.has(text, ['крыш', 'rooftop'])) subs.push(EventSubcategory.ROOFTOP);
+      if (this.has(text, ['квест', 'quest'])) subs.push(EventSubcategory.QUEST);
+      if (this.has(text, ['комбинирован', 'комбо'])) subs.push(EventSubcategory.COMBINED);
+      if (subs.length === 0 && this.has(text, ['прогулк', 'обзорн'])) subs.push(EventSubcategory.WALKING);
+      return { category: EventCategory.EXCURSION, subcategories: subs, audience };
+    }
+
+    // Fallback
+    return { category: EventCategory.EVENT, subcategories: [], audience };
+  }
+
+  /** Хелпер: есть ли хотя бы одно из слов в тексте */
+  private has(text: string, words: string[]): boolean {
+    return words.some((w) => text.includes(w));
   }
 
   /** Парсинг возрастного рейтинга */
@@ -824,7 +920,7 @@ export class TcSyncService {
     const tcId = String(best.id);
     const title = best.title?.text?.trim() || '';
     const description = best.title?.desc || null;
-    const category = this.mapCategory(best);
+    const { category, subcategories } = this.classifyRest(best);
     const minAge = typeof best.age_rating === 'number' ? best.age_rating : 0;
 
     const cityGeoId = best?.venue?.city?.id;
@@ -863,6 +959,7 @@ export class TcSyncService {
           tcEventId: tcId,
           description: description || event.description,
           category,
+          subcategories,
           minAge,
           durationMinutes:
             durationMinutes && durationMinutes > 0 && durationMinutes < 2880
@@ -888,6 +985,7 @@ export class TcSyncService {
           slug,
           description,
           category,
+          subcategories,
           minAge,
           durationMinutes:
             durationMinutes && durationMinutes > 0 && durationMinutes < 2880
@@ -957,12 +1055,15 @@ export class TcSyncService {
   };
 
   private static readonly KEYWORD_TAG_MAP: Record<string, string[]> = {
-    'теплоход': ['panoramnyi'],
-    'прогулка по неве': ['panoramnyi'],
-    'речн': ['panoramnyi'],
-    'белые ночи': ['belye-nochi'],
-    'разводн': ['belye-nochi', 'nochnye'],
-    'ночн': ['nochnye'],
+    'теплоход': ['panoramnyi', 'water'],
+    'прогулка по неве': ['panoramnyi', 'water'],
+    'речн': ['panoramnyi', 'water'],
+    'белые ночи': ['white-nights', 'belye-nochi'],
+    'развод мостов': ['bridges', 'nochnye-mosty', 'nochnye'],
+    'разводные мосты': ['bridges', 'nochnye-mosty', 'nochnye'],
+    'разводка мостов': ['bridges', 'nochnye-mosty'],
+    'под разводными': ['bridges', 'nochnye-mosty'],
+    'ночн': ['nochnye', 'night'],
     'бар': ['kafe-bar'],
     'ресторан': ['restoran', 'gastro'],
     'кафе': ['kafe-bar'],
@@ -971,13 +1072,13 @@ export class TcSyncService {
     'фуршет': ['gastro', 's-pitaniem'],
     'гастро': ['gastro'],
     'дегустац': ['gastro'],
-    'квест': ['kvesty'],
+    'квест': ['kvesty', 'interactive'],
     'дет': ['s-detmi'],
     'ребён': ['s-detmi'],
     'семей': ['s-detmi'],
-    'романтик': ['romantika'],
-    'свидан': ['romantika'],
-    'для двоих': ['romantika'],
+    'романтик': ['romantika', 'romantic'],
+    'свидан': ['romantika', 'romantic'],
+    'для двоих': ['romantika', 'romantic'],
     'компани': ['dlya-kompanii'],
     'корпоратив': ['dlya-kompanii'],
     'группо': ['dlya-kompanii'],
@@ -1005,12 +1106,12 @@ export class TcSyncService {
     'бестселлер': ['hit-prodazh'],
     'новинк': ['novinka'],
     'премьер': ['novinka'],
-    'развод мостов': ['nochnye-mosty', 'nochnye'],
-    'разводные мосты': ['nochnye-mosty', 'nochnye'],
-    'развод': ['nochnye-mosty'],
-    'мост': ['nochnye-mosty'],
-    'салют': ['salyut-s-vody'],
-    'фейерверк': ['salyut-s-vody'],
+    'ночной мост': ['nochnye-mosty'],
+    'ночные мосты': ['nochnye-mosty'],
+    'салют': ['salute', 'salyut-s-vody'],
+    'салюты': ['salute'],
+    'фейерверк': ['salute', 'salyut-s-vody'],
+    'алые паруса': ['scarlet-sails'],
     'день победы': ['salyut-s-vody'],
     '9 мая': ['salyut-s-vody'],
     'метеор': ['meteor-petergof'],
@@ -1021,6 +1122,13 @@ export class TcSyncService {
     'куршск': ['kurshskaya-kosa'],
     'коса': ['kurshskaya-kosa'],
     'танцующий лес': ['kurshskaya-kosa'],
+    'золотые ворота': ['zolotye-vorota-vlad'],
+    'успенский собор': ['zolotye-vorota-vlad'],
+    'дмитриевский собор': ['zolotye-vorota-vlad'],
+    'золотое кольцо': ['zolotoe-koltso-vlad'],
+    'стрелка ярославл': ['strelka-yaroslavl'],
+    'спасо-преображенский': ['strelka-yaroslavl'],
+    'которосл': ['strelka-yaroslavl'],
     'стрелка': ['progulki-volga-nn'],
     'волга': ['progulki-volga-nn'],
     'ока': ['progulki-volga-nn'],
@@ -1028,6 +1136,46 @@ export class TcSyncService {
     'нижегородск': ['kreml-nn'],
     'канатн': ['kanatka-nn'],
     'бор': ['kanatka-nn'],
+    // System tags (filtering, badges, ranking)
+    'ночь': ['night'],
+    'полуночн': ['night'],
+    'night': ['night'],
+    'катер': ['water'],
+    'яхт': ['water'],
+    'водн': ['water'],
+    'по неве': ['water', 'panoramnyi'],
+    'по реке': ['water'],
+    'по каналам': ['water'],
+    'boat': ['water'],
+    'river': ['water'],
+    'romantic': ['romantic'],
+    'с гидом': ['with-guide'],
+    'экскурсовод': ['with-guide'],
+    'сопровожден': ['with-guide'],
+    'гид ': ['with-guide'],
+    'guided': ['with-guide'],
+    'обзорн': ['first-time-city'],
+    'закрыт': ['bad-weather-ok'],
+    'в помещени': ['bad-weather-ok'],
+    'крытый': ['bad-weather-ok'],
+    'indoor': ['bad-weather-ok'],
+    'знакомство с город': ['first-time-city'],
+    'главные достопримечательност': ['first-time-city'],
+    'must see': ['first-time-city'],
+    'топ ': ['first-time-city'],
+    'лучшие места': ['first-time-city'],
+    'интерактив': ['interactive'],
+    'игров': ['interactive'],
+    'interactive': ['interactive'],
+    'quest': ['interactive'],
+    'аудиогид': ['audioguide'],
+    'аудио-гид': ['audioguide'],
+    'audioguide': ['audioguide'],
+    'audio guide': ['audioguide'],
+    'без очеред': ['no-queue'],
+    'приоритетн': ['no-queue'],
+    'skip the line': ['no-queue'],
+    'fast track': ['no-queue'],
   };
 
   private async syncTags(eventId: string, tagNames: string[], title?: string, description?: string): Promise<void> {
@@ -1184,19 +1332,11 @@ export class TcSyncService {
     return { start, finish };
   }
 
-  private mapCategory(tc: any): EventCategory {
+  private classifyRest(tc: any) {
     const tags = (tc.tags || []).map((t: string) => t.toLowerCase());
     const title = String(tc.title?.text || '').toLowerCase();
     const desc = String(tc.title?.desc || '').toLowerCase();
-    const text = `${title} ${desc} ${tags.join(' ')}`;
-
-    const museumWords = ['музей', 'музеи', 'выставк', 'галерея', 'gallery', 'exhibition', 'museum'];
-    if (museumWords.some((w) => text.includes(w))) return EventCategory.MUSEUM;
-
-    const excursionWords = ['экскурси', 'excursion', 'тур', 'tour', 'прогулк', 'walk', 'квест', 'quest'];
-    if (excursionWords.some((w) => text.includes(w))) return EventCategory.EXCURSION;
-
-    return EventCategory.EVENT;
+    return this.classify(title, desc, tags);
   }
 
   private extractMinPrice(sets: any[]): number | null {

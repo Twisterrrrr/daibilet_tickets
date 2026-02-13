@@ -1,0 +1,137 @@
+-- ==============================================
+-- Migration: EventAudience (replace KIDS category with audience attribute)
+-- ==============================================
+
+-- Step 1: Create EventAudience enum
+DO $$ BEGIN
+  CREATE TYPE "EventAudience" AS ENUM ('ALL', 'KIDS', 'FAMILY');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Step 2: Add audience column to events (default ALL)
+ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "audience" "EventAudience" NOT NULL DEFAULT 'ALL';
+
+-- Step 3: Add audience column to event_overrides (nullable)
+ALTER TABLE "event_overrides" ADD COLUMN IF NOT EXISTS "audience" "EventAudience";
+
+-- Step 4: Migrate KIDS events → real categories + audience=KIDS
+-- 4a: KIDS + KIDS_SHOW → EVENT + [SHOW] + KIDS
+UPDATE "events"
+SET category = 'EVENT',
+    subcategories = ARRAY['SHOW']::"EventSubcategory"[],
+    audience = 'KIDS'
+WHERE category = 'KIDS' AND 'KIDS_SHOW' = ANY(subcategories);
+
+-- 4b: KIDS + KIDS_EXCURSION → EXCURSION + [] + KIDS
+UPDATE "events"
+SET category = 'EXCURSION',
+    subcategories = '{}'::"EventSubcategory"[],
+    audience = 'KIDS'
+WHERE category = 'KIDS' AND 'KIDS_EXCURSION' = ANY(subcategories)
+  AND audience != 'KIDS';
+
+-- 4c: KIDS + KIDS_MASTER → EVENT + [MASTERCLASS] + KIDS
+UPDATE "events"
+SET category = 'EVENT',
+    subcategories = ARRAY['MASTERCLASS']::"EventSubcategory"[],
+    audience = 'KIDS'
+WHERE category = 'KIDS' AND 'KIDS_MASTER' = ANY(subcategories)
+  AND audience != 'KIDS';
+
+-- 4d: KIDS + KIDS_MUSEUM → MUSEUM + [MUSEUM_CLASSIC] + KIDS
+UPDATE "events"
+SET category = 'MUSEUM',
+    subcategories = ARRAY['MUSEUM_CLASSIC']::"EventSubcategory"[],
+    audience = 'KIDS'
+WHERE category = 'KIDS' AND 'KIDS_MUSEUM' = ANY(subcategories)
+  AND audience != 'KIDS';
+
+-- 4e: KIDS + KIDS_QUEST → EXCURSION + [QUEST] + KIDS
+UPDATE "events"
+SET category = 'EXCURSION',
+    subcategories = ARRAY['QUEST']::"EventSubcategory"[],
+    audience = 'KIDS'
+WHERE category = 'KIDS' AND 'KIDS_QUEST' = ANY(subcategories)
+  AND audience != 'KIDS';
+
+-- 4f: KIDS + KIDS_AMUSEMENT → EVENT + [SHOW] + KIDS
+UPDATE "events"
+SET category = 'EVENT',
+    subcategories = ARRAY['SHOW']::"EventSubcategory"[],
+    audience = 'KIDS'
+WHERE category = 'KIDS' AND 'KIDS_AMUSEMENT' = ANY(subcategories)
+  AND audience != 'KIDS';
+
+-- 4g: Remaining KIDS without matching subcategories → EVENT + [] + KIDS
+UPDATE "events"
+SET category = 'EVENT',
+    subcategories = '{}'::"EventSubcategory"[],
+    audience = 'KIDS'
+WHERE category = 'KIDS';
+
+-- Step 5: Migrate event_overrides with KIDS category
+UPDATE "event_overrides"
+SET category = 'EVENT',
+    audience = 'KIDS'
+WHERE category = 'KIDS';
+
+-- Step 6: Remove KIDS_* from subcategories arrays
+UPDATE "events"
+SET subcategories = array_remove(
+      array_remove(
+        array_remove(
+          array_remove(
+            array_remove(
+              array_remove(subcategories, 'KIDS_SHOW'),
+            'KIDS_EXCURSION'),
+          'KIDS_MASTER'),
+        'KIDS_MUSEUM'),
+      'KIDS_QUEST'),
+    'KIDS_AMUSEMENT')
+WHERE subcategories && ARRAY['KIDS_SHOW','KIDS_EXCURSION','KIDS_MASTER','KIDS_MUSEUM','KIDS_QUEST','KIDS_AMUSEMENT']::"EventSubcategory"[];
+
+UPDATE "event_overrides"
+SET subcategories = array_remove(
+      array_remove(
+        array_remove(
+          array_remove(
+            array_remove(
+              array_remove(subcategories, 'KIDS_SHOW'),
+            'KIDS_EXCURSION'),
+          'KIDS_MASTER'),
+        'KIDS_MUSEUM'),
+      'KIDS_QUEST'),
+    'KIDS_AMUSEMENT')
+WHERE subcategories && ARRAY['KIDS_SHOW','KIDS_EXCURSION','KIDS_MASTER','KIDS_MUSEUM','KIDS_QUEST','KIDS_AMUSEMENT']::"EventSubcategory"[];
+
+-- Step 7: Remove old enum values
+-- 7a: Drop default constraints before altering types
+ALTER TABLE "events" ALTER COLUMN "subcategories" DROP DEFAULT;
+ALTER TABLE "event_overrides" ALTER COLUMN "subcategories" DROP DEFAULT;
+
+-- 7b: Remove KIDS from EventCategory
+ALTER TYPE "EventCategory" RENAME TO "EventCategory_old";
+CREATE TYPE "EventCategory" AS ENUM ('EXCURSION', 'MUSEUM', 'EVENT');
+ALTER TABLE "events" ALTER COLUMN "category" TYPE "EventCategory" USING "category"::text::"EventCategory";
+ALTER TABLE "event_overrides" ALTER COLUMN "category" TYPE "EventCategory" USING "category"::text::"EventCategory";
+DROP TYPE "EventCategory_old";
+
+-- 7c: Remove KIDS_* from EventSubcategory
+ALTER TYPE "EventSubcategory" RENAME TO "EventSubcategory_old";
+CREATE TYPE "EventSubcategory" AS ENUM (
+  'RIVER', 'WALKING', 'BUS', 'COMBINED', 'QUEST', 'GASTRO', 'ROOFTOP',
+  'MUSEUM_CLASSIC', 'EXHIBITION', 'GALLERY', 'PALACE', 'PARK',
+  'CONCERT', 'SHOW', 'STANDUP', 'THEATER', 'SPORT', 'FESTIVAL', 'MASTERCLASS', 'PARTY'
+);
+ALTER TABLE "events" ALTER COLUMN "subcategories" TYPE "EventSubcategory"[]
+  USING "subcategories"::text[]::"EventSubcategory"[];
+ALTER TABLE "event_overrides" ALTER COLUMN "subcategories" TYPE "EventSubcategory"[]
+  USING "subcategories"::text[]::"EventSubcategory"[];
+DROP TYPE "EventSubcategory_old";
+
+-- 7d: Restore defaults
+ALTER TABLE "events" ALTER COLUMN "subcategories" SET DEFAULT '{}'::"EventSubcategory"[];
+ALTER TABLE "event_overrides" ALTER COLUMN "subcategories" SET DEFAULT '{}'::"EventSubcategory"[];
+
+-- Step 8: Add index on audience for filtering
+CREATE INDEX IF NOT EXISTS "events_audience_idx" ON "events" ("audience");

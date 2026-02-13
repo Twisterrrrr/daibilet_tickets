@@ -18,9 +18,11 @@ export class AdminOrdersController {
     @Query('status') status?: string,
     @Query('city') city?: string,
     @Query('search') search?: string,
-    @Query('page') page = 1,
-    @Query('limit') limit = 50,
+    @Query('page') pageRaw = '1',
+    @Query('limit') limitRaw = '50',
   ) {
+    const page = Number(pageRaw) || 1;
+    const limit = Number(limitRaw) || 50;
     const where: any = {};
     if (status) where.status = status;
     if (city) where.city = { slug: city };

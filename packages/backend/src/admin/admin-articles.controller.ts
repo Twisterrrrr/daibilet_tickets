@@ -22,9 +22,11 @@ export class AdminArticlesController {
     @Query('city') city?: string,
     @Query('published') published?: string,
     @Query('search') search?: string,
-    @Query('page') page = 1,
-    @Query('limit') limit = 50,
+    @Query('page') pageRaw = '1',
+    @Query('limit') limitRaw = '50',
   ) {
+    const page = Number(pageRaw) || 1;
+    const limit = Number(limitRaw) || 50;
     const where: any = { isDeleted: false };
     if (city) where.city = { slug: city };
     if (published !== undefined) where.isPublished = published === 'true';

@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { MapPin, Ticket, Calendar, QrCode, ArrowRight, TrendingUp } from 'lucide-react';
 import { CATEGORY_LABELS, EventCategory } from '@daibilet/shared';
 import { api } from '@/lib/api';
+import { EventCard } from '@/components/ui/EventCard';
+import { PromoBlock } from '@/components/ui/PromoBlock';
 
 // ISR: обновлять каждый час
 export const revalidate = 3600;
@@ -49,6 +51,25 @@ export default async function HomePage() {
 
   const topCities = cities;
 
+  let departingSoon: any[] = [];
+  try {
+    const res = await api.getEvents({ sort: 'departing_soon', limit: 4 });
+    departingSoon = res.items || [];
+  } catch {
+    departingSoon = [];
+  }
+
+  let popularTags: any[] = [];
+  try {
+    const allTags = await api.getTags();
+    popularTags = (allTags as any[])
+      .filter((t: any) => t._count?.events > 0)
+      .sort((a: any, b: any) => (b._count?.events ?? 0) - (a._count?.events ?? 0))
+      .slice(0, 20);
+  } catch {
+    popularTags = [];
+  }
+
   return (
     <>
       {/* Hero */}
@@ -68,7 +89,7 @@ export default async function HomePage() {
                 <Ticket className="mr-2 h-5 w-5" />
                 Смотреть каталог
               </Link>
-              <Link href="/planner" className="btn-secondary border-primary-400 !text-white hover:!bg-primary-600">
+              <Link href="/planner" className="inline-flex items-center justify-center rounded-lg border-2 border-white/70 bg-white/10 backdrop-blur-sm px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-white hover:text-primary-700 active:scale-[0.98] sm:px-6">
                 Спланировать поездку
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -99,11 +120,62 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* Начнутся скоро */}
+      {departingSoon.length > 0 && (
+        <section className="py-12 sm:py-16">
+          <div className="container-page">
+            <div className="flex items-end justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Начнутся скоро</h2>
+                <p className="mt-1 text-slate-500">Ближайшие события за 2 часа</p>
+              </div>
+              <Link
+                href="/events?sort=departing_soon"
+                className="text-sm font-medium text-primary-600 hover:text-primary-700"
+              >
+                Все события →
+              </Link>
+            </div>
+            <div className="mt-6 grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-4">
+              {departingSoon.map((event: any) => (
+                <EventCard
+                  key={event.id}
+                  slug={event.slug}
+                  title={event.title}
+                  category={event.category}
+                  subcategories={event.subcategories}
+                  imageUrl={event.imageUrl}
+                  priceFrom={event.priceFrom}
+                  rating={event.rating}
+                  reviewCount={event.reviewCount}
+                  durationMinutes={event.durationMinutes}
+                  city={event.city}
+                  departingSoonMinutes={event.departingSoonMinutes}
+                  nextSessionAt={event.nextSessionAt}
+                  compact
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Сезонные предложения */}
+      <section className="py-12 sm:py-16">
+        <div className="container-page">
+          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Сезонные предложения</h2>
+          <p className="mt-1 text-slate-500">Лучшие события и экскурсии сезона</p>
+          <div className="mt-6">
+            <PromoBlock />
+          </div>
+        </div>
+      </section>
+
       {/* Категории */}
       <section className="bg-slate-50 py-16 sm:py-20">
         <div className="container-page">
           <h2 className="text-3xl font-bold text-slate-900">Что посмотреть</h2>
-          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {categoryMeta.map(({ category, emoji }) => (
               <Link
                 key={category}
@@ -120,7 +192,39 @@ export default async function HomePage() {
                 <ArrowRight className="ml-auto h-5 w-5 text-slate-400" />
               </Link>
             ))}
+            <Link
+              href="/events?audience=KIDS"
+              className="card flex items-center gap-4 p-6 transition-transform hover:scale-[1.02]"
+            >
+              <span className="text-4xl">👶</span>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Детям</h3>
+                <p className="text-sm text-slate-500">Смотреть все</p>
+              </div>
+              <ArrowRight className="ml-auto h-5 w-5 text-slate-400" />
+            </Link>
           </div>
+
+          {/* Популярные темы — теги с количеством событий */}
+          {popularTags.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold text-slate-700">Популярные темы</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {popularTags.map((tag: any) => (
+                  <Link
+                    key={tag.slug}
+                    href={`/events?tag=${tag.slug}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-primary-300 hover:text-primary-700 hover:shadow-md"
+                  >
+                    {tag.name}
+                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-500">
+                      {tag._count?.events ?? 0}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
