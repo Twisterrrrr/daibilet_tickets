@@ -39,9 +39,13 @@
 - [x] **Средний**: /podborki/* в sitemap (индекс + все подборки)
 - [x] **Средний**: Admin-контроллеры: take: 500 → пагинация limit/skip (max 200)
 
+### Выполнено (ночь 15 февраля)
+- [x] **Высокий**: CSV cursor-based streaming (csv-stream.util.ts) — 3 экспорта переведены
+- [x] **Высокий**: Единый pagination contract (pagination.ts) — 15 контроллеров
+- [x] **Средний**: ESLint `no-console: error` + исключения для тестов/seed
+
 ### Отложено (backlog)
-- [ ] **Средний**: CSV-экспорты: cursor-based стриминг вместо take: 1000
-- [ ] **Средний**: ESLint правило: запретить `any` в новых файлах (warning), `console.log` (error)
+- [ ] **Средний**: ESLint правило: запретить `any` в новых файлах (warning)
 - [ ] **Низкий**: Типизация `as any` в бэкенде (31 место) — заменить на type guards постепенно
 - [ ] **Низкий**: Frontend `any` (100+) — начать с api.ts и DTO types
 

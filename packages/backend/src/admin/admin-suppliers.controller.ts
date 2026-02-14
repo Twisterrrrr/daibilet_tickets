@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 import { UpdateSupplierDto, CreateApiKeyDto, UpdateWebhookDto } from './dto/admin-supplier.dto';
 import * as crypto from 'crypto';
 
@@ -22,11 +23,11 @@ export class AdminSuppliersController {
   async list(
     @Query('search') search?: string,
     @Query('trustLevel') trustLevel?: string,
-    @Query('page') pageRaw = '1',
-    @Query('limit') limitRaw = '25',
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    const page = Number(pageRaw) || 1;
-    const limit = Number(limitRaw) || 25;
+    const pg = parsePagination({ cursor, page, limit });
     const where: any = { isSupplier: true };
 
     if (search) {
@@ -39,20 +40,19 @@ export class AdminSuppliersController {
     }
     if (trustLevel !== undefined) where.trustLevel = Number(trustLevel);
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.operator.findMany({
         where,
         include: {
           _count: { select: { events: true, offers: true, supplierUsers: true } },
         },
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginationArgs(pg),
       }),
       this.prisma.operator.count({ where }),
     ]);
 
-    return { items, total, page, pages: Math.ceil(total / limit) };
+    return buildPaginatedResult(rawItems, total, pg.limit);
   }
 
   /**

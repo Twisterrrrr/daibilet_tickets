@@ -5,6 +5,7 @@ import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 import { CreateArticleDto, UpdateArticleDto } from './dto/admin-article.dto';
 
 @ApiTags('admin')
@@ -23,11 +24,11 @@ export class AdminArticlesController {
     @Query('city') city?: string,
     @Query('published') published?: string,
     @Query('search') search?: string,
-    @Query('page') pageRaw = '1',
-    @Query('limit') limitRaw = '50',
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    const page = Number(pageRaw) || 1;
-    const limit = Number(limitRaw) || 50;
+    const pg = parsePagination({ cursor, page, limit });
     const where: any = { isDeleted: false };
     if (city) where.city = { slug: city };
     if (published !== undefined) where.isPublished = published === 'true';
@@ -38,7 +39,7 @@ export class AdminArticlesController {
       ];
     }
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.article.findMany({
         where,
         include: {
@@ -46,13 +47,12 @@ export class AdminArticlesController {
           _count: { select: { articleEvents: true, articleTags: true } },
         },
         orderBy: { updatedAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginationArgs(pg),
       }),
       this.prisma.article.count({ where }),
     ]);
 
-    return { items, total, page, pages: Math.ceil(total / limit) };
+    return buildPaginatedResult(rawItems, total, pg.limit);
   }
 
   @Get(':id')

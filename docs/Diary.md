@@ -4,6 +4,64 @@
 
 ---
 
+## 15 февраля 2026 (ночь) — Batch A: CSV streaming, cursor pagination, ESLint
+
+### Наблюдения
+
+Перед интеграцией YooKassa закрываем последние масштабируемые риски: экспорты, пагинация, качество кода.
+
+При аудите обнаружено что Batch B (денежный контур) **уже реализован**:
+- `WebhookIdempotencyService.processOnce()` — таблица `ProcessedWebhookEvent` с unique constraint
+- `checkout-state-machine.ts` — PaymentIntent state machine с терминальными состояниями
+- `FulfillmentProcessor` (BullMQ) — post-payment queue с retry и auto-compensate
+
+### Решения
+
+**1. CSV cursor-based streaming**
+
+Создана утилита `common/csv-stream.util.ts`:
+- Batch size: 500 записей, hard limit: 50 000 строк
+- Cursor pagination: `findMany({ cursor, skip: 1, take })` → каждый batch берёт cursor от последнего элемента
+- Streaming: пишет в `Response` по батчам, не накапливает в памяти
+- CSV escaping: кавычки, запятые, переводы строк
+- BOM для Excel
+
+Применено к:
+- `admin-checkout.controller.ts` — export/requests, export/sessions
+- `supplier-reports.controller.ts` — sales/export
+
+Старый паттерн `take: 1000 → findMany → join → send` заменён на streaming.
+
+**2. Единый pagination contract**
+
+Создана утилита `common/pagination.ts`:
+- `parsePagination({ cursor, page, limit })` → нормализация (limit ∈ [1, 200])
+- `paginationArgs(pg)` → `{ take: limit+1, cursor?, skip }` для Prisma
+- `buildPaginatedResult(rawItems, total, limit)` → `{ items, total, nextCursor, hasMore }`
+
+Dual-mode:
+- Если передан `cursor` → cursor-based (O(1), не деградирует)
+- Если передан `page` → offset fallback (совместимость с фронтом)
+
+Применено ко ВСЕМ list-эндпоинтам (15 контроллеров):
+- admin: tags, cities, upsells, landings, combos, events, orders, articles, reviews, external-reviews, audit, collections, venues, suppliers
+- supplier: events
+
+Все возвращают единый формат `{ items, total, nextCursor, hasMore }`.
+
+**3. ESLint: запрет console.***
+
+Добавлено правило `'no-console': ['error', { allow: ['warn'] }]` в `eslint.config.mjs`:
+- Production-код: `console.log/error/debug` → ESLint error (использовать NestJS Logger)
+- Тесты: `no-console: 'off'`
+- Seed/fix скрипты: `no-console: 'off'`
+
+### Проблемы
+
+Никаких. TypeScript `--noEmit` без ошибок, ESLint проходит (pre-existing unused vars не затронуты).
+
+---
+
 ## 15 февраля 2026 (вечер) — Production Hardening: индексы, логирование, пагинация
 
 ### Наблюдения

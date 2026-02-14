@@ -2,6 +2,7 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 import { AuditService } from './audit.service';
 
 @ApiTags('admin')
@@ -18,11 +19,11 @@ export class AdminAuditController {
     @Query('entityId') entityId?: string,
     @Query('userId') userId?: string,
     @Query('action') action?: string,
-    @Query('page') pageRaw = '1',
-    @Query('limit') limitRaw = '50',
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    const page = Number(pageRaw) || 1;
-    const limit = Number(limitRaw) || 50;
-    return this.audit.findMany({ entity, entityId, userId, action, page, limit });
+    const pg = parsePagination({ cursor, page, limit });
+    return this.audit.findMany({ entity, entityId, userId, action, page: pg.page, limit: pg.limit });
   }
 }

@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateUpsellDto, UpdateUpsellDto } from './dto/admin-upsell.dto';
 
@@ -18,20 +19,24 @@ export class AdminUpsellsController {
   async list(
     @Query('city') citySlug?: string,
     @Query('active') active?: string,
-    @Query('limit') limit?: number,
-    @Query('skip') skip?: number,
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const where: any = {};
     if (citySlug) where.citySlug = citySlug;
     if (active !== undefined) where.isActive = active === 'true';
 
-    const take = Math.min(Number(limit) || 200, 200);
-    return this.prisma.upsellItem.findMany({
-      where,
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-      take,
-      skip: Number(skip) || 0,
-    });
+    const pg = parsePagination({ cursor, page, limit });
+    const [rawItems, total] = await Promise.all([
+      this.prisma.upsellItem.findMany({
+        where,
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+        ...paginationArgs(pg),
+      }),
+      this.prisma.upsellItem.count({ where }),
+    ]);
+    return buildPaginatedResult(rawItems, total, pg.limit);
   }
 
   @Get(':id')

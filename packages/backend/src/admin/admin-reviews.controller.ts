@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { AuditInterceptor } from './audit.interceptor';
 import { ReviewService } from '../catalog/review.service';
+import { parsePagination } from '../common/pagination';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -17,14 +18,16 @@ export class AdminReviewsController {
   async list(
     @Query('status') status?: string,
     @Query('eventId') eventId?: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
+    const pg = parsePagination({ cursor, page, limit: limit || '20' });
     return this.reviewService.adminList({
       status,
       eventId,
-      page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      page: pg.page,
+      limit: pg.limit,
     });
   }
 

@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 import { PackageStatus } from '@prisma/client';
 
 @ApiTags('admin')
@@ -19,11 +20,11 @@ export class AdminOrdersController {
     @Query('status') status?: string,
     @Query('city') city?: string,
     @Query('search') search?: string,
-    @Query('page') pageRaw = '1',
-    @Query('limit') limitRaw = '50',
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    const page = Number(pageRaw) || 1;
-    const limit = Number(limitRaw) || 50;
+    const pg = parsePagination({ cursor, page, limit });
     const where: any = {};
     if (status) where.status = status;
     if (city) where.city = { slug: city };
@@ -35,7 +36,7 @@ export class AdminOrdersController {
       ];
     }
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.package.findMany({
         where,
         include: {
@@ -44,13 +45,12 @@ export class AdminOrdersController {
           voucher: { select: { shortCode: true } },
         },
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginationArgs(pg),
       }),
       this.prisma.package.count({ where }),
     ]);
 
-    return { items, total, page, pages: Math.ceil(total / limit) };
+    return buildPaginatedResult(rawItems, total, pg.limit);
   }
 
   @Get(':id')

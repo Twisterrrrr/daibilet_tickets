@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SupplierJwtGuard, SupplierRolesGuard, SupplierRoles } from './supplier.guard';
 import { validateWidgetPayload, ensurePayloadVersion } from '@daibilet/shared';
 import { OfferSource, Prisma } from '@prisma/client';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 import {
   CreateSupplierEventDto,
   UpdateSupplierEventDto,
@@ -26,16 +27,16 @@ export class SupplierEventsController {
   async list(
     @Req() req: any,
     @Query('status') status?: string,
-    @Query('page') pageRaw = '1',
-    @Query('limit') limitRaw = '25',
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    const page = Number(pageRaw) || 1;
-    const limit = Math.min(Number(limitRaw) || 25, 100);
+    const pg = parsePagination({ cursor, page, limit: limit || '25' });
     const where: any = { operatorId: req.user.operatorId };
 
     if (status) where.moderationStatus = status;
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
         where,
         include: {
@@ -43,13 +44,12 @@ export class SupplierEventsController {
           _count: { select: { offers: true, reviews: true } },
         },
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginationArgs(pg),
       }),
       this.prisma.event.count({ where }),
     ]);
 
-    return { items, total, page, pages: Math.ceil(total / limit) };
+    return buildPaginatedResult(rawItems, total, pg.limit);
   }
 
   /**

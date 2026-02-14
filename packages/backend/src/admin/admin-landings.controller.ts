@@ -11,6 +11,7 @@ import {
   validateJson,
 } from './json-schemas';
 import { CreateLandingDto, UpdateLandingDto } from './dto/admin-landing.dto';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -26,20 +27,24 @@ export class AdminLandingsController {
   @Get()
   async list(
     @Query('city') city?: string,
-    @Query('limit') limit?: number,
-    @Query('skip') skip?: number,
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const where: any = { isDeleted: false };
     if (city) where.city = { slug: city };
 
-    const take = Math.min(Number(limit) || 200, 200);
-    return this.prisma.landingPage.findMany({
-      where,
-      include: { city: { select: { slug: true, name: true } } },
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-      take,
-      skip: Number(skip) || 0,
-    });
+    const pg = parsePagination({ cursor, page, limit });
+    const [rawItems, total] = await Promise.all([
+      this.prisma.landingPage.findMany({
+        where,
+        include: { city: { select: { slug: true, name: true } } },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+        ...paginationArgs(pg),
+      }),
+      this.prisma.landingPage.count({ where }),
+    ]);
+    return buildPaginatedResult(rawItems, total, pg.limit);
   }
 
   @Get(':id')

@@ -5,6 +5,7 @@ import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateTagDto, UpdateTagDto } from './dto/admin-tag.dto';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -18,8 +19,9 @@ export class AdminTagsController {
   async list(
     @Query('category') category?: string,
     @Query('search') search?: string,
-    @Query('limit') limit?: number,
-    @Query('skip') skip?: number,
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const where: any = { isDeleted: false };
     if (category) where.category = category;
@@ -30,14 +32,17 @@ export class AdminTagsController {
       ];
     }
 
-    const take = Math.min(Number(limit) || 200, 200);
-    return this.prisma.tag.findMany({
-      where,
-      include: { _count: { select: { events: true } } },
-      orderBy: [{ category: 'asc' }, { name: 'asc' }],
-      take,
-      skip: Number(skip) || 0,
-    });
+    const pg = parsePagination({ cursor, page, limit });
+    const [rawItems, total] = await Promise.all([
+      this.prisma.tag.findMany({
+        where,
+        include: { _count: { select: { events: true } } },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+        ...paginationArgs(pg),
+      }),
+      this.prisma.tag.count({ where }),
+    ]);
+    return buildPaginatedResult(rawItems, total, pg.limit);
   }
 
   @Get(':id')

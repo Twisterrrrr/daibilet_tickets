@@ -5,6 +5,7 @@ import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { UpdateCityDto } from './dto/admin-city.dto';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -17,8 +18,9 @@ export class AdminCitiesController {
   @Get()
   async list(
     @Query('search') search?: string,
-    @Query('limit') limit?: number,
-    @Query('skip') skip?: number,
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const where: any = {};
     if (search) {
@@ -28,14 +30,17 @@ export class AdminCitiesController {
       ];
     }
 
-    const take = Math.min(Number(limit) || 200, 200);
-    return this.prisma.city.findMany({
-      where,
-      include: { _count: { select: { events: true, landingPages: true, comboPages: true } } },
-      orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
-      take,
-      skip: Number(skip) || 0,
-    });
+    const pg = parsePagination({ cursor, page, limit });
+    const [rawItems, total] = await Promise.all([
+      this.prisma.city.findMany({
+        where,
+        include: { _count: { select: { events: true, landingPages: true, comboPages: true } } },
+        orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
+        ...paginationArgs(pg),
+      }),
+      this.prisma.city.count({ where }),
+    ]);
+    return buildPaginatedResult(rawItems, total, pg.limit);
   }
 
   @Get(':id')

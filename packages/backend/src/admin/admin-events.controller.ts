@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
+import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 import { EventOverrideService } from './event-override.service';
 import { ReviewService } from '../catalog/review.service';
 import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
@@ -49,11 +50,11 @@ export class AdminEventsController {
     @Query('active') active?: string,
     @Query('hidden') hidden?: string,
     @Query('search') search?: string,
-    @Query('page') pageRaw = '1',
-    @Query('limit') limitRaw = '50',
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    const page = Number(pageRaw) || 1;
-    const limit = Number(limitRaw) || 50;
+    const pg = parsePagination({ cursor, page, limit });
     const where: any = {};
     if (city) where.city = { slug: city };
     if (category) where.category = category;
@@ -66,7 +67,7 @@ export class AdminEventsController {
       ];
     }
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
         where,
         include: {
@@ -75,21 +76,20 @@ export class AdminEventsController {
           override: true,
         },
         orderBy: { updatedAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        ...paginationArgs(pg),
       }),
       this.prisma.event.count({ where }),
     ]);
 
     // Опционально: фильтрация по isHidden через override
-    let filtered = items;
+    let filtered = rawItems;
     if (hidden === 'true') {
-      filtered = items.filter((e: any) => e.override?.isHidden === true);
+      filtered = rawItems.filter((e: any) => e.override?.isHidden === true);
     } else if (hidden === 'false') {
-      filtered = items.filter((e: any) => !e.override?.isHidden);
+      filtered = rawItems.filter((e: any) => !e.override?.isHidden);
     }
 
-    return { items: filtered, total, page, pages: Math.ceil(total / limit) };
+    return buildPaginatedResult(filtered, total, pg.limit);
   }
 
   /**

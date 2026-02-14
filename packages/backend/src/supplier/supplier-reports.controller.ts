@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupplierJwtGuard } from './supplier.guard';
+import { streamCsv } from '../common/csv-stream.util';
 
 @ApiTags('supplier')
 @ApiBearerAuth()
@@ -102,36 +103,32 @@ export class SupplierReportsController {
       throw new BadRequestException('Максимальный период выгрузки: 93 дня');
     }
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       supplierId: operatorId,
       status: 'PAID',
       paidAt: { gte: dateFrom, lte: dateTo },
     };
 
-    const items = await this.prisma.paymentIntent.findMany({
-      where,
-      include: {
-        checkoutSession: { select: { shortCode: true, customerName: true } },
-      },
-      orderBy: { paidAt: 'desc' },
-      take: 1000, // TODO: заменить на cursor-based стриминг при росте данных
+    await streamCsv({
+      res,
+      filename: 'sales',
+      fields: [
+        { header: 'Дата', accessor: (i) => i.paidAt?.toISOString().split('T')[0] },
+        { header: 'Заказ', accessor: (i) => (i as any).checkoutSession?.shortCode },
+        { header: 'Клиент', accessor: (i) => (i as any).checkoutSession?.customerName },
+        { header: 'Сумма (руб)', accessor: (i) => ((i.grossAmount || 0) / 100).toFixed(2) },
+        { header: 'Комиссия (руб)', accessor: (i) => ((i.platformFee || 0) / 100).toFixed(2) },
+        { header: 'Ваш доход (руб)', accessor: (i) => ((i.supplierAmount || 0) / 100).toFixed(2) },
+        { header: 'Ставка', accessor: (i) => i.commissionRate ? `${Number(i.commissionRate) * 100}%` : '' },
+      ],
+      fetchBatch: (cursor, take) =>
+        this.prisma.paymentIntent.findMany({
+          where: where as any,
+          include: { checkoutSession: { select: { shortCode: true, customerName: true } } },
+          orderBy: { paidAt: 'desc' },
+          take,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        }),
     });
-
-    const header = 'Дата,Заказ,Клиент,Сумма (руб),Комиссия (руб),Ваш доход (руб),Ставка\n';
-    const rows = items.map((i) =>
-      [
-        i.paidAt?.toISOString().split('T')[0] || '',
-        i.checkoutSession.shortCode,
-        `"${(i.checkoutSession.customerName || '').replace(/"/g, '""')}"`,
-        ((i.grossAmount || 0) / 100).toFixed(2),
-        ((i.platformFee || 0) / 100).toFixed(2),
-        ((i.supplierAmount || 0) / 100).toFixed(2),
-        i.commissionRate ? `${Number(i.commissionRate) * 100}%` : '',
-      ].join(','),
-    ).join('\n');
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="sales-${Date.now()}.csv"`);
-    res.send('\uFEFF' + header + rows);
   }
 }

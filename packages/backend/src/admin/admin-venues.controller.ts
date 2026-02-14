@@ -9,6 +9,7 @@ import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateVenueDto, UpdateVenueDto } from './dto/admin-venue.dto';
+import { parsePagination, paginationArgs } from '../common/pagination';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -21,14 +22,14 @@ export class AdminVenuesController {
   @Get()
   @Roles('ADMIN', 'EDITOR', 'VIEWER')
   async list(
+    @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('city') city?: string,
     @Query('venueType') venueType?: string,
     @Query('search') search?: string,
   ) {
-    const p = Math.max(1, Number(page) || 1);
-    const l = Math.min(100, Math.max(1, Number(limit) || 20));
+    const pg = parsePagination({ cursor, page, limit: limit || '20' });
 
     const where: any = {
       isDeleted: false,
@@ -47,8 +48,7 @@ export class AdminVenuesController {
       this.prisma.venue.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
-        skip: (p - 1) * l,
-        take: l,
+        ...paginationArgs(pg),
         include: {
           city: { select: { name: true, slug: true } },
           _count: { select: { events: true, offers: true } },
@@ -57,8 +57,12 @@ export class AdminVenuesController {
       this.prisma.venue.count({ where }),
     ]);
 
+    const hasMore = items.length > pg.limit;
+    const pageItems = hasMore ? items.slice(0, pg.limit) : items;
+    const nextCursor = hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null;
+
     return {
-      items: items.map((v) => ({
+      items: pageItems.map((v) => ({
         id: v.id,
         slug: v.slug,
         title: v.title,
@@ -72,8 +76,8 @@ export class AdminVenuesController {
         updatedAt: v.updatedAt,
       })),
       total,
-      page: p,
-      totalPages: Math.ceil(total / l),
+      nextCursor,
+      hasMore,
     };
   }
 

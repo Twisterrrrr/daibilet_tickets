@@ -8,6 +8,7 @@ import { RolesGuard, Roles } from '../auth/roles.guard';
 import { AuditInterceptor } from './audit.interceptor';
 import { ReviewService } from '../catalog/review.service';
 import { CreateExternalReviewDto, BatchExternalReviewsDto } from './dto/admin.dto';
+import { parsePagination } from '../common/pagination';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -21,14 +22,16 @@ export class AdminExternalReviewsController {
   async list(
     @Query('eventId') eventId?: string,
     @Query('source') source?: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('cursor') cursor?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
+    const pg = parsePagination({ cursor, page, limit: limit || '20' });
     return this.reviewService.listExternalReviews({
       eventId,
       source,
-      page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      page: pg.page,
+      limit: pg.limit,
     });
   }
 

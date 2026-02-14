@@ -13,6 +13,7 @@ import {
   DEFAULT_REQUEST_SLA_MINUTES,
 } from '../checkout/checkout-state-machine';
 import { getCompatMetrics } from '@daibilet/shared';
+import { streamCsv } from '../common/csv-stream.util';
 import { UpdateSessionStatusDto, AdminNoteDto, ExportRequestsCsvDto, ExportSessionsCsvDto } from './dto/admin-checkout.dto';
 
 @ApiTags('admin')
@@ -469,7 +470,7 @@ export class AdminCheckoutController {
   // ============================
 
   /**
-   * Экспорт заявок в CSV (с фильтрацией по статусу и дате).
+   * Экспорт заявок в CSV (cursor-based streaming, без лимита строк).
    */
   @Get('export/requests')
   @Roles('ADMIN')
@@ -477,7 +478,6 @@ export class AdminCheckoutController {
     @Res() res: Response,
     @Query() query: ExportRequestsCsvDto,
   ) {
-    // Validate and set date range (default: last 30 days, max: 93 days)
     const dateFrom = query.dateFrom ? new Date(query.dateFrom) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const dateTo = query.dateTo ? new Date(query.dateTo) : new Date();
 
@@ -486,44 +486,42 @@ export class AdminCheckoutController {
       throw new BadRequestException('Максимальный период выгрузки: 93 дня');
     }
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       createdAt: { gte: dateFrom, lte: dateTo },
     };
-    if (query.status) where.status = query.status;
+    if (query.status) (where as any).status = query.status;
 
-    const requests = await this.prisma.orderRequest.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 1000, // TODO: заменить на cursor-based стриминг при росте данных
+    await streamCsv({
+      res,
+      filename: 'order-requests',
+      fields: [
+        { header: 'id', accessor: (r) => r.id },
+        { header: 'eventId', accessor: (r) => r.eventId },
+        { header: 'eventOfferId', accessor: (r) => r.eventOfferId },
+        { header: 'status', accessor: (r) => r.status },
+        { header: 'expireReason', accessor: (r) => r.expireReason },
+        { header: 'slaMinutes', accessor: (r) => r.slaMinutes },
+        { header: 'customerName', accessor: (r) => r.customerName },
+        { header: 'customerEmail', accessor: (r) => r.customerEmail },
+        { header: 'customerPhone', accessor: (r) => r.customerPhone },
+        { header: 'priceSnapshot', accessor: (r) => r.priceSnapshot },
+        { header: 'quantity', accessor: (r) => r.quantity },
+        { header: 'createdAt', accessor: (r) => r.createdAt.toISOString() },
+        { header: 'confirmedAt', accessor: (r) => r.confirmedAt?.toISOString() },
+        { header: 'expiresAt', accessor: (r) => r.expiresAt?.toISOString() },
+      ],
+      fetchBatch: (cursor, take) =>
+        this.prisma.orderRequest.findMany({
+          where: where as any,
+          orderBy: { createdAt: 'desc' },
+          take,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        }),
     });
-
-    const header = 'id,eventId,eventOfferId,status,expireReason,slaMinutes,customerName,customerEmail,customerPhone,priceSnapshot,quantity,createdAt,confirmedAt,expiresAt\n';
-    const rows = requests.map((r) =>
-      [
-        r.id,
-        r.eventId,
-        r.eventOfferId,
-        r.status,
-        r.expireReason || '',
-        r.slaMinutes,
-        `"${(r.customerName || '').replace(/"/g, '""')}"`,
-        r.customerEmail || '',
-        r.customerPhone || '',
-        r.priceSnapshot,
-        r.quantity,
-        r.createdAt.toISOString(),
-        r.confirmedAt?.toISOString() || '',
-        r.expiresAt?.toISOString() || '',
-      ].join(','),
-    ).join('\n');
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="order-requests-${Date.now()}.csv"`);
-    res.send('\uFEFF' + header + rows); // BOM для Excel
   }
 
   /**
-   * Экспорт checkout sessions в CSV (с фильтрацией по статусу и дате).
+   * Экспорт checkout sessions в CSV (cursor-based streaming, без лимита строк).
    */
   @Get('export/sessions')
   @Roles('ADMIN')
@@ -531,7 +529,6 @@ export class AdminCheckoutController {
     @Res() res: Response,
     @Query() query: ExportSessionsCsvDto,
   ) {
-    // Validate and set date range (default: last 30 days, max: 93 days)
     const dateFrom = query.dateFrom ? new Date(query.dateFrom) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const dateTo = query.dateTo ? new Date(query.dateTo) : new Date();
 
@@ -540,38 +537,36 @@ export class AdminCheckoutController {
       throw new BadRequestException('Максимальный период выгрузки: 93 дня');
     }
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       createdAt: { gte: dateFrom, lte: dateTo },
     };
-    if (query.status) where.status = query.status;
+    if (query.status) (where as any).status = query.status;
 
-    const sessions = await this.prisma.checkoutSession.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { orderRequests: true } } },
-      take: 1000, // TODO: заменить на cursor-based стриминг при росте данных
+    await streamCsv({
+      res,
+      filename: 'checkout-sessions',
+      fields: [
+        { header: 'id', accessor: (s) => s.id },
+        { header: 'shortCode', accessor: (s) => s.shortCode },
+        { header: 'status', accessor: (s) => s.status },
+        { header: 'customerName', accessor: (s) => s.customerName },
+        { header: 'customerEmail', accessor: (s) => s.customerEmail },
+        { header: 'customerPhone', accessor: (s) => s.customerPhone },
+        { header: 'totalPrice', accessor: (s) => s.totalPrice },
+        { header: 'requestCount', accessor: (s) => (s as any)._count?.orderRequests ?? 0 },
+        { header: 'createdAt', accessor: (s) => s.createdAt.toISOString() },
+        { header: 'completedAt', accessor: (s) => s.completedAt?.toISOString() },
+        { header: 'expiresAt', accessor: (s) => s.expiresAt?.toISOString() },
+      ],
+      fetchBatch: (cursor, take) =>
+        this.prisma.checkoutSession.findMany({
+          where: where as any,
+          orderBy: { createdAt: 'desc' },
+          include: { _count: { select: { orderRequests: true } } },
+          take,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        }),
     });
-
-    const header = 'id,shortCode,status,customerName,customerEmail,customerPhone,totalPrice,requestCount,createdAt,completedAt,expiresAt\n';
-    const rows = sessions.map((s) =>
-      [
-        s.id,
-        s.shortCode,
-        s.status,
-        `"${(s.customerName || '').replace(/"/g, '""')}"`,
-        s.customerEmail || '',
-        s.customerPhone || '',
-        s.totalPrice || 0,
-        s._count.orderRequests,
-        s.createdAt.toISOString(),
-        s.completedAt?.toISOString() || '',
-        s.expiresAt?.toISOString() || '',
-      ].join(','),
-    ).join('\n');
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="checkout-sessions-${Date.now()}.csv"`);
-    res.send('\uFEFF' + header + rows);
   }
 
   /**
