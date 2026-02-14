@@ -9,7 +9,7 @@ import { Injectable, Logger } from '@nestjs/common';
 @Injectable()
 export class TepApiService {
   private readonly logger = new Logger(TepApiService.name);
-  private readonly baseUrl = 'https://api.teplohod.info/v1';
+  private readonly baseUrl = process.env.TEP_API_URL || 'https://api.teplohod.info/v1';
 
   private async request<T = any>(path: string): Promise<T> {
     const url = `${this.baseUrl}${path}`;

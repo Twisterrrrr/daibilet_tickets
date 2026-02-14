@@ -114,7 +114,7 @@ export class SupplierReportsController {
         checkoutSession: { select: { shortCode: true, customerName: true } },
       },
       orderBy: { paidAt: 'desc' },
-      take: 1000,
+      take: 1000, // TODO: заменить на cursor-based стриминг при росте данных
     });
 
     const header = 'Дата,Заказ,Клиент,Сумма (руб),Комиссия (руб),Ваш доход (руб),Ставка\n';

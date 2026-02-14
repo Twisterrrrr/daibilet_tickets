@@ -22,6 +22,7 @@ import { EventCategory, EventSubcategory, EventAudience, Prisma } from '@prisma/
 @Injectable()
 export class TepSyncService {
   private readonly logger = new Logger(TepSyncService.name);
+  private readonly tepSiteUrl = process.env.TEP_SITE_URL || 'https://teplohod.info';
 
   /** Кэш tepCityId → наш cityId (UUID) */
   private cityCache = new Map<number, string>();
@@ -268,7 +269,7 @@ export class TepSyncService {
         update: {
           eventId: eventRecord.id,
           priceFrom,
-          deeplink: `https://teplohod.info/event/${tep.id}`,
+          deeplink: `${this.tepSiteUrl}/event/${tep.id}`,
           externalData: tep as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
@@ -277,7 +278,7 @@ export class TepSyncService {
           source: 'TEPLOHOD',
           purchaseType: 'REDIRECT',
           externalEventId: sourceId,
-          deeplink: `https://teplohod.info/event/${tep.id}`,
+          deeplink: `${this.tepSiteUrl}/event/${tep.id}`,
           priceFrom,
           isPrimary: true,
           status: 'ACTIVE',

@@ -30,6 +30,23 @@
 
 ---
 
+## Production Hardening (15 февраля 2026)
+
+### Выполнено
+- [x] **Критический**: FK-индексы: 16 недостающих + 1 композитный (offerId, startsAt) — один db push
+- [x] **Высокий**: console.log → NestJS Logger (main.ts, partner-auth.guard.ts, audit.interceptor.ts)
+- [x] **Высокий**: Hardcoded teplohod URL → env (TEP_API_URL, TEP_SITE_URL)
+- [x] **Средний**: /podborki/* в sitemap (индекс + все подборки)
+- [x] **Средний**: Admin-контроллеры: take: 500 → пагинация limit/skip (max 200)
+
+### Отложено (backlog)
+- [ ] **Средний**: CSV-экспорты: cursor-based стриминг вместо take: 1000
+- [ ] **Средний**: ESLint правило: запретить `any` в новых файлах (warning), `console.log` (error)
+- [ ] **Низкий**: Типизация `as any` в бэкенде (31 место) — заменить на type guards постепенно
+- [ ] **Низкий**: Frontend `any` (100+) — начать с api.ts и DTO types
+
+---
+
 ## UX-бэклог: отставание от Tripster (experience.tripster.ru)
 
 > Задачи отсортированы по ROI (визуальный эффект / сложность). Подробный анализ — в `Diary.md` от 15.02.2026.
@@ -79,7 +96,7 @@
 
 #### Backend
 - [ ] **Высокий**: Мониторинг первых реальных платежей через reconciliation page
-- [ ] **Высокий**: Structured JSON logs → log aggregator
+- [ ] **Высокий**: Structured JSON logs → log aggregator (NestJS Logger уже заменён, следующий шаг — pino)
 - [ ] **Высокий**: Email шаблоны: order-confirmed, order-completed с красивой вёрсткой
 
 #### Контент

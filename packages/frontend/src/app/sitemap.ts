@@ -75,6 +75,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // API недоступен — пропускаем
   }
 
+  // Подборки
+  try {
+    const collections = await api.getCollections();
+    // Индексная страница
+    entries.push({
+      url: `${SITE_URL}/podborki`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    });
+    for (const col of collections) {
+      entries.push({
+        url: `${SITE_URL}/podborki/${col.slug}`,
+        lastModified: col.updatedAt ? new Date(col.updatedAt) : now,
+        changeFrequency: 'weekly',
+        priority: 0.85,
+      });
+    }
+  } catch {
+    // API недоступен — пропускаем
+  }
+
   // События (первые 500)
   try {
     const { items: events } = await api.getEvents({ limit: 500 });

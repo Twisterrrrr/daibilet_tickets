@@ -4,6 +4,73 @@
 
 ---
 
+## 15 февраля 2026 (вечер) — Production Hardening: индексы, логирование, пагинация
+
+### Наблюдения
+
+По результатам аудита выполнен батч «production hardening» — самый дешёвый набор изменений для прироста производительности и чистоты кода.
+
+### Решения
+
+**1. FK-индексы (16 + 1 композитный)**
+
+Добавлены недостающие индексы на все FK-поля, которые ранее вызывали full table scan при JOIN/WHERE:
+
+| Модель | Поле | Тип |
+|---|---|---|
+| Region | hubCityId | FK |
+| RegionCity | cityId | FK |
+| Event | supplierId, startLocationId, endLocationId, routeId | FK ×4 |
+| EventSession | (offerId, startsAt) | Композитный |
+| EventTag | tagId | FK |
+| PackageItem | eventId, sessionId | FK ×2 |
+| Article | cityId | FK |
+| ArticleEvent | eventId | FK |
+| ArticleTag | tagId | FK |
+| Venue | operatorId | FK |
+| ReviewRequest | eventId | FK |
+| OrderRequest | eventOfferId | FK |
+| FulfillmentItem | offerId | FK |
+
+Одна миграция `prisma db push`, ноль простоя.
+
+**2. console.log → NestJS Logger**
+
+Заменены все `console.log`/`console.error` в backend на `Logger`:
+- `main.ts` — Bootstrap logger (3 вызова)
+- `partner-auth.guard.ts` — ApiKeyGuard logger (1 вызов)
+- `audit.interceptor.ts` — AuditInterceptor logger (1 вызов)
+
+Теперь все логи идут через NestJS Logger с timestamps и context.
+
+**3. Hardcoded teplohod URL → env**
+
+- `tep-api.service.ts`: `baseUrl` → `process.env.TEP_API_URL || 'https://api.teplohod.info/v1'`
+- `tep-sync.service.ts`: deeplink → `process.env.TEP_SITE_URL || 'https://teplohod.info'`
+
+Позволяет переключить на staging/mock API без пересборки.
+
+**4. Sitemap: /podborki/*
+
+Добавлены подборки (Collections) в `sitemap.ts`:
+- Индексная страница `/podborki` (priority 0.8)
+- Все активные подборки `/podborki/:slug` (priority 0.85)
+
+**5. Ограничение take в admin-контроллерах**
+
+Все списковые admin-эндпоинты переведены с `take: 500` на пагинацию:
+- Добавлены `@Query('limit')` и `@Query('skip')` параметры
+- Лимит ограничен `Math.min(limit || 200, 200)`
+- CSV-экспорты оставлены с `take: 1000` + TODO на cursor-based стриминг
+
+Затронутые контроллеры: tags, cities, upsells, landings, combos, checkout (SLA metrics).
+
+### Проблемы
+
+Никаких. Все изменения backward-compatible, TypeScript compilation без ошибок.
+
+---
+
 ## 15 февраля 2026 — Подборки (Collections) + системный аудит
 
 ### Наблюдения

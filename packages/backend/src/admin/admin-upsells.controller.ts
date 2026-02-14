@@ -15,15 +15,22 @@ export class AdminUpsellsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  async list(@Query('city') citySlug?: string, @Query('active') active?: string) {
+  async list(
+    @Query('city') citySlug?: string,
+    @Query('active') active?: string,
+    @Query('limit') limit?: number,
+    @Query('skip') skip?: number,
+  ) {
     const where: any = {};
     if (citySlug) where.citySlug = citySlug;
     if (active !== undefined) where.isActive = active === 'true';
 
+    const take = Math.min(Number(limit) || 200, 200);
     return this.prisma.upsellItem.findMany({
       where,
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-      take: 500,
+      take,
+      skip: Number(skip) || 0,
     });
   }
 

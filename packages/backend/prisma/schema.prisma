@@ -264,6 +264,7 @@ model Region {
   hubCity     City     @relation("RegionHub", fields: [hubCityId], references: [id])
   cities      RegionCity[]
 
+  @@index([hubCityId])
   @@map("regions")
 }
 
@@ -275,6 +276,7 @@ model RegionCity {
   city     City   @relation(fields: [cityId], references: [id])
 
   @@id([regionId, cityId])
+  @@index([cityId])
   @@map("region_cities")
 }
 
@@ -366,6 +368,10 @@ model Event {
   @@index([canonicalOfId])
   @@index([venueId])
   @@index([operatorId])
+  @@index([supplierId])
+  @@index([startLocationId])
+  @@index([endLocationId])
+  @@index([routeId])
   @@map("events")
 }
 
@@ -389,6 +395,7 @@ model EventSession {
   @@index([startsAt])
   @@index([eventId])
   @@index([offerId])
+  @@index([offerId, startsAt])
   @@map("event_sessions")
 }
 
@@ -506,6 +513,7 @@ model EventTag {
   tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([eventId, tagId])
+  @@index([tagId])
   @@map("event_tags")
 }
 
@@ -568,6 +576,8 @@ model PackageItem {
   session EventSession @relation(fields: [sessionId], references: [id])
 
   @@index([packageId])
+  @@index([eventId])
+  @@index([sessionId])
   @@map("package_items")
 }
 
@@ -616,6 +626,7 @@ model Article {
   articleEvents ArticleEvent[]
   articleTags   ArticleTag[]
 
+  @@index([cityId])
   @@map("articles")
 }
 
@@ -627,6 +638,7 @@ model ArticleEvent {
   event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@id([articleId, eventId])
+  @@index([eventId])
   @@map("article_events")
 }
 
@@ -638,6 +650,7 @@ model ArticleTag {
   tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([articleId, tagId])
+  @@index([tagId])
   @@map("article_tags")
 }
 
@@ -867,6 +880,7 @@ model Venue {
   @@index([cityId])
   @@index([venueType])
   @@index([slug])
+  @@index([operatorId])
   @@map("venues")
 }
 
@@ -1124,6 +1138,7 @@ model ReviewRequest {
 
   @@unique([email, eventId])
   @@index([token])
+  @@index([eventId])
   @@map("review_requests")
 }
 
@@ -1201,6 +1216,7 @@ model OrderRequest {
   @@index([checkoutSessionId])
   @@index([status])
   @@index([eventId])
+  @@index([eventOfferId])
   @@index([status, expiresAt])             // Для cron-выборки PENDING + expiresAt < now
   @@map("order_requests")
 }
@@ -1296,6 +1312,7 @@ model FulfillmentItem {
   checkoutSession     CheckoutSession   @relation(fields: [checkoutSessionId], references: [id])
 
   @@index([checkoutSessionId])
+  @@index([offerId])
   @@index([status])
   @@index([status, nextRetryAt])           // Для cron retry
   @@index([status, escalatedAt])           // Для cron auto-compensate

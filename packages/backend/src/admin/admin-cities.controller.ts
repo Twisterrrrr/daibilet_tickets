@@ -15,7 +15,11 @@ export class AdminCitiesController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  async list(@Query('search') search?: string) {
+  async list(
+    @Query('search') search?: string,
+    @Query('limit') limit?: number,
+    @Query('skip') skip?: number,
+  ) {
     const where: any = {};
     if (search) {
       where.OR = [
@@ -24,11 +28,13 @@ export class AdminCitiesController {
       ];
     }
 
+    const take = Math.min(Number(limit) || 200, 200);
     return this.prisma.city.findMany({
       where,
       include: { _count: { select: { events: true, landingPages: true, comboPages: true } } },
       orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
-      take: 500,
+      take,
+      skip: Number(skip) || 0,
     });
   }
 

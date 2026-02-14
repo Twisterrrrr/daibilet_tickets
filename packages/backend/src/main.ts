@@ -10,7 +10,7 @@ if (SENTRY_DSN) {
 }
 
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
@@ -18,11 +18,13 @@ import { setCompatDisabled, setCompatLogger } from '@daibilet/shared';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma/prisma.service';
 
+const logger = new Logger('Bootstrap');
+
 async function bootstrap() {
   // Kill switch: env DISABLE_PURCHASE_TYPE_COMPAT=true запрещает legacy PurchaseType
   if (process.env.DISABLE_PURCHASE_TYPE_COMPAT === 'true') {
     setCompatDisabled(true);
-    console.log('[PurchaseType] COMPAT disabled — legacy values will throw');
+    logger.warn('PurchaseType COMPAT disabled — legacy values will throw');
   }
 
   const app = await NestFactory.create(AppModule);
@@ -52,7 +54,7 @@ async function bootstrap() {
         before: { raw } as Prisma.InputJsonValue,
         after: { resolved, context } as Prisma.InputJsonValue,
       },
-    }).catch((e) => console.error('Audit log failed:', (e as Error).message));
+    }).catch((e) => logger.error('Audit log failed: ' + (e as Error).message));
   });
 
   app.setGlobalPrefix('api/v1');
@@ -102,8 +104,8 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
-  console.log(`Daibilet API running on port ${port}`);
-  console.log(`Swagger: http://localhost:${port}/api/docs`);
+  logger.log(`Daibilet API running on port ${port}`);
+  logger.log(`Swagger: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

@@ -15,7 +15,12 @@ export class AdminTagsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  async list(@Query('category') category?: string, @Query('search') search?: string) {
+  async list(
+    @Query('category') category?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: number,
+    @Query('skip') skip?: number,
+  ) {
     const where: any = { isDeleted: false };
     if (category) where.category = category;
     if (search) {
@@ -25,11 +30,13 @@ export class AdminTagsController {
       ];
     }
 
+    const take = Math.min(Number(limit) || 200, 200);
     return this.prisma.tag.findMany({
       where,
       include: { _count: { select: { events: true } } },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
-      take: 500,
+      take,
+      skip: Number(skip) || 0,
     });
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
+  private readonly logger = new Logger(ApiKeyGuard.name);
   constructor(private readonly prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -62,7 +63,7 @@ export class ApiKeyGuard implements CanActivate {
     this.prisma.apiKey.update({
       where: { id: apiKey.id },
       data: { lastUsedAt: new Date() },
-    }).catch((e) => console.error('lastUsedAt update failed:', (e as Error).message));
+    }).catch((e) => this.logger.error('lastUsedAt update failed: ' + (e as Error).message));
 
     // Attach partner context to request
     request.user = {

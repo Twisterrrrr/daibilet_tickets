@@ -23,15 +23,21 @@ export class AdminCombosController {
   ) {}
 
   @Get()
-  async list(@Query('city') city?: string) {
+  async list(
+    @Query('city') city?: string,
+    @Query('limit') limit?: number,
+    @Query('skip') skip?: number,
+  ) {
     const where: any = { isDeleted: false };
     if (city) where.city = { slug: city };
 
+    const take = Math.min(Number(limit) || 200, 200);
     return this.prisma.comboPage.findMany({
       where,
       include: { city: { select: { slug: true, name: true } } },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-      take: 500,
+      take,
+      skip: Number(skip) || 0,
     });
   }
 

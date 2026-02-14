@@ -360,7 +360,7 @@ export class AdminCheckoutController {
         createdAt: { gte: slaDateFrom },
       },
       select: { createdAt: true, confirmedAt: true, slaMinutes: true },
-      take: 500,
+      take: 200,
       orderBy: { confirmedAt: 'desc' },
     });
 
@@ -494,7 +494,7 @@ export class AdminCheckoutController {
     const requests = await this.prisma.orderRequest.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: 1000,
+      take: 1000, // TODO: заменить на cursor-based стриминг при росте данных
     });
 
     const header = 'id,eventId,eventOfferId,status,expireReason,slaMinutes,customerName,customerEmail,customerPhone,priceSnapshot,quantity,createdAt,confirmedAt,expiresAt\n';
@@ -549,7 +549,7 @@ export class AdminCheckoutController {
       where,
       orderBy: { createdAt: 'desc' },
       include: { _count: { select: { orderRequests: true } } },
-      take: 1000,
+      take: 1000, // TODO: заменить на cursor-based стриминг при росте данных
     });
 
     const header = 'id,shortCode,status,customerName,customerEmail,customerPhone,totalPrice,requestCount,createdAt,completedAt,expiresAt\n';
