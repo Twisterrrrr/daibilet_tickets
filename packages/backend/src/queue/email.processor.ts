@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { MailService } from '../mail/mail.service';
-import { QUEUE_EMAILS } from './queue.module';
+import { QUEUE_EMAILS } from './queue.constants';
 
 export type EmailJobData =
   | { type: 'review-verify'; to: string; authorName: string; eventTitle: string; verifyUrl: string }
@@ -58,7 +58,7 @@ export class EmailProcessor extends WorkerHost {
         break;
 
       default:
-        this.logger.warn(`Unknown email job type: ${(data as any).type}`);
+        this.logger.warn(`Unknown email job type: ${(data as { type: string }).type}`);
     }
   }
 }

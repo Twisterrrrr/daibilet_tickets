@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { DateMode, Prisma } from '@prisma/client';
 
 @Injectable()
 export class LandingService {
@@ -67,11 +68,14 @@ export class LandingService {
       ? await this.prisma.event.findMany({
           where: {
             isActive: true,
+            isDeleted: false,
             cityId: landing.cityId,
             tags: { some: { tagId: tag.id } },
-            sessions: {
-              some: { isActive: true, startsAt: { gte: now } },
-            },
+            // Поддержка OPEN_DATE: показываем и без сеансов
+            OR: [
+              { dateMode: DateMode.SCHEDULED, sessions: { some: { isActive: true, startsAt: { gte: now } } } },
+              { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: now } }] },
+            ],
             ...extraWhere,
           },
           include: {
@@ -84,14 +88,54 @@ export class LandingService {
         })
       : [];
 
-    // Строим "варианты" — плоский список сессий
-    const variants = events.flatMap((event) =>
-      event.sessions.map((session) => ({
-        sessionId: session.id,
-        startsAt: session.startsAt,
-        endsAt: session.endsAt,
-        availableTickets: session.availableTickets,
-        prices: session.prices,
+    // Строим "варианты" — плоский список сессий + OPEN_DATE события без сессий
+    interface LandingVariant {
+      sessionId: string | null;
+      startsAt: Date | null;
+      endsAt: Date | null;
+      availableTickets: number | null;
+      prices: Prisma.JsonValue;
+      isOpenDate: boolean;
+      event: {
+        id: string; title: string; slug: string; address: string | null;
+        durationMinutes: number | null; imageUrl: string | null;
+        tcEventId: string; source: string; rating: any;
+        reviewCount: number; priceFrom: number | null;
+      };
+    }
+
+    const variants: LandingVariant[] = events.flatMap((event) => {
+      // OPEN_DATE события без сессий — выводим как один "вариант" без привязки к сеансу
+      if (event.dateMode === DateMode.OPEN_DATE && event.sessions.length === 0) {
+        return [{
+          sessionId: null as string | null,
+          startsAt: null as Date | null,
+          endsAt: null as Date | null,
+          availableTickets: null as number | null,
+          prices: null as Prisma.JsonValue,
+          isOpenDate: true as boolean,
+          event: {
+            id: event.id,
+            title: event.title,
+            slug: event.slug,
+            address: event.address,
+            durationMinutes: event.durationMinutes,
+            imageUrl: event.imageUrl,
+            tcEventId: event.tcEventId,
+            source: event.source,
+            rating: event.rating,
+            reviewCount: event.reviewCount,
+            priceFrom: event.priceFrom,
+          },
+        }];
+      }
+      return event.sessions.map((session) => ({
+        sessionId: session.id as string | null,
+        startsAt: session.startsAt as Date | null,
+        endsAt: session.endsAt as Date | null,
+        availableTickets: session.availableTickets as number | null,
+        prices: session.prices as Prisma.JsonValue,
+        isOpenDate: false,
         event: {
           id: event.id,
           title: event.title,
@@ -105,14 +149,16 @@ export class LandingService {
           reviewCount: event.reviewCount,
           priceFrom: event.priceFrom,
         },
-      })),
-    );
+      }));
+    });
 
-    // Сортировка по времени
-    variants.sort(
-      (a, b) =>
-        new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
-    );
+    // Сортировка по времени (OPEN_DATE — в конец)
+    variants.sort((a, b) => {
+      if (!a.startsAt && !b.startsAt) return 0;
+      if (!a.startsAt) return 1;
+      if (!b.startsAt) return -1;
+      return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+    });
 
     // Формируем фильтры для фронтенда
     const piers = [
@@ -130,9 +176,11 @@ export class LandingService {
       })
       .filter((p): p is number => p !== null);
 
-    const allDates = variants.map((v) =>
-      new Date(v.startsAt).toISOString().slice(0, 10),
-    );
+    const allDates = variants
+      .filter((v) => v.startsAt != null)
+      .map((v) =>
+        new Date(v.startsAt!).toISOString().slice(0, 10),
+      );
     const uniqueDates = [...new Set(allDates)].sort();
 
     const filters = {

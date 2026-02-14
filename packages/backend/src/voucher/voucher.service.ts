@@ -1,9 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class VoucherService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly appUrl: string;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {
+    // В production APP_URL обязателен, в dev используем localhost по умолчанию
+    this.appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
+  }
 
   async getByShortCode(shortCode: string) {
     const voucher = await this.prisma.voucher.findUnique({
@@ -40,7 +49,7 @@ export class VoucherService {
       data: {
         packageId,
         shortCode,
-        publicUrl: `${process.env.APP_URL || 'https://daibilet.ru'}/v/${shortCode}`,
+        publicUrl: `${this.appUrl}/v/${shortCode}`,
       },
     });
 

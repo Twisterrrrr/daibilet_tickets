@@ -196,8 +196,8 @@ export function BuyModal({
 
       setOrderResult(data);
       setCheckoutState('success');
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Произошла ошибка при создании заказа');
+    } catch (err: unknown) {
+      setErrorMessage((err instanceof Error ? err.message : String(err)) || 'Произошла ошибка при создании заказа');
       setCheckoutState('error');
     }
   };

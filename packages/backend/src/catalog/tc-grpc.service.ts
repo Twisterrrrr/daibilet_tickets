@@ -125,8 +125,8 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.initClient();
       this.logger.log(`gRPC-клиент подключён к ${this.endpoint}`);
-    } catch (err: any) {
-      this.logger.error(`Ошибка инициализации gRPC: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Ошибка инициализации gRPC: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -156,8 +156,8 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
       },
     );
 
-    const proto = grpc.loadPackageDefinition(packageDefinition) as any;
-    const SimpleService = proto.v2.Simple;
+    const proto = grpc.loadPackageDefinition(packageDefinition) as Record<string, Record<string, unknown>>;
+    const SimpleService = proto.v2?.Simple as (new (endpoint: string, credentials: grpc.ChannelCredentials) => grpc.Client) | undefined;
 
     if (!SimpleService) {
       throw new Error('Не удалось загрузить proto v2.Simple');

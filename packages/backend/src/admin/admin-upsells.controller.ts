@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
+import { CreateUpsellDto, UpdateUpsellDto } from './dto/admin-upsell.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -22,6 +23,7 @@ export class AdminUpsellsController {
     return this.prisma.upsellItem.findMany({
       where,
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+      take: 500,
     });
   }
 
@@ -32,14 +34,14 @@ export class AdminUpsellsController {
 
   @Post()
   @Roles('ADMIN')
-  async create(@Body() data: any) {
+  async create(@Body() data: CreateUpsellDto) {
     return this.prisma.upsellItem.create({ data });
   }
 
   @Patch(':id')
   @Roles('ADMIN')
-  async update(@Param('id') id: string, @Body() data: any) {
-    const { id: _, createdAt, updatedAt, ...clean } = data;
+  async update(@Param('id') id: string, @Body() data: UpdateUpsellDto) {
+    const { id: _, createdAt, updatedAt, ...clean } = data as any;
     return this.prisma.upsellItem.update({ where: { id }, data: clean });
   }
 

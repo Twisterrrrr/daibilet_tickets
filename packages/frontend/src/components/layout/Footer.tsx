@@ -8,15 +8,18 @@ const footerLinks = {
     { name: 'Мероприятия', href: '/events?category=EVENT' },
   ],
   'Города': [
-    { name: 'Москва', href: '/cities/moscow' },
     { name: 'Санкт-Петербург', href: '/cities/saint-petersburg' },
+    { name: 'Москва', href: '/cities/moscow' },
     { name: 'Казань', href: '/cities/kazan' },
+    { name: 'Калининград', href: '/cities/kaliningrad' },
+    { name: 'Нижний Новгород', href: '/cities/nizhny-novgorod' },
     { name: 'Владимир', href: '/cities/vladimir' },
     { name: 'Ярославль', href: '/cities/yaroslavl' },
   ],
   'Компания': [
     { name: 'О сервисе', href: '/about' },
     { name: 'Блог', href: '/blog' },
+    { name: 'Помощь', href: '/help' },
     { name: 'Контакты', href: '/contacts' },
   ],
 };
@@ -36,7 +39,6 @@ export function Footer() {
             </Link>
             <p className="mt-3 text-sm text-slate-500">
               Билеты на экскурсии, музеи и мероприятия по городам России.
-              Умный планировщик программы.
             </p>
           </div>
 

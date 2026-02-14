@@ -50,7 +50,7 @@ export class AuditInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap((result) => {
         // Записываем в аудит после успешного выполнения
-        this.audit.log(userId, action as any, entity, entityId, before, body).catch(() => {});
+        this.audit.log(userId, action, entity, entityId, before, body).catch((e) => console.error('Audit log failed:', e.message));
       }),
     );
   }

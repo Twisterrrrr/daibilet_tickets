@@ -60,6 +60,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // API недоступен — пропускаем
   }
 
+  // Музеи и арт-пространства
+  try {
+    const { items: venues } = await api.getVenues({ limit: 500 });
+    for (const venue of venues ?? []) {
+      entries.push({
+        url: `${SITE_URL}/venues/${venue.slug}`,
+        lastModified: venue.updatedAt ? new Date(venue.updatedAt) : now,
+        changeFrequency: 'weekly',
+        priority: 0.9,
+      });
+    }
+  } catch {
+    // API недоступен — пропускаем
+  }
+
   // События (первые 500)
   try {
     const { items: events } = await api.getEvents({ limit: 500 });

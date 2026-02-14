@@ -76,8 +76,8 @@ export function ExternalReviewsListPage() {
       }>('/admin/external-reviews?limit=50');
       setReviews(res.items);
       setTotal(res.total);
-    } catch {
-      // no-op
+    } catch (e) {
+      console.error('Load reviews failed:', e);
     } finally {
       setLoading(false);
     }

@@ -1,22 +1,18 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { TcApiService } from '../catalog/tc-api.service';
-
-/** Cart item from frontend */
-interface CartItemDto {
-  eventId: string;
-  offerId: string;
-  sessionId?: string;
-  quantity: number;
-  eventTitle: string;
-  eventSlug: string;
-  imageUrl?: string;
-  priceFrom: number;
-  purchaseType: string;
-  source: string;
-  deeplink?: string;
-  badge?: string;
-}
+import { MailService } from '../mail/mail.service';
+import {
+  calculateExpiresAt,
+  CHECKOUT_SESSION_TTL_MINUTES,
+  QUICK_REQUEST_TTL_MINUTES,
+  DEFAULT_REQUEST_SLA_MINUTES,
+} from './checkout-state-machine';
+import { resolvePurchaseType, validateWidgetPayload, ensurePayloadVersion } from '@daibilet/shared';
+import { Prisma } from '@prisma/client';
+import { CartItemDto, CreateTripPlanCheckoutDto } from './dto/checkout.dto';
+import { resolvePaymentFlow, PaymentFlowType } from './cart-partitioning';
 
 /**
  * Checkout Service — покупка билетов + корзина + заявки.
@@ -28,7 +24,19 @@ export class CheckoutService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tcApi: TcApiService,
+    private readonly mailService: MailService,
+    private readonly config: ConfigService,
   ) {}
+
+  /** Domain/host from APP_URL for vendor_data.source (e.g. daibilet.ru). */
+  private getSourceDomain(): string {
+    const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
+    try {
+      return new URL(appUrl).hostname;
+    } catch {
+      return 'daibilet.ru';
+    }
+  }
 
   /**
    * Создать заказ в Ticketscloud.
@@ -101,10 +109,11 @@ export class CheckoutService {
         event: event.tcEventId,
         random,
       });
-    } catch (err: any) {
-      this.logger.error(`TC order creation failed: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`TC order creation failed: ${msg}`);
       throw new BadRequestException(
-        `Не удалось создать заказ: ${err.message}`,
+        `Не удалось создать заказ: ${msg}`,
       );
     }
 
@@ -120,13 +129,13 @@ export class CheckoutService {
           vendor_data: {
             customer_email: body.customerEmail || '',
             customer_name: body.customerName || '',
-            source: 'daibilet.ru',
+            source: this.getSourceDomain(),
           },
         });
         this.logger.log(`Updated TC order ${orderData.id} with customer data`);
-      } catch (err: any) {
+      } catch (err: unknown) {
         this.logger.warn(
-          `Failed to update TC order with customer data: ${err.message}`,
+          `Failed to update TC order with customer data: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }
@@ -140,8 +149,8 @@ export class CheckoutService {
       this.logger.log(
         `TC order ${orderData.id} confirmed (status: done). Tickets will be sent.`,
       );
-    } catch (err: any) {
-      this.logger.error(`TC order confirmation failed: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`TC order confirmation failed: ${err instanceof Error ? err.message : String(err)}`);
       // Заказ создан, но не подтверждён — билеты зарезервированы
     }
 
@@ -192,13 +201,14 @@ export class CheckoutService {
       const result = await this.tcApi.finishOrder(tcOrderId);
       return {
         success: true,
-        order: result?.data || result,
+        order: (result as any)?.data || result,
         message: 'Заказ подтверждён. Билеты будут отправлены на email.',
       };
-    } catch (err: any) {
-      this.logger.error(`TC order confirmation failed: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`TC order confirmation failed: ${msg}`);
       throw new BadRequestException(
-        `Не удалось подтвердить заказ: ${err.message}`,
+        `Не удалось подтвердить заказ: ${msg}`,
       );
     }
   }
@@ -217,10 +227,11 @@ export class CheckoutService {
         success: true,
         message: 'Заказ отменён. Билеты возвращены в продажу.',
       };
-    } catch (err: any) {
-      this.logger.error(`TC order cancellation failed: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`TC order cancellation failed: ${msg}`);
       throw new BadRequestException(
-        `Не удалось отменить заказ: ${err.message}`,
+        `Не удалось отменить заказ: ${msg}`,
       );
     }
   }
@@ -284,7 +295,7 @@ export class CheckoutService {
   // ============================
 
   /**
-   * Создать CheckoutSession + OrderRequests для REQUEST_ONLY items.
+   * Создать CheckoutSession + OrderRequests для REQUEST items.
    */
   async createCheckoutSession(data: {
     items: CartItemDto[];
@@ -305,24 +316,114 @@ export class CheckoutService {
     }
 
     const shortCode = `CS-${Date.now().toString(36).toUpperCase()}`;
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min TTL
+    const expiresAt = calculateExpiresAt(CHECKOUT_SESSION_TTL_MINUTES);
 
-    // Separate items by type
-    const requestItems = data.items.filter((i) => i.purchaseType === 'REQUEST_ONLY' || i.purchaseType === 'API_CHECKOUT');
-    const redirectItems = data.items.filter((i) => i.purchaseType === 'REDIRECT');
+    // Separate items by purchase flow (domain contract: PLATFORM vs EXTERNAL)
+    const platformItems = data.items.filter((i) => resolvePaymentFlow(i.purchaseType) === PaymentFlowType.PLATFORM);
+    const externalItems = data.items.filter((i) => resolvePaymentFlow(i.purchaseType) === PaymentFlowType.EXTERNAL);
+    // Legacy alias for OrderRequest creation (REQUEST items need confirmation)
+    const requestItems = data.items.filter((i) => i.purchaseType === 'REQUEST');
+
+    // Build immutable offers snapshot (не зависит от будущих правок офферов в админке)
+    const offerIds = data.items.map((i) => i.offerId);
+    const offersData = await this.prisma.eventOffer.findMany({
+      where: { id: { in: offerIds } },
+      include: {
+        event: { select: { id: true, title: true, slug: true, imageUrl: true } },
+        operator: {
+          select: {
+            id: true, name: true, isSupplier: true,
+            commissionRate: true, promoRate: true, promoUntil: true,
+          },
+        },
+      },
+    });
+
+    // Map offerId → cart item for quantity lookup
+    const cartByOffer = new Map(data.items.map((i) => [i.offerId, i]));
+
+    // Immutable snapshot: write-once, единая структура для PLATFORM и EXTERNAL
+    const now = new Date();
+    const offersSnapshot = offersData.map((o, index) => {
+      const cartItem = cartByOffer.get(o.id);
+      const quantity = cartItem?.quantity || 1;
+      const unitPrice = o.priceFrom || 0;
+      const lineTotal = unitPrice * quantity;
+      const purchaseFlow = resolvePaymentFlow(o.purchaseType);
+
+      // Commission snapshot (для PLATFORM split)
+      let commissionRateSnapshot: number | null = null;
+      let platformFeeSnapshot: number | null = null;
+      let supplierAmountSnapshot: number | null = null;
+      if (purchaseFlow === PaymentFlowType.PLATFORM && o.operator?.isSupplier) {
+        const effectiveRate = (o.operator.promoRate && o.operator.promoUntil && now < o.operator.promoUntil)
+          ? Number(o.operator.promoRate)
+          : Number(o.operator.commissionRate);
+        commissionRateSnapshot = effectiveRate;
+        platformFeeSnapshot = Math.round(lineTotal * effectiveRate);
+        supplierAmountSnapshot = lineTotal - platformFeeSnapshot;
+      }
+
+      return {
+        // === Identity ===
+        lineItemIndex: index,
+        offerId: o.id,
+        eventId: o.eventId,
+        source: o.source,
+        purchaseType: o.purchaseType,
+        purchaseTypeResolved: resolvePurchaseType(o.purchaseType, `offer:${o.id}`),
+        purchaseFlow,                            // PLATFORM | EXTERNAL — единственный контракт
+        // === Content ===
+        eventTitle: o.event.title,
+        eventSlug: o.event.slug,
+        eventImage: o.event.imageUrl,
+        badge: o.badge,
+        operatorName: o.operator?.name || null,
+        // === Pricing (immutable, kopecks) ===
+        unitPrice,
+        quantity,
+        lineTotal,
+        priceCurrency: 'RUB',
+        // === Supplier/Split (для PLATFORM) ===
+        supplierId: o.operator?.id || null,
+        commissionRateSnapshot,
+        platformFeeSnapshot,
+        supplierAmountSnapshot,
+        // === External purchase info ===
+        deeplink: o.deeplink,
+        widgetProvider: o.widgetProvider,
+        widgetPayload: o.widgetPayload,
+        // === Operational info (frozen) ===
+        meetingPoint: o.meetingPoint || null,
+        meetingInstructions: o.meetingInstructions || null,
+        operationalPhone: o.operationalPhone || null,
+        operationalNote: o.operationalNote || null,
+        // === Meta ===
+        snapshotAt: now.toISOString(),
+      };
+    });
+
+    // totalPrice вычисляется ТОЛЬКО из snapshot (единственный источник правды по сумме)
+    const snapshotTotalPrice = offersSnapshot.reduce((sum, s) => sum + s.lineTotal, 0);
 
     const session = await this.prisma.$transaction(async (tx) => {
-      // Create checkout session
+      // Determine initial status:
+      // - Has PLATFORM (REQUEST) items → PENDING_CONFIRMATION (need operator confirmation)
+      // - Only EXTERNAL items → REDIRECTED (user pays at provider)
+      const initialStatus = platformItems.length > 0 ? 'PENDING_CONFIRMATION' : 'REDIRECTED';
+
+      // Create checkout session with immutable snapshot
       const cs = await tx.checkoutSession.create({
         data: {
           shortCode,
-          cartSnapshot: data.items as any,
-          validatedSnapshot: validation.items as any,
+          cartSnapshot: data.items as unknown as Prisma.InputJsonValue,
+          validatedSnapshot: validation.items as unknown as Prisma.InputJsonValue,
+          offersSnapshot: offersSnapshot as unknown as Prisma.InputJsonValue,
           customerName: data.customer.name,
           customerEmail: data.customer.email,
           customerPhone: data.customer.phone,
-          status: requestItems.length > 0 ? 'PENDING_CONFIRMATION' : 'REDIRECTED',
-          totalPrice: validation.totalPrice,
+          status: initialStatus,
+          totalPrice: snapshotTotalPrice,
           expiresAt,
           utmSource: data.utm?.source || null,
           utmMedium: data.utm?.medium || null,
@@ -333,8 +434,9 @@ export class CheckoutService {
         },
       });
 
-      // Create OrderRequests for REQUEST_ONLY items
+      // Create OrderRequests for REQUEST items (with SLA)
       for (const item of requestItems) {
+        const slaMinutes = DEFAULT_REQUEST_SLA_MINUTES;
         await tx.orderRequest.create({
           data: {
             checkoutSessionId: cs.id,
@@ -347,7 +449,8 @@ export class CheckoutService {
             customerEmail: data.customer.email,
             customerPhone: data.customer.phone,
             status: 'PENDING',
-            expiresAt,
+            slaMinutes,
+            expiresAt: calculateExpiresAt(slaMinutes),
           },
         });
       }
@@ -355,15 +458,32 @@ export class CheckoutService {
       return cs;
     });
 
-    this.logger.log(`Created checkout session ${shortCode} with ${requestItems.length} request items and ${redirectItems.length} redirect items`);
+    this.logger.log(
+      `Created checkout session ${shortCode}: ${platformItems.length} PLATFORM, ${externalItems.length} EXTERNAL items, total=${snapshotTotalPrice}`,
+    );
+
+    // Send "order created" email
+    if (data.customer.email) {
+      this.mailService.sendOrderCreated(data.customer.email, {
+        customerName: data.customer.name || 'Клиент',
+        shortCode,
+        items: data.items.map((item) => ({
+          title: item.eventTitle || 'Билет',
+          quantity: item.quantity,
+          price: Math.round(item.priceFrom / 100),
+        })),
+        totalPrice: Math.round(session.totalPrice ? session.totalPrice / 100 : 0),
+      }).catch((e) => this.logger.error('Order email failed: ' + e.message));
+    }
 
     return {
       sessionId: session.id,
       shortCode,
       status: session.status,
       expiresAt: session.expiresAt,
-      requestItems: requestItems.length,
-      redirectItems: redirectItems.map((item) => ({
+      totalPrice: snapshotTotalPrice,
+      platformItems: platformItems.length,
+      externalItems: externalItems.map((item) => ({
         offerId: item.offerId,
         eventTitle: item.eventTitle,
         deeplink: item.deeplink,
@@ -402,7 +522,8 @@ export class CheckoutService {
 
     if (!offer) throw new BadRequestException('Активный оффер не найден');
 
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h TTL
+    const slaMinutes = QUICK_REQUEST_TTL_MINUTES;
+    const expiresAt = calculateExpiresAt(slaMinutes);
 
     const request = await this.prisma.orderRequest.create({
       data: {
@@ -415,6 +536,7 @@ export class CheckoutService {
         customerPhone: data.phone,
         customerComment: data.comment || null,
         status: 'PENDING',
+        slaMinutes,
         expiresAt,
       },
     });
@@ -446,10 +568,91 @@ export class CheckoutService {
   }
 
   // ============================
+  // Public order tracking (no auth)
+  // ============================
+
+  async trackByShortCode(shortCode: string) {
+    const session = await this.prisma.checkoutSession.findFirst({
+      where: { shortCode: shortCode.toUpperCase() },
+      include: {
+        orderRequests: {
+          include: {
+            eventOffer: {
+              select: {
+                id: true, priceFrom: true, purchaseType: true,
+                meetingPoint: true, meetingInstructions: true,
+                operationalPhone: true, operationalNote: true,
+              },
+            },
+            event: {
+              select: { id: true, title: true, slug: true, imageUrl: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!session) return null;
+
+    // Operational info is visible ONLY when session is CONFIRMED or COMPLETED
+    const showOperational = ['CONFIRMED', 'COMPLETED', 'AWAITING_PAYMENT'].includes(session.status);
+
+    // Return safe public-facing data (no internal fields)
+    return {
+      shortCode: session.shortCode,
+      status: session.status,
+      totalPrice: session.totalPrice,
+      customerName: session.customerName,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      completedAt: session.completedAt,
+      expiresAt: session.expiresAt,
+      items: session.orderRequests.map((req) => ({
+        id: req.id,
+        status: req.status,
+        quantity: req.quantity,
+        priceSnapshot: req.priceSnapshot,
+        confirmedAt: req.confirmedAt,
+        event: req.event ? {
+          title: req.event.title,
+          slug: req.event.slug,
+          imageUrl: req.event.imageUrl,
+        } : null,
+        offerTitle: req.event?.title || null,
+        // Operational info — only after confirmation
+        ...(showOperational && req.eventOffer ? {
+          meetingPoint: req.eventOffer.meetingPoint || null,
+          meetingInstructions: req.eventOffer.meetingInstructions || null,
+          operationalPhone: req.eventOffer.operationalPhone || null,
+          operationalNote: req.eventOffer.operationalNote || null,
+        } : {}),
+      })),
+    };
+  }
+
+  // ============================
+  // Snapshot write-once guard
+  // ============================
+
+  /**
+   * offersSnapshot записывается ОДИН РАЗ при создании session.
+   * Перезапись запрещена — данные иммутабельны.
+   */
+  async assertSnapshotImmutable(sessionId: string): Promise<void> {
+    const session = await this.prisma.checkoutSession.findUnique({
+      where: { id: sessionId },
+      select: { offersSnapshot: true },
+    });
+    if (session?.offersSnapshot) {
+      throw new BadRequestException('offersSnapshot уже записан и не может быть перезаписан (immutable)');
+    }
+  }
+
+  // ============================
   // Trip Planner (legacy)
   // ============================
 
-  async create(body: any) {
+  async create(body: CreateTripPlanCheckoutDto) {
     // TODO: Реализовать создание Package + платёж YooKassa (Trip Planner)
     return {
       message: 'Checkout create — в разработке. Требуется подключение YooKassa.',

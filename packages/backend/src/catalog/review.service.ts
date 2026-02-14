@@ -7,30 +7,12 @@ import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadService, ProcessedImage } from '../upload/upload.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, ReviewStatus } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
-import { QUEUE_EMAILS } from '../queue/queue.module';
+import { QUEUE_EMAILS } from '../queue/queue.constants';
 import { EmailJobData } from '../queue/email.processor';
 
-// ========================
-// DTO
-// ========================
-
-export interface CreateReviewDto {
-  eventId: string;
-  rating: number;      // 1-5
-  title?: string;
-  text: string;
-  authorName: string;
-  authorEmail: string;
-  voucherCode?: string;
-  /** Honeypot — если заполнено, отклоняем */
-  website?: string;
-  /** Timestamp начала заполнения формы (ms) */
-  formStartedAt?: number;
-  /** Токен из ReviewRequest (post-purchase flow) */
-  reviewRequestToken?: string;
-}
+import { CreateReviewDto } from './dto/create-review.dto';
 
 export interface VoteDto {
   helpful: boolean;
@@ -72,7 +54,7 @@ export class ReviewService {
     }
 
     // Минимальное время заполнения
-    if (dto.formStartedAt && Date.now() - dto.formStartedAt < MIN_FORM_TIME_MS) {
+    if (dto.formStartedAt && Date.now() - new Date(dto.formStartedAt).getTime() < MIN_FORM_TIME_MS) {
       this.logger.warn(`Suspiciously fast form submission from IP ${ip}`);
       return { message: 'Спасибо! Отзыв будет опубликован после модерации.' };
     }
@@ -91,24 +73,43 @@ export class ReviewService {
       throw new BadRequestException('Укажите корректный email');
     }
 
-    // Проверить что событие существует
-    const event = await this.prisma.event.findUnique({
-      where: { id: dto.eventId },
-      select: { id: true, title: true, slug: true },
-    });
-    if (!event) throw new NotFoundException('Событие не найдено');
+    // Хотя бы одна цель обязательна
+    if (!dto.eventId && !dto.venueId) {
+      throw new BadRequestException('Укажите событие или место для отзыва');
+    }
 
-    // Проверить дубликат (один email — один отзыв на событие)
-    const existing = await this.prisma.review.findUnique({
+    // Проверить что событие существует
+    let event: { id: string; title: string; slug: string } | null = null;
+    if (dto.eventId) {
+      event = await this.prisma.event.findUnique({
+        where: { id: dto.eventId },
+        select: { id: true, title: true, slug: true },
+      });
+      if (!event) throw new NotFoundException('Событие не найдено');
+    }
+
+    // Проверить что место существует
+    let venue: { id: string; title: string; slug: string } | null = null;
+    if (dto.venueId) {
+      venue = await this.prisma.venue.findUnique({
+        where: { id: dto.venueId },
+        select: { id: true, title: true, slug: true },
+      });
+      if (!venue) throw new NotFoundException('Место не найдено');
+    }
+
+    // Проверить дубликат (один email — один отзыв на событие/место)
+    const existing = await this.prisma.review.findFirst({
       where: {
-        authorEmail_eventId: {
-          authorEmail: dto.authorEmail.toLowerCase().trim(),
-          eventId: dto.eventId,
-        },
+        authorEmail: dto.authorEmail.toLowerCase().trim(),
+        eventId: dto.eventId || null,
+        venueId: dto.venueId || null,
       },
     });
     if (existing) {
-      throw new ConflictException('Вы уже оставляли отзыв на это событие');
+      throw new ConflictException(
+        dto.venueId ? 'Вы уже оставляли отзыв на это место' : 'Вы уже оставляли отзыв на это событие',
+      );
     }
 
     // Определить верификацию и начальный статус
@@ -116,7 +117,7 @@ export class ReviewService {
     let skipEmailVerify = false;
 
     // Верификация через voucher
-    if (dto.voucherCode) {
+    if (dto.voucherCode && dto.eventId) {
       const voucher = await this.prisma.voucher.findUnique({
         where: { shortCode: dto.voucherCode },
         include: {
@@ -137,7 +138,7 @@ export class ReviewService {
     }
 
     // Верификация через ReviewRequest token (post-purchase)
-    if (dto.reviewRequestToken) {
+    if (dto.reviewRequestToken && dto.eventId) {
       const request = await this.prisma.reviewRequest.findUnique({
         where: { token: dto.reviewRequestToken },
       });
@@ -153,7 +154,8 @@ export class ReviewService {
 
     const review = await this.prisma.review.create({
       data: {
-        eventId: dto.eventId,
+        eventId: dto.eventId || null,
+        venueId: dto.venueId || null,
         rating: dto.rating,
         title: dto.title?.trim() || null,
         text: dto.text.trim(),
@@ -167,13 +169,15 @@ export class ReviewService {
     });
 
     // Отправить email-верификацию или уведомить админа
+    const entityTitle = event?.title || venue?.title || 'Событие';
+
     if (!skipEmailVerify) {
       const verifyUrl = `${this.appUrl}/api/v1/reviews/verify?token=${verifyToken}`;
       await this.emailQueue.add('review-verify', {
         type: 'review-verify',
         to: dto.authorEmail.toLowerCase().trim(),
         authorName: dto.authorName.trim(),
-        eventTitle: event.title,
+        eventTitle: entityTitle,
         verifyUrl,
       });
     } else {
@@ -181,7 +185,7 @@ export class ReviewService {
       await this.emailQueue.add('admin-new-review', {
         type: 'admin-new-review',
         authorName: dto.authorName.trim(),
-        eventTitle: event.title,
+        eventTitle: entityTitle,
         rating: dto.rating,
         text: dto.text.trim(),
       });
@@ -427,6 +431,53 @@ export class ReviewService {
   }
 
   /**
+   * Получить одобренные отзывы для места (venue).
+   */
+  async getByVenueSlug(slug: string, page = 1, limit = 10) {
+    const venue = await this.prisma.venue.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    if (!venue) throw new NotFoundException('Место не найдено');
+
+    const where: Prisma.ReviewWhereInput = {
+      venueId: venue.id,
+      status: 'APPROVED',
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where,
+        orderBy: [{ isVerified: 'desc' }, { helpfulCount: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          rating: true,
+          title: true,
+          text: true,
+          authorName: true,
+          isVerified: true,
+          helpfulCount: true,
+          createdAt: true,
+          photos: {
+            select: { id: true, url: true, thumbUrl: true },
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      }),
+      this.prisma.review.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
    * Рейтинг-сводка для события: средний балл + разбивка по звёздам.
    */
   async getEventRatingSummary(eventId: string) {
@@ -527,6 +578,48 @@ export class ReviewService {
     return { rating: finalRating, reviewCount: finalCount };
   }
 
+  /**
+   * Пересчитать Venue.rating и Venue.reviewCount на основе прямых отзывов (venueId).
+   */
+  async recalculateVenueRating(venueId: string) {
+    const reviews = await this.prisma.review.findMany({
+      where: { venueId, status: 'APPROVED' },
+      select: { rating: true },
+    });
+
+    // Также учитываем отзывы через привязанные events
+    const eventReviews = await this.prisma.review.findMany({
+      where: {
+        event: { venueId },
+        status: 'APPROVED',
+        venueId: null, // Не считать дважды прямые venue-отзывы
+      },
+      select: { rating: true },
+    });
+
+    const allReviews = [...reviews, ...eventReviews];
+
+    if (allReviews.length === 0) {
+      await this.prisma.venue.update({
+        where: { id: venueId },
+        data: { rating: 0, reviewCount: 0 },
+      });
+      return;
+    }
+
+    const sum = allReviews.reduce((acc, r) => acc + r.rating, 0);
+    const avgRating = Math.round((sum / allReviews.length) * 10) / 10;
+
+    await this.prisma.venue.update({
+      where: { id: venueId },
+      data: { rating: avgRating, reviewCount: allReviews.length },
+    });
+
+    this.logger.log(
+      `Venue ${venueId}: rating=${avgRating}, reviewCount=${allReviews.length} (direct=${reviews.length}, event=${eventReviews.length})`,
+    );
+  }
+
   // ========================
   // Admin
   // ========================
@@ -534,11 +627,12 @@ export class ReviewService {
   /**
    * Список отзывов для админки.
    */
-  async adminList(filters: { status?: string; eventId?: string; page?: number; limit?: number }) {
-    const { status, eventId, page = 1, limit = 20 } = filters;
+  async adminList(filters: { status?: string; eventId?: string; venueId?: string; page?: number; limit?: number }) {
+    const { status, eventId, venueId, page = 1, limit = 20 } = filters;
     const where: Prisma.ReviewWhereInput = {};
-    if (status) where.status = status as any;
+    if (status) where.status = status as ReviewStatus;
     if (eventId) where.eventId = eventId;
+    if (venueId) where.venueId = venueId;
 
     const [items, total] = await Promise.all([
       this.prisma.review.findMany({
@@ -548,6 +642,7 @@ export class ReviewService {
         take: limit,
         include: {
           event: { select: { id: true, title: true, slug: true } },
+          venue: { select: { id: true, title: true, slug: true } },
           photos: {
             select: { id: true, url: true, thumbUrl: true },
             orderBy: { sortOrder: 'asc' },
@@ -569,7 +664,10 @@ export class ReviewService {
   async adminModerate(reviewId: string, action: 'approve' | 'reject', adminComment?: string) {
     const review = await this.prisma.review.findUnique({
       where: { id: reviewId },
-      include: { event: { select: { title: true, slug: true } } },
+      include: {
+        event: { select: { title: true, slug: true } },
+        venue: { select: { title: true, slug: true } },
+      },
     });
     if (!review) throw new NotFoundException('Отзыв не найден');
 
@@ -585,15 +683,22 @@ export class ReviewService {
       await this.recalculateEventRating(review.eventId);
     }
 
+    // Пересчитать рейтинг места
+    if (review.venueId) {
+      await this.recalculateVenueRating(review.venueId);
+    }
+
     // Уведомить автора об одобрении
     if (action === 'approve' && review.authorEmail) {
-      const eventUrl = `${this.appUrl}/events/${review.event?.slug || ''}`;
+      const entitySlug = review.event?.slug || review.venue?.slug || '';
+      const entityPath = review.venueId ? 'venues' : 'events';
+      const entityUrl = `${this.appUrl}/${entityPath}/${entitySlug}`;
       await this.emailQueue.add('review-approved', {
         type: 'review-approved',
         to: review.authorEmail,
         authorName: review.authorName,
-        eventTitle: review.event?.title || 'Событие',
-        eventUrl,
+        eventTitle: review.event?.title || review.venue?.title || 'Событие',
+        eventUrl: entityUrl,
       });
     }
 
@@ -620,6 +725,11 @@ export class ReviewService {
     // Пересчитать рейтинг события
     if (review.eventId) {
       await this.recalculateEventRating(review.eventId);
+    }
+
+    // Пересчитать рейтинг места
+    if (review.venueId) {
+      await this.recalculateVenueRating(review.venueId);
     }
 
     return { message: 'Отзыв удалён' };

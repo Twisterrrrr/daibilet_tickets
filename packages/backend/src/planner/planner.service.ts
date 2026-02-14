@@ -184,9 +184,9 @@ export class PlannerService {
 
     const slot = day.slots[body.slotIndex];
     const session = event.sessions[0];
-    const prices = (session.prices as any[]) || [];
-    const adultPrice = prices.find((p: any) => p.type === 'adult')?.price || 0;
-    const childPrice = prices.find((p: any) => p.type === 'child')?.price || adultPrice;
+    const prices = (session.prices as Array<{ type: string; price?: number }>) || [];
+    const adultPrice = prices.find((p) => p.type === 'adult')?.price || 0;
+    const childPrice = prices.find((p) => p.type === 'child')?.price || adultPrice;
 
     // Пересчитать
     const adultTotal = adultPrice * (slot.tickets?.adult?.count || 1);

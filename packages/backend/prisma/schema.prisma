@@ -48,6 +48,9 @@ enum EventSubcategory {
   GALLERY        // Галерея
   PALACE         // Дворец / Усадьба
   PARK           // Парк / Заповедник
+  ART_SPACE      // Арт-пространство
+  SCULPTURE      // Скульптура
+  CONTEMPORARY   // Современное искусство
   // EVENT
   CONCERT        // Концерт
   SHOW           // Шоу / Представление
@@ -103,11 +106,39 @@ enum AdminRole {
   VIEWER
 }
 
+enum SupplierRole {
+  OWNER             // Полный доступ + настройки
+  MANAGER           // Управление событиями/заявками
+}
+
+enum ModerationStatus {
+  DRAFT             // Черновик (поставщик ещё не отправил)
+  PENDING_REVIEW    // Ожидает модерации (trust level 0)
+  APPROVED          // Одобрено админом
+  REJECTED          // Отклонено (с причиной)
+  AUTO_APPROVED     // Автоодобрено (trust level 1-2)
+}
+
 enum LocationType {
   PIER          // Причал
   VENUE         // Площадка
   MEETING_POINT // Точка встречи
   OTHER
+}
+
+enum VenueType {
+  MUSEUM           // Музей
+  GALLERY          // Галерея
+  ART_SPACE        // Арт-пространство
+  EXHIBITION_HALL  // Выставочный зал
+  THEATER          // Театр
+  PALACE           // Дворец / Усадьба
+  PARK             // Парк / Заповедник
+}
+
+enum DateMode {
+  SCHEDULED   // Обычные события с сеансами
+  OPEN_DATE   // Билет с открытой датой (музеи)
 }
 
 // --- Мульти-офферная архитектура ---
@@ -127,10 +158,9 @@ enum OfferStatus {
 }
 
 enum PurchaseType {
-  TC_WIDGET       // Ticketscloud popup widget
+  WIDGET          // Встроенный виджет покупки (Ticketscloud и др.)
   REDIRECT        // Внешний URL (teplohod.info и т.п.)
-  API_CHECKOUT    // Внутренний API checkout
-  REQUEST_ONLY    // Заявка на подтверждение (без прямой оплаты)
+  REQUEST         // Заявка на подтверждение (без прямой оплаты)
 }
 
 enum ReviewStatus {
@@ -201,13 +231,51 @@ model City {
   updatedAt       DateTime @updatedAt
 
   events       Event[]
+  venues       Venue[]
   packages     Package[]
   articles     Article[]
   landingPages LandingPage[]
   comboPages   ComboPage[]
+  collections  Collection[]
   locations    Location[]
 
+  // Регионы: город может быть хабом региона и/или входить в регион
+  hubForRegions  Region[]     @relation("RegionHub")
+  regionLinks    RegionCity[]
+
   @@map("cities")
+}
+
+// ========================
+// Регионы (группировка городов по области/зоне транспортной доступности)
+// ========================
+
+model Region {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique
+  name        String                // "Татарстан", "Ленинградская область"
+  description String?  @db.Text     // SEO-текст для /regions/[slug]
+  heroImage   String?
+  hubCityId   String   @db.Uuid     // Главный город (Казань, СПб, Москва)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  hubCity     City     @relation("RegionHub", fields: [hubCityId], references: [id])
+  cities      RegionCity[]
+
+  @@map("regions")
+}
+
+model RegionCity {
+  regionId String @db.Uuid
+  cityId   String @db.Uuid
+
+  region   Region @relation(fields: [regionId], references: [id])
+  city     City   @relation(fields: [cityId], references: [id])
+
+  @@id([regionId, cityId])
+  @@map("region_cities")
 }
 
 // ========================
@@ -245,8 +313,24 @@ model Event {
   isActive         Boolean       @default(true)
   tcData           Json?         // оригинальные данные из TC
   lastSyncAt       DateTime?
+  // === Soft-delete (финансовая безопасность) ===
+  isDeleted        Boolean       @default(false)
+  deletedAt        DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+
+  // === Supplier / Moderation ===
+  supplierId          String?          @db.Uuid      // Ссылка на оператора-поставщика
+  moderationStatus    ModerationStatus @default(APPROVED)
+  moderationNote      String?
+  moderatedAt         DateTime?
+  moderatedBy         String?          @db.Uuid
+
+  // === Venue / DateMode (Музеи и Арт) ===
+  venueId          String?       @db.Uuid
+  dateMode         DateMode      @default(SCHEDULED)
+  isPermanent      Boolean       @default(false)   // Постоянная экспозиция
+  endDate          DateTime?                        // Дата окончания для временных выставок
 
   // Дедупликация: если canonicalOfId задан — это дубль, скрывается из каталога
   canonicalOfId    String?       @db.Uuid
@@ -260,6 +344,7 @@ model Event {
   routeId          String?       @db.Uuid
 
   city          City            @relation(fields: [cityId], references: [id])
+  venue         Venue?          @relation("VenueEvents", fields: [venueId], references: [id])
   startLocation Location?       @relation("EventStartLocation", fields: [startLocationId], references: [id])
   endLocation   Location?       @relation("EventEndLocation", fields: [endLocationId], references: [id])
   operator      Operator?       @relation(fields: [operatorId], references: [id])
@@ -273,11 +358,14 @@ model Event {
   reviews          Review[]
   externalReviews  ExternalReview[]
   reviewRequests   ReviewRequest[]
+  orderRequests    OrderRequest[]
 
   @@index([cityId, category])
   @@index([slug])
   @@index([tcMetaEventId])
   @@index([canonicalOfId])
+  @@index([venueId])
+  @@index([operatorId])
   @@map("events")
 }
 
@@ -294,7 +382,7 @@ model EventSession {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Restrict)
   offer        EventOffer?   @relation(fields: [offerId], references: [id], onDelete: SetNull)
   packageItems PackageItem[]
 
@@ -324,19 +412,36 @@ model EventOffer {
   availabilityMode  String?      // "UNKNOWN" | "LIMITED" | "SOLD_OUT" | "BY_API"
   badge             String?      // "optimal" | "cheapest" | "fastest" | custom
   operatorId        String?      @db.Uuid
+  // --- WIDGET contract ---
+  widgetProvider    String?      // Провайдер виджета: "TC" | "RADARIO" | custom (может совпадать с source)
+  widgetPayload     Json?        // JSON-конфиг для виджета: { tokenKey, eventId, metaEventId, ... }
+  // ---
   externalData      Json?        // Оригинальные данные из источника
+  venueId           String?      @db.Uuid  // Прямой оффер к venue (билет в Эрмитаж)
+  // --- Операционная информация (видна клиенту ПОСЛЕ подтверждения) ---
+  meetingPoint         String?              // Адрес/описание точки сбора
+  meetingInstructions  String?   @db.Text   // Как добраться, где вход, ориентиры
+  operationalPhone     String?              // Контактный телефон на месте (НЕ офис поставщика)
+  operationalNote      String?   @db.Text   // Доп. инструкции (что взять с собой, дресс-код...)
+  // ---
   lastSyncAt        DateTime?
+  // === Soft-delete (нельзя удалять если есть OrderRequests/FulfillmentItems) ===
+  isDeleted         Boolean      @default(false)
+  deletedAt         DateTime?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  event    Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  sessions EventSession[]
-  operator Operator?      @relation(fields: [operatorId], references: [id])
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  venue         Venue?         @relation("VenueOffers", fields: [venueId], references: [id])
+  sessions      EventSession[]
+  operator      Operator?      @relation(fields: [operatorId], references: [id])
+  orderRequests OrderRequest[]
 
   @@unique([source, externalEventId])
   @@index([eventId])
   @@index([status])
   @@index([operatorId])
+  @@index([venueId])
   @@map("event_offers")
 }
 
@@ -362,7 +467,7 @@ model EventOverride {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Restrict)
 
   @@map("event_overrides")
 }
@@ -437,6 +542,7 @@ model Package {
 
   @@index([email])
   @@index([status])
+  @@index([cityId])
   @@map("packages")
 }
 
@@ -607,6 +713,54 @@ model LandingPage {
 }
 
 // ========================
+// Подборки (тематические посадочные страницы)
+// ========================
+
+model Collection {
+  id                String    @id @default(uuid()) @db.Uuid
+  slug              String    @unique
+  cityId            String?   @db.Uuid             // null = кросс-городская
+
+  // --- Фильтры (динамические события) ---
+  filterTags        String[]                        // slug тегов (OR-логика)
+  filterCategory    String?                         // EventCategory enum value
+  filterSubcategory String?                         // EventSubcategory enum value
+  filterAudience    String?                         // EventAudience enum value
+  additionalFilters Json?                           // {maxDuration?, dateMode?, etc.}
+
+  // --- Ручная курация ---
+  pinnedEventIds    String[]  @db.Uuid              // всегда показывать первыми
+  excludedEventIds  String[]  @db.Uuid              // никогда не показывать
+
+  // --- Контент ---
+  title             String                          // H1
+  subtitle          String?
+  heroImage         String?
+  description       String?   @db.Text              // SEO-текст (markdown)
+  infoBlocks        Json?                           // [{title, text}]
+  faq               Json?                           // [{question, answer}]
+
+  // --- SEO ---
+  metaTitle         String?
+  metaDescription   String?   @db.Text
+
+  // --- Состояние ---
+  isActive          Boolean   @default(true)
+  isDeleted         Boolean   @default(false)
+  deletedAt         DateTime?
+  sortOrder         Int       @default(0)
+  version           Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  city              City?     @relation(fields: [cityId], references: [id])
+
+  @@index([cityId])
+  @@index([isActive, isDeleted])
+  @@map("collections")
+}
+
+// ========================
 // Pricing Config (singleton)
 // ========================
 
@@ -661,6 +815,62 @@ model OpsStatus {
 }
 
 // ========================
+// Venues (музеи, галереи, арт-пространства)
+// ========================
+
+model Venue {
+  id               String     @id @default(uuid()) @db.Uuid
+  cityId           String     @db.Uuid
+  slug             String     @unique
+  title            String                          // "Государственный Эрмитаж"
+  shortTitle       String?                         // "Эрмитаж"
+  venueType        VenueType
+  description      String?    @db.Text             // Markdown/HTML
+  shortDescription String?
+  imageUrl         String?
+  galleryUrls      String[]   @default([])         // фото залов/экспозиций
+  address          String?
+  lat              Float?
+  lng              Float?
+  metro            String?                         // "Адмиралтейская"
+  district         String?
+  phone            String?
+  email            String?
+  website          String?
+  openingHours     Json?                           // {"mon":"10:00-18:00","tue":"10:00-21:00",...,"wed":null}
+  priceFrom        Int?                            // мин. цена (копейки)
+  rating           Decimal    @default(0) @db.Decimal(2, 1)
+  reviewCount      Int        @default(0)
+  externalRating   Decimal?   @db.Decimal(2, 1)
+  externalSource   String?
+  operatorId       String?    @db.Uuid             // партнер-музей
+  isActive         Boolean    @default(true)
+  isFeatured       Boolean    @default(false)      // для главной
+  isDeleted        Boolean    @default(false)
+  deletedAt        DateTime?
+  highlights       Json?                           // ["3 млн экспонатов","В центре города","Детям бесплатно"]
+  faq              Json?                           // [{q:"Можно ли вернуть билет?",a:"Да, до начала визита"}]
+  features         String[]   @default([])         // ["no_queue","audio_guide","kids_friendly","wheelchair"]
+  commissionRate   Decimal?   @db.Decimal(4, 2)    // индивидуальная комиссия для музея (%)
+  metaTitle        String?
+  metaDescription  String?    @db.Text
+  version          Int        @default(0)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  city      City         @relation(fields: [cityId], references: [id])
+  operator  Operator?    @relation("VenueOperator", fields: [operatorId], references: [id])
+  events    Event[]      @relation("VenueEvents")
+  offers    EventOffer[] @relation("VenueOffers")
+  reviews   Review[]
+
+  @@index([cityId])
+  @@index([venueType])
+  @@index([slug])
+  @@map("venues")
+}
+
+// ========================
 // Локации (причалы, площадки, точки встречи)
 // ========================
 
@@ -701,11 +911,80 @@ model Operator {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events  Event[]
-  reviews Review[]
-  offers  EventOffer[]
+  // === Supplier Portal ===
+  isSupplier        Boolean   @default(false)
+  trustLevel        Int       @default(0)           // 0=модерация, 1=авто+постмод, 2=доверенный
+  commissionRate    Decimal   @default(0.25) @db.Decimal(5, 4)  // Базовая комиссия (25%, включает комиссию YooKassa ~3%)
+  promoRate         Decimal?  @db.Decimal(5, 4)     // Промо-комиссия (7%)
+  promoUntil        DateTime?                        // Окончание промо
+  yookassaAccountId String?                          // Sub-merchant ID в YooKassa
+  companyName       String?
+  inn               String?
+  contactEmail      String?
+  contactPhone      String?
+  verifiedAt        DateTime?
+  successfulSales   Int       @default(0)
+  refundRate        Decimal   @default(0) @db.Decimal(5, 4)
+
+  // === Partner B2B API ===
+  webhookUrl        String?                          // URL для отправки webhook-уведомлений
+  webhookSecret     String?                          // HMAC-секрет для подписи payload
+
+  events        Event[]
+  venues        Venue[]       @relation("VenueOperator")
+  reviews       Review[]
+  offers        EventOffer[]
+  supplierUsers SupplierUser[]
+  apiKeys       ApiKey[]
 
   @@map("operators")
+}
+
+// ========================
+// API-ключи (Partner B2B)
+// ========================
+
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  operatorId  String    @db.Uuid
+  keyHash     String    @unique              // SHA-256 хеш ключа
+  prefix      String                         // Первые 8 символов (dbl_xxxx)
+  name        String    @default("default")
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  rateLimit   Int       @default(100)        // запросов/минуту
+  ipWhitelist String[]                       // разрешённые IP (пустой = все)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  operator    Operator  @relation(fields: [operatorId], references: [id])
+
+  @@index([operatorId])
+  @@map("api_keys")
+}
+
+// ========================
+// Поставщики (авторизация)
+// ========================
+
+model SupplierUser {
+  id               String       @id @default(uuid()) @db.Uuid
+  operatorId       String       @db.Uuid
+  email            String       @unique
+  passwordHash     String
+  name             String
+  role             SupplierRole @default(MANAGER)
+  isActive         Boolean      @default(true)
+  refreshTokenHash String?
+  lastLoginAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  operator         Operator     @relation(fields: [operatorId], references: [id])
+
+  @@index([operatorId])
+  @@map("supplier_users")
 }
 
 // ========================
@@ -736,6 +1015,7 @@ model Review {
   id           String       @id @default(uuid()) @db.Uuid
   eventId      String?      @db.Uuid  // Отзыв на конкретное событие
   operatorId   String?      @db.Uuid  // Отзыв на оператора (будущее)
+  venueId      String?      @db.Uuid  // Отзыв на место (музей, галерея)
   rating       Int                    // 1-5
   title        String?               // Заголовок отзыва (опционально)
   text         String       @db.Text
@@ -750,14 +1030,16 @@ model Review {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  event    Event?        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event    Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
   operator Operator?     @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  venue    Venue?        @relation(fields: [venueId], references: [id], onDelete: SetNull)
   photos   ReviewPhoto[]
   votes    ReviewVote[]
 
-  @@unique([authorEmail, eventId])  // Один отзыв на событие от одного email
+  @@unique([authorEmail, eventId, venueId])
   @@index([eventId, status])
   @@index([operatorId, status])
+  @@index([venueId, status])
   @@index([status])
   @@map("reviews")
 }
@@ -816,7 +1098,7 @@ model ExternalReview {
   publishedAt DateTime?             // Дата оригинального отзыва
   createdAt   DateTime  @default(now())
 
-  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@index([eventId, source])
   @@index([operatorId])
@@ -866,12 +1148,14 @@ model CheckoutSession {
   shortCode         String         @unique                       // "CS-XXXX" для UI
   cartSnapshot      Json                                         // Снимок корзины из localStorage
   validatedSnapshot Json?                                        // Результат validate (актуальные цены/наличие)
+  offersSnapshot    Json?                                        // Immutable: данные офферов на момент оформления (title, price, type, deeplink, widgetPayload)
   customerName      String?
   customerEmail     String?
   customerPhone     String?
   status            CheckoutStatus @default(STARTED)
   totalPrice        Int?                                         // Итого в копейках
   expiresAt         DateTime?                                    // TTL для soft-reserve
+  completedAt       DateTime?                                    // Когда сессия завершена (для аналитики)
   utmSource         String?
   utmMedium         String?
   utmCampaign       String?
@@ -881,6 +1165,8 @@ model CheckoutSession {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   orderRequests     OrderRequest[]
+  paymentIntents    PaymentIntent[]
+  fulfillmentItems  FulfillmentItem[]
 
   @@index([status])
   @@index([customerEmail])
@@ -900,16 +1186,225 @@ model OrderRequest {
   customerPhone     String?
   customerComment   String?
   status            String    @default("PENDING") // PENDING | CONFIRMED | REJECTED | EXPIRED
+  slaMinutes        Int       @default(30)        // SLA: ожидаемое время реакции оператора (мин)
+  expireReason      String?                       // "SLA" | "TTL" | "CART" — причина истечения
   adminNote         String?
   confirmedAt       DateTime?
-  expiresAt         DateTime?
+  expiresAt         DateTime?                     // TTL: явная дата/время истечения заявки
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   checkoutSession   CheckoutSession? @relation(fields: [checkoutSessionId], references: [id])
+  event             Event            @relation(fields: [eventId], references: [id])
+  eventOffer        EventOffer       @relation(fields: [eventOfferId], references: [id])
 
   @@index([checkoutSessionId])
   @@index([status])
   @@index([eventId])
+  @@index([status, expiresAt])             // Для cron-выборки PENDING + expiresAt < now
   @@map("order_requests")
+}
+
+// ========================
+// Payments (YooKassa-ready)
+// ========================
+
+enum PaymentStatus {
+  PENDING           // Ожидает инициации / оплаты
+  PROCESSING        // В обработке (redirect / waiting)
+  PAID              // Оплачено
+  FAILED            // Ошибка оплаты
+  CANCELLED         // Отменён пользователем
+  REFUNDED          // Возврат
+}
+
+model PaymentIntent {
+  id                  String          @id @default(uuid()) @db.Uuid
+  checkoutSessionId   String          @db.Uuid
+  idempotencyKey      String          @unique
+  amount              Int                                  // Сумма в копейках
+  currency            String          @default("RUB")
+  status              PaymentStatus   @default(PENDING)
+  provider            String          @default("STUB")
+  providerPaymentId   String?
+  providerData        Json?
+  paymentUrl          String?
+  paidAt              DateTime?
+  failedAt            DateTime?
+  failReason          String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  // === Split Payment (маркетплейс) ===
+  supplierId          String?         @db.Uuid
+  grossAmount         Int?                                 // Полная сумма от клиента (копейки)
+  platformFee         Int?                                 // Комиссия платформы (копейки)
+  supplierAmount      Int?                                 // Сумма поставщику (копейки)
+  commissionRate      Decimal?        @db.Decimal(5, 4)    // Ставка на момент транзакции
+  splitPaymentId      String?                              // ID split-платежа YooKassa
+
+  checkoutSession     CheckoutSession @relation(fields: [checkoutSessionId], references: [id])
+
+  @@index([checkoutSessionId])
+  @@index([status])
+  @@index([provider, providerPaymentId])
+  @@index([supplierId])
+  @@map("payment_intents")
+}
+
+// ========================
+// Fulfillment (per-line-item execution)
+// ========================
+
+enum PurchaseFlow {
+  PLATFORM   // Оплата через нашу платформу (YooKassa)
+  EXTERNAL   // Оплата у внешнего провайдера (TC widget, redirect)
+}
+
+enum FulfillmentStatus {
+  PENDING       // Ожидает исполнения
+  RESERVING     // В процессе резервирования
+  RESERVED      // Зарезервировано у провайдера
+  CONFIRMED     // Подтверждено провайдером
+  FAILED        // Ошибка (исчерпаны ретраи)
+  CANCELLED     // Отменено
+  REFUNDED      // Возврат выполнен
+}
+
+model FulfillmentItem {
+  id                  String            @id @default(uuid()) @db.Uuid
+  checkoutSessionId   String            @db.Uuid
+  lineItemIndex       Int                                    // Индекс позиции в offersSnapshot
+  offerId             String            @db.Uuid
+  purchaseFlow        PurchaseFlow                           // PLATFORM | EXTERNAL
+  provider            String            @default("INTERNAL") // TC | TEP | INTERNAL | PARTNER
+  status              FulfillmentStatus @default(PENDING)
+  externalOrderId     String?                                // ID заказа у провайдера (TC order id, etc.)
+  externalPaymentUrl  String?                                // Ссылка на оплату у провайдера
+  providerData        Json?                                  // Данные от провайдера
+  amount              Int                                    // Сумма позиции в копейках
+  refundedAmount      Int               @default(0)          // Возвращённая сумма в копейках
+  refundId            String?                                // ID рефанда (YooKassa)
+  attemptCount        Int               @default(0)          // Количество попыток
+  nextRetryAt         DateTime?                              // Следующая попытка
+  lastError           String?                                // Последняя ошибка
+  escalatedAt         DateTime?                              // Когда эскалировано админу
+  resolvedBy          String?           @db.Uuid             // ID админа, вмешавшегося вручную
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  checkoutSession     CheckoutSession   @relation(fields: [checkoutSessionId], references: [id])
+
+  @@index([checkoutSessionId])
+  @@index([status])
+  @@index([status, nextRetryAt])           // Для cron retry
+  @@index([status, escalatedAt])           // Для cron auto-compensate
+  @@map("fulfillment_items")
+}
+
+// ========================
+// Webhook Idempotency
+// ========================
+
+model ProcessedWebhookEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  providerEventId String   @unique                          // Ключ идемпотентности (payment.id от YK, etc.)
+  provider        String                                    // YOOKASSA | TC | PARTNER
+  eventType       String                                    // payment.succeeded, payment.canceled, etc.
+  payload         Json                                      // Полный payload для аудита
+  result          String?                                   // PAID | FAILED | IGNORED | etc.
+  processedAt     DateTime @default(now())
+
+  @@index([provider, eventType])
+  @@map("processed_webhook_events")
+}
+
+// ========================
+// Feature Flags
+// ========================
+
+model FeatureFlag {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String                                        // e.g. "disable_external_offers"
+  scope       String   @default("global")                   // global | city | category
+  scopeValue  String?                                       // cityId / category slug (null для global)
+  enabled     Boolean  @default(false)
+  metadata    Json?                                         // Дополнительные параметры
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([key, scope, scopeValue])
+  @@index([key, scope])
+  @@map("feature_flags")
+}
+
+// ════════════════════════════════════════════
+// SUPPORT TICKETS
+// ════════════════════════════════════════════
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum TicketCategory {
+  ORDER
+  REFUND
+  VENUE
+  TECHNICAL
+  OTHER
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model SupportTicket {
+  id              String          @id @default(uuid()) @db.Uuid
+  shortCode       String          @unique                        // ST-XXXX
+  name            String
+  email           String
+  phone           String?
+  category        TicketCategory  @default(OTHER)
+  priority        TicketPriority  @default(MEDIUM)
+  status          TicketStatus    @default(OPEN)
+  subject         String                                         // Краткое описание
+  message         String          @db.Text                       // Первое сообщение
+  orderCode       String?                                        // Связь с заказом (CS-XXXX)
+  assignedTo      String?         @db.Uuid                       // ID администратора
+  resolvedAt      DateTime?
+  slaDeadline     DateTime?                                      // Дедлайн SLA ответа
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  responses       TicketResponse[]
+
+  @@index([status])
+  @@index([email])
+  @@index([orderCode])
+  @@index([category, status])
+  @@index([assignedTo])
+  @@map("support_tickets")
+}
+
+model TicketResponse {
+  id              String          @id @default(uuid()) @db.Uuid
+  ticketId        String          @db.Uuid
+  authorType      String          @default("admin")              // admin | system | customer
+  authorName      String?
+  message         String          @db.Text
+  isInternal      Boolean         @default(false)                // Внутренняя заметка (не видна клиенту)
+  createdAt       DateTime        @default(now())
+
+  ticket          SupportTicket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("ticket_responses")
 }

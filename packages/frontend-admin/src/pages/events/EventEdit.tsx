@@ -43,7 +43,7 @@ type EventSubcategory = string;
 
 const CATEGORY_OPTIONS = [
   { value: 'EXCURSION', label: 'Экскурсии' },
-  { value: 'MUSEUM', label: 'Музеи' },
+  { value: 'MUSEUM', label: 'Музеи и Арт' },
   { value: 'EVENT', label: 'Мероприятия' },
 ];
 
@@ -56,6 +56,8 @@ const SUBCATEGORY_OPTIONS: Record<string, { value: string; label: string }[]> = 
   MUSEUM: [
     { value: 'MUSEUM_CLASSIC', label: 'Музей' }, { value: 'EXHIBITION', label: 'Выставка' },
     { value: 'GALLERY', label: 'Галерея' }, { value: 'PALACE', label: 'Дворец' }, { value: 'PARK', label: 'Парк' },
+    { value: 'ART_SPACE', label: 'Арт-пространство' }, { value: 'SCULPTURE', label: 'Скульптура' },
+    { value: 'CONTEMPORARY', label: 'Совр. искусство' },
   ],
   EVENT: [
     { value: 'CONCERT', label: 'Концерт' }, { value: 'SHOW', label: 'Шоу' },
@@ -98,10 +100,9 @@ interface OperatorOption {
 }
 
 const PURCHASE_TYPE_LABELS: Record<string, string> = {
-  TC_WIDGET: 'TC Widget',
+  WIDGET: 'Виджет (TC и др.)',
   REDIRECT: 'Внешняя ссылка',
-  API_CHECKOUT: 'API Checkout',
-  REQUEST_ONLY: 'Заявка',
+  REQUEST: 'Заявка',
 };
 
 const AVAILABILITY_LABELS: Record<string, string> = {
@@ -131,6 +132,13 @@ interface EventOverride {
   manualRating?: number | null;
 }
 
+interface VenueOption {
+  id: string;
+  title: string;
+  slug: string;
+  venueType: string;
+}
+
 interface EventDetail {
   id: string;
   title: string;
@@ -148,6 +156,10 @@ interface EventDetail {
   description: string | null;
   shortDescription: string | null;
   minAge: number | null;
+  venueId: string | null;
+  dateMode: string;
+  isPermanent: boolean;
+  endDate: string | null;
   sessions?: Session[];
   tags?: { tag: { id: string; name: string } }[];
   offers?: EventOffer[];
@@ -187,7 +199,26 @@ export function EventEditPage() {
     minAge?: number | null;
     description?: string;
     shortDescription?: string;
+    venueId?: string | null;
+    dateMode?: string;
+    isPermanent?: boolean;
+    endDate?: string | null;
   }>({});
+
+  // Venues list for museum linking
+  const [venues, setVenues] = useState<VenueOption[]>([]);
+
+  // Load venues for MUSEUM category linking
+  useEffect(() => {
+    adminApi
+      .get<{ items: VenueOption[] } | VenueOption[]>('/admin/venues')
+      .then((res: any) => {
+        if (Array.isArray(res)) setVenues(res);
+        else if (res?.items) setVenues(res.items);
+        else setVenues([]);
+      })
+      .catch(() => setVenues([]));
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -208,24 +239,52 @@ export function EventEditPage() {
           minAge: ov?.minAge ?? data.minAge,
           description: ov?.description ?? data.description ?? '',
           shortDescription: data.shortDescription ?? '',
+          venueId: data.venueId ?? null,
+          dateMode: data.dateMode ?? 'SCHEDULED',
+          isPermanent: data.isPermanent ?? false,
+          endDate: data.endDate ? data.endDate.slice(0, 10) : null,
         });
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!id) return;
     setSaving(true);
     setError(null);
-    adminApi
-      .patch(`/admin/events/${id}/override`, form)
-      .then((ov) => {
-        setEvent((prev) => (prev ? { ...prev, override: ov } : null));
-        toast.success('Override сохранён');
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка сохранения'))
-      .finally(() => setSaving(false));
+    try {
+      // Save override fields
+      const ov = await adminApi.patch(`/admin/events/${id}/override`, {
+        title: form.title,
+        category: form.category,
+        audience: form.audience,
+        subcategories: form.subcategories,
+        imageUrl: form.imageUrl,
+        manualRating: form.manualRating,
+        minAge: form.minAge,
+        description: form.description,
+        shortDescription: form.shortDescription,
+      });
+      setEvent((prev) => (prev ? { ...prev, override: ov } : null));
+
+      // Save venue-specific fields (direct on Event, not override)
+      if (form.category === 'MUSEUM' || form.venueId || form.dateMode === 'OPEN_DATE') {
+        const venueData = await adminApi.patch(`/admin/events/${id}/venue-settings`, {
+          venueId: form.venueId,
+          dateMode: form.dateMode || 'SCHEDULED',
+          isPermanent: form.isPermanent ?? false,
+          endDate: form.isPermanent ? null : (form.endDate || null),
+        });
+        setEvent((prev) => prev ? { ...prev, ...venueData } : null);
+      }
+
+      toast.success('Сохранено');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleResetOverride = () => {
@@ -430,6 +489,71 @@ export function EventEditPage() {
                     )}
                   </div>
                 </div>
+                {/* Venue & Date Mode — показываем для MUSEUM */}
+                {(form.category === 'MUSEUM') && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Место (Venue)</Label>
+                      <Select
+                        value={form.venueId || '__none__'}
+                        onValueChange={(v) => setForm((f) => ({ ...f, venueId: v === '__none__' ? null : v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Не привязано к месту" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Не привязано</SelectItem>
+                          {venues.map((v) => (
+                            <SelectItem key={v.id} value={v.id}>
+                              {v.title} ({v.venueType})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Режим даты</Label>
+                      <Select
+                        value={form.dateMode || 'SCHEDULED'}
+                        onValueChange={(v) => setForm((f) => ({ ...f, dateMode: v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SCHEDULED">По расписанию (сеансы)</SelectItem>
+                          <SelectItem value="OPEN_DATE">Открытая дата (без сеансов)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {form.dateMode === 'OPEN_DATE' && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="isPermanent"
+                            checked={form.isPermanent ?? false}
+                            onChange={(e) => setForm((f) => ({ ...f, isPermanent: e.target.checked }))}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <Label htmlFor="isPermanent" className="cursor-pointer">
+                            Постоянная экспозиция (без даты окончания)
+                          </Label>
+                        </div>
+                        {!form.isPermanent && (
+                          <div className="space-y-2">
+                            <Label>Дата окончания</Label>
+                            <Input
+                              type="date"
+                              value={form.endDate ?? ''}
+                              onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value || null }))}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
                 <div className="space-y-2">
                   <Label>URL изображения</Label>
                   <Input
@@ -665,11 +789,16 @@ interface OfferFormData {
   availabilityMode: string;
   badge: string;
   operatorId: string;
+  // Operational info
+  meetingPoint: string;
+  meetingInstructions: string;
+  operationalPhone: string;
+  operationalNote: string;
 }
 
 const EMPTY_OFFER_FORM: OfferFormData = {
   source: 'MANUAL',
-  purchaseType: 'REQUEST_ONLY',
+  purchaseType: 'REQUEST',
   externalEventId: '',
   metaEventId: '',
   deeplink: '',
@@ -681,6 +810,10 @@ const EMPTY_OFFER_FORM: OfferFormData = {
   availabilityMode: '',
   badge: '',
   operatorId: '',
+  meetingPoint: '',
+  meetingInstructions: '',
+  operationalPhone: '',
+  operationalNote: '',
 };
 
 function OffersSection({ eventId, offers: initialOffers }: { eventId: string; offers: EventOffer[] }) {
@@ -706,14 +839,14 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
         if (Array.isArray(res)) setOperators(res);
         else if (res?.items) setOperators(res.items);
       })
-      .catch(() => {});
+      .catch((e) => console.error('Load failed:', e));
   }, [eventId]);
 
   const refreshOffers = useCallback(async () => {
     try {
       const data = await adminApi.get<EventOffer[]>(`/admin/events/${eventId}/offers`);
       setOffers(data);
-    } catch { /* ignore */ }
+    } catch (e) { console.error('Load offers failed:', e); }
   }, [eventId]);
 
   const handleSetPrimary = async (offerId: string) => {
@@ -767,6 +900,10 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
       availabilityMode: offer.availabilityMode || '',
       badge: offer.badge || '',
       operatorId: offer.operatorId || '',
+      meetingPoint: (offer as any).meetingPoint || '',
+      meetingInstructions: (offer as any).meetingInstructions || '',
+      operationalPhone: (offer as any).operationalPhone || '',
+      operationalNote: (offer as any).operationalNote || '',
     });
     setDialogOpen(true);
   };
@@ -818,6 +955,11 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
         availabilityMode: formData.availabilityMode || undefined,
         badge: formData.badge || undefined,
         operatorId: formData.operatorId || undefined,
+        // Operational info
+        meetingPoint: formData.meetingPoint || null,
+        meetingInstructions: formData.meetingInstructions || null,
+        operationalPhone: formData.operationalPhone || null,
+        operationalNote: formData.operationalNote || null,
       };
 
       if (dialogMode === 'create') {
@@ -1000,17 +1142,16 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                 <Select value={formData.purchaseType} onValueChange={(v) => updateField('purchaseType', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="TC_WIDGET">TC Widget</SelectItem>
+                    <SelectItem value="WIDGET">Виджет (TC и др.)</SelectItem>
                     <SelectItem value="REDIRECT">Внешняя ссылка</SelectItem>
-                    <SelectItem value="API_CHECKOUT">API Checkout</SelectItem>
-                    <SelectItem value="REQUEST_ONLY">Заявка</SelectItem>
+                    <SelectItem value="REQUEST">Заявка</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             {/* URL / External IDs */}
-            {(formData.purchaseType === 'REDIRECT' || formData.purchaseType === 'REQUEST_ONLY') && (
+            {(formData.purchaseType === 'REDIRECT' || formData.purchaseType === 'REQUEST') && (
               <div className="space-y-2">
                 <Label>URL / Deep Link</Label>
                 <Input
@@ -1020,7 +1161,7 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                 />
               </div>
             )}
-            {(formData.purchaseType === 'TC_WIDGET' || formData.purchaseType === 'API_CHECKOUT') && (
+            {formData.purchaseType === 'WIDGET' && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>External Event ID</Label>
@@ -1143,6 +1284,53 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                 </Select>
               </div>
             )}
+
+            {/* Operational Info */}
+            <div className="border-t pt-4 mt-2 space-y-3">
+              <p className="text-sm font-semibold text-slate-700">Операционная информация</p>
+              <p className="text-xs text-slate-500">
+                Показывается клиенту только после подтверждения заказа (в email и трекинге).
+                НЕ указывайте офисные контакты поставщика — только данные для визита.
+              </p>
+              <div className="space-y-2">
+                <Label>Место встречи / адрес</Label>
+                <Input
+                  value={formData.meetingPoint}
+                  onChange={(e) => updateField('meetingPoint', e.target.value)}
+                  placeholder="Дворцовая площадь, у Александровской колонны"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Как добраться / инструкции</Label>
+                <textarea
+                  value={formData.meetingInstructions}
+                  onChange={(e) => updateField('meetingInstructions', e.target.value)}
+                  placeholder="Метро «Адмиралтейская», выход на Невский проспект, 10 мин пешком..."
+                  rows={2}
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Телефон на месте</Label>
+                  <Input
+                    value={formData.operationalPhone}
+                    onChange={(e) => updateField('operationalPhone', e.target.value)}
+                    placeholder="+7 (999) 123-45-67"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Доп. заметки для клиента</Label>
+                <textarea
+                  value={formData.operationalNote}
+                  onChange={(e) => updateField('operationalNote', e.target.value)}
+                  placeholder="Возьмите с собой паспорт. Дресс-код: закрытые плечи и колени..."
+                  rows={2}
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                />
+              </div>
+            </div>
 
             {/* Primary checkbox */}
             <div className="flex items-center gap-2">

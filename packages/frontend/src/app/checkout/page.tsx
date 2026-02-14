@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { CheckoutClient } from './CheckoutClient';
+import { CheckoutErrorBoundary } from '@/components/CheckoutErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'Оформление заказа — Дайбилет',
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function CheckoutPage() {
-  return <CheckoutClient />;
+  return (
+    <CheckoutErrorBoundary>
+      <CheckoutClient />
+    </CheckoutErrorBoundary>
+  );
 }

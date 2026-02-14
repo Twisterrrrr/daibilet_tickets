@@ -6,6 +6,27 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { EventOverrideService } from './event-override.service';
 import { ReviewService } from '../catalog/review.service';
+import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
+import { validateWidgetPayload, ensurePayloadVersion } from '@daibilet/shared';
+import {
+  OfferSource,
+  EventCategory,
+  EventSubcategory,
+  EventAudience,
+  PurchaseType,
+  OfferStatus,
+  DateMode,
+  Prisma,
+} from '@prisma/client';
+import {
+  CreateEventDto,
+  CreateEventOfferDto,
+  UpdateEventOfferDto,
+  PatchEventOfferDto,
+  OverrideEventDto,
+  VenueSettingsDto,
+  ExternalRatingDto,
+} from './dto/admin-event.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -17,6 +38,7 @@ export class AdminEventsController {
     private readonly prisma: PrismaService,
     private readonly overrideService: EventOverrideService,
     private readonly reviewService: ReviewService,
+    private readonly fuzzyDedupService: FuzzyDedupService,
   ) {}
 
   @Get()
@@ -71,39 +93,23 @@ export class AdminEventsController {
   }
 
   /**
+   * Fuzzy deduplication: find (and optionally merge) near-duplicate events.
+   * By default runs in dry-run mode (returns candidates only).
+   * Pass ?dryRun=false to actually merge duplicates.
+   */
+  @Post('deduplicate-fuzzy')
+  @Roles('ADMIN')
+  async deduplicateFuzzy(@Query('dryRun') dryRun?: string) {
+    const isDryRun = dryRun !== 'false';
+    return this.fuzzyDedupService.findDuplicates(isDryRun);
+  }
+
+  /**
    * Создать новое событие (ручное) + опционально первый оффер.
    */
   @Post()
   @Roles('ADMIN', 'EDITOR')
-  async createEvent(
-    @Body() data: {
-      title: string;
-      cityId: string;
-      category: string;
-      subcategories?: string[];
-      audience?: string;
-      description?: string;
-      shortDescription?: string;
-      imageUrl?: string;
-      galleryUrls?: string[];
-      durationMinutes?: number;
-      address?: string;
-      lat?: number;
-      lng?: number;
-      minAge?: number;
-      // First offer (optional)
-      offer?: {
-        source?: string;
-        purchaseType: string;
-        deeplink?: string;
-        priceFrom?: number;
-        commissionPercent?: number;
-        availabilityMode?: string;
-        badge?: string;
-        operatorId?: string;
-      };
-    },
-  ) {
+  async createEvent(@Body() data: CreateEventDto) {
     // Auto-generate slug from title via transliteration
     const slug = this.transliterate(data.title);
 
@@ -122,16 +128,16 @@ export class AdminEventsController {
       // Create event — generate a unique tcEventId for manual events
       const event = await tx.event.create({
         data: {
-          source: 'MANUAL' as any,
+          source: OfferSource.MANUAL,
           tcEventId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           cityId: data.cityId,
           title: data.title,
           slug,
           description: data.description || null,
           shortDescription: data.shortDescription || null,
-          category: data.category as any,
-          subcategories: data.subcategories || [],
-          audience: (data.audience as any) || 'ALL',
+          category: data.category as EventCategory,
+          subcategories: (data.subcategories || []) as EventSubcategory[],
+          audience: (data.audience as EventAudience) || EventAudience.ALL,
           minAge: data.minAge || 0,
           durationMinutes: data.durationMinutes || null,
           address: data.address || null,
@@ -150,8 +156,8 @@ export class AdminEventsController {
         offer = await tx.eventOffer.create({
           data: {
             eventId: event.id,
-            source: (data.offer.source as any) || 'MANUAL',
-            purchaseType: data.offer.purchaseType as any,
+            source: (data.offer.source as OfferSource) || OfferSource.MANUAL,
+            purchaseType: data.offer.purchaseType as PurchaseType,
             deeplink: data.offer.deeplink || null,
             priceFrom: data.offer.priceFrom || null,
             commissionPercent: data.offer.commissionPercent || null,
@@ -216,7 +222,7 @@ export class AdminEventsController {
    */
   @Patch(':id/override')
   @Roles('ADMIN', 'EDITOR')
-  async upsertOverride(@Param('id') id: string, @Body() data: any, @Request() req: any) {
+  async upsertOverride(@Param('id') id: string, @Body() data: OverrideEventDto, @Request() req: any) {
     return this.overrideService.upsert(id, data, req.user.id);
   }
 
@@ -239,14 +245,43 @@ export class AdminEventsController {
     return this.overrideService.toggleHidden(id, isHidden, req.user.id);
   }
 
+  // --- Venue & dateMode (прямое обновление Event) ---
+
+  @Patch(':id/venue-settings')
+  @Roles('ADMIN', 'EDITOR')
+  async updateVenueSettings(@Param('id') id: string, @Body() data: VenueSettingsDto) {
+    const event = await this.prisma.event.findUnique({ where: { id } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    // Validate venue exists if provided
+    if (data.venueId) {
+      const venue = await this.prisma.venue.findUnique({ where: { id: data.venueId } });
+      if (!venue) throw new NotFoundException('Место (Venue) не найдено');
+    }
+
+    return this.prisma.event.update({
+      where: { id },
+      data: {
+        ...(data.venueId !== undefined && { venueId: data.venueId || null }),
+        ...(data.dateMode && { dateMode: data.dateMode as DateMode }),
+        ...(data.isPermanent !== undefined && { isPermanent: data.isPermanent }),
+        ...(data.endDate !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
+      },
+      select: {
+        id: true,
+        venueId: true,
+        dateMode: true,
+        isPermanent: true,
+        endDate: true,
+      },
+    });
+  }
+
   // --- External rating (ручной ввод из Яндекс/2GIS) ---
 
   @Patch(':id/external-rating')
   @Roles('ADMIN', 'EDITOR')
-  async updateExternalRating(
-    @Param('id') id: string,
-    @Body() data: { externalRating?: number; externalReviewCount?: number; externalSource?: string },
-  ) {
+  async updateExternalRating(@Param('id') id: string, @Body() data: ExternalRatingDto) {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) throw new NotFoundException('Событие не найдено');
 
@@ -295,24 +330,7 @@ export class AdminEventsController {
    */
   @Post(':id/offers')
   @Roles('ADMIN', 'EDITOR')
-  async createOffer(
-    @Param('id') eventId: string,
-    @Body() data: {
-      source: string;
-      purchaseType: string;
-      externalEventId?: string;
-      metaEventId?: string;
-      deeplink?: string;
-      priceFrom?: number;
-      commissionPercent?: number;
-      priority?: number;
-      isPrimary?: boolean;
-      status?: string;
-      availabilityMode?: string;
-      badge?: string;
-      operatorId?: string;
-    },
-  ) {
+  async createOffer(@Param('id') eventId: string, @Body() data: CreateEventOfferDto) {
     // Verify event exists
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
     if (!event) throw new NotFoundException('Событие не найдено');
@@ -325,11 +343,34 @@ export class AdminEventsController {
       });
     }
 
+    // WIDGET contract: auto-fill + validate
+    let widgetProvider = data.widgetProvider || null;
+    let widgetPayload = data.widgetPayload || null;
+    if (data.purchaseType === 'WIDGET') {
+      if (!widgetProvider) {
+        widgetProvider = data.source || 'TC';
+      }
+      if (!widgetPayload) {
+        widgetPayload = {
+          v: 1,
+          externalEventId: data.externalEventId || null,
+          metaEventId: data.metaEventId || null,
+        };
+      } else {
+        widgetPayload = ensurePayloadVersion(widgetPayload as Record<string, unknown>);
+      }
+      // Validate
+      const validation = validateWidgetPayload(widgetProvider, widgetPayload);
+      if (!validation.valid) {
+        throw new BadRequestException(`Невалидный widgetPayload: ${validation.errors?.join('; ')}`);
+      }
+    }
+
     const offer = await this.prisma.eventOffer.create({
       data: {
         eventId,
-        source: data.source as any,
-        purchaseType: data.purchaseType as any,
+        source: data.source as OfferSource,
+        purchaseType: data.purchaseType as PurchaseType,
         externalEventId: data.externalEventId || null,
         metaEventId: data.metaEventId || null,
         deeplink: data.deeplink || null,
@@ -337,10 +378,16 @@ export class AdminEventsController {
         commissionPercent: data.commissionPercent ?? null,
         priority: data.priority ?? 0,
         isPrimary: data.isPrimary ?? false,
-        status: (data.status as any) || 'ACTIVE',
+        status: (data.status as OfferStatus) || OfferStatus.ACTIVE,
         availabilityMode: data.availabilityMode || null,
         badge: data.badge || null,
         operatorId: data.operatorId || null,
+        widgetProvider,
+        widgetPayload: widgetPayload as Prisma.InputJsonValue,
+        meetingPoint: data.meetingPoint || null,
+        meetingInstructions: data.meetingInstructions || null,
+        operationalPhone: data.operationalPhone || null,
+        operationalNote: data.operationalNote || null,
       },
       include: {
         _count: { select: { sessions: true } },
@@ -367,21 +414,7 @@ export class AdminEventsController {
   async fullUpdateOffer(
     @Param('id') eventId: string,
     @Param('offerId') offerId: string,
-    @Body() data: {
-      source?: string;
-      purchaseType?: string;
-      externalEventId?: string;
-      metaEventId?: string;
-      deeplink?: string;
-      priceFrom?: number;
-      commissionPercent?: number;
-      priority?: number;
-      isPrimary?: boolean;
-      status?: string;
-      availabilityMode?: string;
-      badge?: string;
-      operatorId?: string;
-    },
+    @Body() data: UpdateEventOfferDto,
   ) {
     const offer = await this.prisma.eventOffer.findFirst({
       where: { id: offerId, eventId },
@@ -399,8 +432,8 @@ export class AdminEventsController {
     const updated = await this.prisma.eventOffer.update({
       where: { id: offerId },
       data: {
-        ...(data.source && { source: data.source as any }),
-        ...(data.purchaseType && { purchaseType: data.purchaseType as any }),
+        ...(data.source && { source: data.source as OfferSource }),
+        ...(data.purchaseType && { purchaseType: data.purchaseType as PurchaseType }),
         ...(data.externalEventId !== undefined && { externalEventId: data.externalEventId || null }),
         ...(data.metaEventId !== undefined && { metaEventId: data.metaEventId || null }),
         ...(data.deeplink !== undefined && { deeplink: data.deeplink || null }),
@@ -408,10 +441,16 @@ export class AdminEventsController {
         ...(data.commissionPercent !== undefined && { commissionPercent: data.commissionPercent ?? null }),
         ...(data.priority !== undefined && { priority: data.priority }),
         ...(data.isPrimary !== undefined && { isPrimary: data.isPrimary }),
-        ...(data.status && { status: data.status as any }),
+        ...(data.status && { status: data.status as OfferStatus }),
         ...(data.availabilityMode !== undefined && { availabilityMode: data.availabilityMode || null }),
         ...(data.badge !== undefined && { badge: data.badge || null }),
         ...(data.operatorId !== undefined && { operatorId: data.operatorId || null }),
+        ...(data.widgetProvider !== undefined && { widgetProvider: data.widgetProvider || null }),
+        ...(data.widgetPayload !== undefined && { widgetPayload: data.widgetPayload || null }),
+        ...(data.meetingPoint !== undefined && { meetingPoint: data.meetingPoint || null }),
+        ...(data.meetingInstructions !== undefined && { meetingInstructions: data.meetingInstructions || null }),
+        ...(data.operationalPhone !== undefined && { operationalPhone: data.operationalPhone || null }),
+        ...(data.operationalNote !== undefined && { operationalNote: data.operationalNote || null }),
       },
       include: {
         _count: { select: { sessions: true } },
@@ -430,7 +469,7 @@ export class AdminEventsController {
   async updateOffer(
     @Param('id') eventId: string,
     @Param('offerId') offerId: string,
-    @Body() data: { status?: string; isPrimary?: boolean; priority?: number; commissionPercent?: number },
+    @Body() data: PatchEventOfferDto,
   ) {
     const offer = await this.prisma.eventOffer.findFirst({
       where: { id: offerId, eventId },
@@ -448,7 +487,7 @@ export class AdminEventsController {
     return this.prisma.eventOffer.update({
       where: { id: offerId },
       data: {
-        ...(data.status && { status: data.status as any }),
+        ...(data.status && { status: data.status as OfferStatus }),
         ...(data.isPrimary !== undefined && { isPrimary: data.isPrimary }),
         ...(data.priority !== undefined && { priority: data.priority }),
         ...(data.commissionPercent !== undefined && { commissionPercent: data.commissionPercent }),
@@ -474,12 +513,19 @@ export class AdminEventsController {
       throw new BadRequestException('Удалять можно только MANUAL-офферы. Синхронизированные офферы скрывайте через статус DISABLED.');
     }
 
-    // Delete related sessions first
-    await this.prisma.eventSession.deleteMany({ where: { offerId } });
+    // Soft-deactivate related sessions
+    await this.prisma.eventSession.updateMany({
+      where: { offerId },
+      data: { isActive: false },
+    });
 
-    await this.prisma.eventOffer.delete({ where: { id: offerId } });
+    // Soft-delete оффера
+    await this.prisma.eventOffer.update({
+      where: { id: offerId },
+      data: { isDeleted: true, deletedAt: new Date(), status: 'DISABLED' },
+    });
 
-    return { message: 'Оффер удалён' };
+    return { message: 'Оффер удалён (soft-delete)' };
   }
 
   /**
@@ -512,6 +558,12 @@ export class AdminEventsController {
         availabilityMode: offer.availabilityMode,
         badge: offer.badge,
         operatorId: offer.operatorId,
+        widgetProvider: offer.widgetProvider,
+        widgetPayload: offer.widgetPayload as Prisma.InputJsonValue,
+        meetingPoint: offer.meetingPoint,
+        meetingInstructions: offer.meetingInstructions,
+        operationalPhone: offer.operationalPhone,
+        operationalNote: offer.operationalNote,
       },
       include: {
         _count: { select: { sessions: true } },

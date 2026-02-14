@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
+import { PackageStatus } from '@prisma/client';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -88,6 +89,6 @@ export class AdminOrdersController {
       throw new BadRequestException(`Невозможен переход ${pkg.status} → ${status}`);
     }
 
-    return this.prisma.package.update({ where: { id }, data: { status: status as any } });
+    return this.prisma.package.update({ where: { id }, data: { status: status as PackageStatus } });
   }
 }

@@ -4,6 +4,9 @@ import './globals.css';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { CartProvider } from '@/lib/cart';
+import { SupportWidget } from '@/components/ui/SupportWidget';
+import { WebVitalsReporter } from '@/components/WebVitalsReporter';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: {
@@ -11,7 +14,7 @@ export const metadata: Metadata = {
     template: '%s | Дайбилет',
   },
   description:
-    'Билеты на экскурсии, музеи и мероприятия. Умный планировщик программы посещения города. Единый ваучер на все события.',
+    'Билеты на экскурсии, музеи и мероприятия по городам России. Экскурсии, музеи, концерты и шоу — всё в одном месте.',
   metadataBase: new URL(process.env.APP_URL || 'https://daibilet.ru'),
   openGraph: {
     type: 'website',
@@ -28,10 +31,14 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className="flex min-h-screen flex-col">
+        <WebVitalsReporter />
         <CartProvider>
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </main>
         <Footer />
+        <SupportWidget />
         </CartProvider>
 
         {/* Ticketscloud — скрипт виджета покупки билетов */}

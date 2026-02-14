@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { TcSyncService } from '../catalog/tc-sync.service';
-import { TepSyncService } from '../catalog/tep-sync.service';
-import { CacheService } from '../cache/cache.service';
-import { ComboService } from '../combo/combo.service';
+import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
+import { QUEUE_SYNC } from '../queue/queue.constants';
 
 /**
  * Scheduler Service — автоматическая синхронизация данных.
@@ -13,108 +14,77 @@ import { ComboService } from '../combo/combo.service';
  * - Инкрементальная синхронизация TC: каждые 30 минут
  * - Дедупликация: раз в сутки (03:00)
  *
- * Combo populate теперь УМНЫЙ:
- * - Пропускает combo с валидными curatedEvents (SEO-стабильность)
- * - Перезаполняет только если >30% событий невалидны
- * - Нагрузка O(1 count-запрос на combo) для проверки
+ * Синхронизация теперь выполняется через BullMQ (QUEUE_SYNC).
+ * SyncProcessor обрабатывает: sync, retag, combo populate, cache invalidation.
+ * Cron-хендлеры только ставят задачу в очередь.
  */
 @Injectable()
 export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
-  private isSyncing = false;
 
   constructor(
+    @InjectQueue(QUEUE_SYNC) private readonly syncQueue: Queue,
     private readonly tcSync: TcSyncService,
-    private readonly tepSync: TepSyncService,
-    private readonly cache: CacheService,
-    private readonly combo: ComboService,
+    private readonly fuzzyDedup: FuzzyDedupService,
   ) {}
 
   /**
-   * Полная синхронизация всех источников + retag + smart populate.
+   * Полная синхронизация всех источников.
+   * Всё (TC, TEP, retag, combo, cache) обрабатывается в SyncProcessor.
    */
   @Cron('0 0 0,6,12,18 * * *', { name: 'full-sync' })
   async handleFullSync() {
-    if (this.isSyncing) {
-      this.logger.warn('Полная синхронизация пропущена — предыдущая ещё выполняется');
+    const activeCount = await this.syncQueue.getActiveCount();
+    const waitingCount = await this.syncQueue.getWaitingCount();
+
+    if (activeCount > 0 || waitingCount > 0) {
+      this.logger.warn(
+        `Полная синхронизация пропущена — в очереди: active=${activeCount}, waiting=${waitingCount}`,
+      );
       return;
     }
 
-    this.isSyncing = true;
-    this.logger.log('=== CRON: Полная синхронизация ===');
+    this.logger.log('=== CRON: Полная синхронизация → queue ===');
 
-    try {
-      // 1. TC sync (retag встроен в конце syncAll)
-      const tcResult = await this.tcSync.syncAll();
-      this.logger.log(
-        `TC sync: ${tcResult.uniqueEvents} событий, ${tcResult.sessionsSynced} сессий, статус: ${tcResult.status}`,
-      );
-
-      // 2. Teplohod sync
-      const tepResult = await this.tepSync.syncAll();
-      this.logger.log(
-        `TEP sync: ${tepResult.eventsSynced} событий, статус: ${tepResult.status}`,
-      );
-
-      // 3. Финальный retag
-      const retagResult = await this.tcSync.retagAll();
-      this.logger.log(
-        `Retag: ${retagResult.eventsProcessed} событий, ${retagResult.tagsLinked} тегов`,
-      );
-
-      // 4. Smart populate combo (проверяет валидность, не трогает здоровые)
-      try {
-        const populateResult = await this.combo.populateAll();
-        this.logger.log(
-          `Combo populate: ${populateResult.checked} проверено, ${populateResult.changed} обновлено`,
-        );
-      } catch (err: any) {
-        this.logger.warn(`Combo populate ошибка: ${err.message}`);
-      }
-
-      // 5. Инвалидация кэша
-      await this.cache.invalidateAfterSync();
-    } catch (err: any) {
-      this.logger.error(`Полная синхронизация — ошибка: ${err.message}`);
-    } finally {
-      this.isSyncing = false;
-    }
+    await this.syncQueue.add('sync-full', {}, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 60_000 },
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    });
   }
 
   /**
    * Инкрементальная синхронизация TC.
+   * TC sync + cache invalidation обрабатываются в SyncProcessor.
    */
   @Cron('0 30 * * * *', { name: 'incremental-tc-sync' })
   async handleIncrementalSync() {
-    if (this.isSyncing) {
-      this.logger.debug('Инкрементальная синхронизация пропущена — занято');
-      return;
-    }
-
     const hour = new Date().getHours();
     if ([0, 6, 12, 18].includes(hour)) {
       this.logger.debug('Инкрементальная пропущена — час полной синхронизации');
       return;
     }
 
-    this.isSyncing = true;
-    this.logger.log('=== CRON: Инкрементальная синхронизация TC ===');
-
-    try {
-      const result = await this.tcSync.syncAll();
-      this.logger.log(
-        `TC incremental: ${result.uniqueEvents} событий, статус: ${result.status}`,
-      );
-      await this.cache.invalidateAfterSync();
-    } catch (err: any) {
-      this.logger.error(`Инкрементальная синхронизация — ошибка: ${err.message}`);
-    } finally {
-      this.isSyncing = false;
+    const activeCount = await this.syncQueue.getActiveCount();
+    if (activeCount > 0) {
+      this.logger.debug('Инкрементальная синхронизация пропущена — очередь занята');
+      return;
     }
+
+    this.logger.log('=== CRON: Инкрементальная синхронизация TC → queue ===');
+
+    await this.syncQueue.add('sync-incremental', {}, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 30_000 },
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    });
   }
 
   /**
    * Дедупликация — раз в сутки в 03:00.
+   * Остаётся прямым вызовом (быстрая операция, не нужна очередь).
    */
   @Cron('0 0 3 * * *', { name: 'daily-dedup' })
   async handleDailyDedup() {
@@ -125,8 +95,18 @@ export class SchedulerService {
       this.logger.log(
         `Dedup: ${result.groupsProcessed} групп, ${result.duplicatesRemoved} дублей удалено`,
       );
-    } catch (err: any) {
-      this.logger.error(`Дедупликация — ошибка: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Дедупликация — ошибка: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // Fuzzy dedup — dry-run only (logging candidates, no merge)
+    try {
+      const fuzzyResult = await this.fuzzyDedup.findDuplicates(true);
+      this.logger.log(
+        `Fuzzy dedup (dry-run): ${fuzzyResult.candidates.length} candidates found`,
+      );
+    } catch (err: unknown) {
+      this.logger.error(`Fuzzy dedup — ошибка: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }

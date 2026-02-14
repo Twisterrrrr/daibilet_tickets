@@ -36,7 +36,9 @@ export default async function CitiesPage() {
               name={city.name}
               heroImage={city.heroImage}
               eventCount={city._count?.events ?? 0}
+              venueCount={city._count?.venues ?? 0}
               description={city.description}
+              region={city.region ?? null}
               large
             />
           ))}

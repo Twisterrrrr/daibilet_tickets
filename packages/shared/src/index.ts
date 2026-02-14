@@ -2,6 +2,25 @@
 // Дайбилет — Общие типы между backend и frontend
 // ==============================================
 
+/* eslint-disable no-var */
+declare var console: { warn: (...args: any[]) => void; log: (...args: any[]) => void; error: (...args: any[]) => void };
+
+// --- Widget Payload Validation ---
+export {
+  TCWidgetPayloadSchema,
+  RadarioWidgetPayloadSchema,
+  TimepadWidgetPayloadSchema,
+  GenericWidgetPayloadSchema,
+  validateWidgetPayload,
+  ensurePayloadVersion,
+  CURRENT_PAYLOAD_VERSION,
+  type TCWidgetPayload,
+  type RadarioWidgetPayload,
+  type TimepadWidgetPayload,
+  type GenericWidgetPayload,
+  type WidgetPayloadValidationResult,
+} from './widget-payload';
+
 // --- Enums (дублируем из Prisma для использования на фронте) ---
 
 export enum EventCategory {
@@ -31,6 +50,9 @@ export enum EventSubcategory {
   GALLERY = 'GALLERY',
   PALACE = 'PALACE',
   PARK = 'PARK',
+  ART_SPACE = 'ART_SPACE',
+  SCULPTURE = 'SCULPTURE',
+  CONTEMPORARY = 'CONTEMPORARY',
   // EVENT
   CONCERT = 'CONCERT',
   SHOW = 'SHOW',
@@ -70,10 +92,94 @@ export enum OfferSource {
 }
 
 export enum PurchaseType {
-  TC_WIDGET = 'TC_WIDGET',
-  REDIRECT = 'REDIRECT',
-  API_CHECKOUT = 'API_CHECKOUT',
-  REQUEST_ONLY = 'REQUEST_ONLY',
+  WIDGET = 'WIDGET',       // Встроенный виджет (TC и др.)
+  REDIRECT = 'REDIRECT',   // Внешний URL (redirect к оператору)
+  REQUEST = 'REQUEST',     // Заявка на подтверждение
+}
+
+/** Старые значения, которые нужно замапить → логируем при обнаружении */
+const COMPAT_LEGACY_KEYS = new Set(['TC_WIDGET', 'API_CHECKOUT', 'REQUEST_ONLY']);
+
+/** @deprecated Маппинг для обратной совместимости. Логирует legacy-значения. */
+export const PURCHASE_TYPE_COMPAT: Record<string, PurchaseType> = {
+  TC_WIDGET: PurchaseType.WIDGET,
+  API_CHECKOUT: PurchaseType.REQUEST,
+  REQUEST_ONLY: PurchaseType.REQUEST,
+  WIDGET: PurchaseType.WIDGET,
+  REDIRECT: PurchaseType.REDIRECT,
+  REQUEST: PurchaseType.REQUEST,
+};
+
+/**
+ * In-memory счётчик (для отладки; основная запись — через onLegacyHit callback).
+ */
+export const legacyPurchaseTypeHits: Record<string, number> = {};
+
+/** Kill switch: если true — legacy-значения полностью запрещены */
+let _compatDisabled = false;
+
+/**
+ * Callback для персистентного логирования legacy-хитов.
+ * Бэкенд подключает сюда запись в AuditLog.
+ */
+let _onLegacyHit: ((raw: string, resolved: string, context?: string) => void) | null = null;
+
+/**
+ * Установить kill switch (DISABLE_PURCHASE_TYPE_COMPAT=true в env).
+ */
+export function setCompatDisabled(disabled: boolean): void {
+  _compatDisabled = disabled;
+}
+
+/**
+ * Подключить персистентный logger для legacy hits.
+ * Вызывается один раз при bootstrap бэкенда.
+ */
+export function setCompatLogger(fn: (raw: string, resolved: string, context?: string) => void): void {
+  _onLegacyHit = fn;
+}
+
+/**
+ * Получить in-memory метрики (полезно для мониторинга между рестартами).
+ */
+export function getCompatMetrics(): Record<string, number> {
+  return { ...legacyPurchaseTypeHits };
+}
+
+/**
+ * Резолвер PurchaseType с метриками + персистентный лог + kill switch.
+ * @throws если kill switch включён и получено legacy-значение
+ */
+export function resolvePurchaseType(raw: string, context?: string): PurchaseType {
+  const resolved = PURCHASE_TYPE_COMPAT[raw];
+  if (!resolved) {
+    console.warn(`[PurchaseType] Unknown value "${raw}"${context ? ` (${context})` : ''}, defaulting to REQUEST`);
+    return PurchaseType.REQUEST;
+  }
+
+  if (COMPAT_LEGACY_KEYS.has(raw)) {
+    // In-memory метрика
+    legacyPurchaseTypeHits[raw] = (legacyPurchaseTypeHits[raw] || 0) + 1;
+
+    // Персистентный лог (AuditLog / Redis — подключается через setCompatLogger)
+    if (_onLegacyHit) {
+      try { _onLegacyHit(raw, resolved, context); } catch { /* не блокируем */ }
+    }
+
+    // Kill switch
+    if (_compatDisabled) {
+      throw new Error(
+        `[PurchaseType] Legacy value "${raw}" запрещён (DISABLE_PURCHASE_TYPE_COMPAT=true).` +
+        `${context ? ` Context: ${context}` : ''} Используй "${resolved}".`,
+      );
+    }
+
+    console.warn(
+      `[PurchaseType] COMPAT: "${raw}" → "${resolved}"${context ? ` (${context})` : ''}. ` +
+      `Hits: ${legacyPurchaseTypeHits[raw]}. Нужно обновить источник.`,
+    );
+  }
+  return resolved;
 }
 
 export enum CheckoutStatus {
@@ -86,6 +192,139 @@ export enum CheckoutStatus {
   COMPLETED = 'COMPLETED',
   EXPIRED = 'EXPIRED',
   CANCELLED = 'CANCELLED',
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  PAID = 'PAID',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+  REFUNDED = 'REFUNDED',
+}
+
+export enum SupplierRole {
+  OWNER = 'OWNER',
+  MANAGER = 'MANAGER',
+}
+
+export enum VenueType {
+  MUSEUM = 'MUSEUM',
+  GALLERY = 'GALLERY',
+  ART_SPACE = 'ART_SPACE',
+  EXHIBITION_HALL = 'EXHIBITION_HALL',
+  THEATER = 'THEATER',
+  PALACE = 'PALACE',
+  PARK = 'PARK',
+}
+
+export enum DateMode {
+  SCHEDULED = 'SCHEDULED',
+  OPEN_DATE = 'OPEN_DATE',
+}
+
+export const VENUE_TYPE_LABELS: Record<VenueType, string> = {
+  [VenueType.MUSEUM]: 'Музей',
+  [VenueType.GALLERY]: 'Галерея',
+  [VenueType.ART_SPACE]: 'Арт-пространство',
+  [VenueType.EXHIBITION_HALL]: 'Выставочный зал',
+  [VenueType.THEATER]: 'Театр',
+  [VenueType.PALACE]: 'Дворец',
+  [VenueType.PARK]: 'Парк',
+};
+
+export const DATE_MODE_LABELS: Record<DateMode, string> = {
+  [DateMode.SCHEDULED]: 'По расписанию',
+  [DateMode.OPEN_DATE]: 'Открытая дата',
+};
+
+// --- Venue Commission Rates (default, %) ---
+// Используется как рекомендация при создании venue, если нет индивидуальной ставки
+
+export interface VenueCommissionConfig {
+  /** Комиссия по умолчанию, % */
+  defaultRate: number;
+  /** Промо-ставка для новых партнёров, % */
+  promoRate: number;
+  /** Длительность промо, месяцев */
+  promoMonths: number;
+  /** Описание для админки */
+  label: string;
+}
+
+export const VENUE_COMMISSION_DEFAULTS: Record<VenueType, VenueCommissionConfig> = {
+  [VenueType.MUSEUM]: {
+    defaultRate: 10,
+    promoRate: 7,
+    promoMonths: 6,
+    label: 'Государственный музей — 10% (промо 7% / 6 мес)',
+  },
+  [VenueType.GALLERY]: {
+    defaultRate: 15,
+    promoRate: 7,
+    promoMonths: 6,
+    label: 'Галерея — 15% (промо 7% / 6 мес)',
+  },
+  [VenueType.ART_SPACE]: {
+    defaultRate: 20,
+    promoRate: 7,
+    promoMonths: 3,
+    label: 'Арт-пространство — 20% (промо 7% / 3 мес)',
+  },
+  [VenueType.EXHIBITION_HALL]: {
+    defaultRate: 15,
+    promoRate: 7,
+    promoMonths: 6,
+    label: 'Выставочный зал — 15% (промо 7% / 6 мес)',
+  },
+  [VenueType.THEATER]: {
+    defaultRate: 12,
+    promoRate: 7,
+    promoMonths: 6,
+    label: 'Театр — 12% (промо 7% / 6 мес)',
+  },
+  [VenueType.PALACE]: {
+    defaultRate: 10,
+    promoRate: 7,
+    promoMonths: 6,
+    label: 'Дворец — 10% (промо 7% / 6 мес)',
+  },
+  [VenueType.PARK]: {
+    defaultRate: 15,
+    promoRate: 7,
+    promoMonths: 3,
+    label: 'Парк — 15% (промо 7% / 3 мес)',
+  },
+};
+
+/** Получить эффективную комиссию для venue (учитывая индивидуальную и промо) */
+export function getEffectiveCommission(
+  venueType: VenueType,
+  customRate?: number | null,
+  createdAt?: Date | string | null,
+): number {
+  if (customRate != null && customRate > 0) return customRate;
+
+  const config = VENUE_COMMISSION_DEFAULTS[venueType];
+  if (!config) return 15; // fallback
+
+  // Проверяем, попадает ли venue в промо-период
+  if (createdAt) {
+    const created = new Date(createdAt);
+    const promoEnd = new Date(created);
+    promoEnd.setMonth(promoEnd.getMonth() + config.promoMonths);
+    if (new Date() < promoEnd) return config.promoRate;
+  }
+
+  return config.defaultRate;
+}
+
+export enum ModerationStatus {
+  DRAFT = 'DRAFT',
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  AUTO_APPROVED = 'AUTO_APPROVED',
 }
 
 export enum PackageStatus {
@@ -287,7 +526,7 @@ export function formatPrice(kopecks: number): string {
 /** Категория → человекочитаемое название */
 export const CATEGORY_LABELS: Record<EventCategory, string> = {
   [EventCategory.EXCURSION]: 'Экскурсии',
-  [EventCategory.MUSEUM]: 'Музеи',
+  [EventCategory.MUSEUM]: 'Музеи и Арт',
   [EventCategory.EVENT]: 'Мероприятия',
 }
 
@@ -314,6 +553,9 @@ export const SUBCATEGORY_LABELS: Record<EventSubcategory, string> = {
   [EventSubcategory.GALLERY]: 'Галерея',
   [EventSubcategory.PALACE]: 'Дворец',
   [EventSubcategory.PARK]: 'Парк',
+  [EventSubcategory.ART_SPACE]: 'Арт-пространство',
+  [EventSubcategory.SCULPTURE]: 'Скульптура',
+  [EventSubcategory.CONTEMPORARY]: 'Современное искусство',
   // EVENT
   [EventSubcategory.CONCERT]: 'Концерт',
   [EventSubcategory.SHOW]: 'Шоу',
@@ -335,6 +577,7 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<EventCategory, EventSubcategory[]
   [EventCategory.MUSEUM]: [
     EventSubcategory.MUSEUM_CLASSIC, EventSubcategory.EXHIBITION,
     EventSubcategory.GALLERY, EventSubcategory.PALACE, EventSubcategory.PARK,
+    EventSubcategory.ART_SPACE, EventSubcategory.SCULPTURE, EventSubcategory.CONTEMPORARY,
   ],
   [EventCategory.EVENT]: [
     EventSubcategory.CONCERT, EventSubcategory.SHOW, EventSubcategory.STANDUP,
@@ -367,12 +610,15 @@ export const QUICK_FILTERS: Record<string, QuickFilter[]> = {
     { id: 'combined', emoji: '🔀', label: 'Комбо', params: { subcategory: 'COMBINED' } },
   ],
   MUSEUM: [
+    { id: 'open-date', emoji: '📅', label: 'Открытая дата', params: { dateMode: 'OPEN_DATE' } },
     { id: 'museum', emoji: '🎟', label: 'Билет', params: { subcategory: 'MUSEUM_CLASSIC' } },
     { id: 'with-guide', emoji: '👨‍🏫', label: 'С экскурсией', params: { tag: 'with-guide' } },
     { id: 'no-queue', emoji: '⚡', label: 'Без очереди', params: { tag: 'no-queue' } },
     { id: 'exhibition', emoji: '🆕', label: 'Выставки', params: { subcategory: 'EXHIBITION' } },
     { id: 'palace', emoji: '🏛', label: 'Дворцы', params: { subcategory: 'PALACE' } },
     { id: 'gallery', emoji: '🖼', label: 'Галереи', params: { subcategory: 'GALLERY' } },
+    { id: 'art-space', emoji: '🎨', label: 'Арт', params: { subcategory: 'ART_SPACE' } },
+    { id: 'contemporary', emoji: '🖌', label: 'Совр. искусство', params: { subcategory: 'CONTEMPORARY' } },
     { id: 'park', emoji: '🌳', label: 'Парки', params: { subcategory: 'PARK' } },
   ],
   EVENT: [
@@ -415,6 +661,51 @@ export const SYSTEM_TAG_BADGES: SystemTagBadge[] = [
   { slug: 'audioguide', emoji: '🎧', label: 'Аудиогид', color: 'bg-purple-500/90', textColor: 'text-white' },
   { slug: 'interactive', emoji: '🎮', label: 'Интерактив', color: 'bg-fuchsia-500/90', textColor: 'text-white' },
 ];
+
+// --- Venue Types ---
+
+export interface VenueListItem {
+  id: string;
+  slug: string;
+  title: string;
+  shortTitle?: string | null;
+  venueType: string;
+  imageUrl?: string | null;
+  city?: { name: string; slug: string };
+  address?: string | null;
+  metro?: string | null;
+  priceFrom?: number | null;
+  rating: number;
+  reviewCount: number;
+  isFeatured?: boolean;
+}
+
+export interface VenueDetail extends VenueListItem {
+  cityId?: string;
+  description?: string | null;
+  shortDescription?: string | null;
+  galleryUrls: string[];
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  openingHours?: Record<string, string | null> | null;
+  lat?: number | null;
+  lng?: number | null;
+  district?: string | null;
+  operator?: { id: string; name: string; slug: string; logo?: string | null } | null;
+  offers: any[];
+  exhibitions: any[];
+  reviews?: any[];
+  recommendPercent?: number;
+  highlights?: string[];
+  faq?: { q: string; a: string }[];
+  features?: string[];
+  externalRating?: number | null;
+  externalSource?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  relatedArticles?: any[];
+}
 
 /** Интенсивность → описание */
 export const INTENSITY_LABELS: Record<Intensity, { label: string; description: string }> = {

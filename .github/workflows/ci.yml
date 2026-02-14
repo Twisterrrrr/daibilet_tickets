@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: packages/backend
+
+      - name: Build shared
+        run: npx pnpm --filter @daibilet/shared build
+
+      - name: Lint
+        run: npx eslint packages/ --max-warnings=0
+
+      - name: Type check backend
+        run: npx tsc --noEmit
+        working-directory: packages/backend
+
+      - name: Type check frontend
+        run: npx tsc --noEmit
+        working-directory: packages/frontend
+
+      - name: Run tests
+        run: npx vitest run
+        working-directory: packages/backend
+
+      - name: Tech debt audit
+        run: bash scripts/tech-debt-audit.sh --ci
+
+      - name: Build frontend
+        run: npx pnpm --filter @daibilet/frontend build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000

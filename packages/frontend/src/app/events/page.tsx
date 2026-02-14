@@ -87,12 +87,12 @@ export default function EventsPage() {
   const effectiveTimeOfDay = isSoonMode ? '' : timeOfDay;
 
   useEffect(() => {
-    api.getCities().then(setCities).catch(() => {});
+    api.getCities().then(setCities).catch((e) => { console.error('Events page error:', e); });
   }, []);
 
   useEffect(() => {
     if (city) {
-      api.getLocations(city, 'PIER').then(setPiers).catch(() => setPiers([]));
+      api.getLocations(city, 'PIER').then(setPiers).catch((e) => { console.error('Events page error:', e); setPiers([]); });
     } else {
       setPiers([]);
       setPier('');
@@ -129,7 +129,7 @@ export default function EventsPage() {
     api
       .getEvents(params)
       .then((res) => { setEvents(res.items); setTotal(res.total); })
-      .catch(() => { setEvents([]); setTotal(0); })
+      .catch((e) => { console.error('Events page error:', e); setEvents([]); setTotal(0); })
       .finally(() => setLoading(false));
   }, [city, category, audience, urlTag, effectiveSort, selectedDate, effectiveTimeOfDay, pier, page, quickFilterParams]);
 
@@ -364,6 +364,7 @@ export default function EventsPage() {
               departingSoonMinutes={event.departingSoonMinutes}
               nextSessionAt={event.nextSessionAt}
               isOptimalChoice={event.isOptimalChoice}
+              dateMode={event.dateMode}
             />
           ))}
         </div>

@@ -3,20 +3,24 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
 import { SchedulerService } from './scheduler.service';
 import { ReviewSchedulerService } from './review-scheduler.service';
+import { OrderExpiryService } from './order-expiry.service';
+import { TagAssignmentService } from './tag-assignment.service';
+import { FulfillmentSchedulerService } from './fulfillment-scheduler.service';
 import { CatalogModule } from '../catalog/catalog.module';
-import { ComboModule } from '../combo/combo.module';
-import { QUEUE_EMAILS, QUEUE_REVIEW_TASKS } from '../queue/queue.module';
+import { QUEUE_EMAILS, QUEUE_REVIEW_TASKS, QUEUE_SYNC, QUEUE_FULFILLMENT } from '../queue/queue.constants';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     CatalogModule,
-    ComboModule,
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_REVIEW_TASKS },
+      { name: QUEUE_SYNC },
+      { name: QUEUE_FULFILLMENT },
     ),
   ],
-  providers: [SchedulerService, ReviewSchedulerService],
+  providers: [SchedulerService, ReviewSchedulerService, OrderExpiryService, TagAssignmentService, FulfillmentSchedulerService],
+  exports: [TagAssignmentService],
 })
 export class SchedulerModule {}

@@ -1,6 +1,291 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-02-12 (EventAudience + Conversion Mechanics)
+> Последнее обновление: 2026-02-15 (UX-аудит Tripster + Понедельный план)
+
+---
+
+## Стратегия конкуренции: 3 козыря (подробно — Diary.md от 15.02.2026)
+
+### Козырь 1 — Посадочные страницы (SEO-структура)
+- [ ] **Критический**: SEO-описания для всех городов (уникальные, не шаблонные)
+- [ ] **Критический**: SEO-описания для ТОП-10 площадок (venues)
+- [ ] **Высокий**: Тематические лендинги: «Ночные экскурсии СПб», «Музеи Казани с детьми», «Калининград за выходные»
+- [ ] **Высокий**: JSON-LD и meta-теги на всех посадочных (города, venues, события, комбо)
+- [ ] **Средний**: Внутренняя перелинковка: карточки событий ↔ venue ↔ статьи блога ↔ города
+
+### Козырь 2 — AI-контент (масштабируемый SEO)
+- [ ] **Высокий**: 5 SEO-статей для блога (AI-каркас + ручная редактура + привязка к событиям)
+- [ ] **Высокий**: Описания ТОП-20 событий (конкретика: цены, как добраться, что рядом)
+- [ ] **Средний**: Email-цепочка review request после покупки (наращивание UGC)
+- [ ] **Средний**: FAQ-секции на страницах площадок (AI-генерация + проверка)
+- [ ] **Низкий**: Сезонные гиды (Белые ночи, Новый год, Майские) — заблаговременно
+
+### Козырь 3 — Планировщик туров (дифференциатор)
+- [ ] **Критический**: Планировщик MVP: город + даты + состав → 3 варианта → покупка (без drag-and-drop)
+- [ ] **Высокий**: Планировщик v2: drag-and-drop расписание, замена событий
+- [ ] **Средний**: Карта маршрута на день (leaflet/mapbox)
+- [ ] **Низкий**: Учёт времени переездов между событиями
+
+> **Порядок:** платежи (Неделя 1) → контент (Неделя 1-2) → планировщик MVP (Неделя 3-4)
+
+---
+
+## UX-бэклог: отставание от Tripster (experience.tripster.ru)
+
+> Задачи отсортированы по ROI (визуальный эффект / сложность). Подробный анализ — в `Diary.md` от 15.02.2026.
+
+### Критический приоритет
+- [ ] **Hero с фотографией**: полноэкранное фото реального города (карусель 3-4 города) + затемнение + поиск поверх. Текущий тёмный градиент не вызывает эмоцию
+- [ ] **Качество фото каталога**: галереи ТОП-20 событий с настоящими фото (не стоковые TC/Teplohod). Ручная замена через админку
+
+### Высокий приоритет
+- [ ] **Карусель отзывов на главной**: 5-6 лучших отзывов (имя, город, текст, рейтинг). Сейчас только статичные цифры
+- [ ] **Лицо за экскурсией**: на карточке события — фото/имя гида или оператора. Требует `avatar`/`bio` в модели `Operator`
+- [ ] **Autocomplete в поиске**: город + начало названия события (вместо простого dropdown)
+
+### Средний приоритет
+- [ ] **Страница события**: профиль оператора/гида, маршрут на карте, фото от путешественников
+- [ ] **Живое социальное доказательство**: «Забронировано N раз сегодня», «N человек смотрят сейчас»
+- [ ] **Мобильный UX**: fixed bottom bar с CTA «Купить», bottom sheet для фильтров
+
+### Низкий приоритет (polish)
+- [ ] **Анимации и микроинтеракции**: сердечко избранного, плавные переходы между состояниями
+- [ ] **Блог/вдохновение на главной**: 3-4 статьи с фото «Что посмотреть в…»
+- [ ] **Персонализация**: «Недавно просмотренные», «На основе ваших интересов»
+
+---
+
+## Понедельный план (февраль-март 2026)
+
+### Неделя 1 — Запуск платежей + контент-база
+
+#### Backend/DevOps
+- [ ] **Критический**: .env production: YooKassa ключи, PAYMENT_PROVIDER=YOOKASSA
+- [ ] **Критический**: Тестовый платёж в sandbox — 3 сценария (PLATFORM, EXTERNAL, mixed)
+- [ ] **Критический**: Deploy: Docker + CI/CD pipeline
+- [ ] **Высокий**: Sentry alerts на 5xx и payment failures
+
+#### Контент
+- [ ] **Высокий**: Наполнение: описания для всех городов (сейчас у части пусто)
+- [ ] **Высокий**: Галереи ТОП-20 событий (качественные фото, не стоковые)
+- [ ] **Высокий**: SEO-тексты на /cities/[slug] — уникальные описания под каждый город
+- [ ] **Средний**: Проверка категоризации: стендапы не в «Музеи», мастер-классы корректно
+
+#### Фронтенд
+- [x] **Высокий**: Error Boundary (root + checkout flow) — «что-то пошло не так» вместо белого экрана
+- [ ] **Высокий**: Скелетоны загрузки на каталоге и странице события (вместо пустоты)
+
+### Неделя 2 — Первые продажи + UX polish
+
+#### Backend
+- [ ] **Высокий**: Мониторинг первых реальных платежей через reconciliation page
+- [ ] **Высокий**: Structured JSON logs → log aggregator
+- [ ] **Высокий**: Email шаблоны: order-confirmed, order-completed с красивой вёрсткой
+
+#### Контент
+- [ ] **Высокий**: Блог: 3-5 статей под SEO (Что посмотреть в Петербурге за 3 дня, Музеи Казани, Калининград за выходные)
+- [ ] **Средний**: FAQ-секции на страницах ТОП-10 площадок (venues)
+- [ ] **Средний**: Мета-теги и OG-картинки для шаринга в соцсетях
+
+#### Фронтенд
+- [ ] **Высокий**: Web Vitals: LCP < 2.5s, CLS < 0.1 — lazy images, font preload, critical CSS
+- [x] **Высокий**: /venues/* в sitemap (priority 0.9)
+- [ ] **Высокий**: Мобильная корзина: проверить UX на 375px, fixed bottom bar для «Оформить»
+- [ ] **Средний**: Breadcrumbs на страницах события и площадки (SEO + навигация)
+- [ ] **Средний**: Фильтры на /events: по дате, по цене, по категории — расширение текущих
+
+### Неделя 3 — Техдолг + конверсия
+
+#### Backend
+- [ ] **Высокий**: Типизация tc-sync.service.ts (TcEvent вместо any[])
+- [ ] **Высокий**: Proto-generated types для gRPC
+- [ ] **Высокий**: JwtPayload вместо req: any
+- [ ] **Средний**: where: any → типизированные Prisma where
+
+#### Контент
+- [ ] **Высокий**: Подборки: Топ-10 экскурсий Петербурга, Детям, Романтические — как combo/landing pages
+- [ ] **Высокий**: Отзывы: запуск email-цепочки review request после покупки
+- [ ] **Средний**: Партнёрские описания: quality check текстов от поставщиков
+
+#### Фронтенд
+- [ ] **Высокий**: Checkout UX: прогресс-бар (корзина → данные → оплата → готово)
+- [ ] **Высокий**: Страница /orders/[id] — трекинг заказа (статус, билеты, контакты)
+- [ ] **Высокий**: Push/email уведомления о смене статуса заказа
+- [ ] **Средний**: Избранное (localStorage) — кнопка «в избранное» на карточке события
+- [ ] **Средний**: «Недавно просмотренные» на главной
+
+### Неделя 4 — Масштабирование + retention
+
+#### Backend
+- [ ] **Высокий**: Feature flags: отключение EXTERNAL по городам с достаточным INTERNAL покрытием
+- [ ] **Высокий**: Supplier self-service: портал для добавления событий
+- [ ] **Высокий**: Review.venueId — отзывы на площадки
+- [ ] **Средний**: Нагрузочное тестирование checkout
+
+#### Контент
+- [ ] **Высокий**: Расширение географии: новые города по KPI (трафик → контент → офферы)
+- [ ] **Средний**: Сезонные лендинги: Белые ночи, Новый год, Майские — заранее
+- [ ] **Средний**: Партнёрский контент: гиды, маршруты от локальных экспертов
+
+#### Фронтенд
+- [ ] **Высокий**: Планировщик v2: drag-and-drop расписание, карта маршрута на день
+- [ ] **Высокий**: Промокоды: поле в checkout, отображение скидки
+- [ ] **Средний**: A/B тесты: CTA на карточках, порядок блоков на главной
+- [ ] **Средний**: PWA: offline fallback, add to home screen, push notifications
+- [ ] **Низкий**: Мультиязычность: подготовка i18n (en как первый иностранный)
+
+---
+
+## Конверсионная оптимизация страницы музея
+
+### Интерактивные компоненты
+- [x] **Высокий**: TicketsBlock — мини-календарь OPEN_DATE + количество + дифференцированные offer-карточки
+- [x] **Высокий**: MobileStickyBar — IntersectionObserver, показ только при скролле
+- [x] **Высокий**: FAQ JSON-LD (FAQPage schema) для SEO
+
+### Backend & Admin
+- [x] **Высокий**: Venue publish validation (минимальные поля: title, address, imageUrl, priceFrom, description)
+- [x] **Высокий**: Конфигурация комиссий по типу venue (VENUE_COMMISSION_DEFAULTS + getEffectiveCommission)
+- [x] **Высокий**: Admin «Конверсия» tab (highlights, features, FAQ, индивидуальная комиссия)
+- [x] **Средний**: Backend: highlights/faq/features/commissionRate в admin create/update endpoints
+
+### Следующие шаги (конверсия)
+- [ ] **Средний**: Scroll-progress indicator на мобиле (% прочитанного)
+- [ ] **Средний**: «Похожие места» блок на venue page
+- [ ] **Низкий**: A/B тестирование CTA-текстов («Купить билет» vs «Выбрать дату»)
+- [ ] **Низкий**: Micro-animations для offer cards (hover, selection feedback)
+
+---
+
+## Музеи и Арт — MVP (4-недельный таймлайн)
+
+### Неделя 1 — Данные и контракты (фундамент)
+- [x] **Критический**: Enum VenueType, DateMode, модель Venue, расширение Event/EventOffer
+- [x] **Критический**: SQL миграция `20260214_venues` (идемпотентная, с verify)
+- [x] **Критический**: Public API: GET /venues, GET /venues/:slug
+- [x] **Критический**: OPEN_DATE фильтр — events с dateMode=OPEN_DATE не отсеиваются фильтром sessions >= now
+- [x] **Критический**: CatalogService.getEvents — 3-ветвичная логика (OPEN_DATE / SCHEDULED / both)
+- [x] **Критический**: getCities, fetchCityBySlug, LandingService — OPEN_DATE поддержка
+
+### Неделя 2 — Админка и контент-операции
+- [x] **Критический**: AdminVenuesController CRUD (list, get, create, update с optimistic lock, soft delete)
+- [x] **Критический**: VenuesList + VenueEdit (табы: основное, расположение, часы, галерея, SEO, выставки, офферы)
+- [x] **Высокий**: EventEdit — venueId select, dateMode toggle, isPermanent/endDate поля
+- [x] **Высокий**: PATCH :id/venue-settings endpoint (прямое обновление Event → venueId/dateMode/isPermanent/endDate)
+- [x] **Высокий**: Seed 25 venue (12 СПб + 13 МСК) — seed-venues.ts (idempotent)
+
+### Неделя 3 — Публичный фронт
+- [x] **Критический**: /venues/[slug] — hero, описание, галерея, часы работы, билеты, выставки, JSON-LD
+- [x] **Критический**: /venues — каталог с VenueCard, фильтры город/тип/сортировка, пагинация
+- [x] **Критический**: VenueCard, VenueFilters компоненты
+- [x] **Высокий**: Header "Музеи и Арт" → /venues, City page секция "Музеи и искусство"
+- [x] **Высокий**: EventCard — dateMode=OPEN_DATE badge + пробросить prop
+- [x] **Высокий**: Event page — ссылка на venue
+- [x] **Высокий**: Quick filter «Открытая дата» в QUICK_FILTERS.MUSEUM
+
+### Неделя 4 — SEO-упаковка и перелинковка
+- [x] **Высокий**: JSON-LD: Museum/Gallery/Park + makesOffer (open-date без startDate) + openingHoursSpecification (нормализация RU→EN)
+- [x] **Высокий**: Venue page → «Читайте также» (связанные статьи по городу)
+- [x] **Высокий**: Blog article page → секция «Музеи и арт-пространства» с VenueCard по городу
+- [x] **Высокий**: VenueService.getRelatedArticles + VenueController возвращает relatedArticles
+- [ ] **Средний**: Контентный план — 30 статей по городам (генерация через ArticlePlanner)
+
+### Исправления багов
+- [x] **Средний**: TS: adminNotes → adminNote в partner-orders.controller.ts
+- [x] **Средний**: TS: subcategories cast в admin-events.controller.ts
+- [x] **Средний**: openingHours: нормализация русских ключей (Пн/Вт) → EN (mon/tue) на venue page
+
+### Отложено (после MVP)
+- [ ] **Средний**: Отзывы на уровне Venue (Review.venueId)
+- [ ] **Низкий**: Sitemap: /venues/* с priority 0.9
+- [ ] **Средний**: Агрегация выставок: isPermanent + endDate сортировка "сейчас идёт / скоро закончится"
+- [ ] **Средний**: Импорт внешних рейтингов (Яндекс/2ГИС) для топ-venue
+
+---
+
+## Partner B2B API — Интеграция с внешними поставщиками
+
+### Модели и миграция
+- [x] **Критический**: Модель ApiKey (keyHash SHA-256, prefix, rateLimit, ipWhitelist, expiresAt)
+- [x] **Критический**: Расширение Operator — webhookUrl + webhookSecret
+- [x] **Критический**: SQL миграция `20260214_partner_api` (идемпотентная)
+
+### Аутентификация
+- [x] **Критический**: ApiKeyGuard — Bearer dbl_xxx..., проверка isActive/expiresAt/IP, fire-and-forget lastUsedAt
+
+### Partner CRUD (каталог)
+- [x] **Высокий**: POST /partner/events — upsert по externalId (создание + обновление)
+- [x] **Высокий**: PUT /partner/events/:externalId — обновление события
+- [x] **Высокий**: DELETE /partner/events/:externalId — деактивация
+- [x] **Высокий**: POST /partner/events/:externalId/offers — upsert оффера
+- [x] **Высокий**: PUT /partner/offers/:externalId — обновление оффера
+- [x] **Высокий**: PATCH /partner/offers/:externalId/availability — быстрое обновление наличия/цены
+- [x] **Средний**: GET /partner/whoami — информация о ключе и операторе
+
+### Partner Orders (заказы)
+- [x] **Высокий**: GET /partner/orders — список заказов (фильтры: status, from, to, пагинация)
+- [x] **Высокий**: GET /partner/orders/:id — детали заказа
+- [x] **Высокий**: POST /partner/orders/:id/confirm — подтверждение (через state machine)
+- [x] **Высокий**: POST /partner/orders/:id/reject — отклонение (через state machine)
+
+### Partner Reports
+- [x] **Средний**: GET /partner/reports/sales — продажи за период (JSON + CSV)
+
+### Webhook
+- [x] **Высокий**: PartnerWebhookService — BullMQ очередь partner-webhooks
+- [x] **Высокий**: PartnerWebhookProcessor — POST на webhookUrl, HMAC-SHA256 подпись
+- [x] **Высокий**: 3 ретрая с exponential backoff (5s → 10s → 20s)
+- [x] **Средний**: Типы: order.created, order.cancelled, payment.paid, payment.refunded
+
+### Admin: управление ключами + webhook
+- [x] **Высокий**: POST /admin/suppliers/:id/api-keys — генерация (plain-text один раз)
+- [x] **Высокий**: GET /admin/suppliers/:id/api-keys — список ключей
+- [x] **Высокий**: DELETE /admin/suppliers/:id/api-keys/:keyId — отзыв
+- [x] **Высокий**: PATCH /admin/suppliers/:id/webhook — настройка URL + автогенерация секрета
+- [x] **Высокий**: Admin UI — секция «API Интеграция» в SupplierDetail (ключи, генерация, копирование, webhook)
+
+---
+
+## Supplier Portal — Маркетплейс
+
+### Модели и миграция
+- [x] **Критический**: Расширение Operator → Supplier (isSupplier, trustLevel, commission, promo, YooKassa, ИНН)
+- [x] **Критический**: SupplierUser модель + SupplierRole enum
+- [x] **Критический**: ModerationStatus enum + поля moderation на Event
+- [x] **Критический**: PaymentIntent split-поля (supplierId, grossAmount, platformFee, supplierAmount)
+- [x] **Критический**: SQL миграция (идемпотентная)
+
+### Supplier Auth
+- [x] **Критический**: JWT стратегия jwt-supplier (отдельная от admin)
+- [x] **Критический**: Регистрация поставщика (Operator + SupplierUser транзакция)
+- [x] **Критический**: Логин + refresh token (HttpOnly cookie)
+- [x] **Критический**: SupplierJwtGuard + SupplierRolesGuard
+
+### Supplier CRUD
+- [x] **Высокий**: CRUD событий (supplier/events) — только свои
+- [x] **Высокий**: CRUD офферов (supplier/events/:id/offers)
+- [x] **Высокий**: Модерация по Trust Level (PENDING_REVIEW / AUTO_APPROVED)
+- [x] **Высокий**: Dashboard поставщика (статистика, финансы)
+- [x] **Высокий**: Отчёты о продажах + CSV экспорт
+- [x] **Высокий**: Настройки профиля поставщика
+
+### Admin: управление маркетплейсом
+- [x] **Высокий**: Список поставщиков + детали + финансовая сводка
+- [x] **Высокий**: Управление Trust Level / комиссией / промо
+- [x] **Высокий**: Очередь модерации (approve / reject с причиной)
+- [x] **Высокий**: Аналитика по поставщикам (топ по доходу)
+
+### Frontend
+- [x] **Высокий**: Supplier Portal (Vite + React) — Login, Register, Dashboard, Events CRUD, Reports, Settings
+- [x] **Высокий**: Admin: страницы Поставщики и Модерация + sidebar
+
+### Split Payment
+- [x] **Высокий**: Commission calculation в PaymentService (effectiveRate + promo)
+- [x] **Высокий**: Split-ready данные в PaymentIntent (snapshot ставки)
+- [x] **Средний**: successfulSales increment при оплате
+- [ ] **Средний**: Подключение YooKassa Split API (после получения ключей)
+
+---
 
 ## Легенда
 
@@ -601,10 +886,10 @@
 ### Гибридные туры: ручные офферы + корзина + checkout
 
 #### Этап 1: Ручные офферы к существующим Event
-- [x] **Критический**: Prisma schema — REQUEST_ONLY в PurchaseType, MANUAL в EventSource, availabilityMode/badge/operatorId в EventOffer
+- [x] **Критический**: Prisma schema — REQUEST в PurchaseType, MANUAL в EventSource, availabilityMode/badge/operatorId в EventOffer
 - [x] **Критический**: Backend CRUD офферов — POST/PUT/DELETE/clone в admin-events.controller
 - [x] **Высокий**: Admin UI — форма создания/редактирования/клонирования оффера (Dialog в EventEdit, OffersSection)
-- [x] **Высокий**: Frontend — обработка REQUEST_ONLY (форма заявки), badge на оффере, multi-offer display
+- [x] **Высокий**: Frontend — обработка REQUEST (форма заявки), badge на оффере, multi-offer display
 
 #### Этап 2: Создание новых Event через wizard
 - [x] **Высокий**: Backend — POST /admin/events (ручной Event + первый offer в транзакции, auto-slug транслитерация)
@@ -620,5 +905,107 @@
 - [x] **Высокий**: Admin — AdminCheckoutController (GET/PATCH sessions, GET requests, POST confirm/reject)
 - [x] **Высокий**: Sidebar — пункт "Заявки" в секции "Основное"
 - [ ] **Средний**: Email-уведомления клиенту при подтверждении/отклонении заявки (через MailService)
-- [ ] **Средний**: Cron для автоматического истечения заявок (TTL 30 мин / 24ч)
-- [ ] **Низкий**: Подключение YooKassa для online-оплаты
+- [x] **Средний**: Cron для автоматического истечения заявок (TTL 30 мин / 24ч) → OrderExpiryService
+- [~] **Низкий**: Подключение YooKassa для online-оплаты → PaymentIntent stub готов, осталось подключить SDK
+
+#### Этап 4: Консолидация и аналитика
+- [x] **Критический**: PurchaseType 4 → 3: TC_WIDGET → WIDGET, REQUEST_ONLY → REQUEST, убран API_CHECKOUT
+- [x] **Критический**: SQL-миграция пересоздания enum с обновлением данных
+- [x] **Высокий**: State Machine для CheckoutSession и OrderRequest (checkout-state-machine.ts)
+- [x] **Высокий**: SLA/TTL для OrderRequest — поле slaMinutes, автоистечение через cron
+- [x] **Высокий**: Аналитический отчёт — GET /admin/checkout/analytics + вкладка "Аналитика" в admin UI
+- [x] **Средний**: Маппинг обратной совместимости PURCHASE_TYPE_COMPAT в shared
+
+#### Этап 5: Foundation Hardening (2026-02-13)
+- [x] **Высокий**: Zod-валидация widgetPayload по provider (TC, RADARIO, TIMEPAD, Generic)
+- [x] **Высокий**: Payload versioning — `v: 1` в widgetPayload JSONB
+- [x] **Высокий**: State Machine v3 — структурный return `{allowed, noOp, reason}`, запрещённые переходы в AuditLog
+- [x] **Высокий**: COMPAT метрики: `legacyPurchaseTypeHits` + kill switch `DISABLE_PURCHASE_TYPE_COMPAT`
+- [x] **Высокий**: Миграция идемпотентная: проверки существования + SQL-assert контрактов
+- [x] **Высокий**: `completedAt` для CheckoutSession (аналитика p50/p90)
+- [x] **Средний**: CSV Export — заявки и сессии + кнопки в Admin UI (BOM для Excel)
+- [x] **Средний**: Snapshot enriched: offerId, source, purchaseTypeResolved, priceCurrency, snapshotAt
+- [x] **Средний**: Write-once guard для offersSnapshot (assertSnapshotImmutable)
+- [x] **Средний**: Инвариант-тесты — 22 теста (vitest): state machine, payload, expiry, compat
+- [x] **Средний**: Endpoint compat-metrics для мониторинга legacy PurchaseType
+
+#### Этап 6: Compat AuditLog + PaymentIntent (2026-02-13)
+- [x] **Высокий**: Compat metrics → AuditLog (персистентный через setCompatLogger callback)
+- [x] **Высокий**: PaymentIntent модель — PENDING/PROCESSING/PAID/FAILED/CANCELLED/REFUNDED + idempotencyKey
+- [x] **Высокий**: Идемпотентная SQL-миграция payment_intents + PaymentStatus enum
+- [x] **Высокий**: State machine для PaymentIntent (по акторам: system/user/admin)
+- [x] **Высокий**: PaymentService — STUB provider (mock payment_url, simulate-paid)
+- [x] **Средний**: Checkout endpoints: /pay, /payment/:id, /simulate-paid, /webhook/payment
+- [x] **Средний**: Admin: paymentIntents в деталях сессии + payment stats в аналитике
+- [x] **Средний**: 28 инвариант-тестов (6 новых на PaymentIntent)
+
+---
+
+## Фаза 4: Продуктовый рост (roadmap)
+
+> Приоритеты определены 2026-02-13. Порядок — по бизнес-влиянию.
+
+### 1. Посадочные страницы — UX/конверсия
+- [ ] **Критический**: Аудит текущих лендингов — мобильная версия, скорость, CTA
+- [ ] **Критический**: FilterBar v2 — sticky на мобильном, быстрые фильтры, сброс
+- [ ] **Высокий**: ComparisonTable — улучшить читаемость, highlight лучшего оффера
+- [ ] **Высокий**: VariantCard — социальное доказательство (рейтинг, кол-во отзывов)
+- [ ] **Высокий**: CTA-блоки — A/B тестирование формулировок и позиционирования
+- [ ] **Средний**: PromoBlock — сезонные акции, "популярное сегодня"
+
+### 2. SEO-блог + перелинковка
+- [ ] **Критический**: Стратегия ключевых слов — топ-10 запросов на город
+- [ ] **Высокий**: Шаблон SEO-статьи: H1 + EventCard-блоки + internal links
+- [ ] **Высокий**: Перелинковка статья ↔ событие (двусторонняя)
+- [ ] **Высокий**: Schema.org разметка для статей (Article, BreadcrumbList)
+- [ ] **Средний**: Автогенерация мета-описаний для каталога (по шаблону)
+- [ ] **Низкий**: RSS-фид для статей
+
+### 3. YooKassa — тестовые платежи
+- [ ] **Критический**: Подключить YooKassa SDK → заменить STUB в payment.service
+- [ ] **Критический**: Sandbox-тесты: создание платежа, webhook PAID/FAILED
+- [ ] **Высокий**: IP whitelist + HMAC верификация webhook
+- [ ] **Высокий**: Страница "Оплата прошла" / "Ошибка оплаты" на фронте
+- [ ] **Средний**: Возвраты через админку (PAID → REFUNDED)
+
+### 4. Unified Checkout (для планировщика программ)
+- [ ] **Высокий**: Создание заказов в TC/TEP API на нашей стороне при оплате через YooKassa
+- [ ] **Высокий**: Обработка двойного резерва (15 мин TC vs наша оплата) — sequence: pay → reserve → confirm
+- [ ] **Высокий**: Partial failure handling: если 1 из 3 событий не забронировано → partial refund
+- [ ] **Средний**: Объединение нескольких источников (TC + TEP + MANUAL) в одной корзине с единой оплатой
+- [ ] **Средний**: Rollback механизм для отмены заказов в TC при ошибке оплаты
+
+### 5. Единые ваучеры (Trip Planner)
+- [ ] **Высокий**: Дизайн ваучера — QR + данные всех событий пакета
+- [ ] **Высокий**: Калькуляция: сумма офферов + сервисный сбор − скидка за пакет
+- [ ] **Высокий**: Политика отмен: полный возврат (>7д), частичный (3-7д), без возврата (<3д)
+- [ ] **Средний**: Переносы: замена события в пакете (если оператор позволяет)
+- [ ] **Средний**: Генерация PDF-ваучера (email + личный кабинет)
+
+### 6. Система поддержки (Phase 1)
+- [x] **Высокий**: Публичная страница /help с 20+ FAQ, категориями, FAQPage JSON-LD
+- [x] **Высокий**: Трекинг заказа /orders/track по shortCode (без авторизации)
+- [x] **Высокий**: Email-уведомления по статусам заказа (created/confirmed/rejected/expired/completed)
+- [x] **Высокий**: Модель SupportTicket + TicketResponse + Prisma-миграция
+- [x] **Высокий**: Backend CRUD (публичный + admin) + авто-маршрутизация + SLA
+- [x] **Высокий**: Admin UI: список тикетов, фильтры, детали, ответы, шаблоны, внутренние заметки
+- [x] **Высокий**: Виджет обратной связи (floating button + modal) на всех страницах
+- [x] **Высокий**: Клиентская форма ContactForm на /help
+- [ ] **Средний**: Scroll-progress indicator на мобиле (% прочитанного)
+- [ ] **Средний**: «Похожие места» блок на venue page
+- [ ] **Низкий**: A/B тестирование CTA-текстов («Купить билет» vs «Выбрать дату»)
+- [ ] **Низкий**: Micro-animations для offer cards (hover, selection feedback)
+
+### 7. Post-seed: связь Venue ↔ Event
+- [x] **Высокий**: seed-venue-links.ts — привязка Event → Venue по ключевым словам (15 правил)
+- [x] **Высокий**: OPEN_DATE событие + MANUAL оффер для Эрмитажа (REDIRECT)
+- [x] **Высокий**: Каскадная привязка EventOffer.venueId к venue
+- [x] **Высокий**: imageUrl + galleryUrls для ТОП-10 venues (Unsplash placeholders)
+- [x] **Средний**: next.config.ts — remotePatterns для Unsplash и Wikimedia
+- [x] **Средний**: VenueDetail интерфейс — добавлены highlights, faq, features, recommendPercent, reviews, relatedArticles
+- [ ] **Средний**: Заменить Unsplash placeholders на собственные фото (S3/CDN)
+
+### 8. Усиление ресурса
+- [ ] **Средний**: Партнёрская программа — операторы добавляют свои события
+- [ ] **Низкий**: Тематические подборки (сезонные, праздники)
+- [ ] **Низкий**: Геймификация — бейджи "Исследователь Петербурга"

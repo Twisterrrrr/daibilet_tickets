@@ -50,10 +50,10 @@ export default async function CombosListPage() {
           <div className="text-center py-16 text-gray-500">
             <p className="text-lg">Скоро здесь появятся готовые программы.</p>
             <Link
-              href="/planner"
+              href="/events"
               className="mt-4 inline-block text-indigo-600 hover:underline"
             >
-              Попробуйте планировщик &rarr;
+              Смотреть каталог событий &rarr;
             </Link>
           </div>
         ) : (
@@ -134,16 +134,16 @@ export default async function CombosListPage() {
       {/* CTA */}
       <section className="bg-white py-12 border-t">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-4">Хотите индивидуальную программу?</h2>
+          <h2 className="text-2xl font-bold mb-4">Ищете что-то конкретное?</h2>
           <p className="text-gray-600 mb-6">
-            Планировщик подберёт события под ваши даты, интересы и бюджет
+            Посмотрите все события по категориям, городам и датам
           </p>
           <Link
-            href="/planner"
+            href="/events"
             className="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-indigo-700 transition-colors"
           >
             <Star className="w-5 h-5" />
-            Запустить планировщик
+            Смотреть каталог
           </Link>
         </div>
       </section>

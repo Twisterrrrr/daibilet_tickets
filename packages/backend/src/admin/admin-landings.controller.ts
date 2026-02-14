@@ -10,6 +10,7 @@ import {
   HowToChooseSchema, InfoBlockSchema, AdditionalFiltersSchema,
   validateJson,
 } from './json-schemas';
+import { CreateLandingDto, UpdateLandingDto } from './dto/admin-landing.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -31,6 +32,7 @@ export class AdminLandingsController {
       where,
       include: { city: { select: { slug: true, name: true } } },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+      take: 500,
     });
   }
 
@@ -44,15 +46,15 @@ export class AdminLandingsController {
 
   @Post()
   @Roles('ADMIN', 'EDITOR')
-  async create(@Body() data: any) {
+  async create(@Body() data: CreateLandingDto) {
     this.validateJsonFields(data);
     return this.prisma.landingPage.create({ data });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: any, @Request() req: any) {
-    const { id: _, createdAt, updatedAt, city, version, ...clean } = data;
+  async update(@Param('id') id: string, @Body() data: UpdateLandingDto, @Request() req: any) {
+    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as any;
 
     this.validateJsonFields(clean);
 
@@ -97,8 +99,8 @@ export class AdminLandingsController {
       if (data.howToChoose !== undefined) validateJson(HowToChooseSchema, data.howToChoose, 'howToChoose');
       if (data.infoBlocks !== undefined) validateJson(InfoBlockSchema, data.infoBlocks, 'infoBlocks');
       if (data.additionalFilters !== undefined) validateJson(AdditionalFiltersSchema, data.additionalFilters, 'additionalFilters');
-    } catch (e: any) {
-      throw new BadRequestException(e.message);
+    } catch (e: unknown) {
+      throw new BadRequestException(e instanceof Error ? e.message : String(e));
     }
   }
 }

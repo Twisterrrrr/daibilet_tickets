@@ -1,7 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { join } from 'path';
+import { RequestIdMiddleware } from './common/request-id.middleware';
 import { PrismaModule } from './prisma/prisma.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { PlannerModule } from './planner/planner.module';
@@ -16,6 +18,11 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { RedisCacheModule } from './cache/cache.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
+import { SupplierModule } from './supplier/supplier.module';
+import { PartnerModule } from './partner/partner.module';
+import { VenueModule } from './venue/venue.module';
+import { CollectionModule } from './collection/collection.module';
+import { SupportModule } from './support/support.module';
 import { MailModule } from './mail/mail.module';
 import { UploadModule } from './upload/upload.module';
 import { QueueModule } from './queue/queue.module';
@@ -51,6 +58,19 @@ import { QueueModule } from './queue/queue.module';
     SchedulerModule,
     AuthModule,
     AdminModule,
+    SupplierModule,
+    PartnerModule,
+    VenueModule,
+    CollectionModule,
+    SupportModule,
+  ],
+  providers: [
+    // Глобальный rate limiter (30 req/min по умолчанию, per-route через @Throttle)
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}

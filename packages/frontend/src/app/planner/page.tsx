@@ -71,7 +71,7 @@ export default function PlannerPage() {
   const [selectedUpsells, setSelectedUpsells] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    api.getCities().then(setCities).catch(() => {});
+    api.getCities().then(setCities).catch((e) => { console.error('Planner error:', e); });
   }, []);
 
   useEffect(() => {
@@ -142,7 +142,8 @@ export default function PlannerPage() {
       const dCount = res.variants?.[0]?.days?.length || 0;
       if (dCount <= 3) setExpandedDays(new Set(Array.from({ length: dCount }, (_, i) => i + 1)));
       trackPlannerResult(city, res.variants?.length || 0);
-    } catch {
+    } catch (e) {
+      console.error('Planner error:', e);
       setResult({ error: true, message: 'Ошибка при подборе программы' });
     } finally {
       setLoading(false);

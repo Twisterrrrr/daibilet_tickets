@@ -61,8 +61,8 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       });
 
       await this.client.connect();
-    } catch (err: any) {
-      this.logger.warn(`Redis не подключён (${err.message}) — работаем без кэша`);
+    } catch (err: unknown) {
+      this.logger.warn(`Redis не подключён (${err instanceof Error ? err.message : String(err)}) — работаем без кэша`);
       this.client = null;
       this.enabled = false;
     }

@@ -2,8 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService, CACHE_TTL } from '../cache/cache.service';
 import { EventsQueryDto } from './dto/events-query.dto';
-import { Prisma } from '@prisma/client';
+import { Prisma, DateMode, EventSubcategory, TagCategory } from '@prisma/client';
 import { EventOverrideService } from '../admin/event-override.service';
+import { RegionService } from './region.service';
 
 @Injectable()
 export class CatalogService {
@@ -11,6 +12,7 @@ export class CatalogService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly overrideService: EventOverrideService,
+    private readonly regionService: RegionService,
   ) {}
 
   // --- Города ---
@@ -19,6 +21,17 @@ export class CatalogService {
     const cacheKey = `cities:list:${featured ?? 'all'}`;
 
     return this.cache.getOrSet(cacheKey, CACHE_TTL.CITIES, async () => {
+      // ID городов, которые являются не-хабовыми членами регионов
+      // (они отображаются внутри карточки хаб-города в блоке «Также в регионе»)
+      const regionMembers = await this.prisma.$queryRaw<{ cityId: string }[]>`
+        SELECT rc."cityId"
+        FROM region_cities rc
+        JOIN regions r ON rc."regionId" = r.id
+        WHERE r."isActive" = true
+          AND rc."cityId" != r."hubCityId"
+      `;
+      const hiddenCityIds = new Set(regionMembers.map((r) => r.cityId));
+
       const cities = await this.prisma.city.findMany({
         where: {
           isActive: true,
@@ -30,10 +43,15 @@ export class CatalogService {
               events: {
                 where: {
                   isActive: true,
-                  sessions: {
-                    some: { isActive: true, startsAt: { gte: new Date() } },
-                  },
+                  isDeleted: false,
+                  OR: [
+                    { dateMode: DateMode.SCHEDULED, sessions: { some: { isActive: true, startsAt: { gte: new Date() } } } },
+                    { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: new Date() } }] },
+                  ],
                 },
+              },
+              venues: {
+                where: { isActive: true },
               },
             },
           },
@@ -44,7 +62,38 @@ export class CatalogService {
           },
         },
       });
-      return cities.sort((a, b) => b._count.events - a._count.events);
+
+      // Количество событий в не-хабовых городах каждого региона (один запрос)
+      const regionStats = await this.prisma.$queryRaw<
+        { slug: string; name: string; hubCityId: string; event_count: bigint }[]
+      >`
+        SELECT r.slug, r.name, r."hubCityId", COUNT(DISTINCT e.id) as event_count
+        FROM regions r
+        JOIN region_cities rc ON rc."regionId" = r.id AND rc."cityId" != r."hubCityId"
+        JOIN events e ON e."cityId" = rc."cityId" AND e."isActive" = true
+          AND (
+            (e."dateMode" = 'SCHEDULED' AND EXISTS(
+              SELECT 1 FROM event_sessions s
+              WHERE s."eventId" = e.id AND s."isActive" = true AND s."startsAt" > NOW()
+            ))
+            OR
+            (e."dateMode" = 'OPEN_DATE' AND (e."endDate" IS NULL OR e."endDate" > NOW()))
+          )
+        WHERE r."isActive" = true
+        GROUP BY r.id
+      `;
+      const regionByHub = new Map(
+        regionStats.map((r) => [r.hubCityId, { slug: r.slug, name: r.name, eventCount: Number(r.event_count) }]),
+      );
+
+      return cities
+        // Скрываем не-хабовые областные города и города без событий
+        .filter((c) => !hiddenCityIds.has(c.id) && c._count.events > 0)
+        .sort((a, b) => b._count.events - a._count.events)
+        .map((c) => ({
+          ...c,
+          region: regionByHub.get(c.id) ?? null,
+        }));
     });
   }
 
@@ -54,16 +103,27 @@ export class CatalogService {
   }
 
   private async fetchCityBySlug(slug: string) {
+    // Активные события: SCHEDULED с будущими сеансами ИЛИ OPEN_DATE (без endDate или не истёк)
+    const activeEventFilter: Prisma.EventWhereInput = {
+      isActive: true,
+      isDeleted: false,
+      OR: [
+        {
+          dateMode: DateMode.SCHEDULED,
+          sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
+        },
+        {
+          dateMode: DateMode.OPEN_DATE,
+          OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+        },
+      ],
+    };
+
     const city = await this.prisma.city.findUnique({
       where: { slug },
       include: {
         events: {
-          where: {
-            isActive: true,
-            sessions: {
-              some: { isActive: true, startsAt: { gte: new Date() } },
-            },
-          },
+          where: activeEventFilter,
           orderBy: { rating: 'desc' },
           take: 20,
           include: {
@@ -85,23 +145,26 @@ export class CatalogService {
 
     if (!city) throw new NotFoundException(`Город "${slug}" не найден`);
 
-    // Статистика по категориям (только события с будущими сеансами)
-    const hasFutureSessions = {
-      sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
+    // Статистика по категориям (с поддержкой OPEN_DATE)
+    const hasFutureSessions: Prisma.EventWhereInput = {
+      OR: [
+        { dateMode: DateMode.SCHEDULED, sessions: { some: { isActive: true, startsAt: { gte: new Date() } } } },
+        { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: new Date() } }] },
+      ],
     };
     const [excursionCount, museumCount, eventCount, totalCount] =
       await Promise.all([
         this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, category: 'EXCURSION', ...hasFutureSessions },
+          where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EXCURSION', ...hasFutureSessions },
         }),
         this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, category: 'MUSEUM', ...hasFutureSessions },
+          where: { cityId: city.id, isActive: true, isDeleted: false, category: 'MUSEUM', ...hasFutureSessions },
         }),
         this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, category: 'EVENT', ...hasFutureSessions },
+          where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EVENT', ...hasFutureSessions },
         }),
         this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, ...hasFutureSessions },
+          where: { cityId: city.id, isActive: true, isDeleted: false, ...hasFutureSessions },
         }),
       ]);
 
@@ -129,45 +192,90 @@ export class CatalogService {
       (a, b) => b._count.events - a._count.events,
     );
 
+    // Превью событий региона (если город — хаб)
+    const regionPreview = await this.regionService.getRegionPreviewByHubCity(city.id);
+
     return {
       ...city,
       stats: { excursionCount, museumCount, eventCount, totalCount },
       popularTags: sortedTags,
+      regionPreview,
     };
   }
 
   // --- События ---
 
   async getEvents(query: EventsQueryDto) {
-    const { city, category, subcategory, audience, tag, dateFrom, dateTo, sort, timeOfDay, pier, maxDuration, minDuration, maxMinAge, page = 1, limit = 20 } = query;
+    const { city, category, subcategory, audience, tag, dateFrom, dateTo, sort, timeOfDay, pier, maxDuration, minDuration, maxMinAge, dateMode, venueId, page = 1, limit = 20 } = query;
+
+    // --- Фильтр сеансов: OPEN_DATE не требуют sessions ---
+    // dateMode=OPEN_DATE → нет сеансов, показываем если isActive и не истёк endDate
+    // dateMode=SCHEDULED (или без фильтра) → обычный фильтр по sessions
+    const isOpenDateOnly = dateMode === 'OPEN_DATE';
+
+    const sessionFilter: Prisma.EventWhereInput = isOpenDateOnly
+      ? {
+          // OPEN_DATE: нет сеансов, но проверяем что не истёк endDate (если задан)
+          dateMode: DateMode.OPEN_DATE,
+          OR: [
+            { endDate: null },                            // вечная экспозиция
+            { endDate: { gte: new Date() } },             // ещё не закончилась
+          ],
+        }
+      : dateMode
+        ? {
+            // Явный SCHEDULED — только с будущими сеансами
+            dateMode: DateMode.SCHEDULED,
+            sessions: {
+              some: {
+                isActive: true,
+                startsAt: {
+                  ...(sort === 'departing_soon'
+                    ? { gte: new Date(), lte: new Date(Date.now() + 2 * 60 * 60 * 1000) }
+                    : { gte: dateFrom ? new Date(dateFrom) : new Date(), ...(dateTo && { lte: new Date(dateTo) }) }),
+                },
+              },
+            },
+          }
+        : {
+            // Без фильтра dateMode — показываем ОБА: SCHEDULED с сеансами ИЛИ OPEN_DATE
+            OR: [
+              {
+                dateMode: DateMode.SCHEDULED,
+                sessions: {
+                  some: {
+                    isActive: true,
+                    startsAt: {
+                      ...(sort === 'departing_soon'
+                        ? { gte: new Date(), lte: new Date(Date.now() + 2 * 60 * 60 * 1000) }
+                        : { gte: dateFrom ? new Date(dateFrom) : new Date(), ...(dateTo && { lte: new Date(dateTo) }) }),
+                    },
+                  },
+                },
+              },
+              {
+                dateMode: DateMode.OPEN_DATE,
+                OR: [
+                  { endDate: null },
+                  { endDate: { gte: new Date() } },
+                ],
+              },
+            ],
+          };
 
     const where: Prisma.EventWhereInput = {
       isActive: true,
+      isDeleted: false,
       canonicalOfId: null, // Не показывать дубли (помеченные как дубликат)
       // Только события из активных городов
       city: {
         isActive: true,
         ...(city && { slug: city }),
       },
-      // Показываем только события с будущими активными сеансами
-      sessions: {
-        some: {
-          isActive: true,
-          startsAt: {
-            ...(sort === 'departing_soon'
-              ? {
-                  gte: new Date(),
-                  lte: new Date(Date.now() + 2 * 60 * 60 * 1000),
-                }
-              : {
-                  gte: dateFrom ? new Date(dateFrom) : new Date(),
-                  ...(dateTo && { lte: new Date(dateTo) }),
-                }),
-          },
-        },
-      },
+      // Фильтр сеансов с поддержкой OPEN_DATE
+      ...sessionFilter,
       ...(category && { category }),
-      ...(subcategory && { subcategories: { has: subcategory as any } }),
+      ...(subcategory && { subcategories: { has: subcategory as EventSubcategory } }),
       ...(audience === 'KIDS' ? { audience: { in: ['KIDS', 'FAMILY'] } } : audience ? { audience } : {}),
       ...(tag && { tags: { some: { tag: { slug: tag } } } }),
       ...(pier && { startLocationId: pier }),
@@ -178,6 +286,7 @@ export class CatalogService {
         },
       } : {}),
       ...(maxMinAge !== undefined && maxMinAge !== null ? { minAge: { lte: maxMinAge } } : {}),
+      ...(venueId && { venueId }),
     };
 
     // Time of day filter: restrict events to those with sessions in the given MSK hour range.
@@ -236,7 +345,7 @@ export class CatalogService {
         }
         const ids = timeEventIds.map((r) => r.eventId);
         if (ids.length > 0) {
-          (where as any).id = { in: ids };
+          where.id = { in: ids };
         } else {
           return { items: [], total: 0, page, totalPages: 0 };
         }
@@ -261,7 +370,7 @@ export class CatalogService {
           city: { select: { slug: true, name: true } },
           tags: { include: { tag: true } },
           offers: {
-            where: { status: 'ACTIVE' },
+            where: { status: 'ACTIVE', isDeleted: false },
             orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
             select: {
               id: true,
@@ -315,17 +424,18 @@ export class CatalogService {
   }
 
   private async fetchEventBySlug(slug: string) {
-    const event = await this.prisma.event.findUnique({
-      where: { slug },
+    const event = await this.prisma.event.findFirst({
+      where: { slug, isDeleted: false },
       include: {
         city: true,
+        venue: { select: { id: true, slug: true, title: true, shortTitle: true, venueType: true } },
         sessions: {
           where: { isActive: true, startsAt: { gte: new Date() } },
           orderBy: { startsAt: 'asc' },
           take: 20,
         },
         offers: {
-          where: { status: 'ACTIVE' },
+          where: { status: 'ACTIVE', isDeleted: false },
           orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
           include: {
             sessions: {
@@ -350,6 +460,7 @@ export class CatalogService {
         cityId: event.cityId,
         category: event.category,
         isActive: true,
+        isDeleted: false,
         canonicalOfId: null,
         id: { not: event.id },
         sessions: {
@@ -369,7 +480,7 @@ export class CatalogService {
     return this.prisma.tag.findMany({
       where: {
         isActive: true,
-        ...(category && { category: category as any }),
+        ...(category && { category: category as TagCategory }),
       },
       orderBy: { name: 'asc' },
       include: {
@@ -389,6 +500,7 @@ export class CatalogService {
     const pageNum = Math.max(1, parseInt(String(page || '1'), 10) || 1);
     const where: Prisma.EventWhereInput = {
       isActive: true,
+      isDeleted: false,
       tags: { some: { tagId: tag.id } },
       ...(city && { city: { slug: city } }),
     };
@@ -419,6 +531,7 @@ export class CatalogService {
   private async fetchSearch(q: string, city?: string) {
     const where: Prisma.EventWhereInput = {
       isActive: true,
+      isDeleted: false,
       OR: [
         { title: { contains: q, mode: 'insensitive' } },
         { description: { contains: q, mode: 'insensitive' } },

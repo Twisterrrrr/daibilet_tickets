@@ -1,6 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
+import { Prisma } from '@prisma/client';
+
+interface CuratedEventSlot {
+  eventId: string;
+  dayNumber: number;
+  slot: string;
+  time: string;
+}
 
 /**
  * Combo Service — готовые программы.
@@ -55,7 +63,7 @@ export class ComboService {
       throw new NotFoundException('Combo-страница не найдена');
     }
 
-    let curatedItems = (combo.curatedEvents as any[]) || [];
+    let curatedItems = (combo.curatedEvents as unknown as CuratedEventSlot[]) || [];
 
     // Auto-fill ТОЛЬКО если пусто (первичное заполнение)
     if (curatedItems.length === 0) {
@@ -63,7 +71,7 @@ export class ComboService {
       if (curatedItems.length > 0) {
         await this.prisma.comboPage.update({
           where: { id: combo.id },
-          data: { curatedEvents: curatedItems },
+          data: { curatedEvents: curatedItems as unknown as Prisma.InputJsonValue },
         });
         this.logger.log(`Auto-filled ${curatedItems.length} events for combo "${slug}"`);
       }
@@ -83,7 +91,7 @@ export class ComboService {
 
     await this.prisma.comboPage.update({
       where: { id: combo.id },
-      data: { curatedEvents: curatedItems },
+      data: { curatedEvents: curatedItems as unknown as Prisma.InputJsonValue },
     });
 
     return {
@@ -114,7 +122,7 @@ export class ComboService {
     const results: { slug: string; action: string; eventsAssigned: number }[] = [];
 
     for (const combo of combos) {
-      const curatedItems = (combo.curatedEvents as any[]) || [];
+      const curatedItems = (combo.curatedEvents as unknown as CuratedEventSlot[]) || [];
 
       // Случай 1: curatedEvents пуст → первичное заполнение
       if (curatedItems.length === 0) {
@@ -122,7 +130,7 @@ export class ComboService {
         if (items.length > 0) {
           await this.prisma.comboPage.update({
             where: { id: combo.id },
-            data: { curatedEvents: items },
+            data: { curatedEvents: items as unknown as Prisma.InputJsonValue },
           });
           results.push({ slug: combo.slug, action: 'filled', eventsAssigned: items.length });
         } else {
@@ -140,7 +148,7 @@ export class ComboService {
         if (items.length > 0) {
           await this.prisma.comboPage.update({
             where: { id: combo.id },
-            data: { curatedEvents: items },
+            data: { curatedEvents: items as unknown as Prisma.InputJsonValue },
           });
           results.push({
             slug: combo.slug,

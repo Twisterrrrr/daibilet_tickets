@@ -1,10 +1,22 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-02-13
+> Последнее обновление: 2026-02-15
 
 ## Миссия
 
-Агрегатор билетов на экскурсии, музеи и мероприятия с умным подбором программы поездки. Стартовые города: Москва, Санкт-Петербург, Казань, Владимир, Ярославль.
+Агрегатор билетов на экскурсии, музеи и мероприятия с умным подбором программы поездки. Стартовые города: Москва, Санкт-Петербург, Казань, Калининград, Владимир, Ярославль.
+
+## Конкурентная стратегия
+
+Главный конкурент: [Tripster](https://experience.tripster.ru/) — лидер рынка экскурсий в России.
+
+Прямое соревнование по UX/дизайну нецелесообразно. Побеждаем на трёх полях, где Tripster структурно слаб:
+
+1. **Посадочные страницы** — многоуровневая таксономия (города, регионы, площадки, категории, подкатегории, теги, комбо) даёт десятки уникальных SEO-страниц. У Tripster — плоский каталог (город → экскурсии от гидов).
+
+2. **AI-контент** — масштабируемое создание SEO-статей и описаний с привязкой к реальным данным (цены, наличие, расписание). Формула: AI-каркас + ручная редактура + уникальные фото + перелинковка.
+
+3. **Планировщик туров** — killer feature, отсутствующая у всех конкурентов (Tripster, GetYourGuide, Viator, Sputnik8). Пользователь выбирает город + даты + состав группы → получает готовую программу с билетами.
 
 ## Архитектура
 
@@ -23,8 +35,10 @@
 - **Ticketscloud gRPC (tc-simple)** — каталог событий (MetaEvent-based синхронизация)
 - **Ticketscloud REST v2** — создание заказов, управление бронированиями
 - **Ticketscloud Widget (JS)** — покупка билетов на фронтенде (JWT-токен)
-- **YooKassa** — оплата бандлов/программ (запланировано)
+- **teplohod.info API v1** — каталог речных прогулок (55 событий, ~2000 сессий с реальным расписанием)
+- **YooKassa** — оплата бандлов/программ + Split Payment для маркетплейса (запланировано)
 - **SMTP** — транзакционные email (@nestjs-modules/mailer + Handlebars)
+- **Partner B2B API** — machine-to-machine API для внешних поставщиков (API-ключи, webhook-уведомления)
 
 ## Модель данных (ключевые сущности)
 
@@ -51,8 +65,16 @@
 - **ExternalReview** — импортированные отзывы с внешних площадок (Яндекс.Карты, 2ГИС, Tripadvisor, Google). Поля: source, sourceUrl, authorName, rating, text, publishedAt. Участвует в recalculateEventRating.
 - **ReviewRequest** — пост-покупочный запрос на отзыв (email, eventId, token, sentAt, reminderSentAt, openedAt, clickedAt, reviewId). Unique: email + eventId.
 - **Event.externalRating/externalReviewCount/externalSource** — ручной импорт рейтинга из внешних платформ. Участвует в расчёте итогового rating через взвешенное среднее (вместе с Review и ExternalReview).
+- **CheckoutSession** — сессия оформления заказа (snapshot корзины, контакт, UTM, статусы через State Machine). Immutable `offersSnapshot` с write-once guard.
+- **OrderRequest** — заявка на подтверждение (SLA/TTL, expireReason, confirmedAt). Привязана к CheckoutSession.
+- **PaymentIntent** — платёжное намерение (PENDING/PROCESSING/PAID/FAILED/CANCELLED/REFUNDED). Привязка к CheckoutSession, idempotencyKey, provider (STUB/YOOKASSA). Split-поля для маркетплейса: supplierId, grossAmount, platformFee, supplierAmount, commissionRate.
+- **Operator** — организатор/оператор, расширен до Supplier: isSupplier, trustLevel (0/1/2), commissionRate (25%), promoRate (7%), yookassaAccountId, ИНН, контакты, webhookUrl/webhookSecret.
+- **SupplierUser** — авторизация поставщика (OWNER/MANAGER), отдельная JWT-стратегия `jwt-supplier`.
+- **ApiKey** — API-ключ для Partner B2B API: SHA-256 хеш (не храним оригинал), prefix (8 символов для UI), rateLimit, ipWhitelist, expiresAt.
+- **Venue** — место (музей, галерея, арт-пространство). VenueType enum (MUSEUM/GALLERY/ART_SPACE/EXHIBITION_HALL/THEATER/PALACE/PARK). Содержит: openingHours (JSON), priceFrom, rating, galleryUrls, address/metro/lat/lng, operatorId (партнёр). Soft delete, optimistic lock.
+- **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate.
+- **EventOffer расширен**: venueId для прямых офферов к месту (без привязки к Event).
 - **Location** — причал, площадка, точка встречи (каркас, Фаза 2)
-- **Operator** — организатор/оператор (каркас, Фаза 2)
 - **Route** — маршрут с POI (каркас, Фаза 2)
 
 ### Классификация при синхронизации
@@ -230,6 +252,97 @@ Article
 - Погодный бейдж: комфортно/ветрено + рекомендация
 - Upsell через TripCombo
 - "Следить за ценой" / "Лучшие предложения недели"
+
+---
+
+## Partner B2B API — Машинная интеграция
+
+> Добавлено: 2026-02-14. Для поставщиков со своей системой бронирования.
+
+### Архитектура
+
+```
+Система поставщика  ──[API Key + REST]──►  Partner API  ──►  PostgreSQL
+                    ◄──[POST webhookUrl]──  Webhook Service
+```
+
+### Аутентификация
+
+- Формат ключа: `dbl_` + 32 случайных символа
+- Хранение: SHA-256 хеш в `api_keys`, оригинал не хранится
+- Проверки: isActive, expiresAt, ipWhitelist, operator.isActive
+- `lastUsedAt` обновляется fire-and-forget
+
+### Endpoints (`/api/v1/partner/`)
+
+| Группа | Метод | Назначение |
+|--------|-------|------------|
+| Каталог | `POST /events` | Upsert события по externalId |
+| Каталог | `PUT /events/:externalId` | Обновление события |
+| Каталог | `DELETE /events/:externalId` | Деактивация |
+| Каталог | `POST /events/:externalId/offers` | Upsert оффера |
+| Каталог | `PATCH /offers/:externalId/availability` | Быстрое обновление наличия/цены |
+| Заказы | `GET /orders` | Список заказов (фильтры) |
+| Заказы | `POST /orders/:id/confirm` | Подтверждение (state machine) |
+| Заказы | `POST /orders/:id/reject` | Отклонение (state machine) |
+| Отчёты | `GET /reports/sales` | Продажи за период (JSON + CSV) |
+| Служ. | `GET /whoami` | Информация о ключе |
+
+### Webhook
+
+- Типы: `order.created`, `order.cancelled`, `payment.paid`, `payment.refunded`
+- Подпись: `HMAC-SHA256(JSON.stringify(body), webhookSecret)` → заголовок `X-Webhook-Signature`
+- Доставка: BullMQ, 3 ретрая (5s → 10s → 20s)
+
+---
+
+## Unified Checkout — Roadmap (для планировщика)
+
+> Добавлено: 2026-02-14. Нужен для работы планировщика программ. Приоритет — после подключения YooKassa.
+
+### Контекст
+
+Планировщик программ объединяет несколько событий из разных источников (TC, teplohod.info, MANUAL, Partner) в один пакет. Для единого ваучера необходима оплата на нашей стороне через YooKassa, даже для событий билетных систем.
+
+### Текущие ограничения
+
+1. **TC Widget / REDIRECT** — оплата происходит на стороне провайдера, мы не контролируем
+2. **Несколько провайдеров в одной корзине** — невозможно оплатить одним платежом
+3. **Планировщик программ** — без unified checkout пользователь должен оплачивать каждое событие отдельно
+
+### Целевая архитектура
+
+```
+Пользователь → [Корзина: TC + TEP + MANUAL] → YooKassa → PaymentIntent.PAID
+                                                                ↓
+                                              ┌─────────────────┼──────────────┐
+                                              ▼                 ▼              ▼
+                                         TC API v2         TEP API         MANUAL
+                                        POST /orders       (резерв)     OrderRequest
+                                         PATCH done      (confirm)       (pending)
+```
+
+### Фазы внедрения
+
+1. **YooKassa для REQUEST** — оплата собственных событий (MVP, минимальный риск)
+2. **YooKassa для TC events** — создаём заказ в TC после оплаты (резерв 15 мин → confirm)
+3. **Unified cart** — смешанная корзина (TC + TEP + MANUAL) с единым платежом
+4. **Ваучер** — единый QR/PDF для пакета событий
+
+### Ключевые риски
+
+- **Двойной резерв**: TC резерв 15 мин vs время оплаты YooKassa → sequence: pay → reserve → confirm
+- **Partial failure**: если 1 из N событий не забронировано → partial refund
+- **Чарджбеки**: при отмене бронирования, деньги уже у нас → нужна чёткая политика возвратов
+
+### Зависимости
+
+- [x] PaymentIntent layer (stub) — готов
+- [x] State Machine (CheckoutSession/OrderRequest/PaymentIntent) — готов
+- [x] offersSnapshot immutable — готов
+- [ ] YooKassa SDK подключение
+- [ ] Sandbox-тесты
+- [ ] Webhook верификация (IP whitelist + HMAC)
 
 ### Преимущества Daibilet перед Афишей (killer features)
 

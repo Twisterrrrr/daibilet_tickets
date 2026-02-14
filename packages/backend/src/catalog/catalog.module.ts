@@ -2,38 +2,45 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
+import { RegionService } from './region.service';
 import { ReviewService } from './review.service';
 import { TcApiService } from './tc-api.service';
 import { TcGrpcService } from './tc-grpc.service';
 import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
 import { TepSyncService } from './tep-sync.service';
-import { AdminModule } from '../admin/admin.module';
-import { QUEUE_EMAILS } from '../queue/queue.module';
+import { FuzzyDedupService } from './fuzzy-dedup.service';
+import { EventOverrideService } from '../admin/event-override.service';
+import { QUEUE_EMAILS } from '../queue/queue.constants';
 
 @Module({
   imports: [
-    AdminModule,
     BullModule.registerQueue({ name: QUEUE_EMAILS }),
   ],
   controllers: [CatalogController],
   providers: [
     CatalogService,
+    RegionService,
     ReviewService,
     TcApiService,
     TcGrpcService,
     TcSyncService,
     TepApiService,
     TepSyncService,
+    FuzzyDedupService,
+    EventOverrideService,
   ],
   exports: [
     CatalogService,
+    RegionService,
     ReviewService,
     TcApiService,
     TcGrpcService,
     TcSyncService,
     TepApiService,
     TepSyncService,
+    FuzzyDedupService,
+    EventOverrideService,
   ],
 })
 export class CatalogModule {}

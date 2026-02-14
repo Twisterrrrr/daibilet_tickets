@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TepApiService, TepEvent, TepCity } from './tep-api.service';
-import { EventCategory, EventSubcategory, EventAudience } from '@prisma/client';
+import { EventCategory, EventSubcategory, EventAudience, Prisma } from '@prisma/client';
 
 /**
  * Синхронизация событий из teplohod.info → наша БД.
@@ -82,7 +82,8 @@ export class TepSyncService {
     try {
       tepCities = await this.tepApi.getCities();
       this.logger.log(`TEP: ${tepCities.length} городов`);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       return {
         status: 'error',
         citiesFetched: 0,
@@ -90,7 +91,7 @@ export class TepSyncService {
         eventsSynced: 0,
         sessionsCreated: 0,
         newCitiesCreated: [],
-        errors: [`Загрузка городов: ${err.message}`],
+        errors: [`Загрузка городов: ${msg}`],
       };
     }
 
@@ -104,7 +105,8 @@ export class TepSyncService {
     try {
       allEvents = await this.tepApi.getEvents();
       this.logger.log(`TEP: ${allEvents.length} событий загружено`);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       return {
         status: 'error',
         citiesFetched: tepCities.length,
@@ -112,7 +114,7 @@ export class TepSyncService {
         eventsSynced: 0,
         sessionsCreated: 0,
         newCitiesCreated,
-        errors: [`Загрузка событий: ${err.message}`],
+        errors: [`Загрузка событий: ${msg}`],
       };
     }
 
@@ -150,9 +152,10 @@ export class TepSyncService {
           totalSynced++;
           totalSessions += sessions;
         }
-      } catch (err: any) {
-        errors.push(`[tep-${tepEvent.id}] ${tepEvent.title}: ${err.message}`);
-        this.logger.warn(`Ошибка tep-${tepEvent.id}: ${err.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`[tep-${tepEvent.id}] ${tepEvent.title}: ${msg}`);
+        this.logger.warn(`Ошибка tep-${tepEvent.id}: ${msg}`);
       }
     }
 
@@ -223,7 +226,7 @@ export class TepSyncService {
           galleryUrls,
           priceFrom,
           isActive: true,
-          tcData: tep as any,
+          tcData: tep as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
       });
@@ -247,7 +250,7 @@ export class TepSyncService {
           galleryUrls,
           priceFrom,
           isActive: true,
-          tcData: tep as any,
+          tcData: tep as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
       });
@@ -266,7 +269,7 @@ export class TepSyncService {
           eventId: eventRecord.id,
           priceFrom,
           deeplink: `https://teplohod.info/event/${tep.id}`,
-          externalData: tep as any,
+          externalData: tep as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
         create: {
@@ -278,7 +281,7 @@ export class TepSyncService {
           priceFrom,
           isPrimary: true,
           status: 'ACTIVE',
-          externalData: tep as any,
+          externalData: tep as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
       });
@@ -350,17 +353,18 @@ export class TepSyncService {
 
       const seenIds = rows.map((r) => r.tcSessionId);
 
-      // Batch upsert через raw SQL: VALUES(...), (...), ...
-      const values = rows
-        .map(
+      // Batch upsert через параметризованный Prisma.sql (без интерполяции строк)
+      const offerId = offer?.id ?? null;
+      const valuesSql = Prisma.join(
+        rows.map(
           (r) =>
-            `(gen_random_uuid(), '${event.id}', ${offer?.id ? `'${offer.id}'` : 'NULL'}, '${r.tcSessionId}', '${r.startsAt.toISOString()}'::timestamptz, '${r.endsAt.toISOString()}'::timestamptz, ${r.availableTickets}, '${pricesJson}'::jsonb, ${r.isActive}, NOW(), NOW())`,
-        )
-        .join(',\n');
+            Prisma.sql`(gen_random_uuid(), ${event.id}::uuid, ${offerId}::uuid, ${r.tcSessionId}, ${r.startsAt}::timestamptz, ${r.endsAt}::timestamptz, ${r.availableTickets}::int, ${pricesJson}::jsonb, ${r.isActive}, NOW(), NOW())`,
+        ),
+      );
 
-      await this.prisma.$executeRawUnsafe(`
+      await this.prisma.$executeRaw`
         INSERT INTO event_sessions ("id", "eventId", "offerId", "tcSessionId", "startsAt", "endsAt", "availableTickets", "prices", "isActive", "createdAt", "updatedAt")
-        VALUES ${values}
+        VALUES ${valuesSql}
         ON CONFLICT ("tcSessionId") DO UPDATE SET
           "offerId" = EXCLUDED."offerId",
           "startsAt" = EXCLUDED."startsAt",
@@ -369,7 +373,7 @@ export class TepSyncService {
           "prices" = EXCLUDED."prices",
           "isActive" = EXCLUDED."isActive",
           "updatedAt" = NOW()
-      `);
+      `;
 
       // Деактивируем старую «виртуальную» main-сессию
       await this.prisma.eventSession.updateMany({
@@ -526,7 +530,7 @@ export class TepSyncService {
           update: {},
           create: { eventId: event.id, tagId: tag.id },
         })
-        .catch(() => {}); // ignore if already exists
+        .catch((e) => this.logger.error('tag sync failed: ' + (e as Error).message));
     }
   }
 
@@ -558,7 +562,7 @@ export class TepSyncService {
             update: {},
             create: { eventId: event.id, tagId: tag.id },
           })
-          .catch(() => {});
+          .catch((e) => this.logger.error('tag sync failed: ' + (e as Error).message));
       }
     }
   }
@@ -597,7 +601,7 @@ export class TepSyncService {
       tep.place || '',
       tep.title || '',
       tep.description || '',
-      (tep as any).openDate?.description || '',
+      (tep as Record<string, any>).openDate?.description || '',
       tep.schedule_description || '',
     ];
     const text = parts.join(' ').toLowerCase();

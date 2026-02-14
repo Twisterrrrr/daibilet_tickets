@@ -2,14 +2,15 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Menu, X, MapPin, Compass } from 'lucide-react';
+import { Menu, X, Compass, HelpCircle } from 'lucide-react';
 import { SearchAutocomplete } from './SearchAutocomplete';
 import { CartIcon } from '@/components/ui/CartDrawer';
 
 const navigation = [
   { name: 'Экскурсии', href: '/events?category=EXCURSION' },
-  { name: 'Музеи', href: '/events?category=MUSEUM' },
+  { name: 'Музеи и Арт', href: '/venues' },
   { name: 'Мероприятия', href: '/events?category=EVENT' },
+  { name: 'Подборки', href: '/podborki' },
   { name: 'Города', href: '/cities' },
   { name: 'Блог', href: '/blog' },
 ];
@@ -41,18 +42,17 @@ export function Header() {
           ))}
         </div>
 
-        {/* Right side: search + cart + planner + mobile menu */}
+        {/* Right side: search + cart + mobile menu */}
         <div className="flex items-center gap-1 sm:gap-2">
           <SearchAutocomplete />
           <CartIcon />
 
           <Link
-            href="/planner"
-            className="hidden items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700 sm:inline-flex"
+            href="/help"
+            className="hidden items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 sm:inline-flex"
+            title="Помощь"
           >
-            <MapPin className="h-4 w-4" />
-            <span className="hidden lg:inline">Спланировать поездку</span>
-            <span className="lg:hidden">Планировщик</span>
+            <HelpCircle className="h-5 w-5" />
           </Link>
 
           {/* Mobile menu button */}
@@ -80,12 +80,12 @@ export function Header() {
               </Link>
             ))}
             <Link
-              href="/planner"
+              href="/help"
               onClick={() => setMobileMenuOpen(false)}
-              className="mt-2 flex items-center gap-2 rounded-lg bg-primary-600 px-3 py-2.5 text-base font-semibold text-white"
+              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-base font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             >
-              <MapPin className="h-5 w-5" />
-              Спланировать поездку
+              <HelpCircle className="h-5 w-5" />
+              Помощь
             </Link>
           </div>
         </div>

@@ -71,7 +71,7 @@ export function EventCreatePage() {
 
   // Step 2 — First offer (optional)
   const [skipOffer, setSkipOffer] = useState(false);
-  const [purchaseType, setPurchaseType] = useState('REQUEST_ONLY');
+  const [purchaseType, setPurchaseType] = useState('REQUEST');
   const [deeplink, setDeeplink] = useState('');
   const [priceFrom, setPriceFrom] = useState('');
   const [commissionPercent, setCommissionPercent] = useState('');
@@ -83,7 +83,7 @@ export function EventCreatePage() {
     adminApi.get<any>('/admin/cities').then((res: any) => {
       const list = res.items || res;
       setCities(Array.isArray(list) ? list : []);
-    }).catch(() => {});
+    }).catch((e) => console.error('Load cities failed:', e));
   }, []);
 
   const canGoStep2 = title.trim() && cityId && category;
@@ -296,15 +296,14 @@ export function EventCreatePage() {
                   <Select value={purchaseType} onValueChange={setPurchaseType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="REQUEST_ONLY">Заявка на подтверждение</SelectItem>
+                      <SelectItem value="REQUEST">Заявка на подтверждение</SelectItem>
                       <SelectItem value="REDIRECT">Внешняя ссылка</SelectItem>
-                      <SelectItem value="TC_WIDGET">TC Widget</SelectItem>
-                      <SelectItem value="API_CHECKOUT">API Checkout</SelectItem>
+                      <SelectItem value="WIDGET">Виджет (TC и др.)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {(purchaseType === 'REDIRECT' || purchaseType === 'REQUEST_ONLY') && (
+                {(purchaseType === 'REDIRECT' || purchaseType === 'REQUEST') && (
                   <div className="space-y-2">
                     <Label>URL / Deep Link</Label>
                     <Input value={deeplink} onChange={(e) => setDeeplink(e.target.value)} placeholder="https://..." />

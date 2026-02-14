@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
-import { QUEUE_REVIEW_TASKS } from './queue.module';
+import { QUEUE_REVIEW_TASKS } from './queue.constants';
 
 export type ReviewTaskData =
   | { type: 'cleanup-expired-tokens' }
@@ -31,7 +31,7 @@ export class ReviewTaskProcessor extends WorkerHost {
         break;
 
       default:
-        this.logger.warn(`Unknown review task type: ${(data as any).type}`);
+        this.logger.warn(`Unknown review task type: ${(data as { type: string }).type}`);
     }
   }
 

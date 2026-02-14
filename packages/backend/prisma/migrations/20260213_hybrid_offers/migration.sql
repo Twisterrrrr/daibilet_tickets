@@ -1,5 +1,5 @@
--- Add REQUEST_ONLY to PurchaseType enum
-ALTER TYPE "PurchaseType" ADD VALUE IF NOT EXISTS 'REQUEST_ONLY';
+-- REQUEST_ONLY уже консолидирован в REQUEST (см. consolidate_purchase_types)
+-- ALTER TYPE "PurchaseType" ADD VALUE IF NOT EXISTS 'REQUEST_ONLY'; -- убрано
 
 -- Add MANUAL to EventSource enum
 ALTER TYPE "EventSource" ADD VALUE IF NOT EXISTS 'MANUAL';
@@ -99,3 +99,13 @@ ALTER TABLE "order_requests" ADD CONSTRAINT "order_requests_checkoutSessionId_fk
 CREATE INDEX IF NOT EXISTS "order_requests_checkoutSessionId_idx" ON "order_requests"("checkoutSessionId");
 CREATE INDEX IF NOT EXISTS "order_requests_status_idx" ON "order_requests"("status");
 CREATE INDEX IF NOT EXISTS "order_requests_eventId_idx" ON "order_requests"("eventId");
+
+-- Дополнительные поля (перенесены из consolidate_purchase_types)
+ALTER TABLE "order_requests" ADD COLUMN IF NOT EXISTS "slaMinutes" INTEGER NOT NULL DEFAULT 30;
+ALTER TABLE "order_requests" ADD COLUMN IF NOT EXISTS "expireReason" TEXT;
+CREATE INDEX IF NOT EXISTS "order_requests_status_expiresAt_idx"
+  ON "order_requests" ("status", "expiresAt");
+
+-- Дополнительные поля для checkout_sessions (перенесены из consolidate_purchase_types)
+ALTER TABLE "checkout_sessions" ADD COLUMN IF NOT EXISTS "offersSnapshot" JSONB;
+ALTER TABLE "checkout_sessions" ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMPTZ;

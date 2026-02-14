@@ -5,7 +5,7 @@ import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomBytes } from 'crypto';
-import { QUEUE_EMAILS, QUEUE_REVIEW_TASKS } from '../queue/queue.module';
+import { QUEUE_EMAILS, QUEUE_REVIEW_TASKS } from '../queue/queue.constants';
 import { EmailJobData } from '../queue/email.processor';
 import { ReviewTaskData } from '../queue/review-task.processor';
 
@@ -109,8 +109,8 @@ export class ReviewSchedulerService {
       if (sent > 0) {
         this.logger.log(`Отправлено ${sent} запросов на отзывы`);
       }
-    } catch (err: any) {
-      this.logger.error(`Ошибка отправки запросов на отзывы: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Ошибка отправки запросов на отзывы: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -164,8 +164,8 @@ export class ReviewSchedulerService {
       if (sent > 0) {
         this.logger.log(`Отправлено ${sent} повторных напоминаний`);
       }
-    } catch (err: any) {
-      this.logger.error(`Ошибка отправки напоминаний: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Ошибка отправки напоминаний: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -180,8 +180,8 @@ export class ReviewSchedulerService {
       await this.reviewQueue.add('cleanup-expired-tokens', {
         type: 'cleanup-expired-tokens',
       });
-    } catch (err: any) {
-      this.logger.error(`Ошибка очистки: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Ошибка очистки: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }

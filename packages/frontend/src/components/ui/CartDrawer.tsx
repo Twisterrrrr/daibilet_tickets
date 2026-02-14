@@ -136,7 +136,7 @@ function CartItemCard({
   onQuantityChange: (qty: number) => void;
 }) {
   const typeLabel =
-    item.purchaseType === 'REQUEST_ONLY'
+    item.purchaseType === 'REQUEST'
       ? 'Заявка'
       : item.purchaseType === 'REDIRECT'
         ? 'Партнёр'

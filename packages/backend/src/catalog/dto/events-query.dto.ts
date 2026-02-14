@@ -72,6 +72,16 @@ export class EventsQueryDto {
   @IsInt()
   maxMinAge?: number;
 
+  @ApiPropertyOptional({ description: 'Режим даты: SCHEDULED | OPEN_DATE' })
+  @IsOptional()
+  @IsString()
+  dateMode?: string;
+
+  @ApiPropertyOptional({ description: 'UUID venue для фильтрации по месту' })
+  @IsOptional()
+  @IsString()
+  venueId?: string;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)

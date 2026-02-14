@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
-  MapPin,
   ArrowRight,
   Ticket,
   Star,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { EventCard } from '@/components/ui/EventCard';
+import { VenueCard } from '@/components/ui/VenueCard';
 import { CATEGORY_LABELS, EventCategory, formatPrice } from '@daibilet/shared';
 
 // ISR: обновлять каждые 6 часов
@@ -56,6 +57,25 @@ function pluralEvents(n: number): string {
   if (mod10 === 1) return `${n} событие`;
   if (mod10 >= 2 && mod10 <= 4) return `${n} события`;
   return `${n} событий`;
+}
+
+/** Склонение названия региона в предложный падеж ("Также в ...") */
+function declineRegionName(name: string): string {
+  // Словарь исключений
+  const exceptions: Record<string, string> = {
+    'Золотое кольцо': 'Золотом кольце',
+    'Татарстан': 'Татарстане',
+  };
+  if (exceptions[name]) return exceptions[name];
+
+  // "Xская область" → "Xской области", "Xая область" → "Xой области"
+  if (name.endsWith('ская область')) return name.replace('ская область', 'ской области');
+  if (name.endsWith('кая область')) return name.replace('кая область', 'кой области');
+
+  // Общий fallback для "область"
+  if (name.endsWith(' область')) return name.replace(' область', ' области');
+
+  return name;
 }
 
 /** Краткая информация о городе — рекомендации и must-see */
@@ -177,6 +197,13 @@ export default async function CityPage({ params }: Props) {
     );
   }
 
+  // Загрузить venues для города
+  let venues: any[] = [];
+  try {
+    const venuesRes = await api.getVenues({ city: slug, limit: 6 });
+    venues = venuesRes.items || [];
+  } catch {}
+
   const info = CITY_INFO[slug];
   const stats = city.stats || {};
   const popularTags = city.popularTags || [];
@@ -197,10 +224,13 @@ export default async function CityPage({ params }: Props) {
       {/* Hero */}
       <section className="relative bg-gradient-to-br from-primary-700 to-primary-900 py-16 sm:py-20">
         {city.heroImage && (
-          <img
+          <Image
             src={city.heroImage}
             alt={city.name}
-            className="absolute inset-0 h-full w-full object-cover opacity-20"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover opacity-20"
           />
         )}
         <div className="container-page relative">
@@ -242,13 +272,6 @@ export default async function CityPage({ params }: Props) {
             >
               <Ticket className="mr-2 h-4 w-4" />
               Все события в {city.name}
-            </Link>
-            <Link
-              href={`/planner?city=${slug}`}
-              className="btn-secondary border-primary-400 !text-white hover:!bg-primary-600"
-            >
-              <MapPin className="mr-2 h-4 w-4" />
-              Спланировать поездку
             </Link>
           </div>
         </div>
@@ -311,7 +334,7 @@ export default async function CityPage({ params }: Props) {
             {categories.map(({ category, emoji, count }) => (
               <Link
                 key={category}
-                href={`/events?city=${slug}&category=${category}`}
+                href={category === EventCategory.MUSEUM ? `/venues?city=${slug}` : `/events?city=${slug}&category=${category}`}
                 className="card flex items-center gap-4 p-5 transition-transform hover:scale-[1.02]"
               >
                 <span className="text-3xl">{emoji}</span>
@@ -329,6 +352,33 @@ export default async function CityPage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      {/* Venues (Музеи и Арт) */}
+      {venues.length > 0 && (
+        <section className="container-page py-10">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">
+                Музеи и искусство
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Музеи, галереи и арт-пространства
+              </p>
+            </div>
+            <Link
+              href={`/venues?city=${slug}`}
+              className="hidden text-sm font-medium text-primary-600 hover:text-primary-700 sm:flex sm:items-center sm:gap-1"
+            >
+              Все места <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {venues.map((venue: any) => (
+              <VenueCard key={venue.id} {...venue} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Popular tags */}
       {popularTags.length > 0 && (
@@ -419,6 +469,60 @@ export default async function CityPage({ params }: Props) {
               Все события в {city.name}
               <ArrowRight className="h-4 w-4" />
             </Link>
+          </div>
+        </section>
+      )}
+
+      {/* Также в регионе — превью событий из соседних городов */}
+      {city.regionPreview && city.regionPreview.events?.length > 0 && (
+        <section className="bg-gradient-to-b from-slate-50 to-white py-12">
+          <div className="container-page">
+            <div className="flex items-end justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">
+                  Также в {declineRegionName(city.regionPreview.regionName)}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  События из соседних городов региона
+                </p>
+              </div>
+              <Link
+                href={`/regions/${city.regionPreview.regionSlug}`}
+                className="hidden text-sm font-medium text-primary-600 hover:text-primary-700 sm:flex sm:items-center sm:gap-1"
+              >
+                Все события региона <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="mt-6 -mx-4 px-4 sm:mx-0 sm:px-0">
+              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
+                {city.regionPreview.events.map((event: any) => (
+                  <div key={event.id} className="min-w-[260px] flex-shrink-0 sm:min-w-0">
+                    <EventCard
+                      slug={event.slug}
+                      title={event.title}
+                      category={event.category}
+                      imageUrl={event.imageUrl}
+                      priceFrom={event.priceFrom}
+                      rating={event.rating}
+                      reviewCount={event.reviewCount}
+                      durationMinutes={event.durationMinutes}
+                      city={event.city}
+                      address={event.address}
+                      dateMode={event.dateMode}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 text-center sm:hidden">
+              <Link
+                href={`/regions/${city.regionPreview.regionSlug}`}
+                className="btn-secondary inline-flex items-center gap-2 text-sm"
+              >
+                Все события региона
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
         </section>
       )}

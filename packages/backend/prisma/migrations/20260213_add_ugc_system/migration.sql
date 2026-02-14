@@ -7,8 +7,8 @@ ALTER TYPE "ReviewStatus" ADD VALUE IF NOT EXISTS 'PENDING_EMAIL' BEFORE 'PENDIN
 ALTER TABLE "reviews" ADD COLUMN IF NOT EXISTS "verifyToken" TEXT UNIQUE;
 ALTER TABLE "reviews" ADD COLUMN IF NOT EXISTS "helpfulCount" INTEGER NOT NULL DEFAULT 0;
 
--- 3. Изменить default status для новых отзывов на PENDING_EMAIL
-ALTER TABLE "reviews" ALTER COLUMN "status" SET DEFAULT 'PENDING_EMAIL'::"ReviewStatus";
+-- 3. SET DEFAULT для PENDING_EMAIL перенесён в следующую миграцию
+-- (PostgreSQL не позволяет использовать новое enum-значение в той же транзакции)
 
 -- 4. ReviewPhoto
 CREATE TABLE IF NOT EXISTS "review_photos" (

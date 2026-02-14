@@ -68,8 +68,8 @@ export class UploadService {
       this.logger.log(`Image processed: ${filename} (${(mainBuffer.length / 1024).toFixed(0)} KB)`);
 
       return { url, filename, thumbUrl, thumbFilename };
-    } catch (err: any) {
-      this.logger.error(`Image processing failed: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Image processing failed: ${err instanceof Error ? err.message : String(err)}`);
       throw new BadRequestException('Не удалось обработать изображение');
     }
   }

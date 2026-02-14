@@ -2,27 +2,32 @@ import {
   Controller, Get, Post, Param, Query, Body, Req, Res,
   UploadedFiles, UseInterceptors,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { CatalogService } from './catalog.service';
+import { RegionService } from './region.service';
 import { ReviewService } from './review.service';
 import { TcApiService } from './tc-api.service';
 import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
 import { TepSyncService } from './tep-sync.service';
 import { EventsQueryDto } from './dto/events-query.dto';
+import { CreateReviewDto } from './dto/create-review.dto';
 
 @ApiTags('catalog')
 @Controller()
 export class CatalogController {
   constructor(
     private readonly catalogService: CatalogService,
+    private readonly regionService: RegionService,
     private readonly reviewService: ReviewService,
     private readonly tcApi: TcApiService,
     private readonly tcSync: TcSyncService,
     private readonly tepApi: TepApiService,
     private readonly tepSync: TepSyncService,
+    private readonly config: ConfigService,
   ) {}
 
   // --- Города ---
@@ -39,6 +44,38 @@ export class CatalogController {
   @ApiOperation({ summary: 'Город с топ-событиями' })
   getCityBySlug(@Param('slug') slug: string) {
     return this.catalogService.getCityBySlug(slug);
+  }
+
+  // --- Регионы ---
+
+  @Get('regions/:slug')
+  @ApiOperation({ summary: 'Данные региона: города, статистика' })
+  getRegionBySlug(@Param('slug') slug: string) {
+    return this.regionService.getRegionBySlug(slug);
+  }
+
+  @Get('regions/:slug/events')
+  @ApiOperation({ summary: 'События региона с пагинацией' })
+  @ApiQuery({ name: 'city', required: false, description: 'Slug города внутри региона' })
+  @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'sort', required: false })
+  getRegionEvents(
+    @Param('slug') slug: string,
+    @Query('city') city?: string,
+    @Query('category') category?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('sort') sort?: string,
+  ) {
+    return this.regionService.getRegionEvents(slug, {
+      city,
+      category,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+      sort,
+    });
   }
 
   // --- События ---
@@ -86,20 +123,9 @@ export class CatalogController {
   // --- Отзывы ---
 
   @Post('reviews')
-  @ApiOperation({ summary: 'Оставить отзыв на событие' })
+  @ApiOperation({ summary: 'Оставить отзыв на событие или место' })
   createReview(
-    @Body() body: {
-      eventId: string;
-      rating: number;
-      title?: string;
-      text: string;
-      authorName: string;
-      authorEmail: string;
-      voucherCode?: string;
-      website?: string;
-      formStartedAt?: number;
-      reviewRequestToken?: string;
-    },
+    @Body() body: CreateReviewDto,
     @Req() req: Request,
   ) {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
@@ -111,7 +137,7 @@ export class CatalogController {
   async verifyReview(@Query('token') token: string, @Res() res: Response) {
     const result = await this.reviewService.verifyEmail(token);
     // Редирект на страницу с сообщением
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const appUrl = this.config.get<string>('APP_URL', process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
     res.redirect(`${appUrl}/reviews/verified?message=${encodeURIComponent(result.message)}`);
   }
 

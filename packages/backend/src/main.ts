@@ -1,11 +1,59 @@
+import * as Sentry from '@sentry/nestjs';
+
+const SENTRY_DSN = process.env.SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    tracesSampleRate: 0.1,
+    environment: process.env.NODE_ENV || 'development',
+  });
+}
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { setCompatDisabled, setCompatLogger } from '@daibilet/shared';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap() {
+  // Kill switch: env DISABLE_PURCHASE_TYPE_COMPAT=true запрещает legacy PurchaseType
+  if (process.env.DISABLE_PURCHASE_TYPE_COMPAT === 'true') {
+    setCompatDisabled(true);
+    console.log('[PurchaseType] COMPAT disabled — legacy values will throw');
+  }
+
   const app = await NestFactory.create(AppModule);
+
+  if (process.env.SENTRY_DSN) {
+    try {
+      const sentryNestjs = await import('@sentry/nestjs');
+      // SentryGlobalFilter may not exist in all @sentry/nestjs versions
+      const FilterClass = (sentryNestjs as any).SentryGlobalFilter;
+      if (FilterClass) {
+        app.useGlobalFilters(new FilterClass());
+      }
+    } catch {
+      // @sentry/nestjs not available or SentryGlobalFilter not exported — skip
+    }
+  }
+
+  // Персистентный лог legacy PurchaseType → AuditLog (переживает рестарты)
+  const prisma = app.get(PrismaService);
+  setCompatLogger((raw, resolved, context) => {
+    prisma.auditLog.create({
+      data: {
+        userId: '00000000-0000-0000-0000-000000000000', // system
+        action: 'LEGACY_PURCHASE_TYPE',
+        entity: 'PurchaseType',
+        entityId: raw,
+        before: { raw } as Prisma.InputJsonValue,
+        after: { resolved, context } as Prisma.InputJsonValue,
+      },
+    }).catch((e) => console.error('Audit log failed:', (e as Error).message));
+  });
 
   app.setGlobalPrefix('api/v1');
 
@@ -15,15 +63,25 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
+      forbidUnknownValues: true,
       transform: true,
-      transformOptions: { enableImplicitConversion: true },
+      transformOptions: {
+        enableImplicitConversion: true, // Пока true — перевести на false после полного покрытия DTO
+        exposeDefaultValues: true,
+      },
     }),
   );
 
+  // Глобальный фильтр ошибок: единый формат + логирование 5xx
+  const { AllExceptionsFilter } = await import('./common/all-exceptions.filter');
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  // CORS: CORS_ORIGIN env, else in production use APP_URL, else in dev use localhost
+  const defaultOrigin =
+    process.env.NODE_ENV === 'production' ? (process.env.APP_URL || '') : 'http://localhost:3000';
+  const corsOrigin = process.env.CORS_ORIGIN || defaultOrigin;
   app.enableCors({
-    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000')
-      .split(',')
-      .map((s) => s.trim()),
+    origin: corsOrigin.split(',').map((s) => s.trim()).filter(Boolean),
     credentials: true,
   });
 

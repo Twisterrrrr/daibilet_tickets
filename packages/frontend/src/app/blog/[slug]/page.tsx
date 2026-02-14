@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Calendar, MapPin, ArrowLeft, Tag } from 'lucide-react';
 import { api } from '@/lib/api';
 import { EventCard } from '@/components/ui/EventCard';
+import { VenueCard } from '@/components/ui/VenueCard';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -64,6 +65,17 @@ export default async function ArticlePage({ params }: Props) {
 
   const linkedEvents = article.articleEvents?.map((ae: any) => ae.event).filter(Boolean) || [];
   const tags = article.articleTags?.map((at: any) => at.tag).filter(Boolean) || [];
+
+  // Подгружаем venue-карточки по городу статьи (для перелинковки)
+  let relatedVenues: any[] = [];
+  try {
+    if (article.city?.slug) {
+      const venuesRes = await api.getVenues({ city: article.city.slug, limit: 4, sort: 'rating' });
+      relatedVenues = venuesRes.items || [];
+    }
+  } catch {
+    // ignore
+  }
 
   return (
     <>
@@ -138,7 +150,7 @@ export default async function ArticlePage({ params }: Props) {
 
       {/* Linked events */}
       {linkedEvents.length > 0 && (
-        <section className="container-page max-w-3xl pb-16">
+        <section className="container-page max-w-3xl pb-10">
           <h2 className="text-xl font-bold text-slate-900">Упомянутые события</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {linkedEvents.map((event: any) => (
@@ -154,6 +166,20 @@ export default async function ArticlePage({ params }: Props) {
                 durationMinutes={event.durationMinutes ?? null}
                 compact
               />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Related venues — перелинковка с музеями/арт-пространствами */}
+      {relatedVenues.length > 0 && (
+        <section className="container-page max-w-3xl pb-16">
+          <h2 className="text-xl font-bold text-slate-900">
+            Музеи и арт-пространства{article.city ? ` — ${article.city.name}` : ''}
+          </h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {relatedVenues.map((venue: any) => (
+              <VenueCard key={venue.id} venue={venue} />
             ))}
           </div>
         </section>

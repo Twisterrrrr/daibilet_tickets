@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Clock, MapPin, Star, Ticket, Flame, Award } from 'lucide-react';
 import { formatPrice, CATEGORY_LABELS, SUBCATEGORY_LABELS, SYSTEM_TAG_BADGES, type EventCategory, type EventSubcategory } from '@daibilet/shared';
 
@@ -25,6 +26,8 @@ interface EventCardProps {
   nextSessionAt?: string;
   /** Лучшее событие по scoring-алгоритму */
   isOptimalChoice?: boolean;
+  /** Режим даты: SCHEDULED (обычный) или OPEN_DATE (музеи) */
+  dateMode?: string;
 }
 
 /** Порог: при скольких оставшихся местах показывать "Осталось N мест" */
@@ -69,6 +72,7 @@ export function EventCard({
   departingSoonMinutes,
   nextSessionAt,
   isOptimalChoice,
+  dateMode,
 }: EventCardProps) {
   // Показываем первый подтип если есть, иначе категорию
   const primarySub = subcategories?.[0];
@@ -93,11 +97,12 @@ export function EventCard({
       {/* Image */}
       <div className={`relative overflow-hidden bg-slate-100 ${compact ? 'h-28 sm:h-36' : 'h-36 sm:h-48'}`}>
         {imageUrl ? (
-          <img
+          <Image
             src={imageUrl}
             alt={title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-            loading="lazy"
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-110"
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary-100 to-primary-50">
@@ -157,8 +162,12 @@ export function EventCard({
           </div>
         )}
 
-        {/* Bottom-left: departing soon (priority) or low tickets badge */}
-        {departingSoonMinutes ? (
+        {/* Bottom-left: departing soon (priority) or low tickets badge (not for OPEN_DATE) */}
+        {dateMode === 'OPEN_DATE' ? (
+          <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:bottom-3 sm:left-3 sm:px-2.5 sm:py-1 sm:text-xs">
+            Открытая дата
+          </span>
+        ) : departingSoonMinutes ? (
           <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-orange-500/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm animate-pulse sm:bottom-3 sm:left-3 sm:px-2.5 sm:py-1 sm:text-xs">
             <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             Через {departingSoonMinutes} мин
@@ -216,12 +225,16 @@ export function EventCard({
           </p>
         )}
 
-        {/* Next session */}
-        {nextSessionAt && (
+        {/* Next session or open date */}
+        {dateMode === 'OPEN_DATE' ? (
+          <p className="mt-1 text-[10px] font-medium text-emerald-600 sm:text-xs">
+            🎟 Билет с открытой датой
+          </p>
+        ) : nextSessionAt ? (
           <p className="mt-1 text-[10px] font-medium text-primary-600 sm:text-xs">
             {formatNextSession(nextSessionAt)}
           </p>
-        )}
+        ) : null}
 
         {/* Footer: price (always visible on mobile since badge is hidden) */}
         <div className="mt-auto flex items-center justify-between pt-2 sm:pt-3">

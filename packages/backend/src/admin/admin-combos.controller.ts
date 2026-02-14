@@ -9,6 +9,7 @@ import {
   FaqSchema, FeatureSchema, CuratedEventSchema, IncludesSchema,
   validateJson,
 } from './json-schemas';
+import { CreateComboDto, UpdateComboDto } from './dto/admin-combo.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -30,6 +31,7 @@ export class AdminCombosController {
       where,
       include: { city: { select: { slug: true, name: true } } },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+      take: 500,
     });
   }
 
@@ -43,15 +45,15 @@ export class AdminCombosController {
 
   @Post()
   @Roles('ADMIN', 'EDITOR')
-  async create(@Body() data: any) {
+  async create(@Body() data: CreateComboDto) {
     this.validateJsonFields(data);
     return this.prisma.comboPage.create({ data });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: any, @Request() req: any) {
-    const { id: _, createdAt, updatedAt, city, version, ...clean } = data;
+  async update(@Param('id') id: string, @Body() data: UpdateComboDto, @Request() req: any) {
+    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as any;
 
     this.validateJsonFields(clean);
 
@@ -95,8 +97,8 @@ export class AdminCombosController {
         validateJson(CuratedEventSchema, data.curatedEvents, 'curatedEvents');
       }
       if (data.includes !== undefined) validateJson(IncludesSchema, data.includes, 'includes');
-    } catch (e: any) {
-      throw new BadRequestException(e.message);
+    } catch (e: unknown) {
+      throw new BadRequestException(e instanceof Error ? e.message : String(e));
     }
   }
 }

@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
+import { UpdateCityDto } from './dto/admin-city.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -27,6 +28,7 @@ export class AdminCitiesController {
       where,
       include: { _count: { select: { events: true, landingPages: true, comboPages: true } } },
       orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
+      take: 500,
     });
   }
 
@@ -40,8 +42,8 @@ export class AdminCitiesController {
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: any) {
-    const { id: _, createdAt, updatedAt, _count, events, packages, articles, landingPages, comboPages, version, ...clean } = data;
+  async update(@Param('id') id: string, @Body() data: UpdateCityDto) {
+    const { id: _, createdAt, updatedAt, _count, events, packages, articles, landingPages, comboPages, version, ...clean } = data as any;
 
     // Optimistic lock
     if (data.version !== undefined) {

@@ -11,11 +11,13 @@ import { MailService } from './mail.service';
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
+      useFactory: (config: ConfigService) => {
+        const port = Number(config.get('SMTP_PORT', '587'));
+        return {
         transport: {
           host: config.get('SMTP_HOST', ''),
-          port: config.get<number>('SMTP_PORT', 587),
-          secure: config.get<number>('SMTP_PORT', 587) === 465,
+          port,
+          secure: port === 465,
           auth: {
             user: config.get('SMTP_USER', ''),
             pass: config.get('SMTP_PASS', ''),
@@ -29,7 +31,8 @@ import { MailService } from './mail.service';
           adapter: new HandlebarsAdapter(),
           options: { strict: true },
         },
-      }),
+      };
+      },
     }),
   ],
   providers: [MailService],

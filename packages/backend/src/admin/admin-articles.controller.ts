@@ -5,6 +5,7 @@ import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
+import { CreateArticleDto, UpdateArticleDto } from './dto/admin-article.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -68,15 +69,15 @@ export class AdminArticlesController {
 
   @Post()
   @Roles('ADMIN', 'EDITOR')
-  async create(@Body() data: any) {
-    const { articleEvents, articleTags, ...articleData } = data;
+  async create(@Body() data: CreateArticleDto) {
+    const { articleEvents, articleTags, ...articleData } = data as any;
     return this.prisma.article.create({ data: articleData });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: any, @Request() req: any) {
-    const { id: _, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data;
+  async update(@Param('id') id: string, @Body() data: UpdateArticleDto, @Request() req: any) {
+    const { id: _, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data as any;
 
     if (data.version !== undefined) {
       const before = await this.prisma.article.findUnique({ where: { id } });

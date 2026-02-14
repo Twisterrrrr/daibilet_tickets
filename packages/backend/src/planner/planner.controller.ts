@@ -2,6 +2,7 @@ import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { PlannerService } from './planner.service';
 import { CalculatePlanDto } from './dto/calculate-plan.dto';
+import { CustomizePlanDto } from './dto/customize-plan.dto';
 
 @ApiTags('planner')
 @Controller('planner')
@@ -16,9 +17,7 @@ export class PlannerController {
 
   @Post('customize')
   @ApiOperation({ summary: 'Заменить событие в программе' })
-  customize(
-    @Body() body: { variant: any; dayNumber: number; slotIndex: number; newEventId: string },
-  ) {
+  customize(@Body() body: CustomizePlanDto) {
     return this.plannerService.customize(body);
   }
 }

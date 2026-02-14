@@ -43,10 +43,10 @@ export function CheckoutClient() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  // Separate items by type
+  // Separate items by type (3 типа: WIDGET, REDIRECT, REQUEST)
   const redirectItems = items.filter((i) => i.purchaseType === 'REDIRECT');
-  const requestItems = items.filter((i) => i.purchaseType === 'REQUEST_ONLY' || i.purchaseType === 'API_CHECKOUT');
-  const otherItems = items.filter((i) => i.purchaseType !== 'REDIRECT' && i.purchaseType !== 'REQUEST_ONLY' && i.purchaseType !== 'API_CHECKOUT');
+  const requestItems = items.filter((i) => i.purchaseType === 'REQUEST');
+  const widgetItems = items.filter((i) => i.purchaseType === 'WIDGET');
 
   // Validate cart
   const handleValidate = async () => {
@@ -67,8 +67,9 @@ export function CheckoutClient() {
       if (data.allValid) {
         setStep('contact');
       }
-    } catch (e: any) {
-      setValidationError(e.message);
+    } catch (e: unknown) {
+      console.error('Checkout error:', e);
+      setValidationError((e as Error).message);
     } finally {
       setValidating(false);
     }
@@ -98,8 +99,9 @@ export function CheckoutClient() {
       setResult(data);
       setStep('done');
       clearCart();
-    } catch (e: any) {
-      setValidationError(e.message);
+    } catch (e: unknown) {
+      console.error('Checkout error:', e);
+      setValidationError((e as Error).message);
     } finally {
       setSubmitting(false);
     }
@@ -188,7 +190,7 @@ export function CheckoutClient() {
                       </Link>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-slate-400">
-                          {item.purchaseType === 'REQUEST_ONLY' ? 'Заявка' :
+                          {item.purchaseType === 'REQUEST' ? 'Заявка' :
                            item.purchaseType === 'REDIRECT' ? 'Партнёр' : 'Билет'}
                         </span>
                         {item.badge && (

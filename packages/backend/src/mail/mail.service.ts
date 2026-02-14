@@ -49,8 +49,8 @@ export class MailService {
       });
       this.logger.log(`Review verify email sent → ${to}`);
       return true;
-    } catch (err: any) {
-      this.logger.error(`Failed to send verify email to ${to}: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send verify email to ${to}: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
   }
@@ -84,8 +84,8 @@ export class MailService {
       });
       this.logger.log(`Review request email sent → ${to}`);
       return true;
-    } catch (err: any) {
-      this.logger.error(`Failed to send review request to ${to}: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send review request to ${to}: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
   }
@@ -117,8 +117,250 @@ export class MailService {
       });
       this.logger.log(`Review approved notification sent → ${to}`);
       return true;
-    } catch (err: any) {
-      this.logger.error(`Failed to send approved email to ${to}: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send approved email to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
+  // ===================================
+  // Checkout / Order Notifications
+  // ===================================
+
+  /**
+   * Подтверждение создания заказа — отправляется сразу после createCheckoutSession.
+   */
+  async sendOrderCreated(to: string, data: {
+    customerName: string;
+    shortCode: string;
+    items: Array<{ title: string; quantity: number; price: number }>;
+    totalPrice: number;
+  }): Promise<boolean> {
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Order created → ${to}: ${data.shortCode}`);
+      return false;
+    }
+    try {
+      await this.mailer.sendMail({
+        to,
+        subject: `Заказ ${data.shortCode} оформлен — Дайбилет`,
+        template: 'order-created',
+        context: {
+          ...data,
+          trackUrl: `${this.appUrl}/orders/track?code=${data.shortCode}`,
+          appUrl: this.appUrl,
+        },
+      });
+      this.logger.log(`Order created email sent → ${to} (${data.shortCode})`);
+      return true;
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send order-created to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Заказ подтверждён оператором.
+   */
+  async sendOrderConfirmed(to: string, data: {
+    customerName: string;
+    shortCode: string;
+    items: Array<{ title: string; quantity: number; price: number }>;
+    totalPrice: number;
+    operationalItems?: Array<{
+      eventTitle: string;
+      meetingPoint?: string | null;
+      meetingInstructions?: string | null;
+      operationalPhone?: string | null;
+      operationalNote?: string | null;
+    }>;
+  }): Promise<boolean> {
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Order confirmed → ${to}: ${data.shortCode}`);
+      return false;
+    }
+
+    // Filter operational items that have at least one field
+    const opItems = (data.operationalItems || []).filter(
+      (i) => i.meetingPoint || i.meetingInstructions || i.operationalPhone || i.operationalNote,
+    );
+
+    try {
+      await this.mailer.sendMail({
+        to,
+        subject: `Заказ ${data.shortCode} подтверждён — Дайбилет`,
+        template: 'order-confirmed',
+        context: {
+          ...data,
+          hasOperationalInfo: opItems.length > 0,
+          operationalItems: opItems,
+          trackUrl: `${this.appUrl}/orders/track?code=${data.shortCode}`,
+          appUrl: this.appUrl,
+        },
+      });
+      this.logger.log(`Order confirmed email sent → ${to} (${data.shortCode})`);
+      return true;
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send order-confirmed to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Заказ отклонён.
+   */
+  async sendOrderRejected(to: string, data: {
+    customerName: string;
+    shortCode: string;
+    reason?: string;
+  }): Promise<boolean> {
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Order rejected → ${to}: ${data.shortCode}`);
+      return false;
+    }
+    try {
+      await this.mailer.sendMail({
+        to,
+        subject: `Заказ ${data.shortCode} не подтверждён — Дайбилет`,
+        template: 'order-rejected',
+        context: {
+          ...data,
+          helpUrl: `${this.appUrl}/help`,
+          appUrl: this.appUrl,
+        },
+      });
+      this.logger.log(`Order rejected email sent → ${to} (${data.shortCode})`);
+      return true;
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send order-rejected to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Заказ истёк (не подтверждён вовремя).
+   */
+  async sendOrderExpired(to: string, data: {
+    customerName: string;
+    shortCode: string;
+    reason?: string;
+  }): Promise<boolean> {
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Order expired → ${to}: ${data.shortCode}`);
+      return false;
+    }
+    try {
+      await this.mailer.sendMail({
+        to,
+        subject: `Заказ ${data.shortCode} истёк — Дайбилет`,
+        template: 'order-expired',
+        context: {
+          ...data,
+          helpUrl: `${this.appUrl}/help`,
+          appUrl: this.appUrl,
+        },
+      });
+      this.logger.log(`Order expired email sent → ${to} (${data.shortCode})`);
+      return true;
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send order-expired to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Заказ завершён — запрос отзыва (через X дней после визита).
+   */
+  async sendOrderCompleted(to: string, data: {
+    customerName: string;
+    shortCode: string;
+    eventTitle: string;
+    reviewUrl: string;
+  }): Promise<boolean> {
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Order completed → ${to}: ${data.shortCode}`);
+      return false;
+    }
+    try {
+      await this.mailer.sendMail({
+        to,
+        subject: `Как прошёл визит? Оцените ${data.eventTitle} — Дайбилет`,
+        template: 'order-completed',
+        context: {
+          ...data,
+          trackUrl: `${this.appUrl}/orders/track?code=${data.shortCode}`,
+          appUrl: this.appUrl,
+        },
+      });
+      this.logger.log(`Order completed email sent → ${to} (${data.shortCode})`);
+      return true;
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send order-completed to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Уведомить администратора о новом тикете поддержки.
+   */
+  async notifyAdminNewTicket(data: {
+    ticketCode: string;
+    name: string;
+    email: string;
+    category: string;
+    message: string;
+  }): Promise<void> {
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Admin: new support ticket ${data.ticketCode}`);
+      return;
+    }
+    try {
+      await this.mailer.sendMail({
+        to: this.adminEmail,
+        subject: `Новый тикет ${data.ticketCode}: ${data.category}`,
+        html: `
+          <h3>Новый запрос в поддержку</h3>
+          <p><b>Код:</b> ${data.ticketCode}</p>
+          <p><b>Имя:</b> ${data.name}</p>
+          <p><b>Email:</b> ${data.email}</p>
+          <p><b>Категория:</b> ${data.category}</p>
+          <p><b>Сообщение:</b> ${data.message.substring(0, 500)}${data.message.length > 500 ? '...' : ''}</p>
+          <p><a href="${this.appUrl}/admin/support">Открыть в админке →</a></p>
+        `,
+      });
+      this.logger.log(`Admin notified about new ticket ${data.ticketCode}`);
+    } catch (err: unknown) {
+      this.logger.error(`Failed to notify admin about ticket: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /**
+   * Ответ на тикет поддержки — уведомление клиента.
+   */
+  async sendTicketReply(to: string, data: {
+    customerName: string;
+    ticketCode: string;
+    message: string;
+  }): Promise<boolean> {
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Ticket reply → ${to}: ${data.ticketCode}`);
+      return false;
+    }
+    try {
+      await this.mailer.sendMail({
+        to,
+        subject: `Ответ на обращение ${data.ticketCode} — Дайбилет`,
+        template: 'ticket-reply',
+        context: {
+          ...data,
+          helpUrl: `${this.appUrl}/help`,
+          appUrl: this.appUrl,
+        },
+      });
+      this.logger.log(`Ticket reply email sent → ${to} (${data.ticketCode})`);
+      return true;
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send ticket-reply to ${to}: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
   }
@@ -150,8 +392,8 @@ export class MailService {
           <p><a href="${this.appUrl}/admin/reviews">Модерировать →</a></p>
         `,
       });
-    } catch (err: any) {
-      this.logger.error(`Failed to notify admin: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.error(`Failed to notify admin: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }

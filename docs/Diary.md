@@ -4,6 +4,717 @@
 
 ---
 
+## 15 февраля 2026 — Подборки (Collections) + системный аудит
+
+### Наблюдения
+
+Реализована полная фича «Подборки» — тематические посадочные страницы с гибридной логикой (фильтры + ручная курация). Параллельно проведён полный аудит кодовой базы.
+
+**Что сделано:**
+- Prisma-модель `Collection` с фильтрами, курацией, контентом, SEO
+- Backend: `CollectionService` + `CollectionController` (GET /collections, GET /collections/:slug)
+- Backend: `AdminCollectionsController` (CRUD с optimistic lock)
+- Frontend: `/podborki` (список, группировка по городам) + `/podborki/[slug]` (SSR, JSON-LD, FAQ-аккордеон)
+- Админка: `CollectionsList` + `CollectionEdit` (5 табов: основное, фильтры, курация, контент, SEO)
+- Seed: 5 примеров (Ночные экскурсии СПб, Музеи Казани детям, Лучшие музеи России, Романтический Петербург, Золотое кольцо)
+- Поддержка мульти-городского фильтра через `additionalFilters.citySlugs`
+
+### Решения
+
+**Архитектурное решение — гибридная модель подборок:**
+- Фильтры (`filterTags`, `filterCategory`, `filterAudience`, `additionalFilters`) определяют автоматическую выборку
+- `pinnedEventIds` — ручные «закреплённые» события (отображаются первыми)
+- `excludedEventIds` — ручное исключение (не попадают даже при совпадении фильтров)
+- `cityId` = null для кросс-городских, конкретный UUID для городских
+- `additionalFilters.citySlugs` — массив slug-ов для мульти-городских (Золотое кольцо, маршруты)
+
+### Проблемы
+
+**Результаты системного аудита:**
+
+#### Backend (31 `as any`, 6 TODO, 0 пустых catch)
+| Метрика | Значение | Статус |
+|---------|----------|--------|
+| `as any` приведения | 31 (+ 52 в тестах) | ⚠️ Требует внимания |
+| Пустые catch | 0 | ✅ Исправлено |
+| @Body() без DTO | 0 | ✅ Исправлено |
+| TODO-комментарии | 6 | ⚠️ (checkout, voucher, reconciliation) |
+| Hardcoded URL | teplohod.info (не через env) | ⚠️ |
+| Запросы take≥500 | 8 файлов (макс. 1000) | ⚠️ Нужна пагинация |
+
+#### Frontend (100+ `any`, 4 пустых catch, sitemap неполный)
+| Метрика | Значение | Статус |
+|---------|----------|--------|
+| `any` типы | 100+ | ⚠️ Постепенная типизация |
+| Пустые catch | 4 (admin, Sentry) | ⚠️ |
+| console.log в проде | 30+ | ⚠️ |
+| Error Boundaries | ✅ root + checkout | ✅ |
+| Sitemap /podborki | ❌ Не включён | ❗ Нужно добавить |
+| Error Boundary в админке | ❌ Нет | ⚠️ |
+
+#### Prisma / БД (17 недостающих индексов, 5 каскадных рисков)
+| Метрика | Значение | Статус |
+|---------|----------|--------|
+| FK без индексов | 17 полей в 12 моделях | ⚠️ Критично при росте |
+| Cascade без soft delete | 5 моделей | ⚠️ Package, Review, SupportTicket |
+| Collection индексы | ✅ cityId + isActive/isDeleted | ✅ |
+| Модели без version | Event, EventOffer, и др. | ⚠️ Нет optimistic lock |
+
+#### Инфраструктура
+| Метрика | Значение | Статус |
+|---------|----------|--------|
+| CI/CD | ✅ GitHub Actions (lint+typecheck+test+build) | ✅ |
+| Docker | ✅ multi-stage (backend, frontend, admin) | ✅ |
+| .env.example | ✅ В корне | ✅ |
+| TypeScript strict | ✅ Включён | ✅ |
+| ESLint | ✅ typescript-eslint + prettier | ✅ |
+| Деплой | ❌ Нет автоматического | ⚠️ |
+| Тесты фронтенда | ❌ Нет | ⚠️ |
+
+**ТОП-5 приоритетных действий:**
+1. Добавить `/podborki/*` в sitemap (SEO)
+2. Добавить 17 недостающих FK-индексов (производительность)
+3. Перенести teplohod.info URL в env (конфигурируемость)
+4. Заменить console.log на structured logging (фронтенд)
+5. Добавить Error Boundary в админку
+
+---
+
+## 15 февраля 2026 — Стратегия конкуренции: 3 козыря против Tripster
+
+### Наблюдения
+
+Tripster — лидер рынка экскурсий в России. Прямое соревнование по UX/дизайну при текущих ресурсах нецелесообразно. Нужно побеждать на тех полях, где Tripster слаб, а наша архитектура даёт преимущество.
+
+Три стратегических направления:
+
+### Решения
+
+#### 1. Посадочные страницы — структурное SEO-преимущество
+
+**Почему работает:** у Tripster плоская структура (город → список экскурсий от гидов). У нас — многоуровневая таксономия: города, регионы, площадки, категории, подкатегории, теги, комбо-программы.
+
+Это даёт десятки уникальных URL под длинный хвост:
+- `/cities/kazan` — «Казань: экскурсии, музеи, мероприятия»
+- `/venues/hermitage` — «Эрмитаж: билеты, расписание, как попасть»
+- `/events?category=MUSEUM&city=spb` — «Музеи Петербурга»
+- `/events?tag=night&city=spb` — «Ночные экскурсии Петербурга»
+- `/combo/spb-3-days` — «Петербург за 3 дня: готовая программа»
+- Блог: «Что посмотреть в Калининграде с детьми»
+
+**Что уже есть:** инфраструктура готова (города, регионы, venues, теги, combo, JSON-LD). Нужен контент.
+
+**Сроки до эффекта:** 2-3 месяца (индексация Google). Уверенность: высокая.
+
+#### 2. AI-контент — масштабируемый SEO
+
+**Почему работает:** можно быстро генерировать десятки статей и описаний, которые Tripster создаёт руками.
+
+**Формула качества (AI-контент ≠ спам):**
+- AI-каркас → ручная редактура → уникальные фото → внутренняя перелинковка к карточкам событий
+- Конкретика: реальные цены, часы работы, как добраться, что рядом (привязка к нашим данным)
+- Регулярное обновление (цены и расписание меняются — мы обновляем автоматически)
+
+**Риски:**
+- Google понижает шаблонный AI-текст. Решение: уникальность через привязку к реальным данным (цены, наличие, отзывы)
+- Tripster побеждает за счёт UGC (отзывы путешественников индексируются как уникальный контент). Решение: наращивать собственные отзывы + email-цепочка review request
+
+**Сроки:** 1-2 мес (создание контента) + 2-3 мес (SEO-эффект). Уверенность: средняя.
+
+#### 3. Планировщик туров — killer feature (дифференциатор)
+
+**Почему работает:** этого нет ни у Tripster, ни у GetYourGuide, ни у Viator, ни у Sputnik8. Человек говорит «Петербург, 3 дня, двое взрослых + ребёнок» — получает готовую программу с билетами.
+
+**MVP (2-4 недели):**
+- Выбрал город + даты + состав группы
+- Получил 3 варианта (эконом / оптимал / премиум)
+- Купил одной кнопкой
+- БЕЗ drag-and-drop, БЕЗ карт маршрутов, БЕЗ кастомизации
+
+**Полная версия (Неделя 4+ в понедельном плане):**
+- Drag-and-drop расписание
+- Карта маршрута на день
+- Замена событий в программе
+- Учёт времени переездов
+
+**Риски:**
+- Самая сложная фича в проекте (оркестрация сеансов, цен, наличия, маршрутов, корзины)
+- Пока не работает — не обещать. Скрыт с фронтенда (14.02.2026)
+- Конверсия MVP непредсказуема — нужен быстрый запуск → A/B тест
+
+**Сроки:** MVP 2-4 недели, полная версия 2-3 месяца. Уверенность: высокая по дифференциации, средняя по конверсии.
+
+### Сводная таблица
+
+| Козырь | Срок до эффекта | Уверенность | Зависимости |
+|--------|-----------------|-------------|-------------|
+| Посадочные + SEO-структура | 2-3 мес (индексация) | Высокая | Контент (описания, фото) |
+| AI-статьи | 1-2 мес + 2-3 мес SEO | Средняя | Качество редактуры, перелинковка |
+| Планировщик MVP | 2-4 нед разработка | Высокая (дифференциация) | Checkout, сеансы, pricing |
+
+### Проблемы
+- Все три направления требуют **контента** — это главный bottleneck, а не код
+- Планировщик конфликтует с текущим приоритетом (запуск платежей). Порядок: платежи → контент → планировщик MVP
+- AI-контент может навредить SEO если делать массово без качества. Лучше 10 хороших статей, чем 100 шаблонных
+
+---
+
+## 15 февраля 2026 — UX-аудит: сравнение с Tripster
+
+### Наблюдения
+
+Проведено сравнение с [experience.tripster.ru](https://experience.tripster.ru/) — ведущей платформой экскурсий в России. Фиксируем конкретные отличия для поэтапного закрытия.
+
+**Где Tripster впереди:**
+
+| # | Область | Tripster | Дайбилет (текущее) | Приоритет |
+|---|---------|----------|--------------------|-----------|
+| 1 | **Hero-секция** | Полноэкранное фото реального места + поиск поверх = мгновенная эмоция «хочу туда» | Тёмный градиент без фотографии, абстрактный паттерн. Утилитарно, не вызывает эмоции | Критический |
+| 2 | **Качество фото** | Реальные фото экскурсий (гид с группой, вид с крыши, момент на мосту) | Стоковые из TicketsCloud/Teplohod, часто низкого качества или технические | Критический |
+| 3 | **Доверие на карточке** | Фото гида + имя + кол-во отзывов крупно → «лицо» за экскурсией | Информативная карточка (бейджи, цена, рейтинг), но безличная — нет человека | Высокий |
+| 4 | **Отзывы на главной** | Карусель реальных отзывов с фото путешественников | Статичный блок с цифрами (304 событий, 4.8 рейтинг), нет ощущения «живого» продукта | Высокий |
+| 5 | **Поиск** | Полноценный autocomplete с подсказками, категориями, популярными направлениями | Простой dropdown с городами. Для 7 городов допустимо, но ощущается «проще» | Средний |
+| 6 | **Страница события** | Подробный профиль гида, маршрут на карте, фото от путешественников, развёрнутые отзывы | Описание + сеансы + оффер. Нет профиля оператора, нет фото от клиентов | Средний |
+| 7 | **Срочность/дефицит** | «Забронировано X раз сегодня», «Осталось 2 места» — ощущение спроса | Есть «Осталось N мест» и «Через N мин», но нет контекста «популярно сейчас» | Низкий |
+
+**Где Дайбилет уже сильнее или на уровне:**
+
+| Область | Преимущество |
+|---------|-------------|
+| Фильтрация | Подкатегории, время суток, быстрые фильтры по витрине (EXCURSION/MUSEUM/EVENT/KIDS) — у Tripster этого нет |
+| Площадки (venues) | Отдельная сущность с FAQ, графиком, ценами, отзывами — у Tripster всё через гидов |
+| Мультипровайдерность | TC + Teplohod + manual + partner → шире каталог в одном месте |
+| Техническая база | ISR, state machine checkout, split payments, fulfillment orchestration — зрелее чем UI |
+| Города и регионы | Регионы с хаб-городами, области, каталог по географии — у Tripster плоский список городов |
+
+### Решения
+
+Принято решение задокументировать отличия и вернуться к ним планомерно. Порядок закрытия по ROI (эффект / сложность):
+
+1. **Фото в hero** (реальное фото, полноэкранный фон) — низкая сложность, максимальный визуальный эффект
+2. **Качество фото каталога** — контентная задача: галереи ТОП-20 событий с настоящими фото
+3. **Карусель отзывов на главной** — 5-6 лучших отзывов с именем/городом
+4. **Autocomplete в поиске** — город + начало названия события
+5. **Профиль оператора/гида на странице события** — лицо за продуктом
+
+Пункты 1-2 — это ~80% визуального отставания. Остальное — polish.
+
+### Проблемы
+- Качество фото — системная проблема: TC и Teplohod отдают то, что есть. Решение: ручная замена для ТОП-событий + возможность загрузки фото через админку (уже есть upload).
+- Профиль гида/оператора — в текущей модели данных нет поля для фото оператора и его описания на уровне Event. Есть `Operator` модель, но без avatar/bio. Потребуется расширение схемы.
+
+---
+
+## 15 февраля 2026 — Запуск серверов: исправление ошибок компиляции
+
+### Наблюдения
+- Бэкенд не компилировался: 138 ошибок TypeScript
+- Prisma-миграции не были применены к БД (колонки `isDeleted`, `fulfillment_items`, `payment_intents` отсутствовали)
+- Циклические зависимости NestJS-модулей: `QueueModule → CatalogModule → AdminModule → SchedulerModule → CatalogModule`
+- Фронтенд не отображал главную: домены изображений `ticketscloud-prod.storage.yandexcloud.net` и `api.teplohod.info` не были в `next.config.ts`
+
+### Решения
+1. `strictPropertyInitialization: false` в backend `tsconfig.json` — убрал ~60 ошибок TS2564 в DTO
+2. `prisma generate` + `prisma db push` — синхронизация схемы с БД
+3. `INACTIVE` → `DISABLED` в soft-delete операциях (enum `OfferStatus` не содержал `INACTIVE`)
+4. 20 type errors: приведение JSON-полей Prisma, Sentry import, supplier DTO, OfferSource enum
+5. Разорваны циклические зависимости модулей:
+   - `CatalogModule`: убран импорт `AdminModule`, добавлен `EventOverrideService` напрямую
+   - `AdminModule`: убран импорт `SchedulerModule`, добавлен `TagAssignmentService` напрямую, добавлен `CatalogModule`
+   - 5 файлов: импорт `QUEUE_*` перенесён из `queue.module.ts` → `queue.constants.ts`
+6. `next.config.ts`: добавлены домены `ticketscloud-prod.storage.yandexcloud.net` и `api.teplohod.info`
+
+### Проблемы
+- `/planner` по-прежнему доступна по прямому URL (сознательно)
+- Unsplash-изображения иногда таймаутят (CDN latency). Рассмотреть локальный кэш или замену на собственные фото
+- Миграции разошлись с БД: есть локальные миграции, отсутствующие в БД и наоборот. Использован `prisma db push` как workaround
+
+---
+
+## 14 февраля 2026 — Редизайн главной + скрытие планировщика
+
+### Наблюдения
+- Главная страница выглядела «беззубо»: абстрактный hero «Откройте для себя города России», два из трёх пунктов «Как это работает» рекламировали нерабочий планировщик/ваучер.
+- Блок «Начнутся скоро» часто пуст (зависит от расписания), из-за чего сразу после hero — пустота.
+- Планировщик ещё не реализован, но ссылки на него были по всему фронтенду: Header (desktop + mobile), Footer, hero CTA, cities/[slug], events/[slug], combo/*, layout.tsx meta.
+
+### Решения
+1. **Скрыт планировщик** из 8 файлов без удаления кода:
+   - Header.tsx — убрана кнопка «Спланировать поездку» (desktop + mobile)
+   - Footer.tsx — убрана фраза «Умный планировщик программы»
+   - layout.tsx — обновлена meta description (убрано упоминание планировщика и ваучера)
+   - cities/[slug], events/[slug], combo/*, combo/[slug] — убраны CTA и ссылки на планировщик
+
+2. **Новая главная** (`page.tsx`):
+   - Hero: тёмный градиент, заголовок «Билеты на экскурсии, музеи и мероприятия», dropdown городов (HeroCitySearch), быстрые ссылки на топ-4 города
+   - Популярные события: sort=popular, limit=8 (fallback sort=rating) — блок всегда с данными
+   - Социальное доказательство: 4 метрики (события, площадки, города, рейтинг)
+   - CTA внизу: «Нужна помощь?» + каталог/помощь
+
+3. **Новый компонент** `HeroCitySearch.tsx` (клиентский, dropdown городов → redirect)
+
+### Проблемы
+- `/planner` по-прежнему доступна по прямому URL (сознательно — код не удалён, будет реализован позже)
+
+---
+
+## 14 февраля 2026 — Pre-YooKassa Safety Gates: двухконтурная архитектура
+
+### Наблюдения
+
+Реализован полный набор «safety gates» перед интеграцией YooKassa с production ключами. Архитектура выстроена как **двухконтурная** (PLATFORM + EXTERNAL) с чётким путём миграции к единому чекауту.
+
+**Ключевые архитектурные решения:**
+
+1. **PurchaseFlow как единый контракт** — `PLATFORM` (YooKassa) / `EXTERNAL` (TC, redirect). Маппинг из `purchaseType` делается в одном месте (`resolvePaymentFlow`). Когда TC/TEP уйдут — просто перестанем создавать EXTERNAL-офферы.
+
+2. **Единая структура offersSnapshot** — одинаковая для PLATFORM и EXTERNAL. Содержит: `purchaseFlow`, `unitPrice`, `quantity`, `lineTotal`, `commissionRateSnapshot`, `platformFeeSnapshot`, `supplierAmountSnapshot`. Сумма считается ТОЛЬКО из snapshot.
+
+3. **FulfillmentItem** — per-line-item execution tracking со статусами `PENDING → RESERVING → RESERVED → CONFIRMED`. Включает retry (до 3 попыток с exponential backoff) и auto-escalation.
+
+4. **BookingProvider interface** — абстракция провайдера бронирования. TC/TEP/Internal/Partner — адаптеры. При отказе от TC/TEP просто удаляем адаптер. Домен не знает «как именно бронируется TC».
+
+5. **Feature Flags** — per-city/category kill switch для постепенного отключения EXTERNAL. Поддержка `disable_external_offers` с scope=city/category/global.
+
+### Решения
+
+**Phase 1 — Доменная модель (schema + snapshot + partitioning):**
+- Новые enums: `PurchaseFlow`, `FulfillmentStatus`
+- Новые модели: `FulfillmentItem`, `ProcessedWebhookEvent`, `FeatureFlag`
+- Обогащённый `offersSnapshot` с pricing/commission snapshots
+- `partitionCart()` разделяет корзину на PLATFORM/EXTERNAL группы
+- `isSessionFullyFulfilled()` — инвариант завершения сессии
+- `resolvePaymentFlow()` — единственный маппер purchaseType → PurchaseFlow
+
+**Phase 2 — Идемпотентность + YooKassa SDK:**
+- `WebhookIdempotencyService.processOnce()` с unique constraint в БД
+- Race condition protection через P2002 handling
+- YooKassa API: `createPayment` (с marketplace split `transfers`), `createRefund`
+- IP whitelist для webhook endpoint (185.71.76.0/27, 77.75.153.0/25, etc.)
+- Webhook → BullMQ queue (не блокируем обработку в контроллере)
+
+**Phase 3 — Fulfillment + компенсация:**
+- `FulfillmentService`: `startFulfillment` → `executeFulfillment` → `checkCompletion`
+- Retry logic: 3 попытки, delays 5s/30s/120s
+- `RefundService`: полный и частичный рефанд через YooKassa API
+- Auto-compensation: 15-мин окно для админа → авто-рефанд
+- Cron через BullMQ: `fulfillment-retry` + `auto-compensate`
+
+**Phase 4 — Rate limiting + observability:**
+- `ThrottlerGuard` глобально (30 req/min), `/session` (5/min), `/pay` (3/min)
+- `@SkipThrottle()` на webhook endpoints
+- `RequestIdMiddleware` — x-request-id propagation
+- `PaymentMetricsService` — in-memory counters для всех payment events
+- Admin reconciliation: mismatches, retry, refund, resolve
+
+**Phase 5 — E2E тесты:**
+- 21 тест, 10 сценариев, все проходят
+- Покрытие: partitioning, state machine, completion, snapshot immutability
+
+### Проблемы
+
+- `TcApiService` не имел методов `confirmOrder`, `cancelOrder`, `getOrder` — добавлены как делегаты к существующим `updateOrder`/`finishOrder`.
+- State machine не допускает прямой переход `STARTED → PENDING_CONFIRMATION` — сессия создаётся сразу с нужным статусом, тест скорректирован.
+- Circular dependency QueueModule ↔ CheckoutModule — CheckoutModule добавлен в imports QueueModule для FulfillmentProcessor.
+
+---
+
+## 14 февраля 2026 (поздно) — Hardening: Топ-5 архитектурных рисков
+
+### Наблюдения
+
+Проведён глубокий аудит по 5 направлениям рисков. Результаты:
+- 50+ boundary violations (any на границах интеграций)
+- 15 hard-delete операций на финансовых/пользовательских данных
+- 11 моделей без soft-delete (6 критических)
+- 16 каскадных связей, часть из которых каскадировала удаление Event в финансовые данные
+- 6 inline @Body без DTO в контроллерах
+- 5+ unbounded findMany без take limit
+
+### Решения
+
+**Риск 5 (каскадные удаления) — ЗАКРЫТ:**
+- Soft-delete добавлен для Event и EventOffer (isDeleted + deletedAt)
+- Cascade → Restrict: EventSession→Event, EventOffer→Event, EventOverride→Event
+- Cascade → SetNull: Review→Event, Review→Venue, ExternalReview→Event (отзывы сохраняются)
+- Hard-delete заменён на soft-delete в tc-sync.service.ts (Event.deleteMany → updateMany), admin-events (offer delete), supplier-events (offer delete)
+- `isDeleted: false` добавлен в 14 мест каталогового сервиса (админка видит всё)
+
+**Риск 4 (admin/supplier без DTO) — ЗАКРЫТ:**
+- Созданы 6 DTO: ReconciliationRefundDto, ReconciliationResolveDto, CreateExternalReviewDto, BatchExternalReviewsDto, SupplierRegisterDto, SupplierLoginDto
+- Все с class-validator (@IsEmail, @MinLength, @IsNumber, @Min/@Max, @ValidateNested)
+- take: 500 добавлен к 5 unbounded findMany (tags, combos, landings, cities, upsells)
+
+**Риск 2 (границы интеграций) — ЧАСТИЧНО ЗАКРЫТ:**
+- Созданы типы `tc-api.types.ts`: TcEvent, TcOrder, TcTicketSet + type guards (isTcEvent, isTcOrder) + safe extractors
+- Созданы типы `yookassa.types.ts`: YkPayment, YkRefund, YkWebhookEvent + type guards (isYkPayment, isYkWebhookEvent) + extractPaymentIdFromWebhook
+- payment.service.ts: YooKassa ответы проверяются через isYkPayment перед использованием
+- checkout.controller.ts: webhook проверяется через isYkWebhookEvent
+- ОСТАТОК: tc-sync.service.ts всё ещё работает с `any[]` для TC events (масштабный рефакторинг, отдельная задача)
+
+### Проблемы
+
+- tc-sync.service.ts содержит 15+ мест с `any` — это самый большой источник нетипизированных данных, но его рефакторинг затрагивает ~1300 строк и требует отдельного этапа
+- tc-grpc.service.ts: gRPC client без типов (нужны proto-generated types)
+- `@Req() req: any` в partner/supplier контроллерах — требует типизации JwtPayload
+
+---
+
+## 14.02.2026 (вечер) — Качественный seed venues: 41 ТОП-музей по 7 городам
+
+### Наблюдения
+
+- Старый seed использовал citySlug `spb` вместо правильного `saint-petersburg` — все venue СПб не привязывались к городу.
+- Seed не был идемпотентным: при повторном запуске выдавал ошибку unique constraint на slug.
+- Калининград был скрыт (`isFeatured: false`), но раздел «Музеи и Арт» даёт ему качественный контент.
+- Не хватало данных по Казани, Калининграду, Владимиру, Ярославлю, Нижнему Новгороду.
+
+### Решения
+
+1. **Полная переработка seed-venues.ts**:
+   - 41 venue по 7 городам: SPb 13, Moscow 10, Kazan 5, Kaliningrad 4, Vladimir 3, Yaroslavl 3, Nizhny 3
+   - Исправлен citySlug: `spb` → `saint-petersburg`
+   - Upsert-логика: существует → update (не трогает imageUrl/galleryUrls), не существует → create
+   - Реальные данные: адреса, координаты, часы работы (EN-ключи), цены в копейках, телефоны, сайты
+
+2. **Конверсионные поля для ТОП-venue**:
+   - Эрмитаж, Третьяковка, Русский музей, Казанский Кремль, Нижегородский Кремль — заполнены `highlights`, `features`, `faq`
+   - Остальные — базовые `features`
+
+3. **Калининград включён**:
+   - 4 venue: Музей Мирового океана, Музей янтаря, Кафедральный собор, Фридландские ворота
+   - При запуске seed автоматически ставится `isFeatured: true` для города
+
+4. **Новые города в каталоге venue**:
+   - Казань: Кремль, Музей исламской культуры, Национальный музей, Галерея, Музей Чак-Чака
+   - Владимир: Успенский собор, Золотые ворота, Палаты
+   - Ярославль: Музей-заповедник, Художественный музей, Планетарий Терешковой
+   - Нижний: Кремль, Арсенал, Художественный музей
+
+### Проблемы
+
+- Нет: seed полностью идемпотентен, обратно-совместим, не создаёт Event.
+
+---
+
+## 14.02.2026 (день) — Конверсионная оптимизация страницы музея
+
+### Наблюдения
+
+- Страница venue была статической SSR-компонентой без интерактивных элементов (календарь, количество).
+- Sticky bottom bar (mobile) всегда отображался, не реагируя на скролл — неоптимально для UX.
+- FAQ-блок существовал, но не генерировал FAQPage JSON-LD для SEO.
+- В админке отсутствовали инструменты для управления конверсионными полями (highlights, FAQ, features, комиссии).
+- Не было валидации минимальных полей при публикации venue.
+
+### Решения
+
+1. **TicketsBlock (Client Component)** — `components/venue/TicketsBlock.tsx`:
+   - Мини-календарь для OPEN_DATE (выбор даты посещения, навигация по месяцам).
+   - Количество билетов (+/- пикер, 1-10).
+   - Дифференцированные карточки офферов: бейджи «Рекомендуем», «Быстрый вход», trust signals.
+   - Динамический пересчёт итоговой суммы по количеству.
+   - Разный CTA для REDIRECT / REQUEST / WIDGET.
+
+2. **MobileStickyBar (Client Component)** — `components/venue/MobileStickyBar.tsx`:
+   - IntersectionObserver на sentinel в hero CTA.
+   - Плавная анимация появления (translate-y transition).
+   - Показывается только когда hero CTA уходит за fold.
+
+3. **FAQ JSON-LD** — FAQPage schema (отдельный `<script type="application/ld+json">`):
+   - Каждый Q/A в `mainEntity` как `Question` + `acceptedAnswer`.
+   - Улучшает SEO-показатели (Featured Snippets, rich results).
+
+4. **Venue publish validation** — `admin-venues.controller.ts`:
+   - При `isActive: true` проверяются: title, address, imageUrl, priceFrom, description.
+   - При update объединяются existing + body для корректной проверки.
+   - Soft: рекомендация «минимум 3 фото», не блокирует.
+
+5. **Commission config** — `shared/index.ts`:
+   - `VENUE_COMMISSION_DEFAULTS` по типу: MUSEUM 10%, GALLERY 15%, ART_SPACE 20% и т.д.
+   - Промо-ставка 7% на первые 3-6 месяцев.
+   - `getEffectiveCommission()` — расчёт с учётом custom rate, promo period, fallback.
+   - Индивидуальная ставка (`commissionRate` на модели Venue) перекрывает дефолт.
+
+6. **Admin «Конверсия» tab** — `VenueEdit.tsx`:
+   - Highlights: добавление/удаление фактов (5-7 буллетов).
+   - Features: чекбоксы (no_queue, audio_guide, kids_friendly и т.д.).
+   - FAQ: вопрос + ответ, добавление/удаление.
+   - Комиссия: индивидуальная ставка с подсказкой дефолта по типу.
+
+7. **Backend**: `highlights`, `faq`, `features`, `commissionRate` добавлены в create/update admin endpoint.
+
+### Проблемы
+
+- Нет: все изменения обратно-совместимы. Client components рендерятся поверх SSR-страницы.
+
+---
+
+## 14.02.2026 (утро) — MVP «Музеи и Арт»: пробелы закрыты
+
+### Наблюдения
+
+- OPEN_DATE события исчезали из каталога, лендингов и city-page из-за жёсткого фильтра `sessions.some { startsAt >= now }`.
+- Ключи openingHours в seed были на русском (Пн, Вт…), а фронт ожидал английские (mon, tue…).
+- Blog article page не содержал перелинковки с venue-каталогом.
+- `adminNotes` (plural) в partner controller не совпадал со schema `adminNote` (singular).
+
+### Решения
+
+1. **OPEN_DATE фильтр** — исправлен `CatalogService.getEvents()`: 3-ветвичная логика (OPEN_DATE only → без sessions; SCHEDULED → обычный; без фильтра → OR обоих). Аналогично исправлены `fetchCityBySlug`, `getCities`, `LandingService.getBySlug`.
+2. **Seed 25 venue** — `prisma/seed-venues.ts`: Эрмитаж, Русский музей, Кунсткамера, Эрарта, Манеж, Севкабель, Фаберже, Стрит-арт и ещё 4 по СПб; Третьяковка, Пушкинский, Гараж, Кремль, ММОМА, Винзавод, Космонавтика, ГЭС-2, Царицыно, Коломенское, Дарвиновский и ещё по МСК. Idempotent (проверяет slug).
+3. **JSON-LD**: venue page — `makesOffer` для open-date (без startDate), `openingHoursSpecification` с правильными Schema.org днями, нормализация RU→EN ключей часов.
+4. **Перелинковка**: venue page → «Читайте также» (статьи по городу через `VenueService.getRelatedArticles`); blog article page → секция «Музеи и арт-пространства» с VenueCard по городу статьи.
+5. **Admin EventEdit**: venueId select (привязка к месту), dateMode toggle (SCHEDULED/OPEN_DATE), isPermanent checkbox, endDate date-picker. Новый endpoint `PATCH :id/venue-settings` на бэкенде.
+6. **Quick filter «Открытая дата»**: добавлен в QUICK_FILTERS.MUSEUM (params: `dateMode: 'OPEN_DATE'`), EventCard передаёт `dateMode` prop.
+7. **TS-fix**: `adminNotes` → `adminNote` в partner-orders.controller.ts, `subcategories` cast в admin-events.controller.ts.
+
+### Проблемы
+
+- Landing variants для OPEN_DATE не имеют sessionId/startsAt — добавлен флаг `isOpenDate: true`, сортировка обрабатывает null.
+
+---
+
+## 14.02.2026 (ночь) — Музеи и Арт: Venue Pages + Open-Date Tickets
+
+### Наблюдения
+
+- Раздел "Музеи" был пуст, т.к. билетные системы (TC, teplohod.info) их практически не содержат.
+- Музеи — это **evergreen-трафик**: люди постоянно ищут "билеты в эрмитаж", "музеи москвы".
+- Музеи кардинально отличаются от событий: билет с **открытой датой**, страница-**место** (а не событие), постоянные экспозиции + временные выставки.
+- Существующая модель `Location` — scaffold, неподходящий для полноценных venue-страниц.
+
+### Решения
+
+1. **Новая модель `Venue`**: полноценная сущность для музеев, галерей, арт-пространств.
+   - Enums: `VenueType` (MUSEUM, GALLERY, ART_SPACE, EXHIBITION_HALL, THEATER, PALACE, PARK), `DateMode` (SCHEDULED, OPEN_DATE).
+   - Поля: title/shortTitle, venueType, description, gallery, address/metro/lat/lng, openingHours (JSON), priceFrom, rating, externalRating, operatorId (партнёр-музей), metaTitle/metaDescription.
+   - Soft delete (isDeleted/deletedAt), optimistic locking (version).
+2. **Расширение `Event`**: `venueId` (FK к Venue), `dateMode`, `isPermanent`, `endDate`.
+3. **Расширение `EventOffer`**: `venueId` для прямых офферов к месту (без привязки к Event).
+4. **Новые подкатегории**: ART_SPACE, SCULPTURE, CONTEMPORARY в EventSubcategory.
+5. **Backend**: `VenueModule` (public API: GET /venues, GET /venues/:slug) + `AdminVenuesController` (CRUD с optimistic lock).
+6. **Frontend**: `/venues` (каталог с фильтрами город/тип/сортировка), `/venues/[slug]` (hero, часы работы, галерея, билеты, выставки, JSON-LD/SEO), `VenueCard` компонент.
+7. **Admin UI**: VenuesList + VenueEdit (табы: основное, расположение, часы работы, галерея, SEO, выставки, офферы). Sidebar пункт "Места".
+8. **Интеграция**: навигация "Музеи и Арт" → /venues, EventCard с `dateMode=OPEN_DATE`, Event page ссылка на venue, City page секция "Музеи и искусство", CATEGORY_LABELS обновлён.
+9. **URL-структура**: `/venues/ermitazh` для места, `/events/rembrandt-v-ermitazhe` для выставки — не смешиваем.
+
+### Проблемы
+
+- Отзывы на уровне venue пока не реализованы (нужна отдельная Review → venueId связь). Решение: отложено, используются отзывы на дочерних Event-ах.
+- Для `OPEN_DATE` событий фильтр по sessions (startsAt >= now) пропустит их в основном каталоге. Решение: в getEvents dateMode=OPEN_DATE можно обрабатывать отдельно.
+
+---
+
+## 14.02.2026 (вечер) — Partner B2B API + Unified Checkout в roadmap
+
+### Наблюдения
+
+- Реализован полный Partner B2B API для машинного взаимодействия с внешними поставщиками, у которых есть собственная система бронирования.
+- Этот слой параллелен Supplier Portal (JWT + UI) — Partner API использует API-ключи (machine-to-machine), без UI.
+- Пользователь уточнил, что «unified checkout» (оплата на нашей стороне для событий билетных систем) нужен для планировщика программ, но не на текущем этапе. Занесено в roadmap.
+
+### Решения
+
+1. **Partner B2B API — полная реализация**:
+   - **Модель `ApiKey`**: SHA-256 хеш ключа, prefix (первые 8 символов для UI), rateLimit (запросов/мин), ipWhitelist, expiresAt. Связь с Operator.
+   - **`Operator` расширен**: `webhookUrl` (URL для уведомлений) + `webhookSecret` (HMAC-секрет).
+   - **Идемпотентная SQL-миграция** `20260214_partner_api`: создаёт таблицу `api_keys`, добавляет webhook-поля.
+   - **`ApiKeyGuard`**: аутентификация по `Authorization: Bearer dbl_xxx...`, проверки isActive/expiresAt/IP, fire-and-forget обновление lastUsedAt, прокидывание `req.user = { operatorId, type: 'partner' }`.
+   - **Partner CRUD** (`/api/v1/partner/`):
+     - Events: upsert по externalId (POST), обновление (PUT), деактивация (DELETE)
+     - Offers: upsert (POST), обновление (PUT), быстрое обновление наличия/цены (PATCH availability)
+     - Whoami: информация о ключе
+   - **Partner Orders**: список заказов (GET, фильтры), детали (GET :id), подтверждение (POST confirm, через state machine), отклонение (POST reject)
+   - **Partner Reports**: продажи за период (JSON + CSV export)
+   - **Webhook Service**: BullMQ очередь `partner-webhooks`, HMAC-SHA256 подпись в `X-Webhook-Signature`, 3 ретрая с exponential backoff (5s→10s→20s). Типы: `order.created`, `order.cancelled`, `payment.paid`, `payment.refunded`.
+   - **Admin: управление ключами**:
+     - POST `/admin/suppliers/:id/api-keys` — генерация (plain-text ключ возвращается ОДИН раз)
+     - GET `/admin/suppliers/:id/api-keys` — список (prefix, lastUsedAt, isActive)
+     - DELETE `/admin/suppliers/:id/api-keys/:keyId` — отзыв
+     - PATCH `/admin/suppliers/:id/webhook` — настройка URL + автогенерация/обновление секрета
+   - **Admin UI**: секция «API Интеграция» в SupplierDetail — таблица ключей, генерация с копированием, отзыв, настройка webhook.
+
+2. **Unified Checkout — занесён в roadmap**:
+   - При подключении YooKassa можно принимать оплату на нашей стороне даже для событий билетных систем (TC, teplohod.info).
+   - Это нужно для планировщика программ (единый ваучер = несколько событий из разных источников).
+   - Технически: создаём заказы в TC/TEP через их API, оплату принимаем через YooKassa.
+   - Риски: двойной резерв (15 мин TC vs наша оплата), частичные failures, чарджбеки.
+   - Порядок: сначала собственные REQUEST-события, потом TC/TEP через unified checkout.
+
+### Проблемы
+
+- Нет проблем. Prisma schema валидна, линтер чист, Prisma Client сгенерирован.
+
+---
+
+## 14.02.2026 — Supplier Portal (маркетплейс-модель)
+
+### Наблюдения
+
+- Реализован полноценный Supplier Portal: отдельные ЛК для поставщиков, которые могут самостоятельно размещать события и офферы.
+- Расширена модель Operator — добавлены поля для маркетплейса: isSupplier, trustLevel, commissionRate, promoRate, yookassaAccountId, ИНН, верификация.
+- Создана отдельная аутентификация поставщиков (jwt-supplier стратегия) с изоляцией от admin JWT.
+- Модерация по Trust Level: Level 0 — полная модерация, Level 1 — авто-публикация + пост-модерация, Level 2 — полное доверие.
+- Commission calculation: effectiveRate учитывает промо-ставку. Snapshot комиссии записывается в PaymentIntent (иммутабельно).
+- Split Payment ready: PaymentIntent содержит grossAmount, platformFee, supplierAmount, supplierId. Подготовлен код для YooKassa Split transfers.
+
+### Решения
+
+- **Operator расширение vs отдельная таблица**: Решили расширять Operator, т.к. Event/Offer уже ссылаются на operatorId — минимум ломающих изменений.
+- **Отдельная JWT стратегия**: jwt-supplier с type='supplier' в payload. Разные guard'ы, разные cookie, разные UI.
+- **Trust Level как механизм масштабирования**: Автоматизирует модерацию по мере роста числа поставщиков. Критерии повышения: продажи, отсутствие жалоб, возвраты < 5%.
+- **Промо-период**: 7% первые 3-6 месяцев для привлечения поставщиков. promoRate + promoUntil записываются в Operator.
+- **Commission snapshot**: Ставка фиксируется в PaymentIntent на момент транзакции (как offersSnapshot) — защита от споров.
+
+### Проблемы
+
+- YooKassa Split API требует отдельную регистрацию sub-merchant для каждого поставщика. Нужно предусмотреть UI для ввода yookassaAccountId.
+- Seed-данные не содержат поставщиков — первые тесты ручные через API /supplier/auth/register.
+
+---
+
+## 13.02.2026 — Стратегические приоритеты (roadmap)
+
+### Наблюдения
+
+Техническая база закреплена: PurchaseType консолидирован, State Machine с акторами, PaymentIntent stub, 28 тестов, CSV export, compat AuditLog. Переходим к продуктовым задачам.
+
+### Решения — 5 стратегических направлений
+
+**1. SEO-блог + перелинковка с каталогом**
+- Цель: органический трафик → каталог → конверсия.
+- Статьи должны быть привязаны к городам, категориям, тегам.
+- Перелинковка: статья → событие (EventCard в теле), событие → статья (блок "Читайте также").
+- Приоритеты: топ-10 поисковых запросов по каждому городу → одна статья на запрос.
+
+**2. Посадочные страницы (ключ к $$$)**
+- Лендинги = главная воронка. Каждый лендинг — отдельный SEO-кластер.
+- Вылизать: FilterBar, ComparisonTable, VariantCard, CTA-блоки, социальное доказательство (отзывы).
+- A/B: заголовки, порядок карточек, формулировки CTA.
+- Mobile-first: 70%+ трафика → мобильная версия должна быть идеальной.
+
+**3. YooKassa — тестовые платежи**
+- PaymentIntent stub готов → подключить SDK, заменить STUB → YOOKASSA.
+- Тестовая среда YooKassa (sandbox) → e2e тесты.
+- Webhook верификация (IP whitelist + HMAC).
+
+**4. Единые ваучеры (Trip Planner)**
+- Один ваучер = несколько событий. QR-код → проверка на входе.
+- Калькуляция: сумма офферов + сервисный сбор (опционально) - скидка за пакет.
+- Политика отмен: полный возврат до X дней, частичный до Y дней, без возврата после.
+- Переносы: перенос конкретного события в пакете (если оператор позволяет).
+
+**5. Усиление ресурса**
+- Партнёрская программа: операторы добавляют свои события → комиссия.
+- Telegram-бот: уведомления о статусе заявки, напоминания.
+- Seasonal: тематические подборки (Новый год, 8 марта, каникулы).
+- Геймификация: "Исследователь Петербурга" — бейджи за посещённые маршруты.
+
+### Проблемы
+
+- Нет проблем. Фиксация стратегии для следующей сессии.
+
+---
+
+## 13.02.2026 (вечер) — Compat AuditLog + PaymentIntent слой
+
+### Наблюдения
+
+- Единственный операционный риск: in-memory compat metrics теряются при рестартах.
+- Для подключения YooKassa нужен PaymentIntent слой, даже как stub.
+
+### Решения
+
+1. **Compat → AuditLog (персистентный)**
+   - `setCompatLogger()` — callback в shared, подключается бэкендом при bootstrap.
+   - Каждый legacy PurchaseType hit записывается в AuditLog как `LEGACY_PURCHASE_TYPE` (fire-and-forget).
+   - In-memory `legacyPurchaseTypeHits` сохранён для текущей сессии мониторинга.
+
+2. **PaymentIntent — модель + миграция**
+   - `PaymentIntent` (PENDING → PROCESSING → PAID/FAILED/CANCELLED/REFUNDED).
+   - `idempotencyKey` (UNIQUE) — защита от дублей.
+   - `provider` (STUB / YOOKASSA) — переключение провайдера.
+   - `providerPaymentId`, `providerData`, `paymentUrl`, `paidAt`, `failedAt`, `failReason`.
+   - Привязка к `CheckoutSession` (1:N — можно повторить попытку).
+
+3. **State Machine v4 — PaymentIntent transitions**
+   - `tryTransitionPayment()` по акторам: system (webhook), user (cancel), admin (refund).
+   - Терминальные: PAID, FAILED, CANCELLED, REFUNDED.
+   - PAID → CheckoutSession.COMPLETED через state machine assert.
+
+4. **Stub endpoint**
+   - `POST /checkout/:sessionId/pay` → создаёт PaymentIntent + payment_url (mock).
+   - `POST /checkout/payment/:id/simulate-paid` → имитация оплаты (только dev/staging).
+   - `POST /checkout/payment/:id/cancel` → отмена.
+   - `POST /checkout/webhook/payment` → готовый webhook для YooKassa.
+
+5. **Тесты** — 6 новых (28 всего): PaymentIntent transitions, idempotency, terminal states.
+
+### Проблемы
+
+- Нет проблем. Все тесты зелёные, линтер чист.
+
+---
+
+## 13.02.2026 — Foundation Hardening (закрепление фундамента)
+
+### Наблюдения
+
+- Все базовые модули (PurchaseType, State Machine, SLA/TTL, Analytics, Snapshot) внедрены и работают.
+- Переход к хардингу для предотвращения скрытых багов перед YooKassa.
+
+### Решения
+
+1. **Widget Payload Validation** (zod)
+   - Создан `packages/shared/src/widget-payload.ts` с zod-схемами по провайдерам: `TCWidgetPayloadSchema`, `RadarioWidgetPayloadSchema`, `TimepadWidgetPayloadSchema`, `GenericWidgetPayloadSchema`.
+   - `validateWidgetPayload(provider, payload)` → `{ valid, data?, errors? }`.
+   - `ensurePayloadVersion()` — автоматическое добавление `v: 1` в payload.
+   - Интегрировано в `admin-events.controller.ts` (createOffer → 400 BadRequest при невалидном payload).
+
+2. **PURCHASE_TYPE_COMPAT — метрики + kill switch**
+   - `legacyPurchaseTypeHits` — in-memory счётчик по каждому legacy-значению (TC_WIDGET, API_CHECKOUT, REQUEST_ONLY).
+   - `setCompatDisabled(true)` — kill switch, активируется через `DISABLE_PURCHASE_TYPE_COMPAT=true` в env.
+   - Endpoint `/admin/checkout/compat-metrics` для мониторинга без BI.
+
+3. **Миграция — идемпотентная + SQL-assert контрактов**
+   - Обёрнута в проверку: если новый enum уже существует — пропускаем.
+   - SQL-assert блоки после миграции: WIDGET ⇒ widgetProvider NOT NULL, REQUEST ⇒ widgetProvider IS NULL.
+   - Добавлен `completedAt` для CheckoutSession.
+
+4. **State Machine v3 — структурный return**
+   - `tryTransition*()` → `TransitionResult { allowed, noOp, reason }` вместо boolean.
+   - Контроллеры и cron реагируют по-разному: noOp → return entity, !allowed → audit log + 400.
+   - Запрещённые переходы логируются в AuditLog как security event (`DENIED_TRANSITION`).
+
+5. **Timestamps: confirmedAt + completedAt**
+   - `confirmedAt` уже было в OrderRequest.
+   - Добавлен `completedAt` в CheckoutSession (schema + migration + controller).
+
+6. **CSV Export**
+   - `GET /admin/checkout/export/requests` + `GET /admin/checkout/export/sessions` с BOM для Excel.
+   - Кнопки в Admin UI → Analytics tab (просроченные, все заявки, сессии).
+
+7. **Snapshot — write-once + enriched**
+   - `offersSnapshot` обогащён: `offerId`, `source`, `purchaseTypeResolved`, `priceCurrency`, `snapshotAt`.
+   - Guard `assertSnapshotImmutable()` в checkout.service — запрещает перезапись.
+
+8. **Инвариант-тесты** (22 теста, vitest)
+   - State machine transitions per actor (6 тестов)
+   - Idempotency no-op (2 теста)
+   - Terminal statuses (2 теста)
+   - Widget payload validation (4 теста)
+   - ExpireReason determination (3 теста)
+   - PURCHASE_TYPE_COMPAT + kill switch (3 теста)
+   - calculateExpiresAt (2 теста)
+
+### Проблемы
+
+- Jest не был установлен → использован vitest (легче, быстрее, нативный ESM).
+- zod v4 установлен (`^4.3.6`) — API совместим с v3 для базовых схем, но `error.issues` доступ адаптирован.
+
+---
+
 ## 2026-02-12 — Подкатегории и KIDS-категория
 
 ### Наблюдения
@@ -1130,6 +1841,157 @@
 - EventSource enum не содержал MANUAL — добавлен в schema и миграцию
 - tcEventId имеет @unique constraint — для ручных событий генерируется уникальный `manual-{timestamp}-{random}` идентификатор
 - Миграция должна быть применена вручную через `prisma migrate resolve` из-за ограничений enum в PostgreSQL
+
+---
+
+### 13 февраля 2026 — Консолидация PurchaseType, State Machine, SLA/TTL, Аналитика
+
+#### Наблюдения
+- `PurchaseType` содержал 4 значения: `TC_WIDGET`, `REDIRECT`, `API_CHECKOUT`, `REQUEST_ONLY`.
+- `API_CHECKOUT` был stub-заглушкой и нигде не использовался в реальных данных.
+- `TC_WIDGET` и `REQUEST_ONLY` — неоптимальные имена, привязанные к конкретному провайдеру и слишком длинные.
+- Переходы статусов CheckoutSession и OrderRequest не были формализованы — контроллер мог записать любой статус напрямую.
+- У OrderRequest не было SLA-контроля: заявки могли висеть вечно в PENDING.
+
+#### Решения
+1. **PurchaseType: 4 → 3 типа**:
+   - `TC_WIDGET` → `WIDGET` (универсальный — TC и любые будущие виджеты)
+   - `REDIRECT` → `REDIRECT` (без изменений)
+   - `API_CHECKOUT` → удалён (мёрж в `REQUEST`)
+   - `REQUEST_ONLY` → `REQUEST` (короче, чище)
+   - Миграция через пересоздание enum в PostgreSQL (CREATE TYPE new → ALTER COLUMN → DROP old → RENAME)
+   - Маппинг обратной совместимости в `PURCHASE_TYPE_COMPAT` (shared)
+
+2. **State Machine** (`checkout-state-machine.ts`):
+   - Все допустимые переходы CheckoutSession и OrderRequest описаны декларативно
+   - `assertCheckoutTransition()` / `assertOrderRequestTransition()` — бросают ошибку при невалидном переходе
+   - Терминальные статусы: `COMPLETED`, `EXPIRED`, `CANCELLED` (для CS); `CONFIRMED`, `REJECTED`, `EXPIRED` (для OR)
+   - Интегрировано в `admin-checkout.controller.ts`
+
+3. **SLA/TTL для OrderRequest**:
+   - Новое поле `slaMinutes` (default 30) в модели OrderRequest
+   - Константы в state machine: `DEFAULT_REQUEST_SLA_MINUTES = 30`, `QUICK_REQUEST_TTL_MINUTES = 1440` (24ч)
+   - Cron `OrderExpiryService` (каждую минуту) — автоматически переводит PENDING → EXPIRED по истечении TTL
+
+4. **Аналитический отчёт** (`GET /admin/checkout/analytics`):
+   - Распределение активных офферов по `purchaseType` (WIDGET / REDIRECT / REQUEST)
+   - Количество и статусы checkout sessions и order requests
+   - Конверсия: sessions → completed, requests → confirmed
+   - Средний SLA (время от создания до подтверждения заявки)
+   - Admin UI: новая вкладка «Аналитика» с карточками и progress bars
+
+#### Проблемы
+- PostgreSQL не поддерживает прямое удаление значений из enum → решено через пересоздание типа
+- Prisma не умеет делать `ALTER TYPE RENAME VALUE` → миграция создана вручную
+
+---
+
+### 13 февраля 2026 — Хардинг State Machine, WIDGET contract, SLA v2, аналитика v2
+
+#### Наблюдения
+- Ревью показала, что state machine нуждается в разделении переходов по актору (user/admin/system).
+- `purchaseType=WIDGET` нуждался в формальном контракте: "рендерим виджет по widgetProvider + widgetPayload".
+- Средний SLA (avg) маскирует хвосты; нужны p50 и p90 для реальной картины.
+- При истечении заявок нужно записывать причину (SLA/TTL/CART) для точной аналитики.
+- CheckoutSession должна хранить immutable snapshot офферов, иначе аналитика "плывёт".
+
+#### Решения
+1. **WIDGET contract**:
+   - Новые поля в EventOffer: `widgetProvider` (TEXT) + `widgetPayload` (JSONB)
+   - Контракт: `purchaseType=WIDGET` → рендерим виджет по `widgetProvider`, конфиг в `widgetPayload`
+   - Миграция автозаполняет `widgetProvider=TC` + payload для существующих WIDGET-офферов
+   - WidgetPayload TypeScript интерфейс в shared
+   - Frontend рендерит виджет по `widgetProvider`, не угадывает по source
+
+2. **PURCHASE_TYPE_COMPAT с логированием**:
+   - `resolvePurchaseType(raw, context)` — выдаёт console.warn при обнаружении legacy-значения
+   - Позволяет найти и вычистить все источники старых типов
+
+3. **Миграция — hardened**:
+   - `ALTER COLUMN DROP DEFAULT` перед переключением типа
+   - Verify block: `RAISE EXCEPTION` если найдены офферы со старым значением
+   - Составной подход: TEXT → update values → DROP old TYPE → CREATE new → CAST
+
+4. **State Machine v2** (user vs admin vs system):
+   - Переходы разделены по `TransitionActor`: user, admin, system
+   - Идемпотентность: `from === to` → no-op (возвращает false), не бросает ошибку
+   - `assertCheckoutTransition(from, to, actor)` → `boolean` (true = нужно обновить, false = no-op)
+   - Применяется в контроллерах, cron, будущих вебхуках
+
+5. **SLA/TTL v2**:
+   - `slaMinutes` = ожидаемое время реакции оператора (не путать с TTL)
+   - `expiresAt` = явная дата истечения заявки (TTL)
+   - Новое поле `expireReason`: SLA | TTL | CART
+   - Составной индекс `(status, expiresAt)` для дешёвой выборки в cron
+   - `determineExpireReason()` — определяет причину по контексту заявки
+   - Cron пишет `expireReason` при каждом expire
+
+6. **Аналитика v2** (GET /admin/checkout/analytics):
+   - Drop-off по шагам checkout (воронка)
+   - Конверсия по purchaseType + source (в связке)
+   - p50 и p90 времени до подтверждения (не только avg)
+   - SLA Breach Rate = % заявок, подтверждённых позже slaMinutes
+   - Причины истечения (requestsByExpireReason)
+   - Admin UI: полноценный дашборд с воронкой, карточками p50/p90, breach rate с цветовыми индикаторами
+
+7. **Immutable snapshot в CheckoutSession**:
+   - Новое поле `offersSnapshot` (JSONB): title, price, type, deeplink, widgetPayload, operator
+   - Фиксируется в момент создания сессии, не зависит от будущих правок офферов
+
+#### Проблемы
+- Нет проблем — все изменения backwards-compatible
+
+---
+
+### 14.02.2026 — Система поддержки (Phase 1)
+
+#### Наблюдения
+- Для минимизации нагрузки на человеческую поддержку нужен трёхуровневый подход: самообслуживание (FAQ, трекинг), автоматические уведомления (email по статусам), и тикет-система для эскалаций.
+- Telegram Bot временно отложен из-за ограничений в РФ.
+- Виджет обратной связи (floating button + modal) обеспечивает доступность формы с любой страницы сайта без перехода на /help.
+
+#### Решения
+1. **Публичная страница /help** — 20+ FAQ в 5 категориях (покупка, заказы, возвраты, музеи, безопасность) + FAQPage JSON-LD для SEO.
+2. **Трекинг заказа /orders/track** — публичная страница с поиском по shortCode (CS-XXXX), таймлайном статусов, составом заказа. Backend endpoint `GET /checkout/track/:shortCode` (без авторизации).
+3. **Email-уведомления по статусам заказа**:
+   - `order-created` — при создании CheckoutSession
+   - `order-confirmed` — при подтверждении оператором (admin confirm request)
+   - `order-rejected` — при отклонении
+   - `order-expired` — при автоматическом истечении (cron)
+   - `order-completed` — при завершении (с предложением оставить отзыв)
+   - `ticket-reply` — при ответе администратора на тикет
+4. **Модель SupportTicket** — Prisma-модель с категориями (ORDER/REFUND/VENUE/TECHNICAL/OTHER), приоритетами (LOW/MEDIUM/HIGH/URGENT), статусами (OPEN/IN_PROGRESS/WAITING_CUSTOMER/RESOLVED/CLOSED), SLA дедлайнами, связью с заказом по orderCode.
+5. **Авто-маршрутизация** — автоматический приоритет на основе категории (REFUND→HIGH, TECHNICAL→HIGH), SLA дедлайны по приоритету (URGENT: 1ч, HIGH: 4ч, MEDIUM: 24ч, LOW: 72ч).
+6. **Admin UI для тикетов** — список с фильтрами/поиском, статистикой (открытые, SLA нарушены), детальная страница с перепиской, быстрыми шаблонами ответов, внутренними заметками.
+7. **Виджет обратной связи** — floating button (MessageCircle) на всех страницах, модал с формой, отправка через API, подтверждение с кодом тикета.
+8. **TicketResponse** — модель для переписки: поддерживает admin/system/customer авторов, внутренние заметки (не видны клиенту), хронологический порядок.
+
+#### Проблемы
+- Telegram Bot API заблокирован в РФ — отложен до нахождения решения (прокси / web-app вместо бота).
+- На `/help` форма должна быть клиентской (CSR), а FAQ — серверными (SSR для SEO). Решено вынесением ContactForm в отдельный 'use client' компонент.
+
+---
+
+### 14.02.2026 — Post-seed: привязка Event → Venue, OPEN_DATE, изображения
+
+#### Наблюдения
+- После засева venues в seed-venues.ts данные venues существуют изолированно: ни один Event не связан с Venue через `venueId`, нет OPEN_DATE офферов, нет изображений у venues.
+- Для полноценной работы `/venues/[slug]` нужна связь Event.venueId → Venue, что заполнит секцию "Выставки и события" и позволит venue-level reviews агрегироваться.
+- Next.js `remotePatterns` блокировал бы загрузку Unsplash-изображений — добавлены `images.unsplash.com` и `upload.wikimedia.org`.
+- `VenueDetail` в shared пакете не содержал поля `highlights`, `faq`, `features`, `recommendPercent`, `reviews`, `relatedArticles` — страница использовала `any`, но контракт был неполным.
+
+#### Решения
+1. **seed-venue-links.ts** — идемпотентный post-seed скрипт (4 шага):
+   - Связь Event → Venue по ключевым словам в title (15 venue-keyword матчей по городам)
+   - Создание OPEN_DATE события «Эрмитаж — входной билет» с MANUAL оффером (REDIRECT → hermitagemuseum.org), `meetingPoint`, `meetingInstructions`, `operationalNote`
+   - Каскадная привязка EventOffer.venueId для уже связанных Event (прямые venue-офферы)
+   - Заполнение imageUrl + galleryUrls для ТОП-10 venues (Unsplash URLs, не перезаписывает загруженные через админку)
+2. **next.config.ts** — расширен `remotePatterns` для Unsplash и Wikimedia.
+3. **VenueDetail** — интерфейс дополнен полями `cityId`, `highlights`, `faq`, `features`, `recommendPercent`, `reviews`, `relatedArticles`.
+
+#### Проблемы
+- Нет прямого доступа к БД для запуска seed — скрипт создан, запуск при деплое.
+- Unsplash URLs для фото venues — placeholder; в production нужно заменить на собственные фото из S3/CDN.
 
 ---
 

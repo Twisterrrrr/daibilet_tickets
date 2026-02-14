@@ -1,0 +1,525 @@
+/**
+ * PaymentIntent service — слой абстракции платежей.
+ *
+ * Провайдеры: STUB (dev/staging), YOOKASSA (production).
+ * Выбор через env PAYMENT_PROVIDER.
+ *
+ * Инварианты:
+ * - Один PaymentIntent на одну попытку оплаты.
+ * - idempotencyKey защищает от дублей.
+ * - Сумма берётся ТОЛЬКО из offersSnapshot (immutable).
+ * - PAID → FulfillmentService → COMPLETED (не напрямую).
+ */
+
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
+import { randomUUID, createHmac } from 'crypto';
+import {
+  tryTransitionPayment,
+  tryTransitionCheckout,
+  PaymentIntentStatus,
+} from './checkout-state-machine';
+import { partitionCart, SnapshotLineItem } from './cart-partitioning';
+import { YkPayment, YkRefund, isYkPayment } from './yookassa.types';
+import { Prisma } from '@prisma/client';
+
+@Injectable()
+export class PaymentService {
+  private readonly logger = new Logger(PaymentService.name);
+  private readonly appUrl: string;
+  private readonly provider: string;
+  private readonly yookassaShopId: string;
+  private readonly yookassaSecretKey: string;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {
+    this.appUrl = process.env.NODE_ENV === 'production'
+      ? this.config.getOrThrow<string>('APP_URL')
+      : this.config.get<string>('APP_URL', 'http://localhost:3000');
+    this.provider = this.config.get<string>('PAYMENT_PROVIDER', 'STUB');
+    this.yookassaShopId = this.config.get<string>('YOOKASSA_SHOP_ID', '');
+    this.yookassaSecretKey = this.config.get<string>('YOOKASSA_SECRET_KEY', '');
+  }
+
+  /**
+   * Создать PaymentIntent для CheckoutSession.
+   *
+   * @param checkoutSessionId — ID сессии
+   * @param idempotencyKey — ключ для защиты от дублей (frontend генерирует uuid)
+   * @returns PaymentIntent с payment_url
+   */
+  async createPaymentIntent(
+    checkoutSessionId: string,
+    idempotencyKey?: string,
+  ) {
+    // Проверяем сессию
+    const session = await this.prisma.checkoutSession.findUnique({
+      where: { id: checkoutSessionId },
+    });
+    if (!session) throw new NotFoundException('CheckoutSession не найдена');
+
+    // Проверяем: сессия должна быть в CONFIRMED или AWAITING_PAYMENT
+    if (!['CONFIRMED', 'AWAITING_PAYMENT'].includes(session.status)) {
+      throw new BadRequestException(
+        `Оплата доступна только для CONFIRMED/AWAITING_PAYMENT сессий (текущий: ${session.status})`,
+      );
+    }
+
+    const key = idempotencyKey || randomUUID();
+
+    // Idempotency: если intent с таким ключом уже есть — вернём его
+    const existing = await this.prisma.paymentIntent.findUnique({
+      where: { idempotencyKey: key },
+    });
+    if (existing) {
+      this.logger.debug(`PaymentIntent already exists for key=${key}, returning existing`);
+      return existing;
+    }
+
+    // Проверяем: нет ли уже активного (PENDING/PROCESSING) intent для этой сессии
+    const activeIntent = await this.prisma.paymentIntent.findFirst({
+      where: {
+        checkoutSessionId,
+        status: { in: ['PENDING', 'PROCESSING'] },
+      },
+    });
+    if (activeIntent) {
+      throw new ConflictException(
+        `Уже есть активный PaymentIntent (${activeIntent.id}) для этой сессии. ` +
+        `Дождитесь завершения или отмените.`,
+      );
+    }
+
+    // ============================================
+    // Amount from snapshot (единственный источник правды)
+    // ============================================
+    const snapshot = (session.offersSnapshot as SnapshotLineItem[] | null) || [];
+    const partitioned = partitionCart(snapshot);
+
+    // Платим только за PLATFORM позиции (EXTERNAL оплачиваются у провайдера)
+    const grossAmount = partitioned.platformTotal;
+    if (grossAmount <= 0) {
+      throw new BadRequestException('Нет PLATFORM-позиций для оплаты (сумма = 0)');
+    }
+
+    // Commission из snapshot (уже рассчитана и заморожена)
+    let supplierId: string | null = null;
+    let platformFee: number | null = null;
+    let supplierAmount: number | null = null;
+    let commissionRate: number | null = null;
+
+    // Агрегируем split по всем PLATFORM позициям
+    const suppliersInPlatform = partitioned.platform.filter((s) => s.supplierId);
+    if (suppliersInPlatform.length > 0) {
+      // Для MVP: один поставщик на платёж (первый в списке)
+      const first = suppliersInPlatform[0];
+      supplierId = first.supplierId;
+      commissionRate = first.commissionRateSnapshot;
+      platformFee = partitioned.platform.reduce((sum, s) => sum + (s.platformFeeSnapshot || 0), 0);
+      supplierAmount = grossAmount - platformFee;
+    }
+
+    // ============================================
+    // Provider: STUB / YOOKASSA
+    // ============================================
+    let paymentUrl: string;
+    let providerPaymentId: string | null = null;
+    let providerData: Record<string, unknown> | null = null;
+
+    if (this.provider === 'STUB') {
+      providerPaymentId = `stub_${randomUUID().slice(0, 8)}`;
+      paymentUrl = `${this.appUrl}/checkout/pay-mock/${providerPaymentId}`;
+      providerData = {
+        mock: true,
+        supplierId,
+        platformFee,
+        supplierAmount,
+        platformItemCount: partitioned.platform.length,
+        externalItemCount: partitioned.external.length,
+        note: 'STUB payment — POST /checkout/payment/:id/simulate-paid для имитации',
+      };
+    } else if (this.provider === 'YOOKASSA') {
+      const ykResult = await this.createYookassaPayment({
+        amount: grossAmount,
+        currency: 'RUB',
+        idempotencyKey: key,
+        returnUrl: `${this.appUrl}/checkout/result?session=${checkoutSessionId}`,
+        description: `Заказ ${session.shortCode}`,
+        metadata: {
+          paymentIntentId: key,
+          checkoutSessionId,
+        },
+        supplierId,
+        supplierAmount,
+      });
+      providerPaymentId = ykResult.paymentId;
+      paymentUrl = ykResult.confirmationUrl;
+      providerData = ykResult.rawResponse;
+    } else {
+      throw new BadRequestException(`Провайдер "${this.provider}" не поддерживается`);
+    }
+
+    // Переводим сессию в AWAITING_PAYMENT
+    const csTransition = tryTransitionCheckout(session.status, 'AWAITING_PAYMENT', 'system');
+    if (csTransition.allowed && !csTransition.noOp) {
+      await this.prisma.checkoutSession.update({
+        where: { id: checkoutSessionId },
+        data: { status: 'AWAITING_PAYMENT' },
+      });
+    }
+
+    const intent = await this.prisma.paymentIntent.create({
+      data: {
+        checkoutSessionId,
+        idempotencyKey: key,
+        amount: grossAmount,
+        currency: 'RUB',
+        status: 'PENDING',
+        provider: this.provider,
+        providerPaymentId,
+        providerData: providerData as unknown as Prisma.InputJsonValue,
+        paymentUrl,
+        // Marketplace split
+        supplierId,
+        grossAmount,
+        platformFee,
+        supplierAmount,
+        commissionRate,
+      },
+    });
+
+    this.logger.log(
+      `Created PaymentIntent ${intent.id} (${this.provider}) for session ${checkoutSessionId}, amount=${grossAmount}, supplierId=${supplierId}`,
+    );
+
+    return {
+      paymentIntentId: intent.id,
+      paymentUrl: intent.paymentUrl,
+      amount: intent.amount,
+      currency: intent.currency,
+      provider: intent.provider,
+      status: intent.status,
+    };
+  }
+
+  /**
+   * Получить PaymentIntent по ID.
+   */
+  async getPaymentIntent(id: string) {
+    const intent = await this.prisma.paymentIntent.findUnique({ where: { id } });
+    if (!intent) throw new NotFoundException('PaymentIntent не найден');
+    return intent;
+  }
+
+  /**
+   * Получить все intents для сессии.
+   */
+  async getIntentsForSession(checkoutSessionId: string) {
+    return this.prisma.paymentIntent.findMany({
+      where: { checkoutSessionId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Обработать подтверждение оплаты (webhook / simulate).
+   *
+   * PAID → CheckoutSession.COMPLETED (через state machine).
+   */
+  async markPaid(intentId: string, providerPaymentId?: string) {
+    const intent = await this.prisma.paymentIntent.findUnique({
+      where: { id: intentId },
+      include: { checkoutSession: true },
+    });
+    if (!intent) throw new NotFoundException('PaymentIntent не найден');
+
+    // State machine: PaymentIntent → PAID
+    const payResult = tryTransitionPayment(intent.status, 'PAID', 'system');
+    if (payResult.noOp) return intent; // уже PAID
+    if (!payResult.allowed) throw new BadRequestException(payResult.reason);
+
+    // State machine: CheckoutSession → COMPLETED
+    const csResult = tryTransitionCheckout(
+      intent.checkoutSession.status,
+      'COMPLETED',
+      'system',
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedIntent = await tx.paymentIntent.update({
+        where: { id: intentId },
+        data: {
+          status: 'PAID',
+          paidAt: new Date(),
+          ...(providerPaymentId && { providerPaymentId }),
+        },
+      });
+
+      // Переводим сессию в COMPLETED (если переход разрешён)
+      if (csResult.allowed && !csResult.noOp) {
+        await tx.checkoutSession.update({
+          where: { id: intent.checkoutSessionId },
+          data: { status: 'COMPLETED', completedAt: new Date() },
+        });
+        this.logger.log(
+          `Session ${intent.checkoutSessionId} → COMPLETED (paid via ${intent.provider})`,
+        );
+      }
+
+      // Инкрементируем successfulSales для поставщика
+      if (intent.supplierId) {
+        await tx.operator.update({
+          where: { id: intent.supplierId },
+          data: { successfulSales: { increment: 1 } },
+        }).catch((e) => this.logger.error('payment callback failed: ' + (e as Error).message));
+      }
+
+      return updatedIntent;
+    });
+  }
+
+  /**
+   * Обработать ошибку оплаты.
+   */
+  async markFailed(intentId: string, reason?: string) {
+    const intent = await this.prisma.paymentIntent.findUnique({ where: { id: intentId } });
+    if (!intent) throw new NotFoundException('PaymentIntent не найден');
+
+    const result = tryTransitionPayment(intent.status, 'FAILED', 'system');
+    if (result.noOp) return intent;
+    if (!result.allowed) throw new BadRequestException(result.reason);
+
+    return this.prisma.paymentIntent.update({
+      where: { id: intentId },
+      data: {
+        status: 'FAILED',
+        failedAt: new Date(),
+        failReason: reason || 'unknown',
+      },
+    });
+  }
+
+  /**
+   * Отменить intent (user-driven).
+   */
+  async cancelIntent(intentId: string) {
+    const intent = await this.prisma.paymentIntent.findUnique({ where: { id: intentId } });
+    if (!intent) throw new NotFoundException('PaymentIntent не найден');
+
+    const result = tryTransitionPayment(intent.status, 'CANCELLED', 'user');
+    if (result.noOp) return intent;
+    if (!result.allowed) throw new BadRequestException(result.reason);
+
+    return this.prisma.paymentIntent.update({
+      where: { id: intentId },
+      data: { status: 'CANCELLED' },
+    });
+  }
+
+  /**
+   * STUB: Симулировать оплату (для тестирования).
+   * Только в dev / staging.
+   */
+  async simulatePaid(intentId: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException('simulate-paid недоступен в production');
+    }
+
+    this.logger.warn(`SIMULATING payment for intent ${intentId}`);
+    return this.markPaid(intentId, `sim_${Date.now()}`);
+  }
+
+  // ============================================
+  // YooKassa API integration
+  // ============================================
+
+  /**
+   * Создать платёж в YooKassa.
+   * https://yookassa.ru/developers/api#create_payment
+   */
+  private async createYookassaPayment(params: {
+    amount: number;
+    currency: string;
+    idempotencyKey: string;
+    returnUrl: string;
+    description: string;
+    metadata: Record<string, string>;
+    supplierId: string | null;
+    supplierAmount: number | null;
+  }): Promise<{ paymentId: string; confirmationUrl: string; rawResponse: Record<string, unknown> }> {
+    const { amount, currency, idempotencyKey, returnUrl, description, metadata, supplierId, supplierAmount } = params;
+
+    // Build request body
+    const body: Record<string, unknown> = {
+      amount: {
+        value: (amount / 100).toFixed(2),
+        currency,
+      },
+      capture: true,
+      confirmation: {
+        type: 'redirect',
+        return_url: returnUrl,
+      },
+      description,
+      metadata,
+    };
+
+    // Marketplace split: transfers to supplier
+    if (supplierId && supplierAmount && supplierAmount > 0) {
+      const supplier = await this.prisma.operator.findUnique({
+        where: { id: supplierId },
+        select: { yookassaAccountId: true },
+      });
+      if (supplier?.yookassaAccountId) {
+        body.transfers = [{
+          account_id: supplier.yookassaAccountId,
+          amount: {
+            value: (supplierAmount / 100).toFixed(2),
+            currency,
+          },
+        }];
+      }
+    }
+
+    // Call YooKassa API
+    const auth = Buffer.from(`${this.yookassaShopId}:${this.yookassaSecretKey}`).toString('base64');
+    const response = await fetch('https://api.yookassa.ru/v3/payments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${auth}`,
+        'Idempotence-Key': idempotencyKey,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      this.logger.error(`YooKassa createPayment failed: ${response.status} ${errorBody}`);
+      throw new BadRequestException(`YooKassa error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!isYkPayment(data)) {
+      this.logger.error('YooKassa: invalid payment response structure');
+      throw new BadRequestException('YooKassa: невалидный ответ');
+    }
+
+    const payment = data as YkPayment;
+    if (!payment.confirmation?.confirmation_url) {
+      this.logger.error('YooKassa: no confirmation_url in response');
+      throw new BadRequestException('YooKassa: нет URL для оплаты');
+    }
+
+    return {
+      paymentId: payment.id,
+      confirmationUrl: payment.confirmation.confirmation_url,
+      rawResponse: payment as unknown as Record<string, unknown>,
+    };
+  }
+
+  /**
+   * Создать рефанд в YooKassa.
+   * https://yookassa.ru/developers/api#create_refund
+   */
+  async createYookassaRefund(params: {
+    providerPaymentId: string;
+    amount: number;
+    currency?: string;
+    description?: string;
+  }): Promise<{ refundId: string; status: string; rawResponse: Record<string, unknown> }> {
+    const { providerPaymentId, amount, currency = 'RUB', description } = params;
+
+    const body: Record<string, unknown> = {
+      payment_id: providerPaymentId,
+      amount: {
+        value: (amount / 100).toFixed(2),
+        currency,
+      },
+    };
+    if (description) body.description = description;
+
+    const auth = Buffer.from(`${this.yookassaShopId}:${this.yookassaSecretKey}`).toString('base64');
+    const idempotencyKey = randomUUID();
+
+    const response = await fetch('https://api.yookassa.ru/v3/refunds', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${auth}`,
+        'Idempotence-Key': idempotencyKey,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      this.logger.error(`YooKassa refund failed: ${response.status} ${errorBody}`);
+      throw new BadRequestException(`YooKassa refund error: ${response.status}`);
+    }
+
+    const data = await response.json() as YkRefund;
+
+    return {
+      refundId: data.id,
+      status: data.status,
+      rawResponse: data as unknown as Record<string, unknown>,
+    };
+  }
+
+  // ============================================
+  // YooKassa Webhook IP Whitelist
+  // ============================================
+
+  /** YooKassa webhook IP ranges (from documentation) */
+  static readonly YOOKASSA_IPS = [
+    '185.71.76.0/27',
+    '185.71.77.0/27',
+    '77.75.153.0/25',
+    '77.75.156.11',
+    '77.75.156.35',
+    '77.75.154.128/25',
+    '2a02:5180::/32',
+  ];
+
+  /**
+   * Проверить, что IP входит в whitelist YooKassa.
+   * Для production: обязательно.
+   */
+  isYookassaIp(ip: string): boolean {
+    if (process.env.NODE_ENV !== 'production') return true;
+    // Simple check for exact IPs first
+    for (const allowed of PaymentService.YOOKASSA_IPS) {
+      if (!allowed.includes('/')) {
+        if (ip === allowed) return true;
+        continue;
+      }
+      // CIDR check
+      if (this.isIpInCidr(ip, allowed)) return true;
+    }
+    return false;
+  }
+
+  private isIpInCidr(ip: string, cidr: string): boolean {
+    if (cidr.includes(':')) return false; // Skip IPv6 for now
+    const [range, bitsStr] = cidr.split('/');
+    const bits = parseInt(bitsStr, 10);
+    const ipNum = this.ipToNum(ip);
+    const rangeNum = this.ipToNum(range);
+    if (ipNum === 0 || rangeNum === 0) return false;
+    const mask = (-1 << (32 - bits)) >>> 0;
+    return (ipNum & mask) === (rangeNum & mask);
+  }
+
+  private ipToNum(ip: string): number {
+    const parts = ip.split('.');
+    if (parts.length !== 4) return 0;
+    return parts.reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+  }
+}

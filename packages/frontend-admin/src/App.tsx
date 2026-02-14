@@ -24,6 +24,16 @@ import { ExternalReviewsListPage } from './pages/reviews/ExternalReviewsList';
 import { CheckoutSessionsListPage } from './pages/checkout/CheckoutSessionsList';
 import { AuditLogPage } from './pages/audit/AuditLog';
 import { SettingsPage } from './pages/settings/SettingsPage';
+import { SuppliersListPage } from './pages/suppliers/SuppliersList';
+import { SupplierDetailPage } from './pages/suppliers/SupplierDetail';
+import { ModerationQueuePage } from './pages/moderation/ModerationQueue';
+import { VenuesListPage } from './pages/venues/VenuesList';
+import { VenueEditPage } from './pages/venues/VenueEdit';
+import { CollectionsListPage } from './pages/collections/CollectionsList';
+import { CollectionEditPage } from './pages/collections/CollectionEdit';
+import { SupportListPage } from './pages/support/SupportList';
+import { SupportDetailPage } from './pages/support/SupportDetail';
+import ReconciliationPage from './pages/reconciliation/ReconciliationPage';
 import { isAuthenticated } from './lib/auth';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -52,12 +62,18 @@ export default function App() {
           <Route path="events/:id" element={<EventEditPage />} />
           <Route path="cities" element={<CitiesListPage />} />
           <Route path="cities/:id" element={<CityEditPage />} />
+          <Route path="venues" element={<VenuesListPage />} />
+          <Route path="venues/new" element={<VenueEditPage />} />
+          <Route path="venues/:id" element={<VenueEditPage />} />
           <Route path="tags" element={<TagsListPage />} />
           <Route path="tags/new" element={<TagEditPage />} />
           <Route path="tags/:id" element={<TagEditPage />} />
           <Route path="landings" element={<LandingsListPage />} />
           <Route path="landings/new" element={<LandingEditPage />} />
           <Route path="landings/:id" element={<LandingEditPage />} />
+          <Route path="collections" element={<CollectionsListPage />} />
+          <Route path="collections/new" element={<CollectionEditPage />} />
+          <Route path="collections/:id" element={<CollectionEditPage />} />
           <Route path="combos" element={<CombosListPage />} />
           <Route path="combos/new" element={<ComboEditPage />} />
           <Route path="combos/:id" element={<ComboEditPage />} />
@@ -72,6 +88,12 @@ export default function App() {
           <Route path="upsells" element={<UpsellsListPage />} />
           <Route path="upsells/new" element={<UpsellEditPage />} />
           <Route path="upsells/:id" element={<UpsellEditPage />} />
+          <Route path="suppliers" element={<SuppliersListPage />} />
+          <Route path="suppliers/:id" element={<SupplierDetailPage />} />
+          <Route path="moderation" element={<ModerationQueuePage />} />
+          <Route path="support" element={<SupportListPage />} />
+          <Route path="support/:id" element={<SupportDetailPage />} />
+          <Route path="reconciliation" element={<ReconciliationPage />} />
           <Route path="audit" element={<AuditLogPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>

@@ -117,10 +117,10 @@ export default async function ComboDetailPage({ params }: Props) {
               Смотреть программу
             </a>
             <Link
-              href={`/planner?city=${data.city.slug}&days=${data.dayCount}`}
+              href={`/events?city=${data.city.slug}`}
               className="border border-white/30 text-white px-8 py-3 rounded-xl font-medium hover:bg-white/10 transition-colors"
             >
-              Настроить под себя
+              Все события
             </Link>
           </div>
         </div>
@@ -245,10 +245,10 @@ export default async function ComboDetailPage({ params }: Props) {
               Нажмите «Настроить под себя», чтобы получить персональный маршрут.
             </p>
             <Link
-              href={`/planner?city=${data.city.slug}&days=${data.dayCount}`}
+              href={`/events?city=${data.city.slug}`}
               className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition-colors"
             >
-              Запустить планировщик
+              Все события в городе
             </Link>
           </div>
         )}
@@ -287,10 +287,10 @@ export default async function ComboDetailPage({ params }: Props) {
 
             <div className="flex flex-wrap items-center gap-4">
               <Link
-                href={`/planner?city=${data.city.slug}&days=${data.dayCount}`}
+                href={`/events?city=${data.city.slug}`}
                 className="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-colors"
               >
-                Забронировать
+                Все события
               </Link>
               <span className="text-sm text-slate-400">
                 Цена может варьироваться в зависимости от дат и доступности

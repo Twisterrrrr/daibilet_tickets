@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class BlogService {
+  private readonly logger = new Logger(BlogService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getArticles(opts?: { city?: string; tag?: string; page?: number; limit?: number }) {
@@ -101,7 +103,7 @@ export class BlogService {
         for (const event of city.events.slice(0, 5)) {
           await this.prisma.articleEvent.create({
             data: { articleId: article.id, eventId: event.id },
-          }).catch(() => {}); // ignore duplicates
+          }).catch((e) => this.logger.error('blog link failed: ' + (e as Error).message));
         }
 
         created++;
@@ -134,7 +136,7 @@ export class BlogService {
           for (const event of excursions.slice(0, 5)) {
             await this.prisma.articleEvent.create({
               data: { articleId: article.id, eventId: event.id },
-            }).catch(() => {});
+            }).catch((e) => this.logger.error('blog link failed: ' + (e as Error).message));
           }
 
           created++;

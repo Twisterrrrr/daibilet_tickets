@@ -24,7 +24,7 @@ export class TepApiService {
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
+      const text = await res.text().catch((e) => { this.logger.warn('TEP API call failed: ' + (e as Error).message); return ''; });
       this.logger.error(`TEP API ${res.status}: ${text.slice(0, 500)}`);
       throw new Error(`TEP API returned ${res.status}: ${text.slice(0, 200)}`);
     }
@@ -57,8 +57,8 @@ export class TepApiService {
       }
       // Если eventTimes отсутствует — IP не в белом списке
       this.logger.warn('TEP: eventTimes not found, IP may not be whitelisted. Fallback to compact.');
-    } catch (err: any) {
-      this.logger.warn(`TEP full API failed: ${err.message}. Fallback to compact.`);
+    } catch (err: unknown) {
+      this.logger.warn(`TEP full API failed: ${err instanceof Error ? err.message : String(err)}. Fallback to compact.`);
     }
     // Fallback: compact
     const compactPath = cityId
@@ -74,8 +74,8 @@ export class TepApiService {
   async getEventFull(eventId: number): Promise<TepEventFull | null> {
     try {
       return await this.request<TepEventFull>(`/events/${eventId}`);
-    } catch (err: any) {
-      this.logger.warn(`TEP full event ${eventId}: ${err.message}`);
+    } catch (err: unknown) {
+      this.logger.warn(`TEP full event ${eventId}: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
   }
@@ -98,13 +98,13 @@ export class TepApiService {
         sampleCities: cities.slice(0, 5).map((c) => c.name),
         eventsEndpoint: '/v1/events?compact',
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return {
         apiReachable: false,
         citiesCount: 0,
         sampleCities: [],
         eventsEndpoint: '/v1/events?compact',
-        error: err.message,
+        error: err instanceof Error ? err.message : String(err),
       };
     }
   }

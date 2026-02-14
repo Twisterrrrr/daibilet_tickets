@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Search, RefreshCw, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
+import { Search, RefreshCw, CheckCircle, XCircle, Clock, Eye, BarChart3, Timer, TrendingUp, Download } from 'lucide-react';
 import { adminApi } from '@/api/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -105,6 +105,7 @@ export function CheckoutSessionsListPage() {
         <TabsList>
           <TabsTrigger value="requests">Заявки</TabsTrigger>
           <TabsTrigger value="sessions">Checkout Sessions</TabsTrigger>
+          <TabsTrigger value="analytics">Аналитика</TabsTrigger>
         </TabsList>
 
         <TabsContent value="requests">
@@ -113,6 +114,10 @@ export function CheckoutSessionsListPage() {
 
         <TabsContent value="sessions">
           <CheckoutSessionsTab />
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <AnalyticsTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -142,7 +147,7 @@ function OrderRequestsTab() {
       const res = await adminApi.get<any>(`/admin/checkout/requests?${params}`);
       setRequests(res.items || []);
       setTotal(res.total || 0);
-    } catch { /* ignore */ }
+    } catch (e) { console.error('Load requests failed:', e); }
     setLoading(false);
   }, [search, statusFilter]);
 
@@ -329,7 +334,7 @@ function CheckoutSessionsTab() {
       const res = await adminApi.get<any>(`/admin/checkout/sessions?${params}`);
       setSessions(res.items || []);
       setTotal(res.total || 0);
-    } catch { /* ignore */ }
+    } catch (e) { console.error('Load sessions failed:', e); }
     setLoading(false);
   }, [search, statusFilter]);
 
@@ -501,5 +506,413 @@ function CheckoutSessionsTab() {
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+// ─── Analytics Tab (v2) ──────────────────────────────────────
+
+const PURCHASE_TYPE_LABELS: Record<string, string> = {
+  WIDGET: 'Виджет (TC)',
+  REDIRECT: 'Внешняя ссылка',
+  REQUEST: 'Заявка',
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  TC: 'TicketsCloud',
+  TEPLOHOD: 'Теплоход',
+  RADARIO: 'Radario',
+  TIMEPAD: 'TimePad',
+  MANUAL: 'Ручной',
+};
+
+const EXPIRE_REASON_LABELS: Record<string, string> = {
+  SLA: 'Оператор не среагировал (SLA)',
+  TTL: 'Явный TTL истёк',
+  CART: 'Корзина/сессия истекла',
+};
+
+interface AnalyticsData {
+  offersByType: Array<{ purchaseType: string; count: number }>;
+  offersByTypeAndSource: Array<{ purchaseType: string; source: string; count: number }>;
+  sessionsByStatus: Array<{ status: string; count: number }>;
+  requestsByStatus: Array<{ status: string; count: number }>;
+  requestsByExpireReason: Array<{ reason: string | null; count: number }>;
+  dropOff: {
+    started: number;
+    validated: number;
+    redirected: number;
+    pendingConfirmation: number;
+    confirmed: number;
+    awaitingPayment: number;
+    completed: number;
+    expired: number;
+    cancelled: number;
+  };
+  conversion: {
+    totalSessions: number;
+    completedSessions: number;
+    sessionConversionRate: number;
+    totalRequests: number;
+    confirmedRequests: number;
+    expiredRequests: number;
+    pendingRequests: number;
+    requestConversionRate: number;
+  };
+  sla: {
+    avgConfirmMinutes: number | null;
+    p50ConfirmMinutes: number | null;
+    p90ConfirmMinutes: number | null;
+    slaBreachCount: number;
+    slaBreachRate: number;
+    defaultSlaMinutes: number;
+    samplesCount: number;
+  };
+}
+
+function AnalyticsTab() {
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadAnalytics = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.get<AnalyticsData>('/admin/checkout/analytics');
+      setData(res as any);
+    } catch {
+      toast.error('Не удалось загрузить аналитику');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-32" />)}
+      </div>
+    );
+  }
+
+  if (!data) return <p className="text-muted-foreground">Нет данных</p>;
+
+  const totalOffers = data.offersByType.reduce((s, o) => s + o.count, 0);
+
+  return (
+    <div className="space-y-6">
+      {/* 1. Purchase type distribution */}
+      <div>
+        <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
+          <BarChart3 className="h-5 w-5" />
+          Распределение офферов по типу покупки
+        </h3>
+        <div className="grid gap-4 md:grid-cols-3">
+          {data.offersByType.map((item) => (
+            <Card key={item.purchaseType}>
+              <CardHeader className="pb-2">
+                <CardDescription>{PURCHASE_TYPE_LABELS[item.purchaseType] || item.purchaseType}</CardDescription>
+                <CardTitle className="text-3xl">{item.count}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-muted-foreground">
+                  {totalOffers > 0 ? Math.round((item.count / totalOffers) * 100) : 0}% от всех активных
+                </div>
+                <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${
+                      item.purchaseType === 'WIDGET' ? 'bg-blue-500' :
+                      item.purchaseType === 'REDIRECT' ? 'bg-emerald-500' :
+                      'bg-amber-500'
+                    }`}
+                    style={{ width: `${totalOffers > 0 ? (item.count / totalOffers) * 100 : 0}%` }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* 2. Type + Source breakdown */}
+      {data.offersByTypeAndSource.length > 0 && (
+        <div>
+          <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
+            <BarChart3 className="h-5 w-5" />
+            Конверсия по типу + источнику
+          </h3>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="space-y-2">
+                {data.offersByTypeAndSource.map((item) => (
+                  <div key={`${item.purchaseType}-${item.source}`} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{PURCHASE_TYPE_LABELS[item.purchaseType] || item.purchaseType}</Badge>
+                      <span className="text-sm text-muted-foreground">{SOURCE_LABELS[item.source] || item.source}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{item.count}</span>
+                      <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{ width: `${totalOffers > 0 ? (item.count / totalOffers) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* 3. Drop-off funnel */}
+      <div>
+        <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
+          <TrendingUp className="h-5 w-5" />
+          Воронка Checkout (drop-off)
+        </h3>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="space-y-1">
+              {[
+                { label: 'Создано (STARTED)', value: data.dropOff.started, color: 'bg-slate-400' },
+                { label: 'Проверено (VALIDATED)', value: data.dropOff.validated, color: 'bg-blue-400' },
+                { label: 'Перенаправлен (REDIRECTED)', value: data.dropOff.redirected, color: 'bg-indigo-400' },
+                { label: 'Ожидает подтверждения', value: data.dropOff.pendingConfirmation, color: 'bg-amber-400' },
+                { label: 'Подтверждено (CONFIRMED)', value: data.dropOff.confirmed, color: 'bg-emerald-400' },
+                { label: 'Ожидает оплату', value: data.dropOff.awaitingPayment, color: 'bg-purple-400' },
+                { label: 'Завершено (COMPLETED)', value: data.dropOff.completed, color: 'bg-emerald-600' },
+                { label: 'Истекло (EXPIRED)', value: data.dropOff.expired, color: 'bg-red-400' },
+                { label: 'Отменено (CANCELLED)', value: data.dropOff.cancelled, color: 'bg-red-600' },
+              ].filter((s) => s.value > 0).map((step) => {
+                const maxVal = Math.max(
+                  data.dropOff.started, data.dropOff.validated,
+                  data.dropOff.redirected, data.dropOff.pendingConfirmation,
+                  data.dropOff.completed, 1,
+                );
+                return (
+                  <div key={step.label} className="flex items-center gap-3">
+                    <span className="text-sm w-48 text-right text-muted-foreground truncate">{step.label}</span>
+                    <div className="flex-1 h-6 bg-muted rounded overflow-hidden">
+                      <div className={`h-full ${step.color} rounded flex items-center pl-2`}
+                        style={{ width: `${Math.max((step.value / maxVal) * 100, 5)}%` }}>
+                        <span className="text-xs font-medium text-white">{step.value}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 4. Conversion metrics */}
+      <div>
+        <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
+          <TrendingUp className="h-5 w-5" />
+          Конверсия
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Checkout Sessions</CardDescription>
+              <CardTitle className="text-2xl">{data.conversion.totalSessions}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">
+                Завершено: <span className="font-medium text-emerald-600">{data.conversion.completedSessions}</span>
+              </div>
+              <div className="text-sm font-medium text-emerald-600 mt-1">
+                {data.conversion.sessionConversionRate}% конверсия
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Заявки (REQUEST)</CardDescription>
+              <CardTitle className="text-2xl">{data.conversion.totalRequests}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">
+                Подтверждено: <span className="font-medium text-emerald-600">{data.conversion.confirmedRequests}</span>
+              </div>
+              <div className="text-sm font-medium text-emerald-600 mt-1">
+                {data.conversion.requestConversionRate}% конверсия
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Ожидают (PENDING)</CardDescription>
+              <CardTitle className="text-2xl">{data.conversion.pendingRequests}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">Требуют обработки</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Истекло (EXPIRED)</CardDescription>
+              <CardTitle className="text-2xl">{data.conversion.expiredRequests}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">
+                {data.conversion.totalRequests > 0
+                  ? `${Math.round((data.conversion.expiredRequests / data.conversion.totalRequests) * 100)}% от заявок`
+                  : '—'}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* 5. SLA metrics — p50, p90, breach rate */}
+      <div>
+        <h3 className="flex items-center gap-2 text-lg font-semibold mb-3">
+          <Timer className="h-5 w-5" />
+          SLA / Время подтверждения
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Среднее (avg)</CardDescription>
+              <CardTitle className="text-2xl">
+                {data.sla.avgConfirmMinutes !== null ? `${data.sla.avgConfirmMinutes} мин` : '—'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xs text-muted-foreground">
+                SLA: {data.sla.defaultSlaMinutes} мин | Выборка: {data.sla.samplesCount}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Медиана (p50)</CardDescription>
+              <CardTitle className="text-2xl">
+                {data.sla.p50ConfirmMinutes !== null ? `${data.sla.p50ConfirmMinutes} мин` : '—'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xs text-muted-foreground">
+                50% заявок подтверждены быстрее
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>p90 (хвост)</CardDescription>
+              <CardTitle className="text-2xl">
+                {data.sla.p90ConfirmMinutes !== null ? `${data.sla.p90ConfirmMinutes} мин` : '—'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xs text-muted-foreground">
+                {data.sla.p90ConfirmMinutes !== null && data.sla.p90ConfirmMinutes > data.sla.defaultSlaMinutes
+                  ? <span className="text-red-500">Превышает SLA — проблема в операционке</span>
+                  : '90% заявок подтверждены быстрее'}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>SLA Breach Rate</CardDescription>
+              <CardTitle className={`text-2xl ${data.sla.slaBreachRate > 20 ? 'text-red-600' : data.sla.slaBreachRate > 10 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                {data.sla.slaBreachRate}%
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xs text-muted-foreground">
+                {data.sla.slaBreachCount} из {data.sla.samplesCount} подтверждены позже SLA
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    data.sla.slaBreachRate > 20 ? 'bg-red-500' :
+                    data.sla.slaBreachRate > 10 ? 'bg-amber-500' :
+                    'bg-emerald-500'
+                  }`}
+                  style={{ width: `${Math.min(data.sla.slaBreachRate, 100)}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* 6. Expire reasons breakdown */}
+      {data.requestsByExpireReason.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold mb-3">Причины истечения заявок</h3>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="space-y-2">
+                {data.requestsByExpireReason.map((item) => (
+                  <div key={item.reason || 'unknown'} className="flex items-center justify-between">
+                    <span className="text-sm">
+                      {item.reason ? (EXPIRE_REASON_LABELS[item.reason] || item.reason) : 'Не указана (legacy)'}
+                    </span>
+                    <span className="text-sm font-medium">{item.count}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* 7. Request statuses breakdown */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Статусы заявок</h3>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="space-y-2">
+              {data.requestsByStatus.map((item) => (
+                <div key={item.status} className="flex items-center justify-between">
+                  <Badge variant={(STATUS_COLORS[item.status] || 'secondary') as any}>
+                    {STATUS_LABELS[item.status] || item.status}
+                  </Badge>
+                  <span className="text-sm font-medium">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <a href="/api/admin/checkout/export/requests?status=EXPIRED" download>
+            <Download className="h-4 w-4 mr-2" />
+            CSV: Просроченные заявки
+          </a>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <a href="/api/admin/checkout/export/requests" download>
+            <Download className="h-4 w-4 mr-2" />
+            CSV: Все заявки
+          </a>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <a href="/api/admin/checkout/export/sessions" download>
+            <Download className="h-4 w-4 mr-2" />
+            CSV: Сессии
+          </a>
+        </Button>
+        <Button variant="outline" onClick={loadAnalytics}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Обновить
+        </Button>
+      </div>
+    </div>
   );
 }

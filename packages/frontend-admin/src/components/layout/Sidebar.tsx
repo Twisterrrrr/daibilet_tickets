@@ -16,6 +16,12 @@ import {
   ChevronLeft,
   Ticket,
   Inbox,
+  Users,
+  ShieldCheck,
+  Landmark,
+  HeadphonesIcon,
+  Scale,
+  LayoutList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -43,16 +49,26 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/events', label: 'События', icon: CalendarDays },
       { to: '/orders', label: 'Заказы', icon: ShoppingCart },
       { to: '/checkout', label: 'Заявки', icon: Inbox },
+      { to: '/support', label: 'Поддержка', icon: HeadphonesIcon },
     ],
   },
   {
     title: 'Контент',
     items: [
       { to: '/cities', label: 'Города', icon: MapPin },
+      { to: '/venues', label: 'Места', icon: Landmark },
       { to: '/tags', label: 'Теги', icon: Tag },
+      { to: '/collections', label: 'Подборки', icon: LayoutList },
       { to: '/landings', label: 'Лендинги', icon: FileText },
       { to: '/combos', label: 'Combo', icon: Layers },
       { to: '/articles', label: 'Статьи', icon: BookOpen },
+    ],
+  },
+  {
+    title: 'Маркетплейс',
+    items: [
+      { to: '/suppliers', label: 'Поставщики', icon: Users },
+      { to: '/moderation', label: 'Модерация', icon: ShieldCheck },
     ],
   },
   {
@@ -61,6 +77,7 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/reviews', label: 'Отзывы', icon: MessageSquare },
       { to: '/external-reviews', label: 'Внешние отзывы', icon: ExternalLink },
       { to: '/upsells', label: 'Upsells', icon: DollarSign },
+      { to: '/reconciliation', label: 'Сверка', icon: Scale },
       { to: '/audit', label: 'Аудит', icon: ClipboardList },
       { to: '/settings', label: 'Настройки', icon: Settings },
     ],

@@ -7,6 +7,7 @@ import { CacheService } from '../cache/cache.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { PeakRangeSchema, validateJson } from './json-schemas';
 import { BadRequestException } from '@nestjs/common';
+import { UpdatePricingDto } from './dto/admin-settings.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -62,18 +63,18 @@ export class AdminSettingsController {
 
   @Patch('pricing')
   @Roles('ADMIN')
-  async updatePricing(@Body() data: any, @Request() req: any) {
+  async updatePricing(@Body() data: UpdatePricingDto, @Request() req: any) {
     try {
       if (data.peakRanges !== undefined) {
         validateJson(PeakRangeSchema, data.peakRanges, 'peakRanges');
       }
-    } catch (e: any) {
-      throw new BadRequestException(e.message);
+    } catch (e: unknown) {
+      throw new BadRequestException(e instanceof Error ? e.message : String(e));
     }
 
     const config = await this.getOrCreatePricingConfig();
 
-    const { id: _, updatedAt, ...clean } = data;
+    const { id: _, updatedAt, ...clean } = data as any;
 
     const updated = await this.prisma.pricingConfig.update({
       where: { id: config.id },

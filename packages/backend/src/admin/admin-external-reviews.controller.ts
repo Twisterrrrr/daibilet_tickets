@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { AuditInterceptor } from './audit.interceptor';
 import { ReviewService } from '../catalog/review.service';
+import { CreateExternalReviewDto, BatchExternalReviewsDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -33,33 +34,13 @@ export class AdminExternalReviewsController {
 
   @Post()
   @Roles('ADMIN', 'EDITOR')
-  async create(@Body() body: {
-    eventId?: string;
-    operatorId?: string;
-    source: string;
-    sourceUrl?: string;
-    authorName: string;
-    rating: number;
-    text: string;
-    publishedAt?: string;
-  }) {
+  async create(@Body() body: CreateExternalReviewDto) {
     return this.reviewService.createExternalReview(body);
   }
 
   @Post('batch')
   @Roles('ADMIN', 'EDITOR')
-  async batchImport(@Body() body: {
-    reviews: Array<{
-      eventId?: string;
-      operatorId?: string;
-      source: string;
-      sourceUrl?: string;
-      authorName: string;
-      rating: number;
-      text: string;
-      publishedAt?: string;
-    }>;
-  }) {
+  async batchImport(@Body() body: BatchExternalReviewsDto) {
     const results = [];
     for (const item of body.reviews) {
       const review = await this.reviewService.createExternalReview(item);

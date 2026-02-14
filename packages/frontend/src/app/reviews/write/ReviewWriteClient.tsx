@@ -27,8 +27,8 @@ function ReviewWriteContent() {
         if (!res.ok) throw new Error('Ссылка недействительна или истекла');
         const data = await res.json();
         setEventData(data);
-      } catch (err: any) {
-        setError(err.message || 'Ошибка загрузки');
+      } catch (err: unknown) {
+        setError((err instanceof Error ? err.message : String(err)) || 'Ошибка загрузки');
       } finally {
         setLoading(false);
       }

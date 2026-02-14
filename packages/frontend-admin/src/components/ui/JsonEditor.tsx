@@ -27,8 +27,8 @@ export function JsonEditor({ value, onChange, label, schema, rows = 10 }: JsonEd
       const parsed = JSON.parse(raw);
       setError('');
       onChange(parsed);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 

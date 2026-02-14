@@ -85,7 +85,7 @@ export function ComboEditPage() {
         const list = Array.isArray(res) ? res : (res as any).items ?? [];
         setCities(list);
       })
-      .catch(() => {});
+      .catch((e) => console.error('Load cities failed:', e));
   }, []);
 
   useEffect(() => {

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { TcApiService } from './tc-api.service';
 import { TcGrpcService, TcGrpcEvent, TcGrpcMetaEvent, TcGrpcVenue, TcGrpcCity, TcGrpcTicketSet } from './tc-grpc.service';
-import { EventCategory, EventSubcategory, EventAudience } from '@prisma/client';
+import { EventCategory, EventSubcategory, EventAudience, Prisma } from '@prisma/client';
 
 /**
  * Сервис синхронизации данных из Ticketscloud в нашу БД.
@@ -51,15 +51,21 @@ export class TcSyncService {
    * Полный сброс.
    */
   async resetAll(): Promise<{ deletedEvents: number; deletedCities: number }> {
-    this.logger.log('=== RESET: удаляю все события и авто-города ===');
-    await this.prisma.articleEvent.deleteMany({});
-    await this.prisma.eventTag.deleteMany({});
-    await this.prisma.eventSession.deleteMany({});
-    const evResult = await this.prisma.event.deleteMany({});
+    this.logger.log('=== RESET: мягкое удаление всех событий и авто-городов ===');
+    // Деактивируем сессии вместо удаления
+    await this.prisma.eventSession.updateMany({
+      where: {},
+      data: { isActive: false },
+    });
+    // Soft-delete всех событий
+    const evResult = await this.prisma.event.updateMany({
+      where: { isDeleted: false },
+      data: { isDeleted: true, deletedAt: new Date(), isActive: false },
+    });
     const cityResult = await this.prisma.city.deleteMany({
       where: { description: null },
     });
-    this.logger.log(`Удалено: ${evResult.count} событий, ${cityResult.count} городов`);
+    this.logger.log(`Soft-deleted: ${evResult.count} событий, ${cityResult.count} городов удалено`);
     return { deletedEvents: evResult.count, deletedCities: cityResult.count };
   }
 
@@ -82,8 +88,9 @@ export class TcSyncService {
       this.logger.log('=== Синхронизация через gRPC tc-simple ===');
       try {
         return await this.syncAllGrpc();
-      } catch (err: any) {
-        this.logger.warn(`gRPC sync failed, fallback на REST: ${err.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`gRPC sync failed, fallback на REST: ${msg}`);
         return await this.syncAllRest();
       }
     }
@@ -200,9 +207,10 @@ export class TcSyncService {
         const sessions = await this.syncGrpcEventGroup(events, meta, venueMap);
         uniqueCount++;
         sessionCount += sessions;
-      } catch (err: any) {
-        errors.push(`[meta:${metaId}]: ${err.message}`);
-        this.logger.warn(`Ошибка MetaEvent ${metaId}: ${err.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`[meta:${metaId}]: ${msg}`);
+        this.logger.warn(`Ошибка MetaEvent ${metaId}: ${msg}`);
       }
     }
 
@@ -212,9 +220,10 @@ export class TcSyncService {
         const sessions = await this.syncGrpcEventGroup([ev], undefined, venueMap);
         uniqueCount++;
         sessionCount += sessions;
-      } catch (err: any) {
-        errors.push(`[event:${ev.id}]: ${err.message}`);
-        this.logger.warn(`Ошибка одиночного события ${ev.id}: ${err.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`[event:${ev.id}]: ${msg}`);
+        this.logger.warn(`Ошибка одиночного события ${ev.id}: ${msg}`);
       }
     }
 
@@ -225,9 +234,10 @@ export class TcSyncService {
     try {
       retagResult = await this.retagAll();
       this.logger.log(`Retag: ${retagResult.eventsProcessed} событий, ${retagResult.tagsLinked} тегов`);
-    } catch (err: any) {
-      this.logger.warn(`Retag ошибка (не критично): ${err.message}`);
-      errors.push(`retag: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Retag ошибка (не критично): ${msg}`);
+      errors.push(`retag: ${msg}`);
     }
 
     return {
@@ -347,7 +357,7 @@ export class TcSyncService {
           imageUrl: imageUrl || event.imageUrl,
           priceFrom,
           isActive,
-          tcData: best as any,
+          tcData: best as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
       });
@@ -375,7 +385,7 @@ export class TcSyncService {
           imageUrl,
           priceFrom,
           isActive,
-          tcData: best as any,
+          tcData: best as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
       });
@@ -390,19 +400,23 @@ export class TcSyncService {
         eventId: event.id,
         metaEventId: tcMetaEventId,
         priceFrom,
-        externalData: best as any,
+        widgetProvider: 'TC',
+        widgetPayload: { externalEventId: tcId, metaEventId: tcMetaEventId } as Prisma.InputJsonValue,
+        externalData: best as unknown as Prisma.InputJsonValue,
         lastSyncAt: new Date(),
       },
       create: {
         eventId: event.id,
         source: 'TC',
-        purchaseType: 'TC_WIDGET',
+        purchaseType: 'WIDGET',
         externalEventId: tcId,
         metaEventId: tcMetaEventId,
         priceFrom,
         isPrimary: true,
         status: 'ACTIVE',
-        externalData: best as any,
+        widgetProvider: 'TC',
+        widgetPayload: { externalEventId: tcId, metaEventId: tcMetaEventId } as Prisma.InputJsonValue,
+        externalData: best as unknown as Prisma.InputJsonValue,
         lastSyncAt: new Date(),
       },
     });
@@ -646,28 +660,25 @@ export class TcSyncService {
       audience = 'FAMILY' as EventAudience;
     }
 
-    // --- MUSEUM ---
-    if (this.has(text, ['музей', 'музеи', 'museum'])) subs.push(EventSubcategory.MUSEUM_CLASSIC);
-    if (this.has(text, ['выставк', 'exhibition', 'экспозиц'])) subs.push(EventSubcategory.EXHIBITION);
-    if (this.has(text, ['галерея', 'gallery'])) subs.push(EventSubcategory.GALLERY);
-    if (this.has(text, ['дворец', 'дворц', 'усадьб', 'palace', 'manor'])) subs.push(EventSubcategory.PALACE);
-    if (this.has(text, ['заповедник', 'ботаническ', 'парк-музей'])) subs.push(EventSubcategory.PARK);
-    if (subs.length > 0) return { category: EventCategory.MUSEUM, subcategories: subs, audience };
+    // =====================================================================
+    // Приоритет: EVENT → EXCURSION → MUSEUM
+    // MUSEUM — только чистое посещение площадки (входной билет, экспозиция).
+    // Любое мероприятие или экскурсия, даже внутри музея — НЕ музей.
+    // =====================================================================
 
-    // --- EVENT ---
+    // --- 1. EVENT (концерт, стендап, театр, мастер-класс и т.д.) ---
     const isStandup = this.has(text, ['стендап', 'stand-up', 'stand up', 'комедия', 'comedy', 'комик']);
     if (this.has(text, ['концерт', 'concert', 'выступлен', 'tribute', 'трибьют', 'джаз', 'jazz', 'рок ', 'rock '])) subs.push(EventSubcategory.CONCERT);
     if (isStandup) subs.push(EventSubcategory.STANDUP);
     if (this.has(text, ['театр', 'спектакл', 'theater', 'theatre', 'драм', 'опер', 'балет'])) subs.push(EventSubcategory.THEATER);
-    // Стендап — не шоу и не спорт; «шоу/show» в описании стендапа не означает подкатегорию ШОУ
     if (!isStandup && this.has(text, ['шоу', 'show', 'представлен', 'цирк', 'иллюзион', 'магическ'])) subs.push(EventSubcategory.SHOW);
     if (this.has(text, ['фестиваль', 'festival', 'fest '])) subs.push(EventSubcategory.FESTIVAL);
     if (!isStandup && this.has(text, ['спорт', 'sport', 'матч', 'хоккей', 'футбол', 'баскетбол', 'бег', 'марафон'])) subs.push(EventSubcategory.SPORT);
-    if (this.has(text, ['мастер-класс', 'мастер класс', 'masterclass', 'workshop', 'мастер-'])) subs.push(EventSubcategory.MASTERCLASS);
+    if (this.has(text, ['мастер-класс', 'мастер класс', 'masterclass', 'workshop', 'воркшоп', 'мастер-', 'лекция', 'лекцию', 'лектори', 'lecture'])) subs.push(EventSubcategory.MASTERCLASS);
     if (this.has(text, ['вечеринк', 'party', 'дискотек', 'клуб '])) subs.push(EventSubcategory.PARTY);
     if (subs.length > 0) return { category: EventCategory.EVENT, subcategories: subs, audience };
 
-    // --- EXCURSION ---
+    // --- 2. EXCURSION (экскурсия, тур, прогулка, квест — даже по музею) ---
     const isExcursion = this.has(text, ['экскурси', 'excursion', 'тур ', ' тур', 'tour', 'прогулк', 'обзорн']);
     if (isExcursion || this.has(text, ['квест', 'quest'])) {
       if (this.has(text, ['речн', 'теплоход', 'корабл', 'катер', 'яхт', 'водн', 'canal', 'boat', 'по неве', 'по реке', 'по каналам', 'развод мостов', 'разводные мосты'])) subs.push(EventSubcategory.RIVER);
@@ -680,6 +691,15 @@ export class TcSyncService {
       if (subs.length === 0 && this.has(text, ['прогулк', 'обзорн'])) subs.push(EventSubcategory.WALKING);
       return { category: EventCategory.EXCURSION, subcategories: subs, audience };
     }
+
+    // --- 3. MUSEUM (только посещение площадки / входной билет / экспозиция) ---
+    // Сюда попадает только если НЕТ признаков мероприятия или экскурсии
+    if (this.has(text, ['музей', 'музеи', 'museum'])) subs.push(EventSubcategory.MUSEUM_CLASSIC);
+    if (this.has(text, ['выставк', 'exhibition', 'экспозиц'])) subs.push(EventSubcategory.EXHIBITION);
+    if (this.has(text, ['галерея', 'gallery'])) subs.push(EventSubcategory.GALLERY);
+    if (this.has(text, ['дворец', 'дворц', 'усадьб', 'palace', 'manor'])) subs.push(EventSubcategory.PALACE);
+    if (this.has(text, ['заповедник', 'ботаническ', 'парк-музей'])) subs.push(EventSubcategory.PARK);
+    if (subs.length > 0) return { category: EventCategory.MUSEUM, subcategories: subs, audience };
 
     // Fallback
     return { category: EventCategory.EVENT, subcategories: [], audience };
@@ -720,8 +740,9 @@ export class TcSyncService {
     try {
       allTcEvents = await this.tcApi.getEvents();
       this.logger.log(`Получено ${allTcEvents.length} TC-записей`);
-    } catch (err: any) {
-      this.logger.error(`Ошибка загрузки: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Ошибка загрузки: ${msg}`);
       return {
         status: 'error',
         mode: 'rest',
@@ -730,7 +751,7 @@ export class TcSyncService {
         sessionsSynced: 0,
         citiesTotal: 0,
         newCitiesCreated: [],
-        errors: [err.message],
+        errors: [msg],
       };
     }
 
@@ -779,16 +800,16 @@ export class TcSyncService {
         const sessions = await this.syncEventGroup(tcEvents);
         uniqueCount++;
         sessionCount += sessions;
-      } catch (err: any) {
-        errors.push(`[${key}]: ${err.message}`);
+      } catch (err: unknown) {
+        errors.push(`[${key}]: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
     // Retag
     try {
       await this.retagAll();
-    } catch (err: any) {
-      errors.push(`retag: ${err.message}`);
+    } catch (err: unknown) {
+      errors.push(`retag: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     return {
@@ -869,12 +890,16 @@ export class TcSyncService {
               update: {},
               create: { eventId: master.id, tagId: et.tagId },
             })
-            .catch(() => {});
+            .catch((e) => this.logger.error('tag sync failed: ' + (e as Error).message));
         }
 
         await this.prisma.eventTag.deleteMany({ where: { eventId: dupe.id } });
         await this.prisma.articleEvent.deleteMany({ where: { eventId: dupe.id } });
-        await this.prisma.event.delete({ where: { id: dupe.id } });
+        // Soft-delete дубля вместо физического удаления
+        await this.prisma.event.update({
+          where: { id: dupe.id },
+          data: { isDeleted: true, deletedAt: new Date(), isActive: false },
+        });
         duplicatesRemoved++;
       }
 
@@ -1206,7 +1231,7 @@ export class TcSyncService {
             update: {},
             create: { eventId, tagId: tag.id },
           })
-          .catch(() => {});
+          .catch((e) => this.logger.error('tag sync failed: ' + (e as Error).message));
       }
     }
   }

@@ -79,7 +79,7 @@ export function AuditLogPage() {
         setItems(data.items);
         setTotal(data.total);
       })
-      .catch(() => {})
+      .catch((e) => console.error('Load audit log failed:', e))
       .finally(() => setLoading(false));
   };
 

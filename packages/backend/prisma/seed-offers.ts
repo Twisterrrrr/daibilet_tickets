@@ -40,7 +40,7 @@ async function main() {
   for (const event of eventsWithoutOffer) {
     // Определяем source → OfferSource и PurchaseType
     const offerSource = event.source === 'TEPLOHOD' ? 'TEPLOHOD' : 'TC';
-    const purchaseType = event.source === 'TEPLOHOD' ? 'REDIRECT' : 'TC_WIDGET';
+    const purchaseType = event.source === 'TEPLOHOD' ? 'REDIRECT' : 'WIDGET';
     const deeplink =
       event.source === 'TEPLOHOD' && event.tcEventId
         ? `https://teplohod.info/event/${event.tcEventId.replace('tep-', '')}`

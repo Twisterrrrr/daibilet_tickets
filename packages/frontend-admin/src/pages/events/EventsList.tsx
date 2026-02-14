@@ -191,8 +191,8 @@ export function EventsListPage() {
       await adminApi.post('/admin/sync');
       // Refetch after sync
       fetchEvents();
-    } catch {
-      // ignore
+    } catch (e) {
+      console.error('Sync failed:', e);
     } finally {
       setSyncing(false);
     }

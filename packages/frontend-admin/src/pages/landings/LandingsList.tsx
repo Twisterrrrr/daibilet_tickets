@@ -108,7 +108,7 @@ export function LandingsListPage() {
         const list = Array.isArray(res) ? res : (res as { items: CityItem[] }).items ?? [];
         setCities(list);
       })
-      .catch(() => {});
+      .catch((e) => console.error('Load cities failed:', e));
   }, []);
 
   const handleRowClick = (item: LandingItem) => {

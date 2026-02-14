@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   Clock,
   MapPin,
   Users,
   Calendar,
-  ArrowRight,
   Building2,
   ChevronRight,
   Shield,
@@ -93,7 +93,8 @@ export default async function EventPage({ params }: Props) {
   let event: any = null;
   try {
     event = await api.getEventBySlug(slug);
-  } catch {
+  } catch (e) {
+    console.error('Event page error:', e);
     return (
       <div className="container-page flex min-h-[60vh] flex-col items-center justify-center py-20">
         <span className="text-6xl">🔍</span>
@@ -136,10 +137,13 @@ export default async function EventPage({ params }: Props) {
       <div className="relative">
         <div className="h-72 overflow-hidden bg-slate-900 sm:h-80 lg:h-[420px]">
           {event.imageUrl ? (
-            <img
+            <Image
               src={event.imageUrl}
               alt={event.title}
-              className="h-full w-full object-cover opacity-80"
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover opacity-80"
             />
           ) : (
             <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary-600 to-primary-900">
@@ -238,13 +242,24 @@ export default async function EventPage({ params }: Props) {
                   <p className="text-sm font-medium text-slate-900 line-clamp-2">{event.address}</p>
                 </div>
               )}
-              {venueName && (
+              {event.venue ? (
+                <Link
+                  href={`/venues/${event.venue.slug}`}
+                  className="rounded-xl border border-slate-200 bg-white p-3.5 hover:border-primary-300 transition-colors"
+                >
+                  <Building2 className="h-5 w-5 text-primary-500" />
+                  <p className="mt-1.5 text-xs text-slate-500">Место</p>
+                  <p className="text-sm font-medium text-primary-600 hover:underline line-clamp-2">
+                    {event.venue.shortTitle || event.venue.title}
+                  </p>
+                </Link>
+              ) : venueName ? (
                 <div className="rounded-xl border border-slate-200 bg-white p-3.5">
                   <Building2 className="h-5 w-5 text-primary-500" />
                   <p className="mt-1.5 text-xs text-slate-500">Площадка</p>
                   <p className="text-sm font-medium text-slate-900 line-clamp-2">{venueName}</p>
                 </div>
-              )}
+              ) : null}
               {event.durationMinutes && (
                 <div className="rounded-xl border border-slate-200 bg-white p-3.5">
                   <Clock className="h-5 w-5 text-primary-500" />
@@ -478,11 +493,15 @@ function BuyCard({
 }) {
   // Определяем тип покупки из primaryOffer или fallback на source
   const purchaseType = primaryOffer?.purchaseType
-    || (event.source === 'TEPLOHOD' ? 'REDIRECT' : 'TC_WIDGET');
-  const isTcWidget = purchaseType === 'TC_WIDGET';
-  const isRequestOnly = purchaseType === 'REQUEST_ONLY';
-  const offerEventId = primaryOffer?.externalEventId || event.tcEventId;
-  const offerMetaId = primaryOffer?.metaEventId || event.tcMetaEventId;
+    || (event.source === 'TEPLOHOD' ? 'REDIRECT' : 'WIDGET');
+  const isWidget = purchaseType === 'WIDGET';
+  const isRequest = purchaseType === 'REQUEST';
+
+  // WIDGET contract: рендерим виджет по widgetProvider, не угадываем
+  const widgetProvider = primaryOffer?.widgetProvider || primaryOffer?.source || event.source;
+  const widgetPayload = primaryOffer?.widgetPayload || {};
+  const offerEventId = widgetPayload?.externalEventId || primaryOffer?.externalEventId || event.tcEventId;
+  const offerMetaId = widgetPayload?.metaEventId || primaryOffer?.metaEventId || event.tcMetaEventId;
   const offerDeeplink = primaryOffer?.deeplink;
   const offerSource = primaryOffer?.source || event.source;
   const offerBadge = primaryOffer?.badge;
@@ -535,7 +554,7 @@ function BuyCard({
                    offer.operator?.name || 'Дайбилет'}
                 </span>
               </div>
-              {offer.purchaseType === 'TC_WIDGET' && offer.externalEventId ? (
+              {offer.purchaseType === 'WIDGET' && offer.externalEventId ? (
                 <TcWidgetButton
                   tcEventId={offer.externalEventId}
                   tcMetaEventId={offer.metaEventId}
@@ -552,7 +571,7 @@ function BuyCard({
                 >
                   Купить
                 </a>
-              ) : offer.purchaseType === 'REQUEST_ONLY' ? (
+              ) : offer.purchaseType === 'REQUEST' ? (
                 <a
                   href="#request-form"
                   className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600"
@@ -572,7 +591,7 @@ function BuyCard({
             <Calendar className="h-3.5 w-3.5" />
             Ближайшие сеансы
           </h3>
-          {isTcWidget && (
+          {isWidget && (
             <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс для покупки</p>
           )}
           <div className="mt-2.5 space-y-1.5">
@@ -580,7 +599,7 @@ function BuyCard({
               .filter((s: any) => s.isActive)
               .slice(0, 5)
               .map((session: any) =>
-                isTcWidget ? (
+                isWidget ? (
                   <TcSessionSlot key={session.id} session={session} />
                 ) : (
                   <StaticSessionRow key={session.id} session={session} />
@@ -591,12 +610,12 @@ function BuyCard({
       )}
 
       {/* Buy button — per offer purchaseType */}
-      {isRequestOnly ? (
-        /* REQUEST_ONLY: форма заявки */
+      {isRequest ? (
+        /* REQUEST: форма заявки */
         <RequestOfferForm event={event} offer={primaryOffer} />
       ) : offerEventId ? (
         <div className="mt-5">
-          {isTcWidget ? (
+          {isWidget ? (
             <TcWidgetButton tcEventId={offerEventId} tcMetaEventId={offerMetaId}>
               Купить билет
             </TcWidgetButton>
@@ -642,8 +661,8 @@ function BuyCard({
         </button>
       )}
 
-      {/* Add to cart (for non-TC_WIDGET offers) */}
-      {primaryOffer && purchaseType !== 'TC_WIDGET' && !isRequestOnly && (
+      {/* Add to cart (for non-WIDGET offers) */}
+      {primaryOffer && purchaseType !== 'WIDGET' && !isRequest && (
         <div className="mt-3">
           <AddToCartButton
             eventId={event.id}
@@ -660,17 +679,6 @@ function BuyCard({
         </div>
       )}
 
-      {/* Planner CTA */}
-      {event.city && (
-        <Link
-          href={`/planner?city=${event.city.slug}`}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-4 py-2.5 text-sm font-medium text-primary-700 transition hover:bg-primary-100"
-        >
-          Добавить в программу поездки
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      )}
-
       {/* Trust badges */}
       <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
         <Shield className="h-4 w-4 text-emerald-500" />
@@ -684,7 +692,7 @@ function BuyCard({
   );
 }
 
-/** Форма заявки для REQUEST_ONLY офферов */
+/** Форма заявки для REQUEST офферов */
 function RequestOfferForm({ event, offer }: { event: any; offer: any }) {
   return (
     <div id="request-form" className="mt-5 space-y-3">
@@ -728,8 +736,8 @@ function RequestOfferForm({ event, offer }: { event: any; offer: any }) {
               submitBtn.disabled = true;
               submitBtn.className = submitBtn.className.replace('bg-amber-500 hover:bg-amber-600', 'bg-emerald-500');
             }
-          } catch (err: any) {
-            alert(err.message || 'Ошибка отправки заявки');
+          } catch (err: unknown) {
+            alert((err instanceof Error ? err.message : String(err)) || 'Ошибка отправки заявки');
           }
         }}
         className="space-y-2.5"

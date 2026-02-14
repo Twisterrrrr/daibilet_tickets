@@ -30,9 +30,9 @@ export class AuditService {
           after: after ?? undefined,
         },
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Не блокируем основную операцию ошибкой аудита
-      this.logger.warn(`Audit log error: ${err.message}`);
+      this.logger.warn(`Audit log error: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

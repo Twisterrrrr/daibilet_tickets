@@ -33,12 +33,17 @@ export interface MarkupContext {
   daysUntilTrip?: number;
 }
 
+interface PeakRange {
+  dateFrom: string;
+  dateTo: string;
+}
+
 interface PricingConfigData {
   serviceFeePercent: number;
   peakMarkupPercent: number;
   lastMinutePercent: number;
   tcCommissionPercent: number;
-  peakRanges: any[];
+  peakRanges: PeakRange[];
 }
 
 const PRICING_CACHE_KEY = 'pricing:config';
@@ -77,7 +82,7 @@ export class PricingService {
           peakMarkupPercent: config.peakMarkupPercent,
           lastMinutePercent: config.lastMinutePercent,
           tcCommissionPercent: config.tcCommissionPercent,
-          peakRanges: (config.peakRanges as any[]) || [],
+          peakRanges: (config.peakRanges as unknown as PeakRange[]) || [],
         };
       },
     );

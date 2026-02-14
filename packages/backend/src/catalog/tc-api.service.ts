@@ -50,7 +50,7 @@ export class TcApiService {
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
+      const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
       this.logger.error(`TC API ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
       throw new Error(`TC API returned ${res.status}: ${text.slice(0, 200)}`);
     }
@@ -92,7 +92,7 @@ export class TcApiService {
 
     // Если обёрнут в data
     if (result && typeof result === 'object') {
-      const obj = result as any;
+      const obj = result as Record<string, unknown>;
       if (Array.isArray(obj.data)) return obj.data;
       if (Array.isArray(obj.events)) return obj.events;
     }
@@ -131,7 +131,7 @@ export class TcApiService {
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
+      const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
       throw new Error(`TC create order failed ${res.status}: ${text.slice(0, 200)}`);
     }
 
@@ -156,7 +156,7 @@ export class TcApiService {
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
+      const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
       throw new Error(`TC update order failed ${res.status}: ${text.slice(0, 200)}`);
     }
 
@@ -166,8 +166,40 @@ export class TcApiService {
   /**
    * Завершить заказ (status: done).
    */
-  async finishOrder(orderId: string): Promise<any> {
+  async finishOrder(orderId: string): Promise<unknown> {
     return this.updateOrder(orderId, { status: 'done' });
+  }
+
+  /**
+   * Подтвердить заказ (для fulfillment flow).
+   */
+  async confirmOrder(orderId: string): Promise<unknown> {
+    return this.updateOrder(orderId, { status: 'done' });
+  }
+
+  /**
+   * Отменить заказ.
+   */
+  async cancelOrder(orderId: string): Promise<unknown> {
+    return this.updateOrder(orderId, { status: 'cancelled' });
+  }
+
+  /**
+   * Получить заказ по ID.
+   */
+  async getOrder(orderId: string): Promise<unknown> {
+    const url = new URL(`/v2/resources/orders/${orderId}`, this.baseUrl);
+    const res = await fetch(url.toString(), {
+      headers: {
+        Authorization: `key ${this.apiToken}`,
+        Accept: 'application/json',
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
+      throw new Error(`TC get order failed ${res.status}: ${text.slice(0, 200)}`);
+    }
+    return res.json();
   }
 
   /**
@@ -197,14 +229,14 @@ export class TcApiService {
         sampleEventFields: sampleFields,
         sampleCityIds: cityIds,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return {
         apiReachable: false,
         eventsEndpoint: '/v1/services/simple/events',
         totalEvents: 0,
         sampleEventFields: [],
         sampleCityIds: [],
-        error: err.message,
+        error: err instanceof Error ? err.message : String(err),
       };
     }
   }

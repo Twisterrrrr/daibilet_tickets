@@ -419,8 +419,8 @@ function ReviewForm({
 
       setSuccessMessage(result.message || 'Спасибо за отзыв!');
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Ошибка при отправке отзыва');
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : String(err)) || 'Ошибка при отправке отзыва');
     } finally {
       setSubmitting(false);
     }

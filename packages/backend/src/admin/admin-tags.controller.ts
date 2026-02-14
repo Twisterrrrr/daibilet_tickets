@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
+import { CreateTagDto, UpdateTagDto } from './dto/admin-tag.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -28,6 +29,7 @@ export class AdminTagsController {
       where,
       include: { _count: { select: { events: true } } },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      take: 500,
     });
   }
 
@@ -41,14 +43,14 @@ export class AdminTagsController {
 
   @Post()
   @Roles('ADMIN', 'EDITOR')
-  async create(@Body() data: any) {
+  async create(@Body() data: CreateTagDto) {
     return this.prisma.tag.create({ data });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: any) {
-    const { id: _, createdAt, updatedAt, events, articleTags, _count, version, ...clean } = data;
+  async update(@Param('id') id: string, @Body() data: UpdateTagDto) {
+    const { id: _, createdAt, updatedAt, events, articleTags, _count, version, ...clean } = data as any;
 
     if (data.version !== undefined) {
       const result = await this.prisma.tag.updateMany({

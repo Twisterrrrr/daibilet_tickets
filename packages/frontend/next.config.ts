@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { withSentryConfig } from '@sentry/nextjs';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -19,6 +20,7 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -28,8 +30,32 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '**.ticketscloud.org',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ticketscloud-prod.storage.yandexcloud.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.teplohod.info',
+      },
+      {
+        protocol: 'http',
+        hostname: 'api.teplohod.info',
+      },
     ],
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  org: 'daibilet',
+  project: 'frontend',
+});
