@@ -25,8 +25,8 @@ export default tseslint.config(
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
-      // Предупреждение на any — бюджет: снижаем каждую неделю
-      '@typescript-eslint/no-explicit-any': 'off',
+      // Предупреждение на any — никаких новых any (постепенно заменять)
+      '@typescript-eslint/no-explicit-any': 'warn',
       // Разрешаем require() в конфигах
       '@typescript-eslint/no-require-imports': 'off',
       // Пустые функции: warn (разрешаем колбэки, но не пустые catch)

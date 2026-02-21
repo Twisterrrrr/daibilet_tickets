@@ -1,6 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Clock, MapPin, Star, Ticket, Flame, Award } from 'lucide-react';
+import { FavoriteButton } from './FavoriteButton';
 import { formatPrice, CATEGORY_LABELS, SUBCATEGORY_LABELS, SYSTEM_TAG_BADGES, type EventCategory, type EventSubcategory } from '@daibilet/shared';
 
 interface EventCardProps {
@@ -146,21 +149,22 @@ export function EventCard({
               {audience === 'KIDS' ? '👶 Детям' : '👨‍👩‍👧 Семейный'}
             </span>
           )}
+
+          {/* System tag badges — слева, не справа с ценой/избранным */}
+          {visibleTagBadges.map((badge) => (
+            <span
+              key={badge.slug}
+              className={`rounded-full ${badge.color} px-2 py-0.5 text-[10px] font-semibold ${badge.textColor} shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs`}
+            >
+              {badge.emoji} {badge.label}
+            </span>
+          ))}
         </div>
 
-        {/* Top-right: system tag badges */}
-        {visibleTagBadges.length > 0 && (
-          <div className="absolute right-2 top-2 flex flex-col gap-1 sm:right-3 sm:top-3">
-            {visibleTagBadges.map((badge) => (
-              <span
-                key={badge.slug}
-                className={`rounded-full ${badge.color} px-2 py-0.5 text-[10px] font-semibold ${badge.textColor} shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs`}
-              >
-                {badge.emoji} {badge.label}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Top-right: только избранное (цену — внизу справа) */}
+        <div className="absolute right-2 top-2 sm:right-3 sm:top-3">
+          <FavoriteButton slug={slug} size="sm" />
+        </div>
 
         {/* Bottom-left: departing soon (priority) or low tickets badge (not for OPEN_DATE) */}
         {dateMode === 'OPEN_DATE' ? (

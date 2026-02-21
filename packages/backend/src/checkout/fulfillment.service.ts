@@ -12,12 +12,15 @@
  */
 
 import { Injectable, Logger, Inject } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SnapshotLineItem, PaymentFlowType, isSessionFullyFulfilled } from './cart-partitioning';
 import { BookingProvider, BookingProviderRegistry, BOOKING_PROVIDER_TOKEN } from './booking-provider.interface';
 import { tryTransitionCheckout } from './checkout-state-machine';
 import { MailService } from '../mail/mail.service';
+import { QUEUE_EMAILS } from '../queue/queue.constants';
 
 /** Max retry attempts per fulfillment item */
 const MAX_RETRY_ATTEMPTS = 3;
@@ -33,6 +36,7 @@ export class FulfillmentService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     @Inject(BOOKING_PROVIDER_TOKEN) private readonly providers: BookingProviderRegistry,
+    @InjectQueue(QUEUE_EMAILS) private readonly emailQueue: Queue,
   ) {}
 
   /**
@@ -42,11 +46,18 @@ export class FulfillmentService {
   async startFulfillment(checkoutSessionId: string): Promise<void> {
     const session = await this.prisma.checkoutSession.findUnique({
       where: { id: checkoutSessionId },
-      select: { id: true, offersSnapshot: true, status: true, shortCode: true },
+      select: { id: true, offersSnapshot: true, giftCertificateSnapshot: true, status: true, shortCode: true },
     });
 
     if (!session) {
       this.logger.error(`startFulfillment: session ${checkoutSessionId} not found`);
+      return;
+    }
+
+    // Подарочный сертификат: создать GiftCertificate и завершить сессию
+    const giftCert = session.giftCertificateSnapshot as { amount: number; recipientEmail: string; senderName?: string; message?: string } | null;
+    if (giftCert?.amount) {
+      await this.fulfillGiftCertificate(checkoutSessionId, session, giftCert);
       return;
     }
 
@@ -91,10 +102,112 @@ export class FulfillmentService {
     });
 
     this.logger.log(
-      `Created ${items.length} fulfillment items for session ${session.shortCode}: ` +
+      `[session=${checkoutSessionId}] Created ${items.length} fulfillment items for ${session.shortCode}: ` +
       `${items.filter((i) => i.purchaseFlow === 'PLATFORM').length} PLATFORM, ` +
       `${items.filter((i) => i.purchaseFlow === 'EXTERNAL').length} EXTERNAL`,
     );
+  }
+
+  /**
+   * Исполнение подарочного сертификата: создать запись и завершить сессию.
+   */
+  private async fulfillGiftCertificate(
+    checkoutSessionId: string,
+    session: { id: string; shortCode: string },
+    giftCert: { amount: number; recipientEmail: string; senderName?: string; message?: string },
+  ): Promise<void> {
+    const existing = await this.prisma.giftCertificate.findUnique({
+      where: { checkoutSessionId },
+    });
+    if (existing) {
+      this.logger.debug(`GiftCertificate already exists for session ${checkoutSessionId}, skipping`);
+      await this.transitionSessionToCompleted(checkoutSessionId);
+      return;
+    }
+
+    const code = this.generateGiftCertificateCode();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.giftCertificate.create({
+        data: {
+          checkoutSessionId,
+          amount: giftCert.amount,
+          code,
+          recipientEmail: giftCert.recipientEmail,
+          senderName: giftCert.senderName || null,
+          message: giftCert.message || null,
+          status: 'ISSUED',
+        },
+      });
+      await tx.checkoutSession.update({
+        where: { id: checkoutSessionId },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      });
+    });
+
+    this.logger.log(
+      `[session=${checkoutSessionId}] Gift certificate created: ${code}, recipient=${giftCert.recipientEmail}`,
+    );
+
+    // Отправка email через очередь (retry при сбое)
+    const sent = await this.mailService.sendGiftCertificate(giftCert.recipientEmail, {
+      code,
+      amountKopecks: giftCert.amount,
+      senderName: giftCert.senderName || null,
+      message: giftCert.message || null,
+    });
+    if (!sent) {
+      await this.emailQueue.add(
+        'gift-certificate',
+        {
+          type: 'gift-certificate',
+          to: giftCert.recipientEmail,
+          code,
+          amountKopecks: giftCert.amount,
+          senderName: giftCert.senderName || null,
+          message: giftCert.message || null,
+        },
+        { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+      );
+      this.logger.warn(`[session=${checkoutSessionId}] Gift cert email queued for retry → ${giftCert.recipientEmail}`);
+    }
+  }
+
+  private generateGiftCertificateCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = 'GC-';
+    for (let i = 0; i < 4; i++) result += chars[Math.floor(Math.random() * chars.length)];
+    result += '-';
+    for (let i = 0; i < 4; i++) result += chars[Math.floor(Math.random() * chars.length)];
+    return result;
+  }
+
+  private async transitionSessionToCompleted(checkoutSessionId: string): Promise<void> {
+    const session = await this.prisma.checkoutSession.findUnique({
+      where: { id: checkoutSessionId },
+      select: { status: true, appliedGiftCertificateSnapshot: true },
+    });
+    if (!session || session.status === 'COMPLETED') return;
+
+    const { tryTransitionCheckout } = await import('./checkout-state-machine');
+    const transition = tryTransitionCheckout(session.status, 'COMPLETED', 'system');
+    if (transition.allowed && !transition.noOp) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.checkoutSession.update({
+          where: { id: checkoutSessionId },
+          data: { status: 'COMPLETED', completedAt: new Date() },
+        });
+        // Пометить применённый подарочный сертификат как использованный
+        const applied = session.appliedGiftCertificateSnapshot as { certificateId: string } | null | undefined;
+        if (applied?.certificateId) {
+          await tx.giftCertificate.update({
+            where: { id: applied.certificateId },
+            data: { status: 'ACTIVATED', activatedAt: new Date() },
+          });
+          this.logger.log(`[session=${checkoutSessionId}] Gift certificate ${applied.certificateId} marked ACTIVATED`);
+        }
+      });
+    }
   }
 
   /**
@@ -190,7 +303,7 @@ export class FulfillmentService {
         data: { status: 'CONFIRMED' },
       });
 
-      this.logger.log(`Fulfillment item ${item.id} CONFIRMED (provider=${item.provider})`);
+      this.logger.log(`[session=${checkoutSessionId}] [item=${item.id}] [provider=${item.provider}] Fulfillment item CONFIRMED`);
     }
 
     // Check if session is fully fulfilled
@@ -222,7 +335,7 @@ export class FulfillmentService {
           nextRetryAt: new Date(Date.now() + delayMs),
         },
       });
-      this.logger.warn(`Fulfillment item ${itemId}: retry ${newAttemptCount}/${MAX_RETRY_ATTEMPTS} in ${delayMs}ms`);
+      this.logger.warn(`[item=${itemId}] Fulfillment retry ${newAttemptCount}/${MAX_RETRY_ATTEMPTS} in ${delayMs}ms [error=${errorCode}]`);
     } else {
       // Max retries exhausted → FAILED + escalate
       await this.prisma.fulfillmentItem.update({
@@ -234,7 +347,7 @@ export class FulfillmentService {
           escalatedAt: new Date(),
         },
       });
-      this.logger.error(`Fulfillment item ${itemId} FAILED after ${newAttemptCount} attempts: ${errorCode}`);
+      this.logger.error(`[item=${itemId}] Fulfillment FAILED after ${newAttemptCount} attempts: ${errorCode} — ${errorMessage}`);
     }
   }
 
@@ -267,7 +380,7 @@ export class FulfillmentService {
         where: { id: checkoutSessionId },
         data: { status: targetStatus, completedAt: new Date() },
       });
-      this.logger.log(`Session ${checkoutSessionId} → ${targetStatus} (all items terminal, allConfirmed=${allConfirmed})`);
+      this.logger.log(`[session=${checkoutSessionId}] Session → ${targetStatus} (all items terminal, allConfirmed=${allConfirmed})`);
     }
   }
 

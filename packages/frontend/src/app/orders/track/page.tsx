@@ -292,72 +292,73 @@ export default function OrderTrackPage() {
                   {result.items.map((item) => {
                     const reqStatus = REQUEST_STATUS[item.status] || REQUEST_STATUS.PENDING;
                     return (
-                      <div key={item.id} className="p-4 flex items-center gap-4">
-                        {/* Image */}
-                        {item.event?.imageUrl ? (
-                          <img
-                            src={item.event.imageUrl}
-                            alt={item.event.title}
-                            className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-14 h-14 bg-slate-100 rounded-lg flex-shrink-0 flex items-center justify-center">
-                            <CalendarCheck className="h-6 w-6 text-slate-400" />
+                      <div key={item.id}>
+                        <div className="p-4 flex items-center gap-4">
+                          {/* Image */}
+                          {item.event?.imageUrl ? (
+                            <img
+                              src={item.event.imageUrl}
+                              alt={item.event.title}
+                              className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 bg-slate-100 rounded-lg flex-shrink-0 flex items-center justify-center">
+                              <CalendarCheck className="h-6 w-6 text-slate-400" />
+                            </div>
+                          )}
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-slate-900 truncate">
+                              {item.event?.title || item.offerTitle || 'Событие'}
+                            </p>
+                            {item.offerTitle && item.event?.title && (
+                              <p className="text-xs text-slate-500 truncate">{item.offerTitle}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-slate-500">× {item.quantity}</span>
+                              <span className="text-xs font-medium text-slate-700">{formatPrice(item.priceSnapshot * item.quantity)}</span>
+                            </div>
+                          </div>
+
+                          {/* Status badge */}
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${reqStatus.color}`}>
+                            {reqStatus.label}
+                          </span>
+                        </div>
+
+                        {/* Operational info — only when confirmed */}
+                        {(item.meetingPoint || item.meetingInstructions || item.operationalPhone || item.operationalNote) && (
+                          <div className="mx-4 mb-3 p-3 bg-blue-50 border border-blue-100 rounded-lg space-y-1.5">
+                            <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              Как добраться
+                            </p>
+                            {item.meetingPoint && (
+                              <p className="text-xs text-blue-700">
+                                <span className="font-medium">Место встречи:</span> {item.meetingPoint}
+                              </p>
+                            )}
+                            {item.meetingInstructions && (
+                              <p className="text-xs text-blue-700">
+                                <span className="font-medium">Инструкция:</span> {item.meetingInstructions}
+                              </p>
+                            )}
+                            {item.operationalPhone && (
+                              <p className="text-xs text-blue-700 flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                <a href={`tel:${item.operationalPhone}`} className="underline">{item.operationalPhone}</a>
+                              </p>
+                            )}
+                            {item.operationalNote && (
+                              <p className="text-xs text-blue-700 flex items-center gap-1">
+                                <Info className="h-3 w-3 flex-shrink-0" />
+                                {item.operationalNote}
+                              </p>
+                            )}
                           </div>
                         )}
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-slate-900 truncate">
-                            {item.event?.title || item.offerTitle || 'Событие'}
-                          </p>
-                          {item.offerTitle && item.event?.title && (
-                            <p className="text-xs text-slate-500 truncate">{item.offerTitle}</p>
-                          )}
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-slate-500">× {item.quantity}</span>
-                            <span className="text-xs font-medium text-slate-700">{formatPrice(item.priceSnapshot * item.quantity)}</span>
-                          </div>
-                        </div>
-
-                        {/* Status badge */}
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${reqStatus.color}`}>
-                          {reqStatus.label}
-                        </span>
                       </div>
-
-                      {/* Operational info — only when confirmed */}
-                      {(item.meetingPoint || item.meetingInstructions || item.operationalPhone || item.operationalNote) && (
-                        <div className="mx-4 mb-3 p-3 bg-blue-50 border border-blue-100 rounded-lg space-y-1.5">
-                          <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            Как добраться
-                          </p>
-                          {item.meetingPoint && (
-                            <p className="text-xs text-blue-700">
-                              <span className="font-medium">Место встречи:</span> {item.meetingPoint}
-                            </p>
-                          )}
-                          {item.meetingInstructions && (
-                            <p className="text-xs text-blue-700">
-                              <span className="font-medium">Инструкция:</span> {item.meetingInstructions}
-                            </p>
-                          )}
-                          {item.operationalPhone && (
-                            <p className="text-xs text-blue-700 flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              <a href={`tel:${item.operationalPhone}`} className="underline">{item.operationalPhone}</a>
-                            </p>
-                          )}
-                          {item.operationalNote && (
-                            <p className="text-xs text-blue-700 flex items-center gap-1">
-                              <Info className="h-3 w-3 flex-shrink-0" />
-                              {item.operationalNote}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
                     );
                   })}
                 </div>

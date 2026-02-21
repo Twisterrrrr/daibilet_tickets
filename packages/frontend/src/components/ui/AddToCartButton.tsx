@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ShoppingCart, Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { CreditCard, Loader2 } from 'lucide-react';
 import { useCart, type CartItem } from '@/lib/cart';
 
 interface AddToCartButtonProps {
@@ -19,13 +20,13 @@ interface AddToCartButtonProps {
   className?: string;
 }
 
+/** Прямой checkout (корзина скрыта до унификации платежей — OpenQuestions §4) */
 export function AddToCartButton(props: AddToCartButtonProps) {
-  const { addItem, items } = useCart();
-  const [justAdded, setJustAdded] = useState(false);
+  const { addItem } = useCart();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  const isInCart = items.some((i) => i.offerId === props.offerId);
-
-  const handleAdd = () => {
+  const handleBuy = () => {
     const item: CartItem = {
       eventId: props.eventId,
       offerId: props.offerId,
@@ -41,29 +42,22 @@ export function AddToCartButton(props: AddToCartButtonProps) {
       badge: props.badge,
     };
     addItem(item);
-    setJustAdded(true);
-    setTimeout(() => setJustAdded(false), 2000);
+    setLoading(true);
+    router.push('/checkout');
   };
-
-  if (justAdded || isInCart) {
-    return (
-      <button
-        disabled
-        className={`flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 ${props.className || ''}`}
-      >
-        <Check className="h-4 w-4" />
-        {justAdded ? 'Добавлено!' : 'В корзине'}
-      </button>
-    );
-  }
 
   return (
     <button
-      onClick={handleAdd}
-      className={`flex w-full items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-4 py-2.5 text-sm font-medium text-primary-700 transition hover:bg-primary-100 ${props.className || ''}`}
+      onClick={handleBuy}
+      disabled={loading}
+      className={`flex w-full items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-4 py-2.5 text-sm font-medium text-primary-700 transition hover:bg-primary-100 disabled:opacity-70 ${props.className || ''}`}
     >
-      <ShoppingCart className="h-4 w-4" />
-      В корзину
+      {loading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <CreditCard className="h-4 w-4" />
+      )}
+      {loading ? 'Переход...' : 'Купить'}
     </button>
   );
 }

@@ -35,8 +35,8 @@ interface Filters {
 
 function getPrice(v: Variant): number {
   const p = v.prices?.[0];
-  // || вместо ?? — чтобы 0 проваливался в priceFrom
-  const sessionPrice = p?.amount || p?.price || 0;
+  // price — цена в копейках; amount — количество мест (teplohod ставит 100)
+  const sessionPrice = p?.price ?? p?.amount ?? 0;
   return sessionPrice > 0 ? sessionPrice : (v.event.priceFrom ?? 0);
 }
 

@@ -15,6 +15,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 1.0,
   });
 
+  // Подарочный сертификат
+  entries.push({
+    url: `${SITE_URL}/gift-certificate`,
+    lastModified: now,
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  });
+
   // Города (featured)
   try {
     const cities = await api.getCities(true);

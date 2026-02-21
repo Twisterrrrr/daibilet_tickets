@@ -13,6 +13,7 @@ import {
   IsISO8601,
   Min,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
@@ -231,6 +232,11 @@ export class CreateEventDto {
   @ValidateNested()
   @Type(() => CreateEventOfferDto)
   offer?: CreateEventOfferDto;
+
+  @ApiPropertyOptional({ description: 'Template fields by category' })
+  @IsOptional()
+  @IsObject()
+  templateData?: Record<string, unknown>;
 }
 
 // ─── Override Event (all optional, merges onto sync data) ──────────
@@ -251,12 +257,13 @@ export class OverrideEventDto {
   @IsUrl()
   imageUrl?: string;
 
-  @ApiPropertyOptional({ enum: EventCategory })
+  @ApiPropertyOptional({ enum: EventCategory, nullable: true, description: 'null = сбросить к sync' })
   @IsOptional()
+  @ValidateIf((_, v) => v != null)
   @IsEnum(EventCategory)
-  category?: EventCategory;
+  category?: EventCategory | null;
 
-  @ApiPropertyOptional({ enum: EventSubcategory, isArray: true })
+  @ApiPropertyOptional({ enum: EventSubcategory, isArray: true, description: '[] = сбросить к sync' })
   @IsOptional()
   @IsArray()
   @IsEnum(EventSubcategory, { each: true })
@@ -294,6 +301,11 @@ export class OverrideEventDto {
   @IsArray()
   @IsString({ each: true })
   tagsRemove?: string[];
+
+  @ApiPropertyOptional({ description: 'Category-specific: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)' })
+  @IsOptional()
+  @IsObject()
+  templateData?: Record<string, unknown>;
 }
 
 // ─── Venue Settings ────────────────────────────────────────────────

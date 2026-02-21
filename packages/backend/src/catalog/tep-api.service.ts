@@ -81,6 +81,54 @@ export class TepApiService {
   }
 
   /**
+   * Проверить доступность embed-виджета для конкретного события (старый API, по tepEventId).
+   *
+   * @deprecated Используйте checkWidgetStatusByTepWidgetId — новый API использует tepWidgetId из xlsx.
+   */
+  async checkWidgetStatus(tepEventId: number): Promise<'working' | 'closed' | 'unavailable'> {
+    return this.checkWidgetStatusByEmbed(tepEventId);
+  }
+
+  /**
+   * Проверить доступность виджета по tepWidgetId (data-id из xlsx/teplohod-widgets.json).
+   * URL: account.teplohod.info/widget/embed/{tepWidgetId} — тот же формат, но ID от нового виджета.
+   *
+   * @returns
+   *  - 'working'     — виджет показывает кнопку «Купить билеты»
+   *  - 'closed'      — виджет показывает «Закрыто» или «нет доступного расписания»
+   *  - 'unavailable' — виджет удалён (deleted-block) или ошибка
+   */
+  async checkWidgetStatusByTepWidgetId(
+    tepWidgetId: string | number,
+  ): Promise<'working' | 'closed' | 'unavailable'> {
+    return this.checkWidgetStatusByEmbed(tepWidgetId);
+  }
+
+  private async checkWidgetStatusByEmbed(
+    widgetOrEventId: string | number,
+  ): Promise<'working' | 'closed' | 'unavailable'> {
+    const url = `https://account.teplohod.info/widget/embed/${widgetOrEventId}`;
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'User-Agent': 'Daibilet/1.0' },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) return 'unavailable';
+      const html = await res.text();
+      if (html.includes('deleted-block')) return 'unavailable';
+      if (html.includes('ti-tickets-event-tickets-buy-closed')) return 'closed';
+      if (html.includes('нет доступного расписания') || html.includes('регистрация закрыта'))
+        return 'closed';
+      if (html.includes('ti-tickets-event-tickets-buy') || html.includes('Купить билеты'))
+        return 'working';
+      return 'unavailable';
+    } catch {
+      return 'unavailable';
+    }
+  }
+
+  /**
    * Проверить доступность API и формат данных.
    */
   async discover(): Promise<{

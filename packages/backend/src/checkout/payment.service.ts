@@ -76,7 +76,14 @@ export class PaymentService {
     });
     if (existing) {
       this.logger.debug(`PaymentIntent already exists for key=${key}, returning existing`);
-      return existing;
+      return {
+        paymentIntentId: existing.id,
+        paymentUrl: existing.paymentUrl,
+        amount: existing.amount,
+        currency: existing.currency,
+        provider: existing.provider,
+        status: existing.status,
+      };
     }
 
     // Проверяем: нет ли уже активного (PENDING/PROCESSING) intent для этой сессии
@@ -94,32 +101,77 @@ export class PaymentService {
     }
 
     // ============================================
-    // Amount from snapshot (единственный источник правды)
+    // INVARIANT: offersSnapshot immutability after PaymentIntent creation
     // ============================================
-    const snapshot = (session.offersSnapshot as SnapshotLineItem[] | null) || [];
-    const partitioned = partitionCart(snapshot);
+    // Если для этой сессии уже создавался хотя бы один PaymentIntent,
+    // snapshot не должен был измениться (гарантия: платим ровно за то, что было).
+    const anyPreviousIntent = await this.prisma.paymentIntent.findFirst({
+      where: { checkoutSessionId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, amount: true, grossAmount: true },
+    });
 
-    // Платим только за PLATFORM позиции (EXTERNAL оплачиваются у провайдера)
-    const grossAmount = partitioned.platformTotal;
-    if (grossAmount <= 0) {
-      throw new BadRequestException('Нет PLATFORM-позиций для оплаты (сумма = 0)');
+    if (anyPreviousIntent) {
+      const giftCertSnap = session.giftCertificateSnapshot as { amount: number } | null;
+      const appliedCert = session.appliedGiftCertificateSnapshot as { discountAmount: number } | null | undefined;
+      let currentTotal: number;
+      if (giftCertSnap?.amount) {
+        currentTotal = Number(giftCertSnap.amount);
+      } else {
+        const pt = partitionCart((session.offersSnapshot as SnapshotLineItem[] | null) || []).platformTotal;
+        currentTotal = appliedCert?.discountAmount ? Math.max(0, pt - appliedCert.discountAmount) : pt;
+      }
+      if (anyPreviousIntent.grossAmount && currentTotal !== anyPreviousIntent.grossAmount) {
+        this.logger.error(
+          `INVARIANT VIOLATION: snapshot amount changed after PaymentIntent creation. ` +
+          `Session=${checkoutSessionId}, previousAmount=${anyPreviousIntent.grossAmount}, currentAmount=${currentTotal}`,
+        );
+        throw new ConflictException(
+          'offersSnapshot был изменён после создания PaymentIntent. Это запрещено.',
+        );
+      }
     }
 
-    // Commission из snapshot (уже рассчитана и заморожена)
+    // ============================================
+    // Amount from snapshot / gift certificate
+    // ============================================
+    const giftCert = session.giftCertificateSnapshot as { amount: number } | null;
+    let grossAmount: number;
     let supplierId: string | null = null;
     let platformFee: number | null = null;
     let supplierAmount: number | null = null;
     let commissionRate: number | null = null;
 
-    // Агрегируем split по всем PLATFORM позициям
-    const suppliersInPlatform = partitioned.platform.filter((s) => s.supplierId);
-    if (suppliersInPlatform.length > 0) {
-      // Для MVP: один поставщик на платёж (первый в списке)
-      const first = suppliersInPlatform[0];
-      supplierId = first.supplierId;
-      commissionRate = first.commissionRateSnapshot;
-      platformFee = partitioned.platform.reduce((sum, s) => sum + (s.platformFeeSnapshot || 0), 0);
-      supplierAmount = grossAmount - platformFee;
+    if (giftCert?.amount) {
+      // Подарочный сертификат: сумма из snapshot
+      grossAmount = Number(giftCert.amount);
+      if (grossAmount <= 0) {
+        throw new BadRequestException('Некорректная сумма сертификата');
+      }
+    } else {
+      const snapshot = (session.offersSnapshot as SnapshotLineItem[] | null) || [];
+      const partitioned = partitionCart(snapshot);
+
+      // Платим только за PLATFORM позиции (EXTERNAL оплачиваются у провайдера)
+      let platformTotal = partitioned.platformTotal;
+      const appliedCert = session.appliedGiftCertificateSnapshot as { discountAmount: number } | null | undefined;
+      if (appliedCert?.discountAmount) {
+        platformTotal = Math.max(0, platformTotal - appliedCert.discountAmount);
+      }
+      grossAmount = platformTotal;
+      if (grossAmount <= 0) {
+        throw new BadRequestException('Нет PLATFORM-позиций для оплаты (сумма = 0)');
+      }
+
+      // Commission из snapshot (уже рассчитана и заморожена)
+      const suppliersInPlatform = partitioned.platform.filter((s) => s.supplierId);
+      if (suppliersInPlatform.length > 0) {
+        const first = suppliersInPlatform[0];
+        supplierId = first.supplierId;
+        commissionRate = first.commissionRateSnapshot;
+        platformFee = partitioned.platform.reduce((sum, s) => sum + (s.platformFeeSnapshot || 0), 0);
+        supplierAmount = grossAmount - platformFee;
+      }
     }
 
     // ============================================
@@ -132,14 +184,16 @@ export class PaymentService {
     if (this.provider === 'STUB') {
       providerPaymentId = `stub_${randomUUID().slice(0, 8)}`;
       paymentUrl = `${this.appUrl}/checkout/pay-mock/${providerPaymentId}`;
+      const snapshot = giftCert ? [] : ((session.offersSnapshot as SnapshotLineItem[] | null) || []);
+      const partitioned = partitionCart(snapshot);
       providerData = {
         mock: true,
         supplierId,
         platformFee,
         supplierAmount,
-        platformItemCount: partitioned.platform.length,
-        externalItemCount: partitioned.external.length,
-        note: 'STUB payment — POST /checkout/payment/:id/simulate-paid для имитации',
+        platformItemCount: giftCert ? 0 : partitioned.platform.length,
+        externalItemCount: giftCert ? 0 : partitioned.external.length,
+        note: giftCert ? 'STUB gift certificate' : 'STUB payment — POST /checkout/payment/:id/simulate-paid для имитации',
       };
     } else if (this.provider === 'YOOKASSA') {
       const ykResult = await this.createYookassaPayment({
@@ -192,7 +246,8 @@ export class PaymentService {
     });
 
     this.logger.log(
-      `Created PaymentIntent ${intent.id} (${this.provider}) for session ${checkoutSessionId}, amount=${grossAmount}, supplierId=${supplierId}`,
+      `[intent=${intent.id}] [provider=${this.provider}] [providerPmtId=${providerPaymentId}] ` +
+      `Created PaymentIntent for session ${checkoutSessionId}, amount=${grossAmount}, supplierId=${supplierId}`,
     );
 
     return {
@@ -265,7 +320,8 @@ export class PaymentService {
           data: { status: 'COMPLETED', completedAt: new Date() },
         });
         this.logger.log(
-          `Session ${intent.checkoutSessionId} → COMPLETED (paid via ${intent.provider})`,
+          `[intent=${intentId}] [provider=${intent.provider}] [providerPmtId=${intent.providerPaymentId}] ` +
+          `Session ${intent.checkoutSessionId} → COMPLETED`,
         );
       }
 

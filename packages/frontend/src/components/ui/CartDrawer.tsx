@@ -6,7 +6,12 @@ import { ShoppingCart, X, Minus, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { useCart, type CartItem } from '@/lib/cart';
 import { formatPrice } from '@daibilet/shared';
 
+/** Скрыта до унификации платежей (OpenQuestions §4) */
 export function CartIcon() {
+  return null;
+}
+
+function CartIconImpl() {
   const { itemCount } = useCart();
   const [open, setOpen] = useState(false);
 

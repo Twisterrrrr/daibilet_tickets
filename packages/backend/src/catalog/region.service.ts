@@ -218,7 +218,7 @@ export class RegionService {
 
     const orderBy = this.getSort(sort);
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
         where,
         orderBy,
@@ -237,12 +237,25 @@ export class RegionService {
       this.prisma.event.count({ where }),
     ]);
 
+    const items = this.moveNoPhotoToEnd(rawItems);
+
     return {
       items,
       total,
       page,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  /** События без фото — в конец списка */
+  private moveNoPhotoToEnd<T extends { imageUrl?: string | null }>(items: T[]): T[] {
+    const withPhoto: T[] = [];
+    const withoutPhoto: T[] = [];
+    for (const e of items) {
+      if (e.imageUrl?.trim()) withPhoto.push(e);
+      else withoutPhoto.push(e);
+    }
+    return [...withPhoto, ...withoutPhoto];
   }
 
   private getSort(sort?: string): Prisma.EventOrderByWithRelationInput {

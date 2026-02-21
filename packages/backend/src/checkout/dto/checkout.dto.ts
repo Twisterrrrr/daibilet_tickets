@@ -92,6 +92,41 @@ export class UtmDto {
 }
 
 // ============================================================
+// Gift certificate checkout DTO — POST /checkout/gift-certificate
+// ============================================================
+
+export class CreateGiftCertificateCheckoutDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  amount: number; // копейки
+
+  @IsEmail()
+  recipientEmail: string;
+
+  @IsString()
+  @IsNotEmpty()
+  senderName: string;
+
+  @IsOptional()
+  @IsString()
+  message?: string;
+
+  @ValidateNested()
+  @Type(() => CustomerDto)
+  customer: CustomerDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UtmDto)
+  utm?: UtmDto;
+
+  @IsOptional()
+  @IsString()
+  referrer?: string;
+}
+
+// ============================================================
 // Create checkout session DTO  — POST /checkout/session
 // ============================================================
 
@@ -113,6 +148,20 @@ export class CreateCheckoutSessionDto {
   @IsOptional()
   @IsString()
   referrer?: string;
+
+  @IsOptional()
+  @IsString()
+  giftCertificateCode?: string;
+}
+
+export class ValidateGiftCertificateDto {
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+
+  @IsInt()
+  @Min(1)
+  cartTotalKopecks: number;
 }
 
 // ============================================================

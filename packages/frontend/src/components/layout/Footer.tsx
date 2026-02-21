@@ -1,30 +1,56 @@
 import Link from 'next/link';
 import { Compass } from 'lucide-react';
+import { api } from '@/lib/api';
 
-const footerLinks = {
-  'Каталог': [
+const staticFooterLinks = {
+  Каталог: [
     { name: 'Экскурсии', href: '/events?category=EXCURSION' },
     { name: 'Музеи', href: '/events?category=MUSEUM' },
     { name: 'Мероприятия', href: '/events?category=EVENT' },
   ],
-  'Города': [
-    { name: 'Санкт-Петербург', href: '/cities/saint-petersburg' },
-    { name: 'Москва', href: '/cities/moscow' },
-    { name: 'Казань', href: '/cities/kazan' },
-    { name: 'Калининград', href: '/cities/kaliningrad' },
-    { name: 'Нижний Новгород', href: '/cities/nizhny-novgorod' },
-    { name: 'Владимир', href: '/cities/vladimir' },
-    { name: 'Ярославль', href: '/cities/yaroslavl' },
-  ],
-  'Компания': [
+  Компания: [
     { name: 'О сервисе', href: '/about' },
+    { name: 'Подарочный сертификат', href: '/gift-certificate' },
     { name: 'Блог', href: '/blog' },
     { name: 'Помощь', href: '/help' },
     { name: 'Контакты', href: '/contacts' },
   ],
 };
 
-export function Footer() {
+export async function Footer() {
+  // Топ-города по количеству событий и мест (по городам, которые реально отображаются)
+  let cities: any[] = [];
+  try {
+    const all = await api.getTopCities();
+    cities = (all || [])
+      .map((c: any) => {
+        const events = c._count?.events ?? 0;
+        const museumCount = (c.museumCount as number | undefined) ?? (c._count?.venues ?? 0);
+        const total = events + museumCount;
+        return {
+          slug: c.slug,
+          name: c.name,
+          total,
+        };
+      })
+      .filter((c) => c.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8);
+  } catch {
+    // Fallback — без блока городов
+    cities = [];
+  }
+
+  const footerLinks = {
+    ...staticFooterLinks,
+    ...(cities.length > 0 && {
+      Города: cities.map((c) => ({
+        name: c.name,
+        href: `/cities/${c.slug}`,
+      })),
+    }),
+  };
+
   return (
     <footer className="border-t border-slate-200 bg-slate-50">
       <div className="container-page py-12">
@@ -42,24 +68,28 @@ export function Footer() {
             </p>
           </div>
 
-          {/* Links */}
-          {Object.entries(footerLinks).map(([title, links]) => (
-            <div key={title}>
-              <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-              <ul className="mt-3 space-y-2">
-                {links.map((link) => (
-                  <li key={link.name}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-slate-500 transition-colors hover:text-primary-600"
-                    >
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {/* Links (каталог, города, компания). Порядок: Каталог → Города → Компания */}
+          {(['Каталог', 'Города', 'Компания'] as const).map((section) => {
+            const links = (footerLinks as any)[section];
+            if (!links || links.length === 0) return null;
+            return (
+              <div key={section}>
+                <h3 className="text-sm font-semibold text-slate-900">{section}</h3>
+                <ul className="mt-3 space-y-2">
+                  {links.map((link: any) => (
+                    <li key={link.name}>
+                      <Link
+                        href={link.href}
+                        className="text-sm text-slate-500 transition-colors hover:text-primary-600"
+                      >
+                        {link.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </div>
 
         {/* Bottom */}

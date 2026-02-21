@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { Request, Response } from 'express';
+import { CacheService } from '../cache/cache.service';
 import { CatalogService } from './catalog.service';
 import { RegionService } from './region.service';
 import { ReviewService } from './review.service';
@@ -14,6 +15,7 @@ import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
 import { TepSyncService } from './tep-sync.service';
 import { EventsQueryDto } from './dto/events-query.dto';
+import { CatalogQueryDto } from './dto/catalog-query.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 
 @ApiTags('catalog')
@@ -27,6 +29,7 @@ export class CatalogController {
     private readonly tcSync: TcSyncService,
     private readonly tepApi: TepApiService,
     private readonly tepSync: TepSyncService,
+    private readonly cache: CacheService,
     private readonly config: ConfigService,
   ) {}
 
@@ -44,6 +47,39 @@ export class CatalogController {
   @ApiOperation({ summary: 'Город с топ-событиями' })
   getCityBySlug(@Param('slug') slug: string) {
     return this.catalogService.getCityBySlug(slug);
+  }
+
+  // --- Локации ---
+
+  @Get('locations')
+  @ApiOperation({ summary: 'Список локаций (причалы, площадки) по городу и типу' })
+  @ApiQuery({ name: 'city', required: false, description: 'Slug города' })
+  @ApiQuery({ name: 'type', required: false, description: 'PIER | VENUE | MEETING_POINT | OTHER' })
+  getLocations(
+    @Query('city') city?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.catalogService.getLocations(city, type);
+  }
+
+  @Get('locations/nearest')
+  @ApiOperation({ summary: 'Ближайшие локации по координатам' })
+  @ApiQuery({ name: 'lat', required: true })
+  @ApiQuery({ name: 'lng', required: true })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  getNearestLocations(
+    @Query('lat') lat: string,
+    @Query('lng') lng: string,
+    @Query('type') type?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.catalogService.getNearestLocations(
+      Number(lat),
+      Number(lng),
+      type,
+      limit ? Number(limit) : 10,
+    );
   }
 
   // --- Регионы ---
@@ -76,6 +112,14 @@ export class CatalogController {
       limit: limit ? Number(limit) : 20,
       sort,
     });
+  }
+
+  // --- Unified Catalog ---
+
+  @Get('catalog')
+  @ApiOperation({ summary: 'Единый каталог: Event (EXCURSION/EVENT) или Venue (MUSEUM)' })
+  getCatalog(@Query() query: CatalogQueryDto) {
+    return this.catalogService.getCatalog(query);
   }
 
   // --- События ---
@@ -214,8 +258,10 @@ export class CatalogController {
 
   @Post('tep/sync')
   @ApiOperation({ summary: 'Синхронизация событий из teplohod.info' })
-  runTepSync() {
-    return this.tepSync.syncAll();
+  async runTepSync() {
+    const result = await this.tepSync.syncAll();
+    await this.cache.invalidateAfterSync();
+    return result;
   }
 
   // --- Дедупликация ---
@@ -244,6 +290,7 @@ export class CatalogController {
     ]);
     // Дополнительный retag для событий teplohod (если tep sync завершился после TC retag)
     const retag = await this.tcSync.retagAll();
+    await this.cache.invalidateAfterSync();
     return { ticketscloud: tc, teplohod: tep, retag };
   }
 }
