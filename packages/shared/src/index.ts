@@ -22,6 +22,7 @@ export {
 } from './widget-payload';
 
 export { normalizeEventTitle } from './normalize-title';
+export { cityToPrepositional } from './city-declension';
 
 export {
   type NormalizedPrice,

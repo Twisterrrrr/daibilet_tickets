@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Menu,
@@ -11,6 +11,7 @@ import {
   MapPin,
   ChevronDown,
   Heart,
+  Search,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { SearchAutocomplete } from './SearchAutocomplete';
@@ -36,13 +37,13 @@ function HeaderCitySelect() {
   const searchParams = useSearchParams();
   const [cities, setCities] = useState<HeaderCity[]>([]);
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // Берём только "featured" города, как на главной
-        const data = await api.getCities(true);
+        const data = await api.getCities();
         if (!cancelled) {
           setCities(
             (data || []).map((c: any) => ({
@@ -60,6 +61,16 @@ function HeaderCitySelect() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!open) setSearch('');
+  }, [open]);
+
+  const filteredCities = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return cities;
+    return cities.filter((c) => c.name.toLowerCase().includes(q));
+  }, [search, cities]);
+
   const currentCitySlug = searchParams.get('city');
   const currentCity = cities.find((c) => c.slug === currentCitySlug);
   const label = currentCity?.name || 'Все города';
@@ -73,7 +84,8 @@ function HeaderCitySelect() {
       params.delete('city');
     }
     const query = params.toString();
-    router.push(`/events${query ? `?${query}` : ''}`);
+    const path = typeof window !== 'undefined' && window.location.pathname === '/' ? '/' : '/events';
+    router.push(`${path}${query ? `?${query}` : ''}`);
   };
 
   if (cities.length === 0) {
@@ -92,17 +104,22 @@ function HeaderCitySelect() {
         <ChevronDown className="h-3 w-3 text-slate-400" />
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-1 w-56 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-          <button
-            type="button"
-            onClick={() => handleSelect(undefined)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-          >
-            <span className="truncate">Все города</span>
-          </button>
-          <div className="my-1 h-px bg-slate-100" />
-          <div className="max-h-64 overflow-y-auto">
-            {cities.map((city) => (
+        <div className="absolute right-0 z-50 mt-1 w-64 rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div className="border-b border-slate-100 p-2">
+            <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+              <Search className="h-4 w-4 flex-shrink-0 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск города..."
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="max-h-56 overflow-y-auto py-1">
+            {filteredCities.map((city) => (
               <button
                 key={city.slug}
                 type="button"
@@ -112,6 +129,9 @@ function HeaderCitySelect() {
                 <span className="truncate">{city.name}</span>
               </button>
             ))}
+            {filteredCities.length === 0 && (
+              <p className="px-3 py-4 text-center text-sm text-slate-500">Ничего не найдено</p>
+            )}
           </div>
         </div>
       )}

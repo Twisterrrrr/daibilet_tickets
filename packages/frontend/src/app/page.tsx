@@ -1,11 +1,10 @@
 import Link from 'next/link';
-import { ArrowRight, TrendingUp, Ticket, Landmark, MapPin, Star, Headphones } from 'lucide-react';
-import { CATEGORY_LABELS, EventCategory } from '@daibilet/shared';
+import { ArrowRight, TrendingUp, Ticket, Landmark, MapPin, Star, Headphones, X } from 'lucide-react';
+import { CATEGORY_LABELS, EventCategory, cityToPrepositional } from '@daibilet/shared';
 import { api } from '@/lib/api';
 import { EventCard } from '@/components/ui/EventCard';
 import { PromoBlock } from '@/components/ui/PromoBlock';
 import { HeroCitySearch } from '@/components/ui/HeroCitySearch';
-import { CityFilterSelect } from '@/components/ui/CityFilterSelect';
 
 // ISR: обновлять каждый час
 export const revalidate = 3600;
@@ -146,14 +145,33 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <HeroCitySearch cities={cities} initialCitySlug={citySlug || undefined} />
             </div>
 
-            {/* Quick links — переключатель фильтра по городу с поиском */}
+            {/* Quick links — переключатель фильтра по городу */}
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <CityFilterSelect
-                cities={cities}
-                currentCitySlug={citySlug || undefined}
-                variant="hero"
-                showReset={!!citySlug}
-              />
+              <Link
+                href="/"
+                scroll={false}
+                className={`rounded-full border px-4 py-1.5 text-sm font-medium backdrop-blur-sm transition-all ${
+                  !citySlug
+                    ? 'border-white/40 bg-white/20 text-white'
+                    : 'border-white/20 bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
+                }`}
+              >
+                Все города
+              </Link>
+              {cities.slice(0, 4).map((city: any) => (
+                <Link
+                  key={city.slug}
+                  href={`/?city=${city.slug}`}
+                  scroll={false}
+                  className={`rounded-full border px-4 py-1.5 text-sm font-medium backdrop-blur-sm transition-all ${
+                    citySlug === city.slug
+                      ? 'border-white/40 bg-white/20 text-white'
+                      : 'border-white/20 bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
+                  }`}
+                >
+                  {city.name}
+                </Link>
+              ))}
             </div>
           </div>
         </div>
@@ -163,30 +181,51 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {popularEvents.length > 0 && (
         <section className="py-12 sm:py-16">
           <div className="container-page">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-                  {cityName ? `Популярные события в городе ${cityName}` : 'Популярные события'}
+                  {cityName ? `Популярные события в ${cityToPrepositional(cityName)}` : 'Популярные события'}
                 </h2>
                 <p className="mt-1 text-slate-500">
                   {cityName ? 'Лучшие экскурсии и мероприятия в выбранном городе' : 'Лучшие экскурсии и мероприятия по рейтингу'}
                 </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {citySlug && (
                   <Link
-                    href={`/cities/${citySlug}`}
-                    className="mt-2 inline-block text-sm font-medium text-primary-600 hover:text-primary-700"
+                    href="/"
+                    scroll={false}
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-800"
                   >
-                    Всё о городе →
+                    <X className="h-3.5 w-3.5" />
+                    Сбросить
                   </Link>
                 )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <CityFilterSelect
-                  cities={cities}
-                  currentCitySlug={citySlug || undefined}
-                  variant="default"
-                  showReset={!!citySlug}
-                />
+                <Link
+                  href="/"
+                  scroll={false}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    !citySlug
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:border-primary-300 hover:text-primary-700'
+                  }`}
+                >
+                  Все города
+                </Link>
+                {cities.slice(0, 5).map((city: any) => (
+                  <Link
+                    key={city.slug}
+                    href={`/?city=${city.slug}`}
+                    scroll={false}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                      citySlug === city.slug
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:border-primary-300 hover:text-primary-700'
+                    }`}
+                  >
+                    {city.name}
+                  </Link>
+                ))}
               </div>
             </div>
             <div className="mt-6 grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-4">
@@ -215,6 +254,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               >
                 Все события <ArrowRight className="h-4 w-4" />
               </Link>
+              {citySlug && (
+                <Link
+                  href={`/cities/${citySlug}`}
+                  className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                >
+                  Всё о городе →
+                </Link>
+              )}
             </div>
           </div>
         </section>
@@ -224,30 +271,51 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {(nearestEvents.length > 0 || cities.length > 0) && (
         <section className="py-12 sm:py-16 bg-slate-50">
           <div className="container-page">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-                  {cityName ? `Ближайшие события в городе ${cityName}` : 'Ближайшие события'}
+                  {cityName ? `Ближайшие события в ${cityToPrepositional(cityName)}` : 'Ближайшие события'}
                 </h2>
                 <p className="mt-1 text-slate-500">
                   {citySlug ? 'Начнутся скоро в выбранном городе' : 'Скоро начинаются — не пропустите'}
                 </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {citySlug && (
                   <Link
-                    href={`/cities/${citySlug}`}
-                    className="mt-2 inline-block text-sm font-medium text-primary-600 hover:text-primary-700"
+                    href="/"
+                    scroll={false}
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-800"
                   >
-                    Всё о городе →
+                    <X className="h-3.5 w-3.5" />
+                    Сбросить
                   </Link>
                 )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <CityFilterSelect
-                  cities={cities}
-                  currentCitySlug={citySlug || undefined}
-                  variant="default"
-                  showReset={!!citySlug}
-                />
+                <Link
+                  href="/"
+                  scroll={false}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    !citySlug
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:border-primary-300 hover:text-primary-700'
+                  }`}
+                >
+                  Все города
+                </Link>
+                {cities.slice(0, 5).map((city: any) => (
+                  <Link
+                    key={city.slug}
+                    href={`/?city=${city.slug}`}
+                    scroll={false}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                      citySlug === city.slug
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:border-primary-300 hover:text-primary-700'
+                    }`}
+                  >
+                    {city.name}
+                  </Link>
+                ))}
               </div>
             </div>
             {nearestEvents.length > 0 ? (
@@ -279,6 +347,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   >
                     Все ближайшие <ArrowRight className="h-4 w-4" />
                   </Link>
+                  {citySlug && (
+                    <Link
+                      href={`/cities/${citySlug}`}
+                      className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      Всё о городе →
+                    </Link>
+                  )}
                 </div>
               </>
             ) : (
