@@ -238,11 +238,19 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   subcategories={event.subcategories}
                   imageUrl={event.imageUrl}
                   priceFrom={event.priceFrom}
+                  priceOriginalKopecks={event.priceOriginalKopecks}
                   rating={event.rating}
                   reviewCount={event.reviewCount}
                   durationMinutes={event.durationMinutes}
                   city={event.city}
+                  totalAvailableTickets={event.totalAvailableTickets}
+                  departingSoonMinutes={event.departingSoonMinutes}
                   nextSessionAt={event.nextSessionAt}
+                  isOptimalChoice={event.isOptimalChoice}
+                  dateMode={event.dateMode}
+                  groupSize={event.groupSize ?? event.templateData?.groupSize}
+                  sessionTimes={event.sessionTimes ?? []}
+                  highlights={event.highlights ?? []}
                   compact
                 />
               ))}
@@ -330,12 +338,19 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       subcategories={event.subcategories}
                       imageUrl={event.imageUrl}
                       priceFrom={event.priceFrom}
+                      priceOriginalKopecks={event.priceOriginalKopecks}
                       rating={event.rating}
                       reviewCount={event.reviewCount}
                       durationMinutes={event.durationMinutes}
                       city={event.city}
-                      nextSessionAt={event.nextSessionAt}
+                      totalAvailableTickets={event.totalAvailableTickets}
                       departingSoonMinutes={event.departingSoonMinutes}
+                      nextSessionAt={event.nextSessionAt}
+                      isOptimalChoice={event.isOptimalChoice}
+                      dateMode={event.dateMode}
+                      groupSize={event.groupSize ?? event.templateData?.groupSize}
+                      sessionTimes={event.sessionTimes ?? []}
+                      highlights={event.highlights ?? []}
                       compact
                     />
                   ))}

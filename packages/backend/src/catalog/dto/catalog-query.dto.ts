@@ -14,6 +14,11 @@ export class CatalogQueryDto {
   @IsString()
   city?: string;
 
+  @ApiPropertyOptional({ description: 'Slug региона — музеи всех городов региона (hub + members)' })
+  @IsOptional()
+  @IsString()
+  region?: string;
+
   @ApiPropertyOptional({ description: 'Поиск по названию' })
   @IsOptional()
   @IsString()

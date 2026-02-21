@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-02-20
+> Последнее обновление: 2026-02-21
 
 ## Миссия
 
@@ -59,6 +59,9 @@
 - **LandingPage** — SEO-подборка по тегу/фильтрам
 - **ComboPage** — готовая программа с курированными событиями
 - **Article** — SEO-статья с перелинковкой
+- **SeoTemplate** — шаблоны для SEO-автогенерации (titleTpl, h1Tpl, descriptionTpl, bodyTpl). См. `docs/sitemap-seo-spec.md`.
+- **SeoContent** — кеш сгенерированных SEO-текстов (cityId, type, filtersKey, title, h1, description, body, noindex, canonicalUrl, relatedLinksJson).
+- **SeoMeta** — универсальный SEO-блок для City, Event, Venue, Landing, Article, Combo. См. `docs/seo/SeoMetaSpec.md`.
 - **Package** — заказ (Trip Planner)
 - **Review** — отзыв на событие/оператора. Поля: rating (1-5), text, authorName, authorEmail (скрыт), isVerified (подтверждённая покупка), voucherCode, verifyToken (email-верификация, 48h TTL), helpfulCount (кэш голосов), status (PENDING_EMAIL/PENDING/APPROVED/REJECTED), adminComment. Unique: authorEmail + eventId.
   - **ReviewPhoto** — до 5 фото на отзыв (url, thumbUrl, filename). WebP, ресайз 1200px + thumb 300px.

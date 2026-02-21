@@ -1,6 +1,6 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-02-20. Решения по 13 вопросам — `docs/OpenQuestions.md`.
+> Последнее обновление: 2026-02-21. Решения по 13 вопросам — `docs/OpenQuestions.md`.
 
 ---
 
@@ -64,6 +64,15 @@
 - [x] Типизация: ESLint `@typescript-eslint/no-explicit-any: warn`
 - [x] Supplier: docs/SupplierArchitecture.md, Operator.status, SupplierRole CONTENT/ACCOUNTANT
 
+### Выполнено (21.02)
+- [x] **SupplierArchitecture.md** — расширена документация: два режима (Operator/Supplier), архивация, создание контента через ЛК, миграция «закрыли юрлицо»
+- [x] **Предложение createdByType** — enum ADMIN | SUPPLIER | IMPORT для Event/Venue (секция 9 в SupplierArchitecture.md)
+- [x] **RBAC-чеклист** — матрица прав по ролям, проверки доступа, эндпоинты Supplier (секция 10 в SupplierArchitecture.md)
+
+### To-do (Supplier)
+- [ ] **Средний**: Добавить Event.createdByType, Venue.createdByType, createdById (миграция Prisma)
+- [ ] **Средний**: Реализовать RBAC для Supplier (guards, decorators, проверка operatorId)
+
 ---
 
 ## Далее (приоритетная очередь)
@@ -72,6 +81,19 @@
 - [x] **Средний**: Автодедуп (fuzzy-matching по названию, площадка, дата)
 - [x] **Средний**: Отзывы на уровне Venue (Review.venueId)
 - [x] **Средний**: Sitemap /venues/* — проверить высокий приоритет (сейчас priority 0.9)
+- [x] **Средний**: Sitemap index + подсайтмапы (21.02): static, cities-catalog, cities-filters, offers, articles. Спецификация `docs/sitemap-seo-spec.md`
+- [x] **Средний**: Prisma SeoTemplate + SeoContent, миграция 20260221000001_add_seo_templates
+- [x] **Средний**: Утилиты renderTemplate, getSeason в `@daibilet/shared`
+- [x] **Средний**: SeoMeta — универсальный SEO-блок, SeoMetaService, админка (EventEdit, VenueEdit, CityEdit), generateMetadata на /events/[slug] (21.02)
+- [x] **Средний**: SeoGeneratorService (anti-thin-content), seed-seo-templates, seo-landing-strategy.md (21.02)
+
+---
+
+## Технические долги
+
+- [ ] **Средний**: sitemap-cities-filters — проверка count ≥ 6 перед добавлением URL
+- [ ] **Низкий**: Типизация `any` (backend ~31, frontend 100+)
+- Полный список — `docs/TechnicalDebt.md`
 
 ---
 

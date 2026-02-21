@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { formatPrice } from '@daibilet/shared';
+import { shortenAddressToStreet } from '@/lib/address';
 
 // ========================
 // Типы
@@ -241,7 +242,7 @@ export function BuyModal({
             {(address || venueName) && (
               <p className={`mt-1 flex items-center gap-1 text-xs ${eventImage ? 'text-white/80' : 'text-slate-500'}`}>
                 <MapPin className="h-3 w-3 flex-shrink-0" />
-                {venueName}{venueName && address ? ' · ' : ''}{address}
+                {venueName}{venueName && address ? ' · ' : ''}{shortenAddressToStreet(address) || address}
               </p>
             )}
           </div>

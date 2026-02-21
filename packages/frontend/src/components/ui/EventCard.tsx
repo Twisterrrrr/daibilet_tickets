@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Clock, MapPin, Star, Ticket, Flame, Award } from 'lucide-react';
 import { FavoriteButton } from './FavoriteButton';
-import { formatPrice, CATEGORY_LABELS, SUBCATEGORY_LABELS, SYSTEM_TAG_BADGES, type EventCategory, type EventSubcategory } from '@daibilet/shared';
+import { formatPrice, type EventCategory, type EventSubcategory } from '@daibilet/shared';
 
 interface EventCardProps {
   slug: string;
@@ -15,6 +16,8 @@ interface EventCardProps {
   tagSlugs?: string[];
   imageUrl: string | null;
   priceFrom: number | null;
+  /** Старая цена в копейках — для бейджа скидки и зачёркнутой цены */
+  priceOriginalKopecks?: number | null;
   rating: number;
   reviewCount: number;
   durationMinutes: number | null;
@@ -31,13 +34,16 @@ interface EventCardProps {
   isOptimalChoice?: boolean;
   /** Режим даты: SCHEDULED (обычный) или OPEN_DATE (музеи) */
   dateMode?: string;
+  /** Размер группы: "1–8 чел." */
+  groupSize?: string | null;
+  /** Слоты времени на сегодня: ["12:30", "13:30", ...] */
+  sessionTimes?: string[];
+  /** 3 highlights: локация, маршрут, экскурсия от гида и т.п. */
+  highlights?: string[];
 }
 
 /** Порог: при скольких оставшихся местах показывать "Осталось N мест" */
 const LOW_TICKETS_THRESHOLD = 20;
-
-/** Максимум тег-бейджей на карточке (чтобы не перегружать) */
-const MAX_TAG_BADGES = 2;
 
 /** Форматировать ближайший сеанс: "Сегодня, 18:00" / "Завтра, 12:30" / "15 фев, 10:00" */
 function formatNextSession(iso: string): string {
@@ -76,21 +82,42 @@ export function EventCard({
   nextSessionAt,
   isOptimalChoice,
   dateMode,
+  priceOriginalKopecks,
+  groupSize,
+  sessionTimes = [],
+  highlights = [],
 }: EventCardProps) {
-  // Показываем первый подтип если есть, иначе категорию
-  const primarySub = subcategories?.[0];
-  const categoryLabel = (primarySub && SUBCATEGORY_LABELS[primarySub])
-    ? SUBCATEGORY_LABELS[primarySub]
-    : CATEGORY_LABELS[category] || 'Событие';
+  const router = useRouter();
   const showLowTickets =
     totalAvailableTickets !== undefined &&
     totalAvailableTickets > 0 &&
     totalAvailableTickets <= LOW_TICKETS_THRESHOLD;
+  const showPopular = reviewCount >= 100;
+  const hasDiscount =
+    priceOriginalKopecks != null &&
+    priceOriginalKopecks > 0 &&
+    priceFrom != null &&
+    priceFrom > 0 &&
+    priceOriginalKopecks > priceFrom;
+  const discountPercent =
+    hasDiscount && priceOriginalKopecks
+      ? Math.round(((priceOriginalKopecks - priceFrom) / priceOriginalKopecks) * 100)
+      : 0;
 
-  // Системные тег-бейджи (показываем не больше MAX_TAG_BADGES)
-  const visibleTagBadges = SYSTEM_TAG_BADGES
-    .filter((badge) => tagSlugs.includes(badge.slug))
-    .slice(0, MAX_TAG_BADGES);
+  const displayHighlights = highlights.slice(0, 3);
+  const displaySlots = sessionTimes.slice(0, 5);
+  const isToday = (() => {
+    if (!nextSessionAt) return false;
+    const d = new Date(nextSessionAt);
+    const today = new Date();
+    return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+  })();
+
+  const handleSlotClick = (e: React.MouseEvent, time: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/events/${slug}?openBuy=1&sessionTime=${encodeURIComponent(time)}`);
+  };
 
   return (
     <Link
@@ -118,55 +145,52 @@ export function EventCard({
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 
-        {/* Top-left badges */}
+        {/* Top-left badges — Рекомендуем, Популярно, Скидка N%, N мест */}
         <div className="absolute left-2 top-2 flex flex-col gap-1 sm:left-3 sm:top-3">
-          {/* Optimal choice badge */}
           {isOptimalChoice && (
             <span className="flex items-center gap-1 rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-semibold text-amber-950 shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs">
               <Award className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-              Лучший выбор
+              Рекомендуем
             </span>
           )}
-
-          {/* Category / subcategory badges */}
-          {subcategories && subcategories.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {subcategories.map((sub) => (
-                <span key={sub} className="rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs">
-                  {SUBCATEGORY_LABELS[sub] || sub}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <span className="rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs">
-              {categoryLabel}
+          {showPopular && (
+            <span className="rounded-full bg-emerald-500/95 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:text-xs">
+              Популярно
             </span>
           )}
-
-          {/* Audience badge */}
-          {audience && audience !== 'ALL' && (
-            <span className="rounded-full bg-pink-500/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs">
-              {audience === 'KIDS' ? '👶 Детям' : '👨‍👩‍👧 Семейный'}
+          {hasDiscount && discountPercent > 0 && (
+            <span className="rounded-full bg-orange-500/95 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:text-xs">
+              Скидка {discountPercent}%
             </span>
           )}
-
-          {/* System tag badges — слева, не справа с ценой/избранным */}
-          {visibleTagBadges.map((badge) => (
-            <span
-              key={badge.slug}
-              className={`rounded-full ${badge.color} px-2 py-0.5 text-[10px] font-semibold ${badge.textColor} shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs`}
-            >
-              {badge.emoji} {badge.label}
+          {showLowTickets && (
+            <span className="flex items-center gap-1 rounded-full bg-red-500/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs">
+              <Flame className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              {totalAvailableTickets} мест
             </span>
-          ))}
+          )}
         </div>
 
-        {/* Top-right: только избранное (цену — внизу справа) */}
-        <div className="absolute right-2 top-2 sm:right-3 sm:top-3">
+        {/* Top-right: избранное — inline-flex чтобы не растягивался flex-родителем */}
+        <div className="absolute right-2 top-2 flex shrink-0 items-center justify-center sm:right-3 sm:top-3">
           <FavoriteButton slug={slug} size="sm" />
         </div>
 
-        {/* Bottom-left: departing soon (priority) or low tickets badge (not for OPEN_DATE) */}
+        {/* Bottom-right фото: цена — синий pill */}
+        {priceFrom !== null && priceFrom > 0 && (
+          <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5 sm:bottom-3 sm:right-3">
+            {hasDiscount && priceOriginalKopecks && (
+              <span className="text-[10px] font-medium text-white/90 line-through drop-shadow-md sm:text-xs">
+                {formatPrice(priceOriginalKopecks)}
+              </span>
+            )}
+            <span className="rounded-full bg-primary-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white shadow-sm sm:px-4 sm:py-2 sm:text-sm">
+              от {formatPrice(priceFrom)}
+            </span>
+          </div>
+        )}
+
+        {/* Bottom-left: departing soon (priority) or nothing (N мест — сверху) */}
         {dateMode === 'OPEN_DATE' ? (
           <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:bottom-3 sm:left-3 sm:px-2.5 sm:py-1 sm:text-xs">
             Открытая дата
@@ -176,41 +200,38 @@ export function EventCard({
             <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             Через {departingSoonMinutes} мин
           </span>
-        ) : showLowTickets ? (
-          <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-red-500/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:bottom-3 sm:left-3 sm:px-2.5 sm:py-1 sm:text-xs">
-            <Flame className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            {totalAvailableTickets} мест
-          </span>
         ) : null}
-
-        {/* Price badge on image (desktop only) */}
-        {priceFrom !== null && priceFrom > 0 && (
-          <span className="absolute bottom-2 right-2 hidden rounded-lg bg-white/95 px-2 py-0.5 text-xs font-bold text-slate-900 shadow-sm backdrop-blur-sm sm:bottom-3 sm:right-3 sm:block sm:px-2.5 sm:py-1 sm:text-sm">
-            от {formatPrice(priceFrom)}
-          </span>
-        )}
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 flex-col p-3 sm:p-4">
-        <h3 className="line-clamp-2 text-xs font-semibold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-sm">
-          {title}
-        </h3>
-
-        {/* Meta */}
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500 sm:mt-2 sm:gap-x-3 sm:text-xs">
-          {/* Рейтинг — всегда видим */}
-          <span className="flex items-center gap-0.5">
+      <div className="flex flex-1 flex-col justify-between p-3 sm:p-4">
+        {/* Между фото и названием: Рейтинг слева, Город прижат вправо */}
+        <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500 sm:text-xs">
+          <span className="flex items-center gap-0.5 shrink-0">
             <Star className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${Number(rating) > 0 ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'}`} />
             {Number(rating) > 0 ? (
               <>
                 <span className="font-medium text-slate-700">{Number(rating).toFixed(1)}</span>
-                {reviewCount > 0 && <span className="hidden text-slate-400 sm:inline">({reviewCount})</span>}
+                {reviewCount > 0 && <span className="text-slate-400">({reviewCount})</span>}
               </>
             ) : (
               <span className="font-medium text-slate-400">Новое</span>
             )}
           </span>
+          {city && (
+            <span className="flex items-center gap-0.5 text-slate-500 truncate">
+              <MapPin className="h-3 w-3 shrink-0" />
+              <span className="truncate">{city.name}</span>
+            </span>
+          )}
+        </div>
+
+        <h3 className="mt-2 line-clamp-2 text-xs font-semibold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-sm">
+          {title}
+        </h3>
+
+        {/* Длительность, размер группы, ближайшая дата */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500 sm:gap-x-3 sm:text-xs">
           {durationMinutes && (
             <span className="flex items-center gap-0.5">
               <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
@@ -219,41 +240,50 @@ export function EventCard({
                 : `${durationMinutes} мин`}
             </span>
           )}
+          {groupSize && <span>{groupSize}</span>}
+          {dateMode === 'OPEN_DATE' && (
+            <span className="font-medium text-emerald-600">Билет с открытой датой</span>
+          )}
+          {dateMode !== 'OPEN_DATE' && nextSessionAt && (
+            <span className="font-medium text-primary-600">
+              {isToday && displaySlots.length > 0 ? 'Сегодня' : formatNextSession(nextSessionAt)}
+            </span>
+          )}
         </div>
 
-        {/* Location */}
-        {(city || address) && (
-          <p className="mt-1 flex items-start gap-0.5 text-[10px] text-slate-400 line-clamp-1 sm:mt-1.5 sm:gap-1 sm:text-xs">
-            <MapPin className="mt-0.5 h-2.5 w-2.5 flex-shrink-0 sm:h-3 sm:w-3" />
-            {city ? city.name : ''}{city && address ? ', ' : ''}{address || ''}
-          </p>
+        {/* Слоты времени — только если ближайший сеанс сегодня */}
+        {isToday && displaySlots.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {displaySlots.map((time) => (
+              <button
+                key={time}
+                type="button"
+                onClick={(e) => handleSlotClick(e, time)}
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-0.5 text-[10px] font-normal text-slate-800 transition-colors hover:border-primary-400 hover:bg-primary-50"
+              >
+                {time}
+              </button>
+            ))}
+          </div>
         )}
 
-        {/* Next session or open date */}
-        {dateMode === 'OPEN_DATE' ? (
-          <p className="mt-1 text-[10px] font-medium text-emerald-600 sm:text-xs">
-            🎟 Билет с открытой датой
-          </p>
-        ) : nextSessionAt ? (
-          <p className="mt-1 text-[10px] font-medium text-primary-600 sm:text-xs">
-            {formatNextSession(nextSessionAt)}
-          </p>
-        ) : null}
+        {/* 3 highlights */}
+        {displayHighlights.length > 0 && (
+          <ul className="mt-2 space-y-0.5 text-[10px] text-slate-600 sm:text-xs">
+            {displayHighlights.map((h, i) => (
+              <li key={i} className="flex gap-1.5">
+                <span className="text-primary-500">•</span>
+                <span className="line-clamp-1">{h}</span>
+              </li>
+            ))}
+          </ul>
+        )}
 
-        {/* Footer: price (always visible on mobile since badge is hidden) */}
-        <div className="mt-auto flex items-center justify-between pt-2 sm:pt-3">
-          {priceFrom !== null && priceFrom > 0 ? (
-            <p className="text-xs sm:text-sm">
-              <span className="text-slate-400">от </span>
-              <span className="font-bold text-slate-900">{formatPrice(priceFrom)}</span>
-            </p>
-          ) : (
-            <p className="text-[10px] text-slate-400 sm:text-xs">Цена уточняется</p>
-          )}
-
-          <span className="hidden items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-medium text-primary-600 opacity-0 transition-opacity group-hover:opacity-100 sm:flex sm:px-2.5 sm:py-1 sm:text-xs">
-            <Ticket className="h-3 w-3" />
-            Подробнее
+        {/* Footer: Подробнее прижат влево (цена на фото) */}
+        <div className="mt-auto flex items-center pt-2 sm:pt-3">
+          <span className="flex items-center gap-1 text-[10px] font-medium text-primary-600 sm:text-xs">
+            <Ticket className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            Подробнее →
           </span>
         </div>
       </div>

@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import { VenueType, VENUE_COMMISSION_DEFAULTS, getEffectiveCommission } from '@daibilet/shared';
 
 const VENUE_TYPES = [
@@ -668,9 +669,13 @@ export function VenueEditPage() {
         </TabsContent>
 
         <TabsContent value="seo" className="space-y-4">
+          {!isNew && id && (
+            <SeoMetaEditor entityType="VENUE" entityId={id} defaultTitle={form.title} />
+          )}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">SEO</CardTitle>
+              <CardTitle className="text-base">Legacy SEO (Venue)</CardTitle>
+              <CardDescription>metaTitle/metaDescription на модели Venue — используется как fallback</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">

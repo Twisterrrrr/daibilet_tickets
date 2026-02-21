@@ -37,8 +37,16 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
   } catch (e) {
+    const err = e as Error & { cause?: { code?: string } };
+    const isConnRefused = err.cause?.code === 'ECONNREFUSED' || String(err.message || '').includes('ECONNREFUSED');
     if (process.env.NODE_ENV === 'development') {
-      console.error('[fetchApi] fetch failed', { url, err: String(e), cause: (e as Error & { cause?: unknown })?.cause });
+      console.error('[fetchApi] fetch failed', { url, err: String(err), cause: err.cause });
+      if (isConnRefused) {
+        console.error('[fetchApi] Подсказка: убедитесь, что backend запущен (port 4000). npx pnpm dev — стартует оба сервиса.');
+      }
+    }
+    if (isConnRefused) {
+      throw new Error(`API недоступен. Запустите backend (port 4000) или npx pnpm dev [${path}]`);
     }
     throw e;
   }
@@ -116,6 +124,10 @@ export const api = {
 
   getEventBySlug: (slug: string) =>
     fetchApi<EventDetail>(`/events/${slug}`),
+
+  // SEO meta (entity-level)
+  getSeoMeta: (entityType: string, entityId: string) =>
+    fetchApi<any>(`/seo/${entityType}/${entityId}`),
 
   // Теги
   getTags: (category?: string) =>

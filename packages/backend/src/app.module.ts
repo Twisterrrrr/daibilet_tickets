@@ -27,6 +27,7 @@ import { UserModule } from './user/user.module';
 import { MailModule } from './mail/mail.module';
 import { UploadModule } from './upload/upload.module';
 import { QueueModule } from './queue/queue.module';
+import { SeoModule } from './seo/seo.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { QueueModule } from './queue/queue.module';
     CollectionModule,
     SupportModule,
     UserModule,
+    SeoModule,
   ],
   providers: [
     // Глобальный rate limiter (30 req/min по умолчанию, per-route через @Throttle)

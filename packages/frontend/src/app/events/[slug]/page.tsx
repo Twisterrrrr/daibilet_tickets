@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
+import { getSeoMeta } from '@/lib/seo/getSeoMeta';
 import {
   Clock,
   MapPin,
@@ -19,6 +20,7 @@ import { TepWidgetEmbed } from '@/components/ui/TepWidget';
 import { ReviewSection, RatingBadge } from '@/components/ui/ReviewSection';
 import { AddToCartButton } from '@/components/ui/AddToCartButton';
 import { formatPrice, CATEGORY_LABELS, SUBCATEGORY_LABELS, type EventSubcategory } from '@daibilet/shared';
+import { shortenAddressToStreet } from '@/lib/address';
 
 // ISR: обновлять каждый час
 export const revalidate = 3600;
@@ -41,9 +43,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   try {
     const event = await api.getEventBySlug(slug);
+    const seo = await getSeoMeta('EVENT', event.id);
+
+    const title = seo?.title ?? `${event.title} — купить билет | Дайбилет`;
+    const description = seo?.description ?? event.shortDescription ?? stripHtml(event.description || '').slice(0, 160);
+    const robots = seo?.robots ?? 'index,follow';
+    const canonical = seo?.canonicalUrl ?? undefined;
+
     return {
-      title: `${event.title} — купить билет | Дайбилет`,
-      description: event.shortDescription || stripHtml(event.description || '').slice(0, 160),
+      title,
+      description,
+      robots,
+      ...(canonical && { alternates: { canonical } }),
+      openGraph: {
+        title: seo?.ogTitle ?? title,
+        description: seo?.ogDescription ?? description,
+        ...(seo?.ogImage && { images: [{ url: seo.ogImage }] }),
+        type: 'website',
+      },
     };
   } catch {
     return { title: 'Событие не найдено' };
@@ -226,6 +243,8 @@ export default async function EventPage({ params }: Props) {
       : null;
   const hasActiveSessions =
     event.sessions?.some((s: any) => s.isActive && s.availableTickets > 0) ?? false;
+
+  const seo = await getSeoMeta('EVENT', event.id);
   const categoryLabel =
     CATEGORY_LABELS[event.category as keyof typeof CATEGORY_LABELS] || 'Событие';
   const subcategoryLabels: string[] = (event.subcategories || [])
@@ -240,6 +259,12 @@ export default async function EventPage({ params }: Props) {
 
   return (
     <>
+      {seo?.jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.jsonLd) }}
+        />
+      )}
       {/* Hero Section */}
       <div className="relative">
         <div className="h-72 overflow-hidden bg-slate-900 sm:h-80 lg:h-[420px]">
@@ -346,7 +371,7 @@ export default async function EventPage({ params }: Props) {
                 <div className="rounded-xl border border-slate-200 bg-white p-3.5">
                   <MapPin className="h-5 w-5 text-primary-500" />
                   <p className="mt-1.5 text-xs text-slate-500">Адрес</p>
-                  <p className="text-sm font-medium text-slate-900 line-clamp-2">{event.address}</p>
+                  <p className="text-sm font-medium text-slate-900 line-clamp-2">{shortenAddressToStreet(event.address)}</p>
                 </div>
               )}
               {event.venue ? (
@@ -630,12 +655,27 @@ function BuyCard({
   // All active offers for multi-offer display
   const allOffers = (event.offers || []).filter((o: any) => o.status === 'ACTIVE');
 
+  // Показывать «от» только если в виджете есть варианты дороже
+  const allPrices = new Set<number>();
+  for (const o of allOffers) {
+    if (o.priceFrom && o.priceFrom > 0) allPrices.add(o.priceFrom);
+  }
+  for (const s of event.sessions || []) {
+    const prices = (s.prices || []) as { price?: number }[];
+    for (const p of prices) {
+      if (p.price && p.price > 0) allPrices.add(p.price);
+    }
+  }
+  const showFromPrefix = allPrices.size > 1;
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/50">
       {/* Price */}
       {event.priceFrom > 0 ? (
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-slate-900">{formatPrice(event.priceFrom)}</span>
+          <span className="text-3xl font-bold text-slate-900">
+            {showFromPrefix ? `от ${formatPrice(event.priceFrom)}` : formatPrice(event.priceFrom)}
+          </span>
           <span className="text-sm text-slate-400">/ чел.</span>
         </div>
       ) : (

@@ -23,6 +23,9 @@ export {
 
 export { normalizeEventTitle } from './normalize-title';
 export { cityToPrepositional } from './city-declension';
+export { shortenAddressToStreet } from './address-utils';
+
+export { renderTemplate, getSeason, type SeasonValue } from './seo-utils';
 
 export {
   type NormalizedPrice,

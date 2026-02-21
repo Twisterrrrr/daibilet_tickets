@@ -1,15 +1,17 @@
 'use client';
 
-import type { CatalogItem } from '@daibilet/shared';
+import type { CatalogItem, EventCategory } from '@daibilet/shared';
 import { EventCard } from './EventCard';
+import { EventCardHorizontal } from './EventCardHorizontal';
 import { VenueCard } from './VenueCard';
 
 interface CatalogCardProps {
   item: CatalogItem;
+  variant?: 'vertical' | 'horizontal';
 }
 
-/** Унифицированная карточка каталога: делегирует в EventCard или VenueCard */
-export function CatalogCard({ item }: CatalogCardProps) {
+/** Унифицированная карточка каталога: делегирует в EventCard, EventCardHorizontal или VenueCard */
+export function CatalogCard({ item, variant = 'vertical' }: CatalogCardProps) {
   if (item.type === 'venue') {
     return (
       <VenueCard
@@ -27,6 +29,41 @@ export function CatalogCard({ item }: CatalogCardProps) {
     );
   }
 
+  const city = item.citySlug && item.cityName ? { slug: item.citySlug, name: item.cityName } : undefined;
+  const ev = item as typeof item & {
+    priceOriginalKopecks?: number | null;
+    groupSize?: string | null;
+    sessionTimes?: string[];
+    highlights?: string[];
+    templateData?: { groupSize?: string };
+  };
+
+  if (variant === 'horizontal') {
+    return (
+      <EventCardHorizontal
+        slug={item.slug}
+        title={item.title}
+        category={(item.category || 'EVENT') as EventCategory}
+        imageUrl={item.imageUrl}
+        priceFrom={item.priceFrom}
+        rating={item.rating}
+        reviewCount={item.reviewCount ?? 0}
+        durationMinutes={item.durationMinutes ?? null}
+        city={city}
+        totalAvailableTickets={item.totalAvailableTickets}
+        departingSoonMinutes={item.departingSoonMinutes ?? undefined}
+        nextSessionAt={item.nextSessionAt ?? undefined}
+        isOptimalChoice={item.isOptimalChoice}
+        dateMode={item.dateMode}
+        priceOriginalKopecks={ev.priceOriginalKopecks}
+        groupSize={ev.groupSize ?? ev.templateData?.groupSize}
+        sessionTimes={ev.sessionTimes ?? []}
+        highlights={ev.highlights ?? []}
+        description={item.description ?? (item as { shortDescription?: string }).shortDescription}
+      />
+    );
+  }
+
   return (
     <EventCard
       slug={item.slug}
@@ -37,16 +74,20 @@ export function CatalogCard({ item }: CatalogCardProps) {
       tagSlugs={item.tagSlugs}
       imageUrl={item.imageUrl}
       priceFrom={item.priceFrom}
+      priceOriginalKopecks={ev.priceOriginalKopecks}
       rating={item.rating}
       reviewCount={item.reviewCount ?? 0}
       durationMinutes={item.durationMinutes ?? null}
-      city={item.citySlug && item.cityName ? { slug: item.citySlug, name: item.cityName } : undefined}
+      city={city}
       address={item.location?.address}
       totalAvailableTickets={item.totalAvailableTickets}
       departingSoonMinutes={item.departingSoonMinutes}
       nextSessionAt={item.nextSessionAt ?? undefined}
       isOptimalChoice={item.isOptimalChoice}
       dateMode={item.dateMode}
+      groupSize={ev.groupSize ?? ev.templateData?.groupSize}
+      sessionTimes={ev.sessionTimes ?? []}
+      highlights={ev.highlights ?? []}
     />
   );
 }

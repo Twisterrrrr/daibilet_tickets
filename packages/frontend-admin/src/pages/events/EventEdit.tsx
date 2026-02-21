@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { EventTemplateFields } from './EventTemplateFields';
+import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import {
   Table,
   TableBody,
@@ -410,6 +411,7 @@ export function EventEditPage() {
       <Tabs defaultValue="general" className="space-y-4">
         <TabsList>
           <TabsTrigger value="general">Основное</TabsTrigger>
+          <TabsTrigger value="seo">SEO</TabsTrigger>
           <TabsTrigger value="offers">Офферы ({event.offers?.length || 0})</TabsTrigger>
           <TabsTrigger value="sessions">Сеансы ({event.sessions?.length || 0})</TabsTrigger>
           <TabsTrigger value="rating">Рейтинг</TabsTrigger>
@@ -650,6 +652,11 @@ export function EventEditPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── SEO Tab ── */}
+        <TabsContent value="seo">
+          <SeoMetaEditor entityType="EVENT" entityId={event.id} defaultTitle={event.title} />
         </TabsContent>
 
         {/* ── Offers Tab ── */}

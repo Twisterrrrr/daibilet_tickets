@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 
 interface CityDetail {
   id: string;
@@ -196,10 +197,12 @@ export function CityEditPage() {
         </CardContent>
       </Card>
 
+      <SeoMetaEditor entityType="CITY" entityId={id!} defaultTitle={form.name ?? undefined} />
+
       <Card>
         <CardHeader>
-          <CardTitle>SEO</CardTitle>
-          <CardDescription>Мета-теги для поисковых систем</CardDescription>
+          <CardTitle>Legacy SEO (City)</CardTitle>
+          <CardDescription>metaTitle/metaDescription на модели City — fallback</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

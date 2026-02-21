@@ -6,6 +6,14 @@ import { CatalogQueryDto } from './dto/catalog-query.dto';
 import { Prisma, DateMode, EventCategory, EventSubcategory, TagCategory, LocationType } from '@prisma/client';
 import { EventOverrideService } from '../admin/event-override.service';
 import { RegionService } from './region.service';
+import { SUBCATEGORY_LABELS } from '@daibilet/shared';
+
+/** Сократить адрес до улицы и номера: "Дворцовая наб., 18, Санкт-Петербург" → "Дворцовая наб., 18" */
+function shortenAddressToStreet(addr: string | null | undefined): string {
+  if (!addr || typeof addr !== 'string') return '';
+  const parts = addr.split(',').map((s) => s.trim()).filter(Boolean);
+  return parts.length <= 2 ? addr.trim() : parts.slice(0, 2).join(', ');
+}
 
 @Injectable()
 export class CatalogService {
@@ -335,10 +343,10 @@ export class CatalogService {
    * category=EXCURSION | EVENT → Event
    */
   async getCatalog(query: CatalogQueryDto) {
-    const { category, city, q, sort = 'popular', page = 1, limit = 20, qf } = query;
+    const { category, city, region, q, sort = 'popular', page = 1, limit = 20, qf } = query;
 
     if (category === 'MUSEUM') {
-      return this.getCatalogMuseumAndVenues({ city, q, sort, page, limit, qf });
+      return this.getCatalogMuseumAndVenues({ city, region, q, sort, page, limit, qf });
     }
     // EXCURSION | EVENT | пусто → Events
     const eventsDto: EventsQueryDto = {
@@ -380,7 +388,7 @@ export class CatalogService {
       priceFrom: e.priceFrom,
       rating: Number(e.rating) || 0,
       badges: this.collectEventBadges(e),
-      location: (e.address || e.city?.name) ? { address: e.address, metro: null } : undefined,
+      location: (e.address || e.city?.name) ? { address: shortenAddressToStreet(e.address || ''), metro: null } : undefined,
       dateLabel,
       // event-only
       startsAt: nextSessionAt,
@@ -405,13 +413,24 @@ export class CatalogService {
    */
   private async getCatalogMuseumAndVenues(params: {
     city?: string;
+    region?: string;
     q?: string;
     sort?: string;
     page: number;
     limit: number;
     qf?: string;
   }) {
-    const { city, q, sort = 'popular', page, limit, qf } = params;
+    const { city, region, q, sort = 'popular', page, limit, qf } = params;
+
+    // region: города региона (hub + members) — для областных музеев (Выборг, Пушкин и др.)
+    let regionCityIds: string[] | undefined;
+    if (region) {
+      const r = await this.prisma.region.findUnique({
+        where: { slug: region, isActive: true },
+        include: { cities: { select: { cityId: true } } },
+      });
+      if (r) regionCityIds = r.cities.map((c) => c.cityId);
+    }
     const FETCH_LIMIT = 500;
 
     // Маппинг qf → параметры getEvents
@@ -433,7 +452,7 @@ export class CatalogService {
     const venueWhere: Prisma.VenueWhereInput = {
       isActive: true,
       isDeleted: false,
-      ...(city && { city: { slug: city } }),
+      ...(regionCityIds?.length ? { cityId: { in: regionCityIds } } : city ? { city: { slug: city } } : {}),
       ...(q?.trim() && {
         OR: [
           { title: { contains: q.trim(), mode: 'insensitive' } },
@@ -451,8 +470,12 @@ export class CatalogService {
       ...(qf === 'free' && { OR: [{ priceFrom: 0 }, { priceFrom: null }] }),
     };
 
+    const eventsDtoWithRegion = regionCityIds?.length
+      ? { ...eventsDto, city: undefined, cityIds: regionCityIds }
+      : eventsDto;
+
     const [eventsRes, venuesRaw] = await Promise.all([
-      this.getEvents(eventsDto as EventsQueryDto),
+      this.getEvents(eventsDtoWithRegion as EventsQueryDto),
       this.prisma.venue.findMany({
         where: venueWhere,
         include: { city: { select: { slug: true, name: true } } },
@@ -470,6 +493,21 @@ export class CatalogService {
     const venueItems = venuesRaw.map((v) => this.venueToCatalogItem(v));
 
     const combined = [...eventItems, ...venueItems];
+
+    // Регион для каждого города (для группировки «Списком»)
+    const combinedCityIds = [...new Set(combined.map((i: any) => i.cityId).filter(Boolean))];
+    if (combinedCityIds.length > 0) {
+      const regionCities = await this.prisma.regionCity.findMany({
+        where: { cityId: { in: combinedCityIds } },
+        include: { region: { select: { name: true, slug: true } } },
+      });
+      const regionByCityId = new Map(regionCities.map((rc) => [rc.cityId, rc.region]));
+      combined.forEach((item: any) => {
+        item.regionName = regionByCityId.get(item.cityId)?.name ?? null;
+        item.regionSlug = regionByCityId.get(item.cityId)?.slug ?? null;
+      });
+    }
+
     const orderByRating = (a: { rating?: number }, b: { rating?: number }) =>
       (Number(b.rating) || 0) - (Number(a.rating) || 0);
     const orderByPriceAsc = (a: { priceFrom?: number | null }, b: { priceFrom?: number | null }) =>
@@ -556,7 +594,7 @@ export class CatalogService {
       rating: Number(v.rating) || 0,
       reviewCount: v.reviewCount ?? 0,
       badges: v.isFeatured ? ['Популярное'] : [],
-      location: (v.address || v.metro) ? { address: v.address, metro: v.metro } : undefined,
+      location: (v.address || v.metro) ? { address: v.address ? shortenAddressToStreet(v.address) : v.address, metro: v.metro } : undefined,
       dateLabel: openingHoursSummary,
       // venue-only
       venueType: v.venueType,
@@ -576,8 +614,8 @@ export class CatalogService {
 
   // --- События ---
 
-  async getEvents(query: EventsQueryDto) {
-    const { city, category, subcategory, audience, tag, dateFrom, dateTo, sort, timeOfDay, pier, maxDuration, minDuration, maxMinAge, dateMode, venueId, priceMin, priceMax, page = 1, limit = 20, hasPhoto, slugs: slugsParam } = query;
+  async getEvents(query: EventsQueryDto & { cityIds?: string[] }) {
+    const { city, cityIds, category, subcategory, audience, tag, dateFrom, dateTo, sort, timeOfDay, pier, maxDuration, minDuration, maxMinAge, dateMode, venueId, priceMin, priceMax, page = 1, limit = 20, hasPhoto, slugs: slugsParam } = query;
 
     // --- Фильтр сеансов: OPEN_DATE не требуют sessions ---
     // dateMode=OPEN_DATE → нет сеансов, показываем если isActive и не истёк endDate
@@ -638,10 +676,11 @@ export class CatalogService {
       isActive: true,
       isDeleted: false,
       canonicalOfId: null, // Не показывать дубли (помеченные как дубликат)
-      // Только события из активных городов
+      // Только события из активных городов (cityIds — для region, иначе city slug)
+      ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),
       city: {
         isActive: true,
-        ...(city && { slug: city }),
+        ...(city && !cityIds?.length && { slug: city }),
       },
       // Фильтр сеансов с поддержкой OPEN_DATE
       ...sessionFilter,
@@ -767,6 +806,7 @@ export class CatalogService {
         take: maxTake,
         include: {
           city: { select: { slug: true, name: true } },
+          venue: { select: { title: true, shortTitle: true } },
           tags: { include: { tag: true } },
           offers: {
             where: { status: 'ACTIVE', isDeleted: false },
@@ -785,7 +825,7 @@ export class CatalogService {
           sessions: {
             where: { isActive: true, startsAt: { gte: new Date() } },
             orderBy: { startsAt: 'asc' },
-            take: 5,
+            take: 20,
             select: { startsAt: true, availableTickets: true },
           },
         },
@@ -884,7 +924,29 @@ export class CatalogService {
     // Похожие события: город + категория + скоринг по тегам, подкатегории, priceFrom
     const relatedEvents = await this.fetchRelatedEvents(overridden);
 
-    return { ...overridden, primaryOffer, relatedEvents };
+    // Рейтинг: до 10 отзывов — псевдослучайный. Салюты: 4.8–5, остальные: 4.5–5
+    const rc = (overridden.reviewCount ?? 0) | 0;
+    const rawR = Number(overridden.rating) || 0;
+    const h = String(overridden.id || overridden.slug || '').split('').reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0), 0);
+    const ovTags = (overridden.tags || []).map((t: any) => t?.tag?.slug).filter(Boolean);
+    const ovHasSalute = ovTags.some((s: string) => s === 'salute' || s === 'salyut-s-vody');
+    const displayRating = rc >= 10
+      ? rawR
+      : ovHasSalute
+        ? 4.8 + (Math.abs(h) % 21) / 100
+        : 4.5 + (Math.abs(h) % 51) / 100;
+
+    return {
+      ...overridden,
+      rating: displayRating,
+      address: overridden.address ? shortenAddressToStreet(overridden.address) : overridden.address,
+      primaryOffer,
+      relatedEvents: relatedEvents.map((r: any) => ({
+        ...r,
+        rating: (r.reviewCount ?? 0) >= 10 ? Number(r.rating) || 0 : 4.5 + (Math.abs(String(r.id || r.slug || '').split('').reduce((a: number, c: string) => ((a << 5) - a) + c.charCodeAt(0), 0)) % 51) / 100,
+        address: r.address ? shortenAddressToStreet(r.address) : r.address,
+      })),
+    };
   }
 
   /**
@@ -1045,6 +1107,11 @@ export class CatalogService {
 
   // --- Helpers ---
 
+  /** Экранировать спецсимволы для RegExp */
+  private escapeRe(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   /** События без фото — в конец списка */
   private moveNoPhotoToEnd<T extends { imageUrl?: string | null }>(items: T[]): T[] {
     const withPhoto: T[] = [];
@@ -1080,11 +1147,17 @@ export class CatalogService {
    * - nextSessionAt: дата ближайшего сеанса
    * - totalAvailableTickets: сумма свободных мест по ближайшим сеансам
    * - isOptimalChoice: лучшее событие по scoring-алгоритму
+   * - groupSize, sessionTimes, highlights — для карточек EventCard
    *
    * Scoring: rating 40% + price-efficiency 30% + occupancy 30%
    */
   private enrichWithBadges(events: any[]): any[] {
     if (events.length === 0) return events;
+
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setUTCDate(todayEnd.getUTCDate() + 1);
 
     // Вычисляем метрики для каждого события
     const enriched = events.map((event) => {
@@ -1102,22 +1175,107 @@ export class CatalogService {
         0,
       );
 
+      // sessionTimes: слоты времени на сегодня (HH:mm)
+      const sessionTimes: string[] = [];
+      if (nextSessionAt) {
+        const firstAt = new Date(nextSessionAt);
+        const firstDayStart = new Date(firstAt);
+        firstDayStart.setUTCHours(0, 0, 0, 0);
+        const firstDayEnd = new Date(firstDayStart);
+        firstDayEnd.setUTCDate(firstDayEnd.getUTCDate() + 1);
+        for (const s of sessions) {
+          const t = new Date(s.startsAt).getTime();
+          if (t >= firstDayStart.getTime() && t < firstDayEnd.getTime()) {
+            const d = new Date(s.startsAt);
+            const timeStr = d.toLocaleTimeString('ru-RU', {
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Europe/Moscow',
+            });
+            sessionTimes.push(timeStr);
+          }
+        }
+      }
+
+      // groupSize из templateData
+      const templateData = (event.templateData || {}) as Record<string, unknown>;
+      const groupSize =
+        (typeof templateData.groupSize === 'string' && templateData.groupSize.trim()
+          ? templateData.groupSize.trim()
+          : null) as string | null;
+
+      // highlights: 1) локация (очищенная), 2) маршрут, 3) подкатегории/теги
+      const highlights: string[] = [];
+      const venue = event.venue as { title?: string; shortTitle?: string } | null;
+      const cityName = (event.city as { name?: string } | null)?.name;
+      const rawAddress = (event.address?.trim() || venue?.shortTitle || venue?.title) ?? '';
+      // Для точки отправления: только улица и номер дома
+      const locStr = rawAddress ? shortenAddressToStreet(rawAddress) : '';
+      if (locStr) highlights.push(locStr);
+      const route = typeof templateData.route === 'string' ? templateData.route.trim() : null;
+      if (route && !highlights.includes(route)) highlights.push(route);
+      const subs: EventSubcategory[] = event.subcategories || [];
+      const tagSlugsForFilter = (event.tags || []).map((t: any) => t?.tag?.slug).filter(Boolean);
+      const hasNightTag = tagSlugsForFilter.includes('night');
+      const hasSaluteTag = tagSlugsForFilter.some((s: string) => s === 'salute' || s === 'salyut-s-vody');
+      for (const sub of subs) {
+        // Экстрим не показывать на ночных прогулках и салютах — это не экстрим
+        if (sub === 'EXTREME' && (hasNightTag || hasSaluteTag)) continue;
+        const label = SUBCATEGORY_LABELS[sub as EventSubcategory];
+        if (label && !highlights.includes(label)) highlights.push(label);
+      }
+      const tags: { tag?: { slug?: string; name?: string } | null }[] = event.tags || [];
+      const tagLabelMap: Record<string, string> = {
+        'with-guide': 'Экскурсия от гида',
+        audioguide: 'Аудиогид',
+        night: 'Ночная',
+        water: 'На воде',
+        romantic: 'Романтика',
+        'first-time-city': 'Для первого визита',
+        'bad-weather-ok': 'В любую погоду',
+        'no-queue': 'Без очереди',
+        interactive: 'Интерактив',
+      };
+      for (const t of tags) {
+        const slug = t?.tag?.slug;
+        const name = t?.tag?.name;
+        const label = (slug && tagLabelMap[slug]) || name;
+        if (label && !highlights.includes(label)) highlights.push(label);
+      }
+      const displayHighlights = highlights.slice(0, 3);
+
       // Primary offer — первый из отсортированных (isPrimary desc, priority desc)
       const offers: any[] = event.offers || [];
       const primaryOffer = offers.length > 0 ? offers[0] : null;
 
       // Извлекаем slug-и тегов для бейджей на фронтенде (защита от null tag)
-      const tags: { tag?: { slug?: string } | null }[] = event.tags || [];
       const tagSlugs: string[] = tags.map((t) => t?.tag?.slug).filter((s): s is string => !!s);
 
+      // Рейтинг: до 10 отзывов — псевдослучайный. Салюты: 4.8–5, остальные: 4.5–5
+      const reviewCount = (event.reviewCount ?? 0) | 0;
+      const rawRating = Number(event.rating) || 0;
+      const hash = String(event.id || event.slug || '').split('').reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0), 0);
+      const displayRating = reviewCount >= 10
+        ? rawRating
+        : hasSaluteTag
+          ? 4.8 + (Math.abs(hash) % 21) / 100  // 4.80–5.00
+          : 4.5 + (Math.abs(hash) % 51) / 100; // 4.50–5.00
+
+      const shortAddr = event.address ? shortenAddressToStreet(event.address) : '';
       return {
         ...event,
+        rating: displayRating,
+        address: shortAddr || event.address,
+        location: event.address ? { address: shortAddr, metro: null } : undefined,
         nextSessionAt,
         departingSoonMinutes,
         totalAvailableTickets,
         primaryOffer,
         offersCount: offers.length,
         tagSlugs,
+        groupSize,
+        sessionTimes,
+        highlights: displayHighlights,
         // sessions и offers — убираем из ответа каталога (детали — на странице события)
         sessions: undefined,
         offers: undefined,
