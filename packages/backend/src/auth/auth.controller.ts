@@ -1,6 +1,7 @@
-import { Controller, Post, Get, Body, UseGuards, Request, Res, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Request, Res, Req, HttpCode } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request as ExpressRequest, Response } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
@@ -14,9 +15,15 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('login')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @HttpCode(200)
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.auth.login(dto.email, dto.password);
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || req.socket?.remoteAddress;
+    const result = await this.auth.login(ip, dto.email, dto.password);
 
     this.setRefreshCookie(res, result.refreshToken);
 

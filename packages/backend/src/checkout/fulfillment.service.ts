@@ -261,7 +261,7 @@ export class FulfillmentService {
       const reserveResult = await provider.reserve({
         fulfillmentItemId: item.id,
         offerId: item.offerId,
-        externalEventId: snapshotItem.source === 'TC' ? undefined : undefined, // TODO: pass externalEventId
+        externalEventId: snapshotItem.externalEventId ?? undefined,
         quantity: snapshotItem.quantity,
         amount: item.amount,
         customerEmail: session?.customerEmail || undefined,

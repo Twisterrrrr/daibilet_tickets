@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server';
 import { api } from '@/lib/api';
-import { toUrlSetXml, SITE_URL } from '@/lib/sitemap-xml';
+import { toUrlSetXml, SITE_URL, type SitemapUrl } from '@/lib/sitemap-xml';
 
 const LASTMOD = new Date().toISOString().slice(0, 10);
 
 export async function GET() {
-  const urls: { loc: string; lastmod: string; changefreq: string; priority: number }[] = [];
+  const urls: SitemapUrl[] = [];
 
   try {
     const { items: venues } = await api.getVenues({ limit: 2000 });
     for (const v of venues ?? []) {
+      const vWithDate = v as { slug: string; updatedAt?: string };
       urls.push({
         loc: `${SITE_URL}/venues/${v.slug}`,
-        lastmod: v.updatedAt ? new Date(v.updatedAt).toISOString().slice(0, 10) : LASTMOD,
+        lastmod: vWithDate.updatedAt ? new Date(vWithDate.updatedAt).toISOString().slice(0, 10) : LASTMOD,
         changefreq: 'weekly',
         priority: 0.7,
       });
@@ -23,7 +24,7 @@ export async function GET() {
       urls.push({
         loc: `${SITE_URL}/events/${e.slug}`,
         lastmod: LASTMOD,
-        changefreq: 'weekly',
+        changefreq: 'weekly' as const,
         priority: 0.6,
       });
     }

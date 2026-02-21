@@ -106,7 +106,7 @@ function MuseumsListByCity({ items }: { items: any[] }) {
     }
   }
 
-  let lastRegion: string | null = undefined;
+  let lastRegion: string | null = null;
   return (
     <div className="space-y-6 sm:space-y-8">
       {blocks.map((block, idx) => {
@@ -219,7 +219,7 @@ export default function EventsPage() {
     setPage(f.page);
     setLimit(f.limit);
     setActiveQuickFilter(f.qf);
-    setMuseumViewMode(f.vm);
+    setMuseumViewMode(f.vm as 'grid' | 'list');
   }, [searchParams]);
 
   /** Обновить URL, сохраняя остальные фильтры */

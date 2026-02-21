@@ -97,8 +97,10 @@ export class TepSyncService {
    *
    * Оптимизация: один запрос к API (teplohod возвращает все события
    * независимо от city_id), город определяется по eventPlaces[0].city_id.
+   *
+   * @param signal — опционально, для отмены при job timeout
    */
-  async syncAll(): Promise<{
+  async syncAll(signal?: AbortSignal): Promise<{
     status: string;
     citiesFetched: number;
     eventsFound: number;
@@ -119,7 +121,7 @@ export class TepSyncService {
     // 1. Получаем города из TEP API и маппим в нашу БД
     let tepCities: TepCity[] = [];
     try {
-      tepCities = await this.tepApi.getCities();
+      tepCities = await this.tepApi.getCities(signal);
       this.logger.log(`TEP: ${tepCities.length} городов`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -142,7 +144,7 @@ export class TepSyncService {
     // 2. Один запрос — все события (teplohod API игнорирует city_id)
     let allEvents: TepEvent[] = [];
     try {
-      allEvents = await this.tepApi.getEvents();
+      allEvents = await this.tepApi.getEvents(undefined, signal);
       this.logger.log(`TEP: ${allEvents.length} событий загружено`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

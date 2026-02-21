@@ -90,6 +90,7 @@
 ## Соглашения
 
 - REST API: `/api/v1`
+- Observability: `docs/Observability.md` — requestId, PII masking, логирование
 - Цены в копейках (целое число)
 - Даты — ISO 8601, UTC в БД, локальные при отображении
 - Slug — транслитерация кириллицы

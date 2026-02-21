@@ -128,6 +128,12 @@ enum ModerationStatus {
   AUTO_APPROVED     // Автоодобрено (trust level 1-2)
 }
 
+enum CreatedByType {
+  ADMIN    // Создано через админку
+  SUPPLIER // Создано через ЛК поставщика
+  IMPORT   // Импорт (TC, Teplohod, скрипты)
+}
+
 enum LocationType {
   PIER          // Причал
   VENUE         // Площадка
@@ -367,6 +373,8 @@ model Event {
   // === Supplier / Moderation ===
   supplierId          String?          @db.Uuid      // Ссылка на оператора-поставщика
   moderationStatus    ModerationStatus @default(APPROVED)
+  createdByType       CreatedByType?   @default(IMPORT) // ADMIN | SUPPLIER | IMPORT
+  createdById         String?          @db.Uuid      // adminUserId | supplierUserId | null при IMPORT
   moderationNote      String?
   moderatedAt         DateTime?
   moderatedBy         String?          @db.Uuid
@@ -1006,6 +1014,8 @@ model Venue {
   commissionRate   Decimal?   @db.Decimal(4, 2)    // индивидуальная комиссия для музея (%)
   metaTitle        String?
   metaDescription  String?    @db.Text
+  createdByType    CreatedByType? @default(ADMIN) // ADMIN | SUPPLIER | IMPORT
+  createdById      String?    @db.Uuid            // adminUserId | supplierUserId
   version          Int        @default(0)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt

@@ -224,6 +224,8 @@ export class AdminEventsController {
           galleryUrls: data.galleryUrls || [],
           priceFrom: data.offer?.priceFrom || null,
           isActive: true,
+          createdByType: 'ADMIN',
+          createdById: req.user.id,
         },
       });
 

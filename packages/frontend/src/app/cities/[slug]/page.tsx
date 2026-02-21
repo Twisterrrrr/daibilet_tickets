@@ -11,6 +11,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { getSeoMeta } from '@/lib/seo/getSeoMeta';
 import { EventCard } from '@/components/ui/EventCard';
 import { VenueCard } from '@/components/ui/VenueCard';
 import { CATEGORY_LABELS, EventCategory, formatPrice } from '@daibilet/shared';
@@ -36,14 +37,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   try {
     const city = await api.getCityBySlug(slug);
+    const seo = await getSeoMeta('CITY', city.id);
+    const title =
+      seo?.title ??
+      city.metaTitle ??
+      `${city.name} — экскурсии, музеи и билеты на мероприятия | Дайбилет`;
+    const description =
+      seo?.description ??
+      city.metaDescription ??
+      city.description ??
+      `Лучшие экскурсии, музеи и мероприятия в ${city.name}. Покупайте билеты онлайн на Дайбилет.`;
+    const robots = seo?.robots ?? 'index,follow';
+    const canonical = seo?.canonicalUrl ?? undefined;
     return {
-      title:
-        city.metaTitle ||
-        `${city.name} — экскурсии, музеи и билеты на мероприятия | Дайбилет`,
-      description:
-        city.metaDescription ||
-        city.description ||
-        `Лучшие экскурсии, музеи и мероприятия в ${city.name}. Покупайте билеты онлайн на Дайбилет.`,
+      title,
+      description,
+      robots,
+      ...(canonical && { alternates: { canonical } }),
+      openGraph: {
+        title: seo?.ogTitle ?? title,
+        description: seo?.ogDescription ?? description,
+        ...(seo?.ogImage && { images: [{ url: seo.ogImage }] }),
+        type: 'website',
+      },
     };
   } catch {
     return { title: 'Город не найден' };

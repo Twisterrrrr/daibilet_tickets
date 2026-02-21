@@ -3,14 +3,17 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
+import { RedisCacheModule } from '../cache/cache.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { LoginBruteForceService } from './login-brute-force.service';
 import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
 
 @Module({
   imports: [
     PrismaModule,
+    RedisCacheModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -21,7 +24,7 @@ import { RolesGuard } from './roles.guard';
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy, RolesGuard],
+  providers: [AuthService, LoginBruteForceService, JwtStrategy, RolesGuard],
   controllers: [AuthController],
   exports: [AuthService, JwtModule, PassportModule, RolesGuard],
 })

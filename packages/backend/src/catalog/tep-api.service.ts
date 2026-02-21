@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
 
 /**
  * Клиент API teplohod.info v1.
@@ -11,9 +12,16 @@ export class TepApiService {
   private readonly logger = new Logger(TepApiService.name);
   private readonly baseUrl = process.env.TEP_API_URL || 'https://api.teplohod.info/v1';
 
-  private async request<T = any>(path: string): Promise<T> {
+  private getTimeoutMs(): number {
+    return getHttpTimeoutMs('TEP_HTTP_TIMEOUT_MS', 30_000);
+  }
+
+  private async request<T = any>(path: string, signal?: AbortSignal): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     this.logger.debug(`TEP API → GET ${url}`);
+
+    const timeoutSignal = AbortSignal.timeout(this.getTimeoutMs());
+    const finalSignal = combineAbortSignals(timeoutSignal, signal);
 
     const res = await fetch(url, {
       method: 'GET',
@@ -21,6 +29,7 @@ export class TepApiService {
         Accept: '*/*',
         'User-Agent': 'Daibilet/1.0',
       },
+      signal: finalSignal,
     });
 
     if (!res.ok) {
@@ -34,22 +43,20 @@ export class TepApiService {
 
   /**
    * Список городов teplohod.info.
-   * [{id: 1, name: "Москва"}, {id: 2, name: "Санкт-Петербург"}, ...]
    */
-  async getCities(): Promise<TepCity[]> {
-    return this.request<TepCity[]>('/cities');
+  async getCities(signal?: AbortSignal): Promise<TepCity[]> {
+    return this.request<TepCity[]>('/cities', signal);
   }
 
   /**
    * События с полными данными (включая расписание eventTimes).
-   * Требует белый IP. Fallback на compact если полные данные недоступны.
    */
-  async getEvents(cityId?: number): Promise<TepEvent[]> {
+  async getEvents(cityId?: number, signal?: AbortSignal): Promise<TepEvent[]> {
     const fullPath = cityId
       ? `/events?city_id=${cityId}`
       : '/events';
     try {
-      const events = await this.request<TepEvent[]>(fullPath);
+      const events = await this.request<TepEvent[]>(fullPath, signal);
       // Проверяем, что получили полные данные (есть eventTimes)
       if (events.length > 0 && events[0].eventTimes !== undefined) {
         this.logger.log(`TEP full API: ${events.length} events with schedules`);
@@ -60,20 +67,18 @@ export class TepApiService {
     } catch (err: unknown) {
       this.logger.warn(`TEP full API failed: ${err instanceof Error ? err.message : String(err)}. Fallback to compact.`);
     }
-    // Fallback: compact
     const compactPath = cityId
       ? `/events?compact&city_id=${cityId}`
       : '/events?compact';
-    return this.request<TepEvent[]>(compactPath);
+    return this.request<TepEvent[]>(compactPath, signal);
   }
 
   /**
    * Полные данные одного события (с расписанием).
-   * Требует белый IP.
    */
-  async getEventFull(eventId: number): Promise<TepEventFull | null> {
+  async getEventFull(eventId: number, signal?: AbortSignal): Promise<TepEventFull | null> {
     try {
-      return await this.request<TepEventFull>(`/events/${eventId}`);
+      return await this.request<TepEventFull>(`/events/${eventId}`, signal);
     } catch (err: unknown) {
       this.logger.warn(`TEP full event ${eventId}: ${err instanceof Error ? err.message : String(err)}`);
       return null;

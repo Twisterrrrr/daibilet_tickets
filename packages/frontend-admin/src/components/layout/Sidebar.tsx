@@ -23,6 +23,7 @@ import {
   HeadphonesIcon,
   Scale,
   LayoutList,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -79,6 +80,7 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/reviews', label: 'Отзывы', icon: MessageSquare },
       { to: '/external-reviews', label: 'Внешние отзывы', icon: ExternalLink },
       { to: '/upsells', label: 'Upsells', icon: DollarSign },
+      { to: '/jobs/failed', label: 'Failed Jobs', icon: AlertCircle },
       { to: '/reconciliation', label: 'Сверка', icon: Scale },
       { to: '/audit', label: 'Аудит', icon: ClipboardList },
       { to: '/settings', label: 'Настройки', icon: Settings },

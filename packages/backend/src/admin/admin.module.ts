@@ -9,7 +9,13 @@ import { EventOverrideService } from './event-override.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
 import { ReviewService } from '../catalog/review.service';
 import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
-import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
+import {
+  QUEUE_EMAILS,
+  QUEUE_SYNC,
+  QUEUE_FULFILLMENT,
+  QUEUE_REVIEW_TASKS,
+  QUEUE_PARTNER_WEBHOOKS,
+} from '../queue/queue.constants';
 
 import { AdminDashboardController } from './admin-dashboard.controller';
 import { AdminCitiesController } from './admin-cities.controller';
@@ -32,6 +38,8 @@ import { AdminCollectionsController } from './admin-collections.controller';
 import { AdminSupportController } from './admin-support.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminReconciliationController } from './admin-reconciliation.controller';
+import { AdminJobsController } from './admin-jobs.controller';
+import { FailedJobsService } from './failed-jobs.service';
 import { SupportModule } from '../support/support.module';
 import { TagAssignmentService } from '../scheduler/tag-assignment.service';
 import { CheckoutModule } from '../checkout/checkout.module';
@@ -48,9 +56,19 @@ import { CatalogModule } from '../catalog/catalog.module';
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_SYNC },
+      { name: QUEUE_FULFILLMENT },
+      { name: QUEUE_REVIEW_TASKS },
+      { name: QUEUE_PARTNER_WEBHOOKS },
     ),
   ],
-  providers: [AuditService, EventOverrideService, ReviewService, PaymentMetricsService, TagAssignmentService],
+  providers: [
+    AuditService,
+    EventOverrideService,
+    ReviewService,
+    PaymentMetricsService,
+    TagAssignmentService,
+    FailedJobsService,
+  ],
   controllers: [
     AdminDashboardController,
     AdminCitiesController,
@@ -73,6 +91,7 @@ import { CatalogModule } from '../catalog/catalog.module';
     AdminSupportController,
     AdminOpsController,
     AdminReconciliationController,
+    AdminJobsController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })

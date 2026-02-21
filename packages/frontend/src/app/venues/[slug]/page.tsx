@@ -7,6 +7,7 @@ import {
   ShieldCheck, Baby, Accessibility, Headphones, Navigation,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { getSeoMeta } from '@/lib/seo/getSeoMeta';
 import { formatPrice, VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
 import { TicketsBlock } from '@/components/venue/TicketsBlock';
 import { MobileStickyBar } from '@/components/venue/MobileStickyBar';
@@ -32,9 +33,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   try {
     const venue = await api.getVenueBySlug(slug);
+    const seo = await getSeoMeta('VENUE', venue.id);
+    const title = seo?.title ?? venue.metaTitle ?? `${venue.title} — билеты, часы работы, адрес | Дайбилет`;
+    const description = seo?.description ?? venue.metaDescription ?? venue.shortDescription ?? stripHtml(venue.description || '').slice(0, 160);
+    const robots = seo?.robots ?? 'index,follow';
+    const canonical = seo?.canonicalUrl ?? undefined;
     return {
-      title: venue.metaTitle || `${venue.title} — билеты, часы работы, адрес | Дайбилет`,
-      description: venue.metaDescription || venue.shortDescription || stripHtml(venue.description || '').slice(0, 160),
+      title,
+      description,
+      robots,
+      ...(canonical && { alternates: { canonical } }),
+      openGraph: {
+        title: seo?.ogTitle ?? title,
+        description: seo?.ogDescription ?? description,
+        ...(seo?.ogImage && { images: [{ url: seo.ogImage }] }),
+        type: 'website',
+      },
     };
   } catch {
     return { title: 'Место не найдено' };

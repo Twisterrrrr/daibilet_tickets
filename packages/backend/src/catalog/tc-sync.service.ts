@@ -73,8 +73,9 @@ export class TcSyncService {
 
   /**
    * Полная синхронизация — диспатчер по режиму.
+   * @param signal — опционально, для отмены при job timeout
    */
-  async syncAll(): Promise<{
+  async syncAll(signal?: AbortSignal): Promise<{
     status: string;
     mode: string;
     tcEventsFound: number;
@@ -93,7 +94,7 @@ export class TcSyncService {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(`gRPC sync failed, fallback на REST: ${msg}`);
-        return await this.syncAllRest();
+        return await this.syncAllRest(signal);
       }
     }
 
@@ -101,7 +102,7 @@ export class TcSyncService {
       this.logger.warn('gRPC-клиент не готов, fallback на REST v1');
     }
 
-    return await this.syncAllRest();
+    return await this.syncAllRest(signal);
   }
 
   // ============================================================
@@ -714,7 +715,7 @@ export class TcSyncService {
   // REST v1 Sync (legacy fallback)
   // ============================================================
 
-  private async syncAllRest(): Promise<{
+  private async syncAllRest(signal?: AbortSignal): Promise<{
     status: string;
     mode: string;
     tcEventsFound: number;
@@ -731,7 +732,7 @@ export class TcSyncService {
 
     let allTcEvents: any[] = [];
     try {
-      allTcEvents = await this.tcApi.getEvents();
+      allTcEvents = await this.tcApi.getEvents({ signal });
       this.logger.log(`Получено ${allTcEvents.length} TC-записей`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

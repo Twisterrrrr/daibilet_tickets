@@ -11,6 +11,7 @@ import {
   Star,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { getSeoMeta } from '@/lib/seo/getSeoMeta';
 import { formatPrice } from '@daibilet/shared';
 import { FaqSection } from '@/components/landing/FaqSection';
 
@@ -33,9 +34,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   try {
     const data = await api.getComboBySlug(slug);
+    const seo = await getSeoMeta('COMBO', data.id);
+    const title = seo?.title ?? data.metaTitle ?? `${data.title} | Дайбилет`;
+    const description = seo?.description ?? data.metaDescription ?? data.subtitle ?? data.description;
+    const robots = seo?.robots ?? 'index,follow';
+    const canonical = seo?.canonicalUrl ?? undefined;
     return {
-      title: data.metaTitle || `${data.title} | Дайбилет`,
-      description: data.metaDescription || data.subtitle || data.description,
+      title,
+      description,
+      robots,
+      ...(canonical && { alternates: { canonical } }),
+      openGraph: {
+        title: seo?.ogTitle ?? title,
+        description: seo?.ogDescription ?? description,
+        ...(seo?.ogImage && { images: [{ url: seo.ogImage }] }),
+        type: 'website',
+      },
     };
   } catch {
     return { title: 'Программа не найдена | Дайбилет' };

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { api } from '@/lib/api';
-import { toUrlSetXml, SITE_URL } from '@/lib/sitemap-xml';
+import { toUrlSetXml, SITE_URL, type SitemapUrl } from '@/lib/sitemap-xml';
 
 const LASTMOD = new Date().toISOString().slice(0, 10);
 
 export async function GET() {
-  const urls: { loc: string; lastmod: string; changefreq: string; priority: number }[] = [
+  const urls: SitemapUrl[] = [
     { loc: `${SITE_URL}/blog`, lastmod: LASTMOD, changefreq: 'weekly', priority: 0.6 },
   ];
 

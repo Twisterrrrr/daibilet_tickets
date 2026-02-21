@@ -41,6 +41,7 @@ export interface SnapshotLineItem {
   lineItemIndex: number;
   offerId: string;
   eventId: string;
+  externalEventId?: string; // tcEventId (TC: "6980...", TEPLOHOD: "tep-282") для reserve
   source: string;
   purchaseType: string;
   purchaseFlow: PaymentFlowType;

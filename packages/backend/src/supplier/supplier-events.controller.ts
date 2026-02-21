@@ -120,6 +120,8 @@ export class SupplierEventsController {
         operatorId: req.user.operatorId,
         supplierId: req.user.operatorId,
         moderationStatus: moderationStatus as any,
+        createdByType: 'SUPPLIER',
+        createdById: req.user.id,
       },
     });
 

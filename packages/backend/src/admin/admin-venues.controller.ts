@@ -156,6 +156,7 @@ export class AdminVenuesController {
         isFeatured: body.isFeatured ?? false,
         metaTitle: body.metaTitle || null,
         metaDescription: body.metaDescription || null,
+        createdByType: 'ADMIN',
         externalRating: body.externalRating ? Number(body.externalRating) : null,
         externalSource: body.externalSource || null,
         highlights: (body.highlights ?? undefined) as any,

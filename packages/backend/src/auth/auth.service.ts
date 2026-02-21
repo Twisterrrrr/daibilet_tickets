@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { LoginBruteForceService } from './login-brute-force.service';
 import { JwtPayload } from './jwt.strategy';
 
 @Injectable()
@@ -10,23 +11,51 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly bruteForce: LoginBruteForceService,
   ) {}
 
-  async login(email: string, password: string) {
+  async login(ip: string | undefined, email: string, password: string) {
+    const clientIp = ip || 'unknown';
+
+    const blocked = await this.bruteForce.checkBlocked(clientIp, email);
+    if (blocked.blocked) {
+      const msg = blocked.retryAfterSec
+        ? `Слишком много попыток входа. Повторите через ${Math.ceil(blocked.retryAfterSec / 60)} мин.`
+        : 'Слишком много попыток входа.';
+      throw new UnauthorizedException(msg);
+    }
+
     const user = await this.prisma.adminUser.findUnique({ where: { email } });
 
     if (!user) {
+      const { blocked: nowBlocked, retryAfterSec } = await this.bruteForce.recordFailedAttempt(clientIp, email);
+      if (nowBlocked) {
+        const msg = retryAfterSec
+          ? `Слишком много попыток входа. Повторите через ${Math.ceil(retryAfterSec / 60)} мин.`
+          : 'Слишком много попыток входа.';
+        throw new UnauthorizedException(msg);
+      }
       throw new UnauthorizedException('Неверный email или пароль');
     }
 
     if (!user.isActive) {
+      await this.bruteForce.recordFailedAttempt(clientIp, email);
       throw new UnauthorizedException('Аккаунт деактивирован');
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
+      const { blocked: nowBlocked, retryAfterSec } = await this.bruteForce.recordFailedAttempt(clientIp, email);
+      if (nowBlocked) {
+        const msg = retryAfterSec
+          ? `Слишком много попыток входа. Повторите через ${Math.ceil(retryAfterSec / 60)} мин.`
+          : 'Слишком много попыток входа.';
+        throw new UnauthorizedException(msg);
+      }
       throw new UnauthorizedException('Неверный email или пароль');
     }
+
+    await this.bruteForce.recordSuccess(clientIp, email);
 
     const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role };
 

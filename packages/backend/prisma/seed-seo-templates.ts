@@ -1,7 +1,13 @@
 /**
  * Seed: SeoTemplate — production-шаблоны L0/L1/L2 для excursions, museums, events.
  * Запуск: npx tsx prisma/seed-seo-templates.ts
+ * .env загружается из корня монорепо.
  */
+import { config } from 'dotenv';
+import path from 'path';
+
+config({ path: path.resolve(process.cwd(), '../../.env') });
+
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();

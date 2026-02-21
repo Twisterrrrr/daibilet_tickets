@@ -1,6 +1,6 @@
 'use client';
 
-import type { CatalogItem, EventCategory } from '@daibilet/shared';
+import { EventCategory, type CatalogItem } from '@daibilet/shared';
 import { EventCard } from './EventCard';
 import { EventCardHorizontal } from './EventCardHorizontal';
 import { VenueCard } from './VenueCard';
@@ -39,18 +39,19 @@ export function CatalogCard({ item, variant = 'vertical' }: CatalogCardProps) {
   };
 
   if (variant === 'horizontal') {
+    const evItem = item as typeof item & { description?: string; shortDescription?: string };
     return (
       <EventCardHorizontal
         slug={item.slug}
         title={item.title}
-        category={(item.category || 'EVENT') as EventCategory}
+        category={(item.category ?? EventCategory.EVENT) as EventCategory}
         imageUrl={item.imageUrl}
         priceFrom={item.priceFrom}
         rating={item.rating}
         reviewCount={item.reviewCount ?? 0}
         durationMinutes={item.durationMinutes ?? null}
         city={city}
-        totalAvailableTickets={item.totalAvailableTickets}
+        totalAvailableTickets={item.totalAvailableTickets ?? undefined}
         departingSoonMinutes={item.departingSoonMinutes ?? undefined}
         nextSessionAt={item.nextSessionAt ?? undefined}
         isOptimalChoice={item.isOptimalChoice}
@@ -59,7 +60,7 @@ export function CatalogCard({ item, variant = 'vertical' }: CatalogCardProps) {
         groupSize={ev.groupSize ?? ev.templateData?.groupSize}
         sessionTimes={ev.sessionTimes ?? []}
         highlights={ev.highlights ?? []}
-        description={item.description ?? (item as { shortDescription?: string }).shortDescription}
+        description={evItem.description ?? evItem.shortDescription}
       />
     );
   }
@@ -68,7 +69,7 @@ export function CatalogCard({ item, variant = 'vertical' }: CatalogCardProps) {
     <EventCard
       slug={item.slug}
       title={item.title}
-      category={item.category || 'EVENT'}
+      category={(item.category ?? EventCategory.EVENT) as EventCategory}
       subcategories={item.subcategories}
       audience={item.audience}
       tagSlugs={item.tagSlugs}
@@ -80,8 +81,8 @@ export function CatalogCard({ item, variant = 'vertical' }: CatalogCardProps) {
       durationMinutes={item.durationMinutes ?? null}
       city={city}
       address={item.location?.address}
-      totalAvailableTickets={item.totalAvailableTickets}
-      departingSoonMinutes={item.departingSoonMinutes}
+      totalAvailableTickets={item.totalAvailableTickets ?? undefined}
+      departingSoonMinutes={item.departingSoonMinutes ?? undefined}
       nextSessionAt={item.nextSessionAt ?? undefined}
       isOptimalChoice={item.isOptimalChoice}
       dateMode={item.dateMode}

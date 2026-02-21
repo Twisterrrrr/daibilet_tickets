@@ -91,9 +91,12 @@
 
 ## Технические долги
 
-- [ ] **Средний**: sitemap-cities-filters — проверка count ≥ 6 перед добавлением URL
+- [x] **Средний** (высокий ROI): sitemap-cities-filters — проверка count ≥ 6 перед добавлением URL (21.02)
+- [x] **Средний** (высокий ROI): SeoMeta на venues, cities, blog, combo (21.02)
+- [x] **Средний** (частично): createdByType + createdById в Event/Venue (миграция 20260221110000), admin/supplier create. RBAC guards — [ ] в плане
+- [x] **Низкий**: Frontend typecheck — ошибки TS исправлены (21.02): VenueCard, CheckoutClient, sitemaps, CatalogCard, page.tsx, events, cities/museums
 - [ ] **Низкий**: Типизация `any` (backend ~31, frontend 100+)
-- Полный список — `docs/TechnicalDebt.md`
+- Полный список и обоснование — `docs/TechnicalDebt.md`
 
 ---
 
@@ -143,6 +146,9 @@
 - [x] **Высокий**: CSV cursor-based streaming (csv-stream.util.ts) — 3 экспорта переведены
 - [x] **Высокий**: Единый pagination contract (pagination.ts) — 15 контроллеров
 - [x] **Средний**: ESLint `no-console: error` + исключения для тестов/seed
+
+### Выполнено (21.02.2026)
+- [x] **A1 — requestId + PII masking**: RequestIdMiddleware (лог входа), LoggingInterceptor (лог завершения), AllExceptionsFilter (requestId, maskPiiInString), pii-mask.util + unit test, docs/Observability.md
 
 ### Выполнено (16.02.2026)
 - [x] **Высокий**: Prisma migrate deploy — идемпотентные миграции (20260215_pre_yookassa_gates, 20260215_review_venue_id, 20260215_soft_delete_and_cascade_safety) для совместимости с базами после db push / migrate dev

@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Param, Query, Body, Req, Res,
   UploadedFiles, UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiQuery, ApiConsumes } from '@nestjs/swagger';
@@ -158,6 +159,7 @@ export class CatalogController {
   // --- Поиск ---
 
   @Get('search')
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
   @ApiOperation({ summary: 'Полнотекстовый поиск' })
   @ApiQuery({ name: 'q', required: true })
   search(@Query('q') q: string, @Query('city') city?: string) {
@@ -167,6 +169,7 @@ export class CatalogController {
   // --- Отзывы ---
 
   @Post('reviews')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @ApiOperation({ summary: 'Оставить отзыв на событие или место' })
   createReview(
     @Body() body: CreateReviewDto,
@@ -196,6 +199,7 @@ export class CatalogController {
   }
 
   @Post('reviews/:id/photos')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @ApiOperation({ summary: 'Добавить фото к отзыву' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FilesInterceptor('photos', 5, {
@@ -210,6 +214,7 @@ export class CatalogController {
   }
 
   @Post('reviews/:id/vote')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @ApiOperation({ summary: 'Голосовать за полезность отзыва' })
   voteReview(
     @Param('id') id: string,

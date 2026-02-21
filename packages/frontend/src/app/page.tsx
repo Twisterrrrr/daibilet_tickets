@@ -45,8 +45,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     const res = await api.getEvents({
       sort: 'popular',
       limit: 8,
-      hasPhoto: true,
-      ...(citySlug && { city: citySlug }),
+      hasPhoto: 1,
+      ...(citySlug ? { city: citySlug } : {}),
     });
     popularEvents = res.items || [];
   } catch (e) {
@@ -60,8 +60,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       const res = await api.getEvents({
         sort: 'rating',
         limit: 8,
-        hasPhoto: true,
-        ...(citySlug && { city: citySlug }),
+        hasPhoto: 1,
+        ...(citySlug ? { city: citySlug } : {}),
       });
       popularEvents = res.items || [];
     } catch {
@@ -75,7 +75,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       const res = await api.getEvents({
         sort: 'popular',
         limit: 8 - popularEvents.length,
-        hasPhoto: true,
+        hasPhoto: 1,
       });
       const ids = new Set(popularEvents.map((e: any) => e.id));
       const extra = (res.items || []).filter((e: any) => !ids.has(e.id));
@@ -91,8 +91,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     const nearestRes = await api.getEvents({
       sort: 'departing_soon',
       limit: 8,
-      hasPhoto: true,
-      ...(citySlug && { city: citySlug }),
+      hasPhoto: 1,
+      ...(citySlug ? { city: citySlug } : {}),
     });
     nearestEvents = nearestRes.items || [];
   } catch (e) {

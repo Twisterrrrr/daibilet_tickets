@@ -56,14 +56,14 @@ export class SyncProcessor extends WorkerHost {
       switch (job.name) {
         case 'sync-full':
           return await this.withTimeout(
-            () => this.handleFullSync(),
+            (signal) => this.handleFullSync(signal),
             FULL_SYNC_TIMEOUT_MS,
             job,
           );
 
         case 'sync-incremental':
           return await this.withTimeout(
-            () => this.handleIncrementalSync(),
+            (signal) => this.handleIncrementalSync(signal),
             INCREMENTAL_TIMEOUT_MS,
             job,
           );
@@ -81,38 +81,36 @@ export class SyncProcessor extends WorkerHost {
   // ─── Hard timeout ──────────────────────────────────────────────────
 
   /**
-   * Обёртка с hard timeout.
+   * Обёртка с hard timeout + AbortController.
    *
    * При превышении лимита:
-   * 1. Логируем ERROR (виден в мониторинге)
-   * 2. Кидаем Error → BullMQ переводит job в failed
-   * 3. Если остались attempts — BullMQ retry с exponential backoff
-   * 4. Если attempts исчерпаны — job в failed, следующий cron-тик создаст новый
-   *
-   * Примечание: реальная async-работа (HTTP к TC/TEP) продолжится в фоне
-   * до естественного завершения/таймаута HTTP-клиента. Это приемлемо —
-   * concurrency: 1 гарантирует, что новый job не начнётся, пока worker занят.
-   * Для полной отмены нужен AbortController в sync-сервисах (future work).
+   * 1. Вызываем ctrl.abort() → HTTP-запросы TC/TEP отменяются
+   * 2. Логируем ERROR (виден в мониторинге)
+   * 3. Кидаем Error → BullMQ переводит job в failed
+   * 4. Если остались attempts — BullMQ retry с exponential backoff
+   * 5. Если attempts исчерпаны — job в failed, следующий cron-тик создаст новый
    */
   private withTimeout<T>(
-    fn: () => Promise<T>,
+    fn: (signal: AbortSignal) => Promise<T>,
     timeoutMs: number,
     job: Job,
   ): Promise<T> {
     const limitMin = Math.round(timeoutMs / 60_000);
+    const ctrl = new AbortController();
 
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.logger.error(
           `[sync] TIMEOUT: job ${job.name} (id=${job.id}) превысил лимит ${limitMin} мин ` +
-          `(attempt ${job.attemptsMade + 1}/${job.opts.attempts ?? '?'}) — переводим в failed`,
+          `(attempt ${job.attemptsMade + 1}/${job.opts.attempts ?? '?'}) — abort + failed`,
         );
+        ctrl.abort();
         reject(
           new Error(`Sync job "${job.name}" timed out after ${limitMin} minutes`),
         );
       }, timeoutMs);
 
-      fn()
+      fn(ctrl.signal)
         .then((result) => {
           clearTimeout(timer);
           resolve(result);
@@ -127,15 +125,15 @@ export class SyncProcessor extends WorkerHost {
   /**
    * Полная синхронизация: TC + TEP + retag + combo populate + cache invalidation.
    */
-  private async handleFullSync() {
+  private async handleFullSync(signal?: AbortSignal) {
     // 1. TC sync (retag встроен в конце syncAll)
-    const tcResult = await this.tcSync.syncAll();
+    const tcResult = await this.tcSync.syncAll(signal);
     this.logger.log(
       `TC sync: ${tcResult.uniqueEvents} событий, ${tcResult.sessionsSynced} сессий, статус: ${tcResult.status}`,
     );
 
     // 2. Teplohod sync
-    const tepResult = await this.tepSync.syncAll();
+    const tepResult = await this.tepSync.syncAll(signal);
     this.logger.log(
       `TEP sync: ${tepResult.eventsSynced} событий, статус: ${tepResult.status}`,
     );
@@ -171,8 +169,8 @@ export class SyncProcessor extends WorkerHost {
   /**
    * Инкрементальная синхронизация: только TC + cache invalidation.
    */
-  private async handleIncrementalSync() {
-    const tcResult = await this.tcSync.syncAll();
+  private async handleIncrementalSync(signal?: AbortSignal) {
+    const tcResult = await this.tcSync.syncAll(signal);
     this.logger.log(
       `TC incremental: ${tcResult.uniqueEvents} событий, статус: ${tcResult.status}`,
     );

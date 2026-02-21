@@ -12,7 +12,7 @@
  *   GET  /admin/ops/health                    — Operational health dashboard
  */
 
-import { Controller, Get, Post, Param, Query, UseGuards, Body, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards, Body, Logger, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { PrismaService } from '../prisma/prisma.service';
@@ -274,11 +274,12 @@ export class AdminReconciliationController {
   async resolveItem(
     @Param('itemId') itemId: string,
     @Body() body: ReconciliationResolveDto,
+    @Req() req: { user: { id: string } },
   ) {
     await this.prisma.fulfillmentItem.update({
       where: { id: itemId },
       data: {
-        resolvedBy: 'admin', // TODO: use actual admin ID from JWT
+        resolvedBy: req.user.id,
         lastError: body.note ? `[RESOLVED] ${body.note}` : '[RESOLVED by admin]',
       },
     });

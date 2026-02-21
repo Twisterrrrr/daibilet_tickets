@@ -1,9 +1,12 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { getThrottlerOptions } from './common/throttle.util';
 import { join } from 'path';
 import { RequestIdMiddleware } from './common/request-id.middleware';
+import { SentryContextMiddleware } from './common/sentry-context.middleware';
+import { LoggingInterceptor } from './common/logging.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { PlannerModule } from './planner/planner.module';
@@ -39,10 +42,7 @@ import { SeoModule } from './seo/seo.module';
         '.env',                                         // cwd
       ],
     }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,  // 60 секунд
-      limit: 30,   // 30 запросов в минуту (глобальный лимит)
-    }]),
+    ThrottlerModule.forRoot(getThrottlerOptions()),
     PrismaModule,
     RedisCacheModule,
     MailModule,
@@ -71,10 +71,13 @@ import { SeoModule } from './seo/seo.module';
   providers: [
     // Глобальный rate limiter (30 req/min по умолчанию, per-route через @Throttle)
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Логирование запросов с requestId
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestIdMiddleware).forRoutes('*');
+    consumer.apply(SentryContextMiddleware).forRoutes('*');
   }
 }

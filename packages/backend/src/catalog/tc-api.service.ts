@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
 
 /**
  * Сервис для работы с Ticketscloud API.
@@ -26,11 +27,19 @@ export class TcApiService {
     }
   }
 
+  private getTimeoutMs(): number {
+    return getHttpTimeoutMs('TC_HTTP_TIMEOUT_MS', 60_000);
+  }
+
   /**
    * Базовый GET-запрос к TC API.
+   * @param signal — опционально, для отмены при job timeout
    */
-  private async request<T = any>(path: string, params?: Record<string, string>): Promise<T> {
-    // path начинается с /v1 или /v2 — это абсолютный путь
+  private async request<T = any>(
+    path: string,
+    params?: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<T> {
     const url = new URL(path, this.baseUrl);
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
@@ -40,13 +49,16 @@ export class TcApiService {
 
     this.logger.debug(`TC API → GET ${url.toString()}`);
 
+    const timeoutSignal = AbortSignal.timeout(this.getTimeoutMs());
+    const finalSignal = combineAbortSignals(timeoutSignal, signal);
+
     const res = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        // TC использует формат: key {token}
         Authorization: `key ${this.apiToken}`,
         Accept: 'application/json',
       },
+      signal: finalSignal,
     });
 
     if (!res.ok) {
@@ -75,6 +87,7 @@ export class TcApiService {
     pageSize?: number;
     city?: number;
     status?: string;
+    signal?: AbortSignal;
   }): Promise<any[]> {
     const params: Record<string, string> = {};
 
@@ -83,7 +96,7 @@ export class TcApiService {
     if (opts?.city) params.city = String(opts.city);
     if (opts?.status) params.status = opts.status;
 
-    const result = await this.request<any[]>('/v1/services/simple/events', params);
+    const result = await this.request<any[]>('/v1/services/simple/events', params, opts?.signal);
 
     // Ответ — массив событий
     if (Array.isArray(result)) {
@@ -105,8 +118,8 @@ export class TcApiService {
    * Получить билеты с местами для конкретного события.
    * GET /v1/resources/events/:id/tickets
    */
-  async getEventTickets(eventId: string, status = 'vacant'): Promise<any[]> {
-    return this.request(`/v1/resources/events/${eventId}/tickets`, { status });
+  async getEventTickets(eventId: string, status = 'vacant', signal?: AbortSignal): Promise<any[]> {
+    return this.request(`/v1/resources/events/${eventId}/tickets`, { status }, signal);
   }
 
   /**
@@ -128,6 +141,7 @@ export class TcApiService {
         Accept: 'application/json',
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(this.getTimeoutMs()),
     });
 
     if (!res.ok) {
@@ -153,6 +167,7 @@ export class TcApiService {
         Accept: 'application/json',
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(this.getTimeoutMs()),
     });
 
     if (!res.ok) {
@@ -194,6 +209,7 @@ export class TcApiService {
         Authorization: `key ${this.apiToken}`,
         Accept: 'application/json',
       },
+      signal: AbortSignal.timeout(this.getTimeoutMs()),
     });
     if (!res.ok) {
       const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });

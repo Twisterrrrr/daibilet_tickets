@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { api } from '@/lib/api';
-import { toUrlSetXml, SITE_URL } from '@/lib/sitemap-xml';
+import { toUrlSetXml, SITE_URL, type SitemapUrl } from '@/lib/sitemap-xml';
 
 const FEATURED_CITY_SLUGS = [
   'saint-petersburg', 'moscow', 'kazan', 'nizhny-novgorod', 'kaliningrad',
@@ -10,7 +10,7 @@ const FEATURED_CITY_SLUGS = [
 const LASTMOD = new Date().toISOString().slice(0, 10);
 
 export async function GET() {
-  const urls: { loc: string; lastmod: string; changefreq: string; priority: number }[] = [];
+  const urls: SitemapUrl[] = [];
 
   try {
     const cities = await api.getCities(true);

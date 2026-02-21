@@ -6,7 +6,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { cityToPrepositional } from '@daibilet/shared';
 import { applyQFToEventParams, applyQFToVenueParams, CatalogType } from '../catalog/query-filter-map';
-import { Prisma, DateMode, EventCategory, EventSubcategory } from '@prisma/client';
+import { Prisma, DateMode, EventAudience, EventCategory, EventSubcategory } from '@prisma/client';
 
 export type SeoCatalogType = 'excursion' | 'venue' | 'event';
 
@@ -250,7 +250,9 @@ export class SeoGeneratorService {
         conditions.push({ tags: { some: { tag: { slug: p.tag } } } });
       }
       if (p.audience) {
-        conditions.push({ audience: p.audience === 'KIDS' ? { in: ['KIDS', 'FAMILY'] } : p.audience });
+        const audienceFilter: EventAudience | { in: EventAudience[] } =
+          p.audience === 'KIDS' ? { in: ['KIDS', 'FAMILY'] } : (p.audience as EventAudience);
+        conditions.push({ audience: audienceFilter });
       }
       if (p.maxDuration != null) conditions.push({ durationMinutes: { lte: p.maxDuration } });
       if (p.minDuration != null) conditions.push({ durationMinutes: { gte: p.minDuration } });
@@ -354,6 +356,7 @@ export class SeoGeneratorService {
     if (!city) throw new Error(`City not found: ${citySlug}`);
 
     const filtersKey = filterSlugs.length ? filterSlugs.join('-') : BASE_FILTERS_KEY;
+    const uniqueKey = filtersKey === BASE_FILTERS_KEY ? '' : filtersKey;
 
     return this.prisma.seoContent.upsert({
       where: {

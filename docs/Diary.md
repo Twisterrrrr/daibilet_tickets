@@ -4,6 +4,126 @@
 
 ---
 
+## 21.02.2026 — Production Hardening Plan (батчи A1–F2)
+
+### Наблюдения
+
+- План масштабирования и стабилизации production ранее обсуждался, но не был зафиксирован.
+
+### Решения
+
+**Документы:**
+- `docs/ProductionHardeningPlan.md` — полная спецификация 17 батчей (цель, scope, DoD, tests, smoke).
+- `docs/CursorAutoPipeline.md` — pipeline для Cursor Auto: правила (один PR = одна тема, DoD, smoke), шаблон задачи, порядок батчей A–F, стандартный чеклист DoD, универсальный smoke-check 10 мин, разделы про БД/кэш/observability/безопасность.
+- A1–A3: requestId, PII masking, Sentry, ops endpoints
+- B1–B4: Helmet, CORS, rate limiting, brute-force защита admin
+- C1–C3: failed jobs UI, HTTP timeouts, rate limit для TC/TEP
+- D1–D3: CacheService контракт, инвалидация, TTL policy
+- E1–E3: retention jobs, индексы, PgBouncer
+- F1–F2: план партиционирования, партиции EventSession по startsAt
+
+Формат каждого батча: цель, scope, non-goals, DoD, tests, smoke.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 21.02.2026 — C2: HTTP timeouts + AbortController для TC/TEP
+
+### Наблюдения
+
+- Синхронные job (full/incremental sync) при timeout переводились в failed, но HTTP-запросы к TC/TEP продолжали висеть до естественного TCP timeout. Future work из Diary: AbortController для полной отмены — реализован.
+
+### Решения
+
+**http-signal.util** — combineAbortSignals, getHttpTimeoutMs (env: TC_HTTP_TIMEOUT_MS, TEP_HTTP_TIMEOUT_MS; значение &lt; 1000 = секунды).
+
+**TC/TEP API** — все fetch с timeout из env и опциональным signal; combineAbortSignals(timeoutSignal, jobSignal).
+
+**TcSyncService** — syncAll(signal), syncAllRest(signal); signal прокидывается в tcApi.getEvents({ signal }).
+
+**TepSyncService** — syncAll(signal); signal в tepApi.getCities(signal), getEvents(undefined, signal).
+
+**SyncProcessor** — withTimeout создаёт AbortController; при срабатывании таймера вызывает ctrl.abort() и reject; handleFullSync/handleIncrementalSync получают signal и передают в syncAll. При job timeout HTTP-запросы TC/TEP прерываются.
+
+**Документация** — ProductionHardeningPlan C2 отмечен ✅; SecurityHeaders дополнен разделом HTTP timeouts (C2).
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 21.02.2026 — Frontend typecheck: исправление ошибок TypeScript
+
+### Наблюдения
+
+- После серии техдолгов (resolvedBy, externalEventId, Voucher, SeoMeta и др.) frontend typecheck падал с 20+ ошибками TS.
+
+### Решения
+
+**blog VenueCard** — вместо `venue={venue}` передаём отдельные props (slug, title, venueType, imageUrl, address, metro, priceFrom, rating, reviewCount, city).
+
+**CheckoutClient** — тип result расширен полями redirectItems и requestItems; для requestItems учтён undefined через `?? 0`.
+
+**cities/museums** — getCatalog: только заданные параметры `...(q ? { q } : {})`, `...(sp.qf ? { qf: sp.qf } : {})` вместо `q: q || undefined`.
+
+**events/page** — lastRegion инициализируется null; setMuseumViewMode(f.vm as 'grid' | 'list').
+
+**page.tsx** — hasPhoto: 1 вместо true (Record<string, string | number>); citySlug через условный spread.
+
+**sitemaps** — массивы типизированы как SitemapUrl[]; changefreq через Changefreq; VenueListItem.updatedAt — приведение типа (API может возвращать updatedAt).
+
+**CatalogCard** — EventCategory, description через evItem, totalAvailableTickets/departingSoonMinutes ?? undefined.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 21.02.2026 — Технические долги: resolvedBy, externalEventId, Voucher QR+PDF
+
+### Наблюдения
+
+- Остаточные TODO: admin-reconciliation resolvedBy, fulfillment externalEventId, voucher QR/PDF.
+
+### Решения
+
+**resolvedBy** — AdminReconciliationController.resolveItem теперь передаёт req.user.id (admin UUID из JWT).
+
+**externalEventId** — SnapshotLineItem дополнен полем externalEventId (tcEventId события). При создании offersSnapshot в checkout.service добавляется o.event.tcEventId. FulfillmentService передаёт snapshotItem.externalEventId в provider.reserve().
+
+**Voucher QR + PDF** — Добавлены qrcode и pdf-lib. VoucherService.generatePdf() генерирует PDF с QR-кодом (ссылка на publicUrl), кодом ваучера, городом, количеством позиций. GET /vouchers/:shortCode/pdf отдаёт PDF с заголовками.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 21.02.2026 — Технические долги: sitemap count, SeoMeta, createdByType
+
+### Наблюдения
+
+- Задачи из TechnicalDebt приоритетной очереди: sitemap count ≥ 6, SeoMeta на всех страницах, createdByType.
+
+### Решения
+
+**1. Sitemap count ≥ 6** — sitemap-cities-filters вызывает api.getCatalog для каждого city×category×qf, добавляет URL только если total ≥ 6. Batch 25 для лимита нагрузки.
+
+**2. SeoMeta** — generateMetadata + getSeoMeta для venues, cities, blog, combo. Добавлены title, description, robots, canonical, openGraph. JSON-LD из SeoMeta — только на /events (как и было).
+
+**3. createdByType** — enum CreatedByType (ADMIN, SUPPLIER, IMPORT), поля createdByType, createdById в Event и Venue. Миграция 20260221110000_add_created_by_type. Admin create Event/Venue → ADMIN, Supplier create Event → SUPPLIER + createdById. Sync (TC, TEP) — default IMPORT.
+
+### Проблемы
+
+- RBAC guards для Supplier (where operatorId) — остаётся в плане.
+
+---
+
 ## 21.02.2026 — Аудит, технические долги, коммит
 
 ### Наблюдения
@@ -656,14 +776,14 @@ npx prisma migrate deploy
 3. Если остались `attempts` — retry с exponential backoff (1 мин, 2 мин, 4 мин)
 4. Если attempts исчерпаны — job в `failed`, `removeOnFail: 20` чистит, следующий cron-тик создаст новый
 
-**Ограничение**: настоящая async-работа (HTTP к TC/TEP API) продолжится в фоне до естественного HTTP timeout. Полная отмена требует `AbortController` в sync-сервисах (backlog). Это приемлемо: `concurrency: 1` не даст начать новый job, пока текущий worker-тред занят.
+**Ограничение (закрыто 21.02)**: ранее async-работа продолжалась в фоне до HTTP timeout. C2 реализован: AbortController в sync-сервисах — при job timeout вызывается abort, HTTP-запросы TC/TEP прерываются.
 
 **Добавлен вывод attempt/maxAttempts в логи** — видно, на какой попытке job и сколько осталось.
 
 ### Проблемы
 
 - Нет. Чистое дополнение, обратно совместимое.
-- Future work: `AbortController` для полной отмены HTTP-запросов при timeout.
+- ~~Future work: AbortController~~ Реализовано в C2 (21.02).
 
 ---
 

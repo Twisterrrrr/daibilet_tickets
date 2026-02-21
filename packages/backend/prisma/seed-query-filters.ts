@@ -1,7 +1,13 @@
 /**
  * Seed: Query Filters (QF) — справочник быстрых фильтров для каталога.
- * Запуск: DATABASE_URL=... npx tsx prisma/seed-query-filters.ts
+ * Запуск: npx tsx prisma/seed-query-filters.ts
+ * .env загружается из корня монорепо.
  */
+import { config } from 'dotenv';
+import path from 'path';
+
+config({ path: path.resolve(process.cwd(), '../../.env') });
+
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();

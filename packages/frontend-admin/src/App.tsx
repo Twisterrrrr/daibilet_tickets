@@ -35,6 +35,7 @@ import { CollectionEditPage } from './pages/collections/CollectionEdit';
 import { SupportListPage } from './pages/support/SupportList';
 import { SupportDetailPage } from './pages/support/SupportDetail';
 import ReconciliationPage from './pages/reconciliation/ReconciliationPage';
+import { FailedJobsPage } from './pages/jobs/FailedJobsPage';
 import { isAuthenticated } from './lib/auth';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -95,6 +96,7 @@ export default function App() {
           <Route path="moderation" element={<ModerationQueuePage />} />
           <Route path="support" element={<SupportListPage />} />
           <Route path="support/:id" element={<SupportDetailPage />} />
+          <Route path="jobs/failed" element={<FailedJobsPage />} />
           <Route path="reconciliation" element={<ReconciliationPage />} />
           <Route path="audit" element={<AuditLogPage />} />
           <Route path="settings" element={<SettingsPage />} />

@@ -1,17 +1,34 @@
 import * as Sentry from '@sentry/nestjs';
+import { HttpException } from '@nestjs/common';
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
-if (SENTRY_DSN) {
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+if (SENTRY_DSN && IS_PRODUCTION) {
   Sentry.init({
     dsn: SENTRY_DSN,
     tracesSampleRate: 0.1,
-    environment: process.env.NODE_ENV || 'development',
+    environment: process.env.NODE_ENV || 'production',
+    initialScope: {
+      tags: {
+        service: 'daibilet-backend',
+      },
+    },
+    beforeSend(event, hint) {
+      const ex = hint?.originalException;
+      if (ex && typeof (ex as HttpException).getStatus === 'function') {
+        const status = (ex as HttpException).getStatus();
+        if (status >= 400 && status < 500) return null;
+      }
+      return event;
+    },
   });
 }
 
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { setCompatDisabled, setCompatLogger } from '@daibilet/shared';
@@ -29,16 +46,15 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  if (process.env.SENTRY_DSN) {
+  if (SENTRY_DSN && IS_PRODUCTION) {
     try {
       const sentryNestjs = await import('@sentry/nestjs');
-      // SentryGlobalFilter may not exist in all @sentry/nestjs versions
       const FilterClass = (sentryNestjs as any).SentryGlobalFilter;
       if (FilterClass) {
         app.useGlobalFilters(new FilterClass());
       }
     } catch {
-      // @sentry/nestjs not available or SentryGlobalFilter not exported — skip
+      // SentryGlobalFilter not available — skip
     }
   }
 
@@ -59,6 +75,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
   app.use(cookieParser());
 
   app.useGlobalPipes(
@@ -78,13 +99,14 @@ async function bootstrap() {
   const { AllExceptionsFilter } = await import('./common/all-exceptions.filter');
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // CORS: CORS_ORIGIN env, else in production use APP_URL, else in dev use localhost
-  const defaultOrigin =
-    process.env.NODE_ENV === 'production' ? (process.env.APP_URL || '') : 'http://localhost:3000';
-  const corsOrigin = process.env.CORS_ORIGIN || defaultOrigin;
+  // CORS: CORS_ORIGINS или CORS_ORIGIN (comma-separated); dev: localhost, prod: APP_URL fallback
+  const { getCorsOrigins } = await import('./common/cors.util');
+  const origins = getCorsOrigins();
   app.enableCors({
-    origin: corsOrigin.split(',').map((s) => s.trim()).filter(Boolean),
+    origin: origins.length > 0 ? origins : true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id'],
   });
 
   const config = new DocumentBuilder()

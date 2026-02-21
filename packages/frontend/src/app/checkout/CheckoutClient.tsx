@@ -41,7 +41,13 @@ export function CheckoutClient() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [contact, setContact] = useState<ContactForm>({ name: '', email: '', phone: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ shortCode?: string; paymentUrl?: string; sessionId?: string } | null>(null);
+  const [result, setResult] = useState<{
+    shortCode?: string;
+    paymentUrl?: string;
+    sessionId?: string;
+    redirectItems?: { offerId: string; eventTitle: string; deeplink: string }[];
+    requestItems?: number;
+  } | null>(null);
   const [giftCertCode, setGiftCertCode] = useState('');
   const [giftCertValidation, setGiftCertValidation] = useState<{ valid: boolean; discountAmount?: number; message?: string } | null>(null);
   const [validatingCert, setValidatingCert] = useState(false);
@@ -483,11 +489,11 @@ export function CheckoutClient() {
             )}
 
             {/* Request items info */}
-            {result.requestItems > 0 && (
+            {(result.requestItems ?? 0) > 0 && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-left">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-amber-800">
                   <Send className="h-4 w-4" />
-                  Заявки на подтверждение: {result.requestItems}
+                  Заявки на подтверждение: {result.requestItems ?? 0}
                 </h3>
                 <p className="mt-1 text-xs text-amber-600">
                   Оператор свяжется с вами в ближайшее время для подтверждения мест и оплаты.

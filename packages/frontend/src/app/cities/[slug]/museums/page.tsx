@@ -127,11 +127,11 @@ export default async function CityMuseumsPage({ params, searchParams }: Props) {
     catalog = await api.getCatalog({
       category: 'MUSEUM',
       city: slug,
-      q: q || undefined,
+      ...(q ? { q } : {}),
       sort,
       page,
       limit: 24,
-      ...(sp.qf && { qf: sp.qf }),
+      ...(sp.qf ? { qf: sp.qf } : {}),
     });
   } catch {
     apiUnavailable = true;
