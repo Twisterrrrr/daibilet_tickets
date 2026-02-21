@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 
 /**
  * Redis Cache Service.
+ * D1: get/set/del + delByPrefix, keys через cacheKeys.
  *
  * Стратегия:
  * - Города: TTL 1 час (редко меняются)
@@ -14,15 +15,25 @@ import Redis from 'ioredis';
  * - После sync → инвалидация по паттерну
  */
 
+export { cacheKeys } from './cache-keys';
+
+/** D3: TTL в секундах. Читает env: CACHE_TTL_DETAIL (1–6h), CACHE_TTL_LIST (5–10m). */
+function parseTtlEnv(key: string, fallbackSec: number): number {
+  const raw = process.env[key];
+  if (raw == null || raw === '') return fallbackSec;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallbackSec;
+}
+
 export const CACHE_TTL = {
-  CITIES: 3600,            // 1 час
-  CITY_DETAIL: 1800,       // 30 мин
-  EVENT_LIST: 300,         // 5 мин
-  EVENT_DETAIL: 600,       // 10 мин
-  TAGS: 3600,              // 1 час
-  LANDINGS: 1800,          // 30 мин
-  COMBOS: 1800,            // 30 мин
-  SEARCH: 120,             // 2 мин
+  CITIES: parseTtlEnv('CACHE_TTL_CITIES', 3600),           // 1 час
+  CITY_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 3600),      // detail 1–6h, default 1h
+  EVENT_LIST: parseTtlEnv('CACHE_TTL_LIST', 300),          // list 5–10m, default 5m
+  EVENT_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 3600),     // detail 1–6h
+  TAGS: parseTtlEnv('CACHE_TTL_TAGS', 3600),               // 1 час
+  LANDINGS: parseTtlEnv('CACHE_TTL_LANDINGS', 1800),       // 30 мин
+  COMBOS: parseTtlEnv('CACHE_TTL_COMBOS', 1800),           // 30 мин
+  SEARCH: parseTtlEnv('CACHE_TTL_SEARCH', 300),            // list 5–10m
 } as const;
 
 @Injectable()
@@ -117,6 +128,14 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Удалить ключи по префиксу (D1). Redis SCAN + DEL.
+   */
+  async delByPrefix(prefix: string): Promise<number> {
+    const pattern = prefix.endsWith('*') ? prefix : `${prefix}*`;
+    return this.invalidatePattern(pattern);
+  }
+
+  /**
    * Инвалидация по паттерну (SCAN + DEL, безопасно для продакшена).
    */
   async invalidatePattern(pattern: string): Promise<number> {
@@ -164,13 +183,13 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /** Вызывать после любого sync или reclassification */
   async invalidateAfterSync() {
     await Promise.all([
-      this.invalidatePattern('cities:*'),
-      this.invalidatePattern('events:*'),
-      this.invalidatePattern('tags:*'),
-      this.invalidatePattern('regions:*'),
-      this.invalidatePattern('landings:*'),
-      this.invalidatePattern('combos:*'),
-      this.invalidatePattern('search:*'),
+      this.delByPrefix('cities:'),
+      this.delByPrefix('events:'),
+      this.delByPrefix('tags:'),
+      this.delByPrefix('regions:'),
+      this.delByPrefix('landings:'),
+      this.delByPrefix('combos:'),
+      this.delByPrefix('search:'),
     ]);
     this.logger.log('Кэш инвалидирован после синхронизации');
   }

@@ -1,0 +1,3 @@
+; Формат: "username" "password"
+; Пароль — md5 hash. Для dev: echo -n "passwordusername" | md5sum
+; В prod генерируется при старте или через secret

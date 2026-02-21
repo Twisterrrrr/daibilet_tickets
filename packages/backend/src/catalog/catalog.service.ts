@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheService, CACHE_TTL } from '../cache/cache.service';
+import { CacheService, CACHE_TTL, cacheKeys } from '../cache/cache.service';
 import { EventsQueryDto } from './dto/events-query.dto';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
 import { Prisma, DateMode, EventCategory, EventSubcategory, TagCategory, LocationType } from '@prisma/client';
@@ -27,7 +27,7 @@ export class CatalogService {
   // --- Города ---
 
   async getCities(featured?: boolean) {
-    const cacheKey = `cities:list:${featured ?? 'all'}`;
+    const cacheKey = cacheKeys.cities.list(featured ?? 'all');
 
     return this.cache.getOrSet(cacheKey, CACHE_TTL.CITIES, async () => {
       // ID городов, которые являются не-хабовыми членами регионов
@@ -157,7 +157,7 @@ export class CatalogService {
   }
 
   async getCityBySlug(slug: string) {
-    const cacheKey = `cities:detail:${slug}`;
+    const cacheKey = cacheKeys.cities.detail(slug);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.CITY_DETAIL, () => this.fetchCityBySlug(slug));
   }
 
@@ -875,7 +875,7 @@ export class CatalogService {
   }
 
   async getEventBySlug(slug: string) {
-    const cacheKey = `events:detail:${slug}`;
+    const cacheKey = cacheKeys.events.detail(slug);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_DETAIL, () => this.fetchEventBySlug(slug));
   }
 
@@ -1070,7 +1070,7 @@ export class CatalogService {
   // --- Поиск ---
 
   async search(q: string, city?: string) {
-    const cacheKey = `search:${q}:${city || 'all'}`;
+    const cacheKey = cacheKeys.search.query(q, city || 'all');
     return this.cache.getOrSet(cacheKey, CACHE_TTL.SEARCH, () => this.fetchSearch(q, city));
   }
 

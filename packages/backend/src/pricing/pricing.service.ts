@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheService } from '../cache/cache.service';
+import { CacheService, cacheKeys } from '../cache/cache.service';
 
 // ==========================================
 // Pricing Service — ядро монетизации Дайбилет
@@ -46,7 +46,6 @@ interface PricingConfigData {
   peakRanges: PeakRange[];
 }
 
-const PRICING_CACHE_KEY = 'pricing:config';
 const PRICING_CACHE_TTL = 300; // 5 минут
 
 @Injectable()
@@ -64,7 +63,7 @@ export class PricingService {
 
   private async getConfig(): Promise<PricingConfigData> {
     const cached = await this.cache.getOrSet<PricingConfigData>(
-      PRICING_CACHE_KEY,
+      cacheKeys.pricing.config(),
       PRICING_CACHE_TTL,
       async () => {
         const config = await this.prisma.pricingConfig.findFirst();

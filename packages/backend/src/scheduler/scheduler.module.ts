@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
 import { SchedulerService } from './scheduler.service';
+import { RetentionService } from './retention.service';
 import { ReviewSchedulerService } from './review-scheduler.service';
 import { OrderExpiryService } from './order-expiry.service';
 import { TagAssignmentService } from './tag-assignment.service';
@@ -20,7 +21,7 @@ import { QUEUE_EMAILS, QUEUE_REVIEW_TASKS, QUEUE_SYNC, QUEUE_FULFILLMENT } from 
       { name: QUEUE_FULFILLMENT },
     ),
   ],
-  providers: [SchedulerService, ReviewSchedulerService, OrderExpiryService, TagAssignmentService, FulfillmentSchedulerService],
+  providers: [SchedulerService, RetentionService, ReviewSchedulerService, OrderExpiryService, TagAssignmentService, FulfillmentSchedulerService],
   exports: [TagAssignmentService],
 })
 export class SchedulerModule {}

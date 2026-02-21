@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheService, CACHE_TTL } from '../cache/cache.service';
+import { CacheService, CACHE_TTL, cacheKeys } from '../cache/cache.service';
 import { Prisma, DateMode, EventCategory } from '@prisma/client';
 
 @Injectable()
@@ -38,7 +38,7 @@ export class RegionService {
     regionName: string;
     events: any[];
   } | null> {
-    const cacheKey = `regions:preview:hub:${cityId}`;
+    const cacheKey = cacheKeys.regions.preview(cityId);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.CITY_DETAIL, async () => {
       // Найти регион, где этот город — хаб
       const region = await this.prisma.region.findFirst({
@@ -110,7 +110,7 @@ export class RegionService {
    * Данные региона по slug: для страницы /regions/[slug]
    */
   async getRegionBySlug(slug: string) {
-    const cacheKey = `regions:detail:${slug}`;
+    const cacheKey = cacheKeys.regions.detail(slug);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.CITY_DETAIL, async () => {
       const region = await this.prisma.region.findUnique({
         where: { slug },

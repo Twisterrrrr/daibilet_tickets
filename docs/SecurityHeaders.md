@@ -35,6 +35,12 @@ Helmet включён с отключённым CSP (`contentSecurityPolicy: fal
 - Логирование: `Admin login brute-force: blocked ip=...`
 - Ответ при блокировке: «Слишком много попыток входа. Повторите через X мин.»
 
+## C3 — Rate limiting внешних API (TC/TEP)
+
+- **TC_TEP_CONCURRENCY** (default 2) — лимит параллельных HTTP-запросов к TC/TEP
+- Retry: 429/5xx → exponential backoff (3 попытки, 1s initial)
+- p-limit + withRetry в TcApiService, TepApiService
+
 ## HTTP timeouts + AbortController (C2)
 
 - **TC_HTTP_TIMEOUT_MS** (default 60_000) — таймаут HTTP-запросов к Ticketscloud API

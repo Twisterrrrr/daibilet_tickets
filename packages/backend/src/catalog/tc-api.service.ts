@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
+import { runWithLimit, withRetry } from '../common/api-rate-limit.util';
 
 /**
  * Сервис для работы с Ticketscloud API.
@@ -33,6 +34,7 @@ export class TcApiService {
 
   /**
    * Базовый GET-запрос к TC API.
+   * C3: concurrency limit + retry с backoff на 429/5xx.
    * @param signal — опционально, для отмены при job timeout
    */
   private async request<T = any>(
@@ -40,34 +42,50 @@ export class TcApiService {
     params?: Record<string, string>,
     signal?: AbortSignal,
   ): Promise<T> {
-    const url = new URL(path, this.baseUrl);
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== '') url.searchParams.set(k, v);
+    const doFetch = async (): Promise<T> => {
+      const url = new URL(path, this.baseUrl);
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v !== undefined && v !== '') url.searchParams.set(k, v);
+        });
+      }
+
+      this.logger.debug(`TC API → GET ${url.toString()}`);
+
+      const timeoutSignal = AbortSignal.timeout(this.getTimeoutMs());
+      const finalSignal = combineAbortSignals(timeoutSignal, signal);
+
+      const res = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          Authorization: `key ${this.apiToken}`,
+          Accept: 'application/json',
+        },
+        signal: finalSignal,
       });
-    }
 
-    this.logger.debug(`TC API → GET ${url.toString()}`);
+      if (!res.ok) {
+        const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
+        this.logger.error(`TC API ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
+        throw new Error(`TC API returned ${res.status}: ${text.slice(0, 200)}`);
+      }
 
-    const timeoutSignal = AbortSignal.timeout(this.getTimeoutMs());
-    const finalSignal = combineAbortSignals(timeoutSignal, signal);
+      return res.json() as Promise<T>;
+    };
 
-    const res = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        Authorization: `key ${this.apiToken}`,
-        Accept: 'application/json',
+    const { data, retries } = await withRetry(
+      () => runWithLimit(doFetch),
+      {
+        maxRetries: 3,
+        initialBackoffMs: 1000,
+        onRetry: (attempt, status, delayMs) =>
+          this.logger.warn(`TC API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
       },
-      signal: finalSignal,
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
-      this.logger.error(`TC API ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
-      throw new Error(`TC API returned ${res.status}: ${text.slice(0, 200)}`);
+    );
+    if (retries > 0) {
+      this.logger.log(`TC API completed after ${retries} retries`);
     }
-
-    return res.json() as Promise<T>;
+    return data;
   }
 
   /**

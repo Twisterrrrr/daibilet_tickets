@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
+import { runWithLimit, withRetry } from '../common/api-rate-limit.util';
 
 /**
  * Клиент API teplohod.info v1.
@@ -16,29 +17,48 @@ export class TepApiService {
     return getHttpTimeoutMs('TEP_HTTP_TIMEOUT_MS', 30_000);
   }
 
+  /**
+   * C3: concurrency limit + retry с backoff на 429/5xx.
+   */
   private async request<T = any>(path: string, signal?: AbortSignal): Promise<T> {
-    const url = `${this.baseUrl}${path}`;
-    this.logger.debug(`TEP API → GET ${url}`);
+    const doFetch = async (): Promise<T> => {
+      const url = `${this.baseUrl}${path}`;
+      this.logger.debug(`TEP API → GET ${url}`);
 
-    const timeoutSignal = AbortSignal.timeout(this.getTimeoutMs());
-    const finalSignal = combineAbortSignals(timeoutSignal, signal);
+      const timeoutSignal = AbortSignal.timeout(this.getTimeoutMs());
+      const finalSignal = combineAbortSignals(timeoutSignal, signal);
 
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: '*/*',
-        'User-Agent': 'Daibilet/1.0',
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: '*/*',
+          'User-Agent': 'Daibilet/1.0',
+        },
+        signal: finalSignal,
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch((e) => { this.logger.warn('TEP API call failed: ' + (e as Error).message); return ''; });
+        this.logger.error(`TEP API ${res.status}: ${text.slice(0, 500)}`);
+        throw new Error(`TEP API returned ${res.status}: ${text.slice(0, 200)}`);
+      }
+
+      return res.json() as Promise<T>;
+    };
+
+    const { data, retries } = await withRetry(
+      () => runWithLimit(doFetch),
+      {
+        maxRetries: 3,
+        initialBackoffMs: 1000,
+        onRetry: (attempt, status, delayMs) =>
+          this.logger.warn(`TEP API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
       },
-      signal: finalSignal,
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch((e) => { this.logger.warn('TEP API call failed: ' + (e as Error).message); return ''; });
-      this.logger.error(`TEP API ${res.status}: ${text.slice(0, 500)}`);
-      throw new Error(`TEP API returned ${res.status}: ${text.slice(0, 200)}`);
+    );
+    if (retries > 0) {
+      this.logger.log(`TEP API completed after ${retries} retries`);
     }
-
-    return res.json() as Promise<T>;
+    return data;
   }
 
   /**

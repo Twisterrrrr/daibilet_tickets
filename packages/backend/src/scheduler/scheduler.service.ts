@@ -4,6 +4,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TcSyncService } from '../catalog/tc-sync.service';
 import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
+import { RetentionService } from './retention.service';
 import { QUEUE_SYNC } from '../queue/queue.constants';
 
 /**
@@ -38,6 +39,7 @@ export class SchedulerService {
     @InjectQueue(QUEUE_SYNC) private readonly syncQueue: Queue,
     private readonly tcSync: TcSyncService,
     private readonly fuzzyDedup: FuzzyDedupService,
+    private readonly retention: RetentionService,
   ) {}
 
   /**
@@ -144,6 +146,26 @@ export class SchedulerService {
       );
     } catch (err: unknown) {
       this.logger.error(`Fuzzy dedup — ошибка: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /**
+   * E1 — Retention cleanup: EventSession, ProcessedWebhookEvent, AuditLog.
+   * Раз в сутки в 04:00. Dry-run через RETENTION_DRY_RUN=true.
+   */
+  @Cron('0 0 4 * * *', { name: 'retention-cleanup' })
+  async handleRetention() {
+    this.logger.log('=== CRON: Retention cleanup ===');
+
+    try {
+      const report = await this.retention.run();
+      this.logger.log(
+        `Retention: sessions ${report.eventSessions.deleted || report.eventSessions.wouldDelete}, ` +
+        `webhooks ${report.webhooks.deleted || report.webhooks.wouldDelete}, ` +
+        `audit ${report.auditLogs.deleted || report.auditLogs.wouldDelete} (dryRun=${report.dryRun})`,
+      );
+    } catch (err: unknown) {
+      this.logger.error(`Retention — ошибка: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CacheService } from './cache.service';
+import { CacheService, cacheKeys } from './cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -32,8 +32,8 @@ export class CacheInvalidationService {
    * Удаляет events:detail:{slug} и search (поиск может включать это событие).
    */
   async invalidateEvent(slug: string): Promise<void> {
-    await this.cache.del(`events:detail:${slug}`);
-    await this.cache.invalidatePattern('search:*');
+    await this.cache.del(cacheKeys.events.detail(slug));
+    await this.cache.delByPrefix('search:');
     this.logger.debug(`Invalidated cache for event slug=${slug}`);
   }
 
@@ -62,17 +62,17 @@ export class CacheInvalidationService {
    */
   async invalidateCity(citySlug?: string): Promise<void> {
     if (citySlug) {
-      await this.cache.del(`cities:detail:${citySlug}`);
+      await this.cache.del(cacheKeys.cities.detail(citySlug));
     }
-    await this.cache.invalidatePattern('cities:*');
-    await this.cache.invalidatePattern('regions:*');
+    await this.cache.delByPrefix('cities:');
+    await this.cache.delByPrefix('regions:');
   }
 
   /**
    * Инвалидировать при изменении региона.
    */
   async invalidateRegions(): Promise<void> {
-    await this.cache.invalidatePattern('regions:*');
+    await this.cache.delByPrefix('regions:');
   }
 
   /**
@@ -80,13 +80,13 @@ export class CacheInvalidationService {
    */
   async invalidateFull(): Promise<void> {
     await Promise.all([
-      this.cache.invalidatePattern('cities:*'),
-      this.cache.invalidatePattern('events:*'),
-      this.cache.invalidatePattern('tags:*'),
-      this.cache.invalidatePattern('regions:*'),
-      this.cache.invalidatePattern('landings:*'),
-      this.cache.invalidatePattern('combos:*'),
-      this.cache.invalidatePattern('search:*'),
+      this.cache.delByPrefix('cities:'),
+      this.cache.delByPrefix('events:'),
+      this.cache.delByPrefix('tags:'),
+      this.cache.delByPrefix('regions:'),
+      this.cache.delByPrefix('landings:'),
+      this.cache.delByPrefix('combos:'),
+      this.cache.delByPrefix('search:'),
     ]);
     this.logger.log('Cache fully invalidated');
   }

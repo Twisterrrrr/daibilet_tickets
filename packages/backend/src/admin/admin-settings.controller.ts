@@ -3,7 +3,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheService } from '../cache/cache.service';
+import { CacheService, cacheKeys } from '../cache/cache.service';
 import { TcSyncService } from '../catalog/tc-sync.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { PeakRangeSchema, validateJson } from './json-schemas';
@@ -84,7 +84,7 @@ export class AdminSettingsController {
     });
 
     // Инвалидируем кэш pricing
-    await this.cache.del('pricing:config');
+    await this.cache.del(cacheKeys.pricing.config());
 
     return updated;
   }
@@ -135,13 +135,13 @@ export class AdminSettingsController {
 
     switch (scope) {
       case 'cities':
-        await this.cache.invalidatePattern('cities:*');
+        await this.cache.delByPrefix('cities:');
         break;
       case 'events':
-        await this.cache.invalidatePattern('events:*');
+        await this.cache.delByPrefix('events:');
         break;
       case 'search':
-        await this.cache.invalidatePattern('search:*');
+        await this.cache.delByPrefix('search:');
         break;
       default:
         await this.cache.invalidateAfterSync();
@@ -171,7 +171,7 @@ export class AdminSettingsController {
   @Roles('ADMIN')
   async generateCityDescriptions() {
     const result = await this.tcSync.generateDescriptionsForCitiesWithout();
-    await this.cache.invalidatePattern('cities:*');
+    await this.cache.delByPrefix('cities:');
     return { success: true, updated: result.updated };
   }
 
@@ -195,7 +195,7 @@ export class AdminSettingsController {
     const descResult = await this.tcSync.generateDescriptionsForCitiesWithout();
 
     // 3. Очищаем кэш городов
-    await this.cache.invalidatePattern('cities:*');
+    await this.cache.delByPrefix('cities:');
 
     this.logger.log(
       `fix-cities: активировано ${activated.count}, описаний: ${descResult.updated}`,

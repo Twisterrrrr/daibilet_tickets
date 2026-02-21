@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheService, CACHE_TTL } from '../cache/cache.service';
+import { CacheService, CACHE_TTL, cacheKeys } from '../cache/cache.service';
 import { Prisma, DateMode, EventSubcategory } from '@prisma/client';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class CollectionService {
    * Список активных подборок (опционально фильтр по городу).
    */
   async getCollections(citySlug?: string) {
-    const cacheKey = `collections:list:${citySlug || 'all'}`;
+    const cacheKey = cacheKeys.collections.list(citySlug);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.CITIES, async () => {
       const where: Prisma.CollectionWhereInput = {
         isActive: true,
@@ -55,7 +55,7 @@ export class CollectionService {
    * Подборка по slug + события (с пагинацией).
    */
   async getBySlug(slug: string, page = 1, limit = 20) {
-    const cacheKey = `collections:detail:${slug}:${page}:${limit}`;
+    const cacheKey = cacheKeys.collections.detail(slug, page, limit);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_DETAIL, async () => {
       const collection = await this.prisma.collection.findFirst({
         where: { slug, isActive: true, isDeleted: false },

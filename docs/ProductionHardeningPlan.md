@@ -9,7 +9,7 @@
 
 ## A — Observability и логирование
 
-### A1 — requestId + корреляция логов + маскирование PII
+### A1 — requestId + корреляция логов + маскирование PII ✅
 
 **Цель:** Добавить requestId для каждого HTTP-запроса, прокинуть в логи, замаскировать PII (email/phone/tokens).
 
@@ -28,9 +28,11 @@
 
 **Smoke:** открыть 2 страницы фронта, вызвать 404, убедиться что requestId в логах.
 
+**Реализовано (5248a65):** RequestIdMiddleware (UUID, x-request-id), pii-mask.util, all-exceptions.filter, LoggingInterceptor. Тесты: pii-mask.util.spec, request-id.e2e.spec. См. `docs/Observability.md`.
+
 ---
 
-### A2 — Sentry baseline (или текущий аналог)
+### A2 — Sentry baseline (или текущий аналог) ✅
 
 **Цель:** Подключить Sentry (или уже выбранный error tracker) для backend, с тегами окружения и requestId.
 
@@ -47,9 +49,11 @@
 
 **Smoke:** искусственно выбросить ошибку → событие уходит.
 
+**Реализовано (5248a65):** Sentry.init при SENTRY_DSN + NODE_ENV=production, beforeSend (4xx не репортим), SentryContextMiddleware (requestId, route). Тест: sentry-filter.spec.
+
 ---
 
-### A3 — Ops endpoints: health/metrics (admin-only)
+### A3 — Ops endpoints: health/metrics (admin-only) ✅
 
 **Цель:** Добавить admin-only эндпоинты `/admin/ops/health` и `/admin/ops/metrics`.
 
@@ -66,11 +70,13 @@
 
 **Smoke:** открыть админку → endpoints отвечают.
 
+**Реализовано (5248a65):** AdminOpsController GET /admin/ops/health, /admin/ops/metrics, JwtAuthGuard + @Roles('ADMIN'). pendingStale, failedUnresolved, escalatedOpen, activeIntents, syncCounts; rates (fulfillment_fail, webhook_dedup, auto_compensate).
+
 ---
 
 ## B — Безопасность
 
-### B1 — Helmet + security headers
+### B1 — Helmet + security headers ✅
 
 **Цель:** Включить Helmet и базовые security headers без поломки фронта/виджетов.
 
@@ -87,9 +93,11 @@
 
 **Smoke:** открыть страницу с виджетом teplohod/TC.
 
+**Реализовано (5248a65):** helmet({ contentSecurityPolicy: false }) в main.ts — CSP выключен для teplohod/TC виджетов. См. `docs/SecurityHeaders.md`.
+
 ---
 
-### B2 — CORS policy
+### B2 — CORS policy ✅
 
 **Цель:** Строго ограничить CORS по окружениям.
 
@@ -106,6 +114,8 @@
 **Tests:** unit на парсинг origins; e2e preflight.
 
 **Smoke:** фронт/админка работают.
+
+**Реализовано (5248a65):** cors.util (getCorsOrigins, parseCorsOrigins), CORS_ORIGINS/CORS_ORIGIN env, dev localhost 3000/3001/5173, prod APP_URL fallback. main.ts enableCors. Тест: cors.util.spec.
 
 ---
 
@@ -195,7 +205,7 @@
 
 ---
 
-### C3 — Rate limiting внешних API (TC/TEP)
+### C3 — Rate limiting внешних API (TC/TEP) ✅
 
 **Цель:** Не бомбить поставщиков; стабилизировать sync.
 
@@ -212,11 +222,13 @@
 
 **Smoke:** full sync в dev → без всплесков.
 
+**Реализовано (22.02):** `api-rate-limit.util` (p-limit, withRetry), TcApiService/TepApiService — request через runWithLimit+withRetry. Env: TC_TEP_CONCURRENCY. Логирование retries. Unit: api-rate-limit.util.spec.
+
 ---
 
 ## D — Кэширование
 
-### D1 — Единый CacheService контракт + namespacing
+### D1 — Единый CacheService контракт + namespacing ✅
 
 **Цель:** Централизовать ключи кэша и TTL.
 
@@ -233,9 +245,11 @@
 
 **Smoke:** детальная страница кэшируется.
 
+**Реализовано (22.02):** cache-keys.ts, CacheService.delByPrefix, cacheKeys re-export. Все сервисы переведены на cacheKeys.
+
 ---
 
-### D2 — Инвалидация кэша по изменениям (override/sync/admin)
+### D2 — Инвалидация кэша по изменениям (override/sync/admin) ✅
 
 **Цель:** Гарантировать актуальность детальных страниц и ключевых листингов.
 
@@ -252,9 +266,11 @@
 
 **Smoke:** поменять title override → сразу видно на фронте.
 
+**Реализовано (22.02):** CacheInvalidationService.invalidateOverride вызывается из AdminEventsController. Матрица: docs/CacheInvalidationMatrix.md.
+
 ---
 
-### D3 — TTL policy (detail/list)
+### D3 — TTL policy (detail/list) ✅
 
 **Цель:** Установить единые TTL и fallback.
 
@@ -271,11 +287,13 @@
 
 **Smoke:** убедиться, что ключи с TTL.
 
+**Реализовано (22.02):** CACHE_TTL_* env (CACHE_TTL_DETAIL, CACHE_TTL_LIST, CACHE_TTL_CITIES и т.д.).
+
 ---
 
 ## E — Retention и инфраструктура БД
 
-### E1 — Retention jobs (cleanup)
+### E1 — Retention jobs (cleanup) ✅
 
 **Цель:** Контролировать рост таблиц (sessions/webhooks/audit).
 
@@ -292,9 +310,11 @@
 
 **Smoke:** прогнать dry-run, проверить отчёт.
 
+**Реализовано (22.02):** RetentionService, cron 04:00. Env: RETENTION_DRY_RUN, RETENTION_EVENTSESSIONS_DAYS (180), RETENTION_WEBHOOK_DAYS (90), RETENTION_AUDIT_DAYS (365). Batch 500.
+
 ---
 
-### E2 — Индексы под реальные запросы
+### E2 — Индексы под реальные запросы ✅
 
 **Цель:** Добавить недостающие индексы под /events, /catalog, /venues, admin list.
 
@@ -311,9 +331,11 @@
 
 **Smoke:** каталог быстрее (по логам/метрике).
 
+**Реализовано (22.02):** 20260222_e2_performance_indexes — events_catalog_idx, events_admin_list_idx, event_sessions_active_starts_idx, venues_city_active_idx, processed_webhook_events_processed_at_idx, audit_logs_created_at_idx.
+
 ---
 
-### E3 — PgBouncer (опционально, если уже в планах)
+### E3 — PgBouncer (опционально, если уже в планах) ✅
 
 **Цель:** Ограничить количество соединений и стабилизировать SSR/админ.
 
@@ -330,11 +352,13 @@
 
 **Smoke:** проверить max connections.
 
+**Реализовано (22.02):** docs/PgBouncer.md, infra/pgbouncer/pgbouncer.ini, userlist.txt. Опционально — см. документацию.
+
 ---
 
 ## F — Партиционирование
 
-### F1 — План миграции партиционирования
+### F1 — План миграции партиционирования ✅
 
 **Цель:** Подготовить документированный план внедрения без простоя.
 
@@ -350,9 +374,11 @@
 
 **Smoke:** checklist выполнен.
 
+**Реализовано (22.02):** docs/PartitioningPlan.md — шаги, rollback, verification.
+
 ---
 
-### F2 — Партиционирование EventSession по startsAt (месяц)
+### F2 — Партиционирование EventSession по startsAt (месяц) ✅
 
 **Цель:** Ускорить запросы и ограничить рост.
 
@@ -368,3 +394,5 @@
 **Tests:** insert/select, migrate deploy idempotent.
 
 **Smoke:** каталог по датам работает.
+
+**Реализовано (22.02):** миграция create_event_sessions_partition(parent_table, month_start). Полный swap — см. docs/PartitioningPlan.md.
