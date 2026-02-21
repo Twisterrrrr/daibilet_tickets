@@ -9,7 +9,31 @@ import { QUEUE_SYNC } from './queue.constants';
 
 export type SyncJobData = Record<string, never>;
 
-@Processor(QUEUE_SYNC)
+/**
+ * Hard timeout для sync-задач (защита от зависания).
+ *
+ * lockDuration (10 мин) спасает от ложного stalled, но не от job,
+ * который завис навсегда (бесконечный HTTP, deadlock, утечка).
+ * Hard timeout гарантирует, что job перейдёт в failed → BullMQ retry.
+ *
+ * Full sync: TC + TEP + retag + combo + cache → нормально 10–30 мин, лимит 90 мин.
+ * Incremental: только TC + cache → нормально 2–10 мин, лимит 30 мин.
+ */
+const FULL_SYNC_TIMEOUT_MS = 90 * 60_000;      // 90 минут
+const INCREMENTAL_TIMEOUT_MS = 30 * 60_000;     // 30 минут
+
+/**
+ * SyncProcessor — обработчик задач синхронизации.
+ *
+ * concurrency: 1 — гарантирует, что только один sync job выполняется одновременно.
+ * lockDuration: 600_000 (10 мин) — предотвращает ложный stalled-статус
+ *   для долгих full sync (авто-продление lock каждые lockDuration/2).
+ *   Если worker реально завис — job перейдёт в stalled через 10 мин.
+ */
+@Processor(QUEUE_SYNC, {
+  concurrency: 1,
+  lockDuration: 600_000,
+})
 export class SyncProcessor extends WorkerHost {
   private readonly logger = new Logger(SyncProcessor.name);
 
@@ -23,19 +47,81 @@ export class SyncProcessor extends WorkerHost {
   }
 
   async process(job: Job<SyncJobData, any, string>): Promise<any> {
-    this.logger.log(`Processing sync job: ${job.name} (attempt ${job.attemptsMade + 1})`);
+    const startMs = Date.now();
+    this.logger.log(
+      `[sync] Processing job: ${job.name} (id=${job.id}, attempt ${job.attemptsMade + 1}/${job.opts.attempts ?? '?'})`,
+    );
 
-    switch (job.name) {
-      case 'sync-full':
-        return this.handleFullSync();
+    try {
+      switch (job.name) {
+        case 'sync-full':
+          return await this.withTimeout(
+            () => this.handleFullSync(),
+            FULL_SYNC_TIMEOUT_MS,
+            job,
+          );
 
-      case 'sync-incremental':
-        return this.handleIncrementalSync();
+        case 'sync-incremental':
+          return await this.withTimeout(
+            () => this.handleIncrementalSync(),
+            INCREMENTAL_TIMEOUT_MS,
+            job,
+          );
 
-      default:
-        this.logger.warn(`Unknown sync job name: ${job.name}`);
-        return null;
+        default:
+          this.logger.warn(`[sync] Unknown job name: ${job.name}`);
+          return null;
+      }
+    } finally {
+      const elapsedSec = ((Date.now() - startMs) / 1000).toFixed(1);
+      this.logger.log(`[sync] Job ${job.name} (id=${job.id}) finished in ${elapsedSec}s`);
     }
+  }
+
+  // ─── Hard timeout ──────────────────────────────────────────────────
+
+  /**
+   * Обёртка с hard timeout.
+   *
+   * При превышении лимита:
+   * 1. Логируем ERROR (виден в мониторинге)
+   * 2. Кидаем Error → BullMQ переводит job в failed
+   * 3. Если остались attempts — BullMQ retry с exponential backoff
+   * 4. Если attempts исчерпаны — job в failed, следующий cron-тик создаст новый
+   *
+   * Примечание: реальная async-работа (HTTP к TC/TEP) продолжится в фоне
+   * до естественного завершения/таймаута HTTP-клиента. Это приемлемо —
+   * concurrency: 1 гарантирует, что новый job не начнётся, пока worker занят.
+   * Для полной отмены нужен AbortController в sync-сервисах (future work).
+   */
+  private withTimeout<T>(
+    fn: () => Promise<T>,
+    timeoutMs: number,
+    job: Job,
+  ): Promise<T> {
+    const limitMin = Math.round(timeoutMs / 60_000);
+
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.logger.error(
+          `[sync] TIMEOUT: job ${job.name} (id=${job.id}) превысил лимит ${limitMin} мин ` +
+          `(attempt ${job.attemptsMade + 1}/${job.opts.attempts ?? '?'}) — переводим в failed`,
+        );
+        reject(
+          new Error(`Sync job "${job.name}" timed out after ${limitMin} minutes`),
+        );
+      }, timeoutMs);
+
+      fn()
+        .then((result) => {
+          clearTimeout(timer);
+          resolve(result);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
   }
 
   /**

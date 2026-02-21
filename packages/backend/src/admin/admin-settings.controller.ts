@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../cache/cache.service';
+import { TcSyncService } from '../catalog/tc-sync.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { PeakRangeSchema, validateJson } from './json-schemas';
 import { BadRequestException } from '@nestjs/common';
@@ -20,6 +21,7 @@ export class AdminSettingsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly tcSync: TcSyncService,
   ) {}
 
   // ========================
@@ -163,6 +165,46 @@ export class AdminSettingsController {
   async invalidateCache() {
     await this.cache.invalidateAfterSync();
     return { success: true, message: 'Кэш инвалидирован' };
+  }
+
+  @Post('ops/generate-city-descriptions')
+  @Roles('ADMIN')
+  async generateCityDescriptions() {
+    const result = await this.tcSync.generateDescriptionsForCitiesWithout();
+    await this.cache.invalidatePattern('cities:*');
+    return { success: true, updated: result.updated };
+  }
+
+  /**
+   * Комбинированная операция: активировать города с событиями,
+   * сгенерировать описания для городов без них, очистить кэш городов.
+   */
+  @Post('ops/fix-cities-for-catalog')
+  @Roles('ADMIN')
+  async fixCitiesForCatalog() {
+    // 1. Активируем города с хотя бы одним не удалённым событием
+    const activated = await this.prisma.city.updateMany({
+      where: {
+        isActive: false,
+        events: { some: { isDeleted: false } },
+      },
+      data: { isActive: true },
+    });
+
+    // 2. Генерируем описания для городов без description
+    const descResult = await this.tcSync.generateDescriptionsForCitiesWithout();
+
+    // 3. Очищаем кэш городов
+    await this.cache.invalidatePattern('cities:*');
+
+    this.logger.log(
+      `fix-cities: активировано ${activated.count}, описаний: ${descResult.updated}`,
+    );
+    return {
+      success: true,
+      activated: activated.count,
+      descriptionsUpdated: descResult.updated,
+    };
   }
 
   // ========================

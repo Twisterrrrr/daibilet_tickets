@@ -10,6 +10,8 @@ import { api } from '@/lib/api';
 import { formatPrice, VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
 import { TicketsBlock } from '@/components/venue/TicketsBlock';
 import { MobileStickyBar } from '@/components/venue/MobileStickyBar';
+import { VenueReviewsBlock } from '@/components/venue/VenueReviewsBlock';
+import { VenueCard } from '@/components/ui/VenueCard';
 
 export const revalidate = 3600;
 
@@ -143,7 +145,6 @@ export default async function VenuePage({ params }: Props) {
   const highlights: string[] = venue.highlights || [];
   const faq: { q: string; a: string }[] = venue.faq || [];
   const features: string[] = venue.features || [];
-  const reviews: any[] = venue.reviews || [];
   const primaryOffer = venue.offers?.[0];
 
   // Quick facts for hero (2-3 bullet points)
@@ -346,58 +347,12 @@ export default async function VenuePage({ params }: Props) {
 
             {/* ═══ 3. СОЦИАЛЬНОЕ ДОКАЗАТЕЛЬСТВО ═══ */}
             <section id="reviews">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold">Отзывы</h2>
-                {venue.reviewCount > 3 && (
-                  <span className="text-sm text-gray-500">{venue.reviewCount} отзывов</span>
-                )}
-              </div>
-              {venue.rating > 0 && (
-                <div className="flex items-center gap-6 mb-5 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100">
-                  <div className="text-center">
-                    <p className="text-4xl font-extrabold text-gray-900">{venue.rating.toFixed(1)}</p>
-                    <div className="flex items-center gap-0.5 mt-1">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <Star key={i} size={14} className={i <= Math.round(venue.rating) ? 'text-amber-500 fill-amber-500' : 'text-gray-300'} />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    {venue.recommendPercent > 0 && (
-                      <p className="text-sm font-semibold text-emerald-700">
-                        <ShieldCheck size={14} className="inline mr-1" />
-                        {venue.recommendPercent}% рекомендуют
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500">на основе {venue.reviewCount} отзывов</p>
-                  </div>
-                </div>
-              )}
-              {reviews.length > 0 ? (
-                <div className="space-y-3">
-                  {reviews.slice(0, 5).map((r: any) => (
-                    <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex gap-0.5">
-                          {[1, 2, 3, 4, 5].map((i) => (
-                            <Star key={i} size={12} className={i <= r.rating ? 'text-amber-500 fill-amber-500' : 'text-gray-200'} />
-                          ))}
-                        </div>
-                        <span className="text-sm font-medium text-gray-900">{r.authorName}</span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(r.createdAt).toLocaleDateString('ru-RU', { month: 'short', year: 'numeric' })}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700 line-clamp-3">{r.text}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-gray-500 text-sm">Пока нет отзывов</p>
-                  <p className="text-gray-400 text-xs mt-1">Станьте первым, кто оставит отзыв!</p>
-                </div>
-              )}
+              <VenueReviewsBlock
+                venueId={venue.id}
+                venueSlug={venue.slug}
+                externalRating={venue.externalRating}
+                externalSource={venue.externalSource}
+              />
             </section>
 
             {/* ═══ 4. ЧТО ВНУТРИ ═══ */}
@@ -550,6 +505,30 @@ export default async function VenuePage({ params }: Props) {
                       </summary>
                       <div className="px-4 pb-4 text-sm text-gray-600">{item.a}</div>
                     </details>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Похожие места */}
+            {venue.relatedVenues && venue.relatedVenues.length > 0 && (
+              <section>
+                <h2 className="text-xl font-bold mb-4">Похожие места</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {venue.relatedVenues.map((v: any) => (
+                    <VenueCard
+                      key={v.id}
+                      slug={v.slug}
+                      title={v.title}
+                      shortTitle={v.shortTitle}
+                      venueType={v.venueType}
+                      imageUrl={v.imageUrl}
+                      address={v.address}
+                      priceFrom={v.priceFrom}
+                      rating={Number(v.rating) || 0}
+                      reviewCount={v.reviewCount || 0}
+                      city={v.city}
+                    />
                   ))}
                 </div>
               </section>

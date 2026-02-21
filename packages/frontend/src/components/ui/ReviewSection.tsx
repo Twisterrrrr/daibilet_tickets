@@ -332,11 +332,13 @@ function ExternalReviewCard({ review }: { review: ExternalReviewItem }) {
 
 function ReviewForm({
   eventId,
+  venueId,
   onSuccess,
   prefillEmail,
   reviewRequestToken,
 }: {
-  eventId: string;
+  eventId?: string;
+  venueId?: string;
   onSuccess: () => void;
   prefillEmail?: string;
   reviewRequestToken?: string;
@@ -397,6 +399,7 @@ function ReviewForm({
     try {
       const result = await api.submitReview({
         eventId,
+        venueId,
         rating,
         title: title.trim() || undefined,
         text: text.trim(),
@@ -540,8 +543,8 @@ function ReviewForm({
         </div>
       </div>
 
-      {/* Voucher for verification */}
-      {!reviewRequestToken && (
+      {/* Voucher for verification (только для event) */}
+      {!reviewRequestToken && eventId && (
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-500">
             Код ваучера (если покупали через нас)
@@ -586,13 +589,17 @@ function ReviewForm({
 export function ReviewSection({
   eventId,
   eventSlug,
+  venueId,
+  venueSlug,
   externalRating,
   externalSource,
   prefillEmail,
   reviewRequestToken,
 }: {
-  eventId: string;
-  eventSlug: string;
+  eventId?: string;
+  eventSlug?: string;
+  venueId?: string;
+  venueSlug?: string;
   externalRating?: number;
   externalSource?: string;
   prefillEmail?: string;
@@ -611,7 +618,9 @@ export function ReviewSection({
 
   const loadReviews = async (page = 1) => {
     try {
-      const res = await api.getEventReviews(eventSlug, page);
+      const res = venueSlug
+        ? await api.getVenueReviews(venueSlug, page)
+        : await api.getEventReviews(eventSlug!, page);
       setData(res);
     } catch {
       // no-op
@@ -620,7 +629,8 @@ export function ReviewSection({
     }
   };
 
-  useEffect(() => { loadReviews(); }, [eventSlug]);
+  const slug = venueSlug ?? eventSlug;
+  useEffect(() => { loadReviews(); }, [slug]);
 
   if (loading) {
     return (
@@ -661,6 +671,7 @@ export function ReviewSection({
       {showForm && (
         <ReviewForm
           eventId={eventId}
+          venueId={venueId}
           prefillEmail={prefillEmail}
           reviewRequestToken={reviewRequestToken}
           onSuccess={() => {

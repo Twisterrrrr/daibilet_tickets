@@ -45,6 +45,7 @@ export class WebhookIdempotencyService {
     eventType: string,
     payload: unknown,
     handler: () => Promise<string>,
+    paymentIntentId?: string,
   ): Promise<ProcessOnceResult> {
     // 1. Проверяем — уже обрабатывали?
     const existing = await this.prisma.processedWebhookEvent.findUnique({
@@ -80,6 +81,7 @@ export class WebhookIdempotencyService {
           eventType,
           payload: payload as unknown as Prisma.InputJsonValue,
           result,
+          ...(paymentIntentId && { paymentIntentId }),
         },
       });
     } catch (error) {
@@ -97,7 +99,9 @@ export class WebhookIdempotencyService {
     }
 
     this.logger.log(
-      `Webhook processed: provider=${provider}, type=${eventType}, eventId=${providerEventId}, result=${result}`,
+      `[provider=${provider}] [eventId=${providerEventId}] [eventType=${eventType}]` +
+      (paymentIntentId ? ` [intent=${paymentIntentId}]` : '') +
+      ` Webhook processed: result=${result}`,
     );
 
     return { processed: true, result };

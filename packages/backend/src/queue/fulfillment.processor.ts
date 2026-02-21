@@ -32,7 +32,10 @@ export class FulfillmentProcessor extends WorkerHost {
   }
 
   async process(job: Job): Promise<unknown> {
-    this.logger.log(`Processing fulfillment job: ${job.name} (id=${job.id})`);
+    const jobContext = job.data ? JSON.stringify(Object.fromEntries(
+      Object.entries(job.data as Record<string, unknown>).filter(([k]) => ['paymentIntentId', 'providerEventId', 'checkoutSessionId'].includes(k)),
+    )) : '{}';
+    this.logger.log(`[job=${job.name}] [jobId=${job.id}] ${jobContext} Processing fulfillment job`);
 
     switch (job.name) {
       case 'yookassa-webhook':
@@ -63,7 +66,7 @@ export class FulfillmentProcessor extends WorkerHost {
       paymentObject: Record<string, unknown>;
     };
 
-    this.logger.log(`YooKassa webhook: type=${eventType}, paymentId=${providerEventId}`);
+    this.logger.log(`[job=yookassa-webhook] [providerEventId=${providerEventId}] [eventType=${eventType}] Processing YooKassa webhook`);
 
     // Find PaymentIntent by providerPaymentId
     const intent = await this.prisma.paymentIntent.findFirst({
@@ -81,7 +84,7 @@ export class FulfillmentProcessor extends WorkerHost {
           return this.processPaymentEvent(intentByKey.id, eventType, providerEventId);
         }
       }
-      this.logger.warn(`No PaymentIntent found for providerPaymentId=${providerEventId}`);
+      this.logger.warn(`[providerEventId=${providerEventId}] No PaymentIntent found for providerPaymentId`);
       return { status: 'intent_not_found' };
     }
 
@@ -133,7 +136,7 @@ export class FulfillmentProcessor extends WorkerHost {
     });
 
     if (!intent || intent.status !== 'PAID') {
-      this.logger.warn(`payment-paid job: intent ${paymentIntentId} not found or not PAID`);
+      this.logger.warn(`[intent=${paymentIntentId}] payment-paid job: intent not found or not PAID`);
       return { status: 'skipped' };
     }
 

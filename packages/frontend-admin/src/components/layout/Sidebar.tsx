@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   CalendarDays,
+  Merge,
   ShoppingCart,
   MapPin,
   Tag,
@@ -47,6 +48,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard },
       { to: '/events', label: 'События', icon: CalendarDays },
+      { to: '/events/merge', label: 'Merge дублей', icon: Merge },
       { to: '/orders', label: 'Заказы', icon: ShoppingCart },
       { to: '/checkout', label: 'Заявки', icon: Inbox },
       { to: '/support', label: 'Поддержка', icon: HeadphonesIcon },

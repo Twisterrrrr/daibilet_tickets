@@ -188,6 +188,34 @@ export class VenueService {
     };
   }
 
+  /** Похожие места: тот же город, тот же тип, исключая текущее */
+  async getRelatedVenues(venueId: string, cityId: string, venueType: string, limit = 6) {
+    return this.prisma.venue.findMany({
+      where: {
+        id: { not: venueId },
+        cityId,
+        venueType: venueType as VenueType,
+        isActive: true,
+        isDeleted: false,
+      },
+      orderBy: { rating: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        shortTitle: true,
+        venueType: true,
+        imageUrl: true,
+        address: true,
+        priceFrom: true,
+        rating: true,
+        reviewCount: true,
+        city: { select: { slug: true, name: true } },
+      },
+    });
+  }
+
   /** Связанные статьи для venue (по городу) */
   async getRelatedArticles(cityId: string, limit = 4) {
     return this.prisma.article.findMany({

@@ -74,7 +74,7 @@ export class RefundService {
       },
     });
 
-    this.logger.log(`Full refund for intent ${intentId}: amount=${intent.amount}, reason=${reason}`);
+    this.logger.log(`[intent=${intentId}] [provider=${intent.provider}] [providerPmtId=${intent.providerPaymentId}] Full refund: amount=${intent.amount}, reason=${reason}`);
 
     // Email notification
     if (intent.checkoutSession.customerEmail) {
@@ -142,8 +142,8 @@ export class RefundService {
     }
 
     this.logger.log(
-      `Partial refund for session ${checkoutSessionId}: ` +
-      `${failedItems.length} items, amount=${refundAmount}, intent=${intent.id}`,
+      `[intent=${intent.id}] [provider=${intent.provider}] [providerPmtId=${intent.providerPaymentId}] ` +
+      `Partial refund for session ${checkoutSessionId}: ${failedItems.length} items, amount=${refundAmount}`,
     );
 
     // Email notification
@@ -188,7 +188,7 @@ export class RefundService {
       }
     }
 
-    this.logger.log(`Auto-compensation: processed ${sessionIds.length} sessions, ${escalatedItems.length} items`);
+    this.logger.log(`[auto-compensate] Processed ${sessionIds.length} sessions, ${escalatedItems.length} items`);
     return escalatedItems.length;
   }
 }

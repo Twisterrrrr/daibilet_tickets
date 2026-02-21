@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { EventTemplateFields } from './EventTemplateFields';
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ export function EventCreatePage() {
   const [durationMinutes, setDurationMinutes] = useState('');
   const [address, setAddress] = useState('');
   const [minAge, setMinAge] = useState('');
+  const [templateData, setTemplateData] = useState<Record<string, unknown>>({});
 
   // Step 2 — First offer (optional)
   const [skipOffer, setSkipOffer] = useState(false);
@@ -103,6 +105,7 @@ export function EventCreatePage() {
         durationMinutes: durationMinutes ? Number(durationMinutes) : undefined,
         address: address || undefined,
         minAge: minAge ? Number(minAge) : undefined,
+        templateData: Object.keys(templateData).length > 0 ? templateData : undefined,
       };
 
       if (!skipOffer) {
@@ -173,7 +176,7 @@ export function EventCreatePage() {
               </div>
               <div className="space-y-2">
                 <Label>Категория *</Label>
-                <Select value={category} onValueChange={(v) => { setCategory(v); setSubcategories([]); }}>
+                <Select value={category} onValueChange={(v) => { setCategory(v); setSubcategories([]); setTemplateData({}); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {CATEGORY_OPTIONS.map((o) => (
@@ -259,6 +262,13 @@ export function EventCreatePage() {
               <Label>Описание</Label>
               <Textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Полное описание события..." />
             </div>
+
+            <EventTemplateFields
+              category={category}
+              subcategories={subcategories}
+              templateData={templateData}
+              onChange={setTemplateData}
+            />
 
             <div className="flex justify-end">
               <Button onClick={() => setStep(2)} disabled={!canGoStep2}>

@@ -46,6 +46,18 @@ export const TimepadWidgetPayloadSchema = z.object({
 });
 export type TimepadWidgetPayload = z.infer<typeof TimepadWidgetPayloadSchema>;
 
+/**
+ * TEPLOHOD widget payload.
+ * tepWidgetId — ID виджета из админки teplohod.info (для data-id в embed).
+ * tepEventId — fallback: ID события из API (tep.id).
+ */
+export const TepWidgetPayloadSchema = z.object({
+  v: z.number().default(CURRENT_PAYLOAD_VERSION),
+  tepWidgetId: z.union([z.string(), z.number()]).optional(),
+  tepEventId: z.union([z.string(), z.number()]).optional(),
+});
+export type TepWidgetPayload = z.infer<typeof TepWidgetPayloadSchema>;
+
 /** Generic / unknown widget payload (fallback) */
 export const GenericWidgetPayloadSchema = z.object({
   v: z.number().default(CURRENT_PAYLOAD_VERSION),
@@ -63,6 +75,7 @@ const PAYLOAD_SCHEMAS: Record<string, z.ZodType> = {
   TC: TCWidgetPayloadSchema,
   RADARIO: RadarioWidgetPayloadSchema,
   TIMEPAD: TimepadWidgetPayloadSchema,
+  TEPLOHOD: TepWidgetPayloadSchema,
 };
 
 // ========================================

@@ -128,6 +128,104 @@ async function main() {
       ],
       sortOrder: 5,
     },
+
+    // --- Сезонные промо-подборки для PromoBlock ---
+    {
+      slug: 'den-vlyublennyh',
+      title: 'День влюблённых',
+      subtitle: 'Романтические экскурсии и ужины для двоих',
+      cityId: null, // кросс-городская
+      filterTags: ['romantic'],
+      filterCategory: null,
+      filterSubcategory: null,
+      filterAudience: null,
+      additionalFilters: {
+        promo: {
+          months: [2], // февраль
+        },
+      },
+      heroImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=1200',
+      description:
+        'Романтические прогулки, ужины на двоих и атмосферные маршруты по любимым городам. Подборка событий ко Дню влюблённых.',
+      metaTitle: 'День влюблённых — романтические экскурсии и ужины | Дайбилет',
+      metaDescription:
+        'Романтические экскурсии, ужины и прогулки для двоих. Лучшие события ко Дню влюблённых в одном месте.',
+      faq: [],
+      infoBlocks: [],
+      sortOrder: 10,
+    },
+    {
+      slug: 'maslenitsa',
+      title: 'Масленица',
+      subtitle: 'Гастро-экскурсии, блины и народные гуляния',
+      cityId: null,
+      filterTags: [],
+      filterCategory: null,
+      filterSubcategory: 'GASTRO',
+      filterAudience: null,
+      additionalFilters: {
+        promo: {
+          months: [2, 3], // февраль–март
+        },
+      },
+      heroImage: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=1200',
+      description:
+        'Тематические гастро-экскурсии, блины и масленичные гуляния в разных городах России.',
+      metaTitle: 'Масленица — гастро-экскурсии и блины | Дайбилет',
+      metaDescription:
+        'Лучшие события на Масленицу: гастро-экскурсии, блины и народные гуляния. Билеты онлайн.',
+      faq: [],
+      infoBlocks: [],
+      sortOrder: 11,
+    },
+    {
+      slug: 'zimniy-gorod',
+      title: 'Зимний город',
+      subtitle: 'Крытые экскурсии, музеи и тёплые маршруты',
+      cityId: null,
+      filterTags: ['bad-weather-ok'],
+      filterCategory: null,
+      filterSubcategory: null,
+      filterAudience: null,
+      additionalFilters: {
+        promo: {
+          months: [11, 12, 1, 2, 3], // ноябрь–март
+        },
+      },
+      heroImage: 'https://images.unsplash.com/photo-1516455590571-18256e5bb9ff?w=1200',
+      description:
+        'Подборка тёплых маршрутов на зиму: крытые экскурсии, музеи и программы, которые не зависят от погоды.',
+      metaTitle: 'Зимний город — крытые экскурсии и музеи | Дайбилет',
+      metaDescription:
+        'Крытые экскурсии, музеи и тёплые маршруты на зиму. Что делать в городе в плохую погоду.',
+      faq: [],
+      infoBlocks: [],
+      sortOrder: 12,
+    },
+    {
+      slug: 'kanikuly-s-detmi',
+      title: 'Каникулы с детьми',
+      subtitle: 'Интерактивные программы и семейные экскурсии',
+      cityId: null,
+      filterTags: [],
+      filterCategory: null,
+      filterSubcategory: null,
+      filterAudience: 'KIDS',
+      additionalFilters: {
+        promo: {
+          months: [1, 3, 6, 7, 8], // зимние, весенние и летние каникулы
+        },
+      },
+      heroImage: 'https://images.unsplash.com/photo-1511895426328-dc8714191300?w=1200',
+      description:
+        'Подборка семейных программ и интерактивных экскурсий для школьных каникул: зима, весна и лето.',
+      metaTitle: 'Каникулы с детьми — семейные программы и экскурсии | Дайбилет',
+      metaDescription:
+        'Лучшие экскурсии и программы для детей на школьные каникулы. Семейный отдых в городах России.',
+      faq: [],
+      infoBlocks: [],
+      sortOrder: 13,
+    },
   ];
 
   for (const data of collections) {

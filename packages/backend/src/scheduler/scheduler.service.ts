@@ -7,6 +7,17 @@ import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
 import { QUEUE_SYNC } from '../queue/queue.constants';
 
 /**
+ * Фиксированные jobId для защиты от перекрытия (overlap protection).
+ *
+ * BullMQ v5+ дедуплицирует job-ы по jobId атомарно на уровне Redis:
+ * если job с таким ID в состоянии waiting / active / delayed —
+ * queue.add() вернёт существующий job, а не создаст дубликат.
+ * Completed / failed НЕ блокируют — новый job создастся.
+ */
+const SYNC_FULL_JOB_ID = 'singleton:sync-full';
+const SYNC_INCREMENTAL_JOB_ID = 'singleton:sync-incremental';
+
+/**
  * Scheduler Service — автоматическая синхронизация данных.
  *
  * Расписание:
@@ -14,9 +25,10 @@ import { QUEUE_SYNC } from '../queue/queue.constants';
  * - Инкрементальная синхронизация TC: каждые 30 минут
  * - Дедупликация: раз в сутки (03:00)
  *
- * Синхронизация теперь выполняется через BullMQ (QUEUE_SYNC).
- * SyncProcessor обрабатывает: sync, retag, combo populate, cache invalidation.
- * Cron-хендлеры только ставят задачу в очередь.
+ * Защита от перекрытия (overlap protection):
+ * 1. jobId dedup — Redis атомарно отклоняет дубликаты (BullMQ v5+)
+ * 2. concurrency: 1 на SyncProcessor — не более 1 job одновременно
+ * 3. Бизнес-логика: incremental не ставится, если full sync активен
  */
 @Injectable()
 export class SchedulerService {
@@ -31,32 +43,40 @@ export class SchedulerService {
   /**
    * Полная синхронизация всех источников.
    * Всё (TC, TEP, retag, combo, cache) обрабатывается в SyncProcessor.
+   *
+   * jobId dedup: если предыдущий full sync ещё не завершён —
+   * Redis атомарно отклонит дубликат, гонки невозможны.
    */
   @Cron('0 0 0,6,12,18 * * *', { name: 'full-sync' })
   async handleFullSync() {
-    const activeCount = await this.syncQueue.getActiveCount();
-    const waitingCount = await this.syncQueue.getWaitingCount();
+    this.logger.log('=== CRON: Полная синхронизация → queue ===');
 
-    if (activeCount > 0 || waitingCount > 0) {
+    const job = await this.syncQueue.add('sync-full', {}, {
+      jobId: SYNC_FULL_JOB_ID,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 60_000 },
+      removeOnComplete: 50,
+      removeOnFail: 20,
+    });
+
+    if (!job || !job.id) {
       this.logger.warn(
-        `Полная синхронизация пропущена — в очереди: active=${activeCount}, waiting=${waitingCount}`,
+        `sync-full: job "${SYNC_FULL_JOB_ID}" уже в очереди — дублирование предотвращено (Redis jobId dedup)`,
       );
       return;
     }
 
-    this.logger.log('=== CRON: Полная синхронизация → queue ===');
-
-    await this.syncQueue.add('sync-full', {}, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 60_000 },
-      removeOnComplete: 100,
-      removeOnFail: 50,
-    });
+    this.logger.log(`sync-full: job ${job.id} поставлен в очередь`);
   }
 
   /**
    * Инкрементальная синхронизация TC.
    * TC sync + cache invalidation обрабатываются в SyncProcessor.
+   *
+   * Пропускается если:
+   * - час полной синхронизации (0, 6, 12, 18) — full sync покрывает TC
+   * - full sync активен/ожидает — incremental — подмножество full, бессмысленно
+   * - предыдущий incremental ещё не завершён — jobId dedup
    */
   @Cron('0 30 * * * *', { name: 'incremental-tc-sync' })
   async handleIncrementalSync() {
@@ -66,20 +86,37 @@ export class SchedulerService {
       return;
     }
 
-    const activeCount = await this.syncQueue.getActiveCount();
-    if (activeCount > 0) {
-      this.logger.debug('Инкрементальная синхронизация пропущена — очередь занята');
-      return;
+    // Targeted check: не ставить incremental, пока full sync работает.
+    // Это бизнес-правило (incremental ⊂ full), а не защита от гонок.
+    const fullSyncJob = await this.syncQueue.getJob(SYNC_FULL_JOB_ID);
+    if (fullSyncJob) {
+      const state = await fullSyncJob.getState();
+      if (state === 'active' || state === 'waiting' || state === 'delayed') {
+        this.logger.debug(
+          `sync-incremental: full sync в состоянии "${state}" — пропускаем (работа покрыта)`,
+        );
+        return;
+      }
     }
 
     this.logger.log('=== CRON: Инкрементальная синхронизация TC → queue ===');
 
-    await this.syncQueue.add('sync-incremental', {}, {
+    const job = await this.syncQueue.add('sync-incremental', {}, {
+      jobId: SYNC_INCREMENTAL_JOB_ID,
       attempts: 3,
       backoff: { type: 'exponential', delay: 30_000 },
-      removeOnComplete: 100,
-      removeOnFail: 50,
+      removeOnComplete: 50,
+      removeOnFail: 20,
     });
+
+    if (!job || !job.id) {
+      this.logger.warn(
+        `sync-incremental: job "${SYNC_INCREMENTAL_JOB_ID}" уже в очереди — дублирование предотвращено`,
+      );
+      return;
+    }
+
+    this.logger.log(`sync-incremental: job ${job.id} поставлен в очередь`);
   }
 
   /**

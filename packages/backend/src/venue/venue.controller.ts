@@ -41,11 +41,13 @@ export class VenueController {
   @ApiOperation({ summary: 'Детальная страница места' })
   async getVenueBySlug(@Param('slug') slug: string) {
     const venue = await this.venueService.getVenueBySlug(slug);
-    // Добавляем связанные статьи по городу
-    const relatedArticles = venue.cityId
-      ? await this.venueService.getRelatedArticles(venue.cityId, 4)
-      : [];
-    return { ...venue, relatedArticles };
+    const [relatedArticles, relatedVenues] = await Promise.all([
+      venue.cityId ? this.venueService.getRelatedArticles(venue.cityId, 4) : [],
+      venue.cityId && venue.venueType
+        ? this.venueService.getRelatedVenues(venue.id, venue.cityId, venue.venueType, 6)
+        : [],
+    ]);
+    return { ...venue, relatedArticles, relatedVenues };
   }
 
   @Get(':slug/reviews')

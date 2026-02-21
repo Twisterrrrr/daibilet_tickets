@@ -3,6 +3,7 @@ import { Layout } from './components/layout/Layout';
 import { LoginPage } from './pages/Login';
 import { DashboardPage } from './pages/Dashboard';
 import { EventsListPage } from './pages/events/EventsList';
+import { EventsMergePage } from './pages/events/EventsMerge';
 import { EventEditPage } from './pages/events/EventEdit';
 import { EventCreatePage } from './pages/events/EventCreate';
 import { CitiesListPage } from './pages/cities/CitiesList';
@@ -58,6 +59,7 @@ export default function App() {
         >
           <Route index element={<DashboardPage />} />
           <Route path="events" element={<EventsListPage />} />
+          <Route path="events/merge" element={<EventsMergePage />} />
           <Route path="events/new" element={<EventCreatePage />} />
           <Route path="events/:id" element={<EventEditPage />} />
           <Route path="cities" element={<CitiesListPage />} />

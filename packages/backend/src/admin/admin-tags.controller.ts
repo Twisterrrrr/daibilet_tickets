@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, UseInterceptors, ConflictException, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, UseInterceptors, BadRequestException, ConflictException, Request } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
@@ -43,6 +43,20 @@ export class AdminTagsController {
       this.prisma.tag.count({ where }),
     ]);
     return buildPaginatedResult(rawItems, total, pg.limit);
+  }
+
+  @Post('unlink-from-events')
+  @Roles('ADMIN')
+  async unlinkFromEvents(@Body('slug') slug: string) {
+    if (!slug) {
+      throw new BadRequestException('slug обязателен');
+    }
+    const tag = await this.prisma.tag.findFirst({ where: { slug } });
+    if (!tag) {
+      return { success: true, deleted: 0, message: 'Тег не найден' };
+    }
+    const result = await this.prisma.eventTag.deleteMany({ where: { tagId: tag.id } });
+    return { success: true, deleted: result.count };
   }
 
   @Get(':id')

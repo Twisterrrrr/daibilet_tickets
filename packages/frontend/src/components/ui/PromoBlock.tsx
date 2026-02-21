@@ -1,5 +1,14 @@
 import Link from 'next/link';
-import { Sparkles, Ship, PartyPopper, Snowflake, Heart, UtensilsCrossed, Baby, Umbrella } from 'lucide-react';
+import {
+  Sparkles,
+  Ship,
+  PartyPopper,
+  Snowflake,
+  Heart,
+  UtensilsCrossed,
+  Baby,
+  Umbrella,
+} from 'lucide-react';
 
 interface PromoItem {
   slug: string;
@@ -50,12 +59,12 @@ const PROMOS: PromoItem[] = [
     months: [12, 1], // December-January
   },
 
-  // --- Всесезонные / зимние ---
+  // --- Всесезонные / зимние (через Collection-подборки) ---
   {
     slug: 'valentines',
     title: 'День влюблённых',
     description: 'Романтические экскурсии и ужины для двоих',
-    href: '/events?tag=romantic',
+    href: '/podborki/den-vlyublennyh',
     icon: Heart,
     gradient: 'from-rose-500 to-pink-500',
     months: [2], // February
@@ -64,7 +73,7 @@ const PROMOS: PromoItem[] = [
     slug: 'maslenitsa',
     title: 'Масленица',
     description: 'Гастро-экскурсии, блины и народные гуляния',
-    href: '/events?subcategory=GASTRO',
+    href: '/podborki/maslenitsa',
     icon: UtensilsCrossed,
     gradient: 'from-amber-500 to-orange-500',
     months: [2, 3], // February-March
@@ -73,7 +82,7 @@ const PROMOS: PromoItem[] = [
     slug: 'winter-city',
     title: 'Зимний город',
     description: 'Крытые экскурсии, музеи и тёплые маршруты',
-    href: '/events?tag=bad-weather-ok',
+    href: '/podborki/zimniy-gorod',
     icon: Umbrella,
     gradient: 'from-slate-600 to-blue-700',
     months: [11, 12, 1, 2, 3], // November-March
@@ -82,7 +91,7 @@ const PROMOS: PromoItem[] = [
     slug: 'kids-holidays',
     title: 'Каникулы с детьми',
     description: 'Интерактивные программы и семейные экскурсии',
-    href: '/events?audience=KIDS',
+    href: '/podborki/kanikuly-s-detmi',
     icon: Baby,
     gradient: 'from-emerald-500 to-teal-500',
     months: [1, 3, 6, 7, 8], // Jan (winter break), Mar (spring break), Jun-Aug (summer)

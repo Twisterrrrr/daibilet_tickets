@@ -469,11 +469,49 @@ export class ReviewService {
       this.prisma.review.count({ where }),
     ]);
 
+    const summary = await this.getVenueRatingSummary(venue.id);
+
     return {
       items,
+      externalReviews: [] as any[],
       total,
       page,
       totalPages: Math.ceil(total / limit),
+      summary,
+    };
+  }
+
+  /**
+   * Рейтинг-сводка для места: средний балл + разбивка по звёздам.
+   */
+  async getVenueRatingSummary(venueId: string) {
+    const reviews = await this.prisma.review.findMany({
+      where: { venueId, status: 'APPROVED' },
+      select: { rating: true, isVerified: true },
+    });
+
+    if (reviews.length === 0) {
+      return {
+        avgRating: 0,
+        reviewCount: 0,
+        verifiedCount: 0,
+        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      };
+    }
+
+    const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
+    const avgRating = Math.round((sum / reviews.length) * 10) / 10;
+    const verifiedCount = reviews.filter((r) => r.isVerified).length;
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const r of reviews) {
+      distribution[r.rating as 1 | 2 | 3 | 4 | 5]++;
+    }
+
+    return {
+      avgRating,
+      reviewCount: reviews.length,
+      verifiedCount,
+      distribution,
     };
   }
 

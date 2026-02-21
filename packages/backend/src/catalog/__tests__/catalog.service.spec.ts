@@ -46,12 +46,13 @@ describe('CatalogService', () => {
   // =========================================
 
   describe('getCities', () => {
-    it('should filter out cities with 0 events', async () => {
+    it('should filter out cities with fewer than 2 events', async () => {
       // Both $queryRaw calls return empty arrays (no hidden cities, no region stats)
       mockPrisma.$queryRaw.mockResolvedValue([]);
       mockPrisma.city.findMany.mockResolvedValue([
         { id: '1', name: 'Москва', slug: 'moscow', _count: { events: 10, venues: 5 }, landingPages: [] },
         { id: '2', name: 'Empty', slug: 'empty', _count: { events: 0, venues: 0 }, landingPages: [] },
+        { id: '3', name: 'OneEvent', slug: 'one-event', _count: { events: 1, venues: 0 }, landingPages: [] },
       ]);
 
       const result = await service.getCities();

@@ -1,12 +1,24 @@
 -- Pre-YooKassa Safety Gates: domain model hardening
 -- FulfillmentItem, ProcessedWebhookEvent, FeatureFlag
+-- Idempotent: safe to run when enums/tables already exist (e.g. after db push)
 
--- Enums
-CREATE TYPE "PurchaseFlow" AS ENUM ('PLATFORM', 'EXTERNAL');
-CREATE TYPE "FulfillmentStatus" AS ENUM ('PENDING', 'RESERVING', 'RESERVED', 'CONFIRMED', 'FAILED', 'CANCELLED', 'REFUNDED');
+-- Enums (create only if not exist)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PurchaseFlow') THEN
+    CREATE TYPE "PurchaseFlow" AS ENUM ('PLATFORM', 'EXTERNAL');
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'FulfillmentStatus') THEN
+    CREATE TYPE "FulfillmentStatus" AS ENUM ('PENDING', 'RESERVING', 'RESERVED', 'CONFIRMED', 'FAILED', 'CANCELLED', 'REFUNDED');
+  END IF;
+END $$;
 
 -- FulfillmentItem: per-line-item execution tracking
-CREATE TABLE "fulfillment_items" (
+CREATE TABLE IF NOT EXISTS "fulfillment_items" (
   "id"                  UUID NOT NULL DEFAULT gen_random_uuid(),
   "checkoutSessionId"   UUID NOT NULL,
   "lineItemIndex"       INTEGER NOT NULL,
@@ -31,17 +43,22 @@ CREATE TABLE "fulfillment_items" (
   CONSTRAINT "fulfillment_items_pkey" PRIMARY KEY ("id")
 );
 
-ALTER TABLE "fulfillment_items"
-  ADD CONSTRAINT "fulfillment_items_checkoutSessionId_fkey"
-  FOREIGN KEY ("checkoutSessionId") REFERENCES "checkout_sessions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fulfillment_items_checkoutSessionId_fkey') THEN
+    ALTER TABLE "fulfillment_items"
+      ADD CONSTRAINT "fulfillment_items_checkoutSessionId_fkey"
+      FOREIGN KEY ("checkoutSessionId") REFERENCES "checkout_sessions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
 
-CREATE INDEX "fulfillment_items_checkoutSessionId_idx" ON "fulfillment_items"("checkoutSessionId");
-CREATE INDEX "fulfillment_items_status_idx" ON "fulfillment_items"("status");
-CREATE INDEX "fulfillment_items_status_nextRetryAt_idx" ON "fulfillment_items"("status", "nextRetryAt");
-CREATE INDEX "fulfillment_items_status_escalatedAt_idx" ON "fulfillment_items"("status", "escalatedAt");
+CREATE INDEX IF NOT EXISTS "fulfillment_items_checkoutSessionId_idx" ON "fulfillment_items"("checkoutSessionId");
+CREATE INDEX IF NOT EXISTS "fulfillment_items_status_idx" ON "fulfillment_items"("status");
+CREATE INDEX IF NOT EXISTS "fulfillment_items_status_nextRetryAt_idx" ON "fulfillment_items"("status", "nextRetryAt");
+CREATE INDEX IF NOT EXISTS "fulfillment_items_status_escalatedAt_idx" ON "fulfillment_items"("status", "escalatedAt");
 
 -- ProcessedWebhookEvent: idempotency for incoming webhooks
-CREATE TABLE "processed_webhook_events" (
+CREATE TABLE IF NOT EXISTS "processed_webhook_events" (
   "id"              UUID NOT NULL DEFAULT gen_random_uuid(),
   "providerEventId" TEXT NOT NULL,
   "provider"        TEXT NOT NULL,
@@ -53,11 +70,11 @@ CREATE TABLE "processed_webhook_events" (
   CONSTRAINT "processed_webhook_events_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "processed_webhook_events_providerEventId_key" ON "processed_webhook_events"("providerEventId");
-CREATE INDEX "processed_webhook_events_provider_eventType_idx" ON "processed_webhook_events"("provider", "eventType");
+CREATE UNIQUE INDEX IF NOT EXISTS "processed_webhook_events_providerEventId_key" ON "processed_webhook_events"("providerEventId");
+CREATE INDEX IF NOT EXISTS "processed_webhook_events_provider_eventType_idx" ON "processed_webhook_events"("provider", "eventType");
 
 -- FeatureFlag: per-city/category feature toggles
-CREATE TABLE "feature_flags" (
+CREATE TABLE IF NOT EXISTS "feature_flags" (
   "id"          UUID NOT NULL DEFAULT gen_random_uuid(),
   "key"         TEXT NOT NULL,
   "scope"       TEXT NOT NULL DEFAULT 'global',
@@ -71,5 +88,5 @@ CREATE TABLE "feature_flags" (
   CONSTRAINT "feature_flags_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "feature_flags_key_scope_scopeValue_key" ON "feature_flags"("key", "scope", "scopeValue");
-CREATE INDEX "feature_flags_key_scope_idx" ON "feature_flags"("key", "scope");
+CREATE UNIQUE INDEX IF NOT EXISTS "feature_flags_key_scope_scopeValue_key" ON "feature_flags"("key", "scope", "scopeValue");
+CREATE INDEX IF NOT EXISTS "feature_flags_key_scope_idx" ON "feature_flags"("key", "scope");
