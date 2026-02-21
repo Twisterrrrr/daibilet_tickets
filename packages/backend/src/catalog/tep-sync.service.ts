@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { TepApiService, TepEvent, TepCity } from './tep-api.service';
+import { normalizeEventTitle } from '@daibilet/shared';
 import { EventCategory, EventSubcategory, EventAudience, Prisma } from '@prisma/client';
 
 /**
@@ -26,6 +29,9 @@ export class TepSyncService {
 
   /** Кэш tepCityId → наш cityId (UUID) */
   private cityCache = new Map<number, string>();
+
+  /** Кэш маппинга tep-XXX → tepWidgetId из teplohod-widgets.json */
+  private widgetsMappingCache: Record<string, number> | null = null;
 
   /**
    * Маппинг city_id teplohod.info → наш slug.
@@ -56,6 +62,37 @@ export class TepSyncService {
   ) {}
 
   /**
+   * Загрузить маппинг tep-XXX → tepWidgetId из teplohod-widgets.json.
+   * Используется для проверки виджета, если tepWidgetId ещё не в widgetPayload (seed не запущен).
+   */
+  private getTeplohodWidgetsMapping(): Record<string, number> {
+    if (this.widgetsMappingCache != null) return this.widgetsMappingCache;
+    const paths = [
+      join(process.cwd(), 'prisma', 'teplohod-widgets.json'),
+      join(__dirname, '../../prisma', 'teplohod-widgets.json'),
+    ];
+    for (const p of paths) {
+      if (existsSync(p)) {
+        try {
+          const raw = readFileSync(p, 'utf-8');
+          const data = JSON.parse(raw) as Record<string, number | string>;
+          const out: Record<string, number> = {};
+          for (const [k, v] of Object.entries(data)) {
+            const num = typeof v === 'number' ? v : parseInt(String(v), 10);
+            if (!Number.isNaN(num)) out[k] = num;
+          }
+          this.widgetsMappingCache = out;
+          return out;
+        } catch (e) {
+          this.logger.warn(`Не удалось загрузить ${p}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+    this.widgetsMappingCache = {};
+    return {};
+  }
+
+  /**
    * Полная синхронизация всех событий из teplohod.info.
    *
    * Оптимизация: один запрос к API (teplohod возвращает все события
@@ -72,6 +109,7 @@ export class TepSyncService {
   }> {
     this.logger.log('=== Начинаю синхронизацию из teplohod.info ===');
     this.cityCache.clear();
+    this.widgetsMappingCache = null;
 
     const errors: string[] = [];
     const newCitiesCreated: string[] = [];
@@ -181,7 +219,7 @@ export class TepSyncService {
    */
   private async syncEvent(tep: TepEvent, cityId: string): Promise<number> {
     const sourceId = `tep-${tep.id}`;
-    const title = tep.title?.trim();
+    const title = normalizeEventTitle(tep.title || '');
     if (!title) return -1;
 
     const description = this.cleanDescription(tep.description);
@@ -257,28 +295,47 @@ export class TepSyncService {
       });
     }
 
-    // Upsert EventOffer (мульти-офферная архитектура)
+    // Upsert EventOffer (мульти-офферная архитектура).
+    // purchaseType = WIDGET — единственный вариант для TEPLOHOD.
+    // Если embed не работает, событие будет скрыто (DISABLED) проверкой ниже.
     const eventRecord = existing
       ? existing
       : await this.prisma.event.findUnique({ where: { tcEventId: sourceId }, select: { id: true } });
     if (eventRecord) {
+      const offer = await this.prisma.eventOffer.findUnique({
+        where: { source_externalEventId: { source: 'TEPLOHOD', externalEventId: sourceId } },
+        select: { widgetPayload: true },
+      });
+      const basePayload = (offer?.widgetPayload as Record<string, unknown>) || {};
+      const mergedPayload = {
+        ...basePayload,
+        v: (basePayload.v as number) ?? 1,
+        tepEventId: tep.id,
+        ...(basePayload.tepWidgetId != null && { tepWidgetId: basePayload.tepWidgetId }),
+      };
+
       await this.prisma.eventOffer.upsert({
         where: {
           source_externalEventId: { source: 'TEPLOHOD', externalEventId: sourceId },
         },
         update: {
           eventId: eventRecord.id,
+          purchaseType: 'WIDGET',
           priceFrom,
           deeplink: `${this.tepSiteUrl}/event/${tep.id}`,
+          widgetProvider: 'TEPLOHOD',
+          widgetPayload: mergedPayload as unknown as Prisma.InputJsonValue,
           externalData: tep as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
         create: {
           eventId: eventRecord.id,
           source: 'TEPLOHOD',
-          purchaseType: 'REDIRECT',
+          purchaseType: 'WIDGET',
           externalEventId: sourceId,
           deeplink: `${this.tepSiteUrl}/event/${tep.id}`,
+          widgetProvider: 'TEPLOHOD',
+          widgetPayload: { tepEventId: tep.id } as unknown as Prisma.InputJsonValue,
           priceFrom,
           isPrimary: true,
           status: 'ACTIVE',
@@ -289,8 +346,80 @@ export class TepSyncService {
     }
 
     // Создаём сессии из расписания (eventTimes) или виртуальную сессию
+    const hasRealSchedule = !!tep.eventTimes?.length;
     const sessionCount = await this.syncSession(sourceId, tep, prices);
-    this.logger.debug(`tep-${tep.id}: ${sessionCount} sessions`);
+    this.logger.debug(`tep-${tep.id}: ${sessionCount} sessions (real=${hasRealSchedule})`);
+
+    // Проверка виджета teplohod.info по tepWidgetId (account.teplohod.info/widget/embed/{tepWidgetId}).
+    // tepWidgetId — из widgetPayload (seed-teplohod-widgets) или teplohod-widgets.json.
+    if (eventRecord) {
+      const offerAfter = await this.prisma.eventOffer.findUnique({
+        where: { source_externalEventId: { source: 'TEPLOHOD', externalEventId: sourceId } },
+        select: { widgetPayload: true },
+      });
+      const payload = (offerAfter?.widgetPayload as Record<string, unknown>) || {};
+      const tepWidgetId =
+        (payload.tepWidgetId as number | string | null | undefined) ??
+        this.getTeplohodWidgetsMapping()[sourceId];
+
+      let offerStatus: 'ACTIVE' | 'DISABLED' = 'ACTIVE';
+      let eventIsActive = true;
+
+      if (tepWidgetId != null) {
+        try {
+          const widgetStatus = await this.tepApi.checkWidgetStatusByTepWidgetId(tepWidgetId);
+          if (widgetStatus === 'working') {
+            offerStatus = 'ACTIVE';
+            eventIsActive = true;
+          } else {
+            offerStatus = 'DISABLED';
+            eventIsActive = false;
+            this.logger.debug(
+              `tep-${tep.id}: виджет ${tepWidgetId} → ${widgetStatus}, скрываем`,
+            );
+          }
+        } catch (err) {
+          this.logger.warn(
+            `tep-${tep.id}: ошибка проверки виджета ${tepWidgetId}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          // При ошибке сети оставляем ACTIVE — не скрываем из-за временных сбоев
+        }
+      }
+
+      await this.prisma.eventOffer.updateMany({
+        where: { source: 'TEPLOHOD', externalEventId: sourceId },
+        data: { purchaseType: 'WIDGET', status: offerStatus },
+      });
+
+      const ev = await this.prisma.event.findUnique({
+        where: { tcEventId: sourceId },
+        select: { isActive: true },
+      });
+      if (ev) {
+        const needReactivate = !ev.isActive && eventIsActive;
+        const needDeactivate = ev.isActive && !eventIsActive;
+        if (needReactivate) {
+          this.logger.log(`tep-${tep.id}: реактивируем`);
+          await this.prisma.event.update({
+            where: { tcEventId: sourceId },
+            data: { isActive: true },
+          });
+          await this.prisma.eventSession.updateMany({
+            where: { eventId: eventRecord.id, tcSessionId: { startsWith: sourceId } },
+            data: { isActive: true },
+          });
+        } else if (needDeactivate) {
+          await this.prisma.event.update({
+            where: { tcEventId: sourceId },
+            data: { isActive: false },
+          });
+          await this.prisma.eventSession.updateMany({
+            where: { eventId: eventRecord.id, tcSessionId: { startsWith: sourceId } },
+            data: { isActive: false },
+          });
+        }
+      }
+    }
 
     // Теги из фич
     await this.syncFeatureTags(sourceId, tep.eventFeatures || []);
@@ -350,7 +479,14 @@ export class TepSyncService {
         });
       }
 
-      if (rows.length === 0) return 0;
+      if (rows.length === 0) {
+        // Нет будущих слотов — деактивируем все сессии (событие скроется из каталога)
+        await this.prisma.eventSession.updateMany({
+          where: { eventId: event.id, tcSessionId: { startsWith: sourceId } },
+          data: { isActive: false },
+        });
+        return 0;
+      }
 
       const seenIds = rows.map((r) => r.tcSessionId);
 
@@ -397,14 +533,23 @@ export class TepSyncService {
 
     // Fallback: compact API — виртуальная сессия
     const sessionId = `${sourceId}-main`;
-    const tomorrow = new Date();
+    const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(10, 0, 0, 0);
 
     const totalVacant = tep.eventTickets?.reduce(
       (sum, t) => sum + (t.is_attached ? 0 : 1),
       0,
-    ) || 1;
+    ) ?? 0;
+    const hasAvailableSlots = totalVacant > 0;
+
+    const existing = await this.prisma.eventSession.findUnique({
+      where: { tcSessionId: sessionId },
+      select: { startsAt: true },
+    });
+    const startsAt = (existing && new Date(existing.startsAt) > now)
+      ? existing.startsAt
+      : tomorrow;
 
     await this.prisma.eventSession.upsert({
       where: { tcSessionId: sessionId },
@@ -412,7 +557,8 @@ export class TepSyncService {
         offerId: offer?.id ?? undefined,
         prices,
         availableTickets: totalVacant * 10,
-        isActive: true,
+        isActive: hasAvailableSlots,
+        startsAt,
       },
       create: {
         eventId: event.id,
@@ -421,7 +567,7 @@ export class TepSyncService {
         startsAt: tomorrow,
         availableTickets: totalVacant * 10,
         prices,
-        isActive: true,
+        isActive: hasAvailableSlots,
       },
     });
     return 1;
@@ -547,10 +693,21 @@ export class TepSyncService {
 
     const text = `${title} ${description}`.toLowerCase();
     const slugsToLink = new Set<string>();
+    const isBusTour = ['автобус', 'bus', 'hop-on', 'hop on'].some((w) => text.includes(w));
 
     for (const [keyword, slugs] of Object.entries(TepSyncService.KEYWORD_TAG_MAP)) {
       if (text.includes(keyword)) {
-        for (const s of slugs) slugsToLink.add(s);
+        for (const s of slugs) {
+          if (isBusTour && s === 'water') continue;
+          slugsToLink.add(s);
+        }
+      }
+    }
+
+    if (isBusTour) {
+      const waterTag = await this.prisma.tag.findFirst({ where: { slug: 'water', isActive: true } });
+      if (waterTag) {
+        await this.prisma.eventTag.deleteMany({ where: { eventId: event.id, tagId: waterTag.id } });
       }
     }
 
@@ -668,7 +825,7 @@ export class TepSyncService {
 
   /**
    * Маппинг категорий teplohod.info → category + subcategory + audience.
-   * Большинство событий teplohod.info — речные прогулки.
+   * teplohod.info — разнородный агрегатор: речные экскурсии, музеи, автобусы, мероприятия и т.д.
    */
   private classifyTep(tep: TepEvent): { category: EventCategory; subcategories: EventSubcategory[]; audience: EventAudience } {
     const cat = (tep.category || '').toLowerCase();
@@ -686,17 +843,31 @@ export class TepSyncService {
       audience = 'FAMILY' as EventAudience;
     }
 
-    // Музей
+    // Мероприятия — выпускной, последний звонок, дискотека (даже на теплоходе) — проверяем ДО водных
+    if (this.hasTep(text, ['выпускной', 'последний звонок', 'дискотек', 'disco']))
+      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.PARTY], audience };
+
+    // Речная/водная экскурсия — только если в заголовке/описании есть «экскурсия»
+    const isWater = this.hasTep(text, ['теплоход', 'речн', 'катер', 'корабл', 'яхт', 'водн', 'по неве', 'по реке', 'круиз', 'развод мостов', 'салют', 'палубн']);
+    const hasExcursion = this.hasTep(text, ['экскурсия']);
+    if (isWater && hasExcursion) {
+      const subs: EventSubcategory[] = [EventSubcategory.RIVER];
+      if (!this.hasTep(text, ['лагерь', 'camp', 'выездной']) && this.hasTep(text, ['гастро', 'гастрономич', 'дегустац', 'culinary', 'food tour']))
+        subs.push(EventSubcategory.GASTRO);
+      return { category: EventCategory.EXCURSION, subcategories: subs, audience };
+    }
+
+    // Музей и площадки (смотровая площадка = площадка, не мероприятие)
     if (cat.includes('музей') || title.includes('музей'))
       return { category: EventCategory.MUSEUM, subcategories: [EventSubcategory.MUSEUM_CLASSIC], audience };
     if (cat.includes('выставк') || title.includes('выставк'))
       return { category: EventCategory.MUSEUM, subcategories: [EventSubcategory.EXHIBITION], audience };
+    if (this.hasTep(text, ['смотровая площадка', 'смотров', 'observation']))
+      return { category: EventCategory.MUSEUM, subcategories: [EventSubcategory.ART_SPACE], audience };
 
-    // Мероприятия — стендап проверяем ДО шоу, чтобы «стендап-шоу» не получал тег SHOW
+    // Мероприятия
     if (this.hasTep(text, ['стендап', 'stand-up', 'stand up', 'комедия', 'comedy', 'комик']))
       return { category: EventCategory.EVENT, subcategories: [EventSubcategory.STANDUP], audience };
-    if (cat.includes('смотров') || cat.includes('observation'))
-      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.SHOW], audience };
     if (this.hasTep(text, ['концерт', 'concert']))
       return { category: EventCategory.EVENT, subcategories: [EventSubcategory.CONCERT], audience };
     if (this.hasTep(text, ['шоу', 'show', 'представлен']))
@@ -704,11 +875,14 @@ export class TepSyncService {
     if (this.hasTep(text, ['фестиваль', 'festival']))
       return { category: EventCategory.EVENT, subcategories: [EventSubcategory.FESTIVAL], audience };
 
-    // По умолчанию — речная экскурсия (teplohod.info)
-    const subs: EventSubcategory[] = [EventSubcategory.RIVER];
-    if (this.hasTep(text, ['гастро', 'ужин', 'обед', 'завтрак', 'бранч', 'кухня']))
-      subs.push(EventSubcategory.GASTRO);
-    return { category: EventCategory.EXCURSION, subcategories: subs, audience };
+    // Экстрим — только наземные (танк, квадроцикл и т.п.). Речные прогулки никогда не экстрим.
+    if (this.hasTep(text, ['танк', 'танке', 'квадроцикл', 'стрельб', 'экстрим', 'броневик']))
+      return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.EXTREME], audience };
+    if (this.hasTep(text, ['автобус', 'bus', 'hop-on', 'hop on']) || (this.hasTep(text, ['обзорн']) && !isWater))
+      return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.BUS], audience };
+
+    // По умолчанию — EVENT. teplohod.info не только речные прогулки: музеи, площадки, мероприятия.
+    return { category: EventCategory.EVENT, subcategories: [], audience };
   }
 
   private hasTep(text: string, words: string[]): boolean {

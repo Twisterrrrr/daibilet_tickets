@@ -41,7 +41,10 @@ export function CheckoutClient() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [contact, setContact] = useState<ContactForm>({ name: '', email: '', phone: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{ shortCode?: string; paymentUrl?: string; sessionId?: string } | null>(null);
+  const [giftCertCode, setGiftCertCode] = useState('');
+  const [giftCertValidation, setGiftCertValidation] = useState<{ valid: boolean; discountAmount?: number; message?: string } | null>(null);
+  const [validatingCert, setValidatingCert] = useState(false);
 
   // Separate items by type (3 типа: WIDGET, REDIRECT, REQUEST)
   const redirectItems = items.filter((i) => i.purchaseType === 'REDIRECT');
@@ -75,12 +78,36 @@ export function CheckoutClient() {
     }
   };
 
+  // Validate gift certificate
+  const handleValidateCert = async () => {
+    const code = giftCertCode.trim();
+    if (!code) return;
+    const cartTotalKopecks = items.reduce((sum, i) => sum + i.priceFrom * i.quantity, 0);
+    if (cartTotalKopecks <= 0) return;
+    setValidatingCert(true);
+    setGiftCertValidation(null);
+    try {
+      const res = await fetch(`${API_BASE}/checkout/validate-gift-certificate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, cartTotalKopecks }),
+      });
+      const data = await res.json();
+      setGiftCertValidation(data);
+    } catch (e) {
+      setGiftCertValidation({ valid: false, message: 'Ошибка проверки кода' });
+    } finally {
+      setValidatingCert(false);
+    }
+  };
+
   // Submit checkout
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contact.name || !contact.email || !contact.phone) return;
 
     setSubmitting(true);
+    setValidationError(null);
     try {
       const res = await fetch(`${API_BASE}/checkout/session`, {
         method: 'POST',
@@ -89,6 +116,7 @@ export function CheckoutClient() {
           items,
           customer: contact,
           utm: getUtmParams(),
+          giftCertificateCode: giftCertValidation?.valid ? giftCertCode.trim() : undefined,
         }),
       });
       if (!res.ok) {
@@ -236,11 +264,52 @@ export function CheckoutClient() {
               })}
             </div>
 
+            {/* Gift certificate */}
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-medium text-slate-500 mb-2">Подарочный сертификат</p>
+              <div className="flex gap-2">
+                <input
+                  value={giftCertCode}
+                  onChange={(e) => {
+                    setGiftCertCode(e.target.value.toUpperCase());
+                    setGiftCertValidation(null);
+                  }}
+                  placeholder="Введите код (напр. GC-XXXX-XXXX)"
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm uppercase placeholder:normal-case focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                />
+                <button
+                  type="button"
+                  onClick={handleValidateCert}
+                  disabled={validatingCert || !giftCertCode.trim()}
+                  className="rounded-lg border border-primary-600 bg-primary-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {validatingCert ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Применить'}
+                </button>
+              </div>
+              {giftCertValidation && (
+                <p className={`mt-2 text-xs ${giftCertValidation.valid ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {giftCertValidation.valid
+                    ? `Скидка ${formatPrice(giftCertValidation.discountAmount ?? 0)} применена`
+                    : giftCertValidation.message}
+                </p>
+              )}
+            </div>
+
             {/* Summary */}
             <div className="rounded-xl border border-slate-200 bg-white p-4">
+              {giftCertValidation?.valid && (giftCertValidation.discountAmount ?? 0) > 0 && (
+                <div className="flex items-center justify-between text-sm text-slate-600 mb-2">
+                  <span>Скидка (сертификат)</span>
+                  <span className="text-emerald-600">−{formatPrice(giftCertValidation.discountAmount ?? 0)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-slate-600">Итого:</span>
-                <span className="text-xl font-bold text-slate-900">{formatPrice(totalPrice)}</span>
+                <span className="text-xl font-bold text-slate-900">
+                  {formatPrice(
+                    totalPrice - (giftCertValidation?.valid ? (giftCertValidation.discountAmount ?? 0) : 0),
+                  )}
+                </span>
               </div>
               {redirectItems.length > 0 && requestItems.length > 0 && (
                 <p className="mt-2 text-xs text-slate-400">

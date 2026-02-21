@@ -3,7 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { TcApiService } from './tc-api.service';
 import { TcGrpcService, TcGrpcEvent, TcGrpcMetaEvent, TcGrpcVenue, TcGrpcCity, TcGrpcTicketSet } from './tc-grpc.service';
+import { normalizeEventTitle } from '@daibilet/shared';
 import { EventCategory, EventSubcategory, EventAudience, Prisma } from '@prisma/client';
+import { classify } from './event-classifier';
 
 /**
  * Сервис синхронизации данных из Ticketscloud в нашу БД.
@@ -124,7 +126,7 @@ export class TcSyncService {
     this.logger.log('gRPC: загрузка данных...');
 
     const [grpcEvents, grpcMetas, grpcVenues, grpcCities] = await Promise.all([
-      this.tcGrpc.fetchEvents({ status: 2 }), // PUBLIC only
+      this.tcGrpc.fetchEvents({ status: 0 }), // 0=ANY — все события (PUBLIC + STAND_BY и др.)
       this.tcGrpc.fetchMetaEvents(),
       this.tcGrpc.fetchVenues(),
       this.tcGrpc.fetchCities(),
@@ -229,6 +231,19 @@ export class TcSyncService {
 
     this.logger.log(`=== gRPC Sync: ${uniqueCount} событий, ${sessionCount} сессий ===`);
 
+    // Step 6.5: Активируем города с TC-событиями и генерируем мини-описания для городов без них
+    const cityIds = [...this.cityCache.values()];
+    if (cityIds.length > 0) {
+      const activated = await this.prisma.city.updateMany({
+        where: { id: { in: cityIds }, isActive: false },
+        data: { isActive: true },
+      });
+      if (activated.count > 0) {
+        this.logger.log(`Активировано городов для каталога: ${activated.count}`);
+      }
+      await this.ensureCityDescriptions(cityIds);
+    }
+
     // Step 7: Retag
     let retagResult = { eventsProcessed: 0, tagsLinked: 0 };
     try {
@@ -274,7 +289,7 @@ export class TcSyncService {
     const tcMetaEventId = meta?.id || null;
 
     // Заголовок: из MetaEvent (если есть), иначе из лучшего Event
-    const title = (meta?.name || best.name || '').trim();
+    const title = normalizeEventTitle(meta?.name || best.name || '');
     if (!title) return 0;
 
     // Описание
@@ -511,12 +526,14 @@ export class TcSyncService {
     const timezone = grpcCity?.timezone || 'Europe/Moscow';
     const lat = grpcCity?.coordinates?.latitude || venue.coordinates?.latitude || null;
     const lng = grpcCity?.coordinates?.longitude || venue.coordinates?.longitude || null;
+    const description = this.generateCityDescription(cityName);
 
     try {
       city = await this.prisma.city.create({
         data: {
           slug,
           name: cityName,
+          description,
           timezone,
           lat: lat ?? null,
           lng: lng ?? null,
@@ -532,6 +549,7 @@ export class TcSyncService {
         data: {
           slug: fallbackSlug,
           name: cityName,
+          description,
           timezone,
           lat: lat ?? null,
           lng: lng ?? null,
@@ -540,6 +558,57 @@ export class TcSyncService {
       });
       this.cityCache.set(geoId, city.id);
       return fallbackSlug;
+    }
+  }
+
+  /**
+   * Генерирует описания для всех городов с событиями, у которых description пустое.
+   * Вызывается из админки или после sync.
+   */
+  async generateDescriptionsForCitiesWithout(): Promise<{ updated: number }> {
+    const cities = await this.prisma.city.findMany({
+      where: {
+        isActive: true,
+        OR: [{ description: null }, { description: '' }],
+        events: { some: { isDeleted: false, isActive: true } },
+      },
+      select: { id: true, name: true },
+    });
+    for (const c of cities) {
+      await this.prisma.city.update({
+        where: { id: c.id },
+        data: { description: this.generateCityDescription(c.name) },
+      });
+      this.logger.log(`Сгенерировано описание для города: ${c.name}`);
+    }
+    return { updated: cities.length };
+  }
+
+  /**
+   * Генерирует мини-описание для страницы города (шаблон).
+   * Используется при создании нового города и для заполнения пустых описаний.
+   */
+  private generateCityDescription(cityName: string): string {
+    return `Экскурсии, музеи и мероприятия в ${cityName}. Покупайте билеты онлайн.`;
+  }
+
+  /**
+   * Заполняет City.description для городов с пустым описанием (чтобы они показывались в каталоге).
+   */
+  private async ensureCityDescriptions(cityIds: string[]): Promise<void> {
+    const cities = await this.prisma.city.findMany({
+      where: {
+        id: { in: cityIds },
+        OR: [{ description: null }, { description: '' }],
+      },
+      select: { id: true, name: true },
+    });
+    for (const c of cities) {
+      await this.prisma.city.update({
+        where: { id: c.id },
+        data: { description: this.generateCityDescription(c.name) },
+      });
+      this.logger.log(`Сгенерировано описание для города: ${c.name}`);
     }
   }
 
@@ -631,83 +700,7 @@ export class TcSyncService {
 
   /** Классификация из gRPC Event */
   private classifyGrpc(ev: TcGrpcEvent, title: string, description: string | null) {
-    return this.classify(title, description || '');
-  }
-
-  // ============================================================
-  // Универсальный классификатор category + subcategory
-  // ============================================================
-
-  /**
-   * Универсальный классификатор: определяет category, subcategories и audience.
-   * Audience (KIDS/FAMILY) отдельно от category — kids events получают реальную категорию (EXCURSION/MUSEUM/EVENT).
-   */
-  private classify(title: string, description: string, tags: string[] = []): {
-    category: EventCategory;
-    subcategories: EventSubcategory[];
-    audience: EventAudience;
-  } {
-    const text = `${title} ${description} ${tags.join(' ')}`.toLowerCase();
-    const subs: EventSubcategory[] = [];
-
-    // --- Detect audience (kids/family) ---
-    const kidsMarkers = ['для детей', 'детский', 'детское', 'детская', 'детям', 'ребёнк', 'ребенк', 'малыш', 'kids', 'children', '0+', '3+', '4+', '5+', '6+'];
-    const familyMarkers = ['семейн', 'family', 'для всей семьи'];
-    let audience: EventAudience = 'ALL' as EventAudience;
-    if (kidsMarkers.some((w) => text.includes(w))) {
-      audience = 'KIDS' as EventAudience;
-    } else if (familyMarkers.some((w) => text.includes(w))) {
-      audience = 'FAMILY' as EventAudience;
-    }
-
-    // =====================================================================
-    // Приоритет: EVENT → EXCURSION → MUSEUM
-    // MUSEUM — только чистое посещение площадки (входной билет, экспозиция).
-    // Любое мероприятие или экскурсия, даже внутри музея — НЕ музей.
-    // =====================================================================
-
-    // --- 1. EVENT (концерт, стендап, театр, мастер-класс и т.д.) ---
-    const isStandup = this.has(text, ['стендап', 'stand-up', 'stand up', 'комедия', 'comedy', 'комик']);
-    if (this.has(text, ['концерт', 'concert', 'выступлен', 'tribute', 'трибьют', 'джаз', 'jazz', 'рок ', 'rock '])) subs.push(EventSubcategory.CONCERT);
-    if (isStandup) subs.push(EventSubcategory.STANDUP);
-    if (this.has(text, ['театр', 'спектакл', 'theater', 'theatre', 'драм', 'опер', 'балет'])) subs.push(EventSubcategory.THEATER);
-    if (!isStandup && this.has(text, ['шоу', 'show', 'представлен', 'цирк', 'иллюзион', 'магическ'])) subs.push(EventSubcategory.SHOW);
-    if (this.has(text, ['фестиваль', 'festival', 'fest '])) subs.push(EventSubcategory.FESTIVAL);
-    if (!isStandup && this.has(text, ['спорт', 'sport', 'матч', 'хоккей', 'футбол', 'баскетбол', 'бег', 'марафон'])) subs.push(EventSubcategory.SPORT);
-    if (this.has(text, ['мастер-класс', 'мастер класс', 'masterclass', 'workshop', 'воркшоп', 'мастер-', 'лекция', 'лекцию', 'лектори', 'lecture'])) subs.push(EventSubcategory.MASTERCLASS);
-    if (this.has(text, ['вечеринк', 'party', 'дискотек', 'клуб '])) subs.push(EventSubcategory.PARTY);
-    if (subs.length > 0) return { category: EventCategory.EVENT, subcategories: subs, audience };
-
-    // --- 2. EXCURSION (экскурсия, тур, прогулка, квест — даже по музею) ---
-    const isExcursion = this.has(text, ['экскурси', 'excursion', 'тур ', ' тур', 'tour', 'прогулк', 'обзорн']);
-    if (isExcursion || this.has(text, ['квест', 'quest'])) {
-      if (this.has(text, ['речн', 'теплоход', 'корабл', 'катер', 'яхт', 'водн', 'canal', 'boat', 'по неве', 'по реке', 'по каналам', 'развод мостов', 'разводные мосты'])) subs.push(EventSubcategory.RIVER);
-      if (this.has(text, ['автобус', 'bus'])) subs.push(EventSubcategory.BUS);
-      if (this.has(text, ['пешеходн', 'пешком', 'walking', 'двор', 'улиц', 'район'])) subs.push(EventSubcategory.WALKING);
-      if (this.has(text, ['гастро', 'еда', 'кухня', 'food', 'gastro', 'дегустац', 'бар ', 'пивн', 'вин'])) subs.push(EventSubcategory.GASTRO);
-      if (this.has(text, ['крыш', 'rooftop'])) subs.push(EventSubcategory.ROOFTOP);
-      if (this.has(text, ['квест', 'quest'])) subs.push(EventSubcategory.QUEST);
-      if (this.has(text, ['комбинирован', 'комбо'])) subs.push(EventSubcategory.COMBINED);
-      if (subs.length === 0 && this.has(text, ['прогулк', 'обзорн'])) subs.push(EventSubcategory.WALKING);
-      return { category: EventCategory.EXCURSION, subcategories: subs, audience };
-    }
-
-    // --- 3. MUSEUM (только посещение площадки / входной билет / экспозиция) ---
-    // Сюда попадает только если НЕТ признаков мероприятия или экскурсии
-    if (this.has(text, ['музей', 'музеи', 'museum'])) subs.push(EventSubcategory.MUSEUM_CLASSIC);
-    if (this.has(text, ['выставк', 'exhibition', 'экспозиц'])) subs.push(EventSubcategory.EXHIBITION);
-    if (this.has(text, ['галерея', 'gallery'])) subs.push(EventSubcategory.GALLERY);
-    if (this.has(text, ['дворец', 'дворц', 'усадьб', 'palace', 'manor'])) subs.push(EventSubcategory.PALACE);
-    if (this.has(text, ['заповедник', 'ботаническ', 'парк-музей'])) subs.push(EventSubcategory.PARK);
-    if (subs.length > 0) return { category: EventCategory.MUSEUM, subcategories: subs, audience };
-
-    // Fallback
-    return { category: EventCategory.EVENT, subcategories: [], audience };
-  }
-
-  /** Хелпер: есть ли хотя бы одно из слов в тексте */
-  private has(text: string, words: string[]): boolean {
-    return words.some((w) => text.includes(w));
+    return classify(title, description || '');
   }
 
   /** Парсинг возрастного рейтинга */
@@ -803,6 +796,16 @@ export class TcSyncService {
       } catch (err: unknown) {
         errors.push(`[${key}]: ${err instanceof Error ? err.message : String(err)}`);
       }
+    }
+
+    // Активируем города и генерируем описания для городов без них
+    const cityIds = [...this.cityCache.values()];
+    if (cityIds.length > 0) {
+      await this.prisma.city.updateMany({
+        where: { id: { in: cityIds }, isActive: false },
+        data: { isActive: true },
+      });
+      await this.ensureCityDescriptions(cityIds);
     }
 
     // Retag
@@ -943,7 +946,7 @@ export class TcSyncService {
 
     const best = tcEvents[0];
     const tcId = String(best.id);
-    const title = best.title?.text?.trim() || '';
+    const title = normalizeEventTitle(best.title?.text || '');
     const description = best.title?.desc || null;
     const { category, subcategories } = this.classifyRest(best);
     const minAge = typeof best.age_rating === 'number' ? best.age_rating : 0;
@@ -1159,8 +1162,6 @@ export class TcSyncService {
     'ока': ['progulki-volga-nn'],
     'нижегородский кремль': ['kreml-nn'],
     'нижегородск': ['kreml-nn'],
-    'канатн': ['kanatka-nn'],
-    'бор': ['kanatka-nn'],
     // System tags (filtering, badges, ranking)
     'ночь': ['night'],
     'полуночн': ['night'],
@@ -1214,9 +1215,21 @@ export class TcSyncService {
     }
 
     const text = `${title || ''} ${description || ''}`.toLowerCase();
+    const isBusTour = ['автобус', 'bus', 'hop-on', 'hop on'].some((w) => text.includes(w));
     for (const [keyword, slugs] of Object.entries(TcSyncService.KEYWORD_TAG_MAP)) {
       if (text.includes(keyword)) {
-        for (const s of slugs) slugsToLink.add(s);
+        for (const s of slugs) {
+          if (isBusTour && s === 'water') continue;
+          slugsToLink.add(s);
+        }
+      }
+    }
+
+    // Удалить тег «На воде» у автобусных экскурсий
+    if (isBusTour) {
+      const waterTag = await this.prisma.tag.findFirst({ where: { slug: 'water', isActive: true } });
+      if (waterTag) {
+        await this.prisma.eventTag.deleteMany({ where: { eventId, tagId: waterTag.id } });
       }
     }
 
@@ -1359,9 +1372,9 @@ export class TcSyncService {
 
   private classifyRest(tc: any) {
     const tags = (tc.tags || []).map((t: string) => t.toLowerCase());
-    const title = String(tc.title?.text || '').toLowerCase();
-    const desc = String(tc.title?.desc || '').toLowerCase();
-    return this.classify(title, desc, tags);
+    const title = String(tc.title?.text || '');
+    const desc = String(tc.title?.desc || '');
+    return classify(title, desc, tags);
   }
 
   private extractMinPrice(sets: any[]): number | null {

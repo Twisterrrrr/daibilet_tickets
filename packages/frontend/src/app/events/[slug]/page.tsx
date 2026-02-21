@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
+import { redirect } from 'next/navigation';
 import {
   Clock,
   MapPin,
@@ -14,6 +15,7 @@ import { api } from '@/lib/api';
 import { EventCard } from '@/components/ui/EventCard';
 import { BuyButton } from '@/components/ui/BuyModal';
 import { TcWidgetButton, TcSessionSlot } from '@/components/ui/TcWidget';
+import { TepWidgetEmbed } from '@/components/ui/TepWidget';
 import { ReviewSection, RatingBadge } from '@/components/ui/ReviewSection';
 import { AddToCartButton } from '@/components/ui/AddToCartButton';
 import { formatPrice, CATEGORY_LABELS, SUBCATEGORY_LABELS, type EventSubcategory } from '@daibilet/shared';
@@ -78,14 +80,113 @@ function getTcBuyUrl(tcEventId: string): string {
   return `https://ticketscloud.com/v1/services/widget?event=${tcEventId}`;
 }
 
+/** Блоки program, cast, hall, route, menu, shipName, rules, advantages, bookingRules из templateData */
+function TemplateDataBlocks({ templateData }: { templateData: Record<string, unknown> }) {
+  const program = templateData.program;
+  const cast = templateData.cast;
+  const hall = templateData.hall;
+  const route = templateData.route;
+  const menu = templateData.menu;
+  const shipName = templateData.shipName;
+  const rules = templateData.rules;
+  const advantages = templateData.advantages;
+  const bookingRules = templateData.bookingRules;
+
+  const programItems = Array.isArray(program) ? program : typeof program === 'string' ? [program] : [];
+  const castItems = Array.isArray(cast) ? cast : [];
+  const hallStr = typeof hall === 'string' ? hall : null;
+  const routeStr = typeof route === 'string' ? route : null;
+  const menuStr = typeof menu === 'string' ? menu : null;
+  const shipStr = typeof shipName === 'string' ? shipName : null;
+  const rulesStr = typeof rules === 'string' ? rules : null;
+  const advantagesStr = typeof advantages === 'string' ? advantages : null;
+  const bookingRulesStr = typeof bookingRules === 'string' ? bookingRules : null;
+
+  const hasAny =
+    programItems.length > 0 || castItems.length > 0 || hallStr || routeStr || menuStr || shipStr ||
+    rulesStr || advantagesStr || bookingRulesStr;
+  if (!hasAny) return null;
+
+  return (
+    <div className="space-y-6">
+      {programItems.length > 0 && (
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Программа</h2>
+          <ul className="mt-3 list-inside list-disc space-y-1 text-slate-600">
+            {programItems.map((item, i) => (
+              <li key={i}>{typeof item === 'string' ? item : (item as { name?: string; text?: string })?.name ?? (item as { text?: string })?.text ?? String(item)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {castItems.length > 0 && (
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Состав</h2>
+          <ul className="mt-3 space-y-1.5 text-slate-600">
+            {castItems.map((item, i) => {
+              const c = typeof item === 'object' && item && 'name' in item
+                ? (item as { name?: string; role?: string })
+                : null;
+              const label = c ? (c.role ? `${c.name ?? ''} — ${c.role}` : (c.name ?? '')) : String(item);
+              return <li key={i}>{label}</li>;
+            })}
+          </ul>
+        </div>
+      )}
+      {hallStr && (
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Зал / площадка</h2>
+          <p className="mt-2 text-slate-600">{hallStr}</p>
+        </div>
+      )}
+      {routeStr && (
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Маршрут</h2>
+          <p className="mt-2 whitespace-pre-line text-slate-600">{routeStr}</p>
+        </div>
+      )}
+      {(shipStr || menuStr) && (
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Теплоход и меню</h2>
+          {shipStr && <p className="mt-2 text-slate-600"><span className="font-medium">Теплоход:</span> {shipStr}</p>}
+          {menuStr && <p className="mt-2 whitespace-pre-line text-slate-600"><span className="font-medium">Меню:</span><br />{menuStr}</p>}
+        </div>
+      )}
+      {rulesStr && (
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Правила</h2>
+          <p className="mt-2 whitespace-pre-line text-slate-600">{rulesStr}</p>
+        </div>
+      )}
+      {advantagesStr && (
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Прогулка вам понравится</h2>
+          <p className="mt-2 whitespace-pre-line text-slate-600">{advantagesStr}</p>
+        </div>
+      )}
+      {bookingRulesStr && (
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Правила бронирования</h2>
+          <p className="mt-2 whitespace-pre-line text-slate-600">{bookingRulesStr}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Извлечь название площадки из tcData */
-function getVenueName(tcData: any): string | null {
-  if (!tcData?.venue) return null;
-  if (typeof tcData.venue === 'string') {
-    const match = tcData.venue.match(/name=([^;]+)/);
+function getVenueName(tcData: unknown): string | null {
+  if (!tcData || typeof tcData !== 'object') return null;
+  const v = (tcData as Record<string, unknown>).venue;
+  if (!v) return null;
+  if (typeof v === 'string') {
+    const match = v.match(/name=([^;]+)/);
     return match ? match[1].trim() : null;
   }
-  return tcData.venue.name || null;
+  if (typeof v === 'object' && v !== null && 'name' in v) {
+    return String((v as { name?: unknown }).name ?? '') || null;
+  }
+  return null;
 }
 
 export default async function EventPage({ params }: Props) {
@@ -94,7 +195,13 @@ export default async function EventPage({ params }: Props) {
   try {
     event = await api.getEventBySlug(slug);
   } catch (e) {
-    console.error('Event page error:', e);
+    // Если slug — это venue (музей/площадка), перенаправляем
+    try {
+      await api.getVenueBySlug(slug);
+      redirect(`/venues/${slug}`);
+    } catch {
+      // И event, и venue не найдены — показываем 404
+    }
     return (
       <div className="container-page flex min-h-[60vh] flex-col items-center justify-center py-20">
         <span className="text-6xl">🔍</span>
@@ -302,6 +409,11 @@ export default async function EventPage({ params }: Props) {
               </div>
             )}
 
+            {/* templateData: program, cast, hall (из EventOverride) */}
+            {event.templateData && (
+              <TemplateDataBlocks templateData={event.templateData} />
+            )}
+
             {/* Отзывы */}
             <ReviewSection
               eventId={event.id}
@@ -499,11 +611,20 @@ function BuyCard({
 
   // WIDGET contract: рендерим виджет по widgetProvider, не угадываем
   const widgetProvider = primaryOffer?.widgetProvider || primaryOffer?.source || event.source;
+  const isTepWidget = widgetProvider === 'TEPLOHOD' || event.source === 'TEPLOHOD';
   const widgetPayload = primaryOffer?.widgetPayload || {};
   const offerEventId = widgetPayload?.externalEventId || primaryOffer?.externalEventId || event.tcEventId;
   const offerMetaId = widgetPayload?.metaEventId || primaryOffer?.metaEventId || event.tcMetaEventId;
   const offerDeeplink = primaryOffer?.deeplink;
   const offerSource = primaryOffer?.source || event.source;
+
+  // Teplohod: tepWidgetId (виджет из админки) приоритетнее tepEventId (ID события из API)
+  const tepWidgetId = widgetPayload?.tepWidgetId ?? null;
+  const tepEventId =
+    widgetPayload?.tepEventId ??
+    (primaryOffer?.externalEventId?.match?.(/^tep-(\d+)$/)?.[1]) ??
+    event.tcData?.id ??
+    null;
   const offerBadge = primaryOffer?.badge;
 
   // All active offers for multi-offer display
@@ -554,11 +675,20 @@ function BuyCard({
                    offer.operator?.name || 'Дайбилет'}
                 </span>
               </div>
-              {offer.purchaseType === 'WIDGET' && offer.externalEventId ? (
+              {offer.source === 'TEPLOHOD' && offer.deeplink ? (
+                <a
+                  href={offer.deeplink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-600"
+                >
+                  Купить
+                </a>
+              ) : offer.purchaseType === 'WIDGET' && offer.externalEventId ? (
                 <TcWidgetButton
                   tcEventId={offer.externalEventId}
                   tcMetaEventId={offer.metaEventId}
-                  className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-700"
+                  compact
                 >
                   Купить
                 </TcWidgetButton>
@@ -584,14 +714,14 @@ function BuyCard({
         </div>
       )}
 
-      {/* Sessions preview — кликабельные для TC-событий */}
+      {/* Sessions preview — кликабельные только для TC-событий (не TEPLOHOD) */}
       {event.sessions && event.sessions.length > 0 && (
         <div className="mt-5">
           <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
             <Calendar className="h-3.5 w-3.5" />
             Ближайшие сеансы
           </h3>
-          {isWidget && (
+          {isWidget && !isTepWidget && (
             <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс для покупки</p>
           )}
           <div className="mt-2.5 space-y-1.5">
@@ -599,7 +729,7 @@ function BuyCard({
               .filter((s: any) => s.isActive)
               .slice(0, 5)
               .map((session: any) =>
-                isWidget ? (
+                isWidget && !isTepWidget ? (
                   <TcSessionSlot key={session.id} session={session} />
                 ) : (
                   <StaticSessionRow key={session.id} session={session} />
@@ -613,6 +743,13 @@ function BuyCard({
       {isRequest ? (
         /* REQUEST: форма заявки */
         <RequestOfferForm event={event} offer={primaryOffer} />
+      ) : isTepWidget && (tepWidgetId || tepEventId || primaryOffer?.externalEventId) ? (
+        /* TEPLOHOD: embed-виджет покупки (data-id = tepWidgetId или tepEventId) */
+        <TepWidgetEmbed
+          tepWidgetId={tepWidgetId}
+          tepEventId={tepEventId}
+          externalEventId={primaryOffer?.externalEventId}
+        />
       ) : offerEventId ? (
         <div className="mt-5">
           {isWidget ? (
@@ -661,8 +798,9 @@ function BuyCard({
         </button>
       )}
 
-      {/* Add to cart (for non-WIDGET offers) */}
-      {primaryOffer && purchaseType !== 'WIDGET' && !isRequest && (
+      {/* Купить (прямой checkout) — только для собственных офферов (не TC, не TEPLOHOD) */}
+      {primaryOffer && purchaseType !== 'WIDGET' && !isRequest
+        && offerSource !== 'TC' && offerSource !== 'TEPLOHOD' && (
         <div className="mt-3">
           <AddToCartButton
             eventId={event.id}
@@ -683,7 +821,7 @@ function BuyCard({
       <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
         <Shield className="h-4 w-4 text-emerald-500" />
         <span className="text-xs text-slate-500">
-          {isRequestOnly
+          {isRequest
             ? 'Заявка будет подтверждена оператором'
             : `Безопасная оплата через ${offerSource === 'TEPLOHOD' ? 'teplohod.info' : 'Дайбилет'}`}
         </span>
@@ -708,10 +846,10 @@ function RequestOfferForm({ event, offer }: { event: any; offer: any }) {
           const form = e.currentTarget;
           const data = new FormData(form);
           try {
-            const response = await fetch(
-              (typeof window === 'undefined'
-                ? (process.env.INTERNAL_API_URL || 'http://localhost:4000/api/v1')
-                : (process.env.NEXT_PUBLIC_API_URL || '/api/v1')) + '/checkout/request',
+            const apiBase = typeof window === 'undefined'
+              ? (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000') + '/api/v1'
+              : (process.env.NEXT_PUBLIC_API_URL || '/api/v1');
+            const response = await fetch(`${apiBase}/checkout/request`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

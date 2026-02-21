@@ -2,7 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService, CACHE_TTL } from '../cache/cache.service';
 import { EventsQueryDto } from './dto/events-query.dto';
-import { Prisma, DateMode, EventSubcategory, TagCategory } from '@prisma/client';
+import { CatalogQueryDto } from './dto/catalog-query.dto';
+import { Prisma, DateMode, EventCategory, EventSubcategory, TagCategory, LocationType } from '@prisma/client';
 import { EventOverrideService } from '../admin/event-override.service';
 import { RegionService } from './region.service';
 
@@ -86,20 +87,132 @@ export class CatalogService {
         regionStats.map((r) => [r.hubCityId, { slug: r.slug, name: r.name, eventCount: Number(r.event_count) }]),
       );
 
-      return cities
-        // Скрываем не-хабовые областные города и города без событий
-        .filter((c) => !hiddenCityIds.has(c.id) && c._count.events > 0)
+      // Отфильтрованные города, которые реально отображаются в каталоге
+      const visibleCities = cities
+        .filter(
+          (c) =>
+            !hiddenCityIds.has(c.id) &&
+            c._count.events >= 2 &&
+            c.description != null &&
+            c.description.trim().length > 0,
+        );
+
+      // Счётчик «Музеи и арт» для списка городов:
+      // museumCount = активные площадки (venues) + активные события с привязкой к площадке (venueId) в этом городе.
+      let eventsAtVenuesByCity = new Map<string, number>();
+      if (visibleCities.length > 0) {
+        const cityIds = visibleCities.map((c) => c.id);
+
+        const hasFutureSessions: Prisma.EventWhereInput = {
+          OR: [
+            {
+              dateMode: DateMode.SCHEDULED,
+              sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
+            },
+            {
+              dateMode: DateMode.OPEN_DATE,
+              OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+            },
+          ],
+        };
+
+        const eventsAtVenues = await this.prisma.event.groupBy({
+          by: ['cityId'],
+          where: {
+            cityId: { in: cityIds },
+            isActive: true,
+            isDeleted: false,
+            venueId: { not: null },
+            ...hasFutureSessions,
+          },
+          _count: { _all: true },
+        });
+
+        eventsAtVenuesByCity = new Map(
+          eventsAtVenues.map((row: any) => [row.cityId as string, Number(row._count._all)]),
+        );
+      }
+
+      return visibleCities
         .sort((a, b) => b._count.events - a._count.events)
-        .map((c) => ({
-          ...c,
-          region: regionByHub.get(c.id) ?? null,
-        }));
+        .map((c) => {
+          const eventsAtVenues = eventsAtVenuesByCity.get(c.id) ?? 0;
+          const museumCount = (c._count.venues ?? 0) + eventsAtVenues;
+
+          return {
+            ...c,
+            region: regionByHub.get(c.id) ?? null,
+            museumCount,
+          };
+        });
     });
   }
 
   async getCityBySlug(slug: string) {
     const cacheKey = `cities:detail:${slug}`;
     return this.cache.getOrSet(cacheKey, CACHE_TTL.CITY_DETAIL, () => this.fetchCityBySlug(slug));
+  }
+
+  // --- Локации (причалы, площадки, точки встречи) ---
+
+  async getLocations(city?: string, type?: string) {
+    const where: Prisma.LocationWhereInput = { isActive: true };
+    if (city) {
+      const c = await this.prisma.city.findUnique({ where: { slug: city }, select: { id: true } });
+      if (!c) return [];
+      where.cityId = c.id;
+    }
+    if (type && Object.values(LocationType).includes(type as LocationType)) {
+      where.type = type as LocationType;
+    }
+    return this.prisma.location.findMany({
+      where,
+      orderBy: [{ title: 'asc' }],
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        shortTitle: true,
+        address: true,
+        lat: true,
+        lng: true,
+        metro: true,
+        district: true,
+        city: { select: { id: true, slug: true, name: true } },
+      },
+    });
+  }
+
+  async getNearestLocations(lat: number, lng: number, type?: string, limit = 10) {
+    const where: Prisma.LocationWhereInput = { isActive: true, lat: { not: null }, lng: { not: null } };
+    if (type && Object.values(LocationType).includes(type as LocationType)) {
+      where.type = type as LocationType;
+    }
+    const list = await this.prisma.location.findMany({
+      where,
+      take: limit * 3,
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        shortTitle: true,
+        address: true,
+        lat: true,
+        lng: true,
+        metro: true,
+        district: true,
+        city: { select: { id: true, slug: true, name: true } },
+      },
+    });
+    const withDist = list
+      .filter((l) => l.lat != null && l.lng != null)
+      .map((l) => ({
+        ...l,
+        _dist: (l.lat! - lat) ** 2 + (l.lng! - lng) ** 2,
+      }))
+      .sort((a, b) => a._dist - b._dist)
+      .slice(0, limit);
+    return withDist.map(({ _dist: _, ...r }) => r);
   }
 
   private async fetchCityBySlug(slug: string) {
@@ -145,20 +258,18 @@ export class CatalogService {
 
     if (!city) throw new NotFoundException(`Город "${slug}" не найден`);
 
-    // Статистика по категориям (с поддержкой OPEN_DATE)
+    // Статистика по категориям (с поддержкой OPEN_DATE).
+    // Музеи и арт = площадки (venues) + события в них (events с venueId).
     const hasFutureSessions: Prisma.EventWhereInput = {
       OR: [
         { dateMode: DateMode.SCHEDULED, sessions: { some: { isActive: true, startsAt: { gte: new Date() } } } },
         { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: new Date() } }] },
       ],
     };
-    const [excursionCount, museumCount, eventCount, totalCount] =
+    const [excursionCount, eventCount, totalCount, venueCount, eventsAtVenuesCount] =
       await Promise.all([
         this.prisma.event.count({
           where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EXCURSION', ...hasFutureSessions },
-        }),
-        this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, isDeleted: false, category: 'MUSEUM', ...hasFutureSessions },
         }),
         this.prisma.event.count({
           where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EVENT', ...hasFutureSessions },
@@ -166,7 +277,20 @@ export class CatalogService {
         this.prisma.event.count({
           where: { cityId: city.id, isActive: true, isDeleted: false, ...hasFutureSessions },
         }),
+        this.prisma.venue.count({
+          where: { cityId: city.id, isActive: true, isDeleted: false },
+        }),
+        this.prisma.event.count({
+          where: {
+            cityId: city.id,
+            isActive: true,
+            isDeleted: false,
+            venueId: { not: null },
+            ...hasFutureSessions,
+          },
+        }),
       ]);
+    const museumCount = venueCount + eventsAtVenuesCount;
 
     // Популярные теги в городе
     const popularTags = await this.prisma.tag.findMany({
@@ -203,10 +327,257 @@ export class CatalogService {
     };
   }
 
+  // --- Unified Catalog (CatalogItem: Event | Venue) ---
+
+  /**
+   * GET /catalog — единый каталог.
+   * category=MUSEUM → Venue + MUSEUM Events (оба как юниты)
+   * category=EXCURSION | EVENT → Event
+   */
+  async getCatalog(query: CatalogQueryDto) {
+    const { category, city, q, sort = 'popular', page = 1, limit = 20, qf } = query;
+
+    if (category === 'MUSEUM') {
+      return this.getCatalogMuseumAndVenues({ city, q, sort, page, limit, qf });
+    }
+    // EXCURSION | EVENT | пусто → Events
+    const eventsDto: EventsQueryDto = {
+      category: category === 'EXCURSION' || category === 'EVENT' ? category : undefined,
+      city,
+      sort: sort === 'departing_soon' ? 'departing_soon' : sort,
+      page,
+      limit,
+    };
+    const res = await this.getEvents(eventsDto);
+    return {
+      items: res.items.map((e) => this.eventToCatalogItem(e)),
+      total: res.total,
+      page: res.page,
+      totalPages: res.totalPages,
+    };
+  }
+
+  private eventToCatalogItem(e: any) {
+    const nextSessionAt = e.nextSessionAt ? new Date(e.nextSessionAt).toISOString() : null;
+    let dateLabel: string;
+    if (e.dateMode === 'OPEN_DATE') {
+      dateLabel = 'Открытая дата';
+    } else if (nextSessionAt) {
+      const d = new Date(nextSessionAt);
+      dateLabel = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    } else {
+      dateLabel = '';
+    }
+    return {
+      type: 'event' as const,
+      id: e.id,
+      slug: e.slug,
+      title: e.title,
+      cityId: e.cityId,
+      citySlug: e.city?.slug,
+      cityName: e.city?.name,
+      imageUrl: e.imageUrl,
+      priceFrom: e.priceFrom,
+      rating: Number(e.rating) || 0,
+      badges: this.collectEventBadges(e),
+      location: (e.address || e.city?.name) ? { address: e.address, metro: null } : undefined,
+      dateLabel,
+      // event-only
+      startsAt: nextSessionAt,
+      durationMinutes: e.durationMinutes,
+      category: e.category,
+      // для EventCard
+      ...e,
+    };
+  }
+
+  private collectEventBadges(e: any): string[] {
+    const badges: string[] = [];
+    if (e.departingSoonMinutes) badges.push(`Через ${e.departingSoonMinutes} мин`);
+    if (e.isOptimalChoice) badges.push('Лучший выбор');
+    if (e.dateMode === 'OPEN_DATE') badges.push('Открытая дата');
+    return badges;
+  }
+
+  /**
+   * «Музеи и арт»: Venue + Events (category=MUSEUM), каждый как юнит.
+   * qf: center | kids | short | modern | free — быстрые фильтры
+   */
+  private async getCatalogMuseumAndVenues(params: {
+    city?: string;
+    q?: string;
+    sort?: string;
+    page: number;
+    limit: number;
+    qf?: string;
+  }) {
+    const { city, q, sort = 'popular', page, limit, qf } = params;
+    const FETCH_LIMIT = 500;
+
+    // Маппинг qf → параметры getEvents
+    const eventsDto: Partial<Parameters<typeof this.getEvents>[0]> = {
+      category: 'MUSEUM',
+      city: city || undefined,
+      sort: sort === 'departing_soon' ? 'departing_soon' : sort,
+      page: 1,
+      limit: FETCH_LIMIT,
+    };
+    if (qf === 'kids') eventsDto.audience = 'KIDS' as const;
+    if (qf === 'short') eventsDto.maxDuration = 60;
+    if (qf === 'modern') eventsDto.subcategory = 'CONTEMPORARY' as const;
+    if (qf === 'free') {
+      eventsDto.priceMin = 0;
+      eventsDto.priceMax = 0;
+    }
+
+    const venueWhere: Prisma.VenueWhereInput = {
+      isActive: true,
+      isDeleted: false,
+      ...(city && { city: { slug: city } }),
+      ...(q?.trim() && {
+        OR: [
+          { title: { contains: q.trim(), mode: 'insensitive' } },
+          { shortTitle: { contains: q.trim(), mode: 'insensitive' } },
+        ],
+      }),
+      ...(qf === 'center' && {
+        OR: [
+          { district: { contains: 'центр', mode: 'insensitive' } },
+          { district: { contains: 'центре', mode: 'insensitive' } },
+        ],
+      }),
+      ...(qf === 'kids' && { features: { has: 'kids_friendly' } }),
+      ...(qf === 'modern' && { venueType: { in: ['GALLERY', 'ART_SPACE', 'EXHIBITION_HALL'] } }),
+      ...(qf === 'free' && { OR: [{ priceFrom: 0 }, { priceFrom: null }] }),
+    };
+
+    const [eventsRes, venuesRaw] = await Promise.all([
+      this.getEvents(eventsDto as EventsQueryDto),
+      this.prisma.venue.findMany({
+        where: venueWhere,
+        include: { city: { select: { slug: true, name: true } } },
+        take: FETCH_LIMIT,
+      }),
+    ]);
+
+    const qLower = q?.trim().toLowerCase();
+    const matchesQ = (title: string, desc?: string) =>
+      !qLower || title.toLowerCase().includes(qLower) || (desc && desc.toLowerCase().includes(qLower));
+
+    const eventItems = eventsRes.items
+      .filter((e: any) => matchesQ(e.title, e.description))
+      .map((e) => this.eventToCatalogItem(e));
+    const venueItems = venuesRaw.map((v) => this.venueToCatalogItem(v));
+
+    const combined = [...eventItems, ...venueItems];
+    const orderByRating = (a: { rating?: number }, b: { rating?: number }) =>
+      (Number(b.rating) || 0) - (Number(a.rating) || 0);
+    const orderByPriceAsc = (a: { priceFrom?: number | null }, b: { priceFrom?: number | null }) =>
+      (a.priceFrom ?? Infinity) - (b.priceFrom ?? Infinity);
+    const orderByPriceDesc = (a: { priceFrom?: number | null }, b: { priceFrom?: number | null }) =>
+      (b.priceFrom ?? 0) - (a.priceFrom ?? 0);
+
+    const compare =
+      sort === 'price_asc' ? orderByPriceAsc :
+      sort === 'price_desc' ? orderByPriceDesc :
+      orderByRating;
+    combined.sort(compare);
+
+    const total = combined.length;
+    const start = (page - 1) * limit;
+    const items = combined.slice(start, start + limit);
+
+    return {
+      items,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  private async getCatalogVenues(params: { city?: string; q?: string; sort?: string; page: number; limit: number }) {
+    const { city, q, sort = 'popular', page, limit } = params;
+
+    const where: Prisma.VenueWhereInput = {
+      isActive: true,
+      isDeleted: false,
+      ...(city && { city: { slug: city } }),
+      ...(q && q.trim() && {
+        OR: [
+          { title: { contains: q.trim(), mode: 'insensitive' } },
+          { shortTitle: { contains: q.trim(), mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    const orderBy: Prisma.VenueOrderByWithRelationInput =
+      sort === 'price_asc' ? { priceFrom: 'asc' } :
+      sort === 'price_desc' ? { priceFrom: 'desc' } :
+      sort === 'rating' ? { rating: 'desc' } :
+      { rating: 'desc' }; // popular = rating
+
+    const [raw, total] = await Promise.all([
+      this.prisma.venue.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { city: { select: { slug: true, name: true } } },
+      }),
+      this.prisma.venue.count({ where }),
+    ]);
+
+    const items = raw.map((v) => this.venueToCatalogItem(v));
+
+    return {
+      items,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  private venueToCatalogItem(v: any) {
+    const openingHours = v.openingHours as Record<string, string | null> | null;
+    const openingHoursSummary = openingHours
+      ? this.formatOpeningHoursSummary(openingHours)
+      : 'Открытая дата';
+
+    return {
+      type: 'venue' as const,
+      id: v.id,
+      slug: v.slug,
+      title: v.title,
+      cityId: v.cityId,
+      citySlug: v.city?.slug,
+      cityName: v.city?.name,
+      imageUrl: v.imageUrl,
+      priceFrom: v.priceFrom,
+      rating: Number(v.rating) || 0,
+      reviewCount: v.reviewCount ?? 0,
+      badges: v.isFeatured ? ['Популярное'] : [],
+      location: (v.address || v.metro) ? { address: v.address, metro: v.metro } : undefined,
+      dateLabel: openingHoursSummary,
+      // venue-only
+      venueType: v.venueType,
+      openingHoursSummary,
+    };
+  }
+
+  private formatOpeningHoursSummary(oh: Record<string, string | null>): string {
+    const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    const withHours = days.filter((d) => oh[d]);
+    if (withHours.length === 0) return 'Открытая дата';
+    if (withHours.length === 7 && new Set(withHours.map((d) => oh[d])).size === 1) {
+      return oh[withHours[0]] || 'Открытая дата';
+    }
+    return 'Открытая дата'; // упрощённо
+  }
+
   // --- События ---
 
   async getEvents(query: EventsQueryDto) {
-    const { city, category, subcategory, audience, tag, dateFrom, dateTo, sort, timeOfDay, pier, maxDuration, minDuration, maxMinAge, dateMode, venueId, page = 1, limit = 20 } = query;
+    const { city, category, subcategory, audience, tag, dateFrom, dateTo, sort, timeOfDay, pier, maxDuration, minDuration, maxMinAge, dateMode, venueId, priceMin, priceMax, page = 1, limit = 20, hasPhoto, slugs: slugsParam } = query;
 
     // --- Фильтр сеансов: OPEN_DATE не требуют sessions ---
     // dateMode=OPEN_DATE → нет сеансов, показываем если isActive и не истёк endDate
@@ -275,7 +646,14 @@ export class CatalogService {
       // Фильтр сеансов с поддержкой OPEN_DATE
       ...sessionFilter,
       ...(category && { category }),
-      ...(subcategory && { subcategories: { has: subcategory as EventSubcategory } }),
+      ...(subcategory && (subcategory === 'RIVER'
+        ? {
+            AND: [
+              { subcategories: { has: 'RIVER' as EventSubcategory } },
+              { NOT: { subcategories: { has: 'BUS' as EventSubcategory } } },
+            ],
+          }
+        : { subcategories: { has: subcategory as EventSubcategory } })),
       ...(audience === 'KIDS' ? { audience: { in: ['KIDS', 'FAMILY'] } } : audience ? { audience } : {}),
       ...(tag && { tags: { some: { tag: { slug: tag } } } }),
       ...(pier && { startLocationId: pier }),
@@ -287,6 +665,27 @@ export class CatalogService {
       } : {}),
       ...(maxMinAge !== undefined && maxMinAge !== null ? { minAge: { lte: maxMinAge } } : {}),
       ...(venueId && { venueId }),
+      ...((priceMin != null || priceMax != null) ? {
+        priceFrom: {
+          ...(priceMin != null && { gte: priceMin }),
+          ...(priceMax != null && { lte: priceMax }),
+        },
+      } : {}),
+      // События без фото исключаем из главной и блоков (hasPhoto=true)
+      ...(hasPhoto === true
+        ? { AND: [{ imageUrl: { not: null } }, { imageUrl: { not: '' } }] }
+        : {}),
+      // Фильтр по slug для страницы избранного
+      ...(slugsParam?.trim()
+        ? {
+            slug: {
+              in: slugsParam
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean),
+            },
+          }
+        : {}),
     };
 
     // Time of day filter: restrict events to those with sessions in the given MSK hour range.
@@ -400,14 +799,31 @@ export class CatalogService {
     // Вычисляем смарт-бейджи: ближайший сеанс, свободные места, optimal score
     let items = this.enrichWithBadges(overridden);
 
+    // События без фото — в конец каталога
+    items = this.moveNoPhotoToEnd(items);
+
+    // Спец-режим "Начнутся скоро": показываем только события с ближайшими сеансами,
+    // сортируем по времени ближайшего сеанса, пагинируем уже отсортированный список.
     if (isDepartingSoon && items.length > 0) {
-      items = items
-        .sort((a, b) => {
+      const withSessions = items.filter((e) => e.nextSessionAt);
+      const departingTotal = withSessions.length;
+
+      const sorted = this.moveNoPhotoToEnd(
+        withSessions.sort((a, b) => {
           const aAt = a.nextSessionAt ? new Date(a.nextSessionAt).getTime() : Infinity;
           const bAt = b.nextSessionAt ? new Date(b.nextSessionAt).getTime() : Infinity;
           return aAt - bAt;
-        })
-        .slice((page - 1) * limit, page * limit);
+        }),
+      );
+
+      const paged = sorted.slice((page - 1) * limit, page * limit);
+
+      return {
+        items: paged,
+        total: departingTotal,
+        page,
+        totalPages: Math.ceil(departingTotal / limit),
+      };
     }
 
     return {
@@ -451,14 +867,47 @@ export class CatalogService {
 
     if (!event) throw new NotFoundException(`Событие "${slug}" не найдено`);
 
-    // Primary offer для удобства фронтенда
-    const primaryOffer = event.offers.length > 0 ? event.offers[0] : null;
+    // Применяем override (мерж title, description, templateData и т.д., фильтр isHidden)
+    const [overridden] = await this.overrideService.applyOverrides([event]);
+    if (!overridden) throw new NotFoundException(`Событие "${slug}" не найдено`);
 
-    // Похожие события (тот же город + категория, только с будущими сеансами)
-    const relatedEvents = await this.prisma.event.findMany({
+    // SCHEDULED без активных слотов — показываем страницу (с пустыми сеансами), не 404.
+    // В каталоге такие события не выводятся; но по прямой ссылке — даём контекст («нет сеансов на данный момент»).
+    // OPEN_DATE с истёкшей endDate — не показывать
+    if (overridden.dateMode === 'OPEN_DATE' && overridden.endDate && new Date(overridden.endDate) < new Date()) {
+      throw new NotFoundException(`Событие "${slug}" не найдено`);
+    }
+
+    // Primary offer для удобства фронтенда
+    const primaryOffer = overridden.offers?.length > 0 ? overridden.offers[0] : null;
+
+    // Похожие события: город + категория + скоринг по тегам, подкатегории, priceFrom
+    const relatedEvents = await this.fetchRelatedEvents(overridden);
+
+    return { ...overridden, primaryOffer, relatedEvents };
+  }
+
+  /**
+   * Похожие события: город + категория + скоринг по тегам, подкатегории, priceFrom.
+   * Выбираем до 30 кандидатов, считаем score, возвращаем топ-6.
+   */
+  private async fetchRelatedEvents(event: {
+    id: string;
+    cityId: string;
+    category: string;
+    subcategories: EventSubcategory[];
+    priceFrom: number | null;
+    tags?: Array<{ tagId: string }>;
+  }) {
+    const eventTagIds = new Set((event.tags ?? []).map((t: { tagId: string }) => t.tagId));
+    const eventSubIds = new Set(event.subcategories);
+    const priceFrom = event.priceFrom ?? 0;
+    const priceTolerance = Math.max(50000, Math.floor(priceFrom * 0.5)); // 500₽ или ±50%
+
+    const candidates = await this.prisma.event.findMany({
       where: {
         cityId: event.cityId,
-        category: event.category,
+        category: event.category as EventCategory,
         isActive: true,
         isDeleted: false,
         canonicalOfId: null,
@@ -467,11 +916,46 @@ export class CatalogService {
           some: { isActive: true, startsAt: { gte: new Date() } },
         },
       },
-      orderBy: { rating: 'desc' },
-      take: 6,
+      include: {
+        tags: { select: { tagId: true } },
+        city: { select: { slug: true, name: true } },
+      },
+      take: 30,
     });
 
-    return { ...event, primaryOffer, relatedEvents };
+    const scored = candidates.map((c) => {
+      let score = 0;
+      // Теги: +3 за каждый общий
+      const cTags = (c as { tags?: { tagId: string }[] }).tags ?? [];
+      const cTagIds = new Set(cTags.map((t) => t.tagId));
+      for (const tid of eventTagIds) {
+        if (cTagIds.has(tid)) score += 3;
+      }
+      // Подкатегория: +5 за совпадение
+      for (const sub of c.subcategories) {
+        if (eventSubIds.has(sub)) {
+          score += 5;
+          break;
+        }
+      }
+      // Цена: +2 если в допустимом диапазоне
+      const cp = c.priceFrom ?? 0;
+      if (cp > 0 && priceFrom > 0 && Math.abs(cp - priceFrom) <= priceTolerance) {
+        score += 2;
+      }
+      return { event: c, score };
+    });
+
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return Number((b.event.rating as unknown as number) ?? 0) - Number((a.event.rating as unknown as number) ?? 0);
+    });
+
+    return scored.slice(0, 6).map((s) => {
+      const { event: e } = s;
+      const { tags: _t, ...rest } = e as typeof e & { tags?: unknown };
+      return rest;
+    });
   }
 
   // --- Теги ---
@@ -561,6 +1045,19 @@ export class CatalogService {
 
   // --- Helpers ---
 
+  /** События без фото — в конец списка */
+  private moveNoPhotoToEnd<T extends { imageUrl?: string | null }>(items: T[]): T[] {
+    const withPhoto: T[] = [];
+    const withoutPhoto: T[] = [];
+    for (const e of items) {
+      const url = e?.imageUrl;
+      const hasPhoto = typeof url === 'string' && url.trim().length > 0;
+      if (hasPhoto) withPhoto.push(e);
+      else withoutPhoto.push(e);
+    }
+    return [...withPhoto, ...withoutPhoto];
+  }
+
   private getEventsSort(sort?: string): Prisma.EventOrderByWithRelationInput {
     switch (sort) {
       case 'price_asc':
@@ -609,9 +1106,9 @@ export class CatalogService {
       const offers: any[] = event.offers || [];
       const primaryOffer = offers.length > 0 ? offers[0] : null;
 
-      // Извлекаем slug-и тегов для бейджей на фронтенде
-      const tags: { tag: { slug: string; name: string } }[] = event.tags || [];
-      const tagSlugs: string[] = tags.map((t) => t.tag.slug);
+      // Извлекаем slug-и тегов для бейджей на фронтенде (защита от null tag)
+      const tags: { tag?: { slug?: string } | null }[] = event.tags || [];
+      const tagSlugs: string[] = tags.map((t) => t?.tag?.slug).filter((s): s is string => !!s);
 
       return {
         ...event,

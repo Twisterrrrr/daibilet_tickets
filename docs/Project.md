@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-02-15
+> Последнее обновление: 2026-02-20
 
 ## Миссия
 
@@ -51,7 +51,8 @@
     - EVENT: `CONCERT`, `SHOW`, `STANDUP`, `THEATER`, `SPORT`, `FESTIVAL`, `MASTERCLASS`, `PARTY`
     - KIDS: `KIDS_SHOW`, `KIDS_EXCURSION`, `KIDS_MASTER`, `KIDS_MUSEUM`, `KIDS_QUEST`, `KIDS_AMUSEMENT`
   - `Event.subcategory` — `EventSubcategory?` (опционально).
-- **EventOverride** — правки админа поверх sync-данных (title, description, imageUrl, isHidden, manualRating, tagsAdd/Remove, **category**, **subcategory**).
+- **EventOverride** — правки админа поверх sync-данных (title, description, imageUrl, isHidden, manualRating, tagsAdd/Remove, **category**, **subcategory**).  
+  **Заголовок**: `Event.title` — оригинал из источника (TC, Teplohod), обновляется при каждом sync. `EventOverride.title` — кастомный заголовок для Daibilet. Для отображения используется override ?? event.title. Оригинал сохраняется в `Event.title` для импорта/экспорта и виджетов.
 - **EventOffer** — оффер из конкретного источника (TC/TEPLOHOD/RADARIO/TIMEPAD/MANUAL). Содержит: source, purchaseType (TC_WIDGET/REDIRECT/API_CHECKOUT), externalEventId, deeplink, priceFrom, commission, status (ACTIVE/HIDDEN/DISABLED), isPrimary.
 - **EventSession** — конкретный сеанс (дата, свободные места, цены). Привязан к Event и к EventOffer (offerId). Для teplohod.info — реальное расписание из `eventTimes` API (дата, время отправления, кол-во свободных мест).
 - **Tag** — теги для фильтрации и группировки (тема, аудитория, сезон)
@@ -65,14 +66,16 @@
 - **ExternalReview** — импортированные отзывы с внешних площадок (Яндекс.Карты, 2ГИС, Tripadvisor, Google). Поля: source, sourceUrl, authorName, rating, text, publishedAt. Участвует в recalculateEventRating.
 - **ReviewRequest** — пост-покупочный запрос на отзыв (email, eventId, token, sentAt, reminderSentAt, openedAt, clickedAt, reviewId). Unique: email + eventId.
 - **Event.externalRating/externalReviewCount/externalSource** — ручной импорт рейтинга из внешних платформ. Участвует в расчёте итогового rating через взвешенное среднее (вместе с Review и ExternalReview).
-- **CheckoutSession** — сессия оформления заказа (snapshot корзины, контакт, UTM, статусы через State Machine). Immutable `offersSnapshot` с write-once guard.
+- **CheckoutSession** — сессия оформления заказа (snapshot корзины, контакт, UTM, статусы через State Machine). Immutable `offersSnapshot` с write-once guard. Опционально `giftCertificateSnapshot` — для подарочных сертификатов.
+- **GiftCertificate** — подарочный сертификат (номинал, код GC-XXXX-XXXX, email получателя, сообщение). Создаётся при успешной оплате, статусы ISSUED/ACTIVATED/EXPIRED.
 - **OrderRequest** — заявка на подтверждение (SLA/TTL, expireReason, confirmedAt). Привязана к CheckoutSession.
 - **PaymentIntent** — платёжное намерение (PENDING/PROCESSING/PAID/FAILED/CANCELLED/REFUNDED). Привязка к CheckoutSession, idempotencyKey, provider (STUB/YOOKASSA). Split-поля для маркетплейса: supplierId, grossAmount, platformFee, supplierAmount, commissionRate.
-- **Operator** — организатор/оператор, расширен до Supplier: isSupplier, trustLevel (0/1/2), commissionRate (25%), promoRate (7%), yookassaAccountId, ИНН, контакты, webhookUrl/webhookSecret.
-- **SupplierUser** — авторизация поставщика (OWNER/MANAGER), отдельная JWT-стратегия `jwt-supplier`.
+- **Operator** — юридическое лицо/правообладатель. Поля маркетплейса: isSupplier, trustLevel, commissionRate, status (ACTIVE/ARCHIVED/SUSPENDED). Подробно: `docs/SupplierArchitecture.md`.
+- **SupplierUser** — аккаунт поставщика (Operator 1—N SupplierUser). Роли: OWNER, MANAGER, CONTENT, ACCOUNTANT.
+- **User** — пользователь сайта (регистрация/вход). Избранное в UserFavorite (eventSlug).
 - **ApiKey** — API-ключ для Partner B2B API: SHA-256 хеш (не храним оригинал), prefix (8 символов для UI), rateLimit, ipWhitelist, expiresAt.
 - **Venue** — место (музей, галерея, арт-пространство). VenueType enum (MUSEUM/GALLERY/ART_SPACE/EXHIBITION_HALL/THEATER/PALACE/PARK). Содержит: openingHours (JSON), priceFrom, rating, galleryUrls, address/metro/lat/lng, operatorId (партнёр). Soft delete, optimistic lock.
-- **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate.
+- **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate. Шаблоны страниц по категориям — `docs/PageTemplateSpecs.md`.
 - **EventOffer расширен**: venueId для прямых офферов к месту (без привязки к Event).
 - **Location** — причал, площадка, точка встречи (каркас, Фаза 2)
 - **Route** — маршрут с POI (каркас, Фаза 2)
@@ -116,6 +119,16 @@
 2. **Смарт-бейджи на карточках** — "Оптимальный выбор" (по scoring-алгоритму), "Осталось N мест", ближайший сеанс. Управление вниманием пользователя.
 
 3. **Каркас новых сущностей** — Location (PIER/VENUE/MEETING_POINT), Operator, Route в Prisma. Без привязки к UI.
+
+### Посадочная «Музеи» (20.02.2026)
+
+Шаблон посадочной страницы `/cities/[slug]/museums` — единый для всех городов, меняется только контент (`getMuseumsLandingContent(citySlug)`).
+
+**Блоки:** HERO (H1, поиск, фильтры), «Лучший выбор» (CTA), секции «Главные / Частные / С детьми», полный каталог (GET /catalog, category=MUSEUM), «Маршрут на 1 день», FAQ, SEO-текст.
+
+**Компоненты:** `page.tsx` (SSR), `MuseumsFilters` (Client), `MuseumsSections`, `MuseumRouteBuilder`. Ссылки со страницы города: категория «Музеи и Арт» и «Все музеи» → `/cities/{slug}/museums`.
+
+**Масштабирование:** добавить ветку в `getMuseumsLandingContent` для нового города (heroTitle, anchors, faq, seoText). Быстрые фильтры (qf) в UI — бэкенд пока не поддерживает.
 
 ### Этап 2 (планируется)
 

@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
 import { Prisma } from '@prisma/client';
+import { getPriceByTypeKopecks } from '@daibilet/shared';
 
 interface CuratedEventSlot {
   eventId: string;
@@ -354,7 +355,7 @@ export class ComboService {
       if (!event) continue;
 
       const session = event.sessions[0];
-      const adultPrice = this.getPrice(session?.prices, 'adult');
+      const adultPrice = getPriceByTypeKopecks(session?.prices, 'adult');
 
       dayMap.get(dayNum)!.push({
         slot: item.slot || 'MORNING',
@@ -413,8 +414,4 @@ export class ComboService {
     };
   }
 
-  private getPrice(prices: any, type: string): number {
-    if (!Array.isArray(prices)) return 0;
-    return prices.find((p: any) => p.type === type)?.price || 0;
-  }
 }

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { X, MapPin, Clock, Ticket, Calendar, LayoutGrid, List as ListIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 import { EventCard } from '@/components/ui/EventCard';
+import { CatalogCard } from '@/components/ui/CatalogCard';
 import { DateRibbon } from '@/components/ui/DateRibbon';
 import { PromoBlock } from '@/components/ui/PromoBlock';
 import {
@@ -32,6 +33,15 @@ const sortOptions = [
   { value: 'departing_soon', label: 'Начнутся скоро' },
 ];
 
+/** Убрать HTML-теги для отображения plain-text; <br> заменяем на пробел */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 const TIME_OF_DAY_OPTIONS = [
   { value: '', label: 'Любое время' },
   { value: 'soon', label: '🔥 Скоро' },
@@ -41,29 +51,94 @@ const TIME_OF_DAY_OPTIONS = [
   { value: 'night', label: '🌙 Ночь' },
 ];
 
+/** Собрать объект фильтров из URL */
+const PRICE_OPTIONS = [
+  { value: '', label: 'Любая цена' },
+  { value: '500', label: 'До 500 ₽' },
+  { value: '1000', label: 'До 1 000 ₽' },
+  { value: '2000', label: 'До 2 000 ₽' },
+  { value: '5000', label: 'До 5 000 ₽' },
+];
+
+const LIMIT_OPTIONS = [20, 50, 100] as const;
+
+function filtersFromParams(sp: URLSearchParams) {
+  const sort = sp.get('sort') || 'popular';
+  const isSoon = sort === 'departing_soon';
+  const rawLimit = parseInt(sp.get('limit') || '20', 10);
+  const limit = LIMIT_OPTIONS.includes(rawLimit as 20 | 50 | 100) ? rawLimit : 20;
+  return {
+    city: sp.get('city') || '',
+    category: sp.get('category') || '',
+    audience: sp.get('audience') || '',
+    sort,
+    timeOfDay: isSoon ? 'soon' : (sp.get('timeOfDay') || ''),
+    tag: sp.get('tag') || '',
+    date: sp.get('date') || null,
+    pier: sp.get('pier') || '',
+    priceMax: sp.get('priceMax') || '',
+    page: Math.max(1, parseInt(sp.get('page') || '1', 10)),
+    limit,
+    qf: sp.get('qf') || '',
+  };
+}
+
 export default function EventsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [events, setEvents] = useState<any[]>([]);
+  const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [cities, setCities] = useState<any[]>([]);
-
-  const [city, setCity] = useState(searchParams.get('city') || '');
-  const [category, setCategory] = useState(searchParams.get('category') || '');
-  const [audience, setAudience] = useState(searchParams.get('audience') || '');
-  const [sort, setSort] = useState(searchParams.get('sort') || 'popular');
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [timeOfDay, setTimeOfDay] = useState(searchParams.get('sort') === 'departing_soon' ? 'soon' : '');
-  const [pier, setPier] = useState('');
   const [piers, setPiers] = useState<any[]>([]);
-  const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Активный quick-filter чип (id из QUICK_FILTERS)
+  // Фильтры — единый источник: URL
+  const [city, setCity] = useState('');
+  const [category, setCategory] = useState('');
+  const [audience, setAudience] = useState('');
+  const [sort, setSort] = useState('popular');
+  const [timeOfDay, setTimeOfDay] = useState('');
+  const [urlTag, setUrlTag] = useState('');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [pier, setPier] = useState('');
+  const [priceMax, setPriceMax] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [activeQuickFilter, setActiveQuickFilter] = useState<string>('');
 
-  // Sync from URL on navigation (e.g. /events?tag=bridges)
-  const urlTag = searchParams.get('tag') || '';
+  // Синхронизация URL → состояние (при загрузке и навигации)
+  useEffect(() => {
+    const f = filtersFromParams(searchParams);
+    setCity(f.city);
+    setCategory(f.category);
+    setAudience(f.audience);
+    setSort(f.sort);
+    setTimeOfDay(f.timeOfDay);
+    setUrlTag(f.tag);
+    setSelectedDate(f.date);
+    setPier(f.pier);
+    setPriceMax(f.priceMax);
+    setPage(f.page);
+    setLimit(f.limit);
+    setActiveQuickFilter(f.qf);
+  }, [searchParams]);
+
+  /** Обновить URL, сохраняя остальные фильтры */
+  const updateUrl = useCallback(
+    (updates: Record<string, string | number | null | undefined>) => {
+      const params = new URLSearchParams(searchParams.toString());
+      for (const [k, v] of Object.entries(updates)) {
+        if (v === null || v === '' || v === undefined) params.delete(k);
+        else params.set(k, String(v));
+      }
+      const q = params.toString();
+      router.replace(`/events${q ? `?${q}` : ''}`);
+    },
+    [router, searchParams],
+  );
 
   // Определяем витрину: конкретная категория, «Детям», или «Все»
   const vitrineKey = audience === 'KIDS' ? 'KIDS' : category || '';
@@ -99,80 +174,174 @@ export default function EventsPage() {
     }
   }, [city]);
 
+  const isMuseumCategory = category === 'MUSEUM';
+
   useEffect(() => {
     setLoading(true);
-    const params: Record<string, string | number> = { page, sort: effectiveSort };
-    if (city) params.city = city;
-    if (category) params.category = category;
-    if (audience) params.audience = audience;
-    if (urlTag) params.tag = urlTag;
 
-    // Лента дат: одиночная дата или диапазон "yyyy-mm-dd..yyyy-mm-dd"
-    if (selectedDate) {
-      if (selectedDate.includes('..')) {
-        const [from, to] = selectedDate.split('..');
+    // Берём фильтры из URL (не из state), чтобы при переходе с главной city/sort уже были в первом запросе
+    const f = filtersFromParams(searchParams);
+    const cityFromUrl = f.city;
+    const sortFromUrl = f.sort === 'departing_soon' || f.timeOfDay === 'soon' ? 'departing_soon' : f.sort;
+    const categoryFromUrl = f.category;
+    const audienceFromUrl = f.audience;
+    const urlTagFromUrl = f.tag;
+    const selectedDateFromUrl = f.date;
+    const timeOfDayFromUrl = f.timeOfDay === 'soon' ? '' : f.timeOfDay;
+    const pageFromUrl = f.page;
+    const limitFromUrl = f.limit;
+    const isMuseumFromUrl = categoryFromUrl === 'MUSEUM';
+
+    if (isMuseumFromUrl) {
+      // Музеи → единый каталог (Venue)
+      const params: Record<string, string | number> = { category: 'MUSEUM', page: pageFromUrl, sort: sortFromUrl, limit: limitFromUrl };
+      if (cityFromUrl) params.city = cityFromUrl;
+      api
+        .getCatalog(params)
+        .then((res) => { setCatalogItems(res.items); setEvents([]); setTotal(res.total); })
+        .catch((e) => { console.error('Catalog error:', e); setCatalogItems([]); setEvents([]); setTotal(0); })
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    // Экскурсии / Мероприятия / Все → Events
+    const params: Record<string, string | number> = { page: pageFromUrl, sort: sortFromUrl, limit: limitFromUrl };
+    if (cityFromUrl) params.city = cityFromUrl;
+    if (categoryFromUrl) params.category = categoryFromUrl;
+    if (audienceFromUrl) params.audience = audienceFromUrl;
+    if (urlTagFromUrl) params.tag = urlTagFromUrl;
+
+    // Лента дат
+    if (selectedDateFromUrl) {
+      if (selectedDateFromUrl.includes('..')) {
+        const [from, to] = selectedDateFromUrl.split('..');
         params.dateFrom = `${from}T00:00:00`;
         params.dateTo = `${to}T23:59:59`;
       } else {
-        params.dateFrom = `${selectedDate}T00:00:00`;
-        params.dateTo = `${selectedDate}T23:59:59`;
+        params.dateFrom = `${selectedDateFromUrl}T00:00:00`;
+        params.dateTo = `${selectedDateFromUrl}T23:59:59`;
       }
     }
-    if (effectiveTimeOfDay) params.timeOfDay = effectiveTimeOfDay;
-    if (pier) params.pier = pier;
+    if (timeOfDayFromUrl) params.timeOfDay = timeOfDayFromUrl;
+    if (f.pier) params.pier = f.pier;
+    if (f.priceMax) params.priceMax = parseInt(f.priceMax, 10) * 100; // рубли → копейки
 
-    // Параметры от quick filter
     for (const [k, v] of Object.entries(quickFilterParams)) {
       params[k] = v;
     }
 
     api
       .getEvents(params)
-      .then((res) => { setEvents(res.items); setTotal(res.total); })
-      .catch((e) => { console.error('Events page error:', e); setEvents([]); setTotal(0); })
+      .then((res) => { setEvents(res.items); setCatalogItems([]); setTotal(res.total); })
+      .catch((e) => { console.error('Events page error:', e); setEvents([]); setCatalogItems([]); setTotal(0); })
       .finally(() => setLoading(false));
-  }, [city, category, audience, urlTag, effectiveSort, selectedDate, effectiveTimeOfDay, pier, page, quickFilterParams]);
+  }, [searchParams, quickFilterParams]);
 
-  const activeFiltersCount = [city, category, selectedDate, audience, urlTag, timeOfDay, pier, activeQuickFilter].filter(Boolean).length;
+  const activeFiltersCount = [city, category, selectedDate, audience, urlTag, timeOfDay, pier, priceMax, activeQuickFilter].filter(Boolean).length;
 
   const clearAllFilters = useCallback(() => {
-    setCity('');
-    setCategory('');
-    setSelectedDate(null);
-    setAudience('');
-    setTimeOfDay('');
-    setPier('');
-    setActiveQuickFilter('');
-    setPage(1);
-  }, []);
+    updateUrl({
+      city: null,
+      category: null,
+      audience: null,
+      sort: null,
+      timeOfDay: null,
+      tag: null,
+      date: null,
+      pier: null,
+      priceMax: null,
+      qf: null,
+      page: 1,
+    });
+  }, [updateUrl]);
 
-  const handleCategorySelect = useCallback((value: string) => {
-    setCategory(value);
-    setAudience('');
-    setActiveQuickFilter('');
-    setPage(1);
-  }, []);
+  const handleCategorySelect = useCallback(
+    (value: string) => {
+      updateUrl({ category: value || null, audience: null, qf: null, page: 1 });
+    },
+    [updateUrl],
+  );
 
   const handleAudienceKids = useCallback(() => {
-    setAudience('KIDS');
-    setCategory('');
-    setActiveQuickFilter('');
-    setPage(1);
-  }, []);
+    updateUrl({ audience: 'KIDS', category: null, qf: null, page: 1 });
+  }, [updateUrl]);
 
-  const handleQuickFilter = useCallback((filterId: string) => {
-    setActiveQuickFilter((prev) => (prev === filterId ? '' : filterId));
-    setPage(1);
-  }, []);
+  const handleQuickFilter = useCallback(
+    (filterId: string) => {
+      const next = activeQuickFilter === filterId ? '' : filterId;
+      updateUrl({ qf: next || null, page: 1 });
+    },
+    [activeQuickFilter, updateUrl],
+  );
+
+  // Города для дропдауна: в режиме "Начнутся скоро" — только города с событиями в текущей выдаче
+  const dropdownCities = useMemo(() => {
+    if (!isSoonMode) return cities;
+    const slugsWithSoon = new Set(
+      events
+        .filter((e: any) => e.city)
+        .map((e: any) => e.city.slug),
+    );
+    return cities.filter((c: any) => slugsWithSoon.has(c.slug));
+  }, [isSoonMode, cities, events]);
 
   return (
     <div className="container-page py-6 sm:py-10">
       {/* Header */}
-      <div className="mb-5 sm:mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Каталог событий</h1>
-        <p className="mt-1 text-sm text-slate-500 sm:text-base">
-          {total > 0 ? `${total} событий` : 'Экскурсии, музеи и мероприятия по городам России'}
-        </p>
+      <div className="mb-5 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Каталог событий</h1>
+          <p className="mt-1 text-sm text-slate-500 sm:text-base">
+            {total > 0 ? `${total} ${isMuseumCategory ? 'мест' : 'событий'}` : 'Экскурсии, музеи и мероприятия по городам России'}
+          </p>
+        </div>
+        {/* Limit selector + View mode toggle */}
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <span className="whitespace-nowrap">Показывать по</span>
+            <select
+              value={limit}
+              onChange={(e) => updateUrl({ limit: Number(e.target.value), page: 1 })}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            >
+              {LIMIT_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+          {!isMuseumCategory && (
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-slate-500 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 sm:px-2.5 ${
+                viewMode === 'grid'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'hover:bg-slate-50'
+              }`}
+              title="Сеткой"
+              aria-label="Показать сеткой"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="sr-only">Сеткой</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 sm:px-2.5 ${
+                viewMode === 'list'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'hover:bg-slate-50'
+              }`}
+              title="С описанием"
+              aria-label="Показать с описанием"
+            >
+              <ListIcon className="h-4 w-4" />
+              <span className="sr-only">С описанием</span>
+            </button>
+          </div>
+          )}
+        </div>
       </div>
 
       {/* Category tabs — horizontal scroll on mobile */}
@@ -219,7 +388,7 @@ export default function EventsPage() {
         <div className="-mx-4 mb-4 px-4 sm:mx-0 sm:px-0">
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
             <button
-              onClick={() => { setActiveQuickFilter(''); setPage(1); }}
+              onClick={() => updateUrl({ qf: null, page: 1 })}
               className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                 !activeQuickFilter
                   ? 'bg-primary-600 text-white'
@@ -257,7 +426,7 @@ export default function EventsPage() {
       <div className="-mx-4 mb-4 px-4 sm:mx-0 sm:mb-5 sm:px-0">
         <DateRibbon
           selected={selectedDate}
-          onChange={(date) => { setSelectedDate(date); setPage(1); }}
+          onChange={(date) => updateUrl({ date: date || null, page: 1 })}
         />
       </div>
 
@@ -268,7 +437,13 @@ export default function EventsPage() {
           {TIME_OF_DAY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => { setTimeOfDay(opt.value); setPage(1); }}
+              onClick={() => {
+                if (opt.value === 'soon') {
+                  updateUrl({ sort: 'departing_soon', timeOfDay: null, page: 1 });
+                } else {
+                  updateUrl({ timeOfDay: opt.value || null, sort: sort === 'departing_soon' ? 'popular' : sort, page: 1 });
+                }
+              }}
               className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                 timeOfDay === opt.value
                   ? opt.value === 'soon'
@@ -286,11 +461,11 @@ export default function EventsPage() {
         <div className="flex gap-2 flex-shrink-0">
           <select
             value={city}
-            onChange={(e) => { setCity(e.target.value); setPage(1); }}
+            onChange={(e) => updateUrl({ city: e.target.value || null, page: 1 })}
             className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           >
             <option value="">Все города</option>
-            {cities.map((c: any) => (
+            {dropdownCities.map((c: any) => (
               <option key={c.slug} value={c.slug}>{c.name}</option>
             ))}
           </select>
@@ -298,7 +473,7 @@ export default function EventsPage() {
           {city && piers.length > 0 && (
             <select
               value={pier}
-              onChange={(e) => { setPier(e.target.value); setPage(1); }}
+              onChange={(e) => updateUrl({ pier: e.target.value || null, page: 1 })}
               className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               <option value="">Все причалы</option>
@@ -308,16 +483,26 @@ export default function EventsPage() {
             </select>
           )}
 
+          {!isMuseumCategory && (
+            <select
+              value={priceMax}
+              onChange={(e) => updateUrl({ priceMax: e.target.value || null, page: 1 })}
+              className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            >
+              {PRICE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          )}
+
           <select
             value={isSoonMode ? 'departing_soon' : sort}
             onChange={(e) => {
               const v = e.target.value;
               if (v === 'departing_soon') {
-                setTimeOfDay('soon');
-                setSort('popular');
+                updateUrl({ sort: 'departing_soon', timeOfDay: null, page: 1 });
               } else {
-                setSort(v);
-                if (timeOfDay === 'soon') setTimeOfDay('');
+                updateUrl({ sort: v, timeOfDay: timeOfDay === 'soon' ? null : timeOfDay, page: 1 });
               }
             }}
             className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
@@ -329,7 +514,7 @@ export default function EventsPage() {
         </div>
       </div>
 
-      {/* Events grid */}
+      {/* Events grid / list */}
       {loading ? (
         <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -343,31 +528,123 @@ export default function EventsPage() {
             </div>
           ))}
         </div>
-      ) : events.length > 0 ? (
+      ) : isMuseumCategory && catalogItems.length > 0 ? (
         <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-          {events.map((event: any) => (
-            <EventCard
-              key={event.id}
-              slug={event.slug}
-              title={event.title}
-              category={event.category}
-              subcategories={event.subcategories}
-              audience={event.audience}
-              tagSlugs={event.tagSlugs}
-              imageUrl={event.imageUrl}
-              priceFrom={event.priceFrom}
-              rating={event.rating}
-              reviewCount={event.reviewCount}
-              durationMinutes={event.durationMinutes}
-              city={event.city}
-              totalAvailableTickets={event.totalAvailableTickets}
-              departingSoonMinutes={event.departingSoonMinutes}
-              nextSessionAt={event.nextSessionAt}
-              isOptimalChoice={event.isOptimalChoice}
-              dateMode={event.dateMode}
-            />
+          {catalogItems.map((item: any) => (
+            <CatalogCard key={item.id} item={item} />
           ))}
         </div>
+      ) : events.length > 0 ? (
+        viewMode === 'grid' ? (
+          <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            {events.map((event: any) => (
+              <EventCard
+                key={event.id}
+                slug={event.slug}
+                title={event.title}
+                category={event.category}
+                subcategories={event.subcategories}
+                audience={event.audience}
+                tagSlugs={event.tagSlugs}
+                imageUrl={event.imageUrl}
+                priceFrom={event.priceFrom}
+                rating={event.rating}
+                reviewCount={event.reviewCount}
+                durationMinutes={event.durationMinutes}
+                city={event.city}
+                totalAvailableTickets={event.totalAvailableTickets}
+                departingSoonMinutes={event.departingSoonMinutes}
+                nextSessionAt={event.nextSessionAt}
+                isOptimalChoice={event.isOptimalChoice}
+                dateMode={event.dateMode}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3 sm:space-y-4">
+            {events.map((event: any) => {
+              const raw = event.shortDescription || event.description || '';
+              const desc = stripHtml(raw);
+              return (
+                <Link
+                  key={event.id}
+                  href={`/events/${event.slug}`}
+                  className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:flex-row"
+                >
+                  {/* Image */}
+                  <div className="relative w-full sm:w-1/3 lg:w-1/4 h-40 sm:h-44 bg-slate-100">
+                    {event.imageUrl ? (
+                      <img
+                        src={event.imageUrl}
+                        alt={event.title}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary-100 to-primary-50 text-4xl">
+                        {event.category === 'EXCURSION' ? '🚶' : event.category === 'MUSEUM' ? '🏛️' : '🎭'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex flex-1 flex-col justify-between border-t border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700 sm:border-t-0 sm:border-l sm:px-6 sm:py-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-900 group-hover:text-primary-600">
+                        {event.title}
+                      </h3>
+                      {event.city && (
+                        <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                          <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                          <span className="truncate">
+                            {event.city.name}
+                            {event.address ? `, ${event.address}` : ''}
+                          </span>
+                        </p>
+                      )}
+                      {desc && (
+                        <div className="mt-2 relative text-xs sm:text-sm text-slate-600 leading-relaxed">
+                          <p className="line-clamp-3">
+                            {desc}
+                          </p>
+                          {/* Мягкий градиент внизу, чтобы "спрятать" обрезку текста */}
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-slate-50 via-slate-50/80 to-transparent" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 sm:text-sm">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {event.durationMinutes && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {event.durationMinutes >= 60
+                              ? `${Math.floor(event.durationMinutes / 60)} ч${event.durationMinutes % 60 > 0 ? ` ${event.durationMinutes % 60} мин` : ''}`
+                              : `${event.durationMinutes} мин`}
+                          </span>
+                        )}
+                        {event.nextSessionAt && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5" />
+                            {/* Краткое указание ближайшей даты, без времени */}
+                            {new Date(event.nextSessionAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                          </span>
+                        )}
+                      </div>
+
+                      {event.priceFrom > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-primary-600 shadow-sm sm:text-base">
+                          <Ticket className="h-4 w-4" />
+                          от {event.priceFrom / 100} ₽
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )
       ) : (
         <div className="rounded-xl border border-dashed border-slate-300 py-16 sm:py-20 text-center">
           <p className="text-4xl">🔍</p>
@@ -379,21 +656,21 @@ export default function EventsPage() {
       )}
 
       {/* Pagination */}
-      {total > 20 && (
+      {total > limit && (
         <div className="mt-8 sm:mt-10 flex items-center justify-center gap-2">
           <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => updateUrl({ page: Math.max(1, page - 1) })}
             disabled={page === 1}
             className="btn-secondary px-4 py-2.5 text-sm disabled:opacity-40"
           >
             Назад
           </button>
           <span className="px-3 text-sm text-slate-500">
-            {page} / {Math.ceil(total / 20)}
+            {page} / {Math.ceil(total / limit)}
           </span>
           <button
-            onClick={() => setPage((p) => p + 1)}
-            disabled={page >= Math.ceil(total / 20)}
+            onClick={() => updateUrl({ page: page + 1 })}
+            disabled={page >= Math.ceil(total / limit)}
             className="btn-secondary px-4 py-2.5 text-sm disabled:opacity-40"
           >
             Далее

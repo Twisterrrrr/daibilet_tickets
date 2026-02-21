@@ -21,6 +21,17 @@ export {
   type WidgetPayloadValidationResult,
 } from './widget-payload';
 
+export { normalizeEventTitle } from './normalize-title';
+
+export {
+  type NormalizedPrice,
+  getPriceKopecks,
+  normalizeSessionPrices,
+  getMinPriceKopecks,
+  getPriceByTypeKopecks,
+  getFirstPriceKopecks,
+} from './price-normalizer';
+
 // --- Enums (дублируем из Prisma для использования на фронте) ---
 
 export enum EventCategory {
@@ -44,6 +55,7 @@ export enum EventSubcategory {
   QUEST = 'QUEST',
   GASTRO = 'GASTRO',
   ROOFTOP = 'ROOFTOP',
+  EXTREME = 'EXTREME',
   // MUSEUM
   MUSEUM_CLASSIC = 'MUSEUM_CLASSIC',
   EXHIBITION = 'EXHIBITION',
@@ -363,6 +375,48 @@ export interface EventListItem {
   city: { slug: string; name: string };
 }
 
+/** Единая карточка каталога: Event или Venue */
+export type CatalogItem = CatalogItemEvent | CatalogItemVenue;
+
+export interface CatalogItemBase {
+  type: 'event' | 'venue';
+  id: string;
+  slug: string;
+  title: string;
+  cityId?: string;
+  citySlug?: string;
+  cityName?: string;
+  imageUrl: string | null;
+  priceFrom: number | null;
+  rating: number;
+  badges?: string[];
+  location?: { address?: string | null; metro?: string | null };
+  dateLabel: string;
+}
+
+export interface CatalogItemEvent extends CatalogItemBase {
+  type: 'event';
+  category?: EventCategory;
+  startsAt?: string | null;
+  durationMinutes?: number | null;
+  subcategories?: EventSubcategory[];
+  audience?: EventAudience;
+  tagSlugs?: string[];
+  reviewCount?: number;
+  nextSessionAt?: string | null;
+  departingSoonMinutes?: number | null;
+  totalAvailableTickets?: number;
+  isOptimalChoice?: boolean;
+  dateMode?: string;
+}
+
+export interface CatalogItemVenue extends CatalogItemBase {
+  type: 'venue';
+  venueType: string;
+  openingHoursSummary?: string;
+  reviewCount?: number;
+}
+
 export interface EventDetail extends EventListItem {
   description: string | null;
   shortDescription: string | null;
@@ -547,6 +601,7 @@ export const SUBCATEGORY_LABELS: Record<EventSubcategory, string> = {
   [EventSubcategory.QUEST]: 'Квест',
   [EventSubcategory.GASTRO]: 'Гастро',
   [EventSubcategory.ROOFTOP]: 'Крыши',
+  [EventSubcategory.EXTREME]: 'Экстрим',
   // MUSEUM
   [EventSubcategory.MUSEUM_CLASSIC]: 'Музей',
   [EventSubcategory.EXHIBITION]: 'Выставка',
@@ -572,7 +627,7 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<EventCategory, EventSubcategory[]
   [EventCategory.EXCURSION]: [
     EventSubcategory.RIVER, EventSubcategory.WALKING, EventSubcategory.BUS,
     EventSubcategory.COMBINED, EventSubcategory.QUEST, EventSubcategory.GASTRO,
-    EventSubcategory.ROOFTOP,
+    EventSubcategory.ROOFTOP, EventSubcategory.EXTREME,
   ],
   [EventCategory.MUSEUM]: [
     EventSubcategory.MUSEUM_CLASSIC, EventSubcategory.EXHIBITION,
@@ -605,6 +660,7 @@ export const QUICK_FILTERS: Record<string, QuickFilter[]> = {
     { id: 'with-guide', emoji: '👨‍🏫', label: 'С гидом', params: { tag: 'with-guide' } },
     { id: 'short', emoji: '⏱', label: 'До 2 часов', params: { maxDuration: 120 } },
     { id: 'rooftop', emoji: '🏙', label: 'Крыши', params: { subcategory: 'ROOFTOP' } },
+    { id: 'extreme', emoji: '🔥', label: 'Экстрим', params: { subcategory: 'EXTREME' } },
     { id: 'gastro', emoji: '🍽', label: 'Гастро', params: { subcategory: 'GASTRO' } },
     { id: 'quest', emoji: '🧩', label: 'Квест', params: { subcategory: 'QUEST' } },
     { id: 'combined', emoji: '🔀', label: 'Комбо', params: { subcategory: 'COMBINED' } },

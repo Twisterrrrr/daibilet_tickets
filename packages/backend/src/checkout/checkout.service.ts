@@ -11,7 +11,7 @@ import {
 } from './checkout-state-machine';
 import { resolvePurchaseType, validateWidgetPayload, ensurePayloadVersion } from '@daibilet/shared';
 import { Prisma } from '@prisma/client';
-import { CartItemDto, CreateTripPlanCheckoutDto } from './dto/checkout.dto';
+import { CartItemDto, CreateGiftCertificateCheckoutDto, CreateTripPlanCheckoutDto } from './dto/checkout.dto';
 import { resolvePaymentFlow, PaymentFlowType } from './cart-partitioning';
 
 /**
@@ -237,6 +237,78 @@ export class CheckoutService {
   }
 
   // ============================
+  // Gift Certificate
+  // ============================
+
+  /**
+   * Создать CheckoutSession для подарочного сертификата.
+   * Сессия сразу в CONFIRMED — можно переходить к оплате.
+   */
+  async createGiftCertificateCheckoutSession(data: {
+    amount: number;
+    recipientEmail: string;
+    senderName: string;
+    message?: string;
+    customer: { name: string; email: string; phone: string };
+    utm?: { source?: string; medium?: string; campaign?: string };
+    referrer?: string;
+    userAgent?: string;
+    ip?: string;
+  }) {
+    const denominations = this.getGiftCertificateDenominations();
+    if (!denominations.includes(data.amount)) {
+      throw new BadRequestException(
+        `Недопустимый номинал. Доступные: ${denominations.map((a) => `${a / 100} ₽`).join(', ')}`,
+      );
+    }
+
+    const shortCode = `CS-${Date.now().toString(36).toUpperCase()}`;
+    const expiresAt = calculateExpiresAt(CHECKOUT_SESSION_TTL_MINUTES);
+
+    const giftCertificateSnapshot = {
+      amount: data.amount,
+      recipientEmail: data.recipientEmail,
+      senderName: data.senderName,
+      message: data.message || null,
+    };
+
+    const session = await this.prisma.checkoutSession.create({
+      data: {
+        shortCode,
+        cartSnapshot: [],
+        giftCertificateSnapshot: giftCertificateSnapshot as unknown as Prisma.InputJsonValue,
+        customerName: data.customer.name,
+        customerEmail: data.customer.email,
+        customerPhone: data.customer.phone,
+        status: 'CONFIRMED',
+        totalPrice: data.amount,
+        expiresAt,
+        utmSource: data.utm?.source || null,
+        utmMedium: data.utm?.medium || null,
+        utmCampaign: data.utm?.campaign || null,
+        referrer: data.referrer || null,
+        userAgent: data.userAgent || null,
+        ip: data.ip || null,
+      },
+    });
+
+    this.logger.log(`Created gift certificate checkout session ${shortCode}, amount=${data.amount}`);
+
+    return {
+      sessionId: session.id,
+      shortCode,
+      status: session.status,
+      expiresAt: session.expiresAt,
+      totalPrice: data.amount,
+    };
+  }
+
+  getGiftCertificateDenominations(): number[] {
+    const raw = this.config.get<string>('GIFT_CERTIFICATE_DENOMINATIONS', '300000,500000,1000000');
+    return raw.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
+  }
+
+  // ============================
   // Cart: Validate
   // ============================
 
@@ -290,6 +362,45 @@ export class CheckoutService {
     return { items: validated, allValid, totalPrice };
   }
 
+  /**
+   * Валидировать подарочный сертификат по коду.
+   * Возвращает discountAmount = min(amount, cartTotal) при успехе.
+   */
+  async validateGiftCertificate(code: string, cartTotalKopecks: number): Promise<{
+    valid: boolean;
+    discountAmount?: number;
+    amount?: number;
+    message?: string;
+  }> {
+    const normalized = code?.trim().toUpperCase();
+    if (!normalized || cartTotalKopecks <= 0) {
+      return { valid: false, message: 'Укажите код и сумму корзины' };
+    }
+
+    const cert = await this.prisma.giftCertificate.findUnique({
+      where: { code: normalized },
+    });
+    if (!cert) {
+      return { valid: false, message: 'Сертификат не найден' };
+    }
+    if (cert.status !== 'ISSUED') {
+      return { valid: false, message: 'Сертификат уже использован или недействителен' };
+    }
+    if (cert.expiresAt && cert.expiresAt < new Date()) {
+      return { valid: false, message: 'Срок действия сертификата истёк' };
+    }
+    if (cert.amount <= 0) {
+      return { valid: false, message: 'Некорректный номинал сертификата' };
+    }
+
+    const discountAmount = Math.min(cert.amount, cartTotalKopecks);
+    return {
+      valid: true,
+      discountAmount,
+      amount: cert.amount,
+    };
+  }
+
   // ============================
   // Cart: Create Checkout Session
   // ============================
@@ -304,6 +415,7 @@ export class CheckoutService {
     referrer?: string;
     userAgent?: string;
     ip?: string;
+    giftCertificateCode?: string;
   }) {
     if (!data.items || data.items.length === 0) {
       throw new BadRequestException('Корзина пуста');
@@ -406,6 +518,26 @@ export class CheckoutService {
     // totalPrice вычисляется ТОЛЬКО из snapshot (единственный источник правды по сумме)
     const snapshotTotalPrice = offersSnapshot.reduce((sum, s) => sum + s.lineTotal, 0);
 
+    // Применение подарочного сертификата
+    let appliedGiftCertSnapshot: { certificateId: string; code: string; discountAmount: number } | null = null;
+    let finalTotalPrice = snapshotTotalPrice;
+    if (data.giftCertificateCode?.trim()) {
+      const validation = await this.validateGiftCertificate(data.giftCertificateCode.trim(), snapshotTotalPrice);
+      if (validation.valid && validation.discountAmount) {
+        const cert = await this.prisma.giftCertificate.findUnique({
+          where: { code: data.giftCertificateCode.trim().toUpperCase() },
+        });
+        if (cert) {
+          appliedGiftCertSnapshot = {
+            certificateId: cert.id,
+            code: cert.code,
+            discountAmount: validation.discountAmount,
+          };
+          finalTotalPrice = Math.max(0, snapshotTotalPrice - validation.discountAmount);
+        }
+      }
+    }
+
     const session = await this.prisma.$transaction(async (tx) => {
       // Determine initial status:
       // - Has PLATFORM (REQUEST) items → PENDING_CONFIRMATION (need operator confirmation)
@@ -419,11 +551,14 @@ export class CheckoutService {
           cartSnapshot: data.items as unknown as Prisma.InputJsonValue,
           validatedSnapshot: validation.items as unknown as Prisma.InputJsonValue,
           offersSnapshot: offersSnapshot as unknown as Prisma.InputJsonValue,
+          appliedGiftCertificateSnapshot: appliedGiftCertSnapshot
+            ? (appliedGiftCertSnapshot as unknown as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
           customerName: data.customer.name,
           customerEmail: data.customer.email,
           customerPhone: data.customer.phone,
           status: initialStatus,
-          totalPrice: snapshotTotalPrice,
+          totalPrice: finalTotalPrice,
           expiresAt,
           utmSource: data.utm?.source || null,
           utmMedium: data.utm?.medium || null,

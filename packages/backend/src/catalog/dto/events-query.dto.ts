@@ -1,7 +1,7 @@
-import { IsOptional, IsString, IsInt, Min, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, IsEnum, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { EventCategory, EventAudience } from '@prisma/client';
+import { EventCategory, EventAudience, EventSource } from '@prisma/client';
 
 export class EventsQueryDto {
   @ApiPropertyOptional({ description: 'Slug города' })
@@ -28,6 +28,11 @@ export class EventsQueryDto {
   @IsOptional()
   @IsString()
   tag?: string;
+
+  @ApiPropertyOptional({ enum: EventSource, description: 'Фильтр по источнику: TC | TEPLOHOD | MANUAL' })
+  @IsOptional()
+  @IsEnum(EventSource)
+  source?: EventSource;
 
   @ApiPropertyOptional({ description: 'Дата от (ISO)' })
   @IsOptional()
@@ -82,6 +87,18 @@ export class EventsQueryDto {
   @IsString()
   venueId?: string;
 
+  @ApiPropertyOptional({ description: 'Мин. цена от (копейки)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  priceMin?: number;
+
+  @ApiPropertyOptional({ description: 'Макс. цена до (копейки)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  priceMax?: number;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -94,5 +111,17 @@ export class EventsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(200)
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Только события с фото (для главной, блоков) — исключает из выдачи события без imageUrl' })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  hasPhoto?: boolean;
+
+  @ApiPropertyOptional({ description: 'Фильтр по slug (через запятую) — для страницы избранного' })
+  @IsOptional()
+  @IsString()
+  slugs?: string;
 }

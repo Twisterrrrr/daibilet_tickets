@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DateMode, Prisma } from '@prisma/client';
+import { getFirstPriceKopecks } from '@daibilet/shared';
 
 @Injectable()
 export class LandingService {
@@ -170,11 +171,8 @@ export class LandingService {
     ];
 
     const allPrices = variants
-      .map((v) => {
-        const prices = v.prices as Array<{ type: string; amount?: number; price?: number }>;
-        return prices?.[0]?.amount ?? prices?.[0]?.price ?? null;
-      })
-      .filter((p): p is number => p !== null);
+      .map((v) => getFirstPriceKopecks(v.prices))
+      .filter((p): p is number => p !== null && p > 0);
 
     const allDates = variants
       .filter((v) => v.startsAt != null)

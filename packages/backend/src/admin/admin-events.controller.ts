@@ -1,14 +1,17 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, UseInterceptors, Request, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, Res, UseGuards, UseInterceptors, Request, NotFoundException, BadRequestException } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
+import { streamCsv } from '../common/csv-stream.util';
 import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 import { EventOverrideService } from './event-override.service';
+import { CacheInvalidationService } from '../cache/cache-invalidation.service';
 import { ReviewService } from '../catalog/review.service';
 import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
-import { validateWidgetPayload, ensurePayloadVersion } from '@daibilet/shared';
+import { validateWidgetPayload, ensurePayloadVersion, normalizeEventTitle } from '@daibilet/shared';
 import {
   OfferSource,
   EventCategory,
@@ -40,6 +43,7 @@ export class AdminEventsController {
     private readonly overrideService: EventOverrideService,
     private readonly reviewService: ReviewService,
     private readonly fuzzyDedupService: FuzzyDedupService,
+    private readonly cacheInvalidation: CacheInvalidationService,
   ) {}
 
   @Get()
@@ -61,9 +65,12 @@ export class AdminEventsController {
     if (source) where.source = source;
     if (active !== undefined) where.isActive = active === 'true';
     if (search) {
+      const trimmed = search.trim();
       where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { slug: { contains: search, mode: 'insensitive' } },
+        { title: { contains: trimmed, mode: 'insensitive' } },
+        { slug: { contains: trimmed, mode: 'insensitive' } },
+        { tcEventId: trimmed },
+        { offers: { some: { externalEventId: trimmed } } },
       ];
     }
 
@@ -93,6 +100,51 @@ export class AdminEventsController {
   }
 
   /**
+   * Экспорт всех событий в CSV (cursor-based streaming).
+   */
+  @Get('export/csv')
+  @Roles('ADMIN', 'EDITOR')
+  async exportEventsCsv(@Res() res: Response) {
+    await streamCsv({
+      res,
+      filename: 'events',
+      fields: [
+        { header: 'id', accessor: (e: any) => e.id },
+        { header: 'tcEventId', accessor: (e: any) => e.tcEventId },
+        { header: 'title', accessor: (e: any) => e.title },
+        { header: 'slug', accessor: (e: any) => e.slug },
+        { header: 'city', accessor: (e: any) => e.city?.name ?? '' },
+        { header: 'citySlug', accessor: (e: any) => e.city?.slug ?? '' },
+        { header: 'category', accessor: (e: any) => e.category },
+        { header: 'source', accessor: (e: any) => e.source },
+        { header: 'priceFrom', accessor: (e: any) => e.priceFrom },
+        { header: 'isActive', accessor: (e: any) => e.isActive },
+        { header: 'address', accessor: (e: any) => e.address ?? '' },
+        { header: 'lastSyncAt', accessor: (e: any) => e.lastSyncAt?.toISOString?.() ?? '' },
+        { header: 'createdAt', accessor: (e: any) => e.createdAt?.toISOString?.() ?? '' },
+      ],
+      fetchBatch: (cursor, take) =>
+        this.prisma.event.findMany({
+          where: { isDeleted: false },
+          include: { city: { select: { name: true, slug: true } } },
+          orderBy: { updatedAt: 'desc' },
+          take,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        }),
+    });
+  }
+
+  /**
+   * Кандидаты на дедупликацию (dry-run, без изменений).
+   */
+  @Get('deduplicate-candidates')
+  @Roles('ADMIN')
+  async getDeduplicateCandidates() {
+    const { candidates } = await this.fuzzyDedupService.findDuplicates(true);
+    return { candidates };
+  }
+
+  /**
    * Fuzzy deduplication: find (and optionally merge) near-duplicate events.
    * By default runs in dry-run mode (returns candidates only).
    * Pass ?dryRun=false to actually merge duplicates.
@@ -105,11 +157,36 @@ export class AdminEventsController {
   }
 
   /**
-   * Создать новое событие (ручное) + опционально первый оффер.
+   * Пометить событие как дубль другого (canonicalOfId).
+   */
+  @Patch(':id/mark-duplicate')
+  @Roles('ADMIN')
+  async markDuplicate(
+    @Param('id') eventId: string,
+    @Body('canonicalOfId') canonicalOfId: string,
+  ) {
+    if (!canonicalOfId) throw new BadRequestException('canonicalOfId обязателен');
+    if (eventId === canonicalOfId) throw new BadRequestException('Нельзя пометить событие дублем самого себя');
+
+    const target = await this.prisma.event.findUnique({ where: { id: canonicalOfId } });
+    if (!target) throw new NotFoundException('Каноническое событие не найдено');
+
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    await this.prisma.event.update({
+      where: { id: eventId },
+      data: { canonicalOfId },
+    });
+    return { message: 'Событие помечено как дубль', canonicalOfId };
+  }
+
+  /**
+   * Создать новое событие (ручное) + опционально первый оффер + templateData.
    */
   @Post()
   @Roles('ADMIN', 'EDITOR')
-  async createEvent(@Body() data: CreateEventDto) {
+  async createEvent(@Body() data: CreateEventDto, @Request() req: { user: { id: string } }) {
     // Auto-generate slug from title via transliteration
     const slug = this.transliterate(data.title);
 
@@ -124,14 +201,14 @@ export class AdminEventsController {
     if (!city) throw new NotFoundException('Город не найден');
 
     // Create in transaction
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx): Promise<{ event: { id: string }; offer: { id: string } | null }> => {
       // Create event — generate a unique tcEventId for manual events
       const event = await tx.event.create({
         data: {
           source: OfferSource.MANUAL,
           tcEventId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           cityId: data.cityId,
-          title: data.title,
+          title: normalizeEventTitle(data.title || ''),
           slug,
           description: data.description || null,
           shortDescription: data.shortDescription || null,
@@ -168,6 +245,11 @@ export class AdminEventsController {
             status: 'ACTIVE',
           },
         });
+      }
+
+      // Create override with templateData if provided
+      if (data.templateData && Object.keys(data.templateData).length > 0) {
+        await this.overrideService.upsert(event.id, { templateData: data.templateData }, req.user.id);
       }
 
       return { event, offer };
@@ -223,7 +305,9 @@ export class AdminEventsController {
   @Patch(':id/override')
   @Roles('ADMIN', 'EDITOR')
   async upsertOverride(@Param('id') id: string, @Body() data: OverrideEventDto, @Request() req: any) {
-    return this.overrideService.upsert(id, data, req.user.id);
+    const result = await this.overrideService.upsert(id, data, req.user.id);
+    await this.cacheInvalidation.invalidateOverride(id);
+    return result;
   }
 
   /**
@@ -233,6 +317,7 @@ export class AdminEventsController {
   @Roles('ADMIN', 'EDITOR')
   async deleteOverride(@Param('id') id: string) {
     const result = await this.overrideService.remove(id);
+    await this.cacheInvalidation.invalidateOverride(id);
     return result || { message: 'Override не найден' };
   }
 
@@ -242,7 +327,9 @@ export class AdminEventsController {
   @Patch(':id/hide')
   @Roles('ADMIN', 'EDITOR')
   async toggleHide(@Param('id') id: string, @Body('isHidden') isHidden: boolean, @Request() req: any) {
-    return this.overrideService.toggleHidden(id, isHidden, req.user.id);
+    const result = await this.overrideService.toggleHidden(id, isHidden, req.user.id);
+    await this.cacheInvalidation.invalidateOverride(id);
+    return result;
   }
 
   // --- Venue & dateMode (прямое обновление Event) ---
@@ -259,7 +346,7 @@ export class AdminEventsController {
       if (!venue) throw new NotFoundException('Место (Venue) не найдено');
     }
 
-    return this.prisma.event.update({
+    const updated = await this.prisma.event.update({
       where: { id },
       data: {
         ...(data.venueId !== undefined && { venueId: data.venueId || null }),
@@ -275,6 +362,8 @@ export class AdminEventsController {
         endDate: true,
       },
     });
+    await this.cacheInvalidation.invalidateEventById(id);
+    return updated;
   }
 
   // --- External rating (ручной ввод из Яндекс/2GIS) ---
@@ -305,6 +394,7 @@ export class AdminEventsController {
     // Пересчитать итоговый рейтинг
     await this.reviewService.recalculateEventRating(id);
 
+    await this.cacheInvalidation.invalidateEventById(id);
     return updated;
   }
 
@@ -403,6 +493,7 @@ export class AdminEventsController {
       });
     }
 
+    await this.cacheInvalidation.invalidateEventById(eventId);
     return offer;
   }
 
@@ -458,6 +549,7 @@ export class AdminEventsController {
       },
     });
 
+    await this.cacheInvalidation.invalidateEventById(eventId);
     return updated;
   }
 

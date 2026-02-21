@@ -11,7 +11,9 @@ import { Request } from 'express';
 import {
   CreateTcOrderDto,
   ValidateCartDto,
+  ValidateGiftCertificateDto,
   CreateCheckoutSessionDto,
+  CreateGiftCertificateCheckoutDto,
   CreateOrderRequestDto,
   CreateTripPlanCheckoutDto,
   PayDto,
@@ -144,6 +146,37 @@ export class CheckoutController {
     return this.checkoutService.validateCart(body.items);
   }
 
+  @Post('validate-gift-certificate')
+  @ApiOperation({ summary: 'Валидировать подарочный сертификат по коду' })
+  validateGiftCertificate(@Body() body: ValidateGiftCertificateDto) {
+    return this.checkoutService.validateGiftCertificate(body.code, body.cartTotalKopecks);
+  }
+
+  @Get('gift-certificate/denominations')
+  @ApiOperation({ summary: 'Номиналы подарочных сертификатов (копейки)' })
+  getGiftCertificateDenominations() {
+    return {
+      denominations: this.checkoutService.getGiftCertificateDenominations(),
+    };
+  }
+
+  @Post('gift-certificate')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @ApiOperation({ summary: 'Создать checkout session для подарочного сертификата' })
+  createGiftCertificateSession(@Body() body: CreateGiftCertificateCheckoutDto, @Req() req: Request) {
+    return this.checkoutService.createGiftCertificateCheckoutSession({
+      amount: body.amount,
+      recipientEmail: body.recipientEmail,
+      senderName: body.senderName,
+      message: body.message,
+      customer: body.customer,
+      utm: body.utm,
+      referrer: req.headers.referer || body.referrer,
+      userAgent: req.headers['user-agent'],
+      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip,
+    });
+  }
+
   @Post('session')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Создать checkout session + order requests' })
@@ -155,6 +188,7 @@ export class CheckoutController {
       referrer: req.headers.referer || body.referrer,
       userAgent: req.headers['user-agent'],
       ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip,
+      giftCertificateCode: body.giftCertificateCode,
     });
   }
 

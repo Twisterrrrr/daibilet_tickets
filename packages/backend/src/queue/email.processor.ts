@@ -8,7 +8,15 @@ export type EmailJobData =
   | { type: 'review-verify'; to: string; authorName: string; eventTitle: string; verifyUrl: string }
   | { type: 'review-request'; to: string; customerName: string; eventTitle: string; eventDate: string; reviewUrl: string }
   | { type: 'review-approved'; to: string; authorName: string; eventTitle: string; eventUrl: string }
-  | { type: 'admin-new-review'; authorName: string; eventTitle: string; rating: number; text: string };
+  | { type: 'admin-new-review'; authorName: string; eventTitle: string; rating: number; text: string }
+  | {
+      type: 'gift-certificate';
+      to: string;
+      code: string;
+      amountKopecks: number;
+      senderName: string | null;
+      message: string | null;
+    };
 
 @Processor(QUEUE_EMAILS)
 export class EmailProcessor extends WorkerHost {
@@ -54,6 +62,15 @@ export class EmailProcessor extends WorkerHost {
           eventTitle: data.eventTitle,
           rating: data.rating,
           text: data.text,
+        });
+        break;
+
+      case 'gift-certificate':
+        await this.mail.sendGiftCertificate(data.to, {
+          code: data.code,
+          amountKopecks: data.amountKopecks,
+          senderName: data.senderName,
+          message: data.message,
         });
         break;
 

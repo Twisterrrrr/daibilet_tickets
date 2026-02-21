@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { EventCard } from '@/components/ui/EventCard';
 import { PromoBlock } from '@/components/ui/PromoBlock';
 import { HeroCitySearch } from '@/components/ui/HeroCitySearch';
+import { CityFilterSelect } from '@/components/ui/CityFilterSelect';
 
 // ISR: обновлять каждый час
 export const revalidate = 3600;
@@ -24,30 +25,80 @@ function pluralEvents(n: number): string {
   return `${n} событий`;
 }
 
-export default async function HomePage() {
+interface HomePageProps {
+  searchParams?: Promise<{ city?: string }>;
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const params = await searchParams;
+  const citySlug = params?.city || '';
+
   let cities: any[] = [];
   try {
-    cities = await api.getCities(true);
-  } catch {
+    cities = await api.getCities();
+  } catch (e) {
+    if (process.env.NODE_ENV === 'development') console.error('[HomePage] getCities failed:', e);
     cities = [];
   }
 
   let popularEvents: any[] = [];
   try {
-    const res = await api.getEvents({ sort: 'popular', limit: 8 });
+    const res = await api.getEvents({
+      sort: 'popular',
+      limit: 8,
+      hasPhoto: true,
+      ...(citySlug && { city: citySlug }),
+    });
     popularEvents = res.items || [];
-  } catch {
+  } catch (e) {
+    if (process.env.NODE_ENV === 'development') console.error('[HomePage] getEvents (popular) failed:', e);
     popularEvents = [];
   }
 
-  // Fallback: если popular пусто — берём по рейтингу
+  // Fallback: если popular пусто — берём по рейтингу (с тем же city)
   if (popularEvents.length === 0) {
     try {
-      const res = await api.getEvents({ sort: 'rating', limit: 8 });
+      const res = await api.getEvents({
+        sort: 'rating',
+        limit: 8,
+        hasPhoto: true,
+        ...(citySlug && { city: citySlug }),
+      });
       popularEvents = res.items || [];
     } catch {
       popularEvents = [];
     }
+  }
+
+  // Fallback: если в городе мало — добиваем до 8 из общероссийского топа
+  if (citySlug && popularEvents.length > 0 && popularEvents.length < 8) {
+    try {
+      const res = await api.getEvents({
+        sort: 'popular',
+        limit: 8 - popularEvents.length,
+        hasPhoto: true,
+      });
+      const ids = new Set(popularEvents.map((e: any) => e.id));
+      const extra = (res.items || []).filter((e: any) => !ids.has(e.id));
+      popularEvents = [...popularEvents, ...extra];
+    } catch {
+      // игнорируем
+    }
+  }
+
+  // Ближайшие события (departing_soon) — с фильтром по городу из URL
+  let nearestEvents: any[] = [];
+  try {
+    const nearestRes = await api.getEvents({
+      sort: 'departing_soon',
+      limit: 8,
+      hasPhoto: true,
+      ...(citySlug && { city: citySlug }),
+    });
+    nearestEvents = nearestRes.items || [];
+  } catch (e) {
+    if (process.env.NODE_ENV === 'development') console.error('[HomePage] getEvents (nearest) failed:', e);
+    nearestEvents = [];
   }
 
   let popularTags: any[] = [];
@@ -55,16 +106,23 @@ export default async function HomePage() {
     const allTags = await api.getTags();
     popularTags = (allTags as any[])
       .filter((t: any) => t._count?.events > 0)
+      // Явно исключаем НН-лендинговые теги, чтобы не засорять главную
+      .filter((t: any) => !['progulki-volga-nn', 'kanatka-nn'].includes(t.slug))
       .sort((a: any, b: any) => (b._count?.events ?? 0) - (a._count?.events ?? 0))
       .slice(0, 20);
   } catch {
     popularTags = [];
   }
 
-  // Счётчики для социального доказательства
+  // Счётчики Hero: по городам, которые реально отображаются
   const totalEvents = cities.reduce((sum: number, c: any) => sum + (c._count?.events ?? 0), 0);
   const totalVenues = cities.reduce((sum: number, c: any) => sum + (c._count?.venues ?? 0), 0);
+  const totalEventsAndVenues = totalEvents + totalVenues;
   const totalCities = cities.length;
+
+  const cityName = citySlug ? cities.find((c: any) => c.slug === citySlug)?.name : null;
+  const eventsHref = citySlug ? `/events?city=${citySlug}` : '/events';
+  const nearestHref = citySlug ? `/events?sort=departing_soon&city=${citySlug}` : '/events?sort=departing_soon';
 
   return (
     <>
@@ -79,26 +137,23 @@ export default async function HomePage() {
               <span className="block text-primary-300">и мероприятия</span>
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-slate-300">
-              {totalEvents > 0 ? `${totalEvents}+ событий` : 'Сотни событий'} в {totalCities > 0 ? `${totalCities} городах` : 'городах'} России.
+              {totalEventsAndVenues > 0 ? `${totalEventsAndVenues}+ событий и мест` : 'Сотни событий и мест'} в {totalCities > 0 ? `${totalCities} городах` : 'городах'} России.
               Экскурсии, музеи, концерты, шоу — выбирайте и покупайте онлайн.
             </p>
 
             {/* City search */}
             <div className="mx-auto mt-10 max-w-lg">
-              <HeroCitySearch cities={cities} />
+              <HeroCitySearch cities={cities} initialCitySlug={citySlug || undefined} />
             </div>
 
-            {/* Quick links */}
+            {/* Quick links — переключатель фильтра по городу с поиском */}
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              {cities.slice(0, 4).map((city: any) => (
-                <Link
-                  key={city.slug}
-                  href={`/cities/${city.slug}`}
-                  className="rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/80 backdrop-blur-sm transition-all hover:bg-white/20 hover:text-white"
-                >
-                  {city.name}
-                </Link>
-              ))}
+              <CityFilterSelect
+                cities={cities}
+                currentCitySlug={citySlug || undefined}
+                variant="hero"
+                showReset={!!citySlug}
+              />
             </div>
           </div>
         </div>
@@ -108,17 +163,31 @@ export default async function HomePage() {
       {popularEvents.length > 0 && (
         <section className="py-12 sm:py-16">
           <div className="container-page">
-            <div className="flex items-end justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Популярные события</h2>
-                <p className="mt-1 text-slate-500">Лучшие экскурсии и мероприятия по рейтингу</p>
+                <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+                  {cityName ? `Популярные события в городе ${cityName}` : 'Популярные события'}
+                </h2>
+                <p className="mt-1 text-slate-500">
+                  {cityName ? 'Лучшие экскурсии и мероприятия в выбранном городе' : 'Лучшие экскурсии и мероприятия по рейтингу'}
+                </p>
+                {citySlug && (
+                  <Link
+                    href={`/cities/${citySlug}`}
+                    className="mt-2 inline-block text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    Всё о городе →
+                  </Link>
+                )}
               </div>
-              <Link
-                href="/events"
-                className="hidden text-sm font-medium text-primary-600 hover:text-primary-700 sm:block"
-              >
-                Все события →
-              </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <CityFilterSelect
+                  cities={cities}
+                  currentCitySlug={citySlug || undefined}
+                  variant="default"
+                  showReset={!!citySlug}
+                />
+              </div>
             </div>
             <div className="mt-6 grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-4">
               {popularEvents.map((event: any) => (
@@ -139,14 +208,87 @@ export default async function HomePage() {
                 />
               ))}
             </div>
-            <div className="mt-6 text-center sm:hidden">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
               <Link
-                href="/events"
-                className="inline-flex items-center gap-1 text-sm font-medium text-primary-600"
+                href={eventsHref}
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
               >
                 Все события <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* ============ NEAREST EVENTS (departing_soon) ============ */}
+      {(nearestEvents.length > 0 || cities.length > 0) && (
+        <section className="py-12 sm:py-16 bg-slate-50">
+          <div className="container-page">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+                  {cityName ? `Ближайшие события в городе ${cityName}` : 'Ближайшие события'}
+                </h2>
+                <p className="mt-1 text-slate-500">
+                  {citySlug ? 'Начнутся скоро в выбранном городе' : 'Скоро начинаются — не пропустите'}
+                </p>
+                {citySlug && (
+                  <Link
+                    href={`/cities/${citySlug}`}
+                    className="mt-2 inline-block text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    Всё о городе →
+                  </Link>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <CityFilterSelect
+                  cities={cities}
+                  currentCitySlug={citySlug || undefined}
+                  variant="default"
+                  showReset={!!citySlug}
+                />
+              </div>
+            </div>
+            {nearestEvents.length > 0 ? (
+              <>
+                <div className="mt-6 grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-4">
+                  {nearestEvents.map((event: any) => (
+                    <EventCard
+                      key={event.id}
+                      slug={event.slug}
+                      title={event.title}
+                      category={event.category}
+                      subcategories={event.subcategories}
+                      imageUrl={event.imageUrl}
+                      priceFrom={event.priceFrom}
+                      rating={event.rating}
+                      reviewCount={event.reviewCount}
+                      durationMinutes={event.durationMinutes}
+                      city={event.city}
+                      nextSessionAt={event.nextSessionAt}
+                      departingSoonMinutes={event.departingSoonMinutes}
+                      compact
+                    />
+                  ))}
+                </div>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
+                  <Link
+                    href={nearestHref}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    Все ближайшие <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <p className="mt-6 text-slate-500 text-center">
+                {citySlug
+                  ? 'В этом городе пока нет событий, которые начинаются скоро. Попробуйте другой город или '
+                  : 'Пока нет событий, которые начинаются в ближайшее время. Посмотрите '}
+                <Link href={eventsHref} className="text-primary-600 hover:underline">весь каталог</Link>.
+              </p>
+            )}
           </div>
         </section>
       )}
@@ -195,13 +337,20 @@ export default async function HomePage() {
                 <div className="relative p-5">
                   <h3 className="text-xl font-bold text-white">{city.name}</h3>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {/* Общее количество событий в городе */}
                     <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-300">
                       <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                       {pluralEvents(city._count?.events ?? 0)}
                     </span>
-                    {(city._count?.venues ?? 0) > 0 && (
+                    {/* Музеи и арт: площадки + события в них (museumCount с бэкенда, fallback на venues) */}
+                    {((city.museumCount as number | undefined) ?? (city._count?.venues ?? 0)) > 0 && (
                       <span className="flex items-center gap-1.5 text-sm text-white/60">
-                        {city._count.venues} {city._count.venues === 1 ? 'музей' : city._count.venues < 5 ? 'музея' : 'музеев'}
+                        {((city.museumCount as number | undefined) ?? (city._count?.venues ?? 0))}{' '}
+                        {(((city.museumCount as number | undefined) ?? (city._count?.venues ?? 0)) === 1
+                          ? 'музей'
+                          : ((city.museumCount as number | undefined) ?? (city._count?.venues ?? 0)) < 5
+                            ? 'музея'
+                            : 'музеев')}
                       </span>
                     )}
                   </div>
@@ -220,7 +369,7 @@ export default async function HomePage() {
             {categoryMeta.map(({ category, emoji }) => (
               <Link
                 key={category}
-                href={category === EventCategory.MUSEUM ? '/venues' : `/events?category=${category}`}
+                href={`/events?category=${category}`}
                 className="card flex items-center gap-4 p-6 transition-transform hover:scale-[1.02]"
               >
                 <span className="text-4xl">{emoji}</span>
@@ -277,9 +426,9 @@ export default async function HomePage() {
                 <Ticket className="h-6 w-6 text-primary-600" />
               </div>
               <p className="mt-3 text-3xl font-extrabold text-slate-900">
-                {totalEvents > 0 ? `${totalEvents}+` : '1000+'}
+                {totalEventsAndVenues > 0 ? `${totalEventsAndVenues}+` : '1000+'}
               </p>
-              <p className="mt-1 text-sm text-slate-500">событий в каталоге</p>
+              <p className="mt-1 text-sm text-slate-500">событий и мест в каталоге</p>
             </div>
             <div className="text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100">
@@ -324,7 +473,7 @@ export default async function HomePage() {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/events"
+                href={eventsHref}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-primary-700 shadow-lg transition-all hover:bg-primary-50 hover:shadow-xl"
               >
                 <Ticket className="h-5 w-5" />

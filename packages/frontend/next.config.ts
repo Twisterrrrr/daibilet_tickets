@@ -9,12 +9,15 @@ const nextConfig: NextConfig = {
 
   // Проксирование API запросов — только в dev-режиме.
   // В production Nginx проксирует /api/* напрямую на backend.
+  // INTERNAL_API_URL может быть http://localhost:4000/api/v1 — извлекаем origin для rewrites
   async rewrites() {
     if (!isDev) return [];
+    const internal = process.env.INTERNAL_API_URL || 'http://localhost:4000/api/v1';
+    const backendOrigin = internal.replace(/\/api\/v1\/?$/, '') || 'http://localhost:4000';
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.INTERNAL_API_URL || 'http://localhost:4000'}/api/:path*`,
+        destination: `${backendOrigin}/api/:path*`,
       },
     ];
   },
@@ -22,6 +25,11 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'ticketscloud.com',
+        pathname: '/**',
+      },
       {
         protocol: 'https',
         hostname: '**.ticketscloud.com',

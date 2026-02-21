@@ -12,33 +12,56 @@ import type {
   VoucherData,
   VenueListItem,
   VenueDetail,
+  CatalogItem,
 } from '@daibilet/shared';
 
 /**
- * SSR (Server Components) → абсолютный URL напрямую к бэкенду.
- * CSR (Client Components) → относительный URL, проксируемый через Next.js rewrites.
+ * Единая схема: и SSR, и CSR идут через Next.js rewrites (/api/v1).
+ * SSR запрашивает свой же origin (localhost:3000), Next проксирует на backend.
+ * Это устраняет fetch failed при недоступности backend напрямую из Node.
  */
 const isServer = typeof window === 'undefined';
 const API_BASE = isServer
-  ? (process.env.INTERNAL_API_URL || 'http://localhost:4000/api/v1')
+  ? (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000') + '/api/v1'
   : (process.env.NEXT_PUBLIC_API_URL || '/api/v1');
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
+  let res: Response;
+  try {
+    res = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options?.headers,
     },
   });
-
-  if (!res.ok) {
-    const error = await res.json().catch((e) => { console.error('API error:', e); return { message: 'Ошибка сервера' }; });
-    throw new Error(error.message || `HTTP ${res.status}`);
+  } catch (e) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[fetchApi] fetch failed', { url, err: String(e), cause: (e as Error & { cause?: unknown })?.cause });
+    }
+    throw e;
   }
 
-  return res.json();
+  const text = await res.text();
+  if (!res.ok) {
+    let error: { message?: string; path?: string };
+    try {
+      error = JSON.parse(text);
+    } catch {
+      error = { message: text?.slice(0, 200) || `HTTP ${res.status}` };
+    }
+    const msg = error.message || `HTTP ${res.status}`;
+    const errPath = error.path ? ` [${error.path}]` : ` [${path}]`;
+    throw new Error(`${msg}${errPath}`);
+  }
+
+  if (!text?.trim()) return {} as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Ответ не JSON: ${text.slice(0, 80)}... [${path}]`);
+  }
 }
 
 // --- Каталог ---
@@ -65,6 +88,18 @@ export const api = {
     if (type) params.set('type', type);
     if (limit) params.set('limit', String(limit));
     return fetchApi<any[]>(`/locations/nearest?${params}`);
+  },
+
+  // Единый каталог (Event + Venue при category=MUSEUM)
+  getCatalog: (params?: Record<string, string | number>) => {
+    const query = params
+      ? '?' + new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : '';
+    return fetchApi<PaginatedResponse<CatalogItem>>(`/catalog${query}`);
   },
 
   // События
@@ -156,6 +191,10 @@ export const api = {
     return fetchApi<any>(`/regions/${slug}/events${query}`);
   },
 
+  // Топ городов для футера (по количеству событий и мест)
+  getTopCities: () =>
+    fetchApi<any[]>(`/cities`),
+
   // Venues (музеи, галереи, арт-пространства)
   getVenues: (params?: Record<string, string | number>) => {
     const query = params
@@ -229,7 +268,7 @@ export const api = {
     const formData = new FormData();
     files.forEach((f) => formData.append('photos', f));
     if (authorEmail) formData.append('authorEmail', authorEmail);
-    const url = `${isServer ? (process.env.INTERNAL_API_URL || 'http://localhost:4000/api/v1') : (process.env.NEXT_PUBLIC_API_URL || '/api/v1')}/reviews/${reviewId}/photos`;
+    const url = `${API_BASE}/reviews/${reviewId}/photos`;
     const res = await fetch(url, { method: 'POST', body: formData });
     if (!res.ok) {
       const err = await res.json().catch((e) => { console.error('API error:', e); return { message: 'Ошибка загрузки фото' }; });
@@ -242,5 +281,79 @@ export const api = {
     fetchApi<{ helpfulCount: number }>(`/reviews/${reviewId}/vote`, {
       method: 'POST',
       body: JSON.stringify({ helpful }),
+    }),
+
+  // Подарочные сертификаты
+  getGiftCertificateDenominations: () =>
+    fetchApi<{ denominations: number[] }>('/checkout/gift-certificate/denominations'),
+
+  createGiftCertificateSession: (data: {
+    amount: number;
+    recipientEmail: string;
+    senderName: string;
+    message?: string;
+    customer: { name: string; email: string; phone: string };
+    utm?: { source?: string; medium?: string; campaign?: string };
+  }) =>
+    fetchApi<{ sessionId: string; shortCode: string; status: string; expiresAt: string; totalPrice: number }>(
+      '/checkout/gift-certificate',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  // User (аккаунты)
+  userRegister: (data: { email: string; password: string; name: string }) =>
+    fetchApi<{ accessToken: string }>('/user/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      credentials: 'include',
+    }),
+
+  userLogin: (data: { email: string; password: string }) =>
+    fetchApi<{ accessToken: string }>('/user/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      credentials: 'include',
+    }),
+
+  userRefresh: () =>
+    fetchApi<{ accessToken: string | null }>('/user/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+    }),
+
+  userLogout: (token: string) =>
+    fetchApi<{ message: string }>('/user/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  userMe: (token: string) =>
+    fetchApi<{ id: string; email: string; name: string }>('/user/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  userFavoritesList: (token: string) =>
+    fetchApi<{ slugs: string[] }>('/user/favorites', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  userFavoritesSync: (token: string, slugs: string[]) =>
+    fetchApi<{ slugs: string[] }>('/user/favorites/sync', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ slugs }),
+    }),
+
+  userFavoritesAdd: (token: string, slug: string) =>
+    fetchApi<{ slugs: string[] }>('/user/favorites', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ slug }),
+    }),
+
+  userFavoritesRemove: (token: string, slug: string) =>
+    fetchApi<{ slugs: string[] }>(`/user/favorites/${encodeURIComponent(slug)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
     }),
 };

@@ -23,6 +23,7 @@ import { PartnerModule } from './partner/partner.module';
 import { VenueModule } from './venue/venue.module';
 import { CollectionModule } from './collection/collection.module';
 import { SupportModule } from './support/support.module';
+import { UserModule } from './user/user.module';
 import { MailModule } from './mail/mail.module';
 import { UploadModule } from './upload/upload.module';
 import { QueueModule } from './queue/queue.module';
@@ -63,6 +64,7 @@ import { QueueModule } from './queue/queue.module';
     VenueModule,
     CollectionModule,
     SupportModule,
+    UserModule,
   ],
   providers: [
     // Глобальный rate limiter (30 req/min по умолчанию, per-route через @Throttle)

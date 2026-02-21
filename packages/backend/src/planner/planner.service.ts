@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PricingService, MarkupContext } from '../pricing/pricing.service';
 import { CalculatePlanDto } from './dto/calculate-plan.dto';
+import { getPriceByTypeKopecks } from '@daibilet/shared';
 
 // ==========================================
 // Planner Service — ядро Trip Planner
@@ -184,9 +185,8 @@ export class PlannerService {
 
     const slot = day.slots[body.slotIndex];
     const session = event.sessions[0];
-    const prices = (session.prices as Array<{ type: string; price?: number }>) || [];
-    const adultPrice = prices.find((p) => p.type === 'adult')?.price || 0;
-    const childPrice = prices.find((p) => p.type === 'child')?.price || adultPrice;
+    const adultPrice = getPriceByTypeKopecks(session.prices, 'adult');
+    const childPrice = getPriceByTypeKopecks(session.prices, 'child') || adultPrice;
 
     // Пересчитать
     const adultTotal = adultPrice * (slot.tickets?.adult?.count || 1);
@@ -347,8 +347,8 @@ export class PlannerService {
       // Проверить доступность
       if (session.availableTickets < totalPersons) continue;
 
-      const adultPrice = this.getPriceByType(session.prices, 'adult');
-      const childPrice = this.getPriceByType(session.prices, 'child') || adultPrice;
+        const adultPrice = getPriceByTypeKopecks(session.prices, 'adult');
+        const childPrice = getPriceByTypeKopecks(session.prices, 'child') || adultPrice;
 
       if (adultPrice <= 0) continue;
 
@@ -431,16 +431,10 @@ export class PlannerService {
 
   private getAdultPrice(sessions: any[]): number {
     for (const s of sessions) {
-      const price = this.getPriceByType(s.prices, 'adult');
+      const price = getPriceByTypeKopecks(s.prices, 'adult');
       if (price > 0) return price;
     }
     return 0;
-  }
-
-  private getPriceByType(prices: any, type: string): number {
-    if (!Array.isArray(prices)) return 0;
-    const found = prices.find((p: any) => p.type === type);
-    return found?.price || 0;
   }
 
   private getSlotsForDay(config: ReturnType<typeof this.getIntensityConfig>): string[] {

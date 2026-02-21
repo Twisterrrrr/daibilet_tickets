@@ -161,12 +161,13 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   // Инвалидация после синхронизации
   // ==========================================
 
-  /** Вызывать после любого sync */
+  /** Вызывать после любого sync или reclassification */
   async invalidateAfterSync() {
     await Promise.all([
       this.invalidatePattern('cities:*'),
       this.invalidatePattern('events:*'),
       this.invalidatePattern('tags:*'),
+      this.invalidatePattern('regions:*'),
       this.invalidatePattern('landings:*'),
       this.invalidatePattern('combos:*'),
       this.invalidatePattern('search:*'),

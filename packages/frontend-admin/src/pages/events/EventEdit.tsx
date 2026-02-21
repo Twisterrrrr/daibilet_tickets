@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { EventTemplateFields } from './EventTemplateFields';
 import {
   Table,
   TableBody,
@@ -130,6 +131,7 @@ interface EventOverride {
   subcategories?: EventSubcategory[];
   minAge?: number | null;
   manualRating?: number | null;
+  templateData?: Record<string, unknown> | null;
 }
 
 interface VenueOption {
@@ -203,6 +205,7 @@ export function EventEditPage() {
     dateMode?: string;
     isPermanent?: boolean;
     endDate?: string | null;
+    templateData?: Record<string, unknown>;
   }>({});
 
   // Venues list for museum linking
@@ -243,6 +246,7 @@ export function EventEditPage() {
           dateMode: data.dateMode ?? 'SCHEDULED',
           isPermanent: data.isPermanent ?? false,
           endDate: data.endDate ? data.endDate.slice(0, 10) : null,
+          templateData: (ov as EventOverride)?.templateData ?? {},
         });
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
@@ -265,6 +269,7 @@ export function EventEditPage() {
         minAge: form.minAge,
         description: form.description,
         shortDescription: form.shortDescription,
+        templateData: form.templateData ?? {},
       });
       setEvent((prev) => (prev ? { ...prev, override: ov } : null));
 
@@ -308,6 +313,11 @@ export function EventEditPage() {
           minAge: ov?.minAge ?? data.minAge,
           description: ov?.description ?? data.description ?? '',
           shortDescription: data.shortDescription ?? '',
+          venueId: data.venueId ?? null,
+          dateMode: data.dateMode ?? 'SCHEDULED',
+          isPermanent: data.isPermanent ?? false,
+          endDate: data.endDate ? data.endDate.slice(0, 10) : null,
+          templateData: (ov as EventOverride)?.templateData ?? {},
         });
         toast.success('Override сброшен');
       })
@@ -422,7 +432,43 @@ export function EventEditPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Категория</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Категория</Label>
+                    {(event?.override?.category != null || (event?.override?.subcategories?.length ?? 0) > 0) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground"
+                        disabled={saving}
+                        onClick={async () => {
+                          if (!id) return;
+                          setSaving(true);
+                          try {
+                            await adminApi.patch(`/admin/events/${id}/override`, {
+                              category: null,
+                              subcategories: [],
+                            });
+                            const data = await adminApi.get<EventDetail>(`/admin/events/${id}`);
+                            setEvent(data);
+                            const ov = data.override;
+                            setForm((f) => ({
+                              ...f,
+                              category: ov?.category ?? data.category,
+                              subcategories: ov?.subcategories?.length ? ov.subcategories : (data.subcategories || []),
+                            }));
+                            toast.success('Категория сброшена к значениям из sync');
+                          } catch (e) {
+                            toast.error(e instanceof Error ? e.message : 'Ошибка');
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                      >
+                        Сбросить к sync
+                      </Button>
+                    )}
+                  </div>
                   <Select
                     value={form.category ?? ''}
                     onValueChange={(v) => setForm((f) => ({ ...f, category: v as EventCategory, subcategories: [] }))}
@@ -578,6 +624,13 @@ export function EventEditPage() {
                   />
                 </div>
               </div>
+
+              <EventTemplateFields
+                category={form.category ?? event.category}
+                subcategories={form.subcategories ?? event.subcategories ?? []}
+                templateData={form.templateData ?? {}}
+                onChange={(td) => setForm((f) => ({ ...f, templateData: td }))}
+              />
 
               {/* Tags */}
               {event.tags && event.tags.length > 0 && (

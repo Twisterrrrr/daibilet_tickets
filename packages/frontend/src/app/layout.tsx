@@ -4,9 +4,11 @@ import './globals.css';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { CartProvider } from '@/lib/cart';
+import { UserAuthProvider } from '@/hooks/useUserAuth';
 import { SupportWidget } from '@/components/ui/SupportWidget';
 import { WebVitalsReporter } from '@/components/WebVitalsReporter';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ScrollProgress } from '@/components/ui/ScrollProgress';
 
 export const metadata: Metadata = {
   title: {
@@ -31,20 +33,29 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className="flex min-h-screen flex-col">
+        <ScrollProgress />
         <WebVitalsReporter />
         <CartProvider>
+        <UserAuthProvider>
         <Header />
         <main className="flex-1">
           <ErrorBoundary>{children}</ErrorBoundary>
         </main>
         <Footer />
         <SupportWidget />
+        </UserAuthProvider>
         </CartProvider>
 
         {/* Ticketscloud — скрипт виджета покупки билетов */}
         <Script
           src="https://ticketscloud.com/static/scripts/widget/tcwidget.js"
           strategy="beforeInteractive"
+        />
+
+        {/* Teplohod.info — скрипт виджета покупки билетов */}
+        <Script
+          src="https://api.teplohod.info/v1/widget/widget.js"
+          strategy="lazyOnload"
         />
 
         {/* Яндекс Метрика */}

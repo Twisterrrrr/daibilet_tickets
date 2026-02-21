@@ -42,6 +42,7 @@ enum EventSubcategory {
   QUEST          // Квест-экскурсия
   GASTRO         // Гастро-экскурсия
   ROOFTOP        // Крыши
+  EXTREME        // Экстрим (танк, квадроцикл, стрельба и т.п.)
   // MUSEUM
   MUSEUM_CLASSIC // Музей
   EXHIBITION     // Выставка
@@ -109,6 +110,14 @@ enum AdminRole {
 enum SupplierRole {
   OWNER             // Полный доступ + настройки
   MANAGER           // Управление событиями/заявками
+  CONTENT           // Создание и правка контента
+  ACCOUNTANT        // Отчёты и выплаты (read-only)
+}
+
+enum OperatorStatus {
+  ACTIVE      // Активный контрагент
+  ARCHIVED    // Юрлицо закрыто
+  SUSPENDED   // Временно приостановлен
 }
 
 enum ModerationStatus {
@@ -187,6 +196,39 @@ model AdminUser {
   updatedAt        DateTime  @updatedAt
 
   @@map("admin_users")
+}
+
+// ========================
+// Пользователи сайта (аккаунты)
+// ========================
+
+model User {
+  id               String    @id @default(uuid()) @db.Uuid
+  email            String    @unique
+  passwordHash     String
+  name             String
+  isActive         Boolean   @default(true)
+  refreshTokenHash String?
+  lastLoginAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  favorites UserFavorite[]
+
+  @@map("users")
+}
+
+model UserFavorite {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  eventSlug String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventSlug])
+  @@index([userId])
+  @@map("user_favorites")
 }
 
 // ========================
@@ -470,6 +512,7 @@ model EventOverride {
   isHidden     Boolean        @default(false)
   tagsAdd      String[]       // tag slugs to add
   tagsRemove   String[]       // tag slugs to remove
+  templateData Json?          // category-specific: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)
   updatedBy    String         @db.Uuid
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -922,6 +965,9 @@ model Operator {
   logo      String?
   website   String?
   isActive  Boolean  @default(true)
+  status    OperatorStatus @default(ACTIVE)  // ACTIVE | ARCHIVED | SUSPENDED
+  archivedAt DateTime?
+  archiveReason String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1159,11 +1205,13 @@ enum CheckoutStatus {
 }
 
 model CheckoutSession {
-  id                String         @id @default(uuid()) @db.Uuid
-  shortCode         String         @unique                       // "CS-XXXX" для UI
-  cartSnapshot      Json                                         // Снимок корзины из localStorage
-  validatedSnapshot Json?                                        // Результат validate (актуальные цены/наличие)
-  offersSnapshot    Json?                                        // Immutable: данные офферов на момент оформления (title, price, type, deeplink, widgetPayload)
+  id                     String         @id @default(uuid()) @db.Uuid
+  shortCode              String         @unique                       // "CS-XXXX" для UI
+  cartSnapshot           Json                                         // Снимок корзины из localStorage
+  validatedSnapshot      Json?                                        // Результат validate (актуальные цены/наличие)
+  offersSnapshot         Json?                                        // Immutable: данные офферов на момент оформления (title, price, type, deeplink, widgetPayload)
+  giftCertificateSnapshot         Json?  // Подарочный сертификат: { amount, recipientEmail, senderName?, message? }
+  appliedGiftCertificateSnapshot  Json?  // Применённый код: { certificateId, code, discountAmount }
   customerName      String?
   customerEmail     String?
   customerPhone     String?
@@ -1182,10 +1230,36 @@ model CheckoutSession {
   orderRequests     OrderRequest[]
   paymentIntents    PaymentIntent[]
   fulfillmentItems  FulfillmentItem[]
+  giftCertificate   GiftCertificate?
 
   @@index([status])
   @@index([customerEmail])
   @@map("checkout_sessions")
+}
+
+// ========================
+// Подарочные сертификаты
+// ========================
+
+model GiftCertificate {
+  id                 String    @id @default(uuid()) @db.Uuid
+  checkoutSessionId  String    @unique @db.Uuid
+  amount             Int                                     // Номинал в копейках
+  code               String    @unique                        // Уникальный код (V-XXXX-XXXX)
+  recipientEmail     String
+  senderName         String?
+  message            String?   @db.Text
+  status             String    @default("ISSUED")             // ISSUED | ACTIVATED | EXPIRED
+  issuedAt           DateTime  @default(now())
+  activatedAt        DateTime?                               // Когда применён к заказу
+  expiresAt          DateTime?                               // Срок действия (null = бессрочно)
+
+  checkoutSession    CheckoutSession @relation(fields: [checkoutSessionId], references: [id])
+
+  @@index([code])
+  @@index([recipientEmail])
+  @@index([status])
+  @@map("gift_certificates")
 }
 
 model OrderRequest {
@@ -1330,9 +1404,11 @@ model ProcessedWebhookEvent {
   eventType       String                                    // payment.succeeded, payment.canceled, etc.
   payload         Json                                      // Полный payload для аудита
   result          String?                                   // PAID | FAILED | IGNORED | etc.
+  paymentIntentId String?  @db.Uuid                         // Трассировка: к какому PaymentIntent относится
   processedAt     DateTime @default(now())
 
   @@index([provider, eventType])
+  @@index([paymentIntentId])
   @@map("processed_webhook_events")
 }
 

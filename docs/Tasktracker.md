@@ -1,6 +1,84 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-02-15 (UX-аудит Tripster + Понедельный план)
+> Последнее обновление: 2026-02-20. Решения по 13 вопросам — `docs/OpenQuestions.md`.
+
+---
+
+## Выполнено 20.02 (главная, каталог, TEPLOHOD)
+
+- [x] **Главная — фильтр по городу**: HeroCitySearch остаётся на /?city=slug; «Популярные» и «Ближайшие» фильтруются; чипы городов как пресеты; ссылки под блоками.
+- [x] **Fallback популярных**: при < 8 событий в городе — добивка из общероссийского топа.
+- [x] **TEPLOHOD classifyTep**: речные (теплоход, развод мостов, палубн) — EXCURSION+RIVER; EXTREME только для наземных.
+- [x] **Скрипт fix-teplohod-river**: перенос EVENT→EXCURSION+RIVER, сброс override. `pnpm run fix:teplohod-river`.
+- [x] **Каталог — «Показывать по»**: селектор 20/50/100, limit в URL и API.
+
+---
+
+## To-do (каталог, корзина, экскурсии, teplohod)
+
+- [x] **Высокий**: Единый каталог (Вариант B): GET /catalog, CatalogItem, CatalogCard. category=MUSEUM → Venue, EXCURSION/EVENT → Event. «Музеи и Арт» → /events?category=MUSEUM
+- [x] **Высокий**: Скрыть единую корзину (19.02 — CartIcon → null, AddToCartButton → прямой checkout)
+- [x] **Высокий**: Страница-шаблон для типа «Экскурсии» (20.02)
+  - Таблица тарифов не нужна — «от X ₽» (есть)
+  - TemplateDataBlocks: маршрут, меню, теплоход (RIVER), правила, «Прогулка вам понравится», правила бронирования — вывод при заполнении templateData
+  - Админка EventTemplateFields: route, menu, shipName, rules, advantages, bookingRules
+- [x] **Высокий**: Шаблоны типов событий в админке — EventTemplateFields (16.02)
+  - EventOverride.templateData (JSON), миграция `20260216_template_data` — применена (16.02, deploy выполнен)
+  - EventCreate + EventEdit: при выборе категории показывается разный набор полей
+  - EXCURSION: маршрут, меню, теплоход (RIVER), правила, преимущества, правила бронирования
+  - MUSEUM: правила посещения
+  - EVENT: программа/сет-лист, состав (артисты), зал, правила
+- [x] **Высокий**: Посадочная «Музеи» по городу — `/cities/[slug]/museums` (20.02)
+  - Единый шаблон: HERO, Лучший выбор, секции (Главные/Частные/С детьми), каталог, Маршрут дня, FAQ, SEO
+  - Ссылки со страницы города: категория «Музеи и Арт», «Все музеи»
+  - Контент через getMuseumsLandingContent(citySlug) — СПб заполнен, остальные города — дефолт
+- [ ] **Высокий**: Шаблон «Музеи» (детальная страница venue) — см. `docs/PageTemplateSpecs.md` §1
+  - Режим работы (Venue.openingHours), галерея, текущие выставки, как добраться, правила (features)
+  - Hero: «Режим работы» при OPEN_DATE, «до DD.MM» для временных выставок
+- [x] **Высокий**: Шаблон «Мероприятия» (фронт) — TemplateDataBlocks: program, cast, hall, rules (19.02)
+- [ ] **Средний**: Реализовать отображение каталога на выбор: карточками или широкими блоками с описанием
+- [ ] **Высокий**: Продумать вывод виджетов для teplohod.info — вариант: создать в системе справочник виджетов, в daibilet хранить пары «номер виджета + id прогулки»
+
+---
+
+## Решения 13 вопросов (19.02) — см. OpenQuestions.md
+
+### Критично ✅ (19.02)
+- [x] Email для GiftCertificate (шаблон, fulfillment, retry)
+- [x] Унификация session.prices (NormalizedPrice, нормализатор shared/price-normalizer)
+- [x] Cache invalidation service (CacheInvalidationService, инвалидация при override/event/offer)
+- [x] Скрипт reclassify-events.ts (dry-run, apply, diff-лог, pnpm reclassify:dry/apply)
+
+### Высокий
+- [x] Скрыть корзину (CartIcon → null, AddToCartButton → «Купить» с редиректом на checkout)
+- [x] Аудит PageTemplateSpecs (документ PageTemplateAudit.md, вывод program/cast/hall/route/menu на фронте) — 19.02
+- [x] SQL-отчёт подозрительной категоризации (check-categorization.ts, pnpm check:categorization) — 19.02
+- [x] GiftCertificate в checkout (поле кода, validate, apply discount) — 19.02
+- [x] EventOverride: category + subcategory (в т.ч. clear)
+
+### Позже
+- [ ] Планировщик MVP — отложить до 2000+ событий
+
+### Выполнено (19.02)
+- [x] Аккаунты: User + UserFavorite, API /user/auth/*, /user/favorites, useFavorites с sync при логине
+- [x] Типизация: ESLint `@typescript-eslint/no-explicit-any: warn`
+- [x] Supplier: docs/SupplierArchitecture.md, Operator.status, SupplierRole CONTENT/ACCOUNTANT
+
+---
+
+## Далее (приоритетная очередь)
+
+- [x] **Средний**: Admin UI для ручной merge дублей событий (поиск + выбор canonical event)
+- [x] **Средний**: Автодедуп (fuzzy-matching по названию, площадка, дата)
+- [x] **Средний**: Отзывы на уровне Venue (Review.venueId)
+- [x] **Средний**: Sitemap /venues/* — проверить высокий приоритет (сейчас priority 0.9)
+
+---
+
+## Страницы городов: обязательные условия
+
+- **Мини-описание обязательно** — при добавлении нового города или при отсутствии описания нужно **сгенерировать** его для страницы города прежде чем выводить в каталог. Без `City.description` город не показывается на /cities.
+- **Столица региона** — если город является хабом региона (Region.hubCityId), все областные события выводятся под его карточкой в блоке «Также в регионе» (как Московская область под Москвой). Реализовано: non-hub города скрыты из основного списка, хаб получает region.slug/name/eventCount.
 
 ---
 
@@ -44,6 +122,9 @@
 - [x] **Высокий**: Единый pagination contract (pagination.ts) — 15 контроллеров
 - [x] **Средний**: ESLint `no-console: error` + исключения для тестов/seed
 
+### Выполнено (16.02.2026)
+- [x] **Высокий**: Prisma migrate deploy — идемпотентные миграции (20260215_pre_yookassa_gates, 20260215_review_venue_id, 20260215_soft_delete_and_cascade_safety) для совместимости с базами после db push / migrate dev
+
 ### Отложено (backlog)
 - [ ] **Средний**: ESLint правило: запретить `any` в новых файлах (warning)
 - [ ] **Низкий**: Типизация `as any` в бэкенде (31 место) — заменить на type guards постепенно
@@ -63,6 +144,14 @@
 - [ ] **Карусель отзывов на главной**: 5-6 лучших отзывов (имя, город, текст, рейтинг). Сейчас только статичные цифры
 - [ ] **Лицо за экскурсией**: на карточке события — фото/имя гида или оператора. Требует `avatar`/`bio` в модели `Operator`
 - [ ] **Autocomplete в поиске**: город + начало названия события (вместо простого dropdown)
+
+### Frontend UX — приоритетная очередь
+- [x] **Скелетоны загрузки** на `/events` и `/events/[slug]` — уже были
+- [x] **Scroll-progress** на мобиле для длинных страниц (% прочитанного)
+- [x] **Блок «Похожие места»** на странице площадки (`/venues/[slug]`)
+- [x] **Расширенные фильтры** на `/events` — добавлен фильтр по цене (до 500/1000/2000/5000 ₽)
+- [x] **Breadcrumbs** на страницах события и площадки — уже были
+- [x] **Блок «Ближайшие события»** на главной с фильтром по городу
 
 ### Средний приоритет
 - [ ] **Страница события**: профиль оператора/гида, маршрут на карте, фото от путешественников
@@ -132,7 +221,7 @@
 - [ ] **Высокий**: Checkout UX: прогресс-бар (корзина → данные → оплата → готово)
 - [ ] **Высокий**: Страница /orders/[id] — трекинг заказа (статус, билеты, контакты)
 - [ ] **Высокий**: Push/email уведомления о смене статуса заказа
-- [ ] **Средний**: Избранное (localStorage) — кнопка «в избранное» на карточке события
+- [x] **Средний**: Избранное (localStorage) — кнопка на карточке, страница /favorites, Header (19.02)
 - [ ] **Средний**: «Недавно просмотренные» на главной
 
 ### Неделя 4 — Масштабирование + retention
@@ -199,10 +288,19 @@
 - [x] **Критический**: /venues/[slug] — hero, описание, галерея, часы работы, билеты, выставки, JSON-LD
 - [x] **Критический**: /venues — каталог с VenueCard, фильтры город/тип/сортировка, пагинация
 - [x] **Критический**: VenueCard, VenueFilters компоненты
-- [x] **Высокий**: Header "Музеи и Арт" → /venues, City page секция "Музеи и искусство"
+- [x] **Высокий**: Header "Музеи и Арт" → /venues (обновлено 16.02: теперь → /events?category=MUSEUM через единый каталог)
 - [x] **Высокий**: EventCard — dateMode=OPEN_DATE badge + пробросить prop
 - [x] **Высокий**: Event page — ссылка на venue
 - [x] **Высокий**: Quick filter «Открытая дата» в QUICK_FILTERS.MUSEUM
+
+### Неделя 3.1 — Метрики и навигация (города, Hero, футер)
+
+- [x] **Высокий**: Счётчик «Музеи и арт» на странице города и в списках городов = активные площадки (venues) + активные события с `venueId` (SCHEDULED с будущими сеансами + OPEN_DATE не истёк).
+- [x] **Средний**: Список городов `/cities` и блок «Города» на главной используют `museumCount` вместо чистого `_count.venues`, сохраняя совместимость при отсутствии поля. (закрыто 16.02)
+- [x] **Средний**: Hero на главной — текст «N+ событий и мест в M городах России», счётчики считаются только по городам, которые реально отображаются после фильтров `getCities`.
+- [x] **Средний**: Header — скрыта иконка корзины, добавлен селектор города (featured-города) с синхронизацией `?city=` в каталоге `/events`.
+- [x] **Средний**: Футер — динамическая колонка «Города»: top-города по `events + museumCount`, без числовых подписей, порядок секций «Каталог → Города → Компания».
+- [x] **Средний**: Фильтры каталога `/events` — URL как единый источник истины (city, category, sort, tag, date, page и др.). Смена города в Header сохраняет «Начнутся скоро» и остальные фильтры. Подробнее: `docs/Diary.md` (16.02.2026).
 
 ### Неделя 4 — SEO-упаковка и перелинковка
 - [x] **Высокий**: JSON-LD: Museum/Gallery/Park + makesOffer (open-date без startDate) + openingHoursSpecification (нормализация RU→EN)
@@ -211,14 +309,18 @@
 - [x] **Высокий**: VenueService.getRelatedArticles + VenueController возвращает relatedArticles
 - [ ] **Средний**: Контентный план — 30 статей по городам (генерация через ArticlePlanner)
 
+### Синхронизация и заголовки
+- [x] **Средний**: EventOverride.title — кастомный заголовок для Daibilet; Event.title сохраняет оригинал из источника для импорта/экспорта. Подробнее: `docs/Diary.md` (16.02.2026).
+- [ ] **Низкий**: EventEdit — показывать «Оригинал (из источника)» и «Для Daibilet» рядом с полем названия для ясности.
+
 ### Исправления багов
 - [x] **Средний**: TS: adminNotes → adminNote в partner-orders.controller.ts
 - [x] **Средний**: TS: subcategories cast в admin-events.controller.ts
 - [x] **Средний**: openingHours: нормализация русских ключей (Пн/Вт) → EN (mon/tue) на venue page
 
 ### Отложено (после MVP)
-- [ ] **Средний**: Отзывы на уровне Venue (Review.venueId)
-- [ ] **Низкий**: Sitemap: /venues/* с priority 0.9
+- [x] **Средний**: Отзывы на уровне Venue (Review.venueId)
+- [x] **Низкий**: Sitemap: /venues/* с priority 0.9
 - [ ] **Средний**: Агрегация выставок: isPermanent + endDate сортировка "сейчас идёт / скоро закончится"
 - [ ] **Средний**: Импорт внешних рейтингов (Яндекс/2ГИС) для топ-venue
 
@@ -344,6 +446,16 @@
 ### Этап 2: SEO-машина + новые страницы (планируется)
 
 - [ ] **Высокий**: 5 SEO-подборок на город (развод мостов, лучшие по отзывам, дешёвые, поздние рейсы, с детьми)
+
+### Подборки (Collections) и сезонные промо
+
+- [x] **Средний**: Public API: GET /collections, GET /collections/:slug + AdminCollectionsController, UI-редактор подборок.
+- [x] **Средний**: PromoBlock — сезонные промо на главной (зима/навигция) переведены на Collection-модель:
+  - `den-vlyublennyh` (tag=romantic, promo.months=[2])
+  - `maslenitsa` (subcategory=GASTRO, promo.months=[2,3])
+  - `zimniy-gorod` (tag=bad-weather-ok, promo.months=[11,12,1,2,3])
+  - `kanikuly-s-detmi` (audience=KIDS, promo.months=[1,3,6,7,8])
+- [x] **Средний**: PromoBlock на главной ведёт на `/podborki/{slug}` вместо прямых фильтров `/events?...`, логика отбора событий задаётся в админке через фильтры/пинning/исключения.
 - [ ] **Высокий**: Страницы причалов (/cities/:slug/piers/:pier)
 - [ ] **Высокий**: Страницы маршрутов (/routes/:slug)
 - [ ] **Средний**: Перелинковка: событие — причал — маршрут — подборка
@@ -430,8 +542,8 @@
 - [x] **Критический**: Интеграция teplohod.info — `TepApiService` + `TepSyncService` (784 события)
 - [x] **Критический**: Enum `EventSource` (TC / TEPLOHOD) + поле `source` в Event
 - [x] **Высокий**: Эндпоинты: `GET /tep/discover`, `POST /tep/sync`, `POST /sync/all`
-- [ ] **Критический**: BullMQ job: `sync-events-full` (cron каждые 6 часов)
-- [ ] **Критический**: BullMQ job: `sync-events-incremental` (cron каждые 15 минут)
+- [x] **Критический**: BullMQ job: `sync-full` (cron `0 0 0,6,12,18 * * *` — каждые 6ч; TC + TEP + retag + combo + cache invalidation)
+- [x] **Критический**: BullMQ job: `sync-incremental` (cron `0 30 * * * *` — каждые 30 мин; TC sync + cache invalidation)
 - [x] **Высокий**: Маппинг категорий TC → наши (EXCURSION / MUSEUM / EVENT / KIDS) по ключевым словам
 - [x] **Высокий**: Маппинг категорий teplohod.info → наши + фичи → теги
 - [ ] **Высокий**: Redis-кэш: списки событий (TTL 10 мин), детали (TTL 5 мин), сессии (TTL 3 мин)
@@ -984,10 +1096,20 @@
 
 ### 3. YooKassa — тестовые платежи
 - [ ] **Критический**: Подключить YooKassa SDK → заменить STUB в payment.service
-- [ ] **Критический**: Sandbox-тесты: создание платежа, webhook PAID/FAILED
-- [ ] **Высокий**: IP whitelist + HMAC верификация webhook
+- [x] **Критический**: Sandbox E2E тесты: 7 сценариев (21 тест-кейс) — payment-e2e.spec.ts
+- [x] **Высокий**: IP whitelist (PaymentService.YOOKASSA_IPS + isIpInCidr)
 - [ ] **Высокий**: Страница "Оплата прошла" / "Ошибка оплаты" на фронте
-- [ ] **Средний**: Возвраты через админку (PAID → REFUNDED)
+- [x] **Средний**: Возвраты через админку (PAID → REFUNDED) — Reconciliation UI
+
+### 3.1 Batch C — Доказательство корректности (DONE)
+- [x] **Критический**: 7 E2E сценариев — happy path, duplicate webhook, out-of-order, retry, auto-compensate, cancel/expire, partial failure
+- [x] **Критический**: Data invariants: offersSnapshot immutability guard, amount=snapshot sum, webhook→intent tracing
+- [x] **Критический**: Reconciliation UI: 4 вкладки (Платежи, Расхождения, Webhooks, Мониторинг) + Retry/Refund/Resolve
+- [x] **Высокий**: Metric alerts: fulfillment_fail_rate, auto_compensate_rate, webhook_dedup_rate + thresholds
+- [x] **Высокий**: Health endpoint: pendingStale, failedUnresolved, escalatedOpen, activeIntents
+- [x] **Высокий**: Log correlation: [intent=] [provider=] [providerPmtId=] в PaymentService, FulfillmentService, RefundService, FulfillmentProcessor
+- [x] **Высокий**: paymentIntentId tracing в ProcessedWebhookEvent (schema + миграция)
+- [x] **Средний**: Исправлены 8 pre-existing тестов в payment.service.spec.ts (snapshot-based flow)
 
 ### 4. Unified Checkout (для планировщика программ)
 - [ ] **Высокий**: Создание заказов в TC/TEP API на нашей стороне при оплате через YooKassa

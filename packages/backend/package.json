@@ -14,6 +14,12 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:prod": "prisma migrate deploy",
     "db:seed": "ts-node prisma/seed.ts",
+    "db:seed:tep-widgets": "npx tsx prisma/seed-teplohod-widgets.ts",
+    "sync:tep": "npx tsx scripts/sync-teplohod.ts",
+    "reclassify:dry": "npx tsx prisma/reclassify-events.ts",
+    "reclassify:apply": "npx tsx prisma/reclassify-events.ts --apply",
+    "check:categorization": "npx tsx prisma/check-categorization.ts",
+    "fix:teplohod-river": "npx tsx prisma/fix-teplohod-river-excursions.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
@@ -47,9 +53,11 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.34.5",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "dotenv": "^16.4.5",
     "@nestjs/cli": "^10.4.0",
     "@nestjs/schematics": "^10.2.0",
     "@nestjs/testing": "^10.4.22",

@@ -332,9 +332,9 @@ export default async function CityPage({ params }: Props) {
         <div className="container-page">
           <div className="grid gap-3 sm:grid-cols-3">
             {categories.map(({ category, emoji, count }) => (
-              <Link
-                key={category}
-                href={category === EventCategory.MUSEUM ? `/venues?city=${slug}` : `/events?city=${slug}&category=${category}`}
+            <Link
+                  key={category}
+                  href={category === EventCategory.MUSEUM ? `/cities/${slug}/museums` : `/events?city=${slug}&category=${category}`}
                 className="card flex items-center gap-4 p-5 transition-transform hover:scale-[1.02]"
               >
                 <span className="text-3xl">{emoji}</span>
@@ -366,10 +366,10 @@ export default async function CityPage({ params }: Props) {
               </p>
             </div>
             <Link
-              href={`/venues?city=${slug}`}
+              href={`/cities/${slug}/museums`}
               className="hidden text-sm font-medium text-primary-600 hover:text-primary-700 sm:flex sm:items-center sm:gap-1"
             >
-              Все места <ArrowRight className="h-4 w-4" />
+              Все музеи <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

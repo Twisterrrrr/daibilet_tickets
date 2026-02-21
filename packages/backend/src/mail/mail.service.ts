@@ -366,6 +366,43 @@ export class MailService {
   }
 
   /**
+   * Подарочный сертификат — письмо получателю с кодом.
+   */
+  async sendGiftCertificate(to: string, data: {
+    code: string;
+    amountKopecks: number;
+    senderName?: string | null;
+    message?: string | null;
+  }): Promise<boolean> {
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Gift certificate → ${to}: ${data.code}`);
+      return false;
+    }
+
+    const amountFormatted = `${(data.amountKopecks / 100).toLocaleString('ru-RU')} ₽`;
+
+    try {
+      await this.mailer.sendMail({
+        to,
+        subject: `Вам подарили сертификат на ${amountFormatted} — Дайбилет`,
+        template: 'gift-certificate',
+        context: {
+          code: data.code,
+          amountFormatted,
+          senderName: data.senderName || null,
+          message: data.message || null,
+          appUrl: this.appUrl,
+        },
+      });
+      this.logger.log(`Gift certificate email sent → ${to} (${data.code})`);
+      return true;
+    } catch (err: unknown) {
+      this.logger.error(`Failed to send gift certificate to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
+  /**
    * Уведомить администратора о новом отзыве.
    */
   async notifyAdminNewReview(data: {
