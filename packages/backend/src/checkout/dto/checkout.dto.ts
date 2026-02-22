@@ -170,6 +170,10 @@ export class CreatePackageItemDto {
   sessionId?: string | null;
 
   @IsOptional()
+  @IsUUID()
+  categoryId?: string | null;
+
+  @IsOptional()
   @IsString()
   openDate?: string | null;
 

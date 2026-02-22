@@ -150,6 +150,11 @@ export class PatchEventOfferDto {
   @IsOptional()
   @IsNumber()
   commissionPercent?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  cancellationPolicyId?: string | null;
 }
 
 // ─── Create Event (with optional nested offer) ─────────────────────

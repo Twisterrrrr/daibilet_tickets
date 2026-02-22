@@ -4,6 +4,31 @@
 
 ---
 
+## 23.02.2026 — Билеты: квоты, категории, политика возвратов, отчётность
+
+### Наблюдения
+
+- Спецификация объединяет: квоты (общая + по категориям), категории билетов (PRIMARY/ADDON, allowedDays), цены на Offer (compareAtPriceCents), политику отмен, RefundRequest, TicketIssued, LedgerEntry, SettlementBatch, ReportRun.
+- Комиссия per ticket — для частичных возвратов.
+- EXTERNAL refund: форвард в teplohod/ticketscloud, задача висит до закрытия админом.
+- TariffCategory (модель) — чтобы не конфликтовать с enum TicketCategory (SupportTicket).
+
+### Решения
+
+- **Prisma**: enum'ы DayOfWeek, TicketCategoryKind, TicketPriceStatus, PaymentMode, ProviderKind, RefundRequestStatus, IssuedTicketStatus, LedgerEntryType, SettlementBatchStatus, ReportType, ReportStatus, CancellationPolicyScope.
+- **TariffCategory**: code, title, description, kind, allowedDays, isDefaultForCard.
+- **TicketPrice**: priceCents, compareAtPriceCents, validFrom/validTo.
+- **TicketQuotaDefault**, **TicketQuotaOverride**, **TicketSalesCounter**.
+- **TicketIssued**: grossCents, commissionCents, providerPayableCents, voucherCode.
+- **RefundRequest**: policySnapshot, calcSnapshot, forwardingChannel.
+- **Миграция** 20260223200000_tickets_quotas_refunds_reporting.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 23.02.2026 — Checkout + Расписания + Event Studio: 16 задач выполнены
 
 ### Наблюдения

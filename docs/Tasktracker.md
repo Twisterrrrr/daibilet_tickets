@@ -107,6 +107,41 @@
 
 ---
 
+## Билеты: квоты, категории, цены + возвраты + отчётность (23.02.2026)
+
+> Спецификация: `docs/TicketsQuotasRefundsReporting.md`
+
+### Блок T: Категории и квоты
+- [x] **T1 (Критический)**: Prisma: TariffCategory, TicketPrice, TicketQuotaDefault, TicketQuotaOverride, TicketSalesCounter
+- [x] **T2 (Высокий)**: Data migration: base категория + цена из priceFrom/compareAt
+- [x] **T3 (Высокий)**: Admin UI: CRUD категорий + цены/compareAt
+- [x] **T4 (Средний)**: Admin UI: квоты по умолчанию + override на слот
+- [x] **T5 (Высокий)**: AvailabilityService: остатки по категориям, allowedDays, ADDON rules
+- [x] **T6 (Средний)**: PriceSnapshotService: snapshot с compareAtPriceCents
+
+### Блок C: Политика возвратов
+- [x] **C1 (Высокий)**: Prisma: CancellationPolicyTemplate
+- [x] **C2 (Средний)**: Admin UI: выбор политики в Offer
+- [x] **C3 (Средний)**: Snapshot политики в CheckoutPackage
+- [x] **C4 (Высокий)**: Refund Engine v1 (tiers, breakdown)
+
+### Блок R: Возвраты и EXTERNAL
+- [x] **R1 (Критический)**: Prisma: TicketIssued, LedgerEntry, RefundRequest, SettlementBatch, ReportRun
+- [x] **R2 (Высокий)**: RefundRequest API: create, list, approve, reject, close
+- [x] **R3 (Высокий)**: PLATFORM refund: YooKassa, LedgerEntry, TicketIssued.status
+- [x] **R4 (Высокий)**: EXTERNAL forwarding: teplohod/ticketscloud, Admin Inbox
+- [x] **R5 (Средний)**: Admin Inbox UI: Возвраты (в работе)
+- [x] **R6 (Высокий)**: Ticket issuance: создание TicketIssued при PAID
+
+### Блок O: Отчётность
+- [x] **O1 (Высокий)**: Report queries: Sales, Refunds, Commissions, Voucher Register (RBAC)
+- [x] **O2 (Средний)**: ReportRun job (BullMQ): queued → running → ready
+- [x] **O3 (Средний)**: XLS export (xlsx)
+- [x] **O4 (Средний)**: PDF export (pdf-lib)
+- [x] **O5 (Средний)**: Email delivery отчётов
+
+---
+
 ## Далее (приоритетная очередь)
 
 - [x] **Средний**: Admin UI для ручной merge дублей событий (поиск + выбор canonical event)

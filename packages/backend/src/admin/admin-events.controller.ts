@@ -621,6 +621,7 @@ export class AdminEventsController {
         ...(data.isPrimary !== undefined && { isPrimary: data.isPrimary }),
         ...(data.priority !== undefined && { priority: data.priority }),
         ...(data.commissionPercent !== undefined && { commissionPercent: data.commissionPercent }),
+        ...(data.cancellationPolicyId !== undefined && { cancellationPolicyId: data.cancellationPolicyId }),
       },
     });
   }

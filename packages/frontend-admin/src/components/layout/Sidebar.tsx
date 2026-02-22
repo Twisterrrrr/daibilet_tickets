@@ -54,6 +54,7 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/events/merge', label: 'Merge дублей', icon: Merge },
       { to: '/orders', label: 'Заказы', icon: ShoppingCart },
       { to: '/checkout', label: 'Заявки', icon: Inbox },
+      { to: '/refunds', label: 'Возвраты', icon: AlertCircle },
       { to: '/support', label: 'Поддержка', icon: HeadphonesIcon },
     ],
   },

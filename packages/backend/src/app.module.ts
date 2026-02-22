@@ -9,6 +9,8 @@ import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { BlogModule } from './blog/blog.module';
 import { RedisCacheModule } from './cache/cache.module';
+import { RefundModule } from './refund/refund.module';
+import { ReportsModule } from './reports/reports.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { CollectionModule } from './collection/collection.module';
@@ -54,6 +56,8 @@ import { VoucherModule } from './voucher/voucher.module';
     QueueModule,
     PricingModule,
     CatalogModule,
+    RefundModule,
+    ReportsModule,
     PlannerModule,
     ScheduleModule,
     CheckoutModule,

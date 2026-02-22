@@ -25,6 +25,7 @@ import { ModerationQueuePage } from './pages/moderation/ModerationQueue';
 import { OrderDetailPage } from './pages/orders/OrderDetail';
 import { OrdersListPage } from './pages/orders/OrdersList';
 import ReconciliationPage from './pages/reconciliation/ReconciliationPage';
+import { RefundsInboxPage } from './pages/refunds/RefundsInboxPage';
 import { ExternalReviewsListPage } from './pages/reviews/ExternalReviewsList';
 import { ReviewsListPage } from './pages/reviews/ReviewsList';
 import { EventStudioPage } from './pages/schedules/EventStudioPage';
@@ -103,6 +104,7 @@ export default function App() {
           <Route path="support/:id" element={<SupportDetailPage />} />
           <Route path="jobs/failed" element={<FailedJobsPage />} />
           <Route path="reconciliation" element={<ReconciliationPage />} />
+          <Route path="refunds" element={<RefundsInboxPage />} />
           <Route path="audit" element={<AuditLogPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>

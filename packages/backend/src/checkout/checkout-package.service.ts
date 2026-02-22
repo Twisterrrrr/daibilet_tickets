@@ -43,6 +43,7 @@ export class CheckoutPackageService {
       type: it.type,
       offerId: it.offerId,
       sessionId: it.type === 'SESSION' ? it.sessionId : null,
+      categoryId: it.categoryId ?? null,
       openDate: it.type === 'OPEN_DATE' && it.openDate ? new Date(it.openDate) : null,
       qty: it.qty,
     }));
@@ -51,6 +52,7 @@ export class CheckoutPackageService {
       await this.availability.checkOrThrow({
         offerId: it.offerId,
         sessionId: it.sessionId,
+        categoryId: it.categoryId,
         qty: it.qty,
         openDate: it.openDate,
       });
@@ -61,6 +63,7 @@ export class CheckoutPackageService {
       const snap = await this.priceSnapshot.buildSnapshot({
         offerId: it.offerId,
         sessionId: it.sessionId,
+        categoryId: it.categoryId,
         qty: it.qty,
         openDate: it.openDate,
       });
@@ -74,6 +77,11 @@ export class CheckoutPackageService {
       currency: 'RUB',
     };
 
+    // C3: Resolve and snapshot cancellation policy (Offer > Operator > Platform default)
+    const cancellationPolicySnapshotJson = await this.resolveCancellationPolicySnapshot(
+      itemInputs.map((it) => it.offerId),
+    );
+
     const pkg = await this.prisma.checkoutPackage.create({
       data: {
         checkoutSessionId: dto.checkoutSessionId,
@@ -81,6 +89,7 @@ export class CheckoutPackageService {
         email: dto.email,
         phone: dto.phone,
         priceSnapshotJson: priceSnapshotJson as object,
+        cancellationPolicySnapshotJson: cancellationPolicySnapshotJson as object | null,
         items: {
           create: itemInputs.map((it, i) => ({
             type: it.type,
@@ -88,7 +97,7 @@ export class CheckoutPackageService {
             sessionId: it.sessionId,
             openDate: it.openDate,
             qty: it.qty,
-            itemSnapshot: lineSnapshots[i].snapshot as object,
+            itemSnapshot: { ...(lineSnapshots[i].snapshot as object), categoryId: it.categoryId } as object,
           })),
         },
       },
@@ -136,7 +145,38 @@ export class CheckoutPackageService {
       status: pkg.status,
       email: pkg.email,
       priceSnapshotJson: pkg.priceSnapshotJson,
+      cancellationPolicySnapshotJson: pkg.cancellationPolicySnapshotJson,
       items: pkg.items,
     };
+  }
+
+  private async resolveCancellationPolicySnapshot(offerIds: string[]): Promise<object | null> {
+    if (offerIds.length === 0) return null;
+    const offers = await this.prisma.eventOffer.findMany({
+      where: { id: { in: offerIds } },
+      include: { cancellationPolicy: true, operator: true },
+    });
+    for (const o of offers) {
+      if (o.cancellationPolicy?.ruleJson) {
+        return {
+          policyId: o.cancellationPolicy.id,
+          name: o.cancellationPolicy.name,
+          ruleJson: o.cancellationPolicy.ruleJson,
+          snapshotAt: new Date().toISOString(),
+        };
+      }
+    }
+    const platformPolicy = await this.prisma.cancellationPolicyTemplate.findFirst({
+      where: { scopeType: 'PLATFORM', scopeId: null, isActive: true },
+    });
+    if (platformPolicy?.ruleJson) {
+      return {
+        policyId: platformPolicy.id,
+        name: platformPolicy.name,
+        ruleJson: platformPolicy.ruleJson,
+        snapshotAt: new Date().toISOString(),
+      };
+    }
+    return null;
   }
 }

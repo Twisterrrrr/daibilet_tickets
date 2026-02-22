@@ -13,6 +13,7 @@ import {
   QUEUE_EMAILS,
   QUEUE_FULFILLMENT,
   QUEUE_PARTNER_WEBHOOKS,
+  QUEUE_REPORTS,
   QUEUE_REVIEW_TASKS,
   QUEUE_SYNC,
 } from '../queue/queue.constants';
@@ -20,6 +21,7 @@ import { TagAssignmentService } from '../scheduler/tag-assignment.service';
 import { ScheduleModule } from '../schedule/schedule.module';
 import { SupportModule } from '../support/support.module';
 import { AdminArticlesController } from './admin-articles.controller';
+import { AdminCancellationPolicyController } from './admin-cancellation-policy.controller';
 import { AdminAuditController } from './admin-audit.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
 import { AdminCitiesController } from './admin-cities.controller';
@@ -34,11 +36,13 @@ import { AdminModerationController } from './admin-moderation.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminOrdersController } from './admin-orders.controller';
 import { AdminReconciliationController } from './admin-reconciliation.controller';
+import { AdminReportsController } from './admin-reports.controller';
 import { AdminScheduleController } from './admin-schedule.controller';
 import { AdminReviewsController } from './admin-reviews.controller';
 import { AdminSettingsController } from './admin-settings.controller';
 import { AdminSuppliersController } from './admin-suppliers.controller';
 import { AdminSupportController } from './admin-support.controller';
+import { AdminTariffController } from './admin-tariff.controller';
 import { AdminTagsController } from './admin-tags.controller';
 import { AdminUpsellsController } from './admin-upsells.controller';
 import { AdminVenuesController } from './admin-venues.controller';
@@ -61,6 +65,7 @@ import { FailedJobsService } from './failed-jobs.service';
       { name: QUEUE_FULFILLMENT },
       { name: QUEUE_REVIEW_TASKS },
       { name: QUEUE_PARTNER_WEBHOOKS },
+      { name: QUEUE_REPORTS },
     ),
   ],
   providers: [
@@ -75,10 +80,12 @@ import { FailedJobsService } from './failed-jobs.service';
     AdminDashboardController,
     AdminCitiesController,
     AdminEventsController,
+    AdminTariffController,
     AdminTagsController,
     AdminLandingsController,
     AdminCombosController,
     AdminArticlesController,
+    AdminCancellationPolicyController,
     AdminOrdersController,
     AdminSettingsController,
     AdminAuditController,
@@ -93,6 +100,7 @@ import { FailedJobsService } from './failed-jobs.service';
     AdminSupportController,
     AdminOpsController,
     AdminReconciliationController,
+    AdminReportsController,
     AdminJobsController,
     AdminScheduleController,
   ],

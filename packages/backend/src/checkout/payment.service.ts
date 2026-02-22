@@ -389,6 +389,15 @@ export class PaymentService {
         );
       }
 
+      // R6: Package payment — update CheckoutPackage to PAID
+      if (intent.idempotencyKey?.startsWith('pkg-')) {
+        const packageId = intent.idempotencyKey.slice(4);
+        await tx.checkoutPackage.updateMany({
+          where: { id: packageId },
+          data: { status: 'PAID' },
+        });
+      }
+
       // Инкрементируем successfulSales для поставщика
       if (intent.supplierId) {
         await tx.operator

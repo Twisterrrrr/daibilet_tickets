@@ -13,6 +13,7 @@ import { InternalBookingProvider } from './providers/internal-booking.provider';
 import { PartnerBookingProvider } from './providers/partner-booking.provider';
 import { TcBookingProvider } from './providers/tc-booking.provider';
 import { RefundService } from './refund.service';
+import { TicketIssuanceService } from './ticket-issuance.service';
 import { WebhookIdempotencyService } from './webhook-idempotency.service';
 
 @Module({
@@ -24,6 +25,7 @@ import { WebhookIdempotencyService } from './webhook-idempotency.service';
     PaymentService,
     FulfillmentService,
     RefundService,
+    TicketIssuanceService,
     WebhookIdempotencyService,
     FeatureFlagService,
     // Booking providers (adapters)
@@ -48,6 +50,6 @@ import { WebhookIdempotencyService } from './webhook-idempotency.service';
       inject: [TcBookingProvider, InternalBookingProvider, PartnerBookingProvider],
     },
   ],
-  exports: [PaymentService, FulfillmentService, RefundService, WebhookIdempotencyService, FeatureFlagService],
+  exports: [PaymentService, FulfillmentService, RefundService, TicketIssuanceService, WebhookIdempotencyService, FeatureFlagService],
 })
 export class CheckoutModule {}

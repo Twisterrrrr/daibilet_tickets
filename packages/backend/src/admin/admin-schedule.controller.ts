@@ -1,8 +1,7 @@
 import {
+  BadRequestException,
   Body,
   Controller,
-  UseGuards,
-  UseInterceptors,
   Delete,
   Get,
   NotFoundException,
@@ -10,6 +9,8 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
@@ -21,6 +22,12 @@ import { OccurrencePolicyService } from '../schedule/occurrence-policy.service';
 import { ScheduleService } from '../schedule/schedule.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RescheduleReason, SessionStatus } from '@prisma/client';
+
+import { Roles } from '../auth/roles.guard';
+import {
+  CreateTicketQuotaOverrideDto,
+  UpdateTicketQuotaOverrideDto,
+} from './dto/admin-tariff.dto';
 
 @ApiTags('admin/schedules')
 @ApiBearerAuth()
@@ -187,5 +194,76 @@ export class AdminScheduleController {
   async deleteSession(@Param('sessionId') sessionId: string) {
     await this.policyService.deleteOrThrow(sessionId);
     return { ok: true };
+  }
+
+  @Get('occurrences/:sessionId/quota-overrides')
+  @ApiOperation({ summary: 'Список quota overrides для сеанса' })
+  async listQuotaOverrides(@Param('sessionId') sessionId: string) {
+    await this.ensureSession(sessionId);
+    return this.prisma.ticketQuotaOverride.findMany({
+      where: { sessionId },
+      include: { category: { select: { id: true, code: true, title: true } } },
+    });
+  }
+
+  @Post('occurrences/:sessionId/quota-overrides')
+  @Roles('ADMIN', 'EDITOR')
+  @ApiOperation({ summary: 'Создать quota override' })
+  async createQuotaOverride(
+    @Param('sessionId') sessionId: string,
+    @Body() dto: CreateTicketQuotaOverrideDto,
+  ) {
+    await this.ensureSession(sessionId);
+    const existing = await this.prisma.ticketQuotaOverride.findUnique({
+      where: { sessionId_categoryId: { sessionId, categoryId: dto.categoryId ?? null } },
+    });
+    if (existing) throw new BadRequestException('Quota override for this category already exists');
+    return this.prisma.ticketQuotaOverride.create({
+      data: {
+        sessionId,
+        categoryId: dto.categoryId ?? null,
+        capacityTotal: dto.capacityTotal ?? null,
+      },
+      include: { category: { select: { id: true, code: true, title: true } } },
+    });
+  }
+
+  @Patch('occurrences/:sessionId/quota-overrides/:overrideId')
+  @Roles('ADMIN', 'EDITOR')
+  @ApiOperation({ summary: 'Обновить quota override' })
+  async updateQuotaOverride(
+    @Param('sessionId') sessionId: string,
+    @Param('overrideId') overrideId: string,
+    @Body() dto: UpdateTicketQuotaOverrideDto,
+  ) {
+    const o = await this.prisma.ticketQuotaOverride.findFirst({
+      where: { id: overrideId, sessionId },
+    });
+    if (!o) throw new NotFoundException('TicketQuotaOverride not found');
+    return this.prisma.ticketQuotaOverride.update({
+      where: { id: overrideId },
+      data: { ...(dto.capacityTotal !== undefined && { capacityTotal: dto.capacityTotal }) },
+      include: { category: { select: { id: true, code: true, title: true } } },
+    });
+  }
+
+  @Delete('occurrences/:sessionId/quota-overrides/:overrideId')
+  @Roles('ADMIN', 'EDITOR')
+  @ApiOperation({ summary: 'Удалить quota override' })
+  async deleteQuotaOverride(
+    @Param('sessionId') sessionId: string,
+    @Param('overrideId') overrideId: string,
+  ) {
+    const o = await this.prisma.ticketQuotaOverride.findFirst({
+      where: { id: overrideId, sessionId },
+    });
+    if (!o) throw new NotFoundException('TicketQuotaOverride not found');
+    await this.prisma.ticketQuotaOverride.delete({ where: { id: overrideId } });
+    return { deleted: true };
+  }
+
+  private async ensureSession(sessionId: string) {
+    const s = await this.prisma.eventSession.findUnique({ where: { id: sessionId } });
+    if (!s) throw new NotFoundException('EventSession not found');
   }
 }

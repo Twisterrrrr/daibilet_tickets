@@ -223,6 +223,112 @@ enum CheckoutPackageStatus {
   EXPIRED
 }
 
+// --- Билеты: категории, цены, квоты ---
+enum DayOfWeek {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+enum TicketCategoryKind {
+  PRIMARY // можно купить отдельно
+  ADDON   // нельзя купить отдельно (только с PRIMARY)
+}
+
+enum TicketPriceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// --- Возвраты и отчётность ---
+enum PaymentMode {
+  PLATFORM
+  EXTERNAL
+  MIXED
+}
+
+enum ProviderKind {
+  TEPLOHOD
+  TICKETS_CLOUD
+  OTHER
+}
+
+enum RefundRequestStatus {
+  REQUESTED
+  CALCULATED
+  FORWARDED
+  WAITING_PROVIDER
+  APPROVED
+  REJECTED
+  PROCESSING
+  REFUNDED
+  FAILED
+  CLOSED
+}
+
+enum RefundResolution {
+  REFUND
+  RESCHEDULE
+  VOUCHER
+  NO_REFUND
+}
+
+enum RefundForwardingChannel {
+  API
+  EMAIL
+  MANUAL_URL
+}
+
+enum IssuedTicketStatus {
+  ISSUED
+  CANCELLED
+  REFUNDED
+  USED
+}
+
+enum LedgerEntryType {
+  SALE_TICKET_GROSS
+  PLATFORM_COMMISSION
+  PAYMENT_FEE
+  PROVIDER_PAYABLE
+  REFUND_TICKET
+  REVERSAL_PLATFORM_COMMISSION
+  REVERSAL_PROVIDER_PAYABLE
+  REVERSAL_PAYMENT_FEE
+  PAYOUT_TO_PROVIDER
+}
+
+enum SettlementBatchStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  PAID
+  CANCELLED
+}
+
+enum ReportType {
+  EVENTS_OVERVIEW
+  SALES
+  COMMISSIONS
+  REFUNDS
+  VOUCHER_REGISTER
+  USAGE_REPORT
+  SETTLEMENT_ACT
+}
+
+enum ReportStatus {
+  QUEUED
+  RUNNING
+  READY
+  FAILED
+  EXPIRED
+}
+
 // ========================
 // Администраторы
 // ========================
@@ -488,10 +594,13 @@ model EventSession {
   event          Event          @relation(fields: [eventId], references: [id], onDelete: Restrict)
   offer          EventOffer?    @relation(fields: [offerId], references: [id], onDelete: SetNull)
   schedule       EventSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
-  packageItems   PackageItem[]
+  packageItems       PackageItem[]
   checkoutPackageItems CheckoutPackageItem[]
-  rescheduledTo   EventSession?  @relation("SessionReschedule", fields: [rescheduledToId], references: [id], onDelete: SetNull)
-  rescheduledFrom EventSession[] @relation("SessionReschedule")
+  quotaOverrides     TicketQuotaOverride[]
+  salesCounters      TicketSalesCounter[]
+  ticketsIssued      TicketIssued[]
+  rescheduledTo      EventSession?  @relation("SessionReschedule", fields: [rescheduledToId], references: [id], onDelete: SetNull)
+  rescheduledFrom    EventSession[] @relation("SessionReschedule")
 
   @@index([startsAt])
   @@index([eventId])
@@ -535,6 +644,8 @@ model EventOffer {
   meetingInstructions  String?   @db.Text   // Как добраться, где вход, ориентиры
   operationalPhone     String?              // Контактный телефон на месте (НЕ офис поставщика)
   operationalNote      String?   @db.Text   // Доп. инструкции (что взять с собой, дресс-код...)
+  // --- Cancellation policy override ---
+  cancellationPolicyId String?   @db.Uuid
   // ---
   lastSyncAt        DateTime?
   // === Soft-delete (нельзя удалять если есть OrderRequests/FulfillmentItems) ===
@@ -543,12 +654,17 @@ model EventOffer {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  event         Event          @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  venue         Venue?         @relation("VenueOffers", fields: [venueId], references: [id])
-  sessions      EventSession[]
-  schedule      EventSchedule?
-  operator      Operator?      @relation(fields: [operatorId], references: [id])
-  orderRequests OrderRequest[]
+  event             Event              @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  venue             Venue?             @relation("VenueOffers", fields: [venueId], references: [id])
+  sessions          EventSession[]
+  schedule          EventSchedule?
+  operator          Operator?          @relation(fields: [operatorId], references: [id])
+  cancellationPolicy CancellationPolicyTemplate? @relation(fields: [cancellationPolicyId], references: [id], onDelete: SetNull)
+  ticketCategories  TariffCategory[]
+  ticketPrices      TicketPrice[]
+  quotaDefaults     TicketQuotaDefault[]
+  ticketsIssued     TicketIssued[]
+  orderRequests     OrderRequest[]
   checkoutPackageItems CheckoutPackageItem[]
 
   @@unique([source, externalEventId])
@@ -583,6 +699,109 @@ model EventSchedule {
   @@index([offerId])
   @@index([type, isActive])
   @@map("event_schedules")
+}
+
+// ========================
+// Tariff (билет): категории, цены, квоты
+// ========================
+
+model TariffCategory {
+  id              String            @id @default(uuid()) @db.Uuid
+  offerId         String            @db.Uuid
+  code            String
+  title           String
+  description     String?           @db.Text
+  kind            TicketCategoryKind @default(PRIMARY)
+  allowedDays     DayOfWeek[]       @default([])
+  isActive        Boolean           @default(true)
+  isDefaultForCard Boolean          @default(false)
+  sortOrder       Int               @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  offer     EventOffer        @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  prices    TicketPrice[]
+  quotas    TicketQuotaDefault[]
+  overrides TicketQuotaOverride[]
+  counters      TicketSalesCounter[]
+  ticketsIssued TicketIssued[]
+
+  @@unique([offerId, code])
+  @@index([offerId, isActive])
+  @@index([offerId, sortOrder])
+  @@map("ticket_categories")
+}
+
+model TicketPrice {
+  id                 String            @id @default(uuid()) @db.Uuid
+  offerId            String            @db.Uuid
+  categoryId         String            @db.Uuid
+  currency           String            @default("RUB")
+  priceCents         Int
+  compareAtPriceCents Int?
+  status             TicketPriceStatus @default(ACTIVE)
+  validFrom          DateTime          @default(now())
+  validTo            DateTime?
+  note               String?           @db.Text
+  createdAt          DateTime          @default(now())
+
+  offer    EventOffer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  category TariffCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([offerId, status, validFrom])
+  @@index([categoryId, status, validFrom])
+  @@map("ticket_prices")
+}
+
+model TicketQuotaDefault {
+  id            String   @id @default(uuid()) @db.Uuid
+  offerId       String   @db.Uuid
+  categoryId    String?  @db.Uuid
+  capacityTotal Int?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  offer    EventOffer     @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  category TariffCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, categoryId])
+  @@index([offerId])
+  @@index([categoryId])
+  @@map("ticket_quota_defaults")
+}
+
+model TicketQuotaOverride {
+  id            String   @id @default(uuid()) @db.Uuid
+  sessionId     String   @db.Uuid
+  categoryId    String?  @db.Uuid
+  capacityTotal Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  session  EventSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  category TariffCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, categoryId])
+  @@index([sessionId])
+  @@index([categoryId])
+  @@map("ticket_quota_overrides")
+}
+
+model TicketSalesCounter {
+  id         String   @id @default(uuid()) @db.Uuid
+  sessionId  String   @db.Uuid
+  categoryId String   @db.Uuid
+  soldQty    Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  session  EventSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  category TariffCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, categoryId])
+  @@index([sessionId])
+  @@index([categoryId])
+  @@map("ticket_sales_counters")
 }
 
 // ========================
@@ -1542,6 +1761,7 @@ model CheckoutPackage {
   email             String
   phone             String?
   priceSnapshotJson Json
+  cancellationPolicySnapshotJson Json?   // Immutable copy of policy at purchase
   snapshotAt        DateTime             @default(now())
   paymentProvider   String?
   paymentId         String?
@@ -1646,6 +1866,269 @@ model ProcessedWebhookEvent {
   @@index([provider, eventType])
   @@index([paymentIntentId])
   @@map("processed_webhook_events")
+}
+
+// ========================
+// Cancellation Policy (политика отмен и возвратов)
+// ========================
+
+enum CancellationPolicyScope {
+  PLATFORM
+  PROVIDER
+  OPERATOR
+  OFFER
+}
+
+model CancellationPolicyTemplate {
+  id          String                  @id @default(uuid()) @db.Uuid
+  scopeType   CancellationPolicyScope
+  scopeId     String?                 @db.Uuid
+  provider    ProviderKind?
+  name        String
+  publicText  String?                 @db.Text
+  shortBadge  String?
+  ruleJson    Json
+  version     Int                     @default(0)
+  isActive    Boolean                 @default(true)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  offers      EventOffer[]
+
+  @@index([scopeType, scopeId])
+  @@index([provider])
+  @@map("cancellation_policy_templates")
+}
+
+// ========================
+// TicketIssued (реестр проданных билетов/ваучеров)
+// ========================
+
+model TicketIssued {
+  id                   String            @id @default(uuid()) @db.Uuid
+  orderId              String?           @db.Uuid
+  packageId            String?           @db.Uuid
+  paymentId            String?           @db.Uuid
+  offerId              String            @db.Uuid
+  sessionId            String?           @db.Uuid
+  openDate             DateTime?         @db.Date
+  categoryId           String?           @db.Uuid
+  categoryCode         String?
+  categoryTitle        String?
+  provider             ProviderKind?
+  providerOrderRef     String?
+  providerTicketRef    String?
+  operatorId           String?           @db.Uuid
+  supplierId           String?           @db.Uuid
+  currency             String            @default("RUB")
+  grossCents           Int
+  commissionCents      Int
+  paymentFeeCents      Int               @default(0)
+  providerPayableCents Int
+  voucherCode          String?           @unique
+  qrPayload            String?           @db.Text
+  status               IssuedTicketStatus @default(ISSUED)
+  issuedAt             DateTime          @default(now())
+  usedAt               DateTime?
+  cancelledAt          DateTime?
+  refundedAt           DateTime?
+  meta                 Json?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  offer    EventOffer     @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  session  EventSession?  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  category TariffCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  ledgerEntries LedgerEntry[]
+  refundRequests RefundRequest[]
+
+  @@index([offerId, issuedAt])
+  @@index([sessionId, issuedAt])
+  @@index([operatorId, issuedAt])
+  @@index([supplierId, issuedAt])
+  @@index([provider, issuedAt])
+  @@index([status, issuedAt])
+  @@index([openDate])
+  @@map("tickets_issued")
+}
+
+// ========================
+// LedgerEntry (финансовые проводки)
+// ========================
+
+model LedgerEntry {
+  id               String          @id @default(uuid()) @db.Uuid
+  entryType        LedgerEntryType
+  currency         String          @default("RUB")
+  amountCents      Int
+  effectiveAt      DateTime        @default(now())
+  orderId          String?         @db.Uuid
+  packageId        String?         @db.Uuid
+  ticketId         String?         @db.Uuid
+  offerId          String?         @db.Uuid
+  sessionId        String?         @db.Uuid
+  provider         ProviderKind?
+  operatorId       String?         @db.Uuid
+  supplierId       String?         @db.Uuid
+  paymentMode      PaymentMode?
+  paymentProvider  String?
+  paymentRef       String?
+  refundRequestId  String?         @db.Uuid
+  memo             String?         @db.Text
+  meta             Json?
+  createdAt        DateTime        @default(now())
+
+  ticket        TicketIssued?    @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  refundRequest RefundRequest?   @relation(fields: [refundRequestId], references: [id], onDelete: SetNull)
+  batchItems    SettlementBatchItem[]
+
+  @@index([entryType, effectiveAt])
+  @@index([ticketId])
+  @@index([orderId])
+  @@index([packageId])
+  @@index([operatorId, effectiveAt])
+  @@index([supplierId, effectiveAt])
+  @@index([provider, effectiveAt])
+  @@index([paymentRef])
+  @@map("ledger_entries")
+}
+
+// ========================
+// RefundRequest (заявка на возврат)
+// ========================
+
+model RefundRequest {
+  id                  String                @id @default(uuid()) @db.Uuid
+  status              RefundRequestStatus   @default(REQUESTED)
+  resolution          RefundResolution?
+  paymentMode         PaymentMode
+  provider            ProviderKind?
+  forwardingChannel   RefundForwardingChannel?
+  requestedByUserId   String?               @db.Uuid
+  requestedByAdminId  String?               @db.Uuid
+  requestedBySupplierUserId String?         @db.Uuid
+  orderId             String?               @db.Uuid
+  packageId           String?               @db.Uuid
+  ticketId            String?               @db.Uuid
+  offerId             String?               @db.Uuid
+  sessionId           String?               @db.Uuid
+  operatorId          String?               @db.Uuid
+  supplierId          String?               @db.Uuid
+  providerOrderRef    String?
+  providerTicketRef   String?
+  providerSupportEmail String?
+  providerSupportUrl  String?
+  forwardedAt         DateTime?
+  providerResponseAt  DateTime?
+  policySnapshot      Json?
+  calcSnapshot        Json?
+  currency            String                @default("RUB")
+  requestedAmountCents Int?
+  approvedAmountCents  Int?
+  refundedAmountCents  Int?
+  reason              String?               @db.Text
+  comment             String?               @db.Text
+  paymentProvider     String?
+  paymentRef          String?
+  refundProviderRef   String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  closedAt            DateTime?
+
+  ticket         TicketIssued?  @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  ledgerEntries  LedgerEntry[]
+
+  @@index([status, createdAt])
+  @@index([paymentMode, createdAt])
+  @@index([provider, status, createdAt])
+  @@index([operatorId, status, createdAt])
+  @@index([supplierId, status, createdAt])
+  @@index([paymentRef])
+  @@map("refund_requests")
+}
+
+// ========================
+// SettlementBatch (акты/взаиморасчёты)
+// ========================
+
+model SettlementBatch {
+  id               String                 @id @default(uuid()) @db.Uuid
+  status           SettlementBatchStatus  @default(DRAFT)
+  periodFrom       DateTime
+  periodTo         DateTime
+  supplierId       String?                @db.Uuid
+  operatorId       String?                @db.Uuid
+  provider         ProviderKind?
+  currency         String                 @default("RUB")
+  grossCents       Int                    @default(0)
+  commissionCents  Int                    @default(0)
+  refundsCents     Int                    @default(0)
+  payableCents     Int                    @default(0)
+  actPdfPath       String?
+  xlsPath          String?
+  snapshot         Json?
+  createdByAdminId String?                @db.Uuid
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  sentAt           DateTime?
+  paidAt           DateTime?
+
+  items SettlementBatchItem[]
+
+  @@index([status, periodFrom, periodTo])
+  @@index([supplierId, periodFrom, periodTo])
+  @@index([operatorId, periodFrom, periodTo])
+  @@index([provider, periodFrom, periodTo])
+  @@map("settlement_batches")
+}
+
+model SettlementBatchItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  batchId        String   @db.Uuid
+  ledgerEntryId  String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  batch       SettlementBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  ledgerEntry LedgerEntry     @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+
+  @@unique([batchId, ledgerEntryId])
+  @@index([batchId])
+  @@index([ledgerEntryId])
+  @@map("settlement_batch_items")
+}
+
+// ========================
+// ReportRun (генерация отчётов)
+// ========================
+
+model ReportRun {
+  id                    String       @id @default(uuid()) @db.Uuid
+  type                  ReportType
+  status                ReportStatus @default(QUEUED)
+  requestedByAdminId    String?      @db.Uuid
+  requestedBySupplierUserId String?  @db.Uuid
+  requestedByOperatorUserId String?  @db.Uuid
+  supplierId            String?      @db.Uuid
+  operatorId            String?      @db.Uuid
+  provider              ProviderKind?
+  params                Json
+  rowCount              Int?
+  fileXlsPath           String?
+  filePdfPath           String?
+  error                 String?      @db.Text
+  sendToEmail           String?
+  emailedAt             DateTime?
+  createdAt             DateTime     @default(now())
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  expiresAt             DateTime?
+
+  @@index([type, status, createdAt])
+  @@index([supplierId, createdAt])
+  @@index([operatorId, createdAt])
+  @@index([provider, createdAt])
+  @@index([sendToEmail, status])
+  @@map("report_runs")
 }
 
 // ========================
