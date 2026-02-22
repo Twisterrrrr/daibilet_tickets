@@ -51,7 +51,7 @@ export class TepApiService {
       {
         maxRetries: 3,
         initialBackoffMs: 1000,
-        onRetry: (attempt, status, delayMs) =>
+        onRetry: (attempt, delayMs, status) =>
           this.logger.warn(`TEP API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
       },
     );

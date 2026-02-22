@@ -4,6 +4,38 @@
 
 ---
 
+## 22.02.2026 — Production Hardening C3–F2 (реализация)
+
+### Наблюдения
+
+- Bатчи C3, D1–D3, E1–E3, F1–F2 реализованы в одном PR.
+
+### Решения
+
+**C3** — api-rate-limit.util (p-limit, withRetry), TcApiService/TepApiService: request через runWithLimit + withRetry, backoff на 429/5xx, env TC_TEP_CONCURRENCY.
+
+**D1** — cache-keys.ts (events, cities, regions, collections, search, pricing), CacheService.delByPrefix, re-export cacheKeys.
+
+**D2** — docs/CacheInvalidationMatrix.md (событие → сбрасываемые ключи).
+
+**D3** — CACHE_TTL_* env (CACHE_TTL_DETAIL, CACHE_TTL_LIST, CACHE_TTL_CITIES и др.).
+
+**E1** — RetentionService, cron 04:00, env RETENTION_DRY_RUN, RETENTION_EVENTSESSIONS_DAYS (180), RETENTION_WEBHOOK_DAYS (90), RETENTION_AUDIT_DAYS (365), batch 500.
+
+**E2** — миграция 20260222_e2_performance_indexes (events_catalog_idx, events_admin_list_idx, event_sessions_active_starts_idx, venues_city_active_idx, processed_webhook_events_processed_at_idx, audit_logs_created_at_idx).
+
+**E3** — docs/PgBouncer.md, infra/pgbouncer/pgbouncer.ini.
+
+**F1** — docs/PartitioningPlan.md (шаги, rollback, verification).
+
+**F2** — миграция create_event_sessions_partition(parent_table, month_start).
+
+### Проблемы
+
+- pnpm install требуется для p-limit. Тесты sync.processor, payment.service — падения из-за моков (job.opts), не связаны с C3–F2.
+
+---
+
 ## 21.02.2026 — Production Hardening Plan (батчи A1–F2)
 
 ### Наблюдения

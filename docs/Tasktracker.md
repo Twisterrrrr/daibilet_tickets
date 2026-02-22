@@ -147,6 +147,17 @@
 - [x] **Высокий**: Единый pagination contract (pagination.ts) — 15 контроллеров
 - [x] **Средний**: ESLint `no-console: error` + исключения для тестов/seed
 
+### Выполнено (22.02.2026)
+- [x] **C3 — Rate limiting TC/TEP**: api-rate-limit.util (p-limit, withRetry 429/5xx), TcApiService/TepApiService
+- [x] **D1 — CacheService контракт**: cacheKeys, delByPrefix, все сервисы переведены
+- [x] **D2 — Инвалидация кэша**: CacheInvalidationMatrix.md
+- [x] **D3 — TTL policy**: CACHE_TTL_* env
+- [x] **E1 — Retention jobs**: RetentionService (EventSession, ProcessedWebhookEvent, AuditLog), cron 04:00
+- [x] **E2 — Индексы**: миграция 20260222_e2_performance_indexes
+- [x] **E3 — PgBouncer**: docs/PgBouncer.md, infra/pgbouncer/
+- [x] **F1 — План партиционирования**: docs/PartitioningPlan.md
+- [x] **F2 — Партиционирование EventSession**: create_event_sessions_partition()
+
 ### Выполнено (21.02.2026)
 - [x] **A1 — requestId + PII masking**: RequestIdMiddleware (лог входа), LoggingInterceptor (лог завершения), AllExceptionsFilter (requestId, maskPiiInString), pii-mask.util + unit test, docs/Observability.md
 
