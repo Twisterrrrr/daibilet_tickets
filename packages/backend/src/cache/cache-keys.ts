@@ -38,10 +38,6 @@ export const cacheKeys = {
     query: (q: string, city?: string) => (city ? `search:${q}:${city}` : `search:${q}`),
     pattern: () => 'search:*',
   },
-  /** catalog:list — единый каталог по query params (hash) */
-  catalog: {
-    list: (paramsHash: string) => `catalog:list:${paramsHash}`,
-  },
   pricing: {
     config: () => 'pricing:config',
   },

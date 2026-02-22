@@ -1,6 +1,4 @@
 import { Body, Controller, Get, Logger, Patch, Post, Query, Request, UseGuards, UseInterceptors } from '@nestjs/common';
-import type { AdminAuthUser } from '../auth/auth.types';
-import type { Request as ExpressRequest } from 'express';
 import { BadRequestException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
@@ -68,7 +66,7 @@ export class AdminSettingsController {
 
   @Patch('pricing')
   @Roles('ADMIN')
-  async updatePricing(@Body() data: UpdatePricingDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
+  async updatePricing(@Body() data: UpdatePricingDto, @Request() req: any) {
     try {
       if (data.peakRanges !== undefined) {
         validateJson(PeakRangeSchema, data.peakRanges, 'peakRanges');
@@ -79,7 +77,7 @@ export class AdminSettingsController {
 
     const config = await this.getOrCreatePricingConfig();
 
-    const { id: _, updatedAt, ...clean } = data as UpdatePricingDto & Record<string, unknown>;
+    const { id: _, updatedAt, ...clean } = data as any;
 
     const updated = await this.prisma.pricingConfig.update({
       where: { id: config.id },

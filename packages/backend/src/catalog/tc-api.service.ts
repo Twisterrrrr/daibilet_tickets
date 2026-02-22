@@ -73,12 +73,15 @@ export class TcApiService {
       return res.json() as Promise<T>;
     };
 
-    const { data, retries } = await withRetry(() => runWithLimit(doFetch), {
-      maxRetries: 3,
-      initialBackoffMs: 1000,
-      onRetry: (attempt, delayMs, status) =>
-        this.logger.warn(`TC API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
-    });
+    const { data, retries } = await withRetry(
+      () => runWithLimit(doFetch),
+      {
+        maxRetries: 3,
+        initialBackoffMs: 1000,
+        onRetry: (attempt, status, delayMs) =>
+          this.logger.warn(`TC API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
+      },
+    );
     if (retries > 0) {
       this.logger.log(`TC API completed after ${retries} retries`);
     }
@@ -103,7 +106,7 @@ export class TcApiService {
     city?: number;
     status?: string;
     signal?: AbortSignal;
-  }): Promise<import('./tc-api.types').TcRestEventV1[]> {
+  }): Promise<any[]> {
     const params: Record<string, string> = {};
 
     if (opts?.page) params.page = String(opts.page);

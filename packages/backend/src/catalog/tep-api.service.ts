@@ -50,12 +50,15 @@ export class TepApiService {
       return res.json() as Promise<T>;
     };
 
-    const { data, retries } = await withRetry(() => runWithLimit(doFetch), {
-      maxRetries: 3,
-      initialBackoffMs: 1000,
-      onRetry: (attempt, delayMs, status) =>
-        this.logger.warn(`TEP API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
-    });
+    const { data, retries } = await withRetry(
+      () => runWithLimit(doFetch),
+      {
+        maxRetries: 3,
+        initialBackoffMs: 1000,
+        onRetry: (attempt, status, delayMs) =>
+          this.logger.warn(`TEP API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
+      },
+    );
     if (retries > 0) {
       this.logger.log(`TEP API completed after ${retries} retries`);
     }

@@ -19,7 +19,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const data = await api.getCollectionBySlug(slug);
     const c = data.collection;
-    if (!c) return { title: 'Подборка не найдена' };
     return {
       title: c.metaTitle || `${c.title} | Дайбилет`,
       description: c.metaDescription || c.description?.slice(0, 160) || `${c.title} — подборка событий на Дайбилет`,

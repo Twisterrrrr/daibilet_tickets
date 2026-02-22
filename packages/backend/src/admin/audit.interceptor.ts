@@ -62,8 +62,6 @@ export class AuditInterceptor implements NestInterceptor {
       settings: 'Settings',
       upsells: 'UpsellItem',
       audit: 'AuditLog',
-      jobs: 'FailedJob',
-      schedules: 'EventSchedule',
     };
     return map[raw] || raw;
   }

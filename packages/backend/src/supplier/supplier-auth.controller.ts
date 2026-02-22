@@ -1,8 +1,6 @@
 import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Request, Response } from 'express';
-
-import type { RequestWithUser, SupplierAuthUser } from '../auth/auth.types';
+import { Request, Response } from 'express';
 
 import { SupplierLoginDto, SupplierRegisterDto } from './dto/supplier-auth.dto';
 import { SupplierJwtGuard } from './supplier.guard';
@@ -62,7 +60,7 @@ export class SupplierAuthController {
   @UseGuards(SupplierJwtGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Выход поставщика' })
-  async logout(@Req() req: RequestWithUser<SupplierAuthUser>, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
     await this.authService.logout(req.user.id);
     res.clearCookie('supplier_refresh_token');
     return { message: 'Logged out' };
@@ -72,7 +70,7 @@ export class SupplierAuthController {
   @UseGuards(SupplierJwtGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Профиль поставщика' })
-  async me(@Req() req: RequestWithUser<SupplierAuthUser>) {
+  async me(@Req() req: any) {
     return this.authService.getProfile(req.user.id);
   }
 }

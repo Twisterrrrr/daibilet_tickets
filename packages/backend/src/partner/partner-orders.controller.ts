@@ -12,8 +12,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { PartnerAuthUser } from '../auth/auth.types';
-import type { Request as ExpressRequest } from 'express';
 
 import { tryTransitionCheckout, tryTransitionOrderRequest } from '../checkout/checkout-state-machine';
 import { PrismaService } from '../prisma/prisma.service';
@@ -33,7 +31,7 @@ export class PartnerOrdersController {
   @Get()
   @ApiOperation({ summary: 'Список заказов поставщика' })
   async listOrders(
-    @Req() req: ExpressRequest & { user: PartnerAuthUser },
+    @Req() req: any,
     @Query('status') status?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
@@ -144,7 +142,7 @@ export class PartnerOrdersController {
    */
   @Get(':id')
   @ApiOperation({ summary: 'Детали заказа' })
-  async getOrder(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Param('id') id: string) {
+  async getOrder(@Req() req: any, @Param('id') id: string) {
     const order = await this.prisma.orderRequest.findUnique({
       where: { id },
       include: {
@@ -188,7 +186,7 @@ export class PartnerOrdersController {
    */
   @Post(':id/confirm')
   @ApiOperation({ summary: 'Подтвердить заказ' })
-  async confirmOrder(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Param('id') id: string, @Body() data?: ConfirmOrderDto) {
+  async confirmOrder(@Req() req: any, @Param('id') id: string, @Body() data?: ConfirmOrderDto) {
     const order = await this.prisma.orderRequest.findUnique({
       where: { id },
       include: { checkoutSession: { select: { id: true, status: true } } },
@@ -231,7 +229,7 @@ export class PartnerOrdersController {
    */
   @Post(':id/reject')
   @ApiOperation({ summary: 'Отклонить заказ' })
-  async rejectOrder(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Param('id') id: string, @Body() data: RejectOrderDto) {
+  async rejectOrder(@Req() req: any, @Param('id') id: string, @Body() data: RejectOrderDto) {
     const order = await this.prisma.orderRequest.findUnique({
       where: { id },
       include: { checkoutSession: { select: { id: true, status: true } } },

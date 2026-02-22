@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { trackPlannerResult, trackPlannerStart } from '@/lib/analytics';
 import { api } from '@/lib/api';
@@ -70,7 +70,7 @@ const TIER_STYLES: Record<
   },
 };
 
-function PlannerContent() {
+export default function PlannerPage() {
   const searchParams = useSearchParams();
 
   const [step, setStep] = useState<Step>('city');
@@ -749,14 +749,6 @@ function PlannerContent() {
         )}
       </div>
     </div>
-  );
-}
-
-export default function PlannerPage() {
-  return (
-    <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>}>
-      <PlannerContent />
-    </Suspense>
   );
 }
 

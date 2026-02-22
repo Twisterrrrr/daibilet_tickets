@@ -154,51 +154,6 @@ export class CreateCheckoutSessionDto {
   giftCertificateCode?: string;
 }
 
-// ============================================================
-// Create CheckoutPackage DTO — POST /checkout/package
-// ============================================================
-
-export class CreatePackageItemDto {
-  @IsString()
-  type: 'SESSION' | 'OPEN_DATE';
-
-  @IsUUID()
-  offerId: string;
-
-  @IsOptional()
-  @IsUUID()
-  sessionId?: string | null;
-
-  @IsOptional()
-  @IsUUID()
-  categoryId?: string | null;
-
-  @IsOptional()
-  @IsString()
-  openDate?: string | null;
-
-  @IsInt()
-  @Min(1)
-  qty: number;
-}
-
-export class CreatePackageDto {
-  @IsUUID()
-  checkoutSessionId: string;
-
-  @IsEmail()
-  email: string;
-
-  @IsOptional()
-  @IsString()
-  phone?: string | null;
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreatePackageItemDto)
-  items: CreatePackageItemDto[];
-}
-
 export class ValidateGiftCertificateDto {
   @IsString()
   @IsNotEmpty()

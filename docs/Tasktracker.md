@@ -1,6 +1,23 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-02-22. Решения по 13 вопросам — `docs/OpenQuestions.md`.
+> Последнее обновление: 2026-02-23. Решения по 13 вопросам — `docs/OpenQuestions.md`.
+> План 26 PR: `docs/InfraTypizationUXCheckoutPlan.md` (инфра, типизация, UX, Checkout + YooKassa).
+
+---
+
+## Инфра + типизация + UX + Checkout (26 PR)
+
+> Спецификация: `docs/InfraTypizationUXCheckoutPlan.md`. Каждая таска = 1 PR.
+
+- [x] T1–T7: Nginx uploads, Feature Flags, Pino logs, Sentry backend/frontend (22.02)
+- [ ] T8–T10: Типизация tc-sync, Proto types, Prisma where builders
+- [ ] T11–T12: Redis cache + подключение к каталогу
+- [ ] T13–T14: Email order-confirmed, order-completed
+- [x] T15: Каталог view toggle + localStorage (22.02); [ ] T16–T17: venue detail, Teplohod widgets
+- [ ] T18: Supplier RBAC + self-service drafts
+- [ ] T19–T26: Checkout (package flow, YooKassa, orders трекинг, webhook idempotency)
+
+Миграции: M1 feature_flags → M8 order_tracking_public.
 
 ---
 
@@ -70,75 +87,8 @@
 - [x] **RBAC-чеклист** — матрица прав по ролям, проверки доступа, эндпоинты Supplier (секция 10 в SupplierArchitecture.md)
 
 ### To-do (Supplier)
-- [x] **Средний**: Добавить Event.createdByType, Venue.createdByType, createdById (миграция 20260221110000)
+- [ ] **Средний**: Добавить Event.createdByType, Venue.createdByType, createdById (миграция Prisma)
 - [ ] **Средний**: Реализовать RBAC для Supplier (guards, decorators, проверка operatorId)
-
----
-
----
-
-## Checkout + Расписания + Event Studio (22.02.2026)
-
-> Спецификация: `docs/CheckoutSchedulesEventStudio.md`
-
-### Блок 1: Данные → Правила → API
-- [x] **1 (Критический)**: Prisma: EventSchedule + расширение EventSession + CheckoutPackage/Items
-- [x] **14 (Высокий)**: PriceSnapshotService
-- [x] **13 (Высокий)**: AvailabilityService
-- [x] **2 (Высокий)**: ONE_TIME + OPEN_DATE генерация
-- [x] **3 (Высокий)**: Recurrence generator (90 дней)
-- [x] **8 (Высокий)**: OccurrencePolicyService (delete/cancel/reschedule + unit tests)
-- [x] **4 (Высокий)**: Admin API: CRUD schedule/occurrences + generate + list
-- [x] **9 (Высокий)**: Checkout API v1: POST /checkout/package
-
-### Блок 2: Админка UI
-- [x] **5 (Средний)**: Event Studio Summary
-- [x] **6 (Средний)**: Schedule Builder wizard
-- [x] **7 (Средний)**: Occurrences list + Bulk edit
-
-### Блок 3: Frontend checkout
-- [x] **10 (Высокий)**: /checkout/:packageId
-- [x] **11 (Высокий)**: /checkout/:packageId/status
-- [x] **15 (Средний)**: /payment/success, /payment/fail
-- [x] **16 (Средний)**: /orders/[id] → redirect на track
-
-### Блок 4: Аудит
-- [x] **12 (Средний)**: AdminAuditLog для schedule/bulk/cancel/reschedule
-
----
-
-## Билеты: квоты, категории, цены + возвраты + отчётность (23.02.2026)
-
-> Спецификация: `docs/TicketsQuotasRefundsReporting.md`
-
-### Блок T: Категории и квоты
-- [x] **T1 (Критический)**: Prisma: TariffCategory, TicketPrice, TicketQuotaDefault, TicketQuotaOverride, TicketSalesCounter
-- [x] **T2 (Высокий)**: Data migration: base категория + цена из priceFrom/compareAt
-- [x] **T3 (Высокий)**: Admin UI: CRUD категорий + цены/compareAt
-- [x] **T4 (Средний)**: Admin UI: квоты по умолчанию + override на слот
-- [x] **T5 (Высокий)**: AvailabilityService: остатки по категориям, allowedDays, ADDON rules
-- [x] **T6 (Средний)**: PriceSnapshotService: snapshot с compareAtPriceCents
-
-### Блок C: Политика возвратов
-- [x] **C1 (Высокий)**: Prisma: CancellationPolicyTemplate
-- [x] **C2 (Средний)**: Admin UI: выбор политики в Offer
-- [x] **C3 (Средний)**: Snapshot политики в CheckoutPackage
-- [x] **C4 (Высокий)**: Refund Engine v1 (tiers, breakdown)
-
-### Блок R: Возвраты и EXTERNAL
-- [x] **R1 (Критический)**: Prisma: TicketIssued, LedgerEntry, RefundRequest, SettlementBatch, ReportRun
-- [x] **R2 (Высокий)**: RefundRequest API: create, list, approve, reject, close
-- [x] **R3 (Высокий)**: PLATFORM refund: YooKassa, LedgerEntry, TicketIssued.status
-- [x] **R4 (Высокий)**: EXTERNAL forwarding: teplohod/ticketscloud, Admin Inbox
-- [x] **R5 (Средний)**: Admin Inbox UI: Возвраты (в работе)
-- [x] **R6 (Высокий)**: Ticket issuance: создание TicketIssued при PAID
-
-### Блок O: Отчётность
-- [x] **O1 (Высокий)**: Report queries: Sales, Refunds, Commissions, Voucher Register (RBAC)
-- [x] **O2 (Средний)**: ReportRun job (BullMQ): queued → running → ready
-- [x] **O3 (Средний)**: XLS export (xlsx)
-- [x] **O4 (Средний)**: PDF export (pdf-lib)
-- [x] **O5 (Средний)**: Email delivery отчётов
 
 ---
 
@@ -162,25 +112,8 @@
 - [x] **Средний** (высокий ROI): SeoMeta на venues, cities, blog, combo (21.02)
 - [x] **Средний** (частично): createdByType + createdById в Event/Venue (миграция 20260221110000), admin/supplier create. RBAC guards — [ ] в плане
 - [x] **Низкий**: Frontend typecheck — ошибки TS исправлены (21.02): VenueCard, CheckoutClient, sitemaps, CatalogCard, page.tsx, events, cities/museums
+- [ ] **Низкий**: Типизация `any` (backend ~31, frontend 100+)
 - Полный список и обоснование — `docs/TechnicalDebt.md`
-
-### Backend и техдолг (очередность в docs/BackendTechDebtTasks.md)
-
-**Порядок:** A5 → B2 → A3 → A4 → B1 → A1-Pino → B3 → B4 → A2 → C1 → C2
-
-- [x] **A5 (HIGH)**: JwtPayload вместо req: any (22.02)
-- [x] **B2 (MED)**: RBAC Supplier (guards, operatorId boundary) (22.02)
-- [x] **A3 (HIGH)**: Типизация tc-sync.service.ts (22.02)
-- [x] **B1 (MED)**: Prisma where builders — частично (22.02)
-- [ ] **A3 (HIGH)**: Типизация tc-sync.service.ts (TcEvent вместо any[])
-- [ ] **A4 (HIGH)**: Proto-generated types для gRPC
-- [ ] **B1 (MED)**: where: any → Prisma typed where builders
-- [ ] **A1-Pino (HIGH)**: Structured JSON logs (pino) + лог-агрегатор
-- [ ] **B3 (MED)**: Redis-кэш: списки/детали/сессии (TTL)
-- [ ] **B4 (MED)**: Nginx location /uploads/ (static)
-- [ ] **A2 (HIGH)**: Email-шаблоны: order-confirmed, order-completed
-- [ ] **C1 (LOW)**: Убрать as any в бэкенде (~31 место)
-- [ ] **C2 (LOW)**: Frontend any (api.ts, DTO) 100+
 
 ---
 
@@ -231,18 +164,6 @@
 - [x] **Высокий**: Единый pagination contract (pagination.ts) — 15 контроллеров
 - [x] **Средний**: ESLint `no-console: error` + исключения для тестов/seed
 
-### Выполнено (22.02.2026)
-- [x] **Frontend build fixes**: JsonLd server-component (без 'use client'), useSearchParams в Suspense (Header, orders/track, planner, events), gift-certificate dynamic
-- [x] **C3 — Rate limiting TC/TEP**: api-rate-limit.util (p-limit, withRetry 429/5xx), TcApiService/TepApiService
-- [x] **D1 — CacheService контракт**: cacheKeys, delByPrefix, все сервисы переведены
-- [x] **D2 — Инвалидация кэша**: CacheInvalidationMatrix.md
-- [x] **D3 — TTL policy**: CACHE_TTL_* env
-- [x] **E1 — Retention jobs**: RetentionService (EventSession, ProcessedWebhookEvent, AuditLog), cron 04:00
-- [x] **E2 — Индексы**: миграция 20260222_e2_performance_indexes
-- [x] **E3 — PgBouncer**: docs/PgBouncer.md, infra/pgbouncer/
-- [x] **F1 — План партиционирования**: docs/PartitioningPlan.md
-- [x] **F2 — Партиционирование EventSession**: create_event_sessions_partition()
-
 ### Выполнено (21.02.2026)
 - [x] **A1 — requestId + PII masking**: RequestIdMiddleware (лог входа), LoggingInterceptor (лог завершения), AllExceptionsFilter (requestId, maskPiiInString), pii-mask.util + unit test, docs/Observability.md
 
@@ -250,8 +171,9 @@
 - [x] **Высокий**: Prisma migrate deploy — идемпотентные миграции (20260215_pre_yookassa_gates, 20260215_review_venue_id, 20260215_soft_delete_and_cascade_safety) для совместимости с базами после db push / migrate dev
 
 ### Отложено (backlog)
-- [x] **Средний**: ESLint правило: запретить `any` в новых файлах — tools/check-no-any-new-files.ts, pnpm check:no-any-new (22.02)
-- [ ] **Низкий**: C1, C2 — см. docs/BackendTechDebtTasks.md
+- [ ] **Средний**: ESLint правило: запретить `any` в новых файлах (warning)
+- [ ] **Низкий**: Типизация `as any` в бэкенде (31 место) — заменить на type guards постепенно
+- [ ] **Низкий**: Frontend `any` (100+) — начать с api.ts и DTO types
 
 ---
 
@@ -324,7 +246,7 @@
 - [ ] **Высокий**: Web Vitals: LCP < 2.5s, CLS < 0.1 — lazy images, font preload, critical CSS
 - [x] **Высокий**: /venues/* в sitemap (priority 0.9)
 - [ ] **Высокий**: Мобильная корзина: проверить UX на 375px, fixed bottom bar для «Оформить»
-- [x] **Средний**: Breadcrumbs на страницах события и площадки (SEO + навигация) — уже были
+- [ ] **Средний**: Breadcrumbs на страницах события и площадки (SEO + навигация)
 - [ ] **Средний**: Фильтры на /events: по дате, по цене, по категории — расширение текущих
 
 ### Неделя 3 — Техдолг + конверсия
@@ -352,7 +274,7 @@
 #### Backend
 - [ ] **Высокий**: Feature flags: отключение EXTERNAL по городам с достаточным INTERNAL покрытием
 - [ ] **Высокий**: Supplier self-service: портал для добавления событий
-- [x] **Высокий**: Review.venueId — отзывы на площадки (выполнено ранее)
+- [ ] **Высокий**: Review.venueId — отзывы на площадки
 - [ ] **Средний**: Нагрузочное тестирование checkout
 
 #### Контент
@@ -383,8 +305,8 @@
 - [x] **Средний**: Backend: highlights/faq/features/commissionRate в admin create/update endpoints
 
 ### Следующие шаги (конверсия)
-- [x] **Средний**: Scroll-progress indicator на мобиле (% прочитанного) — уже в UX
-- [x] **Средний**: «Похожие места» блок на venue page — уже в UX
+- [ ] **Средний**: Scroll-progress indicator на мобиле (% прочитанного)
+- [ ] **Средний**: «Похожие места» блок на venue page
 - [ ] **Низкий**: A/B тестирование CTA-текстов («Купить билет» vs «Выбрать дату»)
 - [ ] **Низкий**: Micro-animations для offer cards (hover, selection feedback)
 
@@ -562,8 +484,8 @@
 - [x] **Критический**: API `getEvents` / `getEventBySlug`: include offers, primaryOffer в ответе, фильтр дублей (canonicalOfId)
 - [x] **Высокий**: Admin: секция офферов (таблица, status toggle, set primary) + endpoints (GET/PATCH/POST merge)
 - [x] **Высокий**: Frontend BuyCard: CTA по primaryOffer.purchaseType (TC_WIDGET / REDIRECT / BuyModal)
-- [x] **Средний**: Admin: UI для ручного merge дублей (поиск + выбор canonical event)
-- [x] **Средний**: Автодедуп: fuzzy matching по названию + площадка + дата (Фаза будущая)
+- [ ] **Средний**: Admin: UI для ручного merge дублей (поиск + выбор canonical event)
+- [ ] **Средний**: Автодедуп: fuzzy matching по названию + площадка + дата (Фаза будущая)
 - [ ] **Низкий**: Автовыбор primary по правилам (комиссия/цена/наличие)
 
 ### Этап 2: SEO-машина + новые страницы (планируется)
@@ -601,8 +523,8 @@
 - [x] **Критический**: Инициализировать monorepo (pnpm workspaces): `packages/backend`, `packages/frontend`, `packages/shared`
 - [x] **Критический**: Docker Compose: postgres:16, redis:7 (порт 5433 из-за конфликта)
 - [x] **Критический**: Настроить `.env.example` со всеми переменными (без секретов)
-- [x] **Высокий**: Настроить ESLint + Prettier для всего monorepo (22.02: eslint.config.mjs, simple-import-sort, react-hooks, format:check/write, pnpm lint)
-- [x] **Средний**: GitHub Actions: lint → test → build — check-no-any-new, lint, typecheck, test, build (22.02)
+- [ ] **Высокий**: Настроить ESLint + Prettier для всего monorepo
+- [ ] **Средний**: GitHub Actions: lint → test → build (без деплоя на первом этапе)
 
 ### 1.3 Подготовка к продакшен-деплою
 
@@ -620,8 +542,6 @@
 - [ ] **Средний**: CI/CD: GitHub Actions для автодеплоя на VPS
 
 ### 1.5 Деплой на Timeweb Cloud
-
-> **Перед deploy:** пройти `docs/PreDeployChecklist.md` (env, security, smoke-план).
 
 - [ ] **Критический**: Создать VPS на Timeweb Cloud (Ubuntu 22.04/24.04, 2 CPU, 4 GB RAM, 50 GB NVMe)
 - [ ] **Критический**: Настроить DNS A-записи: daibilet.ru, www.daibilet.ru, admin.daibilet.ru → IP VPS
@@ -1259,8 +1179,8 @@
 - [x] **Высокий**: Admin UI: список тикетов, фильтры, детали, ответы, шаблоны, внутренние заметки
 - [x] **Высокий**: Виджет обратной связи (floating button + modal) на всех страницах
 - [x] **Высокий**: Клиентская форма ContactForm на /help
-- [x] **Средний**: Scroll-progress indicator на мобиле (% прочитанного) — дубль
-- [x] **Средний**: «Похожие места» блок на venue page — дубль
+- [ ] **Средний**: Scroll-progress indicator на мобиле (% прочитанного)
+- [ ] **Средний**: «Похожие места» блок на venue page
 - [ ] **Низкий**: A/B тестирование CTA-текстов («Купить билет» vs «Выбрать дату»)
 - [ ] **Низкий**: Micro-animations для offer cards (hover, selection feedback)
 

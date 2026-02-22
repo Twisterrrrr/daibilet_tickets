@@ -13,8 +13,6 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import type { AdminAuthUser } from '../auth/auth.types';
-import type { Request as ExpressRequest } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -86,8 +84,8 @@ export class AdminLandingsController {
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: UpdateLandingDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
-    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as UpdateLandingDto & Record<string, unknown>;
+  async update(@Param('id') id: string, @Body() data: UpdateLandingDto, @Request() req: any) {
+    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as any;
 
     this.validateJsonFields(clean);
 

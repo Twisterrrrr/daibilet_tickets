@@ -1,7 +1,6 @@
 import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { PartnerAuthUser } from '../auth/auth.types';
-import type { Request as ExpressRequest, Response } from 'express';
+import { Response } from 'express';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiKeyGuard } from './partner-auth.guard';
@@ -19,7 +18,7 @@ export class PartnerReportsController {
   @Get('sales')
   @ApiOperation({ summary: 'Продажи за период' })
   async salesReport(
-    @Req() req: ExpressRequest & { user: PartnerAuthUser },
+    @Req() req: any,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('format') format?: string,

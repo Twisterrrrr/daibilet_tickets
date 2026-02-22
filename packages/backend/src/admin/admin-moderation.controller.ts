@@ -11,8 +11,6 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import type { AdminAuthUser } from '../auth/auth.types';
-import type { Request as ExpressRequest } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -78,7 +76,7 @@ export class AdminModerationController {
    */
   @Post(':id/approve')
   @Roles('ADMIN', 'EDITOR')
-  async approve(@Param('id') id: string, @Req() req: ExpressRequest & { user: AdminAuthUser }) {
+  async approve(@Param('id') id: string, @Req() req: any) {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) throw new NotFoundException('Событие не найдено');
 
@@ -113,7 +111,7 @@ export class AdminModerationController {
    */
   @Post(':id/reject')
   @Roles('ADMIN', 'EDITOR')
-  async reject(@Param('id') id: string, @Req() req: ExpressRequest & { user: AdminAuthUser }, @Body() body: RejectModerationDto) {
+  async reject(@Param('id') id: string, @Req() req: any, @Body() body: RejectModerationDto) {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) throw new NotFoundException('Событие не найдено');
 

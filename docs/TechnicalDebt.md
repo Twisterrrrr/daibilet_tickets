@@ -26,7 +26,6 @@
 
 - **Backend**: ~31 файл с `as any` или `: any`. Tasktracker: заменить на type guards постепенно.
 - **Frontend**: 100+ вхождений. Начать с `api.ts` и DTO types.
-- **Frontend typecheck**: ✅ Исправлены ошибки TS (2026-02-21): VenueCard props, CheckoutClient redirectItems/requestItems, sitemaps SitemapUrl, CatalogCard EventCategory/description, page.tsx hasPhoto, cities/museums getCatalog params, events/page lastRegion/setMuseumViewMode.
 - **Тесты**: допустимо для моков, но лучше типизировать.
 
 ---
@@ -70,16 +69,3 @@ pnpm run db:seed:qf    # при необходимости (query filters)
 - **Критический**: Checkout YooKassa, payment webhooks.
 - **Высокий**: bulk SEO generator (Voucher QR + PDF ✅).
 - **Низкий**: Типизация any, resolvedBy из JWT.
-
----
-
-## 6. Production Hardening (батчи A1–F2)
-
-Полный план: `docs/ProductionHardeningPlan.md`.
-
-- **A** — Observability: requestId, PII masking, Sentry, ops endpoints
-- **B** — Безопасность: Helmet, CORS, rate limit, brute-force защита
-- **C** — Jobs: failed jobs UI, HTTP timeouts, rate limit для TC/TEP
-- **D** — Кэш: контракт, инвалидация, TTL policy
-- **E** — Retention, индексы, PgBouncer (опционально)
-- **F** — Партиционирование EventSession

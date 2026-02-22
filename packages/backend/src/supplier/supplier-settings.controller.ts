@@ -3,7 +3,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateSupplierSettingsDto } from './dto/supplier.dto';
-import type { RequestWithUser, SupplierAuthUser } from '../auth/auth.types';
 import { SupplierJwtGuard, SupplierRoles, SupplierRolesGuard } from './supplier.guard';
 
 @ApiTags('supplier')
@@ -15,7 +14,7 @@ export class SupplierSettingsController {
 
   @Get()
   @ApiOperation({ summary: 'Настройки поставщика' })
-  async getSettings(@Req() req: RequestWithUser<SupplierAuthUser>) {
+  async getSettings(@Req() req: any) {
     return this.prisma.operator.findUnique({
       where: { id: req.user.operatorId },
       select: {
@@ -41,7 +40,7 @@ export class SupplierSettingsController {
   @Put()
   @SupplierRoles('OWNER')
   @ApiOperation({ summary: 'Обновить настройки' })
-  async updateSettings(@Req() req: RequestWithUser<SupplierAuthUser>, @Body() data: UpdateSupplierSettingsDto) {
+  async updateSettings(@Req() req: any, @Body() data: UpdateSupplierSettingsDto) {
     // Поставщик может менять только контактные/компанейские данные
     return this.prisma.operator.update({
       where: { id: req.user.operatorId },

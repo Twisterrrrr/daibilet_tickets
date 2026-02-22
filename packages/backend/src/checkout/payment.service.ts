@@ -12,6 +12,7 @@
  */
 
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { createHmac, randomUUID } from 'crypto';
@@ -255,80 +256,6 @@ export class PaymentService {
   }
 
   /**
-   * Создать PaymentIntent для CheckoutPackage (минимальный flow, без offersSnapshot).
-   */
-  async createPaymentIntentForPackage(params: {
-    checkoutSessionId: string;
-    amount: number;
-    idempotencyKey: string;
-    metadata?: Record<string, unknown>;
-  }) {
-    const session = await this.prisma.checkoutSession.findUnique({
-      where: { id: params.checkoutSessionId },
-    });
-    if (!session) throw new NotFoundException('Сессия не найдена');
-
-    const existing = await this.prisma.paymentIntent.findUnique({
-      where: { idempotencyKey: params.idempotencyKey },
-    });
-    if (existing) {
-      return {
-        paymentIntentId: existing.id,
-        paymentUrl: existing.paymentUrl,
-        provider: existing.provider,
-        providerPaymentId: existing.providerPaymentId,
-      };
-    }
-
-    let paymentUrl: string;
-    let providerPaymentId: string | null = null;
-    if (this.provider === 'STUB') {
-      providerPaymentId = `stub_${randomUUID().slice(0, 8)}`;
-      paymentUrl = `${this.appUrl}/checkout/pay-mock/${providerPaymentId}`;
-    } else {
-      const meta: Record<string, string> = { checkoutSessionId: params.checkoutSessionId };
-      if (params.metadata) {
-        for (const [k, v] of Object.entries(params.metadata)) {
-          meta[k] = String(v);
-        }
-      }
-      const yk = await this.createYookassaPayment({
-        amount: params.amount,
-        currency: 'RUB',
-        idempotencyKey: params.idempotencyKey,
-        returnUrl: `${this.appUrl}/checkout/result?session=${params.checkoutSessionId}`,
-        description: `Заказ ${session.shortCode}`,
-        metadata: meta,
-        supplierId: null,
-        supplierAmount: null,
-      });
-      providerPaymentId = yk.paymentId;
-      paymentUrl = yk.confirmationUrl;
-    }
-
-    const intent = await this.prisma.paymentIntent.create({
-      data: {
-        checkoutSessionId: params.checkoutSessionId,
-        idempotencyKey: params.idempotencyKey,
-        amount: params.amount,
-        currency: 'RUB',
-        status: 'PENDING',
-        provider: this.provider,
-        providerPaymentId,
-        paymentUrl,
-        grossAmount: params.amount,
-      },
-    });
-
-    return {
-      paymentIntentId: intent.id,
-      paymentUrl,
-      provider: intent.provider,
-      providerPaymentId,
-    };
-  }
-
-  /**
    * Получить PaymentIntent по ID.
    */
   async getPaymentIntent(id: string) {
@@ -389,15 +316,6 @@ export class PaymentService {
         );
       }
 
-      // R6: Package payment — update CheckoutPackage to PAID
-      if (intent.idempotencyKey?.startsWith('pkg-')) {
-        const packageId = intent.idempotencyKey.slice(4);
-        await tx.checkoutPackage.updateMany({
-          where: { id: packageId },
-          data: { status: 'PAID' },
-        });
-      }
-
       // Инкрементируем successfulSales для поставщика
       if (intent.supplierId) {
         await tx.operator
@@ -423,7 +341,7 @@ export class PaymentService {
     if (result.noOp) return intent;
     if (!result.allowed) throw new BadRequestException(result.reason);
 
-    return this.prisma.paymentIntent.update({
+    const updated = await this.prisma.paymentIntent.update({
       where: { id: intentId },
       data: {
         status: 'FAILED',
@@ -431,6 +349,25 @@ export class PaymentService {
         failReason: reason || 'unknown',
       },
     });
+
+    this.logger.error(
+      `[paymentId=${intentId}] [provider=${intent.provider}] [providerPmtId=${intent.providerPaymentId}] ` +
+        `[checkoutSessionId=${intent.checkoutSessionId}] PAYMENT_FAILED: ${reason || 'unknown'}`,
+    );
+    if (process.env.SENTRY_DSN) {
+      Sentry.captureMessage(`PAYMENT_FAILED: ${reason || 'unknown'}`, {
+        level: 'error',
+        tags: {
+          paymentIntentId: intentId,
+          provider: intent.provider,
+          checkoutSessionId: intent.checkoutSessionId,
+          env: process.env.NODE_ENV,
+        },
+        extra: { failReason: reason },
+      });
+    }
+
+    return updated;
   }
 
   /**

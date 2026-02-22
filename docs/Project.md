@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-02-21
+> Последнее обновление: 2026-02-20
 
 ## Миссия
 
@@ -54,14 +54,11 @@
 - **EventOverride** — правки админа поверх sync-данных (title, description, imageUrl, isHidden, manualRating, tagsAdd/Remove, **category**, **subcategory**).  
   **Заголовок**: `Event.title` — оригинал из источника (TC, Teplohod), обновляется при каждом sync. `EventOverride.title` — кастомный заголовок для Daibilet. Для отображения используется override ?? event.title. Оригинал сохраняется в `Event.title` для импорта/экспорта и виджетов.
 - **EventOffer** — оффер из конкретного источника (TC/TEPLOHOD/RADARIO/TIMEPAD/MANUAL). Содержит: source, purchaseType (TC_WIDGET/REDIRECT/API_CHECKOUT), externalEventId, deeplink, priceFrom, commission, status (ACTIVE/HIDDEN/DISABLED), isPrimary.
-- **EventSession** — конкретный сеанс (дата, свободные места, цены). Привязан к Event и к EventOffer (offerId). Для teplohod.info — реальное расписание из `eventTimes` API. Планируется расширение: `EventSchedule`, status (ACTIVE/PAUSED/CANCELLED/RESCHEDULED), capacity, reschedule. См. `docs/CheckoutSchedulesEventStudio.md`.
+- **EventSession** — конкретный сеанс (дата, свободные места, цены). Привязан к Event и к EventOffer (offerId). Для teplohod.info — реальное расписание из `eventTimes` API (дата, время отправления, кол-во свободных мест).
 - **Tag** — теги для фильтрации и группировки (тема, аудитория, сезон)
 - **LandingPage** — SEO-подборка по тегу/фильтрам
 - **ComboPage** — готовая программа с курированными событиями
 - **Article** — SEO-статья с перелинковкой
-- **SeoTemplate** — шаблоны для SEO-автогенерации (titleTpl, h1Tpl, descriptionTpl, bodyTpl). См. `docs/sitemap-seo-spec.md`.
-- **SeoContent** — кеш сгенерированных SEO-текстов (cityId, type, filtersKey, title, h1, description, body, noindex, canonicalUrl, relatedLinksJson).
-- **SeoMeta** — универсальный SEO-блок для City, Event, Venue, Landing, Article, Combo. См. `docs/seo/SeoMetaSpec.md`.
 - **Package** — заказ (Trip Planner)
 - **Review** — отзыв на событие/оператора. Поля: rating (1-5), text, authorName, authorEmail (скрыт), isVerified (подтверждённая покупка), voucherCode, verifyToken (email-верификация, 48h TTL), helpfulCount (кэш голосов), status (PENDING_EMAIL/PENDING/APPROVED/REJECTED), adminComment. Unique: authorEmail + eventId.
   - **ReviewPhoto** — до 5 фото на отзыв (url, thumbUrl, filename). WebP, ресайз 1200px + thumb 300px.
@@ -69,7 +66,7 @@
 - **ExternalReview** — импортированные отзывы с внешних площадок (Яндекс.Карты, 2ГИС, Tripadvisor, Google). Поля: source, sourceUrl, authorName, rating, text, publishedAt. Участвует в recalculateEventRating.
 - **ReviewRequest** — пост-покупочный запрос на отзыв (email, eventId, token, sentAt, reminderSentAt, openedAt, clickedAt, reviewId). Unique: email + eventId.
 - **Event.externalRating/externalReviewCount/externalSource** — ручной импорт рейтинга из внешних платформ. Участвует в расчёте итогового rating через взвешенное среднее (вместе с Review и ExternalReview).
-- **CheckoutSession** — сессия оформления заказа (snapshot корзины, контакт, UTM, статусы через State Machine). Immutable `offersSnapshot` с write-once guard. Опционально `giftCertificateSnapshot` — для подарочных сертификатов. Планируется **CheckoutPackage** (привязка к session, priceSnapshotJson, items SESSION/OPEN_DATE) — см. `docs/CheckoutSchedulesEventStudio.md`.
+- **CheckoutSession** — сессия оформления заказа (snapshot корзины, контакт, UTM, статусы через State Machine). Immutable `offersSnapshot` с write-once guard. Опционально `giftCertificateSnapshot` — для подарочных сертификатов.
 - **GiftCertificate** — подарочный сертификат (номинал, код GC-XXXX-XXXX, email получателя, сообщение). Создаётся при успешной оплате, статусы ISSUED/ACTIVATED/EXPIRED.
 - **OrderRequest** — заявка на подтверждение (SLA/TTL, expireReason, confirmedAt). Привязана к CheckoutSession.
 - **PaymentIntent** — платёжное намерение (PENDING/PROCESSING/PAID/FAILED/CANCELLED/REFUNDED). Привязка к CheckoutSession, idempotencyKey, provider (STUB/YOOKASSA). Split-поля для маркетплейса: supplierId, grossAmount, platformFee, supplierAmount, commissionRate.
@@ -361,16 +358,6 @@ Article
 - [ ] Sandbox-тесты
 - [ ] Webhook верификация (IP whitelist + HMAC)
 
-### Checkout + Расписания + Event Studio (спецификация 22.02.2026)
-
-Полная спецификация — `docs/CheckoutSchedulesEventStudio.md`. Основное:
-- **EventSchedule** — ONE_TIME / OPEN_DATE / RECURRENCE, привязка 1:1 к EventOffer
-- **EventSession** — расширение: status, capacity, reschedule; OPEN_DATE без сессий (дата в package)
-- **CheckoutPackage** + **CheckoutPackageItem** — SESSION | OPEN_DATE, priceSnapshotJson
-- **AvailabilityService**, **PriceSnapshotService**, **OccurrencePolicyService**
-- Admin UI: Event Studio Summary, Schedule Builder, Occurrences bulk edit
-- RBAC: Admin — полный контроль; Supplier — только свои offerId (operatorId из токена)
-
 ### Преимущества Daibilet перед Афишей (killer features)
 
 - Ближайший причал + время доезда
@@ -378,3 +365,11 @@ Article
 - Правда о маршруте (какие мосты гарантированы)
 - Честная длительность (время на воде + посадка/выход)
 - Прозрачные условия возвратов/переносов
+
+---
+
+## План 26 PR: Инфра + типизация + UX + Checkout
+
+> Документ: `docs/InfraTypizationUXCheckoutPlan.md`
+
+26 задач (каждая = 1 PR): Nginx static, Feature Flags, Pino/Sentry, Redis cache, типизация (tc-sync, Proto, where builders), email order-confirmed/completed, каталог (view toggle, venue detail), Teplohod widgets, Supplier RBAC + drafts, Checkout (package flow, YooKassa, orders tracking, webhook idempotency). Миграции M1–M8.

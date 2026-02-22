@@ -27,11 +27,8 @@ import {
   Prisma,
   PurchaseType,
 } from '@prisma/client';
-import type { Request as ExpressRequest, Response } from 'express';
+import type { Response } from 'express';
 
-import { buildEventWhere } from '../common/where-builders';
-
-import type { AdminAuthUser } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { CacheInvalidationService } from '../cache/cache-invalidation.service';
@@ -79,13 +76,20 @@ export class AdminEventsController {
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
-    const where = buildEventWhere({
-      city: city ?? undefined,
-      category: category ?? undefined,
-      source: source ?? undefined,
-      isActive: active === undefined ? undefined : active === 'true',
-      search: search ?? undefined,
-    });
+    const where: any = {};
+    if (city) where.city = { slug: city };
+    if (category) where.category = category;
+    if (source) where.source = source;
+    if (active !== undefined) where.isActive = active === 'true';
+    if (search) {
+      const trimmed = search.trim();
+      where.OR = [
+        { title: { contains: trimmed, mode: 'insensitive' } },
+        { slug: { contains: trimmed, mode: 'insensitive' } },
+        { tcEventId: trimmed },
+        { offers: { some: { externalEventId: trimmed } } },
+      ];
+    }
 
     const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
@@ -211,10 +215,36 @@ export class AdminEventsController {
     if (!city) throw new NotFoundException('Город не найден');
 
     // Create in transaction
-    const result = await this.prisma.$transaction(
-      async (tx): Promise<{ event: { id: string }; offer: { id: string } | null }> => {
-        // Create event — generate a unique tcEventId for manual events
-        const event = await tx.event.create({
+    const result = await this.prisma.$transaction(async (tx): Promise<{ event: { id: string }; offer: { id: string } | null }> => {
+      // Create event — generate a unique tcEventId for manual events
+      const event = await tx.event.create({
+        data: {
+          source: OfferSource.MANUAL,
+          tcEventId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          cityId: data.cityId,
+          title: normalizeEventTitle(data.title || ''),
+          slug,
+          description: data.description || null,
+          shortDescription: data.shortDescription || null,
+          category: data.category as EventCategory,
+          subcategories: (data.subcategories || []) as EventSubcategory[],
+          audience: (data.audience as EventAudience) || EventAudience.ALL,
+          minAge: data.minAge || 0,
+          durationMinutes: data.durationMinutes || null,
+          address: data.address || null,
+          lat: data.lat || null,
+          lng: data.lng || null,
+          imageUrl: data.imageUrl || null,
+          galleryUrls: data.galleryUrls || [],
+          priceFrom: data.offer?.priceFrom || null,
+          isActive: true,
+        },
+      });
+
+      // Create first offer if provided
+      let offer = null;
+      if (data.offer) {
+        offer = await tx.eventOffer.create({
           data: {
             source: OfferSource.MANUAL,
             tcEventId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -346,7 +376,7 @@ export class AdminEventsController {
    */
   @Patch(':id/override')
   @Roles('ADMIN', 'EDITOR')
-  async upsertOverride(@Param('id') id: string, @Body() data: OverrideEventDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
+  async upsertOverride(@Param('id') id: string, @Body() data: OverrideEventDto, @Request() req: any) {
     const result = await this.overrideService.upsert(id, data, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
@@ -368,7 +398,7 @@ export class AdminEventsController {
    */
   @Patch(':id/hide')
   @Roles('ADMIN', 'EDITOR')
-  async toggleHide(@Param('id') id: string, @Body('isHidden') isHidden: boolean, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
+  async toggleHide(@Param('id') id: string, @Body('isHidden') isHidden: boolean, @Request() req: any) {
     const result = await this.overrideService.toggleHidden(id, isHidden, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
@@ -621,7 +651,6 @@ export class AdminEventsController {
         ...(data.isPrimary !== undefined && { isPrimary: data.isPrimary }),
         ...(data.priority !== undefined && { priority: data.priority }),
         ...(data.commissionPercent !== undefined && { commissionPercent: data.commissionPercent }),
-        ...(data.cancellationPolicyId !== undefined && { cancellationPolicyId: data.cancellationPolicyId }),
       },
     });
   }

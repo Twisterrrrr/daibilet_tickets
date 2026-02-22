@@ -187,7 +187,7 @@ export class CheckoutService {
       const result = await this.tcApi.finishOrder(tcOrderId);
       return {
         success: true,
-        order: (result as { data?: unknown })?.data ?? result,
+        order: (result as any)?.data || result,
         message: 'Заказ подтверждён. Билеты будут отправлены на email.',
       };
     } catch (err: unknown) {
@@ -429,15 +429,11 @@ export class CheckoutService {
     const offersData = await this.prisma.eventOffer.findMany({
       where: { id: { in: offerIds } },
       include: {
-        event: { select: { id: true, title: true, slug: true, imageUrl: true, tcEventId: true } },
+        event: { select: { id: true, title: true, slug: true, imageUrl: true } },
         operator: {
           select: {
-            id: true,
-            name: true,
-            isSupplier: true,
-            commissionRate: true,
-            promoRate: true,
-            promoUntil: true,
+            id: true, name: true, isSupplier: true,
+            commissionRate: true, promoRate: true, promoUntil: true,
           },
         },
       },
@@ -474,7 +470,6 @@ export class CheckoutService {
         lineItemIndex: index,
         offerId: o.id,
         eventId: o.eventId,
-        externalEventId: o.event.tcEventId ?? undefined,
         source: o.source,
         purchaseType: o.purchaseType,
         purchaseTypeResolved: resolvePurchaseType(o.purchaseType, `offer:${o.id}`),

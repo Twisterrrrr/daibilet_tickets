@@ -39,6 +39,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Аккаунт деактивирован');
     }
 
-    return { id: user.id, email: user.email, name: user.name, role: user.role, type: 'admin' as const };
+    return { id: user.id, email: user.email, name: user.name, role: user.role };
   }
 }

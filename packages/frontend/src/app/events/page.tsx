@@ -1,25 +1,22 @@
 'use client';
 
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { X, LayoutGrid, List as ListIcon } from 'lucide-react';
+import { api } from '@/lib/api';
+import { EventCard } from '@/components/ui/EventCard';
+import { EventCardHorizontal } from '@/components/ui/EventCardHorizontal';
+import { CatalogCard } from '@/components/ui/CatalogCard';
+import { DateRibbon } from '@/components/ui/DateRibbon';
+import { PromoBlock } from '@/components/ui/PromoBlock';
 import {
   AUDIENCE_LABELS,
   CATEGORY_LABELS,
   EventAudience,
   EventCategory,
-  formatPrice,
   QUICK_FILTERS,
   type QuickFilter,
 } from '@daibilet/shared';
-import { LayoutGrid, List as ListIcon, X } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-
-import { CatalogCard } from '@/components/ui/CatalogCard';
-import { DateRibbon } from '@/components/ui/DateRibbon';
-import { EventCard } from '@/components/ui/EventCard';
-import { EventCardHorizontal } from '@/components/ui/EventCardHorizontal';
-import { PromoBlock } from '@/components/ui/PromoBlock';
-import { api } from '@/lib/api';
 
 const categories = [
   { value: '', label: 'Все' },
@@ -56,109 +53,11 @@ const PRICE_OPTIONS = [
 
 const LIMIT_OPTIONS = [20, 50, 100] as const;
 
-/** Регионы, заголовки которых временно скрываем */
-const HIDDEN_REGION_HEADERS = ['Золотое кольцо'];
-
-/** Хаб-города регионов: не показывать заголовок области над ними */
-const REGION_HUB_CITIES: Record<string, string> = {
-  'Ленинградская область': 'Санкт-Петербург',
-  'Московская область': 'Москва',
-  Татарстан: 'Казань',
-  'Свердловская область': 'Екатеринбург',
-  'Кемеровская область': 'Кемерово',
-  'Нижегородская область': 'Нижний Новгород',
-};
-
-/** Список музеев: город — отдельно; областные музеи — под заголовком области */
-function MuseumsListByCity({ items }: { items: any[] }) {
-  // Группируем: регион → город → [items]
-  const byRegion = new Map<string | null, Map<string, { cityName: string; items: any[] }>>();
-  for (const item of items) {
-    const rn = item.regionName || null;
-    const cSlug = item.citySlug || item.cityId || 'other';
-    const cName = item.cityName || 'Другие';
-    if (!byRegion.has(rn)) byRegion.set(rn, new Map());
-    const byCity = byRegion.get(rn)!;
-    if (!byCity.has(cSlug)) byCity.set(cSlug, { cityName: cName, items: [] });
-    byCity.get(cSlug)!.items.push(item);
-  }
-
-  // Сортировка: регионы по сумме мест, города по кол-ву
-  const regionEntries = Array.from(byRegion.entries()).map(([regionName, cities]) => {
-    const cityEntries = Array.from(cities.entries())
-      .map(([slug, { cityName, items: its }]) => ({ slug, cityName, items: its, count: its.length }))
-      .sort((a, b) => b.count - a.count);
-    const total = cityEntries.reduce((s, c) => s + c.count, 0);
-    return { regionName, cityEntries, total };
-  });
-  regionEntries.sort((a, b) => b.total - a.total);
-
-  // Блоки: город-хаб — без заголовка области; областные города — под заголовком области
-  const blocks: { regionName: string | null; cityName: string; items: any[] }[] = [];
-  for (const { regionName, cityEntries } of regionEntries) {
-    for (const { cityName, items: its } of cityEntries) {
-      const isHubCity = regionName && REGION_HUB_CITIES[regionName] === cityName;
-      const hideRegion = regionName && HIDDEN_REGION_HEADERS.includes(regionName);
-      blocks.push({
-        regionName: isHubCity || hideRegion ? null : regionName,
-        cityName,
-        items: its,
-      });
-    }
-  }
-
-  let lastRegion: string | null = null;
-  return (
-    <div className="space-y-6 sm:space-y-8">
-      {blocks.map((block, idx) => {
-        const showRegion = block.regionName && block.regionName !== lastRegion;
-        if (showRegion) lastRegion = block.regionName;
-        return (
-          <div key={`${block.regionName}-${block.cityName}-${idx}`}>
-            {showRegion && <h3 className="mb-2 text-sm font-semibold text-slate-500">{block.regionName}</h3>}
-            <h2 className="mb-3 text-lg font-semibold text-slate-800 sm:text-xl">{block.cityName}</h2>
-            <div className="grid grid-cols-1 gap-y-3 min-[800px]:grid-cols-2 min-[800px]:gap-x-6 min-[800px]:gap-y-2">
-              {block.items.map((item: any) => {
-                const href = item.type === 'venue' ? `/venues/${item.slug}` : `/events/${item.slug}`;
-                const addr = item.location?.address || item.address || '';
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 min-h-[3rem]"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <Link href={href} className="font-medium text-slate-900 hover:text-primary-600">
-                        {item.title}
-                      </Link>
-                      {addr && <p className="mt-0.5 text-xs text-slate-500">{addr}</p>}
-                    </div>
-                    {item.priceFrom != null && item.priceFrom > 0 ? (
-                      <Link
-                        href={href}
-                        className="shrink-0 self-center rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
-                      >
-                        от {formatPrice(item.priceFrom)}
-                      </Link>
-                    ) : (
-                      <span className="shrink-0 self-center text-sm text-slate-500">Цена уточняется</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function filtersFromParams(sp: URLSearchParams) {
   const sort = sp.get('sort') || 'popular';
   const isSoon = sort === 'departing_soon';
   const rawLimit = parseInt(sp.get('limit') || '20', 10);
   const limit = LIMIT_OPTIONS.includes(rawLimit as 20 | 50 | 100) ? rawLimit : 20;
-  const vm = sp.get('vm') || 'grid';
   return {
     city: sp.get('city') || '',
     category: sp.get('category') || '',
@@ -172,11 +71,10 @@ function filtersFromParams(sp: URLSearchParams) {
     page: Math.max(1, parseInt(sp.get('page') || '1', 10)),
     limit,
     qf: sp.get('qf') || '',
-    vm: vm === 'list' ? 'list' : 'grid',
   };
 }
 
-function EventsPageContent() {
+export default function EventsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -186,7 +84,29 @@ function EventsPageContent() {
   const [loading, setLoading] = useState(true);
   const [cities, setCities] = useState<any[]>([]);
   const [piers, setPiers] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewModeState] = useState<'grid' | 'list'>('grid');
+
+  // T15: persist view mode to localStorage
+  const setViewMode = useCallback((mode: 'grid' | 'list') => {
+    setViewModeState(mode);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('catalog:viewMode', mode);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem('catalog:viewMode');
+      if (stored === 'grid' || stored === 'list') setViewModeState(stored);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Фильтры — единый источник: URL
   const [city, setCity] = useState('');
@@ -201,7 +121,6 @@ function EventsPageContent() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [activeQuickFilter, setActiveQuickFilter] = useState<string>('');
-  const [museumViewMode, setMuseumViewMode] = useState<'grid' | 'list'>('grid');
 
   // Синхронизация URL → состояние (при загрузке и навигации)
   useEffect(() => {
@@ -218,7 +137,6 @@ function EventsPageContent() {
     setPage(f.page);
     setLimit(f.limit);
     setActiveQuickFilter(f.qf);
-    setMuseumViewMode(f.vm as 'grid' | 'list');
   }, [searchParams]);
 
   /** Обновить URL, сохраняя остальные фильтры */
@@ -293,50 +211,16 @@ function EventsPageContent() {
     const timeOfDayFromUrl = f.timeOfDay === 'soon' ? '' : f.timeOfDay;
     const pageFromUrl = f.page;
     const limitFromUrl = f.limit;
-    const vmFromUrl = f.vm;
     const isMuseumFromUrl = categoryFromUrl === 'MUSEUM';
 
     if (isMuseumFromUrl) {
-      // Музеи → единый каталог. В режиме «Списком» — region для областных музеев (СПб + Выборг, Пушкин и др.)
-      const effectiveLimit = vmFromUrl === 'list' ? 200 : limitFromUrl;
-      const params: Record<string, string | number> = {
-        category: 'MUSEUM',
-        page: vmFromUrl === 'list' ? 1 : pageFromUrl,
-        sort: sortFromUrl,
-        limit: effectiveLimit,
-      };
-      if (vmFromUrl === 'list') {
-        // region — города региона (хаб + областные). Пустой город — все музеи всех городов
-        const citySlug = cityFromUrl || '';
-        const regionByCity: Record<string, string> = {
-          'saint-petersburg': 'leningradskaya-oblast',
-          moscow: 'moskovskaya-oblast',
-          kazan: 'tatarstan',
-          yaroslavl: 'zolotoe-koltso',
-          ekaterinburg: 'sverdlovskaya-oblast',
-          kemerovo: 'kemerovskaya-oblast',
-          'nizhny-novgorod': 'nizhegorodskaya-oblast',
-        };
-        const regionSlug = citySlug ? regionByCity[citySlug] : undefined;
-        if (regionSlug) params.region = regionSlug;
-        else if (citySlug) params.city = citySlug;
-        // иначе city/region не передаём — все города
-      } else if (cityFromUrl) {
-        params.city = cityFromUrl;
-      }
+      // Музеи → единый каталог (Venue)
+      const params: Record<string, string | number> = { category: 'MUSEUM', page: pageFromUrl, sort: sortFromUrl, limit: limitFromUrl };
+      if (cityFromUrl) params.city = cityFromUrl;
       api
         .getCatalog(params)
-        .then((res) => {
-          setCatalogItems(res.items);
-          setEvents([]);
-          setTotal(res.total);
-        })
-        .catch((e) => {
-          console.error('Catalog error:', e);
-          setCatalogItems([]);
-          setEvents([]);
-          setTotal(0);
-        })
+        .then((res) => { setCatalogItems(res.items); setEvents([]); setTotal(res.total); })
+        .catch((e) => { console.error('Catalog error:', e); setCatalogItems([]); setEvents([]); setTotal(0); })
         .finally(() => setLoading(false));
       return;
     }
@@ -465,56 +349,37 @@ function EventsPageContent() {
               ))}
             </select>
           </label>
-          {isMuseumCategory ? (
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-slate-500 shadow-sm">
-              <button
-                type="button"
-                onClick={() => updateUrl({ vm: 'grid', page: 1 })}
-                className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
-                  museumViewMode === 'grid' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
-                }`}
-                title="Карточками"
-                aria-label="Показать карточками"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => updateUrl({ vm: 'list', page: 1 })}
-                className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
-                  museumViewMode === 'list' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
-                }`}
-                title="Списком"
-                aria-label="Списком с разбивкой по городам"
-              >
-                <ListIcon className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-slate-500 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
-                  viewMode === 'grid' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
-                }`}
-                title="Карточками"
-                aria-label="Показать карточками"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
-                  viewMode === 'list' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
-                }`}
-                title="Списком"
-                aria-label="Показать списком"
-              >
-                <ListIcon className="h-4 w-4" />
-              </button>
-            </div>
+          {!isMuseumCategory && (
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-slate-500 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 sm:px-2.5 ${
+                viewMode === 'grid'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'hover:bg-slate-50'
+              }`}
+              title="Сеткой"
+              aria-label="Показать сеткой"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="sr-only">Сеткой</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 sm:px-2.5 ${
+                viewMode === 'list'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'hover:bg-slate-50'
+              }`}
+              title="С описанием"
+              aria-label="Показать с описанием"
+            >
+              <ListIcon className="h-4 w-4" />
+              <span className="sr-only">С описанием</span>
+            </button>
+          </div>
           )}
         </div>
       </div>
@@ -711,15 +576,11 @@ function EventsPageContent() {
           ))}
         </div>
       ) : isMuseumCategory && catalogItems.length > 0 ? (
-        museumViewMode === 'list' ? (
-          <MuseumsListByCity items={catalogItems} />
-        ) : (
-          <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-            {catalogItems.map((item: any) => (
-              <CatalogCard key={item.id} item={item} />
-            ))}
-          </div>
-        )
+        <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          {catalogItems.map((item: any) => (
+            <CatalogCard key={item.id} item={item} />
+          ))}
+        </div>
       ) : events.length > 0 ? (
         viewMode === 'grid' ? (
           <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
@@ -734,19 +595,17 @@ function EventsPageContent() {
                 tagSlugs={event.tagSlugs}
                 imageUrl={event.imageUrl}
                 priceFrom={event.priceFrom}
-                priceOriginalKopecks={event.priceOriginalKopecks}
                 rating={event.rating}
                 reviewCount={event.reviewCount}
                 durationMinutes={event.durationMinutes}
                 city={event.city}
+                address={event.address}
+                description={event.shortDescription ?? event.description}
                 totalAvailableTickets={event.totalAvailableTickets}
                 departingSoonMinutes={event.departingSoonMinutes}
                 nextSessionAt={event.nextSessionAt}
                 isOptimalChoice={event.isOptimalChoice}
                 dateMode={event.dateMode}
-                groupSize={event.groupSize ?? event.templateData?.groupSize}
-                sessionTimes={event.sessionTimes ?? []}
-                highlights={event.highlights ?? []}
               />
             ))}
           </div>
@@ -758,6 +617,7 @@ function EventsPageContent() {
                 slug={event.slug}
                 title={event.title}
                 category={event.category}
+                subcategories={event.subcategories}
                 imageUrl={event.imageUrl}
                 priceFrom={event.priceFrom}
                 rating={event.rating}
@@ -770,10 +630,6 @@ function EventsPageContent() {
                 isOptimalChoice={event.isOptimalChoice}
                 dateMode={event.dateMode}
                 priceOriginalKopecks={event.priceOriginalKopecks}
-                groupSize={event.groupSize ?? event.templateData?.groupSize}
-                sessionTimes={event.sessionTimes ?? []}
-                highlights={event.highlights ?? []}
-                description={event.description ?? event.shortDescription}
               />
             ))}
           </div>
@@ -786,8 +642,8 @@ function EventsPageContent() {
         </div>
       )}
 
-      {/* Pagination — скрыта в режиме «Списком» для музеев */}
-      {total > limit && !(isMuseumCategory && museumViewMode === 'list') && (
+      {/* Pagination */}
+      {total > limit && (
         <div className="mt-8 sm:mt-10 flex items-center justify-center gap-2">
           <button
             onClick={() => updateUrl({ page: Math.max(1, page - 1) })}
@@ -809,13 +665,5 @@ function EventsPageContent() {
         </div>
       )}
     </div>
-  );
-}
-
-export default function EventsPage() {
-  return (
-    <Suspense fallback={<div className="min-h-[40vh] flex items-center justify-center"><LayoutGrid className="h-8 w-8 animate-pulse text-slate-400" /></div>}>
-      <EventsPageContent />
-    </Suspense>
   );
 }

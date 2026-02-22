@@ -1,10 +1,8 @@
 import { Module } from '@nestjs/common';
 
 import { CatalogModule } from '../catalog/catalog.module';
-import { ScheduleModule } from '../schedule/schedule.module';
 import { BOOKING_PROVIDER_TOKEN, BookingProviderRegistry } from './booking-provider.interface';
 import { CheckoutController } from './checkout.controller';
-import { CheckoutPackageService } from './checkout-package.service';
 import { CheckoutService } from './checkout.service';
 import { FeatureFlagService } from './feature-flag.service';
 import { FulfillmentService } from './fulfillment.service';
@@ -13,19 +11,16 @@ import { InternalBookingProvider } from './providers/internal-booking.provider';
 import { PartnerBookingProvider } from './providers/partner-booking.provider';
 import { TcBookingProvider } from './providers/tc-booking.provider';
 import { RefundService } from './refund.service';
-import { TicketIssuanceService } from './ticket-issuance.service';
 import { WebhookIdempotencyService } from './webhook-idempotency.service';
 
 @Module({
-  imports: [CatalogModule, ScheduleModule],
+  imports: [CatalogModule],
   controllers: [CheckoutController],
   providers: [
     CheckoutService,
-    CheckoutPackageService,
     PaymentService,
     FulfillmentService,
     RefundService,
-    TicketIssuanceService,
     WebhookIdempotencyService,
     FeatureFlagService,
     // Booking providers (adapters)
@@ -50,6 +45,6 @@ import { WebhookIdempotencyService } from './webhook-idempotency.service';
       inject: [TcBookingProvider, InternalBookingProvider, PartnerBookingProvider],
     },
   ],
-  exports: [PaymentService, FulfillmentService, RefundService, TicketIssuanceService, WebhookIdempotencyService, FeatureFlagService],
+  exports: [PaymentService, FulfillmentService, RefundService, WebhookIdempotencyService, FeatureFlagService],
 })
 export class CheckoutModule {}

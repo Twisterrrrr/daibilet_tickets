@@ -4,6 +4,9 @@ import { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
+  /** T7: packageId/sessionId для Sentry tags */
+  packageId?: string;
+  sessionId?: string;
 }
 
 interface State {
@@ -25,8 +28,11 @@ export class CheckoutErrorBoundary extends Component<Props, State> {
     if (typeof window !== 'undefined') {
       import('@sentry/nextjs')
         .then((Sentry) => {
+          const tags: Record<string, string> = { area: 'checkout' };
+          if (this.props.packageId) tags.packageId = this.props.packageId;
+          if (this.props.sessionId) tags.sessionId = this.props.sessionId;
           Sentry.captureException(error, {
-            tags: { area: 'checkout' },
+            tags,
             extra: { componentStack: errorInfo.componentStack },
           });
         })

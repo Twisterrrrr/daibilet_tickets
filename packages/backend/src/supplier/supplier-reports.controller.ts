@@ -1,6 +1,5 @@
 import { BadRequestException, Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { RequestWithUser, SupplierAuthUser } from '../auth/auth.types';
 import type { Response } from 'express';
 
 import { streamCsv } from '../common/csv-stream.util';
@@ -20,7 +19,7 @@ export class SupplierReportsController {
   @Get('sales')
   @ApiOperation({ summary: 'Отчёт о продажах' })
   async salesReport(
-    @Req() req: RequestWithUser<SupplierAuthUser>,
+    @Req() req: any,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('page') pageRaw = '1',
@@ -90,7 +89,7 @@ export class SupplierReportsController {
    */
   @Get('sales/export')
   @ApiOperation({ summary: 'Экспорт продаж в CSV' })
-  async exportCsv(@Req() req: RequestWithUser<SupplierAuthUser>, @Res() res: Response, @Query('from') from?: string, @Query('to') to?: string) {
+  async exportCsv(@Req() req: any, @Res() res: Response, @Query('from') from?: string, @Query('to') to?: string) {
     const operatorId = req.user.operatorId;
 
     // Validate and set date range (default: last 30 days, max: 93 days)

@@ -6,7 +6,7 @@ import { ComparisonTable } from '@/components/landing/ComparisonTable';
 import { FilterBar, type FilterState } from '@/components/landing/FilterBar';
 import { VariantCards } from '@/components/landing/VariantCard';
 
-export interface Variant {
+interface Variant {
   sessionId: string;
   startsAt: string;
   endsAt?: string;
@@ -27,7 +27,7 @@ export interface Variant {
   };
 }
 
-export interface Filters {
+interface Filters {
   piers: string[];
   priceRange: [number, number];
   dateRange: string[];

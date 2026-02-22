@@ -15,7 +15,6 @@ import { Job } from 'bullmq';
 import { FulfillmentService } from '../checkout/fulfillment.service';
 import { PaymentService } from '../checkout/payment.service';
 import { RefundService } from '../checkout/refund.service';
-import { TicketIssuanceService } from '../checkout/ticket-issuance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QUEUE_FULFILLMENT } from './queue.constants';
 
@@ -28,7 +27,6 @@ export class FulfillmentProcessor extends WorkerHost {
     private readonly paymentService: PaymentService,
     private readonly fulfillmentService: FulfillmentService,
     private readonly refundService: RefundService,
-    private readonly ticketIssuanceService: TicketIssuanceService,
     private readonly prisma: PrismaService,
   ) {
     super();
@@ -109,19 +107,14 @@ export class FulfillmentProcessor extends WorkerHost {
     if (eventType === 'payment.succeeded') {
       await this.paymentService.markPaid(intentId, providerPaymentId);
 
+      // Start fulfillment
       const intent = await this.prisma.paymentIntent.findUnique({
         where: { id: intentId },
-        select: { checkoutSessionId: true, idempotencyKey: true },
+        select: { checkoutSessionId: true },
       });
       if (intent) {
         await this.fulfillmentService.startFulfillment(intent.checkoutSessionId);
         await this.fulfillmentService.executeFulfillment(intent.checkoutSessionId);
-        // R6: Package payment — issue tickets
-        if (intent.idempotencyKey?.startsWith('pkg-')) {
-          const packageId = intent.idempotencyKey.slice(4);
-          const count = await this.ticketIssuanceService.issueForPackage(packageId);
-          return { status: 'paid', intentId, ticketsIssued: count };
-        }
       }
 
       return { status: 'paid', intentId };
@@ -144,7 +137,7 @@ export class FulfillmentProcessor extends WorkerHost {
 
     const intent = await this.prisma.paymentIntent.findUnique({
       where: { id: paymentIntentId },
-      select: { checkoutSessionId: true, status: true, idempotencyKey: true },
+      select: { checkoutSessionId: true, status: true },
     });
 
     if (!intent || intent.status !== 'PAID') {
@@ -154,12 +147,6 @@ export class FulfillmentProcessor extends WorkerHost {
 
     await this.fulfillmentService.startFulfillment(intent.checkoutSessionId);
     await this.fulfillmentService.executeFulfillment(intent.checkoutSessionId);
-
-    if (intent.idempotencyKey?.startsWith('pkg-')) {
-      const packageId = intent.idempotencyKey.slice(4);
-      const count = await this.ticketIssuanceService.issueForPackage(packageId);
-      return { status: 'fulfilled', checkoutSessionId: intent.checkoutSessionId, ticketsIssued: count };
-    }
 
     return { status: 'fulfilled', checkoutSessionId: intent.checkoutSessionId };
   }

@@ -1,9 +1,8 @@
 import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import type { Request, Response } from 'express';
+import { Request, Response } from 'express';
 
-import type { UserAuthUser } from '../auth/auth.types';
 import { UserLoginDto, UserRegisterDto } from './dto/user-auth.dto';
 import { UserJwtGuard } from './user.guard';
 import { UserAuthService } from './user-auth.service';
@@ -62,7 +61,7 @@ export class UserAuthController {
   @UseGuards(UserJwtGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Выход' })
-  async logout(@Req() req: Request & { user: UserAuthUser }, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: { user: { id: string } }, @Res({ passthrough: true }) res: Response) {
     await this.authService.logout(req.user.id);
     res.clearCookie('user_refresh_token');
     return { message: 'Logged out' };
@@ -72,7 +71,7 @@ export class UserAuthController {
   @UseGuards(UserJwtGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Профиль пользователя' })
-  async me(@Req() req: Request & { user: UserAuthUser }) {
+  async me(@Req() req: { user: { id: string } }) {
     return this.authService.getProfile(req.user.id);
   }
 }

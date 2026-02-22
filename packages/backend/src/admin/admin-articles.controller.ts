@@ -12,14 +12,11 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import type { AdminAuthUser } from '../auth/auth.types';
-import type { Request as ExpressRequest } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
-import { buildArticleWhere } from '../common/where-builders';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
@@ -46,11 +43,15 @@ export class AdminArticlesController {
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
-    const where = buildArticleWhere({
-      city: city ?? undefined,
-      isPublished: published === undefined ? undefined : published === 'true',
-      search: search ?? undefined,
-    });
+    const where: any = { isDeleted: false };
+    if (city) where.city = { slug: city };
+    if (published !== undefined) where.isPublished = published === 'true';
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     const [rawItems, total] = await Promise.all([
       this.prisma.article.findMany({
@@ -83,18 +84,14 @@ export class AdminArticlesController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateArticleDto) {
-    const { articleEvents, articleTags, ...articleData } = data as CreateArticleDto & {
-      articleEvents?: unknown;
-      articleTags?: unknown;
-    };
+    const { articleEvents, articleTags, ...articleData } = data as any;
     return this.prisma.article.create({ data: articleData });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateArticleDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
-    const { id: _, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data as UpdateArticleDto &
-      Record<string, unknown>;
+    const { id: _, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data as any;
 
     if (data.version !== undefined) {
       const before = await this.prisma.article.findUnique({ where: { id } });

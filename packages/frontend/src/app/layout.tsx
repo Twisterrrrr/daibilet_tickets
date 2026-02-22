@@ -3,7 +3,6 @@ import './globals.css';
 import type { Metadata } from 'next';
 import Script from 'next/script';
 
-import { JsonLd, buildOrganizationSchema } from '@/components/seo/JsonLd';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
@@ -20,22 +19,18 @@ export const metadata: Metadata = {
   },
   description:
     'Билеты на экскурсии, музеи и мероприятия по городам России. Экскурсии, музеи, концерты и шоу — всё в одном месте.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || 'https://daibilet.ru'),
+  metadataBase: new URL(process.env.APP_URL || 'https://daibilet.ru'),
   openGraph: {
     type: 'website',
     locale: 'ru_RU',
     siteName: 'Дайбилет',
-    images: [{ url: '/og-default.png', width: 1200, height: 630, alt: 'Дайбилет — экскурсии и мероприятия' }],
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || 'https://daibilet.ru';
-
   return (
     <html lang="ru">
       <body className="flex min-h-screen flex-col">
-        <JsonLd data={buildOrganizationSchema(siteUrl)} />
         <ScrollProgress />
         <WebVitalsReporter />
         <CartProvider>

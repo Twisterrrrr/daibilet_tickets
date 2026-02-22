@@ -1,15 +1,10 @@
 import { normalizeEventTitle } from '@daibilet/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { classify } from './event-classifier';
-import {
-  SessionPrice,
-  TcRestEventV1,
-  TcRestTicketSetV1,
-} from './tc-api.types';
 import { TcApiService } from './tc-api.service';
 import {
   TcGrpcCity,
@@ -86,9 +81,8 @@ export class TcSyncService {
 
   /**
    * Полная синхронизация — диспатчер по режиму.
-   * @param signal — опционально, для отмены при job timeout
    */
-  async syncAll(signal?: AbortSignal): Promise<{
+  async syncAll(): Promise<{
     status: string;
     mode: string;
     tcEventsFound: number;
@@ -107,7 +101,7 @@ export class TcSyncService {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(`gRPC sync failed, fallback на REST: ${msg}`);
-        return await this.syncAllRest(signal);
+        return await this.syncAllRest();
       }
     }
 
@@ -115,7 +109,7 @@ export class TcSyncService {
       this.logger.warn('gRPC-клиент не готов, fallback на REST v1');
     }
 
-    return await this.syncAllRest(signal);
+    return await this.syncAllRest();
   }
 
   // ============================================================
@@ -472,7 +466,6 @@ export class TcSyncService {
     const prices = this.extractPricesGrpc(ev.sets);
     const isActive = ev.status === 1 && availableTickets > 0; // PUBLIC + есть билеты
 
-    const pricesJson = prices as unknown as Prisma.InputJsonValue;
     await this.prisma.eventSession.upsert({
       where: { tcSessionId },
       update: {
@@ -481,7 +474,7 @@ export class TcSyncService {
         startsAt: dates.start,
         endsAt: dates.finish,
         availableTickets,
-        prices: pricesJson,
+        prices,
         isActive,
       },
       create: {
@@ -491,7 +484,7 @@ export class TcSyncService {
         startsAt: dates.start,
         endsAt: dates.finish,
         availableTickets,
-        prices: pricesJson,
+        prices,
         isActive,
       },
     });
@@ -661,7 +654,7 @@ export class TcSyncService {
   }
 
   /** Цены из gRPC TicketSets → JSON для EventSession.prices */
-  private extractPricesGrpc(sets: TcGrpcTicketSet[]): SessionPrice[] {
+  private extractPricesGrpc(sets: TcGrpcTicketSet[]): any[] {
     if (!sets?.length) return [];
     return sets
       .map((set) => {
@@ -717,7 +710,7 @@ export class TcSyncService {
   // REST v1 Sync (legacy fallback)
   // ============================================================
 
-  private async syncAllRest(signal?: AbortSignal): Promise<{
+  private async syncAllRest(): Promise<{
     status: string;
     mode: string;
     tcEventsFound: number;
@@ -732,10 +725,9 @@ export class TcSyncService {
     const newCitiesCreated: string[] = [];
     this.cityCache.clear();
 
-    let allTcEvents: TcRestEventV1[] = [];
+    let allTcEvents: any[] = [];
     try {
-      const raw = await this.tcApi.getEvents({ signal });
-      allTcEvents = Array.isArray(raw) ? (raw as TcRestEventV1[]) : [];
+      allTcEvents = await this.tcApi.getEvents();
       this.logger.log(`Получено ${allTcEvents.length} TC-записей`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -777,7 +769,7 @@ export class TcSyncService {
     }
 
     // Группируем по title + cityGeoId
-    const groups = new Map<string, TcRestEventV1[]>();
+    const groups = new Map<string, any[]>();
     for (const tc of allTcEvents) {
       const title = tc.title?.text?.trim() || '';
       if (!title) continue;
@@ -913,10 +905,9 @@ export class TcSyncService {
       const allSessions = await this.prisma.eventSession.findMany({
         where: { eventId: master.id },
       });
-      const allPrices = allSessions.flatMap((s) => {
-        const prices = (s.prices as SessionPrice[] | null) ?? [];
-        return prices.map((p) => p.price).filter((p): p is number => typeof p === 'number' && p > 0);
-      });
+      const allPrices = allSessions.flatMap((s: any) =>
+        ((s.prices as any[]) || []).map((p: any) => p.price).filter((p: number) => p > 0),
+      );
       const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : master.priceFrom;
 
       await this.prisma.event.update({
@@ -937,7 +928,7 @@ export class TcSyncService {
   }
 
   /** REST v1: синхронизация группы TC events */
-  private async syncEventGroup(tcEvents: TcRestEventV1[]): Promise<number> {
+  private async syncEventGroup(tcEvents: any[]): Promise<number> {
     if (tcEvents.length === 0) return 0;
 
     tcEvents.sort((a, b) => {
@@ -952,11 +943,10 @@ export class TcSyncService {
     const tcId = String(best.id);
     const title = normalizeEventTitle(best.title?.text || '');
     const description = best.title?.desc || null;
-    const { category, subcategories } = this.classifyRest(best, description);
+    const { category, subcategories } = this.classifyRest(best);
     const minAge = typeof best.age_rating === 'number' ? best.age_rating : 0;
 
     const cityGeoId = best?.venue?.city?.id;
-    if (cityGeoId == null) return 0;
     const cityId = this.cityCache.get(cityGeoId);
     if (!cityId) return 0;
 
@@ -969,7 +959,7 @@ export class TcSyncService {
 
     const allPrices: number[] = [];
     for (const tc of tcEvents) {
-      const p = this.extractMinPrice(tc.sets ?? []);
+      const p = this.extractMinPrice(tc.sets);
       if (p) allPrices.push(p);
     }
     const priceFrom = allPrices.length > 0 ? Math.min(...allPrices) : null;
@@ -998,7 +988,7 @@ export class TcSyncService {
           imageUrl: imageUrl || event.imageUrl,
           priceFrom,
           isActive,
-          tcData: best as unknown as Prisma.InputJsonValue,
+          tcData: best,
           lastSyncAt: new Date(),
         },
       });
@@ -1021,7 +1011,7 @@ export class TcSyncService {
           imageUrl,
           priceFrom,
           isActive,
-          tcData: best as unknown as Prisma.InputJsonValue,
+          tcData: best,
           lastSyncAt: new Date(),
         },
       });
@@ -1039,27 +1029,26 @@ export class TcSyncService {
         allTags.add(tag);
       }
     }
-    await this.syncTags(event.id, [...allTags], title, description ?? undefined);
+    await this.syncTags(event.id, [...allTags], title, description);
 
     return sessionCount;
   }
 
   /** REST v1: сессия */
-  private async syncSession(eventId: string, tc: TcRestEventV1): Promise<boolean> {
+  private async syncSession(eventId: string, tc: any): Promise<boolean> {
     const tcId = String(tc.id);
     const dates = this.parseVevent(tc.lifetime);
     if (!dates.start) return false;
 
     const tcSessionId = `${tcId}-main`;
     const availableTickets = tc.tickets_amount_vacant || 0;
-    const prices = this.extractPrices(tc.sets ?? []);
+    const prices = this.extractPrices(tc.sets);
     const isActive = tc.status === 'public' && availableTickets > 0;
 
-    const pricesJson = prices as unknown as Prisma.InputJsonValue;
     await this.prisma.eventSession.upsert({
       where: { tcSessionId },
-      update: { eventId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices: pricesJson, isActive },
-      create: { eventId, tcSessionId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices: pricesJson, isActive },
+      update: { eventId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices, isActive },
+      create: { eventId, tcSessionId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices, isActive },
     });
 
     return true;
@@ -1201,12 +1190,7 @@ export class TcSyncService {
     'fast track': ['no-queue'],
   };
 
-  private async syncTags(
-    eventId: string,
-    tagNames: string[],
-    title?: string | null,
-    description?: string | null,
-  ): Promise<void> {
+  private async syncTags(eventId: string, tagNames: string[], title?: string, description?: string): Promise<void> {
     const slugsToLink = new Set<string>();
 
     for (const tcTag of tagNames || []) {
@@ -1261,8 +1245,8 @@ export class TcSyncService {
 
     let tagsLinked = 0;
     for (const ev of events) {
-      const tc = (ev.tcData as { tags?: string[] } | null) ?? {};
-      const tcTags = tc.tags ?? [];
+      const tc = (ev.tcData as any) || {};
+      const tcTags = (tc.tags || []) as string[];
       const before = await this.prisma.eventTag.count({ where: { eventId: ev.id } });
       await this.syncTags(ev.id, tcTags, ev.title, ev.description || '');
       const after = await this.prisma.eventTag.count({ where: { eventId: ev.id } });
@@ -1277,7 +1261,7 @@ export class TcSyncService {
   // REST v1 Города (legacy)
   // ============================================================
 
-  private async ensureCity(geoId: number, sampleEvent: TcRestEventV1): Promise<string | null> {
+  private async ensureCity(geoId: number, sampleEvent: any): Promise<string | null> {
     if (this.cityCache.has(geoId)) return null;
 
     let slug = this.CITY_MAP[geoId] || null;
@@ -1339,7 +1323,7 @@ export class TcSyncService {
       .toLowerCase();
   }
 
-  private findBestImage(tcEvents: TcRestEventV1[]): string | null {
+  private findBestImage(tcEvents: any[]): string | null {
     for (const tc of tcEvents) {
       const url = tc.media?.cover_original?.url || tc.media?.cover?.url || tc.media?.cover_small?.url;
       if (url) return url;
@@ -1347,7 +1331,7 @@ export class TcSyncService {
     return null;
   }
 
-  private extractDuration(tc: TcRestEventV1): number | null {
+  private extractDuration(tc: any): number | null {
     const dates = this.parseVevent(tc.lifetime);
     if (dates.start && dates.finish) {
       const min = Math.round((dates.finish.getTime() - dates.start.getTime()) / 60000);
@@ -1357,14 +1341,14 @@ export class TcSyncService {
   }
 
   private async getCleanSlug(title: string, currentEventId: string): Promise<string> {
-    const base = this.transliterate(String(title)).slice(0, 80) || 'event';
+    const base = this.transliterate(title).slice(0, 80) || 'event';
     const existing = await this.prisma.event.findUnique({ where: { slug: base } });
     if (!existing || existing.id === currentEventId) return base;
     const current = await this.prisma.event.findUnique({ where: { id: currentEventId } });
     return current?.slug || base;
   }
 
-  private parseVevent(vevent: string | null | undefined): { start: Date | null; finish: Date | null } {
+  private parseVevent(vevent: string | null): { start: Date | null; finish: Date | null } {
     if (!vevent) return { start: null, finish: null };
     let start: Date | null = null;
     let finish: Date | null = null;
@@ -1381,19 +1365,19 @@ export class TcSyncService {
     return { start, finish };
   }
 
-  private classifyRest(tc: TcRestEventV1, descOverride?: string | null) {
-    const tags = (tc.tags ?? []).map((t: string) => t.toLowerCase());
+  private classifyRest(tc: any) {
+    const tags = (tc.tags || []).map((t: string) => t.toLowerCase());
     const title = String(tc.title?.text || '');
-    const desc = descOverride ?? String(tc.title?.desc || '');
+    const desc = String(tc.title?.desc || '');
     return classify(title, desc, tags);
   }
 
-  private extractMinPrice(sets: TcRestTicketSetV1[]): number | null {
+  private extractMinPrice(sets: any[]): number | null {
     if (!sets || !Array.isArray(sets)) return null;
     const prices: number[] = [];
     for (const set of sets) {
       if (set.price) {
-        const p = Math.round(parseFloat(String(set.price)) * 100);
+        const p = Math.round(parseFloat(set.price) * 100);
         if (p > 0) prices.push(p);
       }
       if (set.rules) {
@@ -1408,10 +1392,10 @@ export class TcSyncService {
     return prices.length > 0 ? Math.min(...prices) : null;
   }
 
-  private extractPrices(sets: TcRestTicketSetV1[]): SessionPrice[] {
+  private extractPrices(sets: any[]): any[] {
     if (!sets || !Array.isArray(sets)) return [];
     return sets
-      .map((set) => {
+      .map((set: any) => {
         let priceCopecks = 0;
         let priceOrg = 0;
         let priceExtra = 0;
@@ -1421,10 +1405,10 @@ export class TcSyncService {
           priceOrg = Math.round(parseFloat(currentRule.price_org || '0') * 100);
           priceExtra = Math.round(parseFloat(currentRule.price_extra || '0') * 100);
         } else if (set.price) {
-          priceCopecks = Math.round(parseFloat(String(set.price)) * 100);
+          priceCopecks = Math.round(parseFloat(set.price) * 100);
         }
         return {
-          setId: String(set.id ?? ''),
+          setId: set.id,
           name: set.name || 'standard',
           price: priceCopecks,
           priceOrg,
@@ -1434,10 +1418,10 @@ export class TcSyncService {
           withSeats: set.with_seats || false,
         };
       })
-      .filter((p) => p.price > 0);
+      .filter((p: any) => p.price > 0);
   }
 
-  private getCityName(tcCity: { name?: string | Record<string, string> } | undefined | null): string {
+  private getCityName(tcCity: any): string {
     if (!tcCity?.name) return 'unknown';
     if (typeof tcCity.name === 'string') return tcCity.name;
     return tcCity.name.ru || tcCity.name.default || tcCity.name.en || 'unknown';

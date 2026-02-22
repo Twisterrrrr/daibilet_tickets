@@ -14,9 +14,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { OfferSource } from '@prisma/client';
-import type { PartnerAuthUser } from '../auth/auth.types';
-import type { Request as ExpressRequest } from 'express';
 
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -44,7 +41,7 @@ export class PartnerEventsController {
    */
   @Post('events')
   @ApiOperation({ summary: 'Создать/обновить событие (upsert)' })
-  async upsertEvent(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Body() data: CreatePartnerEventDto) {
+  async upsertEvent(@Req() req: any, @Body() data: CreatePartnerEventDto) {
     const operatorId = req.user.operatorId;
     const tcEventId = `partner-${operatorId.slice(0, 8)}-${data.externalId}`;
 
@@ -92,7 +89,7 @@ export class PartnerEventsController {
 
     return this.prisma.event.create({
       data: {
-        source: OfferSource.MANUAL,
+        source: 'MANUAL' as any,
         tcEventId,
         cityId: data.cityId,
         title: data.title,
@@ -109,7 +106,7 @@ export class PartnerEventsController {
         isActive: moderationStatus !== 'PENDING_REVIEW',
         operatorId,
         supplierId: operatorId,
-        moderationStatus,
+        moderationStatus: moderationStatus as any,
       },
     });
   }
@@ -119,7 +116,7 @@ export class PartnerEventsController {
    */
   @Put('events/:externalId')
   @ApiOperation({ summary: 'Обновить событие' })
-  async updateEvent(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Param('externalId') externalId: string, @Body() data: UpdatePartnerEventDto) {
+  async updateEvent(@Req() req: any, @Param('externalId') externalId: string, @Body() data: UpdatePartnerEventDto) {
     const operatorId = req.user.operatorId;
     const tcEventId = `partner-${operatorId.slice(0, 8)}-${externalId}`;
 
@@ -148,7 +145,7 @@ export class PartnerEventsController {
    */
   @Delete('events/:externalId')
   @ApiOperation({ summary: 'Деактивировать событие' })
-  async deleteEvent(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Param('externalId') externalId: string) {
+  async deleteEvent(@Req() req: any, @Param('externalId') externalId: string) {
     const operatorId = req.user.operatorId;
     const tcEventId = `partner-${operatorId.slice(0, 8)}-${externalId}`;
 
@@ -175,7 +172,7 @@ export class PartnerEventsController {
   @Post('events/:externalId/offers')
   @ApiOperation({ summary: 'Добавить/обновить оффер' })
   async upsertOffer(
-    @Req() req: ExpressRequest & { user: PartnerAuthUser },
+    @Req() req: any,
     @Param('externalId') eventExternalId: string,
     @Body() data: CreatePartnerOfferDto,
   ) {
@@ -188,7 +185,7 @@ export class PartnerEventsController {
     if (!event) throw new NotFoundException(`Event ${eventExternalId} not found`);
 
     const offerExternalId = data.externalId || eventExternalId;
-    const source = (data.source || OfferSource.MANUAL) as OfferSource;
+    const source = (data.source || 'MANUAL') as any;
 
     // Ищем существующий оффер
     const existing = await this.prisma.eventOffer.findFirst({
@@ -232,7 +229,7 @@ export class PartnerEventsController {
    */
   @Put('offers/:externalId')
   @ApiOperation({ summary: 'Обновить оффер' })
-  async updateOffer(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Param('externalId') externalId: string, @Body() data: UpdatePartnerOfferDto) {
+  async updateOffer(@Req() req: any, @Param('externalId') externalId: string, @Body() data: UpdatePartnerOfferDto) {
     const offer = await this.prisma.eventOffer.findFirst({
       where: { externalEventId: externalId, operatorId: req.user.operatorId },
     });
@@ -258,7 +255,7 @@ export class PartnerEventsController {
   @Patch('offers/:externalId/availability')
   @ApiOperation({ summary: 'Обновить наличие/цену' })
   async updateAvailability(
-    @Req() req: ExpressRequest & { user: PartnerAuthUser },
+    @Req() req: any,
     @Param('externalId') externalId: string,
     @Body() data: PatchAvailabilityDto,
   ) {
@@ -283,7 +280,7 @@ export class PartnerEventsController {
    */
   @Get('whoami')
   @ApiOperation({ summary: 'Информация о текущем ключе' })
-  whoami(@Req() req: ExpressRequest & { user: PartnerAuthUser }) {
+  whoami(@Req() req: any) {
     return {
       operatorId: req.user.operatorId,
       operatorName: req.user.operatorName,

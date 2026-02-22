@@ -23,6 +23,11 @@ import {
   Tag,
   Ticket,
   Users,
+  ShieldCheck,
+  Landmark,
+  HeadphonesIcon,
+  Scale,
+  LayoutList,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
@@ -50,11 +55,9 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard },
       { to: '/events', label: 'События', icon: CalendarDays },
-      { to: '/schedules', label: 'Event Studio', icon: CalendarDays },
       { to: '/events/merge', label: 'Merge дублей', icon: Merge },
       { to: '/orders', label: 'Заказы', icon: ShoppingCart },
       { to: '/checkout', label: 'Заявки', icon: Inbox },
-      { to: '/refunds', label: 'Возвраты', icon: AlertCircle },
       { to: '/support', label: 'Поддержка', icon: HeadphonesIcon },
     ],
   },

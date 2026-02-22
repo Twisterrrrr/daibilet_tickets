@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { cacheKeys, CacheService } from '../cache/cache.service';
-import { buildUpsellWhere } from '../common/where-builders';
 import { PrismaService } from '../prisma/prisma.service';
 
 // ==========================================
@@ -145,7 +144,12 @@ export class PricingService {
   // ==========================================
 
   async getUpsells(citySlug?: string): Promise<UpsellItem[]> {
-    const where = buildUpsellWhere({ citySlug: citySlug ?? null });
+    const where: any = { isActive: true };
+    if (citySlug) {
+      where.OR = [{ citySlug: null }, { citySlug }];
+    } else {
+      where.citySlug = null;
+    }
 
     const items = await this.prisma.upsellItem.findMany({
       where,

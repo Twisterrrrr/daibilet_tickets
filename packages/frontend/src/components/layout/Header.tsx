@@ -3,7 +3,6 @@
 import { ChevronDown, Compass, Heart, HelpCircle, MapPin, Menu, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { useFavorites } from '@/hooks/useFavorites';
@@ -165,9 +164,7 @@ export function Header() {
 
         {/* Right side: city selector (desktop) + search + help + mobile menu */}
         <div className="flex items-center gap-1 sm:gap-2">
-          <Suspense fallback={null}>
-            <HeaderCitySelect />
-          </Suspense>
+          <HeaderCitySelect />
           <SearchAutocomplete />
           <Link
             href="/favorites"

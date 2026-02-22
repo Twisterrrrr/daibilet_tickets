@@ -23,9 +23,7 @@
     "reclassify:apply": "npx tsx prisma/reclassify-events.ts --apply",
     "check:categorization": "npx tsx prisma/check-categorization.ts",
     "fix:teplohod-river": "npx tsx prisma/fix-teplohod-river-excursions.ts",
-    "db:migrate:ticket-categories": "npx tsx prisma/migrate-ticket-categories.ts",
-    "db:studio": "prisma studio",
-    "gen:proto": "protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/generated --proto_path=proto/tc-simple proto/tc-simple/*.proto"
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@daibilet/shared": "workspace:*",

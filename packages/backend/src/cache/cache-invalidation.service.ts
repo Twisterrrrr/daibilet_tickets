@@ -83,7 +83,6 @@ export class CacheInvalidationService {
     await Promise.all([
       this.cache.delByPrefix('cities:'),
       this.cache.delByPrefix('events:'),
-      this.cache.delByPrefix('catalog:'),
       this.cache.delByPrefix('tags:'),
       this.cache.delByPrefix('regions:'),
       this.cache.delByPrefix('landings:'),

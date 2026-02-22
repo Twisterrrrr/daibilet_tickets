@@ -11,16 +11,13 @@ import {
   QUEUE_EMAILS,
   QUEUE_FULFILLMENT,
   QUEUE_PARTNER_WEBHOOKS,
-  QUEUE_REPORTS,
   QUEUE_REVIEW_TASKS,
   QUEUE_SYNC,
 } from './queue.constants';
 import { ReviewTaskProcessor } from './review-task.processor';
-import { ReportsModule } from '../reports/reports.module';
-import { ReportRunProcessor } from '../reports/report-run.processor';
 import { SyncProcessor } from './sync.processor';
 
-export { QUEUE_EMAILS, QUEUE_FULFILLMENT, QUEUE_PARTNER_WEBHOOKS, QUEUE_REPORTS, QUEUE_REVIEW_TASKS, QUEUE_SYNC };
+export { QUEUE_EMAILS, QUEUE_FULFILLMENT, QUEUE_PARTNER_WEBHOOKS, QUEUE_REVIEW_TASKS, QUEUE_SYNC };
 
 @Global()
 @Module({
@@ -46,14 +43,12 @@ export { QUEUE_EMAILS, QUEUE_FULFILLMENT, QUEUE_PARTNER_WEBHOOKS, QUEUE_REPORTS,
       { name: QUEUE_PARTNER_WEBHOOKS },
       { name: QUEUE_SYNC },
       { name: QUEUE_FULFILLMENT },
-      { name: QUEUE_REPORTS },
     ),
     CatalogModule,
     ComboModule,
     forwardRef(() => CheckoutModule),
-    ReportsModule,
   ],
-  providers: [EmailProcessor, ReviewTaskProcessor, SyncProcessor, FulfillmentProcessor, ReportRunProcessor],
+  providers: [EmailProcessor, ReviewTaskProcessor, SyncProcessor, FulfillmentProcessor],
   exports: [BullModule],
 })
 export class QueueModule {}

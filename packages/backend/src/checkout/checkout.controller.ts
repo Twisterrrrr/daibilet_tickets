@@ -17,13 +17,11 @@ import { Queue } from 'bullmq';
 import { Request } from 'express';
 
 import { QUEUE_FULFILLMENT } from '../queue/queue.constants';
-import { CheckoutPackageService } from './checkout-package.service';
 import { CheckoutService } from './checkout.service';
 import {
   CreateCheckoutSessionDto,
   CreateGiftCertificateCheckoutDto,
   CreateOrderRequestDto,
-  CreatePackageDto,
   CreateTcOrderDto,
   CreateTripPlanCheckoutDto,
   PayDto,
@@ -43,7 +41,6 @@ export class CheckoutController {
 
   constructor(
     private readonly checkoutService: CheckoutService,
-    private readonly packageService: CheckoutPackageService,
     private readonly paymentService: PaymentService,
     private readonly webhookIdempotency: WebhookIdempotencyService,
     @InjectQueue(QUEUE_FULFILLMENT) private readonly fulfillmentQueue: Queue,
@@ -131,20 +128,10 @@ export class CheckoutController {
     return { status: 'ok', processed: result.processed, result: result.result };
   }
 
-  @Post('package')
-  @ApiOperation({ summary: 'Создать CheckoutPackage (v1) и инициировать оплату' })
-  createPackage(@Body() body: CreatePackageDto) {
-    return this.packageService.create(body);
-  }
-
   @Get(':packageId/status')
-  @ApiOperation({ summary: 'Статус пакета (CheckoutPackage или Trip Planner Package)' })
-  async getStatus(@Param('packageId') packageId: string) {
-    try {
-      return await this.packageService.getStatus(packageId);
-    } catch {
-      return this.checkoutService.getStatus(packageId);
-    }
+  @ApiOperation({ summary: 'Статус пакета после оплаты' })
+  getStatus(@Param('packageId') packageId: string) {
+    return this.checkoutService.getStatus(packageId);
   }
 
   // ============================

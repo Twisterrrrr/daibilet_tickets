@@ -623,11 +623,11 @@ export function ReviewSection({
 }) {
   const [data, setData] = useState<{
     items: ReviewItem[];
-    externalReviews?: ExternalReviewItem[];
+    externalReviews: ExternalReviewItem[];
     total: number;
     page: number;
     totalPages: number;
-    summary?: RatingSummary;
+    summary: RatingSummary;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(!!reviewRequestToken);
@@ -635,7 +635,7 @@ export function ReviewSection({
   const loadReviews = async (page = 1) => {
     try {
       const res = venueSlug ? await api.getVenueReviews(venueSlug, page) : await api.getEventReviews(eventSlug!, page);
-      setData(res as { items: ReviewItem[]; externalReviews?: ExternalReviewItem[]; total: number; page: number; totalPages: number; summary?: RatingSummary });
+      setData(res);
     } catch {
       // no-op
     } finally {

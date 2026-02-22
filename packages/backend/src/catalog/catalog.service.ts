@@ -1,5 +1,4 @@
 import { SUBCATEGORY_LABELS } from '@daibilet/shared';
-import { createHash } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DateMode, EventCategory, EventSubcategory, LocationType, Prisma, TagCategory } from '@prisma/client';
 
@@ -344,34 +343,26 @@ export class CatalogService {
    * category=EXCURSION | EVENT → Event
    */
   async getCatalog(query: CatalogQueryDto) {
-    const paramsHash = createHash('sha256')
-      .update(JSON.stringify({ ...query, sort: query.sort ?? 'popular', page: query.page ?? 1, limit: query.limit ?? 20 }))
-      .digest('hex')
-      .slice(0, 16);
-    const cacheKey = cacheKeys.catalog.list(paramsHash);
+    const { category, city, region, q, sort = 'popular', page = 1, limit = 20, qf } = query;
 
-    return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_LIST, async () => {
-      const { category, city, region, q, sort = 'popular', page = 1, limit = 20, qf } = query;
-
-      if (category === 'MUSEUM') {
-        return this.getCatalogMuseumAndVenues({ city, region, q, sort, page, limit, qf });
-      }
-      // EXCURSION | EVENT | пусто → Events
-      const eventsDto: EventsQueryDto = {
-        category: category === 'EXCURSION' || category === 'EVENT' ? category : undefined,
-        city,
-        sort: sort === 'departing_soon' ? 'departing_soon' : sort,
-        page,
-        limit,
-      };
-      const res = await this.getEvents(eventsDto);
-      return {
-        items: res.items.map((e) => this.eventToCatalogItem(e)),
-        total: res.total,
-        page: res.page,
-        totalPages: res.totalPages,
-      };
-    });
+    if (category === 'MUSEUM') {
+      return this.getCatalogMuseumAndVenues({ city, region, q, sort, page, limit, qf });
+    }
+    // EXCURSION | EVENT | пусто → Events
+    const eventsDto: EventsQueryDto = {
+      category: category === 'EXCURSION' || category === 'EVENT' ? category : undefined,
+      city,
+      sort: sort === 'departing_soon' ? 'departing_soon' : sort,
+      page,
+      limit,
+    };
+    const res = await this.getEvents(eventsDto);
+    return {
+      items: res.items.map((e) => this.eventToCatalogItem(e)),
+      total: res.total,
+      page: res.page,
+      totalPages: res.totalPages,
+    };
   }
 
   private eventToCatalogItem(e: any) {

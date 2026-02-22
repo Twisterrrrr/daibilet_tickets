@@ -162,15 +162,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   // Хелперы для кэш-паттернов
   // ==========================================
 
-  /** Кэш с автоматическим fetch-if-miss и логом hit/miss */
+  /** Кэш с автоматическим fetch-if-miss */
   async getOrSet<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
     const cached = await this.get<T>(key);
-    if (cached !== null) {
-      this.logger.debug(`cache HIT ${key}`);
-      return cached;
-    }
+    if (cached !== null) return cached;
 
-    this.logger.debug(`cache MISS ${key}`);
     const data = await fetcher();
     await this.set(key, data, ttlSeconds);
     return data;
@@ -185,7 +181,6 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     await Promise.all([
       this.delByPrefix('cities:'),
       this.delByPrefix('events:'),
-      this.delByPrefix('catalog:'),
       this.delByPrefix('tags:'),
       this.delByPrefix('regions:'),
       this.delByPrefix('landings:'),

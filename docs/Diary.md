@@ -4,24 +4,21 @@
 
 ---
 
-## 23.02.2026 — Билеты: квоты, категории, политика возвратов, отчётность
+## 22.02.2026 — T1–T7, T15: Инфра, Feature Flags, Pino, Sentry, view toggle
 
 ### Наблюдения
 
-- Спецификация объединяет: квоты (общая + по категориям), категории билетов (PRIMARY/ADDON, allowedDays), цены на Offer (compareAtPriceCents), политику отмен, RefundRequest, TicketIssued, LedgerEntry, SettlementBatch, ReportRun.
-- Комиссия per ticket — для частичных возвратов.
-- EXTERNAL refund: форвард в teplohod/ticketscloud, задача висит до закрытия админом.
-- TariffCategory (модель) — чтобы не конфликтовать с enum TicketCategory (SupportTicket).
+- T1 Nginx /uploads уже в конфиге. T2 Feature Flags — PublicModule + endpoint готов, FeatureFlag модель в схеме.
+- nestjs-pino в зависимостях, LoggerModule подключён. Sentry backend и frontend уже инициализированы.
 
 ### Решения
 
-- **Prisma**: enum'ы DayOfWeek, TicketCategoryKind, TicketPriceStatus, PaymentMode, ProviderKind, RefundRequestStatus, IssuedTicketStatus, LedgerEntryType, SettlementBatchStatus, ReportType, ReportStatus, CancellationPolicyScope.
-- **TariffCategory**: code, title, description, kind, allowedDays, isDefaultForCard.
-- **TicketPrice**: priceCents, compareAtPriceCents, validFrom/validTo.
-- **TicketQuotaDefault**, **TicketQuotaOverride**, **TicketSalesCounter**.
-- **TicketIssued**: grossCents, commissionCents, providerPayableCents, voucherCode.
-- **RefundRequest**: policySnapshot, calcSnapshot, forwardingChannel.
-- **Миграция** 20260223200000_tickets_quotas_refunds_reporting.
+- **T2–T3**: PublicModule добавлен в AppModule; `useFeatureFlags()`, `isEnabled(flag, ctx)` в frontend (featureFlags.ts, useFeatureFlags.ts).
+- **T4**: LoggerModule.forRoot (pino-http, pino-pretty в dev), `app.useLogger(PinoLogger)` в main.ts.
+- **T5**: Логи PAYMENT_FAILED с paymentId, provider, checkoutSessionId; Sentry.captureMessage при markFailed.
+- **T6**: AllExceptionsFilter — captureException для 5xx; PaymentService.markFailed — Sentry.captureMessage с тегами.
+- **T7**: CheckoutErrorBoundary — опциональные packageId/sessionId в Sentry tags.
+- **T15**: Каталог — viewMode в localStorage `catalog:viewMode`; toggle grid/list с персистенцией.
 
 ### Проблемы
 
@@ -29,415 +26,16 @@
 
 ---
 
-## 23.02.2026 — Checkout + Расписания + Event Studio: 16 задач выполнены
+## 23.02.2026 — План 26 PR: Инфра, типизация, UX, Checkout
 
 ### Наблюдения
 
-- Все 16 задач из спецификации CheckoutSchedulesEventStudio.md реализованы. Backend: Prisma-модели (EventSchedule, EventSession, CheckoutPackage/Items), ScheduleService, AvailabilityService, PriceSnapshotService, OccurrencePolicyService, Admin API schedules, POST /checkout/package. Admin UI: Event Studio (список, pause/resume, generate), Schedule Builder (диалог), Occurrences list + bulk (pause/resume/cancel). Frontend: /checkout/[packageId], /checkout/[packageId]/status, /payment/success, /payment/fail, /orders/[id]→track.
+- Добавлен пакет из 26 задач (каждая = 1 PR) и 8 миграций Prisma.
 
 ### Решения
 
-- **Admin API**: PATCH schedules/:id (isActive), POST occurrences/bulk — маршрут bulk перенесён выше :sessionId, чтобы избежать конфликта.
-- **Event Studio**: кнопки Пауза/Запуск на карточке расписания; Schedule Builder — диалог с offerId, type, rule; ScheduleDetailPage — чекбоксы, bulk pause/resume/cancel.
-- **Frontend**: checkout/[packageId] — прогресс, сводка; status — polling, CTA; payment/success|fail — лендинги; orders/[id] — редирект на track.
-- **Audit**: schedules → EventSchedule в audit.interceptor.ts уже настроен.
-
-### Проблемы
-
-- Нет.
-
----
-
-## 22.02.2026 — Спецификация Checkout + Расписания + Event Studio
-
-### Наблюдения
-
-- Входная спецификация: 16 задач, Prisma-модели (EventSchedule, расширение EventSession, CheckoutPackage/Items), миграционный план, RBAC Admin vs Supplier.
-- Текущая схема: EventSession (offerId, startsAt), EventOffer (operatorId), CheckoutSession, AuditLog. Партиционирование event_sessions по startsAt — см. PartitioningPlan.
-- Supplier: защита по operatorId только из токена; если supplier подставляет чужой offerId — backend возвращает 404/403 (не косметика UI).
-
-### Решения
-
-- **docs/CheckoutSchedulesEventStudio.md** — полная спецификация: enum'ы, Prisma-модели, миграционный план, AvailabilityService, PriceSnapshotService, OccurrencePolicyService, RBAC, DoD по задачам.
-- **Project.md** — ссылки на EventSession/CheckoutPackage, секция «Checkout + Расписания + Event Studio».
-- **Tasktracker.md** — блок задач 1–16 (4 блока: Данные/API, Админка UI, Frontend checkout, Аудит).
-
-### Проблемы
-
-- Нет.
-
----
-
-## 22.02.2026 — Backend Tech Debt: A3, A4, B1, B4, A1-Pino, A2
-
-### Наблюдения
-
-- tc-sync.service.ts: REST v1 использовал any[] для событий и any для tcData/sets.
-- A4 (proto): protoc не установлен глобально; ts-proto добавлен, скрипт gen:proto готов.
-- B4, A1-Pino, A2 уже реализованы (nginx uploads, pino, email templates).
-
-### Решения
-
-**A3:** TcRestEventV1, TcRestTicketSetV1, SessionPrice в tc-api.types.ts; tc-sync переведён на типы.
-
-**A4:** Добавлен pnpm gen:proto (требует protoc).
-
-**B1:** common/where-builders.ts: buildEventWhere, buildArticleWhere, buildUpsellWhere; применены в admin-events, admin-articles, pricing.
-
-### Проблемы
-
-- Нет.
-
----
-
-## 22.02.2026 — A5 JwtPayload + B2 RBAC Supplier (Backend Tech Debt)
-
-### Наблюдения
-
-- req: any в 30+ местах (admin, supplier, partner, user controllers).
-- Passport типизирует user как User — конфликт с AdminAuthUser, SupplierAuthUser и т.д.
-
-### Решения
-
-**A5 JwtPayload:**
-- auth.types.ts: AdminAuthUser, SupplierAuthUser, UserAuthUser, PartnerAuthUser, RequestWithUser<T>
-- types/express.d.ts: расширение Express.Request
-- JwtStrategy: добавлен type: 'admin'
-- auth-user.decorator.ts: @AuthUser()
-- Контроллеры: req: any заменён на RequestWithUser<...> или ExpressRequest & { user: AdminAuthUser }
-
-**B2 RBAC Supplier:**
-- supplier-settings: RequestWithUser<SupplierAuthUser>
-- Supplier CRUD уже использует operatorId из req.user в where
-
-### Проблемы
-
-- Нет.
-
----
-
-## 22.02.2026 — Backend Tech Debt: задачи с DoD
-
-### Наблюдения
-
-- Блок «Backend и техдолг» требовал декомпозиции на автономные задачи с чёткими DoD и Smoke.
-
-### Решения
-
-**docs/BackendTechDebtTasks.md** — 11 задач с полной спецификацией:
-- A5 (JwtPayload), B2 (RBAC Supplier), A3 (tc-sync typing), A4 (proto), B1 (Prisma where)
-- A1-Pino (pino + лог-агрегатор) — переименовано, т.к. A1 (requestId + PII) уже выполнён
-- B3 (Redis cache), B4 (nginx uploads), A2 (email templates), C1/C2 (any cleanup)
-
-Очередность: A5 → B2 → A3 → A4 → B1 → A1-Pino → B3 → B4 → A2 → C1 → C2.
-
-**docs/Tasktracker.md** — раздел «Технические долги» обновлён: ссылка на BackendTechDebtTasks, список задач в нужном порядке.
-
-### Проблемы
-
-- Нет.
-
----
-
-## 22.02.2026 — JSON-LD, useSearchParams Suspense, gift-certificate dynamic
-
-### Наблюдения
-
-- Next.js 15 требует оборачивать `useSearchParams()` в `<Suspense>` при пререндере.
-- JsonLd компонент с `'use client'` не может вызывать `buildOrganizationSchema()` из layout (серверный компонент).
-- Страница /gift-certificate вызывает API при билде — падает, если backend не запущен.
-
-### Решения
-
-**JsonLd.tsx** — удалён `'use client'`. Компонент и `buildOrganizationSchema` выполняются на сервере; layout вызывает их без ошибки.
-
-**useSearchParams + Suspense** — обёрнуты в Suspense: HeaderCitySelect в Header; OrderTrackContent в orders/track; PlannerContent в planner; EventsPageContent в events. Fallback — минимальный скелетон или null.
-
-**gift-certificate/page.tsx** — добавлен `export const dynamic = 'force-dynamic'`, страница не пререндерится при билде.
-
-### Проблемы
-
-- Windows EPERM при билде standalone (symlink) — среда, не код. Сборка страниц проходит успешно.
-- og-default.png отсутствует в public/ — для OG-тегов нужен файл 1200×630 в `packages/frontend/public/og-default.png`.
-
----
-
-## 22.02.2026 — Pre-deploy checklist, env и smoke-план
-
-### Наблюдения
-
-- Нужен единый чеклист перед deploy: env, security, health, логи.
-
-### Решения
-
-**docs/PreDeployChecklist.md** — чеклист: (1) Production env — .env.example как источник истины, обязательные переменные; (2) Security B1–B4 — Helmet, CORS, rate limit, brute-force; (3) Health и smoke-план — daibilet.ru, admin, /health, виджеты; (4) Логи requestId + PII — включено в prod (AppModule).
-
-**docker-compose.prod.yml** — TC_API_TOKEN и TC_WIDGET_TOKEN с `:?` — compose падает при отсутствии.
-
-**.env.example** — уточнён комментарий про источник истины и ссылку на PreDeployChecklist.
-
-### Проблемы
-
-- Нет.
-
----
-
-## 22.02.2026 — Production Hardening C3–F2 (реализация)
-
-### Наблюдения
-
-- Bатчи C3, D1–D3, E1–E3, F1–F2 реализованы в одном PR.
-
-### Решения
-
-**C3** — api-rate-limit.util (p-limit, withRetry), TcApiService/TepApiService: request через runWithLimit + withRetry, backoff на 429/5xx, env TC_TEP_CONCURRENCY.
-
-**D1** — cache-keys.ts (events, cities, regions, collections, search, pricing), CacheService.delByPrefix, re-export cacheKeys.
-
-**D2** — docs/CacheInvalidationMatrix.md (событие → сбрасываемые ключи).
-
-**D3** — CACHE_TTL_* env (CACHE_TTL_DETAIL, CACHE_TTL_LIST, CACHE_TTL_CITIES и др.).
-
-**E1** — RetentionService, cron 04:00, env RETENTION_DRY_RUN, RETENTION_EVENTSESSIONS_DAYS (180), RETENTION_WEBHOOK_DAYS (90), RETENTION_AUDIT_DAYS (365), batch 500.
-
-**E2** — миграция 20260222_e2_performance_indexes (events_catalog_idx, events_admin_list_idx, event_sessions_active_starts_idx, venues_city_active_idx, processed_webhook_events_processed_at_idx, audit_logs_created_at_idx).
-
-**E3** — docs/PgBouncer.md, infra/pgbouncer/pgbouncer.ini.
-
-**F1** — docs/PartitioningPlan.md (шаги, rollback, verification).
-
-**F2** — миграция create_event_sessions_partition(parent_table, month_start).
-
-### Проблемы
-
-- pnpm install требуется для p-limit. Тесты sync.processor, payment.service — падения из-за моков (job.opts), не связаны с C3–F2.
-- TS: onRetry(attempt, status?, delayMs) — required после optional. Исправлено: onRetry(attempt, delayMs, status?).
-
-**Smoke-check (22.02):** /events 200 + x-request-id, /health 200, /admin/ops/health без auth → 401.
-
----
-
-## 21.02.2026 — Production Hardening Plan (батчи A1–F2)
-
-### Наблюдения
-
-- План масштабирования и стабилизации production ранее обсуждался, но не был зафиксирован.
-
-### Решения
-
-**Документы:**
-- `docs/ProductionHardeningPlan.md` — полная спецификация 17 батчей (цель, scope, DoD, tests, smoke).
-- `docs/CursorAutoPipeline.md` — pipeline для Cursor Auto: правила (один PR = одна тема, DoD, smoke), шаблон задачи, порядок батчей A–F, стандартный чеклист DoD, универсальный smoke-check 10 мин, разделы про БД/кэш/observability/безопасность.
-- A1–A3: requestId, PII masking, Sentry, ops endpoints
-- B1–B4: Helmet, CORS, rate limiting, brute-force защита admin
-- C1–C3: failed jobs UI, HTTP timeouts, rate limit для TC/TEP
-- D1–D3: CacheService контракт, инвалидация, TTL policy
-- E1–E3: retention jobs, индексы, PgBouncer
-- F1–F2: план партиционирования, партиции EventSession по startsAt
-
-Формат каждого батча: цель, scope, non-goals, DoD, tests, smoke.
-
-### Проблемы
-
-- Нет.
-
----
-
-## 21.02.2026 — C2: HTTP timeouts + AbortController для TC/TEP
-
-### Наблюдения
-
-- Синхронные job (full/incremental sync) при timeout переводились в failed, но HTTP-запросы к TC/TEP продолжали висеть до естественного TCP timeout. Future work из Diary: AbortController для полной отмены — реализован.
-
-### Решения
-
-**http-signal.util** — combineAbortSignals, getHttpTimeoutMs (env: TC_HTTP_TIMEOUT_MS, TEP_HTTP_TIMEOUT_MS; значение &lt; 1000 = секунды).
-
-**TC/TEP API** — все fetch с timeout из env и опциональным signal; combineAbortSignals(timeoutSignal, jobSignal).
-
-**TcSyncService** — syncAll(signal), syncAllRest(signal); signal прокидывается в tcApi.getEvents({ signal }).
-
-**TepSyncService** — syncAll(signal); signal в tepApi.getCities(signal), getEvents(undefined, signal).
-
-**SyncProcessor** — withTimeout создаёт AbortController; при срабатывании таймера вызывает ctrl.abort() и reject; handleFullSync/handleIncrementalSync получают signal и передают в syncAll. При job timeout HTTP-запросы TC/TEP прерываются.
-
-**Документация** — ProductionHardeningPlan C2 отмечен ✅; SecurityHeaders дополнен разделом HTTP timeouts (C2).
-
-### Проблемы
-
-- Нет.
-
----
-
-## 21.02.2026 — Frontend typecheck: исправление ошибок TypeScript
-
-### Наблюдения
-
-- После серии техдолгов (resolvedBy, externalEventId, Voucher, SeoMeta и др.) frontend typecheck падал с 20+ ошибками TS.
-
-### Решения
-
-**blog VenueCard** — вместо `venue={venue}` передаём отдельные props (slug, title, venueType, imageUrl, address, metro, priceFrom, rating, reviewCount, city).
-
-**CheckoutClient** — тип result расширен полями redirectItems и requestItems; для requestItems учтён undefined через `?? 0`.
-
-**cities/museums** — getCatalog: только заданные параметры `...(q ? { q } : {})`, `...(sp.qf ? { qf: sp.qf } : {})` вместо `q: q || undefined`.
-
-**events/page** — lastRegion инициализируется null; setMuseumViewMode(f.vm as 'grid' | 'list').
-
-**page.tsx** — hasPhoto: 1 вместо true (Record<string, string | number>); citySlug через условный spread.
-
-**sitemaps** — массивы типизированы как SitemapUrl[]; changefreq через Changefreq; VenueListItem.updatedAt — приведение типа (API может возвращать updatedAt).
-
-**CatalogCard** — EventCategory, description через evItem, totalAvailableTickets/departingSoonMinutes ?? undefined.
-
-### Проблемы
-
-- Нет.
-
----
-
-## 21.02.2026 — Технические долги: resolvedBy, externalEventId, Voucher QR+PDF
-
-### Наблюдения
-
-- Остаточные TODO: admin-reconciliation resolvedBy, fulfillment externalEventId, voucher QR/PDF.
-
-### Решения
-
-**resolvedBy** — AdminReconciliationController.resolveItem теперь передаёт req.user.id (admin UUID из JWT).
-
-**externalEventId** — SnapshotLineItem дополнен полем externalEventId (tcEventId события). При создании offersSnapshot в checkout.service добавляется o.event.tcEventId. FulfillmentService передаёт snapshotItem.externalEventId в provider.reserve().
-
-**Voucher QR + PDF** — Добавлены qrcode и pdf-lib. VoucherService.generatePdf() генерирует PDF с QR-кодом (ссылка на publicUrl), кодом ваучера, городом, количеством позиций. GET /vouchers/:shortCode/pdf отдаёт PDF с заголовками.
-
-### Проблемы
-
-- Нет.
-
----
-
-## 21.02.2026 — Технические долги: sitemap count, SeoMeta, createdByType
-
-### Наблюдения
-
-- Задачи из TechnicalDebt приоритетной очереди: sitemap count ≥ 6, SeoMeta на всех страницах, createdByType.
-
-### Решения
-
-**1. Sitemap count ≥ 6** — sitemap-cities-filters вызывает api.getCatalog для каждого city×category×qf, добавляет URL только если total ≥ 6. Batch 25 для лимита нагрузки.
-
-**2. SeoMeta** — generateMetadata + getSeoMeta для venues, cities, blog, combo. Добавлены title, description, robots, canonical, openGraph. JSON-LD из SeoMeta — только на /events (как и было).
-
-**3. createdByType** — enum CreatedByType (ADMIN, SUPPLIER, IMPORT), поля createdByType, createdById в Event и Venue. Миграция 20260221110000_add_created_by_type. Admin create Event/Venue → ADMIN, Supplier create Event → SUPPLIER + createdById. Sync (TC, TEP) — default IMPORT.
-
-### Проблемы
-
-- RBAC guards для Supplier (where operatorId) — остаётся в плане.
-
----
-
-## 21.02.2026 — Аудит, технические долги, коммит
-
-### Наблюдения
-
-- Накоплены изменения по SEO (sitemap, SeoTemplate, SeoContent, SeoMeta, SeoGeneratorService).
-- Есть TODO в коде, типизация any, неприменённые миграции.
-
-### Решения
-
-**Документация**
-- `docs/TechnicalDebt.md` — технические долги, TODO, рекомендации.
-- Tasktracker: добавлены выполненные SEO-задачи, раздел «Технические долги».
-- Project.md: обновлены SeoTemplate, SeoContent, добавлен SeoMeta.
-
-### Проблемы
-
-- Prisma generate EPERM на Windows — известная проблема, документирована.
-
----
-
-## 21.02.2026 — SeoMeta: универсальный SEO-блок, админка, интеграция
-
-### Наблюдения
-
-- Универсальный SEO-блок для City, Event, Venue, Landing, Article, Combo — отдельная таблица SeoMeta.
-- Приоритет: manual > auto > default (fallback из полей сущности).
-
-### Решения
-
-**Prisma**
-- Модель SeoMeta: entityType, entityId, title, description, h1, canonicalUrl, robots, ogTitle, ogDescription, ogImage, jsonLd, autoGenerated.
-- Enum SeoEntityType. Миграция `20260221100000_seo_meta`.
-
-**Backend**
-- SeoMetaService: getSeoMeta, upsertSeoMeta, generateSeoMeta, computeDefaultSeo, generateFromEntity.
-- SeoMetaAdminController (admin/seo), SeoMetaPublicController (seo) — GET для публичных страниц.
-
-**Frontend**
-- getSeoMeta(entityType, entityId), интеграция в generateMetadata (events/[slug]).
-- JSON-LD script при наличии seo.jsonLd.
-
-**Admin**
-- SeoMetaEditor: поля с счётчиками, кнопки Сгенерировать/Сохранить.
-- Врезка в EventEdit, VenueEdit, CityEdit.
-
-### Проблемы
-
-- Prisma generate может падать с EPERM на Windows (lock файла) — перезапустить IDE/процессы.
-
----
-
-## 21.02.2026 — SEO: anti-thin-content, SeoGeneratorService, production-шаблоны
-
-### Наблюдения
-
-- Спецификация anti-thin-content: пороги (6/10), whitelist L2, noindex+canonical для слабых страниц.
-- Production-шаблоны для L0/L1/L2 (excursions, museums, events) с плейсхолдерами.
-- Related links «Читайте также» — 6–10 ссылок внутри кластера.
-
-### Решения
-
-**Prisma**
-- SeoTemplate: titleTpl, h1Tpl, descriptionTpl, bodyTpl, priority.
-- SeoContent: noindex, canonicalUrl, relatedLinksJson.
-- Миграция `20260221000002_seo_template_content_fields`.
-
-**SeoGeneratorService**
-- `upsertSeoForPage(citySlug, type, filterSlugs)` — генерация/кеш с проверкой threshold.
-- `regenerateAllForCity(citySlug)` — батч для города.
-- getOfferStats через Event/Venue + query-filter-map.
-- buildRelatedLinks с curated slugs и проверкой count.
-
-**Seed**
-- `prisma/seed-seo-templates.ts` — 9 шаблонов (3 типа × 3 уровня).
-
-### Проблемы
-
-- Нет.
-
----
-
-## 21.02.2026 — Sitemap, SEO-модели, утилиты
-
-### Наблюдения
-
-- Нужна структура sitemap index + подсайтмапы для масштабирования и раздельного обновления.
-- SEO-автогенерация: шаблоны с переменными и кеш готовых текстов.
-
-### Решения
-
-**Sitemap**
-- Документация `docs/sitemap-seo-spec.md`: структура sitemap index, 5 подсайтмапов (static, cities-catalog, cities-filters, offers, articles).
-- Next.js routes: `/sitemap.xml` (index), `/sitemaps/sitemap-static`, `sitemap-cities-catalog`, `sitemap-cities-filters`, `sitemap-offers`, `sitemap-articles`.
-
-**Prisma**
-- Модели SeoTemplate (type, level, template, isActive) и SeoContent (cityId, type, filtersKey, title, h1, description, body).
-- Миграция `20260221000001_add_seo_templates`.
-
-**Утилиты**
-- `renderTemplate(template, context)` — подстановка `{{key}}` в `packages/shared/src/seo-utils.ts`.
-- `getSeason(date?)` — возвращает `'лето'|'зима'|'сезон'` по месяцу.
+- **docs/InfraTypizationUXCheckoutPlan.md** — спецификация: Nginx /uploads, Feature Flags, Pino/Sentry, Redis cache, типизация (tc-sync, Proto, where builders), email templates, каталог (view toggle, venue detail), Teplohod widgets, Supplier RBAC + drafts, Checkout (package flow, YooKassa, /orders/[id], webhook idempotency).
+- Tasktracker и Project.md — ссылки на план.
 
 ### Проблемы
 
@@ -989,14 +587,14 @@ npx prisma migrate deploy
 3. Если остались `attempts` — retry с exponential backoff (1 мин, 2 мин, 4 мин)
 4. Если attempts исчерпаны — job в `failed`, `removeOnFail: 20` чистит, следующий cron-тик создаст новый
 
-**Ограничение (закрыто 21.02)**: ранее async-работа продолжалась в фоне до HTTP timeout. C2 реализован: AbortController в sync-сервисах — при job timeout вызывается abort, HTTP-запросы TC/TEP прерываются.
+**Ограничение**: настоящая async-работа (HTTP к TC/TEP API) продолжится в фоне до естественного HTTP timeout. Полная отмена требует `AbortController` в sync-сервисах (backlog). Это приемлемо: `concurrency: 1` не даст начать новый job, пока текущий worker-тред занят.
 
 **Добавлен вывод attempt/maxAttempts в логи** — видно, на какой попытке job и сколько осталось.
 
 ### Проблемы
 
 - Нет. Чистое дополнение, обратно совместимое.
-- ~~Future work: AbortController~~ Реализовано в C2 (21.02).
+- Future work: `AbortController` для полной отмены HTTP-запросов при timeout.
 
 ---
 

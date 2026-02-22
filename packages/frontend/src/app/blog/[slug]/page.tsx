@@ -1,7 +1,8 @@
 import { ArrowLeft, Calendar, MapPin, Tag } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-
+import { Calendar, MapPin, ArrowLeft, Tag } from 'lucide-react';
+import { api } from '@/lib/api';
 import { EventCard } from '@/components/ui/EventCard';
 import { VenueCard } from '@/components/ui/VenueCard';
 import { api } from '@/lib/api';
@@ -15,22 +16,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   try {
     const article = await api.getArticleBySlug(slug);
-    const seo = await getSeoMeta('ARTICLE', article.id);
-    const title = seo?.title ?? article.metaTitle ?? article.title;
-    const description = seo?.description ?? article.metaDescription ?? article.excerpt;
-    const robots = seo?.robots ?? 'index,follow';
-    const canonical = seo?.canonicalUrl ?? undefined;
     return {
-      title: title != null ? title : undefined,
-      description: description != null ? description : undefined,
-      robots,
-      ...(canonical && { alternates: { canonical } }),
-      openGraph: {
-        title: (seo?.ogTitle ?? title) ?? undefined,
-        description: (seo?.ogDescription ?? description) ?? undefined,
-        ...(seo?.ogImage && { images: [{ url: seo.ogImage }] }),
-        type: 'article',
-      },
+      title: article.metaTitle || article.title,
+      description: article.metaDescription || article.excerpt,
     };
   } catch {
     return { title: 'Статья не найдена' };
@@ -185,20 +173,7 @@ export default async function ArticlePage({ params }: Props) {
           </h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {relatedVenues.map((venue: any) => (
-              <VenueCard
-                key={venue.id}
-                slug={venue.slug}
-                title={venue.title}
-                shortTitle={venue.shortTitle}
-                venueType={venue.venueType}
-                imageUrl={venue.imageUrl}
-                address={venue.address}
-                metro={venue.metro}
-                priceFrom={venue.priceFrom}
-                rating={venue.rating}
-                reviewCount={venue.reviewCount ?? 0}
-                city={venue.city}
-              />
+              <VenueCard key={venue.id} venue={venue} />
             ))}
           </div>
         </section>

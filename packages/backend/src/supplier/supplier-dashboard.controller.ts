@@ -1,6 +1,5 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { RequestWithUser, SupplierAuthUser } from '../auth/auth.types';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { SupplierJwtGuard } from './supplier.guard';
@@ -14,7 +13,7 @@ export class SupplierDashboardController {
 
   @Get()
   @ApiOperation({ summary: 'Dashboard поставщика' })
-  async dashboard(@Req() req: RequestWithUser<SupplierAuthUser>) {
+  async dashboard(@Req() req: any) {
     const operatorId = req.user.operatorId;
 
     const [totalEvents, activeEvents, pendingEvents, totalOffers, operator] = await Promise.all([

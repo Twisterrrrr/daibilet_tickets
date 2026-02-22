@@ -465,32 +465,4 @@ export class MailService {
       this.logger.error(`Failed to notify admin: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-
-  /**
-   * O5: Report ready notification (email delivery).
-   */
-  async sendReportReady(
-    to: string,
-    data: { reportType: string; xlsPath: string; pdfPath: string },
-  ): Promise<boolean> {
-    if (!this.enabled) {
-      this.logger.warn(`[DRY RUN] Report ready → ${to}: ${data.reportType}`);
-      return false;
-    }
-    try {
-      await this.mailer.sendMail({
-        to,
-        subject: `Отчёт ${data.reportType} готов`,
-        html: `
-          <h3>Отчёт ${data.reportType} сформирован</h3>
-          <p>XLS: ${data.xlsPath}</p>
-          <p>PDF: ${data.pdfPath}</p>
-        `,
-      });
-      return true;
-    } catch (err: unknown) {
-      this.logger.error(`Failed to send report email: ${err instanceof Error ? err.message : String(err)}`);
-      return false;
-    }
-  }
 }
