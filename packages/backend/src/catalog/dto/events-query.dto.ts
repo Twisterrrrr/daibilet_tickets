@@ -126,4 +126,9 @@ export class EventsQueryDto {
   @IsOptional()
   @IsString()
   slugs?: string;
+
+  @ApiPropertyOptional({ description: 'T12: bypass cache (nocache=1)' })
+  @IsOptional()
+  @IsString()
+  nocache?: string;
 }

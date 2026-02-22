@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { type TcEvent, isTcEvent, isTcEventArray } from './tc-api.types';
 import { runWithLimit, withRetry } from '../common/api-rate-limit.util';
 import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
 
@@ -106,7 +107,7 @@ export class TcApiService {
     city?: number;
     status?: string;
     signal?: AbortSignal;
-  }): Promise<any[]> {
+  }): Promise<TcEvent[]> {
     const params: Record<string, string> = {};
 
     if (opts?.page) params.page = String(opts.page);
@@ -114,22 +115,19 @@ export class TcApiService {
     if (opts?.city) params.city = String(opts.city);
     if (opts?.status) params.status = opts.status;
 
-    const result = await this.request<any[]>('/v1/services/simple/events', params, opts?.signal);
+    const result = await this.request<unknown>('/v1/services/simple/events', params, opts?.signal);
 
-    // Ответ — массив событий
+    let raw: unknown[] = [];
     if (Array.isArray(result)) {
-      return result;
-    }
-
-    // Если обёрнут в data
-    if (result && typeof result === 'object') {
+      raw = result;
+    } else if (result && typeof result === 'object') {
       const obj = result as Record<string, unknown>;
-      if (Array.isArray(obj.data)) return obj.data;
-      if (Array.isArray(obj.events)) return obj.events;
+      if (Array.isArray(obj.data)) raw = obj.data;
+      else if (Array.isArray(obj.events)) raw = obj.events;
     }
+    if (raw.length === 0) return [];
 
-    this.logger.warn('Unexpected TC events response format');
-    return [];
+    return isTcEventArray(raw) ? raw : raw.filter((v): v is TcEvent => isTcEvent(v));
   }
 
   /**

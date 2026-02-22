@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { SUBCATEGORY_LABELS } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DateMode, EventCategory, EventSubcategory, LocationType, Prisma, TagCategory } from '@prisma/client';
@@ -8,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
 import { EventsQueryDto } from './dto/events-query.dto';
 import { RegionService } from './region.service';
+import { buildEventWhere, buildVenueWhere } from './where-builders';
 
 /** Сократить адрес до улицы и номера: "Дворцовая наб., 18, Санкт-Петербург" → "Дворцовая наб., 18" */
 function shortenAddressToStreet(addr: string | null | undefined): string {
@@ -537,18 +539,7 @@ export class CatalogService {
   private async getCatalogVenues(params: { city?: string; q?: string; sort?: string; page: number; limit: number }) {
     const { city, q, sort = 'popular', page, limit } = params;
 
-    const where: Prisma.VenueWhereInput = {
-      isActive: true,
-      isDeleted: false,
-      ...(city && { city: { slug: city } }),
-      ...(q &&
-        q.trim() && {
-          OR: [
-            { title: { contains: q.trim(), mode: 'insensitive' } },
-            { shortTitle: { contains: q.trim(), mode: 'insensitive' } },
-          ],
-        }),
-    };
+    const where = buildVenueWhere({ city, q });
 
     const orderBy: Prisma.VenueOrderByWithRelationInput =
       sort === 'price_asc'
@@ -621,6 +612,25 @@ export class CatalogService {
   // --- События ---
 
   async getEvents(query: EventsQueryDto & { cityIds?: string[] }) {
+    const nocache = query.nocache === '1' || query.nocache === 'true';
+    const paramsHash = createHash('sha256')
+      .update(JSON.stringify({ ...query, nocache: undefined }))
+      .digest('hex')
+      .slice(0, 16);
+    const cacheKey = cacheKeys.catalog.list(`${query.city || 'all'}:${paramsHash}`);
+
+    if (!nocache) {
+      const cached = await this.cache.getOrSet(
+        cacheKey,
+        CACHE_TTL.EVENT_LIST,
+        () => this.fetchEvents(query),
+      );
+      return cached;
+    }
+    return this.fetchEvents(query);
+  }
+
+  private async fetchEvents(query: EventsQueryDto & { cityIds?: string[] }) {
     const {
       city,
       cityIds,
@@ -701,63 +711,28 @@ export class CatalogService {
             ],
           };
 
-    const where: Prisma.EventWhereInput = {
-      isActive: true,
-      isDeleted: false,
-      canonicalOfId: null, // Не показывать дубли (помеченные как дубликат)
-      // Только события из активных городов (cityIds — для region, иначе city slug)
-      ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),
-      city: {
-        isActive: true,
-        ...(city && !cityIds?.length && { slug: city }),
+    const where = buildEventWhere(
+      {
+        city,
+        cityIds,
+        category,
+        subcategory,
+        audience,
+        tag,
+        pier,
+        maxDuration,
+        minDuration,
+        maxMinAge,
+        venueId,
+        priceMin,
+        priceMax,
+        hasPhoto,
+        slugs: slugsParam,
+        dateMode,
+        isOpenDateOnly,
       },
-      // Фильтр сеансов с поддержкой OPEN_DATE
-      ...sessionFilter,
-      ...(category && { category }),
-      ...(subcategory &&
-        (subcategory === 'RIVER'
-          ? {
-              AND: [
-                { subcategories: { has: 'RIVER' as EventSubcategory } },
-                { NOT: { subcategories: { has: 'BUS' as EventSubcategory } } },
-              ],
-            }
-          : { subcategories: { has: subcategory as EventSubcategory } })),
-      ...(audience === 'KIDS' ? { audience: { in: ['KIDS', 'FAMILY'] } } : audience ? { audience } : {}),
-      ...(tag && { tags: { some: { tag: { slug: tag } } } }),
-      ...(pier && { startLocationId: pier }),
-      ...(maxDuration || minDuration
-        ? {
-            durationMinutes: {
-              ...(maxDuration && { lte: maxDuration }),
-              ...(minDuration && { gte: minDuration }),
-            },
-          }
-        : {}),
-      ...(maxMinAge !== undefined && maxMinAge !== null ? { minAge: { lte: maxMinAge } } : {}),
-      ...(venueId && { venueId }),
-      ...(priceMin != null || priceMax != null
-        ? {
-            priceFrom: {
-              ...(priceMin != null && { gte: priceMin }),
-              ...(priceMax != null && { lte: priceMax }),
-            },
-          }
-        : {}),
-      // События без фото исключаем из главной и блоков (hasPhoto=true)
-      ...(hasPhoto === true ? { AND: [{ imageUrl: { not: null } }, { imageUrl: { not: '' } }] } : {}),
-      // Фильтр по slug для страницы избранного
-      ...(slugsParam?.trim()
-        ? {
-            slug: {
-              in: slugsParam
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean),
-            },
-          }
-        : {}),
-    };
+      sessionFilter,
+    );
 
     // Time of day filter: restrict events to those with sessions in the given MSK hour range.
     // startsAt stored as timestamp(3) WITHOUT timezone in UTC.
@@ -906,7 +881,8 @@ export class CatalogService {
     };
   }
 
-  async getEventBySlug(slug: string) {
+  async getEventBySlug(slug: string, nocache = false) {
+    if (nocache) return this.fetchEventBySlug(slug);
     const cacheKey = cacheKeys.events.detail(slug);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_DETAIL, () => this.fetchEventBySlug(slug));
   }

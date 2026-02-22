@@ -4,6 +4,28 @@
 
 ---
 
+## 22.02.2026 — T8–T12: типизация, where builders, Redis cache
+
+### Наблюдения
+
+- TcEvent уже в tc-api.types. tc-sync REST-режим использует getEvents → TcEvent[].
+- where-builders.ts был пустой — создан buildEventWhere, buildVenueWhere.
+- CacheService имеет getOrSet (remember). catalog keys добавлены.
+
+### Решения
+
+- **T8**: tc-api getEvents → Promise<TcEvent[]>, tc-sync allTcEvents/syncEventGroup/findBestImage → TcEvent[].
+- **T9**: добавлен gen:proto в backend package.json (protoc + ts-proto).
+- **T10**: buildEventWhere(dto), buildVenueWhere(dto); catalog.getEvents и getCatalogVenues используют builders.
+- **T11**: cacheKeys.catalog.list/detail, invalidateAfterSync включает catalog:.
+- **T12**: getEvents кэшируется через catalog:list:{city}:{hash}, TTL EVENT_LIST; getEventBySlug поддерживает ?nocache=1; EventsQueryDto.nocache.
+
+### Проблемы
+
+- gen:proto на Windows может требовать .cmd для плагина.
+
+---
+
 ## 22.02.2026 — T1–T7, T15: Инфра, Feature Flags, Pino, Sentry, view toggle
 
 ### Наблюдения

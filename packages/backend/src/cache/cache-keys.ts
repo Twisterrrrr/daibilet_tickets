@@ -38,6 +38,11 @@ export const cacheKeys = {
     query: (q: string, city?: string) => (city ? `search:${q}:${city}` : `search:${q}`),
     pattern: () => 'search:*',
   },
+  /** T11: catalog list/detail keys */
+  catalog: {
+    list: (paramsHash: string) => `catalog:list:${paramsHash}`,
+    detail: (type: string, id: string) => `catalog:detail:${type}:${id}`,
+  },
   pricing: {
     config: () => 'pricing:config',
   },

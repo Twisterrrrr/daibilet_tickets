@@ -123,8 +123,9 @@ export class CatalogController {
 
   @Get('events/:slug')
   @ApiOperation({ summary: 'Карточка события' })
-  getEventBySlug(@Param('slug') slug: string) {
-    return this.catalogService.getEventBySlug(slug);
+  @ApiQuery({ name: 'nocache', required: false, description: 'T12: bypass cache' })
+  getEventBySlug(@Param('slug') slug: string, @Query('nocache') nocache?: string) {
+    return this.catalogService.getEventBySlug(slug, nocache === '1' || nocache === 'true');
   }
 
   // --- Теги ---

@@ -6,6 +6,7 @@ import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/
 import { PrismaService } from '../prisma/prisma.service';
 import { classify } from './event-classifier';
 import { TcApiService } from './tc-api.service';
+import { type TcEvent } from './tc-api.types';
 import {
   TcGrpcCity,
   TcGrpcEvent,
@@ -725,7 +726,7 @@ export class TcSyncService {
     const newCitiesCreated: string[] = [];
     this.cityCache.clear();
 
-    let allTcEvents: any[] = [];
+    let allTcEvents: TcEvent[] = [];
     try {
       allTcEvents = await this.tcApi.getEvents();
       this.logger.log(`Получено ${allTcEvents.length} TC-записей`);
@@ -769,7 +770,7 @@ export class TcSyncService {
     }
 
     // Группируем по title + cityGeoId
-    const groups = new Map<string, any[]>();
+    const groups = new Map<string, TcEvent[]>();
     for (const tc of allTcEvents) {
       const title = tc.title?.text?.trim() || '';
       if (!title) continue;
@@ -928,7 +929,7 @@ export class TcSyncService {
   }
 
   /** REST v1: синхронизация группы TC events */
-  private async syncEventGroup(tcEvents: any[]): Promise<number> {
+  private async syncEventGroup(tcEvents: TcEvent[]): Promise<number> {
     if (tcEvents.length === 0) return 0;
 
     tcEvents.sort((a, b) => {
@@ -1323,7 +1324,7 @@ export class TcSyncService {
       .toLowerCase();
   }
 
-  private findBestImage(tcEvents: any[]): string | null {
+  private findBestImage(tcEvents: TcEvent[]): string | null {
     for (const tc of tcEvents) {
       const url = tc.media?.cover_original?.url || tc.media?.cover?.url || tc.media?.cover_small?.url;
       if (url) return url;

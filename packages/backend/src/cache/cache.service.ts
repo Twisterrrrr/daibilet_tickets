@@ -181,6 +181,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     await Promise.all([
       this.delByPrefix('cities:'),
       this.delByPrefix('events:'),
+      this.delByPrefix('catalog:'),
       this.delByPrefix('tags:'),
       this.delByPrefix('regions:'),
       this.delByPrefix('landings:'),

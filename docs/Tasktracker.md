@@ -10,7 +10,7 @@
 > Спецификация: `docs/InfraTypizationUXCheckoutPlan.md`. Каждая таска = 1 PR.
 
 - [x] T1–T7: Nginx uploads, Feature Flags, Pino logs, Sentry backend/frontend (22.02)
-- [ ] T8–T10: Типизация tc-sync, Proto types, Prisma where builders
+- [x] T8–T10: TcEvent[], gen:proto script, Prisma where builders (22.02)
 - [ ] T11–T12: Redis cache + подключение к каталогу
 - [ ] T13–T14: Email order-confirmed, order-completed
 - [x] T15: Каталог view toggle + localStorage (22.02); [ ] T16–T17: venue detail, Teplohod widgets

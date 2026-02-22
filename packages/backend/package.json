@@ -23,6 +23,7 @@
     "reclassify:apply": "npx tsx prisma/reclassify-events.ts --apply",
     "check:categorization": "npx tsx prisma/check-categorization.ts",
     "fix:teplohod-river": "npx tsx prisma/fix-teplohod-river-excursions.ts",
+    "gen:proto": "node -e \"require('fs').mkdirSync('src/generated',{recursive:true})\" && protoc --plugin=protoc-gen-ts_proto=./node_modules/ts-proto/protoc-gen-ts_proto --ts_proto_out=./src/generated --ts_proto_opt=esModuleInterop=true --ts_proto_opt=outputServices=false -I ./proto/tc-simple -I ./node_modules/google-proto-files ./proto/tc-simple/events.proto ./proto/tc-simple/venues.proto ./proto/tc-simple/geo.proto ./proto/tc-simple/generic.proto ./proto/tc-simple/meta_events.proto ./proto/tc-simple/mods.proto",
     "db:studio": "prisma studio"
   },
   "dependencies": {
