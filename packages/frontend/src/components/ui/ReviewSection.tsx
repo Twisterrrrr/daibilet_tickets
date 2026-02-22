@@ -1,10 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import {
-  Star, CheckCircle, ChevronDown, Send, AlertCircle,
-  ThumbsUp, Camera, X, ExternalLink, Image as ImageIcon,
+  AlertCircle,
+  Camera,
+  CheckCircle,
+  ChevronDown,
+  ExternalLink,
+  Image as ImageIcon,
+  Send,
+  Star,
+  ThumbsUp,
+  X,
 } from 'lucide-react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+
 import { api } from '@/lib/api';
 
 // ========================
@@ -78,9 +87,7 @@ function StarRating({
             onClick={() => interactive && onChange?.(i + 1)}
             className={`${interactive ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'}`}
           >
-            <Star
-              className={`${cls} ${filled ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'}`}
-            />
+            <Star className={`${cls} ${filled ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'}`} />
           </button>
         );
       })}
@@ -92,7 +99,11 @@ function StarRating({
 // Сводка рейтинга
 // ========================
 
-function RatingSummaryBlock({ summary, externalRating, externalSource }: {
+function RatingSummaryBlock({
+  summary,
+  externalRating,
+  externalSource,
+}: {
   summary: RatingSummary;
   externalRating?: number;
   externalSource?: string;
@@ -144,9 +155,7 @@ function RatingSummaryBlock({ summary, externalRating, externalSource }: {
         <div className="flex flex-col items-center justify-center border-t sm:border-t-0 sm:border-l border-slate-100 pt-4 sm:pt-0 sm:pl-6">
           <span className="text-2xl font-bold text-slate-700">{Number(externalRating).toFixed(1)}</span>
           <StarRating value={Number(externalRating)} size="sm" />
-          <p className="mt-1 text-[10px] text-slate-400">
-            {formatSourceName(externalSource)}
-          </p>
+          <p className="mt-1 text-[10px] text-slate-400">{formatSourceName(externalSource)}</p>
         </div>
       )}
     </div>
@@ -171,12 +180,7 @@ function PhotoGallery({ photos }: { photos: ReviewPhoto[] }) {
             onClick={() => setSelected(p.url)}
             className="flex-shrink-0 overflow-hidden rounded-lg border border-slate-100 hover:border-primary-300 transition"
           >
-            <img
-              src={p.thumbUrl}
-              alt="Фото отзыва"
-              className="h-20 w-20 object-cover"
-              loading="lazy"
-            />
+            <img src={p.thumbUrl} alt="Фото отзыва" className="h-20 w-20 object-cover" loading="lazy" />
           </button>
         ))}
       </div>
@@ -254,9 +258,7 @@ function ReviewCard({ review }: { review: ReviewItem }) {
         <StarRating value={review.rating} size="sm" />
       </div>
 
-      {review.title && (
-        <p className="mt-3 text-sm font-semibold text-slate-800">{review.title}</p>
-      )}
+      {review.title && <p className="mt-3 text-sm font-semibold text-slate-800">{review.title}</p>}
       <p className="mt-2 text-sm leading-relaxed text-slate-600">{review.text}</p>
 
       {/* Photos */}
@@ -358,28 +360,31 @@ function ReviewForm({
   const [successMessage, setSuccessMessage] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    const remaining = 5 - photos.length;
-    const selected = files.slice(0, remaining);
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []);
+      const remaining = 5 - photos.length;
+      const selected = files.slice(0, remaining);
 
-    const validFiles = selected.filter((f) => {
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) return false;
-      if (f.size > 5 * 1024 * 1024) return false;
-      return true;
-    });
+      const validFiles = selected.filter((f) => {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) return false;
+        if (f.size > 5 * 1024 * 1024) return false;
+        return true;
+      });
 
-    setPhotos((prev) => [...prev, ...validFiles]);
-    // Create preview URLs
-    validFiles.forEach((f) => {
-      const reader = new FileReader();
-      reader.onload = () => setPreviews((prev) => [...prev, reader.result as string]);
-      reader.readAsDataURL(f);
-    });
+      setPhotos((prev) => [...prev, ...validFiles]);
+      // Create preview URLs
+      validFiles.forEach((f) => {
+        const reader = new FileReader();
+        reader.onload = () => setPreviews((prev) => [...prev, reader.result as string]);
+        reader.readAsDataURL(f);
+      });
 
-    // Reset input
-    if (fileRef.current) fileRef.current.value = '';
-  }, [photos.length]);
+      // Reset input
+      if (fileRef.current) fileRef.current.value = '';
+    },
+    [photos.length],
+  );
 
   const removePhoto = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
@@ -390,10 +395,22 @@ function ReviewForm({
     e.preventDefault();
     setError('');
 
-    if (rating === 0) { setError('Поставьте оценку'); return; }
-    if (text.trim().length < 10) { setError('Отзыв слишком короткий (мин. 10 символов)'); return; }
-    if (!authorName.trim()) { setError('Укажите ваше имя'); return; }
-    if (!authorEmail.includes('@')) { setError('Укажите корректный email'); return; }
+    if (rating === 0) {
+      setError('Поставьте оценку');
+      return;
+    }
+    if (text.trim().length < 10) {
+      setError('Отзыв слишком короткий (мин. 10 символов)');
+      return;
+    }
+    if (!authorName.trim()) {
+      setError('Укажите ваше имя');
+      return;
+    }
+    if (!authorEmail.includes('@')) {
+      setError('Укажите корректный email');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -546,9 +563,7 @@ function ReviewForm({
       {/* Voucher for verification (только для event) */}
       {!reviewRequestToken && eventId && (
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">
-            Код ваучера (если покупали через нас)
-          </label>
+          <label className="mb-1 block text-xs font-medium text-slate-500">Код ваучера (если покупали через нас)</label>
           <input
             type="text"
             placeholder="Например: ABCD1234"
@@ -558,7 +573,8 @@ function ReviewForm({
             maxLength={20}
           />
           <p className="mt-1 text-[11px] text-slate-400">
-            Если вы приобретали билет через Дайбилет — введите код из ваучера. Отзыв получит метку «Покупка подтверждена».
+            Если вы приобретали билет через Дайбилет — введите код из ваучера. Отзыв получит метку «Покупка
+            подтверждена».
           </p>
         </div>
       )}
@@ -607,21 +623,19 @@ export function ReviewSection({
 }) {
   const [data, setData] = useState<{
     items: ReviewItem[];
-    externalReviews: ExternalReviewItem[];
+    externalReviews?: ExternalReviewItem[];
     total: number;
     page: number;
     totalPages: number;
-    summary: RatingSummary;
+    summary?: RatingSummary;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(!!reviewRequestToken);
 
   const loadReviews = async (page = 1) => {
     try {
-      const res = venueSlug
-        ? await api.getVenueReviews(venueSlug, page)
-        : await api.getEventReviews(eventSlug!, page);
-      setData(res);
+      const res = venueSlug ? await api.getVenueReviews(venueSlug, page) : await api.getEventReviews(eventSlug!, page);
+      setData(res as { items: ReviewItem[]; externalReviews?: ExternalReviewItem[]; total: number; page: number; totalPages: number; summary?: RatingSummary });
     } catch {
       // no-op
     } finally {
@@ -630,7 +644,9 @@ export function ReviewSection({
   };
 
   const slug = venueSlug ?? eventSlug;
-  useEffect(() => { loadReviews(); }, [slug]);
+  useEffect(() => {
+    loadReviews();
+  }, [slug]);
 
   if (loading) {
     return (
@@ -640,7 +656,12 @@ export function ReviewSection({
     );
   }
 
-  const summary = data?.summary || { avgRating: 0, reviewCount: 0, verifiedCount: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+  const summary = data?.summary || {
+    avgRating: 0,
+    reviewCount: 0,
+    verifiedCount: 0,
+    distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  };
   const reviews = data?.items || [];
   const externalReviews = data?.externalReviews || [];
 
@@ -648,7 +669,8 @@ export function ReviewSection({
     <section className="space-y-6" id="reviews">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-900">
-          Отзывы {summary.reviewCount > 0 && <span className="text-slate-400 font-normal">({summary.reviewCount})</span>}
+          Отзывы{' '}
+          {summary.reviewCount > 0 && <span className="text-slate-400 font-normal">({summary.reviewCount})</span>}
         </h2>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -660,11 +682,7 @@ export function ReviewSection({
 
       {/* Rating summary */}
       {(summary.reviewCount > 0 || (externalRating && externalRating > 0)) && (
-        <RatingSummaryBlock
-          summary={summary}
-          externalRating={externalRating}
-          externalSource={externalSource}
-        />
+        <RatingSummaryBlock summary={summary} externalRating={externalRating} externalSource={externalSource} />
       )}
 
       {/* Review form */}
@@ -731,7 +749,11 @@ export function ReviewSection({
 // Компактный виджет рейтинга (для карточки события)
 // ========================
 
-export function RatingBadge({ rating, reviewCount, variant = 'dark' }: {
+export function RatingBadge({
+  rating,
+  reviewCount,
+  variant = 'dark',
+}: {
   rating: number;
   reviewCount: number;
   variant?: 'dark' | 'light';
@@ -743,9 +765,7 @@ export function RatingBadge({ rating, reviewCount, variant = 'dark' }: {
     <div className="flex items-center gap-1.5">
       <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
       <span className={`text-sm font-semibold ${textColor}`}>{Number(rating).toFixed(1)}</span>
-      {reviewCount > 0 && (
-        <span className={`text-xs ${subColor}`}>({reviewCount})</span>
-      )}
+      {reviewCount > 0 && <span className={`text-xs ${subColor}`}>({reviewCount})</span>}
     </div>
   );
 }

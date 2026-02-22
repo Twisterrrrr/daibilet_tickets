@@ -11,7 +11,8 @@ export const cacheKeys = {
     list: (prefix = '') => (prefix ? `events:list:${prefix}` : 'events:list'),
   },
   cities: {
-    list: (featured?: boolean | 'all') => (featured !== undefined && featured !== 'all' ? `cities:list:${featured}` : 'cities:list:all'),
+    list: (featured?: boolean | 'all') =>
+      featured !== undefined && featured !== 'all' ? `cities:list:${featured}` : 'cities:list:all',
     detail: (slug: string) => `cities:detail:${slug}`,
   },
   tags: {
@@ -36,6 +37,10 @@ export const cacheKeys = {
   search: {
     query: (q: string, city?: string) => (city ? `search:${q}:${city}` : `search:${q}`),
     pattern: () => 'search:*',
+  },
+  /** catalog:list — единый каталог по query params (hash) */
+  catalog: {
+    list: (paramsHash: string) => `catalog:list:${paramsHash}`,
   },
   pricing: {
     config: () => 'pricing:config',

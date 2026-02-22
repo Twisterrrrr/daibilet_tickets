@@ -2,11 +2,12 @@
  * SEO-генератор: anti-thin-content, шаблоны, related links.
  * См. docs/sitemap-seo-spec.md
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { cityToPrepositional } from '@daibilet/shared';
+import { Injectable, Logger } from '@nestjs/common';
+import { DateMode, EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
+
 import { applyQFToEventParams, applyQFToVenueParams, CatalogType } from '../catalog/query-filter-map';
-import { Prisma, DateMode, EventAudience, EventCategory, EventSubcategory } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 export type SeoCatalogType = 'excursion' | 'venue' | 'event';
 
@@ -38,9 +39,13 @@ export class SeoGeneratorService {
   private readonly THRESHOLD_L2 = 10;
 
   private readonly LEVEL2_WHITELIST = new Set<string>([
-    'walking|history', 'boat|night', 'walking|with-children',
-    'art|with-guide', 'history|with-guide',
-    'concert|rock', 'theatre|classical',
+    'walking|history',
+    'boat|night',
+    'walking|with-children',
+    'art|with-guide',
+    'history|with-guide',
+    'concert|rock',
+    'theatre|classical',
   ]);
 
   constructor(private readonly prisma: PrismaService) {}
@@ -70,7 +75,12 @@ export class SeoGeneratorService {
         : [];
 
     if (filters.length !== filterSlugs.length) {
-      return this.upsertNoindexStub(params.citySlug, params.type, filterSlugs, this.buildCanonical(params.citySlug, params.type));
+      return this.upsertNoindexStub(
+        params.citySlug,
+        params.type,
+        filterSlugs,
+        this.buildCanonical(params.citySlug, params.type),
+      );
     }
 
     const filtersKey = filterSlugs.length ? filterSlugs.join('-') : BASE_FILTERS_KEY;
@@ -320,13 +330,17 @@ export class SeoGeneratorService {
     const title = this.render(tpl.titleTpl, ctx).trim();
     const h1 = this.render(tpl.h1Tpl, ctx).trim();
     const description = this.render(tpl.descriptionTpl, ctx).trim();
-    let body = this.render(tpl.bodyTpl, ctx).trim();
+    const body = this.render(tpl.bodyTpl, ctx).trim();
 
     return {
       title: title === h1 ? `${title} — билеты онлайн` : title,
       h1,
       description: this.trimToMeta(description, 160),
-      body: body.length >= 600 ? body : body + '\n\nВыберите подходящий вариант по времени, программе и стоимости — после оплаты вы получите электронное подтверждение.',
+      body:
+        body.length >= 600
+          ? body
+          : body +
+            '\n\nВыберите подходящий вариант по времени, программе и стоимости — после оплаты вы получите электронное подтверждение.',
     };
   }
 
@@ -483,7 +497,10 @@ export class SeoGeneratorService {
     const curated = this.curatedLinks(params.type);
     for (const slug of curated) {
       if (params.currentFilters.some((f) => f.slug === slug)) continue;
-      const f = await this.prisma.queryFilter.findFirst({ where: { type: params.type, slug }, select: { title: true } });
+      const f = await this.prisma.queryFilter.findFirst({
+        where: { type: params.type, slug },
+        select: { title: true },
+      });
       links.push({ title: f?.title ?? slug, url: `${baseUrl}/${slug}` });
     }
 

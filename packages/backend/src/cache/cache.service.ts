@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
@@ -26,14 +26,14 @@ function parseTtlEnv(key: string, fallbackSec: number): number {
 }
 
 export const CACHE_TTL = {
-  CITIES: parseTtlEnv('CACHE_TTL_CITIES', 3600),           // 1 час
-  CITY_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 3600),      // detail 1–6h, default 1h
-  EVENT_LIST: parseTtlEnv('CACHE_TTL_LIST', 300),          // list 5–10m, default 5m
-  EVENT_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 3600),     // detail 1–6h
-  TAGS: parseTtlEnv('CACHE_TTL_TAGS', 3600),               // 1 час
-  LANDINGS: parseTtlEnv('CACHE_TTL_LANDINGS', 1800),       // 30 мин
-  COMBOS: parseTtlEnv('CACHE_TTL_COMBOS', 1800),           // 30 мин
-  SEARCH: parseTtlEnv('CACHE_TTL_SEARCH', 300),            // list 5–10m
+  CITIES: parseTtlEnv('CACHE_TTL_CITIES', 3600), // 1 час
+  CITY_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 3600), // detail 1–6h, default 1h
+  EVENT_LIST: parseTtlEnv('CACHE_TTL_LIST', 300), // list 5–10m, default 5m
+  EVENT_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 3600), // detail 1–6h
+  TAGS: parseTtlEnv('CACHE_TTL_TAGS', 3600), // 1 час
+  LANDINGS: parseTtlEnv('CACHE_TTL_LANDINGS', 1800), // 30 мин
+  COMBOS: parseTtlEnv('CACHE_TTL_COMBOS', 1800), // 30 мин
+  SEARCH: parseTtlEnv('CACHE_TTL_SEARCH', 300), // list 5–10m
 } as const;
 
 @Injectable()
@@ -162,15 +162,15 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   // Хелперы для кэш-паттернов
   // ==========================================
 
-  /** Кэш с автоматическим fetch-if-miss */
-  async getOrSet<T>(
-    key: string,
-    ttlSeconds: number,
-    fetcher: () => Promise<T>,
-  ): Promise<T> {
+  /** Кэш с автоматическим fetch-if-miss и логом hit/miss */
+  async getOrSet<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
     const cached = await this.get<T>(key);
-    if (cached !== null) return cached;
+    if (cached !== null) {
+      this.logger.debug(`cache HIT ${key}`);
+      return cached;
+    }
 
+    this.logger.debug(`cache MISS ${key}`);
     const data = await fetcher();
     await this.set(key, data, ttlSeconds);
     return data;
@@ -185,6 +185,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     await Promise.all([
       this.delByPrefix('cities:'),
       this.delByPrefix('events:'),
+      this.delByPrefix('catalog:'),
       this.delByPrefix('tags:'),
       this.delByPrefix('regions:'),
       this.delByPrefix('landings:'),

@@ -1,15 +1,29 @@
+import {
+  Building2,
+  CalendarCheck,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  FileText,
+  HelpCircle,
+  Mail,
+  MapPin,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  Ticket,
+  Users,
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  HelpCircle, Ticket, CreditCard, RotateCcw, Clock, MapPin,
-  Mail, ShieldCheck, ChevronDown, ChevronRight, Search,
-  Building2, CalendarCheck, Users, FileText,
-} from 'lucide-react';
+
 import { ContactForm } from '@/components/ui/ContactForm';
 
 export const metadata: Metadata = {
   title: 'Помощь — Дайбилет',
-  description: 'Ответы на частые вопросы: покупка билетов, возвраты, статусы заказов, как получить билет, льготы и другие вопросы.',
+  description:
+    'Ответы на частые вопросы: покупка билетов, возвраты, статусы заказов, как получить билет, льготы и другие вопросы.',
 };
 
 // ─── FAQ Data ─────────────────────────────────────
@@ -149,12 +163,18 @@ const FAQ_CATEGORIES: FaqCategory[] = [
 function CategoryIcon({ name }: { name: string }) {
   const cls = 'h-5 w-5';
   switch (name) {
-    case 'ticket': return <Ticket className={cls} />;
-    case 'calendar': return <CalendarCheck className={cls} />;
-    case 'refund': return <RotateCcw className={cls} />;
-    case 'building': return <Building2 className={cls} />;
-    case 'shield': return <ShieldCheck className={cls} />;
-    default: return <HelpCircle className={cls} />;
+    case 'ticket':
+      return <Ticket className={cls} />;
+    case 'calendar':
+      return <CalendarCheck className={cls} />;
+    case 'refund':
+      return <RotateCcw className={cls} />;
+    case 'building':
+      return <Building2 className={cls} />;
+    case 'shield':
+      return <ShieldCheck className={cls} />;
+    default:
+      return <HelpCircle className={cls} />;
   }
 }
 
@@ -188,9 +208,7 @@ export default function HelpPage() {
             <HelpCircle className="h-4 w-4" />
             Центр помощи
           </div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900">
-            Как мы можем помочь?
-          </h1>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900">Как мы можем помочь?</h1>
           <p className="mt-3 text-lg text-slate-600">
             Ответы на частые вопросы о билетах, заказах, возвратах и работе сервиса
           </p>
@@ -252,14 +270,15 @@ export default function HelpPage() {
               </div>
               <div className="space-y-2">
                 {category.items.map((item, i) => (
-                  <details key={i} className="group bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
+                  <details
+                    key={i}
+                    className="group bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors"
+                  >
                     <summary className="flex items-center justify-between p-4 cursor-pointer list-none select-none">
                       <span className="font-medium text-sm text-slate-900 pr-4">{item.q}</span>
                       <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0 transition-transform group-open:rotate-180" />
                     </summary>
-                    <div className="px-4 pb-4 text-sm text-slate-600 leading-relaxed">
-                      {item.a}
-                    </div>
+                    <div className="px-4 pb-4 text-sm text-slate-600 leading-relaxed">{item.a}</div>
                   </details>
                 ))}
               </div>

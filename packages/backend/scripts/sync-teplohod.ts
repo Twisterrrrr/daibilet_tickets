@@ -26,9 +26,7 @@ async function runTepSync(): Promise<boolean> {
     console.log('Результат sync:', JSON.stringify(data, null, 2));
     return true;
   } catch (e) {
-    console.warn(
-      `Не удалось вызвать sync API (${API_BASE}). Запустите бэкенд: pnpm dev:backend`,
-    );
+    console.warn(`Не удалось вызвать sync API (${API_BASE}). Запустите бэкенд: pnpm dev:backend`);
     console.warn((e as Error).message);
     return false;
   }

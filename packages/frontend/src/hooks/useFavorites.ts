@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+
 import { api } from '@/lib/api';
 import { getStoredToken } from '@/lib/user-auth';
+
 import { useUserAuthOptional } from './useUserAuth';
 
 const STORAGE_KEY = 'daibilet-favorites';
@@ -71,9 +73,7 @@ export function useFavorites() {
       if (t) {
         const isIn = slugs.includes(slug);
         try {
-          const { slugs: next } = isIn
-            ? await api.userFavoritesRemove(t, slug)
-            : await api.userFavoritesAdd(t, slug);
+          const { slugs: next } = isIn ? await api.userFavoritesRemove(t, slug) : await api.userFavoritesAdd(t, slug);
           setSlugs(next);
           saveLocalFavorites(next);
         } catch {
@@ -138,10 +138,7 @@ export function useFavorites() {
     [token, slugs],
   );
 
-  const isFavorite = useCallback(
-    (slug: string) => slugs.includes(slug),
-    [slugs],
-  );
+  const isFavorite = useCallback((slug: string) => slugs.includes(slug), [slugs]);
 
   return { slugs, toggle, add, remove, isFavorite, mounted };
 }

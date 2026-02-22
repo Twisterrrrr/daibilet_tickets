@@ -18,8 +18,7 @@ const REGIONS: RegionDef[] = [
   {
     slug: 'moskovskaya-oblast',
     name: 'Московская область',
-    description:
-      'События и мероприятия Подмосковья — Коломна, Серпухов, Дубна и другие города в 1–2 часах от Москвы.',
+    description: 'События и мероприятия Подмосковья — Коломна, Серпухов, Дубна и другие города в 1–2 часах от Москвы.',
     hubCitySlug: 'moscow',
     citySlugs: [
       'balashiha',
@@ -45,8 +44,7 @@ const REGIONS: RegionDef[] = [
   {
     slug: 'leningradskaya-oblast',
     name: 'Ленинградская область',
-    description:
-      'События Ленинградской области — дворцы, крепости и природа в 1–2 часах от Санкт-Петербурга.',
+    description: 'События Ленинградской области — дворцы, крепости и природа в 1–2 часах от Санкт-Петербурга.',
     hubCitySlug: 'saint-petersburg',
     citySlugs: [], // пока нет отдельных городов ЛО в базе; хаб СПб включается автоматически
   },
@@ -61,24 +59,21 @@ const REGIONS: RegionDef[] = [
   {
     slug: 'sverdlovskaya-oblast',
     name: 'Свердловская область',
-    description:
-      'События Свердловской области — Екатеринбург, Нижний Тагил и города Урала.',
+    description: 'События Свердловской области — Екатеринбург, Нижний Тагил и города Урала.',
     hubCitySlug: 'ekaterinburg',
     citySlugs: ['nizhnij-tagil'],
   },
   {
     slug: 'kemerovskaya-oblast',
     name: 'Кемеровская область',
-    description:
-      'События Кузбасса — Кемерово, Новокузнецк, Междуреченск.',
+    description: 'События Кузбасса — Кемерово, Новокузнецк, Междуреченск.',
     hubCitySlug: 'kemerovo',
     citySlugs: ['novokuznetsk', 'mezhdurechensk'],
   },
   {
     slug: 'nizhegorodskaya-oblast',
     name: 'Нижегородская область',
-    description:
-      'События Нижегородской области — Нижний Новгород, Арзамас и города в зоне доступности.',
+    description: 'События Нижегородской области — Нижний Новгород, Арзамас и города в зоне доступности.',
     hubCitySlug: 'nizhny-novgorod',
     citySlugs: ['nizhnij-novgorod', 'arzamas'],
   },
@@ -134,14 +129,15 @@ async function main() {
       data: uniqueCityIds.map((cityId) => ({ regionId: region.id, cityId })),
     });
 
-    console.log(
-      `  ✓ ${def.name} (hub: ${def.hubCitySlug}) — ${uniqueCityIds.length} cities`,
-    );
+    console.log(`  ✓ ${def.name} (hub: ${def.hubCitySlug}) — ${uniqueCityIds.length} cities`);
   }
 
   console.log('Done!');
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1); })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
   .finally(() => prisma.$disconnect());

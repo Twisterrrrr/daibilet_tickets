@@ -1,13 +1,14 @@
+import { ColumnDef } from '@tanstack/react-table';
+import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
-import { ColumnDef } from '@tanstack/react-table';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/input';
 
 interface CollectionItem {
   id: string;
@@ -31,9 +32,7 @@ const columns: ColumnDef<CollectionItem>[] = [
     cell: ({ row }) => (
       <div>
         <span className="font-medium">{row.original.title}</span>
-        {row.original.subtitle && (
-          <p className="text-xs text-muted-foreground mt-0.5">{row.original.subtitle}</p>
-        )}
+        {row.original.subtitle && <p className="text-xs text-muted-foreground mt-0.5">{row.original.subtitle}</p>}
       </div>
     ),
   },
@@ -45,9 +44,7 @@ const columns: ColumnDef<CollectionItem>[] = [
   {
     id: 'city',
     header: 'Город',
-    cell: ({ row }) => (
-      <span>{row.original.city?.name || <Badge variant="outline">Кросс-город</Badge>}</span>
-    ),
+    cell: ({ row }) => <span>{row.original.city?.name || <Badge variant="outline">Кросс-город</Badge>}</span>,
   },
   {
     id: 'filters',
@@ -55,10 +52,14 @@ const columns: ColumnDef<CollectionItem>[] = [
     cell: ({ row }) => (
       <div className="flex flex-wrap gap-1">
         {row.original.filterCategory && (
-          <Badge variant="outline" className="text-xs">{row.original.filterCategory}</Badge>
+          <Badge variant="outline" className="text-xs">
+            {row.original.filterCategory}
+          </Badge>
         )}
         {row.original.filterTags.map((t) => (
-          <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
+          <Badge key={t} variant="secondary" className="text-xs">
+            {t}
+          </Badge>
         ))}
       </div>
     ),

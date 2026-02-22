@@ -1,24 +1,26 @@
+import { ArrowLeft, Calendar, CreditCard, ExternalLink, MapPin, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, CreditCard, Users, MapPin, Calendar } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type OrderStatus = 'DRAFT' | 'PENDING_PAYMENT' | 'PAID' | 'FULFILLING' | 'FULFILLED' | 'PARTIALLY_FULFILLED' | 'FAILED' | 'REFUNDED';
+type OrderStatus =
+  | 'DRAFT'
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'FULFILLING'
+  | 'FULFILLED'
+  | 'PARTIALLY_FULFILLED'
+  | 'FAILED'
+  | 'REFUNDED';
 type PackageItemStatus = 'PENDING' | 'BOOKED' | 'CONFIRMED' | 'FAILED' | 'REFUNDED';
 
 interface PackageItem {
@@ -59,30 +61,50 @@ interface OrderDetailData {
 }
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'destructive' | 'secondary'> = {
-  DRAFT: 'secondary', PENDING_PAYMENT: 'warning', PAID: 'success',
-  FULFILLING: 'success', FULFILLED: 'success', PARTIALLY_FULFILLED: 'warning',
-  FAILED: 'destructive', REFUNDED: 'destructive',
+  DRAFT: 'secondary',
+  PENDING_PAYMENT: 'warning',
+  PAID: 'success',
+  FULFILLING: 'success',
+  FULFILLED: 'success',
+  PARTIALLY_FULFILLED: 'warning',
+  FAILED: 'destructive',
+  REFUNDED: 'destructive',
 };
 
 const ITEM_STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'destructive' | 'secondary'> = {
-  PENDING: 'secondary', BOOKED: 'default', CONFIRMED: 'success',
-  FAILED: 'destructive', REFUNDED: 'destructive',
+  PENDING: 'secondary',
+  BOOKED: 'default',
+  CONFIRMED: 'success',
+  FAILED: 'destructive',
+  REFUNDED: 'destructive',
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Черновик', PENDING_PAYMENT: 'Ожидает оплаты', PAID: 'Оплачен',
-  FULFILLING: 'В исполнении', FULFILLED: 'Исполнен', PARTIALLY_FULFILLED: 'Частично',
-  FAILED: 'Ошибка', REFUNDED: 'Возврат',
+  DRAFT: 'Черновик',
+  PENDING_PAYMENT: 'Ожидает оплаты',
+  PAID: 'Оплачен',
+  FULFILLING: 'В исполнении',
+  FULFILLED: 'Исполнен',
+  PARTIALLY_FULFILLED: 'Частично',
+  FAILED: 'Ошибка',
+  REFUNDED: 'Возврат',
 };
 
 const SAFE_TRANSITIONS: Record<string, string[]> = {
-  DRAFT: ['PENDING_PAYMENT'], PENDING_PAYMENT: ['PAID', 'FAILED'],
-  PAID: ['FULFILLING', 'REFUNDED'], FULFILLING: ['FULFILLED', 'PARTIALLY_FULFILLED', 'FAILED'],
-  FULFILLED: [], PARTIALLY_FULFILLED: [], FAILED: ['REFUNDED'], REFUNDED: [],
+  DRAFT: ['PENDING_PAYMENT'],
+  PENDING_PAYMENT: ['PAID', 'FAILED'],
+  PAID: ['FULFILLING', 'REFUNDED'],
+  FULFILLING: ['FULFILLED', 'PARTIALLY_FULFILLED', 'FAILED'],
+  FULFILLED: [],
+  PARTIALLY_FULFILLED: [],
+  FAILED: ['REFUNDED'],
+  REFUNDED: [],
 };
 
 function formatPrice(kopecks: number): string {
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(kopecks / 100);
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(
+    kopecks / 100,
+  );
 }
 
 function formatDate(iso: string): string {
@@ -90,7 +112,13 @@ function formatDate(iso: string): string {
 }
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 // ─── Info Field ──────────────────────────────────────────────────────────────
@@ -166,7 +194,9 @@ export function OrderDetailPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
-            <Link to="/orders"><ArrowLeft className="h-4 w-4" /></Link>
+            <Link to="/orders">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
           <div>
             <h1 className="text-xl font-bold tracking-tight">Заказ {order.code}</h1>
@@ -243,7 +273,10 @@ export function OrderDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2">
-            <InfoField label="Итого" value={<span className="text-lg font-bold">{formatPrice(order.totalPrice)}</span>} />
+            <InfoField
+              label="Итого"
+              value={<span className="text-lg font-bold">{formatPrice(order.totalPrice)}</span>}
+            />
             <InfoField label="Сервисный сбор" value={formatPrice(order.serviceFee)} />
             <InfoField label="Payment ID" value={<span className="font-mono text-xs">{order.paymentId}</span>} />
             <InfoField label="Оплачен" value={order.paidAt ? formatDateTime(order.paidAt) : null} />
@@ -276,16 +309,18 @@ export function OrderDetailPage() {
                 {order.items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium max-w-[200px] truncate">{item.event?.title ?? '—'}</TableCell>
-                    <TableCell className="text-sm">{item.session?.startsAt ? formatDateTime(item.session.startsAt) : '—'}</TableCell>
+                    <TableCell className="text-sm">
+                      {item.session?.startsAt ? formatDateTime(item.session.startsAt) : '—'}
+                    </TableCell>
                     <TableCell className="tabular-nums">{item.dayNumber}</TableCell>
                     <TableCell>{item.slot}</TableCell>
-                    <TableCell className="tabular-nums">{item.adultTickets}+{item.childTickets}</TableCell>
+                    <TableCell className="tabular-nums">
+                      {item.adultTickets}+{item.childTickets}
+                    </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{formatPrice(item.subtotal)}</TableCell>
                     <TableCell className="font-mono text-xs">{item.tcOrderId || '—'}</TableCell>
                     <TableCell>
-                      <Badge variant={ITEM_STATUS_VARIANT[item.status] || 'secondary'}>
-                        {item.status}
-                      </Badge>
+                      <Badge variant={ITEM_STATUS_VARIANT[item.status] || 'secondary'}>{item.status}</Badge>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -306,7 +341,12 @@ export function OrderDetailPage() {
             <InfoField
               label="Ссылка"
               value={
-                <a href={order.voucher.publicUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                <a
+                  href={order.voucher.publicUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1"
+                >
                   Открыть <ExternalLink className="h-3 w-3" />
                 </a>
               }

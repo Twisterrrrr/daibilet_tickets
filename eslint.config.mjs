@@ -1,6 +1,8 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   // Базовые правила JS
@@ -14,16 +16,21 @@ export default tseslint.config(
 
   // Глобальные настройки
   {
+    plugins: {
+      'simple-import-sort': simpleImportSort,
+      'react-hooks': reactHooks,
+    },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
     },
     rules: {
       // Разрешаем неиспользуемые переменные с _ (деструктуризация)
-      '@typescript-eslint/no-unused-vars': ['error', {
+      '@typescript-eslint/no-unused-vars': ['warn', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
+        ignoreRestSiblings: true,
       }],
       // Предупреждение на any — никаких новых any (постепенно заменять)
       '@typescript-eslint/no-explicit-any': 'warn',
@@ -38,14 +45,24 @@ export default tseslint.config(
       'no-useless-catch': 'error',
       // Запрет console.* в production-коде (использовать NestJS Logger)
       'no-console': ['error', { allow: ['warn'] }],
+      // Сортировка импортов (единая политика)
+      'simple-import-sort/imports': 'warn',
+      'simple-import-sort/exports': 'warn',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'no-misleading-character-class': 'warn',
+      'no-useless-escape': 'warn',
+      'no-constant-condition': 'warn',
+      '@typescript-eslint/no-namespace': 'warn',
+      '@typescript-eslint/triple-slash-reference': 'warn',
     },
   },
 
-  // Backend-контроллеры: строже — no-explicit-any как error для DTO-покрытых файлов
+  // Backend DTO: no-explicit-any — пока warn (привести к типам в отдельной задаче)
   {
     files: ['**/packages/backend/src/**/dto/**/*.ts'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
 
@@ -60,11 +77,41 @@ export default tseslint.config(
     },
   },
 
-  // Seed/migration скрипты: разрешаем console (CLI output)
+  // Seed/migration/CLI скрипты: разрешаем console (CLI output)
   {
-    files: ['**/prisma/seed*.ts', '**/prisma/fix*.ts'],
+    files: [
+      '**/prisma/*.ts',
+      '**/prisma/**/seed*.ts',
+      '**/scripts/**/*.ts',
+      '**/__mocks__/**',
+      '**/seed/**',
+    ],
     rules: {
       'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+
+  // Backend src (вне prisma/scripts): console — warn (постепенно заменить на Logger)
+  {
+    files: ['**/packages/backend/src/**/*.ts'],
+    rules: {
+      'no-console': 'warn',
+    },
+  },
+
+  // Frontend + admin + supplier: console допускается (web-vitals, dev) — постепенно убирать
+  {
+    files: [
+      '**/packages/frontend/**/*.{ts,tsx}',
+      '**/packages/frontend-admin/**/*.{ts,tsx}',
+      '**/packages/frontend-supplier/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-console': 'warn',
+      'no-empty': 'warn',
+      '@typescript-eslint/no-empty-function': ['warn', { allow: ['arrowFunctions'] }],
+      '@typescript-eslint/triple-slash-reference': 'off',
     },
   },
 

@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
+
 import { api } from '@/lib/api';
-import { toUrlSetXml, SITE_URL, type SitemapUrl } from '@/lib/sitemap-xml';
+import { SITE_URL, type SitemapUrl, toUrlSetXml } from '@/lib/sitemap-xml';
 
 const LASTMOD = new Date().toISOString().slice(0, 10);
 
 export async function GET() {
-  const urls: SitemapUrl[] = [
-    { loc: `${SITE_URL}/blog`, lastmod: LASTMOD, changefreq: 'weekly', priority: 0.6 },
-  ];
+  const urls: SitemapUrl[] = [{ loc: `${SITE_URL}/blog`, lastmod: LASTMOD, changefreq: 'weekly', priority: 0.6 }];
 
   try {
     const { items: articles } = await api.getArticles({ limit: 500 });

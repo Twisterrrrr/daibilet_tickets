@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
-import { toUrlSetXml, SITE_URL, type SitemapUrl } from '@/lib/sitemap-xml';
+
 import { api } from '@/lib/api';
+import { SITE_URL, type SitemapUrl, toUrlSetXml } from '@/lib/sitemap-xml';
 
 const FEATURED_CITY_SLUGS = [
-  'saint-petersburg', 'moscow', 'kazan', 'nizhny-novgorod', 'kaliningrad',
-  'sochi', 'ekaterinburg', 'vladivostok', 'novosibirsk', 'yaroslavl',
+  'saint-petersburg',
+  'moscow',
+  'kazan',
+  'nizhny-novgorod',
+  'kaliningrad',
+  'sochi',
+  'ekaterinburg',
+  'vladivostok',
+  'novosibirsk',
+  'yaroslavl',
 ];
 
 const MIN_COUNT_FOR_SITEMAP = 6;
@@ -19,8 +28,18 @@ type Changefreq = NonNullable<SitemapUrl['changefreq']>;
 type FilterDef = { qf: string; category: 'EXCURSION' | 'MUSEUM' | 'EVENT'; changefreq: Changefreq; priority: number };
 
 const ALL_FILTERS: FilterDef[] = [
-  ...EXCURSION_FILTERS.map((qf) => ({ qf, category: 'EXCURSION' as const, changefreq: 'weekly' as Changefreq, priority: 0.7 })),
-  ...VENUE_FILTERS.map((qf) => ({ qf, category: 'MUSEUM' as const, changefreq: 'weekly' as Changefreq, priority: 0.6 })),
+  ...EXCURSION_FILTERS.map((qf) => ({
+    qf,
+    category: 'EXCURSION' as const,
+    changefreq: 'weekly' as Changefreq,
+    priority: 0.7,
+  })),
+  ...VENUE_FILTERS.map((qf) => ({
+    qf,
+    category: 'MUSEUM' as const,
+    changefreq: 'weekly' as Changefreq,
+    priority: 0.6,
+  })),
   ...EVENT_FILTERS.map((qf) => ({ qf, category: 'EVENT' as const, changefreq: 'daily' as Changefreq, priority: 0.7 })),
 ];
 

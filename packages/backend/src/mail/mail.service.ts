@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class MailService {
@@ -25,11 +25,14 @@ export class MailService {
   /**
    * Отправить письмо верификации отзыва.
    */
-  async sendReviewVerification(to: string, data: {
-    authorName: string;
-    eventTitle: string;
-    verifyUrl: string;
-  }): Promise<boolean> {
+  async sendReviewVerification(
+    to: string,
+    data: {
+      authorName: string;
+      eventTitle: string;
+      verifyUrl: string;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Review verify → ${to}: ${data.verifyUrl}`);
       return false;
@@ -58,12 +61,15 @@ export class MailService {
   /**
    * Отправить запрос на отзыв после посещения.
    */
-  async sendReviewRequest(to: string, data: {
-    customerName: string;
-    eventTitle: string;
-    eventDate: string;
-    reviewUrl: string;
-  }): Promise<boolean> {
+  async sendReviewRequest(
+    to: string,
+    data: {
+      customerName: string;
+      eventTitle: string;
+      eventDate: string;
+      reviewUrl: string;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Review request → ${to}: ${data.reviewUrl}`);
       return false;
@@ -93,11 +99,14 @@ export class MailService {
   /**
    * Уведомить админа о новом отзыве на модерации.
    */
-  async sendReviewApprovedNotification(to: string, data: {
-    authorName: string;
-    eventTitle: string;
-    eventUrl: string;
-  }): Promise<boolean> {
+  async sendReviewApprovedNotification(
+    to: string,
+    data: {
+      authorName: string;
+      eventTitle: string;
+      eventUrl: string;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Review approved → ${to}`);
       return false;
@@ -130,12 +139,15 @@ export class MailService {
   /**
    * Подтверждение создания заказа — отправляется сразу после createCheckoutSession.
    */
-  async sendOrderCreated(to: string, data: {
-    customerName: string;
-    shortCode: string;
-    items: Array<{ title: string; quantity: number; price: number }>;
-    totalPrice: number;
-  }): Promise<boolean> {
+  async sendOrderCreated(
+    to: string,
+    data: {
+      customerName: string;
+      shortCode: string;
+      items: Array<{ title: string; quantity: number; price: number }>;
+      totalPrice: number;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Order created → ${to}: ${data.shortCode}`);
       return false;
@@ -162,19 +174,22 @@ export class MailService {
   /**
    * Заказ подтверждён оператором.
    */
-  async sendOrderConfirmed(to: string, data: {
-    customerName: string;
-    shortCode: string;
-    items: Array<{ title: string; quantity: number; price: number }>;
-    totalPrice: number;
-    operationalItems?: Array<{
-      eventTitle: string;
-      meetingPoint?: string | null;
-      meetingInstructions?: string | null;
-      operationalPhone?: string | null;
-      operationalNote?: string | null;
-    }>;
-  }): Promise<boolean> {
+  async sendOrderConfirmed(
+    to: string,
+    data: {
+      customerName: string;
+      shortCode: string;
+      items: Array<{ title: string; quantity: number; price: number }>;
+      totalPrice: number;
+      operationalItems?: Array<{
+        eventTitle: string;
+        meetingPoint?: string | null;
+        meetingInstructions?: string | null;
+        operationalPhone?: string | null;
+        operationalNote?: string | null;
+      }>;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Order confirmed → ${to}: ${data.shortCode}`);
       return false;
@@ -209,11 +224,14 @@ export class MailService {
   /**
    * Заказ отклонён.
    */
-  async sendOrderRejected(to: string, data: {
-    customerName: string;
-    shortCode: string;
-    reason?: string;
-  }): Promise<boolean> {
+  async sendOrderRejected(
+    to: string,
+    data: {
+      customerName: string;
+      shortCode: string;
+      reason?: string;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Order rejected → ${to}: ${data.shortCode}`);
       return false;
@@ -240,11 +258,14 @@ export class MailService {
   /**
    * Заказ истёк (не подтверждён вовремя).
    */
-  async sendOrderExpired(to: string, data: {
-    customerName: string;
-    shortCode: string;
-    reason?: string;
-  }): Promise<boolean> {
+  async sendOrderExpired(
+    to: string,
+    data: {
+      customerName: string;
+      shortCode: string;
+      reason?: string;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Order expired → ${to}: ${data.shortCode}`);
       return false;
@@ -271,12 +292,15 @@ export class MailService {
   /**
    * Заказ завершён — запрос отзыва (через X дней после визита).
    */
-  async sendOrderCompleted(to: string, data: {
-    customerName: string;
-    shortCode: string;
-    eventTitle: string;
-    reviewUrl: string;
-  }): Promise<boolean> {
+  async sendOrderCompleted(
+    to: string,
+    data: {
+      customerName: string;
+      shortCode: string;
+      eventTitle: string;
+      reviewUrl: string;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Order completed → ${to}: ${data.shortCode}`);
       return false;
@@ -337,11 +361,14 @@ export class MailService {
   /**
    * Ответ на тикет поддержки — уведомление клиента.
    */
-  async sendTicketReply(to: string, data: {
-    customerName: string;
-    ticketCode: string;
-    message: string;
-  }): Promise<boolean> {
+  async sendTicketReply(
+    to: string,
+    data: {
+      customerName: string;
+      ticketCode: string;
+      message: string;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Ticket reply → ${to}: ${data.ticketCode}`);
       return false;
@@ -368,12 +395,15 @@ export class MailService {
   /**
    * Подарочный сертификат — письмо получателю с кодом.
    */
-  async sendGiftCertificate(to: string, data: {
-    code: string;
-    amountKopecks: number;
-    senderName?: string | null;
-    message?: string | null;
-  }): Promise<boolean> {
+  async sendGiftCertificate(
+    to: string,
+    data: {
+      code: string;
+      amountKopecks: number;
+      senderName?: string | null;
+      message?: string | null;
+    },
+  ): Promise<boolean> {
     if (!this.enabled) {
       this.logger.warn(`[DRY RUN] Gift certificate → ${to}: ${data.code}`);
       return false;
@@ -397,7 +427,9 @@ export class MailService {
       this.logger.log(`Gift certificate email sent → ${to} (${data.code})`);
       return true;
     } catch (err: unknown) {
-      this.logger.error(`Failed to send gift certificate to ${to}: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.error(
+        `Failed to send gift certificate to ${to}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return false;
     }
   }

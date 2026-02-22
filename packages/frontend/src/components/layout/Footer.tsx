@@ -1,5 +1,6 @@
-import Link from 'next/link';
 import { Compass } from 'lucide-react';
+import Link from 'next/link';
+
 import { api } from '@/lib/api';
 
 const staticFooterLinks = {
@@ -25,7 +26,7 @@ export async function Footer() {
     cities = (all || [])
       .map((c: any) => {
         const events = c._count?.events ?? 0;
-        const museumCount = (c.museumCount as number | undefined) ?? (c._count?.venues ?? 0);
+        const museumCount = (c.museumCount as number | undefined) ?? c._count?.venues ?? 0;
         const total = events + museumCount;
         return {
           slug: c.slug,
@@ -63,9 +64,7 @@ export async function Footer() {
                 Дай<span className="text-primary-600">билет</span>
               </span>
             </Link>
-            <p className="mt-3 text-sm text-slate-500">
-              Билеты на экскурсии, музеи и мероприятия по городам России.
-            </p>
+            <p className="mt-3 text-sm text-slate-500">Билеты на экскурсии, музеи и мероприятия по городам России.</p>
           </div>
 
           {/* Links (каталог, города, компания). Порядок: Каталог → Города → Компания */}
@@ -94,9 +93,7 @@ export async function Footer() {
 
         {/* Bottom */}
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-slate-200 pt-6 sm:flex-row">
-          <p className="text-sm text-slate-400">
-            &copy; {new Date().getFullYear()} Дайбилет. ИП Бутин В.А.
-          </p>
+          <p className="text-sm text-slate-400">&copy; {new Date().getFullYear()} Дайбилет. ИП Бутин В.А.</p>
           <div className="flex gap-6">
             <Link href="/privacy" className="text-sm text-slate-400 hover:text-slate-600">
               Конфиденциальность

@@ -1,4 +1,4 @@
-import { getToken, setToken, clearTokens } from '../lib/auth';
+import { clearTokens, getToken, setToken } from '../lib/auth';
 
 const BASE = '/api/v1';
 
@@ -22,10 +22,7 @@ async function refreshAccessToken(): Promise<boolean> {
   }
 }
 
-export async function api<T = any>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
+export async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

@@ -1,10 +1,11 @@
+import { normalizeEventTitle } from '@daibilet/shared';
 import { Injectable, Logger } from '@nestjs/common';
+import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+
 import { PrismaService } from '../prisma/prisma.service';
-import { TepApiService, TepEvent, TepCity } from './tep-api.service';
-import { normalizeEventTitle } from '@daibilet/shared';
-import { EventCategory, EventSubcategory, EventAudience, Prisma } from '@prisma/client';
+import { TepApiService, TepCity, TepEvent } from './tep-api.service';
 
 /**
  * Синхронизация событий из teplohod.info → наша БД.
@@ -38,7 +39,7 @@ export class TepSyncService {
    * ID из https://api.teplohod.info/v1/cities
    */
   private readonly CITY_MAP: Record<number, string> = {
-    1: 'moscow',           // Москва
+    1: 'moscow', // Москва
     2: 'saint-petersburg', // Санкт-Петербург (в API город с id=2 назван "Санкт-Петербург" но events city_id=2 при этом московские)
     3: 'krasnoyarsk',
     4: 'kazan',
@@ -200,9 +201,7 @@ export class TepSyncService {
       }
     }
 
-    this.logger.log(
-      `=== TEP синхронизация: ${totalSynced}/${allEvents.length} событий, ${totalSessions} сессий ===`,
-    );
+    this.logger.log(`=== TEP синхронизация: ${totalSynced}/${allEvents.length} событий, ${totalSessions} сессий ===`);
 
     return {
       status: 'ok',
@@ -361,8 +360,7 @@ export class TepSyncService {
       });
       const payload = (offerAfter?.widgetPayload as Record<string, unknown>) || {};
       const tepWidgetId =
-        (payload.tepWidgetId as number | string | null | undefined) ??
-        this.getTeplohodWidgetsMapping()[sourceId];
+        (payload.tepWidgetId as number | string | null | undefined) ?? this.getTeplohodWidgetsMapping()[sourceId];
 
       let offerStatus: 'ACTIVE' | 'DISABLED' = 'ACTIVE';
       let eventIsActive = true;
@@ -376,9 +374,7 @@ export class TepSyncService {
           } else {
             offerStatus = 'DISABLED';
             eventIsActive = false;
-            this.logger.debug(
-              `tep-${tep.id}: виджет ${tepWidgetId} → ${widgetStatus}, скрываем`,
-            );
+            this.logger.debug(`tep-${tep.id}: виджет ${tepWidgetId} → ${widgetStatus}, скрываем`);
           }
         } catch (err) {
           this.logger.warn(
@@ -438,11 +434,7 @@ export class TepSyncService {
    *
    * Используем batch INSERT ... ON CONFLICT для производительности.
    */
-  private async syncSession(
-    sourceId: string,
-    tep: TepEvent,
-    prices: any[],
-  ): Promise<number> {
+  private async syncSession(sourceId: string, tep: TepEvent, prices: any[]): Promise<number> {
     const event = await this.prisma.event.findUnique({
       where: { tcEventId: sourceId },
       select: { id: true },
@@ -539,19 +531,14 @@ export class TepSyncService {
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(10, 0, 0, 0);
 
-    const totalVacant = tep.eventTickets?.reduce(
-      (sum, t) => sum + (t.is_attached ? 0 : 1),
-      0,
-    ) ?? 0;
+    const totalVacant = tep.eventTickets?.reduce((sum, t) => sum + (t.is_attached ? 0 : 1), 0) ?? 0;
     const hasAvailableSlots = totalVacant > 0;
 
     const existing = await this.prisma.eventSession.findUnique({
       where: { tcSessionId: sessionId },
       select: { startsAt: true },
     });
-    const startsAt = (existing && new Date(existing.startsAt) > now)
-      ? existing.startsAt
-      : tomorrow;
+    const startsAt = existing && new Date(existing.startsAt) > now ? existing.startsAt : tomorrow;
 
     await this.prisma.eventSession.upsert({
       where: { tcSessionId: sessionId },
@@ -580,66 +567,63 @@ export class TepSyncService {
    * Совпадает с TC Sync для единообразия.
    */
   private static readonly KEYWORD_TAG_MAP: Record<string, string[]> = {
-    'ночн': ['nochnye', 'night'],
-    'ночь': ['night'],
-    'полуночн': ['night'],
+    ночн: ['nochnye', 'night'],
+    ночь: ['night'],
+    полуночн: ['night'],
     night: ['night'],
-    'теплоход': ['panoramnyi', 'water'],
-    'речн': ['panoramnyi', 'water'],
-    'катер': ['water'],
-    'яхт': ['water'],
-    'водн': ['water'],
+    теплоход: ['panoramnyi', 'water'],
+    речн: ['panoramnyi', 'water'],
+    катер: ['water'],
+    яхт: ['water'],
+    водн: ['water'],
     'по неве': ['water', 'panoramnyi'],
     'по реке': ['water'],
     'по каналам': ['water'],
     boat: ['water'],
     river: ['water'],
-    'романтик': ['romantika', 'romantic'],
-    'свидан': ['romantika', 'romantic'],
+    романтик: ['romantika', 'romantic'],
+    свидан: ['romantika', 'romantic'],
     'для двоих': ['romantika', 'romantic'],
     romantic: ['romantic'],
     'с гидом': ['with-guide'],
-    'экскурсовод': ['with-guide'],
-    'сопровожден': ['with-guide'],
+    экскурсовод: ['with-guide'],
+    сопровожден: ['with-guide'],
     'гид ': ['with-guide'],
     guided: ['with-guide'],
-    'закрыт': ['bad-weather-ok'],
+    закрыт: ['bad-weather-ok'],
     'в помещени': ['bad-weather-ok'],
-    'крытый': ['bad-weather-ok'],
+    крытый: ['bad-weather-ok'],
     indoor: ['bad-weather-ok'],
-    'обзорн': ['first-time-city'],
+    обзорн: ['first-time-city'],
     'знакомство с город': ['first-time-city'],
     'главные достопримечательност': ['first-time-city'],
     'must see': ['first-time-city'],
     'топ ': ['first-time-city'],
     'лучшие места': ['first-time-city'],
-    'интерактив': ['interactive'],
-    'квест': ['kvesty', 'interactive'],
+    интерактив: ['interactive'],
+    квест: ['kvesty', 'interactive'],
     interactive: ['interactive'],
     quest: ['interactive'],
-    'аудиогид': ['audioguide'],
+    аудиогид: ['audioguide'],
     'аудио-гид': ['audioguide'],
     audioguide: ['audioguide'],
     'audio guide': ['audioguide'],
     'без очеред': ['no-queue'],
-    'приоритетн': ['no-queue'],
+    приоритетн: ['no-queue'],
     'skip the line': ['no-queue'],
     'fast track': ['no-queue'],
     'с обедом': ['s-pitaniem'],
     'с ужином': ['s-pitaniem'],
     'живая музыка': ['zhivaya-muzyka'],
-    'кафе': ['kafe-bar'],
-    'бар': ['kafe-bar'],
-    'панорам': ['panoramnyi'],
+    кафе: ['kafe-bar'],
+    бар: ['kafe-bar'],
+    панорам: ['panoramnyi'],
   };
 
   /**
    * Связать фичи teplohod.info (Кафе-бар, WC, Дискотека) с тегами.
    */
-  private async syncFeatureTags(
-    sourceId: string,
-    features: { id: number; title: string }[],
-  ): Promise<void> {
+  private async syncFeatureTags(sourceId: string, features: { id: number; title: string }[]): Promise<void> {
     const event = await this.prisma.event.findUnique({
       where: { tcEventId: sourceId },
       select: { id: true },
@@ -649,7 +633,7 @@ export class TepSyncService {
     const featureToTag: Record<string, string> = {
       'С обедом/ужином': 's-pitaniem',
       'Живая музыка': 'zhivaya-muzyka',
-      'Дискотека': 'diskoteka',
+      Дискотека: 'diskoteka',
       'Кафе-бар': 'kafe-bar',
       'Шоу-программа': 'shou-programma',
       'Можно с детской коляской': 's-detmi',
@@ -736,9 +720,35 @@ export class TepSyncService {
    * Используется для событий без eventPlaces.
    */
   private static readonly CITY_KEYWORDS: { cityId: number; keywords: string[] }[] = [
-    { cityId: 2, keywords: ['санкт-петербург', 'петербург', 'спб', 'невы', 'неве', 'невой', 'исаакиевск', 'крестовск', 'адмиралтейск', 'василеостровск', 'петроградск', 'эрмитаж', 'финский залив'] },
+    {
+      cityId: 2,
+      keywords: [
+        'санкт-петербург',
+        'петербург',
+        'спб',
+        'невы',
+        'неве',
+        'невой',
+        'исаакиевск',
+        'крестовск',
+        'адмиралтейск',
+        'василеостровск',
+        'петроградск',
+        'эрмитаж',
+        'финский залив',
+      ],
+    },
     { cityId: 4, keywords: ['казань', 'казани', 'казанск', 'татарстан'] },
-    { cityId: 7, keywords: ['нижний новгород', 'нижнего новгорода', 'нижнем новгороде', 'минина и пожарского', 'дмитриевской башни'] },
+    {
+      cityId: 7,
+      keywords: [
+        'нижний новгород',
+        'нижнего новгорода',
+        'нижнем новгороде',
+        'минина и пожарского',
+        'дмитриевской башни',
+      ],
+    },
     { cityId: 3, keywords: ['красноярск'] },
     { cityId: 5, keywords: ['череповец'] },
     { cityId: 6, keywords: ['пенза'] },
@@ -829,7 +839,11 @@ export class TepSyncService {
    * Маппинг категорий teplohod.info → category + subcategory + audience.
    * teplohod.info — разнородный агрегатор: речные экскурсии, музеи, автобусы, мероприятия и т.д.
    */
-  private classifyTep(tep: TepEvent): { category: EventCategory; subcategories: EventSubcategory[]; audience: EventAudience } {
+  private classifyTep(tep: TepEvent): {
+    category: EventCategory;
+    subcategories: EventSubcategory[];
+    audience: EventAudience;
+  } {
     const cat = (tep.category || '').toLowerCase();
     const title = (tep.title || '').toLowerCase();
     const desc = (tep.description || '').toLowerCase();
@@ -850,11 +864,27 @@ export class TepSyncService {
       return { category: EventCategory.EVENT, subcategories: [EventSubcategory.PARTY], audience };
 
     // Речная/водная экскурсия — только если в заголовке/описании есть «экскурсия»
-    const isWater = this.hasTep(text, ['теплоход', 'речн', 'катер', 'корабл', 'яхт', 'водн', 'по неве', 'по реке', 'круиз', 'развод мостов', 'салют', 'палубн']);
+    const isWater = this.hasTep(text, [
+      'теплоход',
+      'речн',
+      'катер',
+      'корабл',
+      'яхт',
+      'водн',
+      'по неве',
+      'по реке',
+      'круиз',
+      'развод мостов',
+      'салют',
+      'палубн',
+    ]);
     const hasExcursion = this.hasTep(text, ['экскурсия']);
     if (isWater && hasExcursion) {
       const subs: EventSubcategory[] = [EventSubcategory.RIVER];
-      if (!this.hasTep(text, ['лагерь', 'camp', 'выездной']) && this.hasTep(text, ['гастро', 'гастрономич', 'дегустац', 'culinary', 'food tour']))
+      if (
+        !this.hasTep(text, ['лагерь', 'camp', 'выездной']) &&
+        this.hasTep(text, ['гастро', 'гастрономич', 'дегустац', 'culinary', 'food tour'])
+      )
         subs.push(EventSubcategory.GASTRO);
       return { category: EventCategory.EXCURSION, subcategories: subs, audience };
     }
@@ -897,9 +927,7 @@ export class TepSyncService {
   private extractMinPrice(tickets: TepEvent['eventTickets']): number | null {
     if (!tickets?.length) return null;
 
-    const prices = tickets
-      .map((t) => Math.round(parseFloat(t.price) * 100))
-      .filter((p) => p > 0);
+    const prices = tickets.map((t) => Math.round(parseFloat(t.price) * 100)).filter((p) => p > 0);
 
     return prices.length > 0 ? Math.min(...prices) : null;
   }
@@ -919,9 +947,7 @@ export class TepSyncService {
       amount: 100, // teplohod.info не возвращает количество в compact
       amountVacant: 100,
       withSeats: false,
-      strikePrice: t.strike_price
-        ? Math.round(parseFloat(t.strike_price) * 100)
-        : null,
+      strikePrice: t.strike_price ? Math.round(parseFloat(t.strike_price) * 100) : null,
     }));
   }
 
@@ -930,12 +956,7 @@ export class TepSyncService {
    */
   private cleanDescription(desc: string): string {
     if (!desc) return '';
-    return desc
-      .replace(/\r\n/g, '<br>')
-      .replace(/\n/g, '<br>')
-      .replace(/\t/g, '')
-      .replace(/ {2,}/g, ' ')
-      .trim();
+    return desc.replace(/\r\n/g, '<br>').replace(/\n/g, '<br>').replace(/\t/g, '').replace(/ {2,}/g, ' ').trim();
   }
 
   /**
@@ -959,10 +980,38 @@ export class TepSyncService {
    */
   private transliterate(text: string): string {
     const map: Record<string, string> = {
-      а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'zh',
-      з: 'z', и: 'i', й: 'j', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o',
-      п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts',
-      ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu',
+      а: 'a',
+      б: 'b',
+      в: 'v',
+      г: 'g',
+      д: 'd',
+      е: 'e',
+      ё: 'yo',
+      ж: 'zh',
+      з: 'z',
+      и: 'i',
+      й: 'j',
+      к: 'k',
+      л: 'l',
+      м: 'm',
+      н: 'n',
+      о: 'o',
+      п: 'p',
+      р: 'r',
+      с: 's',
+      т: 't',
+      у: 'u',
+      ф: 'f',
+      х: 'h',
+      ц: 'ts',
+      ч: 'ch',
+      ш: 'sh',
+      щ: 'shch',
+      ъ: '',
+      ы: 'y',
+      ь: '',
+      э: 'e',
+      ю: 'yu',
       я: 'ya',
     };
 

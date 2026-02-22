@@ -17,6 +17,7 @@ import {
   QUEUE_SYNC,
 } from '../queue/queue.constants';
 import { TagAssignmentService } from '../scheduler/tag-assignment.service';
+import { ScheduleModule } from '../schedule/schedule.module';
 import { SupportModule } from '../support/support.module';
 import { AdminArticlesController } from './admin-articles.controller';
 import { AdminAuditController } from './admin-audit.controller';
@@ -33,6 +34,7 @@ import { AdminModerationController } from './admin-moderation.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminOrdersController } from './admin-orders.controller';
 import { AdminReconciliationController } from './admin-reconciliation.controller';
+import { AdminScheduleController } from './admin-schedule.controller';
 import { AdminReviewsController } from './admin-reviews.controller';
 import { AdminSettingsController } from './admin-settings.controller';
 import { AdminSuppliersController } from './admin-suppliers.controller';
@@ -48,6 +50,7 @@ import { FailedJobsService } from './failed-jobs.service';
   imports: [
     PrismaModule,
     AuthModule,
+    ScheduleModule,
     RedisCacheModule,
     SupportModule,
     CheckoutModule,
@@ -91,6 +94,7 @@ import { FailedJobsService } from './failed-jobs.service';
     AdminOpsController,
     AdminReconciliationController,
     AdminJobsController,
+    AdminScheduleController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })

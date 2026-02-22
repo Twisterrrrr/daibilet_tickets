@@ -2,9 +2,9 @@
  * Поиск tep-события по tcEventId.
  * Запуск: npx tsx prisma/find-tep-event.ts 370
  */
+import { PrismaClient } from '@prisma/client';
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
-import { PrismaClient } from '@prisma/client';
 
 // Load .env
 const rootEnv = resolve(process.cwd(), '../../.env');
@@ -31,7 +31,12 @@ async function main() {
     include: {
       city: { select: { slug: true, name: true } },
       offers: { where: { isDeleted: false }, select: { id: true, status: true, widgetPayload: true } },
-      sessions: { where: { isActive: true }, select: { startsAt: true, availableTickets: true }, orderBy: { startsAt: 'asc' }, take: 5 },
+      sessions: {
+        where: { isActive: true },
+        select: { startsAt: true, availableTickets: true },
+        orderBy: { startsAt: 'asc' },
+        take: 5,
+      },
       override: { select: { isHidden: true, category: true } },
     },
   });
@@ -56,7 +61,10 @@ async function main() {
   console.log(`offers: ${event.offers.length} (active: ${event.offers.filter((o) => o.status === 'ACTIVE').length})`);
   console.log(`sessions (активных): ${event.sessions.length}, будущих: ${futureSessions.length}`);
   if (event.sessions.length > 0) {
-    console.log('  первые 5:', event.sessions.map((s) => s.startsAt.toISOString().slice(0, 16)));
+    console.log(
+      '  первые 5:',
+      event.sessions.map((s) => s.startsAt.toISOString().slice(0, 16)),
+    );
   }
   console.log('');
 }

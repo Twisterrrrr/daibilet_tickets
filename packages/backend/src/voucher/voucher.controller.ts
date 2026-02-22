@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Res } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
+
 import { VoucherService } from './voucher.service';
 
 @ApiTags('vouchers')

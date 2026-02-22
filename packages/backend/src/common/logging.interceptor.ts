@@ -3,16 +3,10 @@
  * Выполняется после RequestIdMiddleware, req.id уже установлен.
  */
 
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  Logger,
-} from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
+import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { Request } from 'express';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -31,9 +25,7 @@ export class LoggingInterceptor implements NestInterceptor {
           const duration = Date.now() - start;
           const res = ctx.getResponse();
           const status = res.statusCode;
-          this.logger.log(
-            `[requestId=${requestId}] ${method} ${url} ${status} ${duration}ms`,
-          );
+          this.logger.log(`[requestId=${requestId}] ${method} ${url} ${status} ${duration}ms`);
         },
       }),
     );

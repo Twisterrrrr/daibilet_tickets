@@ -1,11 +1,12 @@
 'use client';
 
-import Link from 'next/link';
+import { type EventCategory, type EventSubcategory, formatPrice } from '@daibilet/shared';
+import { Award, Clock, Flame, MapPin, Star, Ticket } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Clock, MapPin, Star, Ticket, Flame, Award } from 'lucide-react';
+
 import { FavoriteButton } from './FavoriteButton';
-import { formatPrice, type EventCategory, type EventSubcategory } from '@daibilet/shared';
 
 interface EventCardProps {
   slug: string;
@@ -89,9 +90,7 @@ export function EventCard({
 }: EventCardProps) {
   const router = useRouter();
   const showLowTickets =
-    totalAvailableTickets !== undefined &&
-    totalAvailableTickets > 0 &&
-    totalAvailableTickets <= LOW_TICKETS_THRESHOLD;
+    totalAvailableTickets !== undefined && totalAvailableTickets > 0 && totalAvailableTickets <= LOW_TICKETS_THRESHOLD;
   const showPopular = reviewCount >= 100;
   const hasDiscount =
     priceOriginalKopecks != null &&
@@ -110,7 +109,9 @@ export function EventCard({
     if (!nextSessionAt) return false;
     const d = new Date(nextSessionAt);
     const today = new Date();
-    return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+    return (
+      d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate()
+    );
   })();
 
   const handleSlotClick = (e: React.MouseEvent, time: string) => {
@@ -208,7 +209,9 @@ export function EventCard({
         {/* Между фото и названием: Рейтинг слева, Город прижат вправо */}
         <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500 sm:text-xs">
           <span className="flex items-center gap-0.5 shrink-0">
-            <Star className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${Number(rating) > 0 ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'}`} />
+            <Star
+              className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${Number(rating) > 0 ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'}`}
+            />
             {Number(rating) > 0 ? (
               <>
                 <span className="font-medium text-slate-700">{Number(rating).toFixed(1)}</span>
@@ -241,9 +244,7 @@ export function EventCard({
             </span>
           )}
           {groupSize && <span>{groupSize}</span>}
-          {dateMode === 'OPEN_DATE' && (
-            <span className="font-medium text-emerald-600">Билет с открытой датой</span>
-          )}
+          {dateMode === 'OPEN_DATE' && <span className="font-medium text-emerald-600">Билет с открытой датой</span>}
           {dateMode !== 'OPEN_DATE' && nextSessionAt && (
             <span className="font-medium text-primary-600">
               {isToday && displaySlots.length > 0 ? 'Сегодня' : formatNextSession(nextSessionAt)}

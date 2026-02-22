@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import { api } from '../lib/api';
 
 export default function Reports() {
@@ -14,14 +15,18 @@ export default function Reports() {
     api.get<any>(`/supplier/reports/sales?${params}`).then(setData);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Отчёт о продажах</h1>
-        <a href={`/api/v1/supplier/reports/sales/export?from=${from}&to=${to}`}
-          className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm">
+        <a
+          href={`/api/v1/supplier/reports/sales/export?from=${from}&to=${to}`}
+          className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm"
+        >
           <Download className="h-4 w-4" /> Скачать CSV
         </a>
       </div>
@@ -29,13 +34,21 @@ export default function Reports() {
       <div className="flex gap-4 items-end">
         <div>
           <label className="block text-xs text-gray-500 mb-1">От</label>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-            className="px-3 py-2 border rounded-lg text-sm" />
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="px-3 py-2 border rounded-lg text-sm"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">До</label>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-            className="px-3 py-2 border rounded-lg text-sm" />
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="px-3 py-2 border rounded-lg text-sm"
+          />
         </div>
         <button onClick={load} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
           Применить
@@ -82,7 +95,11 @@ export default function Reports() {
               </tr>
             ))}
             {(!data?.items || data.items.length === 0) && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Нет данных</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                  Нет данных
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

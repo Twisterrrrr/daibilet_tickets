@@ -28,9 +28,7 @@ async function main() {
   });
   if (standupInMuseum.length > 0) {
     console.log('1. STANDUP в MUSEUM (должно быть EVENT):');
-    standupInMuseum.forEach((e) =>
-      console.log(`   - ${e.slug} | ${e.title} | subcats: ${e.subcategories.join(', ')}`)
-    );
+    standupInMuseum.forEach((e) => console.log(`   - ${e.slug} | ${e.title} | subcats: ${e.subcategories.join(', ')}`));
     console.log(`   Всего: ${standupInMuseum.length}\n`);
   } else {
     console.log('1. STANDUP в MUSEUM: нет подозрительных\n');
@@ -48,7 +46,7 @@ async function main() {
   if (masterclassInMuseum.length > 0) {
     console.log('2. MASTERCLASS в MUSEUM (часто должен быть EVENT):');
     masterclassInMuseum.forEach((e) =>
-      console.log(`   - ${e.slug} | ${e.title} | subcats: ${e.subcategories.join(', ')}`)
+      console.log(`   - ${e.slug} | ${e.title} | subcats: ${e.subcategories.join(', ')}`),
     );
     console.log(`   Всего: ${masterclassInMuseum.length}\n`);
   } else {

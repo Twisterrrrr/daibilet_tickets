@@ -1,40 +1,34 @@
+import {
+  ArrowRight,
+  CalendarDays,
+  DollarSign,
+  ExternalLink,
+  MessageSquare,
+  Ticket,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  DollarSign,
-  Ticket,
-  CalendarDays,
-  MessageSquare,
-  TrendingUp,
-  TrendingDown,
-  ArrowRight,
-  ExternalLink,
-} from 'lucide-react';
-import {
-  AreaChart,
   Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
 } from 'recharts';
+
 import { adminApi } from '@/api/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -161,7 +155,10 @@ function StatCard({ title, value, trend, icon: Icon, description }: StatCardProp
         {trend !== undefined && (
           <p className={`flex items-center gap-1 text-xs ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
             <TrendIcon className="h-3 w-3" />
-            <span>{isPositive ? '+' : ''}{trend}% за 30 дней</span>
+            <span>
+              {isPositive ? '+' : ''}
+              {trend}% за 30 дней
+            </span>
           </p>
         )}
         {description && <p className="text-xs text-muted-foreground">{description}</p>}
@@ -316,9 +313,7 @@ export function DashboardPage() {
         <Card className="lg:col-span-4">
           <CardHeader>
             <CardTitle className="text-base">Выручка за 30 дней</CardTitle>
-            <CardDescription>
-              Общая сумма оплаченных заказов по дням
-            </CardDescription>
+            <CardDescription>Общая сумма оплаченных заказов по дням</CardDescription>
           </CardHeader>
           <CardContent>
             {revenueChartData.length > 0 ? (
@@ -405,10 +400,7 @@ export function DashboardPage() {
                       {idx + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <Link
-                        to={`/events/${ev.eventId}`}
-                        className="text-sm font-medium hover:underline truncate block"
-                      >
+                      <Link to={`/events/${ev.eventId}`} className="text-sm font-medium hover:underline truncate block">
                         {ev.title}
                       </Link>
                       <div className="mt-1 h-2 w-full rounded-full bg-muted overflow-hidden">

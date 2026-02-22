@@ -93,9 +93,7 @@ export function buildPaginatedResult<T extends { id: string }>(
 ): PaginatedResult<T> {
   const hasMore = rawItems.length > limit;
   const items = hasMore ? rawItems.slice(0, limit) : rawItems;
-  const nextCursor = hasMore && items.length > 0
-    ? items[items.length - 1].id
-    : null;
+  const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].id : null;
 
   return { items, total, nextCursor, hasMore };
 }

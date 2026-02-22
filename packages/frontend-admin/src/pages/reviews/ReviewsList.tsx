@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { toast } from 'sonner';
 import { CheckCircle2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -15,8 +15,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 interface ReviewPhoto {
   id: string;
@@ -69,7 +70,11 @@ export function ReviewsListPage() {
   const [rejectDialogId, setRejectDialogId] = useState<string | null>(null);
   const [rejectComment, setRejectComment] = useState('');
 
-  const statusFilter = (searchParams.get('status') || 'PENDING') as 'PENDING_EMAIL' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  const statusFilter = (searchParams.get('status') || 'PENDING') as
+    | 'PENDING_EMAIL'
+    | 'PENDING'
+    | 'APPROVED'
+    | 'REJECTED';
   const page = Number(searchParams.get('page')) || 1;
 
   const fetchReviews = useCallback(async () => {
@@ -163,9 +168,7 @@ export function ReviewsListPage() {
     if (reviews.length === 0) {
       return (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Нет отзывов с таким статусом
-          </CardContent>
+          <CardContent className="py-12 text-center text-muted-foreground">Нет отзывов с таким статусом</CardContent>
         </Card>
       );
     }
@@ -179,9 +182,7 @@ export function ReviewsListPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold">{r.authorName}</span>
                     <span className="text-amber-500 text-sm tracking-wider">{stars(r.rating)}</span>
-                    <Badge variant={STATUS_VARIANTS[r.status] ?? 'default'}>
-                      {STATUS_LABELS[r.status]}
-                    </Badge>
+                    <Badge variant={STATUS_VARIANTS[r.status] ?? 'default'}>{STATUS_LABELS[r.status]}</Badge>
                     {r.isVerified && (
                       <Badge variant="success" className="gap-1">
                         <CheckCircle2 className="h-3 w-3" />
@@ -195,16 +196,11 @@ export function ReviewsListPage() {
                     {r.voucherCode && <span>Ваучер: {r.voucherCode}</span>}
                   </div>
                   {r.event && (
-                    <Link
-                      to={`/events/${r.event.id}`}
-                      className="mt-1 block text-xs text-primary hover:underline"
-                    >
+                    <Link to={`/events/${r.event.id}`} className="mt-1 block text-xs text-primary hover:underline">
                       {r.event.title}
                     </Link>
                   )}
-                  {r.title && (
-                    <p className="mt-2 text-sm font-medium">{r.title}</p>
-                  )}
+                  {r.title && <p className="mt-2 text-sm font-medium">{r.title}</p>}
                   <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{r.text}</p>
                   {r.photos && r.photos.length > 0 && (
                     <div className="mt-2 flex gap-1.5">
@@ -220,9 +216,7 @@ export function ReviewsListPage() {
                     </div>
                   )}
                   {r.helpfulCount > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      👍 Полезный: {r.helpfulCount}
-                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">👍 Полезный: {r.helpfulCount}</p>
                   )}
                   {r.adminComment && (
                     <p className="mt-2 rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive">
@@ -307,10 +301,7 @@ export function ReviewsListPage() {
       </div>
 
       {/* Status tabs */}
-      <Tabs
-        value={statusFilter}
-        onValueChange={(v) => setFilter('status', v)}
-      >
+      <Tabs value={statusFilter} onValueChange={(v) => setFilter('status', v)}>
         <TabsList className="grid w-full max-w-lg grid-cols-4">
           <TabsTrigger value="PENDING" className="gap-1.5">
             {STATUS_LABELS.PENDING}

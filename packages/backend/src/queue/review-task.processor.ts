@@ -1,12 +1,11 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { QUEUE_REVIEW_TASKS } from './queue.constants';
 
-export type ReviewTaskData =
-  | { type: 'cleanup-expired-tokens' }
-  | { type: 'send-review-requests' };
+export type ReviewTaskData = { type: 'cleanup-expired-tokens' } | { type: 'send-review-requests' };
 
 @Processor(QUEUE_REVIEW_TASKS)
 export class ReviewTaskProcessor extends WorkerHost {

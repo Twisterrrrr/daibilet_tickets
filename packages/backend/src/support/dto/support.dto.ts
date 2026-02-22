@@ -1,12 +1,5 @@
-import {
-  IsString,
-  IsEmail,
-  IsNotEmpty,
-  IsOptional,
-  IsEnum,
-  MaxLength,
-} from 'class-validator';
 import { TicketCategory } from '@prisma/client';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 // ============================================================
 // Create support request DTO — POST /support/request

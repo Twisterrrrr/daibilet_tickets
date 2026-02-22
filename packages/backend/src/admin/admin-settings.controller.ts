@@ -79,7 +79,7 @@ export class AdminSettingsController {
 
     const config = await this.getOrCreatePricingConfig();
 
-    const { id: _, updatedAt, ...clean } = data as any;
+    const { id: _, updatedAt, ...clean } = data as UpdatePricingDto & Record<string, unknown>;
 
     const updated = await this.prisma.pricingConfig.update({
       where: { id: config.id },

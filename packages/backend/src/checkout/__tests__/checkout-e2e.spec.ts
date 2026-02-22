@@ -5,18 +5,16 @@
  * Полноценные E2E (с БД + Redis) — в отдельном test:e2e задании.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
-  resolvePaymentFlow,
-  PaymentFlowType,
-  partitionCart,
   isSessionFullyFulfilled,
+  partitionCart,
+  PaymentFlowType,
+  resolvePaymentFlow,
   SnapshotLineItem,
 } from '../cart-partitioning';
-import {
-  tryTransitionPayment,
-  tryTransitionCheckout,
-} from '../checkout-state-machine';
+import { tryTransitionCheckout, tryTransitionPayment } from '../checkout-state-machine';
 
 // ============================================================
 // Helpers

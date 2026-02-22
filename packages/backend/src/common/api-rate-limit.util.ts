@@ -41,11 +41,13 @@ export async function withRetry<T>(
   const maxRetries = opts?.maxRetries ?? DEFAULT_MAX_RETRIES;
   const initialBackoffMs = opts?.initialBackoffMs ?? DEFAULT_INITIAL_BACKOFF_MS;
 
-  const shouldRetry = opts?.shouldRetry ?? ((status?: number) => {
-    if (status === 429) return true;
-    if (status != null && status >= 500) return true;
-    return false;
-  });
+  const shouldRetry =
+    opts?.shouldRetry ??
+    ((status?: number) => {
+      if (status === 429) return true;
+      if (status != null && status >= 500) return true;
+      return false;
+    });
 
   let lastError: Error | undefined;
   let lastStatus: number | undefined;

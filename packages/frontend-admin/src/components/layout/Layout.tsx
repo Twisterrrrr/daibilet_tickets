@@ -1,14 +1,10 @@
+import { ChevronRight, LogOut, Menu, Moon, Sun, User } from 'lucide-react';
 import { useState } from 'react';
-import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
-import { Menu, LogOut, ChevronRight, User, Moon, Sun } from 'lucide-react';
-import { Sidebar } from './Sidebar';
-import { clearTokens } from '@/lib/auth';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
-import { cn } from '@/lib/utils';
-import { useTheme } from '@/lib/theme';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,8 +13,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { clearTokens } from '@/lib/auth';
+import { useTheme } from '@/lib/theme';
+import { cn } from '@/lib/utils';
+
+import { Sidebar } from './Sidebar';
 
 const ROUTE_LABELS: Record<string, string> = {
   '': 'Dashboard',
@@ -147,9 +149,7 @@ export function Layout() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                      AD
-                    </AvatarFallback>
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">AD</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>

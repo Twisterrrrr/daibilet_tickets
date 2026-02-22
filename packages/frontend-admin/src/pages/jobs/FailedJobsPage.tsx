@@ -1,17 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { RefreshCw, RotateCcw } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { RotateCcw, RefreshCw } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const QUEUE_OPTIONS = [
   { value: '_all', label: 'Все очереди' },
@@ -161,9 +156,7 @@ export function FailedJobsPage() {
               </table>
             </div>
           )}
-          {total > 0 && (
-            <p className="mt-2 text-sm text-muted-foreground">Всего: {total}</p>
-          )}
+          {total > 0 && <p className="mt-2 text-sm text-muted-foreground">Всего: {total}</p>}
         </CardContent>
       </Card>
     </div>

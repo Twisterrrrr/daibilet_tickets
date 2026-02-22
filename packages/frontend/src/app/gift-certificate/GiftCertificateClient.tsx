@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Gift, ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
 import { formatPrice } from '@daibilet/shared';
+import { ArrowLeft, CheckCircle, Gift, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
@@ -89,9 +89,7 @@ export function GiftCertificateClient({ denominations }: GiftCertificateClientPr
             <CheckCircle className="h-8 w-8 text-emerald-600" />
           </div>
           <h1 className="mt-4 text-2xl font-bold text-slate-900">Заявка отправлена</h1>
-          <p className="mt-2 text-slate-600">
-            Ссылка для оплаты будет отправлена на вашу почту.
-          </p>
+          <p className="mt-2 text-slate-600">Ссылка для оплаты будет отправлена на вашу почту.</p>
           <Link
             href="/events"
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 font-medium text-white hover:bg-primary-700"
@@ -106,10 +104,7 @@ export function GiftCertificateClient({ denominations }: GiftCertificateClientPr
   return (
     <div className="container-page py-12">
       <div className="mx-auto max-w-xl">
-        <Link
-          href="/events"
-          className="mb-6 inline-flex items-center gap-2 text-slate-600 hover:text-slate-900"
-        >
+        <Link href="/events" className="mb-6 inline-flex items-center gap-2 text-slate-600 hover:text-slate-900">
           <ArrowLeft className="h-4 w-4" />
           Назад
         </Link>
@@ -126,9 +121,7 @@ export function GiftCertificateClient({ denominations }: GiftCertificateClientPr
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
           )}
 
           <div>
@@ -140,9 +133,7 @@ export function GiftCertificateClient({ denominations }: GiftCertificateClientPr
                   type="button"
                   onClick={() => setAmount(d)}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                    amount === d
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    amount === d ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   {formatPrice(d)}

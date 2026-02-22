@@ -43,9 +43,7 @@ export function MuseumRouteBuilder({ citySlug }: MuseumRouteBuilderProps) {
         >
           Посмотреть экскурсии
         </Link>
-        <div className="text-sm text-slate-600">
-          Дальше можно добавить экскурсии или купить всё одним заказом.
-        </div>
+        <div className="text-sm text-slate-600">Дальше можно добавить экскурсии или купить всё одним заказом.</div>
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 'use client';
 
-import { EventCategory, type CatalogItem } from '@daibilet/shared';
+import { type CatalogItem, EventCategory } from '@daibilet/shared';
+
 import { EventCard } from './EventCard';
 import { EventCardHorizontal } from './EventCardHorizontal';
 import { VenueCard } from './VenueCard';

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 
 export function MuseumsSearch() {
   const router = useRouter();

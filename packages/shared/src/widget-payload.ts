@@ -115,8 +115,9 @@ export function validateWidgetPayload(
   }
 
   // Zod v4 compatible error extraction
-  const errors = (result as any).error?.issues?.map?.((i: any) => `${i.path?.join?.('.') || ''}: ${i.message}`)
-    || ['Невалидный widgetPayload'];
+  const errors = (result as any).error?.issues?.map?.((i: any) => `${i.path?.join?.('.') || ''}: ${i.message}`) || [
+    'Невалидный widgetPayload',
+  ];
 
   return { valid: false, errors };
 }

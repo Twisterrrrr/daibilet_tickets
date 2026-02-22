@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { FilterBar, type FilterState } from '@/components/landing/FilterBar';
+import { useMemo, useState } from 'react';
+
 import { ComparisonTable } from '@/components/landing/ComparisonTable';
+import { FilterBar, type FilterState } from '@/components/landing/FilterBar';
 import { VariantCards } from '@/components/landing/VariantCard';
 
-interface Variant {
+export interface Variant {
   sessionId: string;
   startsAt: string;
   endsAt?: string;
@@ -26,7 +27,7 @@ interface Variant {
   };
 }
 
-interface Filters {
+export interface Filters {
   piers: string[];
   priceRange: [number, number];
   dateRange: string[];
@@ -79,7 +80,7 @@ function scoreOffer(v: Variant, allPrices: number[]): number {
   // Места
   const seatScore = v.availableTickets <= 0 ? 0 : Math.min(v.availableTickets / 20, 1);
 
-  return 0.35 * timeScore + 0.30 * priceScore + 0.20 * ratingScore + 0.15 * seatScore;
+  return 0.35 * timeScore + 0.3 * priceScore + 0.2 * ratingScore + 0.15 * seatScore;
 }
 
 function pickOptimal(variants: Variant[]): number | null {
@@ -160,10 +161,7 @@ export function LandingClient({
     });
   }, [allVariants, filterState]);
 
-  const sorted = useMemo(
-    () => sortVariants(filtered, filterState.sort),
-    [filtered, filterState.sort],
-  );
+  const sorted = useMemo(() => sortVariants(filtered, filterState.sort), [filtered, filterState.sort]);
 
   const bestDealIdx = useMemo(() => pickOptimal(sorted), [sorted]);
 

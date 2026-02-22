@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
 
 const TRUST_LABELS: Record<number, string> = {
@@ -27,7 +28,9 @@ export function SuppliersListPage() {
     });
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -67,20 +70,30 @@ export function SuppliersListPage() {
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{s.contactEmail}</td>
                 <td className="px-4 py-3 text-center">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TRUST_COLORS[s.trustLevel] || TRUST_COLORS[0]}`}>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${TRUST_COLORS[s.trustLevel] || TRUST_COLORS[0]}`}
+                  >
                     {TRUST_LABELS[s.trustLevel] || s.trustLevel}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-center">
                   {(Number(s.commissionRate) * 100).toFixed(0)}%
-                  {s.promoRate && <span className="text-green-600 text-xs ml-1">({(Number(s.promoRate) * 100).toFixed(0)}% промо)</span>}
+                  {s.promoRate && (
+                    <span className="text-green-600 text-xs ml-1">
+                      ({(Number(s.promoRate) * 100).toFixed(0)}% промо)
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center">{s._count?.events || 0}</td>
                 <td className="px-4 py-3 text-center">{s.successfulSales || 0}</td>
               </tr>
             ))}
             {suppliers.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Нет поставщиков</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  Нет поставщиков
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

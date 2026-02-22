@@ -1,11 +1,12 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
+
 import { isAuthenticated } from './lib/api';
+import Dashboard from './pages/Dashboard';
+import EventEdit from './pages/events/EventEdit';
+import EventsList from './pages/events/EventsList';
 import Layout from './pages/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import EventsList from './pages/events/EventsList';
-import EventEdit from './pages/events/EventEdit';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 
@@ -18,7 +19,14 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<Dashboard />} />
         <Route path="events" element={<EventsList />} />
         <Route path="events/new" element={<EventEdit />} />

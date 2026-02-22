@@ -1,21 +1,16 @@
+import { ArrowLeft, Plus, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Save, ArrowLeft, Trash2, Plus, X } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 const CATEGORIES = [
   { value: '', label: '— Без фильтра —' },
@@ -104,37 +99,43 @@ export function CollectionEditPage() {
 
   useEffect(() => {
     // Загрузка городов
-    adminApi.get<{ items: CityOption[] }>('/admin/cities?limit=100').then((data) => {
-      setCities(data.items ?? []);
-    }).catch(() => {});
+    adminApi
+      .get<{ items: CityOption[] }>('/admin/cities?limit=100')
+      .then((data) => {
+        setCities(data.items ?? []);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (isNew) return;
-    adminApi.get(`/admin/collections/${id}`).then((data: any) => {
-      setForm({
-        slug: data.slug || '',
-        title: data.title || '',
-        subtitle: data.subtitle || '',
-        cityId: data.cityId || '',
-        heroImage: data.heroImage || '',
-        description: data.description || '',
-        filterTags: data.filterTags || [],
-        filterCategory: data.filterCategory || '',
-        filterSubcategory: data.filterSubcategory || '',
-        filterAudience: data.filterAudience || '',
-        additionalFilters: data.additionalFilters ? JSON.stringify(data.additionalFilters, null, 2) : '',
-        pinnedEventIds: data.pinnedEventIds || [],
-        excludedEventIds: data.excludedEventIds || [],
-        metaTitle: data.metaTitle || '',
-        metaDescription: data.metaDescription || '',
-        infoBlocks: Array.isArray(data.infoBlocks) ? data.infoBlocks : [],
-        faq: Array.isArray(data.faq) ? data.faq : [],
-        isActive: data.isActive ?? true,
-        sortOrder: data.sortOrder ?? 0,
-        version: data.version ?? 0,
-      });
-    }).catch((e: any) => setError(e.message));
+    adminApi
+      .get(`/admin/collections/${id}`)
+      .then((data: any) => {
+        setForm({
+          slug: data.slug || '',
+          title: data.title || '',
+          subtitle: data.subtitle || '',
+          cityId: data.cityId || '',
+          heroImage: data.heroImage || '',
+          description: data.description || '',
+          filterTags: data.filterTags || [],
+          filterCategory: data.filterCategory || '',
+          filterSubcategory: data.filterSubcategory || '',
+          filterAudience: data.filterAudience || '',
+          additionalFilters: data.additionalFilters ? JSON.stringify(data.additionalFilters, null, 2) : '',
+          pinnedEventIds: data.pinnedEventIds || [],
+          excludedEventIds: data.excludedEventIds || [],
+          metaTitle: data.metaTitle || '',
+          metaDescription: data.metaDescription || '',
+          infoBlocks: Array.isArray(data.infoBlocks) ? data.infoBlocks : [],
+          faq: Array.isArray(data.faq) ? data.faq : [],
+          isActive: data.isActive ?? true,
+          sortOrder: data.sortOrder ?? 0,
+          version: data.version ?? 0,
+        });
+      })
+      .catch((e: any) => setError(e.message));
   }, [id, isNew]);
 
   // Поиск событий для курации
@@ -284,12 +285,8 @@ export function CollectionEditPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {isNew ? 'Новая подборка' : form.title || 'Подборка'}
-            </h1>
-            <p className="text-muted-foreground">
-              {isNew ? 'Создание тематической подборки' : `Slug: ${form.slug}`}
-            </p>
+            <h1 className="text-2xl font-bold tracking-tight">{isNew ? 'Новая подборка' : form.title || 'Подборка'}</h1>
+            <p className="text-muted-foreground">{isNew ? 'Создание тематической подборки' : `Slug: ${form.slug}`}</p>
           </div>
         </div>
 
@@ -369,11 +366,15 @@ export function CollectionEditPage() {
                     value={form.cityId || '__none__'}
                     onValueChange={(v) => setForm((p) => ({ ...p, cityId: v === '__none__' ? '' : v }))}
                   >
-                    <SelectTrigger><SelectValue placeholder="Кросс-городская" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Кросс-городская" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">— Кросс-городская —</SelectItem>
                       {cities.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -419,9 +420,7 @@ export function CollectionEditPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Динамические фильтры</CardTitle>
-              <CardDescription>
-                Определяют, какие события автоматически попадают в подборку
-              </CardDescription>
+              <CardDescription>Определяют, какие события автоматически попадают в подборку</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -431,10 +430,14 @@ export function CollectionEditPage() {
                     value={form.filterCategory || ''}
                     onValueChange={(v) => setForm((p) => ({ ...p, filterCategory: v }))}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {CATEGORIES.map((c) => (
-                        <SelectItem key={c.value} value={c.value || '__none__'}>{c.label}</SelectItem>
+                        <SelectItem key={c.value} value={c.value || '__none__'}>
+                          {c.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -445,10 +448,14 @@ export function CollectionEditPage() {
                     value={form.filterAudience || ''}
                     onValueChange={(v) => setForm((p) => ({ ...p, filterAudience: v }))}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {AUDIENCES.map((a) => (
-                        <SelectItem key={a.value} value={a.value || '__none__'}>{a.label}</SelectItem>
+                        <SelectItem key={a.value} value={a.value || '__none__'}>
+                          {a.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -510,9 +517,7 @@ export function CollectionEditPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Закреплённые события (pinned)</CardTitle>
-              <CardDescription>
-                Всегда отображаются первыми в подборке в указанном порядке
-              </CardDescription>
+              <CardDescription>Всегда отображаются первыми в подборке в указанном порядке</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {form.pinnedEventIds.length > 0 && (
@@ -521,7 +526,10 @@ export function CollectionEditPage() {
                     <div key={eid} className="flex items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-sm">
                       <span className="text-muted-foreground">#{i + 1}</span>
                       <code className="flex-1 text-xs">{eid}</code>
-                      <button onClick={() => removeEvent('pinnedEventIds', eid)} className="text-destructive hover:text-destructive/80">
+                      <button
+                        onClick={() => removeEvent('pinnedEventIds', eid)}
+                        className="text-destructive hover:text-destructive/80"
+                      >
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -531,7 +539,10 @@ export function CollectionEditPage() {
               <div className="flex gap-2">
                 <Input
                   value={searchTarget === 'pinned' ? eventSearch : ''}
-                  onChange={(e) => { setSearchTarget('pinned'); setEventSearch(e.target.value); }}
+                  onChange={(e) => {
+                    setSearchTarget('pinned');
+                    setEventSearch(e.target.value);
+                  }}
                   placeholder="Поиск события по названию..."
                   onFocus={() => setSearchTarget('pinned')}
                 />
@@ -556,9 +567,7 @@ export function CollectionEditPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Исключённые события (excluded)</CardTitle>
-              <CardDescription>
-                Никогда не попадут в подборку, даже если соответствуют фильтрам
-              </CardDescription>
+              <CardDescription>Никогда не попадут в подборку, даже если соответствуют фильтрам</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {form.excludedEventIds.length > 0 && (
@@ -566,7 +575,10 @@ export function CollectionEditPage() {
                   {form.excludedEventIds.map((eid) => (
                     <div key={eid} className="flex items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-sm">
                       <code className="flex-1 text-xs">{eid}</code>
-                      <button onClick={() => removeEvent('excludedEventIds', eid)} className="text-destructive hover:text-destructive/80">
+                      <button
+                        onClick={() => removeEvent('excludedEventIds', eid)}
+                        className="text-destructive hover:text-destructive/80"
+                      >
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -576,7 +588,10 @@ export function CollectionEditPage() {
               <div className="flex gap-2">
                 <Input
                   value={searchTarget === 'excluded' ? eventSearch : ''}
-                  onChange={(e) => { setSearchTarget('excluded'); setEventSearch(e.target.value); }}
+                  onChange={(e) => {
+                    setSearchTarget('excluded');
+                    setEventSearch(e.target.value);
+                  }}
                   placeholder="Поиск события по названию..."
                   onFocus={() => setSearchTarget('excluded')}
                 />
@@ -649,9 +664,7 @@ export function CollectionEditPage() {
                   />
                 </div>
               ))}
-              {form.infoBlocks.length === 0 && (
-                <p className="text-sm text-muted-foreground">Нет блоков</p>
-              )}
+              {form.infoBlocks.length === 0 && <p className="text-sm text-muted-foreground">Нет блоков</p>}
             </CardContent>
           </Card>
 
@@ -689,9 +702,7 @@ export function CollectionEditPage() {
                   />
                 </div>
               ))}
-              {form.faq.length === 0 && (
-                <p className="text-sm text-muted-foreground">Нет вопросов</p>
-              )}
+              {form.faq.length === 0 && <p className="text-sm text-muted-foreground">Нет вопросов</p>}
             </CardContent>
           </Card>
         </TabsContent>
@@ -710,9 +721,7 @@ export function CollectionEditPage() {
                   onChange={(e) => setForm((p) => ({ ...p, metaTitle: e.target.value }))}
                   placeholder="Ночные экскурсии Петербурга — билеты онлайн | Дайбилет"
                 />
-                <p className="text-xs text-muted-foreground">
-                  {form.metaTitle.length}/60 символов
-                </p>
+                <p className="text-xs text-muted-foreground">{form.metaTitle.length}/60 символов</p>
               </div>
               <div className="space-y-2">
                 <Label>Meta Description</Label>
@@ -722,9 +731,7 @@ export function CollectionEditPage() {
                   placeholder="Лучшие ночные экскурсии по Санкт-Петербургу: водные прогулки, развод мостов, ночные музеи. Купить билеты онлайн."
                   rows={3}
                 />
-                <p className="text-xs text-muted-foreground">
-                  {form.metaDescription.length}/160 символов
-                </p>
+                <p className="text-xs text-muted-foreground">{form.metaDescription.length}/160 символов</p>
               </div>
             </CardContent>
           </Card>

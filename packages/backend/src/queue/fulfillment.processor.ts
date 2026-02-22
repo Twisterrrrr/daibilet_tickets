@@ -11,11 +11,12 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUE_FULFILLMENT } from './queue.constants';
-import { PaymentService } from '../checkout/payment.service';
+
 import { FulfillmentService } from '../checkout/fulfillment.service';
+import { PaymentService } from '../checkout/payment.service';
 import { RefundService } from '../checkout/refund.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { QUEUE_FULFILLMENT } from './queue.constants';
 
 @Injectable()
 @Processor(QUEUE_FULFILLMENT)
@@ -32,9 +33,15 @@ export class FulfillmentProcessor extends WorkerHost {
   }
 
   async process(job: Job): Promise<unknown> {
-    const jobContext = job.data ? JSON.stringify(Object.fromEntries(
-      Object.entries(job.data as Record<string, unknown>).filter(([k]) => ['paymentIntentId', 'providerEventId', 'checkoutSessionId'].includes(k)),
-    )) : '{}';
+    const jobContext = job.data
+      ? JSON.stringify(
+          Object.fromEntries(
+            Object.entries(job.data as Record<string, unknown>).filter(([k]) =>
+              ['paymentIntentId', 'providerEventId', 'checkoutSessionId'].includes(k),
+            ),
+          ),
+        )
+      : '{}';
     this.logger.log(`[job=${job.name}] [jobId=${job.id}] ${jobContext} Processing fulfillment job`);
 
     switch (job.name) {
@@ -66,7 +73,9 @@ export class FulfillmentProcessor extends WorkerHost {
       paymentObject: Record<string, unknown>;
     };
 
-    this.logger.log(`[job=yookassa-webhook] [providerEventId=${providerEventId}] [eventType=${eventType}] Processing YooKassa webhook`);
+    this.logger.log(
+      `[job=yookassa-webhook] [providerEventId=${providerEventId}] [eventType=${eventType}] Processing YooKassa webhook`,
+    );
 
     // Find PaymentIntent by providerPaymentId
     const intent = await this.prisma.paymentIntent.findFirst({
@@ -94,11 +103,7 @@ export class FulfillmentProcessor extends WorkerHost {
   /**
    * Process payment event (PAID / FAILED / CANCELED).
    */
-  private async processPaymentEvent(
-    intentId: string,
-    eventType: string,
-    providerPaymentId: string,
-  ): Promise<unknown> {
+  private async processPaymentEvent(intentId: string, eventType: string, providerPaymentId: string): Promise<unknown> {
     if (eventType === 'payment.succeeded') {
       await this.paymentService.markPaid(intentId, providerPaymentId);
 

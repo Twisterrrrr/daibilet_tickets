@@ -2,7 +2,7 @@
  * Экспорт событий из БД в CSV (без API, без JWT).
  * Запуск: npx ts-node prisma/export-events-csv.ts
  */
-/* eslint-disable @typescript-eslint/no-require-imports */
+
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const fs = require('fs');
 const path = require('path');
@@ -24,8 +24,19 @@ async function main() {
 
   stream.write('\uFEFF'); // BOM for Excel
   const headers = [
-    'id', 'tcEventId', 'title', 'slug', 'city', 'citySlug', 'category',
-    'source', 'priceFrom', 'isActive', 'address', 'lastSyncAt', 'createdAt',
+    'id',
+    'tcEventId',
+    'title',
+    'slug',
+    'city',
+    'citySlug',
+    'category',
+    'source',
+    'priceFrom',
+    'isActive',
+    'address',
+    'lastSyncAt',
+    'createdAt',
   ];
   stream.write(headers.join(',') + '\n');
 

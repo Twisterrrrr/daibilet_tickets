@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+
 import { PrismaModule } from '../prisma/prisma.module';
-import { UserJwtStrategy } from './user-jwt.strategy';
-import { UserAuthService } from './user-auth.service';
-import { UserAuthController } from './user-auth.controller';
-import { UserFavoritesService } from './user-favorites.service';
-import { UserFavoritesController } from './user-favorites.controller';
 import { UserJwtGuard } from './user.guard';
+import { UserAuthController } from './user-auth.controller';
+import { UserAuthService } from './user-auth.service';
+import { UserFavoritesController } from './user-favorites.controller';
+import { UserFavoritesService } from './user-favorites.service';
+import { UserJwtStrategy } from './user-jwt.strategy';
 
 @Module({
   imports: [

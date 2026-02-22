@@ -1,20 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 const CATEGORY_OPTIONS = [
   { value: 'food', label: 'food' },
   { value: 'transport', label: 'transport' },
@@ -43,18 +38,21 @@ export function UpsellEditPage() {
 
   useEffect(() => {
     if (!isNew) {
-      adminApi.get(`/admin/upsells/${id}`).then((data: any) => {
-        setForm({
-          title: data.title || '',
-          description: data.description || '',
-          priceKopecks: data.priceKopecks || 0,
-          category: data.category || 'food',
-          citySlug: data.citySlug || '',
-          icon: data.icon || '',
-          isActive: data.isActive ?? true,
-          sortOrder: data.sortOrder || 0,
-        });
-      }).finally(() => setLoading(false));
+      adminApi
+        .get(`/admin/upsells/${id}`)
+        .then((data: any) => {
+          setForm({
+            title: data.title || '',
+            description: data.description || '',
+            priceKopecks: data.priceKopecks || 0,
+            category: data.category || 'food',
+            citySlug: data.citySlug || '',
+            icon: data.icon || '',
+            isActive: data.isActive ?? true,
+            sortOrder: data.sortOrder || 0,
+          });
+        })
+        .finally(() => setLoading(false));
     }
   }, [id]);
 
@@ -97,9 +95,7 @@ export function UpsellEditPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {isNew ? 'Новый Upsell' : 'Редактировать Upsell'}
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">{isNew ? 'Новый Upsell' : 'Редактировать Upsell'}</h1>
         <p className="text-muted-foreground">Дополнительное предложение для бронирования</p>
       </div>
 
@@ -158,16 +154,11 @@ export function UpsellEditPage() {
                 value={form.priceKopecks}
                 onChange={(e) => setForm((f) => ({ ...f, priceKopecks: Number(e.target.value) }))}
               />
-              <p className="text-xs text-muted-foreground">
-                {(form.priceKopecks / 100).toLocaleString('ru-RU')} ₽
-              </p>
+              <p className="text-xs text-muted-foreground">{(form.priceKopecks / 100).toLocaleString('ru-RU')} ₽</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="category">Категория</Label>
-              <Select
-                value={form.category}
-                onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
-              >
+              <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}>
                 <SelectTrigger id="category">
                   <SelectValue />
                 </SelectTrigger>

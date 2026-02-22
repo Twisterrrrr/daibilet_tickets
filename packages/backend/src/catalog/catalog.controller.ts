@@ -1,23 +1,21 @@
-import {
-  Controller, Get, Post, Param, Query, Body, Req, Res,
-  UploadedFiles, UseInterceptors,
-} from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { Body, Controller, Get, Param, Post, Query, Req, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
+
 import { CacheService } from '../cache/cache.service';
 import { CatalogService } from './catalog.service';
+import { CatalogQueryDto } from './dto/catalog-query.dto';
+import { CreateReviewDto } from './dto/create-review.dto';
+import { EventsQueryDto } from './dto/events-query.dto';
 import { RegionService } from './region.service';
 import { ReviewService } from './review.service';
 import { TcApiService } from './tc-api.service';
 import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
 import { TepSyncService } from './tep-sync.service';
-import { EventsQueryDto } from './dto/events-query.dto';
-import { CatalogQueryDto } from './dto/catalog-query.dto';
-import { CreateReviewDto } from './dto/create-review.dto';
 
 @ApiTags('catalog')
 @Controller()
@@ -56,10 +54,7 @@ export class CatalogController {
   @ApiOperation({ summary: 'Список локаций (причалы, площадки) по городу и типу' })
   @ApiQuery({ name: 'city', required: false, description: 'Slug города' })
   @ApiQuery({ name: 'type', required: false, description: 'PIER | VENUE | MEETING_POINT | OTHER' })
-  getLocations(
-    @Query('city') city?: string,
-    @Query('type') type?: string,
-  ) {
+  getLocations(@Query('city') city?: string, @Query('type') type?: string) {
     return this.catalogService.getLocations(city, type);
   }
 
@@ -75,12 +70,7 @@ export class CatalogController {
     @Query('type') type?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.catalogService.getNearestLocations(
-      Number(lat),
-      Number(lng),
-      type,
-      limit ? Number(limit) : 10,
-    );
+    return this.catalogService.getNearestLocations(Number(lat), Number(lng), type, limit ? Number(limit) : 10);
   }
 
   // --- Регионы ---
@@ -148,11 +138,7 @@ export class CatalogController {
 
   @Get('tags/:slug')
   @ApiOperation({ summary: 'Лендинг тега с событиями' })
-  getTagBySlug(
-    @Param('slug') slug: string,
-    @Query('city') city?: string,
-    @Query('page') page?: number,
-  ) {
+  getTagBySlug(@Param('slug') slug: string, @Query('city') city?: string, @Query('page') page?: number) {
     return this.catalogService.getTagBySlug(slug, city, page);
   }
 
@@ -171,10 +157,7 @@ export class CatalogController {
   @Post('reviews')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @ApiOperation({ summary: 'Оставить отзыв на событие или место' })
-  createReview(
-    @Body() body: CreateReviewDto,
-    @Req() req: Request,
-  ) {
+  createReview(@Body() body: CreateReviewDto, @Req() req: Request) {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     return this.reviewService.create(body, ip);
   }
@@ -184,17 +167,16 @@ export class CatalogController {
   async verifyReview(@Query('token') token: string, @Res() res: Response) {
     const result = await this.reviewService.verifyEmail(token);
     // Редирект на страницу с сообщением
-    const appUrl = this.config.get<string>('APP_URL', process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000');
+    const appUrl = this.config.get<string>(
+      'APP_URL',
+      process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000',
+    );
     res.redirect(`${appUrl}/reviews/verified?message=${encodeURIComponent(result.message)}`);
   }
 
   @Get('events/:slug/reviews')
   @ApiOperation({ summary: 'Одобренные отзывы события' })
-  getEventReviews(
-    @Param('slug') slug: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
+  getEventReviews(@Param('slug') slug: string, @Query('page') page?: number, @Query('limit') limit?: number) {
     return this.reviewService.getByEventSlug(slug, Number(page) || 1, Number(limit) || 10);
   }
 
@@ -202,9 +184,11 @@ export class CatalogController {
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @ApiOperation({ summary: 'Добавить фото к отзыву' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FilesInterceptor('photos', 5, {
-    limits: { fileSize: 5 * 1024 * 1024 },
-  }))
+  @UseInterceptors(
+    FilesInterceptor('photos', 5, {
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
   uploadReviewPhotos(
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
@@ -216,11 +200,7 @@ export class CatalogController {
   @Post('reviews/:id/vote')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @ApiOperation({ summary: 'Голосовать за полезность отзыва' })
-  voteReview(
-    @Param('id') id: string,
-    @Body('helpful') helpful: boolean,
-    @Req() req: Request,
-  ) {
+  voteReview(@Param('id') id: string, @Body('helpful') helpful: boolean, @Req() req: Request) {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     return this.reviewService.vote(id, ip, helpful);
   }
@@ -290,7 +270,7 @@ export class CatalogController {
   async syncAllSources() {
     // Параллельная синхронизация из обоих источников
     const [tc, tep] = await Promise.all([
-      this.tcSync.syncAll(),   // retag встроен в конец tcSync.syncAll()
+      this.tcSync.syncAll(), // retag встроен в конец tcSync.syncAll()
       this.tepSync.syncAll(),
     ]);
     // Дополнительный retag для событий teplohod (если tep sync завершился после TC retag)

@@ -185,6 +185,44 @@ enum ReviewStatus {
   REJECTED
 }
 
+// --- Checkout + Event Studio (расписания) ---
+
+enum ScheduleType {
+  ONE_TIME   // разовое
+  OPEN_DATE  // открытая дата (без конкретного времени)
+  RECURRENCE // повторяемое правило
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  SOLD_OUT
+  RESCHEDULED
+}
+
+enum RescheduleReason {
+  WEATHER
+  TECHNICAL
+  PROVIDER_REQUEST
+  LOW_DEMAND
+  OTHER
+}
+
+enum CheckoutPackageItemType {
+  SESSION   // покупка конкретного сеанса
+  OPEN_DATE // покупка «дата посещения» без сеанса
+}
+
+enum CheckoutPackageStatus {
+  CREATED
+  LOCKED // нельзя менять после создания платежа
+  PAID
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
 // ========================
 // Администраторы
 // ========================
@@ -427,26 +465,42 @@ model Event {
 }
 
 model EventSession {
-  id               String      @id @default(uuid()) @db.Uuid
-  eventId          String      @db.Uuid
-  offerId          String?     @db.Uuid  // FK к EventOffer (nullable на переходном этапе)
-  tcSessionId      String      @unique
+  id               String           @id @default(uuid()) @db.Uuid
+  eventId          String           @db.Uuid
+  offerId          String?          @db.Uuid
+  scheduleId       String?          @db.Uuid
+  tcSessionId      String           @unique
   startsAt         DateTime
   endsAt           DateTime?
-  availableTickets Int         @default(0)
-  prices           Json        // [{type: "adult", price: 150000}, ...]
-  isActive         Boolean     @default(true)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  dateLocal        DateTime?        @db.Date // UTC midnight для фильтров по дням
+  status           SessionStatus    @default(ACTIVE)
+  availableTickets Int              @default(0)
+  capacityTotal    Int?
+  capacitySold     Int              @default(0)
+  prices           Json
+  isActive         Boolean          @default(true)
+  rescheduledToId  String?          @db.Uuid
+  rescheduleReason RescheduleReason?
+  rescheduleNote   String?          @db.Text
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  event        Event         @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  offer        EventOffer?   @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  packageItems PackageItem[]
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  offer          EventOffer?    @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  schedule       EventSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  packageItems   PackageItem[]
+  checkoutPackageItems CheckoutPackageItem[]
+  rescheduledTo   EventSession?  @relation("SessionReschedule", fields: [rescheduledToId], references: [id], onDelete: SetNull)
+  rescheduledFrom EventSession[] @relation("SessionReschedule")
 
   @@index([startsAt])
   @@index([eventId])
   @@index([offerId])
+  @@index([scheduleId])
   @@index([offerId, startsAt])
+  @@index([status])
+  @@index([dateLocal])
+  @@index([rescheduledToId])
   @@map("event_sessions")
 }
 
@@ -492,8 +546,10 @@ model EventOffer {
   event         Event          @relation(fields: [eventId], references: [id], onDelete: Restrict)
   venue         Venue?         @relation("VenueOffers", fields: [venueId], references: [id])
   sessions      EventSession[]
+  schedule      EventSchedule?
   operator      Operator?      @relation(fields: [operatorId], references: [id])
   orderRequests OrderRequest[]
+  checkoutPackageItems CheckoutPackageItem[]
 
   @@unique([source, externalEventId])
   @@index([eventId])
@@ -501,6 +557,32 @@ model EventOffer {
   @@index([operatorId])
   @@index([venueId])
   @@map("event_offers")
+}
+
+// ========================
+// Event Schedule (расписания: ONE_TIME, OPEN_DATE, RECURRENCE)
+// ========================
+
+model EventSchedule {
+  id          String       @id @default(uuid()) @db.Uuid
+  offerId     String       @unique @db.Uuid
+  type        ScheduleType
+  timezone    String       @default("Europe/Moscow")
+  durationMin Int?
+  salesFrom   DateTime?
+  salesTo     DateTime?
+  isActive    Boolean      @default(true)
+  rule        Json
+  version     Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  offer    EventOffer     @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  sessions EventSession[]
+
+  @@index([offerId])
+  @@index([type, isActive])
+  @@map("event_schedules")
 }
 
 // ========================
@@ -1337,6 +1419,7 @@ model CheckoutSession {
   paymentIntents    PaymentIntent[]
   fulfillmentItems  FulfillmentItem[]
   giftCertificate   GiftCertificate?
+  checkoutPackages  CheckoutPackage[]
 
   @@index([status])
   @@index([customerEmail])
@@ -1446,6 +1529,53 @@ model PaymentIntent {
   @@index([provider, providerPaymentId])
   @@index([supplierId])
   @@map("payment_intents")
+}
+
+// ========================
+// Checkout Package (унифицированный checkout v1)
+// ========================
+
+model CheckoutPackage {
+  id                String               @id @default(uuid()) @db.Uuid
+  checkoutSessionId String               @db.Uuid
+  status            CheckoutPackageStatus @default(CREATED)
+  email             String
+  phone             String?
+  priceSnapshotJson Json
+  snapshotAt        DateTime             @default(now())
+  paymentProvider   String?
+  paymentId         String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  checkoutSession CheckoutSession      @relation(fields: [checkoutSessionId], references: [id], onDelete: Cascade)
+  items           CheckoutPackageItem[]
+
+  @@index([checkoutSessionId])
+  @@index([status, createdAt])
+  @@map("checkout_packages")
+}
+
+model CheckoutPackageItem {
+  id           String                 @id @default(uuid()) @db.Uuid
+  packageId    String                 @db.Uuid
+  type         CheckoutPackageItemType
+  offerId      String                 @db.Uuid
+  sessionId    String?                @db.Uuid
+  openDate     DateTime?              @db.Date
+  qty          Int                    @default(1)
+  itemSnapshot Json
+  createdAt    DateTime               @default(now())
+
+  package CheckoutPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  offer   EventOffer      @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  session EventSession?   @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@unique([packageId, offerId, type, sessionId, openDate])
+  @@index([packageId])
+  @@index([offerId])
+  @@index([sessionId])
+  @@map("checkout_package_items")
 }
 
 // ========================

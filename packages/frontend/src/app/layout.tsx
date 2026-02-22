@@ -1,14 +1,17 @@
+import './globals.css';
+
 import type { Metadata } from 'next';
 import Script from 'next/script';
-import './globals.css';
-import { Header } from '@/components/layout/Header';
+
+import { JsonLd, buildOrganizationSchema } from '@/components/seo/JsonLd';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Footer } from '@/components/layout/Footer';
-import { CartProvider } from '@/lib/cart';
-import { UserAuthProvider } from '@/hooks/useUserAuth';
+import { Header } from '@/components/layout/Header';
+import { ScrollProgress } from '@/components/ui/ScrollProgress';
 import { SupportWidget } from '@/components/ui/SupportWidget';
 import { WebVitalsReporter } from '@/components/WebVitalsReporter';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ScrollProgress } from '@/components/ui/ScrollProgress';
+import { UserAuthProvider } from '@/hooks/useUserAuth';
+import { CartProvider } from '@/lib/cart';
 
 export const metadata: Metadata = {
   title: {
@@ -17,46 +20,40 @@ export const metadata: Metadata = {
   },
   description:
     'Билеты на экскурсии, музеи и мероприятия по городам России. Экскурсии, музеи, концерты и шоу — всё в одном месте.',
-  metadataBase: new URL(process.env.APP_URL || 'https://daibilet.ru'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || 'https://daibilet.ru'),
   openGraph: {
     type: 'website',
     locale: 'ru_RU',
     siteName: 'Дайбилет',
+    images: [{ url: '/og-default.png', width: 1200, height: 630, alt: 'Дайбилет — экскурсии и мероприятия' }],
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || 'https://daibilet.ru';
+
   return (
     <html lang="ru">
       <body className="flex min-h-screen flex-col">
+        <JsonLd data={buildOrganizationSchema(siteUrl)} />
         <ScrollProgress />
         <WebVitalsReporter />
         <CartProvider>
-        <UserAuthProvider>
-        <Header />
-        <main className="flex-1">
-          <ErrorBoundary>{children}</ErrorBoundary>
-        </main>
-        <Footer />
-        <SupportWidget />
-        </UserAuthProvider>
+          <UserAuthProvider>
+            <Header />
+            <main className="flex-1">
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </main>
+            <Footer />
+            <SupportWidget />
+          </UserAuthProvider>
         </CartProvider>
 
         {/* Ticketscloud — скрипт виджета покупки билетов */}
-        <Script
-          src="https://ticketscloud.com/static/scripts/widget/tcwidget.js"
-          strategy="beforeInteractive"
-        />
+        <Script src="https://ticketscloud.com/static/scripts/widget/tcwidget.js" strategy="beforeInteractive" />
 
         {/* Teplohod.info — скрипт виджета покупки билетов */}
-        <Script
-          src="https://api.teplohod.info/v1/widget/widget.js"
-          strategy="lazyOnload"
-        />
+        <Script src="https://api.teplohod.info/v1/widget/widget.js" strategy="lazyOnload" />
 
         {/* Яндекс Метрика */}
         {process.env.NEXT_PUBLIC_YM_ID && (

@@ -3,8 +3,8 @@
  * Логика совпадает с main.ts Sentry.init beforeSend.
  */
 
-import { describe, it, expect } from 'vitest';
 import { HttpException } from '@nestjs/common';
+import { describe, expect, it } from 'vitest';
 
 function createBeforeSend() {
   return (event: unknown, hint: { originalException?: unknown }) => {

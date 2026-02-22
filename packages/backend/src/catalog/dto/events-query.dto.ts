@@ -1,7 +1,7 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsEnum, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { EventCategory, EventAudience, EventSource } from '@prisma/client';
+import { EventAudience, EventCategory, EventSource } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class EventsQueryDto {
   @ApiPropertyOptional({ description: 'Slug города' })
@@ -114,7 +114,9 @@ export class EventsQueryDto {
   @Max(200)
   limit?: number = 20;
 
-  @ApiPropertyOptional({ description: 'Только события с фото (для главной, блоков) — исключает из выдачи события без imageUrl' })
+  @ApiPropertyOptional({
+    description: 'Только события с фото (для главной, блоков) — исключает из выдачи события без imageUrl',
+  })
   @IsOptional()
   @IsBoolean()
   @Type(() => Boolean)

@@ -87,7 +87,7 @@ export class AdminLandingsController {
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateLandingDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
-    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as any;
+    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as UpdateLandingDto & Record<string, unknown>;
 
     this.validateJsonFields(clean);
 

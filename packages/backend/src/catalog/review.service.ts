@@ -1,17 +1,21 @@
-import {
-  Injectable, Logger, BadRequestException, NotFoundException,
-  ConflictException, ForbiddenException,
-} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
-import { UploadService, ProcessedImage } from '../upload/upload.service';
 import { Prisma, ReviewStatus } from '@prisma/client';
+import { Queue } from 'bullmq';
 import { createHash, randomBytes } from 'crypto';
-import { QUEUE_EMAILS } from '../queue/queue.constants';
-import { EmailJobData } from '../queue/email.processor';
 
+import { PrismaService } from '../prisma/prisma.service';
+import { EmailJobData } from '../queue/email.processor';
+import { QUEUE_EMAILS } from '../queue/queue.constants';
+import { ProcessedImage, UploadService } from '../upload/upload.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 
 export interface VoteDto {
@@ -473,7 +477,7 @@ export class ReviewService {
 
     return {
       items,
-      externalReviews: [] as any[],
+      externalReviews: [] as Array<{ rating: number; text?: string; author?: string; source?: string }>,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -575,10 +579,10 @@ export class ReviewService {
       const extCount = event.externalReviewCount || 0;
 
       if (summary.reviewCount > 0 && extCount > 0) {
-        finalRating = Math.round(
-          ((summary.avgRating * summary.reviewCount + extRating * extCount) /
-            (summary.reviewCount + extCount)) * 10,
-        ) / 10;
+        finalRating =
+          Math.round(
+            ((summary.avgRating * summary.reviewCount + extRating * extCount) / (summary.reviewCount + extCount)) * 10,
+          ) / 10;
         finalCount = summary.reviewCount + extCount;
       } else if (summary.reviewCount === 0) {
         finalRating = extRating;
@@ -591,10 +595,10 @@ export class ReviewService {
       const extSum = extReviews.reduce((acc, r) => acc + r.rating, 0);
       const extAvg = extSum / extReviews.length;
       if (finalCount > 0) {
-        finalRating = Math.round(
-          ((finalRating * finalCount + extAvg * extReviews.length) /
-            (finalCount + extReviews.length)) * 10,
-        ) / 10;
+        finalRating =
+          Math.round(
+            ((finalRating * finalCount + extAvg * extReviews.length) / (finalCount + extReviews.length)) * 10,
+          ) / 10;
       } else {
         finalRating = Math.round(extAvg * 10) / 10;
       }
@@ -812,12 +816,7 @@ export class ReviewService {
     return review;
   }
 
-  async listExternalReviews(filters: {
-    eventId?: string;
-    source?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async listExternalReviews(filters: { eventId?: string; source?: string; page?: number; limit?: number }) {
     const { eventId, source, page = 1, limit = 20 } = filters;
     const where: Prisma.ExternalReviewWhereInput = {};
     if (eventId) where.eventId = eventId;

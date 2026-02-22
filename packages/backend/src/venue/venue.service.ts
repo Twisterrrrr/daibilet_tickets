@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, VenueType } from '@prisma/client';
+
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class VenueService {
@@ -26,9 +27,7 @@ export class VenueService {
     };
 
     const orderBy: Prisma.VenueOrderByWithRelationInput =
-      sort === 'price' ? { priceFrom: 'asc' } :
-      sort === 'name' ? { title: 'asc' } :
-      { rating: 'desc' }; // default: rating
+      sort === 'price' ? { priceFrom: 'asc' } : sort === 'name' ? { title: 'asc' } : { rating: 'desc' }; // default: rating
 
     const [items, total] = await Promise.all([
       this.prisma.venue.findMany({
@@ -116,10 +115,7 @@ export class VenueService {
     const eventIds = venue.events.map((e) => e.id);
     const reviewWhere = {
       status: 'APPROVED' as const,
-      OR: [
-        ...(eventIds.length > 0 ? [{ eventId: { in: eventIds } }] : []),
-        { venueId: venue.id },
-      ],
+      OR: [...(eventIds.length > 0 ? [{ eventId: { in: eventIds } }] : []), { venueId: venue.id }],
     };
 
     let reviews: any[] = [];

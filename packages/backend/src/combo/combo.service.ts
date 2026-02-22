@@ -1,8 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { PricingService } from '../pricing/pricing.service';
-import { Prisma } from '@prisma/client';
 import { getPriceByTypeKopecks } from '@daibilet/shared';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+
+import { PricingService } from '../pricing/pricing.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 interface CuratedEventSlot {
   eventId: string;
@@ -167,10 +168,8 @@ export class ComboService {
       }
     }
 
-    const changed = results.filter(r => r.action !== 'skipped' && !r.action.startsWith('skipped'));
-    this.logger.log(
-      `populateAll: ${combos.length} combo проверено, ${changed.length} обновлено`,
-    );
+    const changed = results.filter((r) => r.action !== 'skipped' && !r.action.startsWith('skipped'));
+    this.logger.log(`populateAll: ${combos.length} combo проверено, ${changed.length} обновлено`);
 
     return { checked: combos.length, changed: changed.length, results };
   }
@@ -219,11 +218,7 @@ export class ComboService {
    * - Новизны (бонус для событий < 30 дней)
    * - Категории → слот
    */
-  private async autoFillCuratedEvents(
-    cityId: string,
-    dayCount: number,
-    intensity: string,
-  ): Promise<any[]> {
+  private async autoFillCuratedEvents(cityId: string, dayCount: number, intensity: string): Promise<any[]> {
     const slotsPerDay = intensity === 'RELAXED' ? 2 : intensity === 'ACTIVE' ? 4 : 3;
     const totalNeeded = dayCount * slotsPerDay;
 
@@ -296,7 +291,7 @@ export class ComboService {
       for (const slot of slots) {
         const prefCat = Object.entries(CATEGORY_SLOT_PREF).find(([, s]) => s === slot)?.[0];
 
-        let picked: typeof scored[number] | undefined;
+        let picked: (typeof scored)[number] | undefined;
 
         // Предпочтительная категория
         if (prefCat && byCategory[prefCat]) {
@@ -413,5 +408,4 @@ export class ComboService {
       totalCuratedEvents: curatedItems.length,
     };
   }
-
 }

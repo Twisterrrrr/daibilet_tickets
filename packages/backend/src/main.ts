@@ -1,5 +1,5 @@
-import * as Sentry from '@sentry/nestjs';
 import { HttpException } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
@@ -25,17 +25,19 @@ if (SENTRY_DSN && IS_PRODUCTION) {
   });
 }
 
-import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import helmet from 'helmet';
-import cookieParser from 'cookie-parser';
-import { AppModule } from './app.module';
 import { setCompatDisabled, setCompatLogger } from '@daibilet/shared';
+import { Logger as NestLogger, ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+
+import { Logger } from 'nestjs-pino';
+import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
 
-const logger = new Logger('Bootstrap');
+const logger = new NestLogger('Bootstrap');
 
 async function bootstrap() {
   // Kill switch: env DISABLE_PURCHASE_TYPE_COMPAT=true запрещает legacy PurchaseType
@@ -44,7 +46,8 @@ async function bootstrap() {
     logger.warn('PurchaseType COMPAT disabled — legacy values will throw');
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   if (SENTRY_DSN && IS_PRODUCTION) {
     try {
@@ -61,16 +64,18 @@ async function bootstrap() {
   // Персистентный лог legacy PurchaseType → AuditLog (переживает рестарты)
   const prisma = app.get(PrismaService);
   setCompatLogger((raw, resolved, context) => {
-    prisma.auditLog.create({
-      data: {
-        userId: '00000000-0000-0000-0000-000000000000', // system
-        action: 'LEGACY_PURCHASE_TYPE',
-        entity: 'PurchaseType',
-        entityId: raw,
-        before: { raw } as Prisma.InputJsonValue,
-        after: { resolved, context } as Prisma.InputJsonValue,
-      },
-    }).catch((e) => logger.error('Audit log failed: ' + (e as Error).message));
+    prisma.auditLog
+      .create({
+        data: {
+          userId: '00000000-0000-0000-0000-000000000000', // system
+          action: 'LEGACY_PURCHASE_TYPE',
+          entity: 'PurchaseType',
+          entityId: raw,
+          before: { raw } as Prisma.InputJsonValue,
+          after: { resolved, context } as Prisma.InputJsonValue,
+        },
+      })
+      .catch((e) => logger.error('Audit log failed: ' + (e as Error).message));
   });
 
   app.setGlobalPrefix('api/v1');

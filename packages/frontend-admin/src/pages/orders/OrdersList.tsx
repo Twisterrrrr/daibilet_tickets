@@ -1,24 +1,27 @@
+import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ColumnDef } from '@tanstack/react-table';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type OrderStatus = 'DRAFT' | 'PENDING_PAYMENT' | 'PAID' | 'FULFILLING' | 'FULFILLED' | 'PARTIALLY_FULFILLED' | 'FAILED' | 'REFUNDED';
+type OrderStatus =
+  | 'DRAFT'
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'FULFILLING'
+  | 'FULFILLED'
+  | 'PARTIALLY_FULFILLED'
+  | 'FAILED'
+  | 'REFUNDED';
 
 interface OrderItem {
   id: string;
@@ -61,7 +64,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function formatPrice(kopecks: number): string {
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(kopecks / 100);
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(
+    kopecks / 100,
+  );
 }
 
 // ─── Columns ─────────────────────────────────────────────────────────────────
@@ -107,7 +112,11 @@ const columns: ColumnDef<OrderItem>[] = [
     cell: ({ row }) =>
       row.original.createdAt
         ? new Date(row.original.createdAt).toLocaleString('ru-RU', {
-            day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit',
+            day: '2-digit',
+            month: '2-digit',
+            year: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
           })
         : '—',
   },
@@ -180,7 +189,9 @@ export function OrdersListPage() {
               <SelectContent>
                 <SelectItem value="__all__">Все статусы</SelectItem>
                 {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                  <SelectItem key={k} value={k}>
+                    {v}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -219,9 +230,25 @@ export function OrdersListPage() {
             Показано {data.items.length} из {data.total}
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))} disabled={filters.page <= 1}>Назад</Button>
-            <span className="text-sm tabular-nums text-muted-foreground">{filters.page} / {data.pages}</span>
-            <Button variant="outline" size="sm" onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))} disabled={filters.page >= data.pages}>Вперёд</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
+              disabled={filters.page <= 1}
+            >
+              Назад
+            </Button>
+            <span className="text-sm tabular-nums text-muted-foreground">
+              {filters.page} / {data.pages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
+              disabled={filters.page >= data.pages}
+            >
+              Вперёд
+            </Button>
           </div>
         </div>
       )}

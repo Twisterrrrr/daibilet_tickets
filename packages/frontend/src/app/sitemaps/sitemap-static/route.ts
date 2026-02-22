@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { toUrlSetXml, SITE_URL } from '@/lib/sitemap-xml';
+
+import { SITE_URL, toUrlSetXml } from '@/lib/sitemap-xml';
 
 const LASTMOD = new Date().toISOString().slice(0, 10);
 

@@ -1,26 +1,40 @@
-import { Controller, Post, Get, Param, Body, Req, Query, NotFoundException, Logger, ForbiddenException } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
-import { CheckoutService } from './checkout.service';
-import { PaymentService } from './payment.service';
-import { WebhookIdempotencyService } from './webhook-idempotency.service';
-import { QUEUE_FULFILLMENT } from '../queue/queue.constants';
-import { Request } from 'express';
 import {
-  CreateTcOrderDto,
-  ValidateCartDto,
-  ValidateGiftCertificateDto,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Logger,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { Queue } from 'bullmq';
+import { Request } from 'express';
+
+import { QUEUE_FULFILLMENT } from '../queue/queue.constants';
+import { CheckoutPackageService } from './checkout-package.service';
+import { CheckoutService } from './checkout.service';
+import {
   CreateCheckoutSessionDto,
   CreateGiftCertificateCheckoutDto,
   CreateOrderRequestDto,
+  CreatePackageDto,
+  CreateTcOrderDto,
   CreateTripPlanCheckoutDto,
   PayDto,
   PaymentWebhookDto,
+  ValidateCartDto,
+  ValidateGiftCertificateDto,
   YookassaWebhookDto,
 } from './dto/checkout.dto';
-import { isYkWebhookEvent, extractPaymentIdFromWebhook } from './yookassa.types';
+import { PaymentService } from './payment.service';
+import { WebhookIdempotencyService } from './webhook-idempotency.service';
+import { extractPaymentIdFromWebhook, isYkWebhookEvent } from './yookassa.types';
 
 @ApiTags('checkout')
 @Controller('checkout')
@@ -29,6 +43,7 @@ export class CheckoutController {
 
   constructor(
     private readonly checkoutService: CheckoutService,
+    private readonly packageService: CheckoutPackageService,
     private readonly paymentService: PaymentService,
     private readonly webhookIdempotency: WebhookIdempotencyService,
     @InjectQueue(QUEUE_FULFILLMENT) private readonly fulfillmentQueue: Queue,
@@ -96,32 +111,40 @@ export class CheckoutController {
     const eventType = body.event;
 
     // 4. Idempotent processing → queue
-    const result = await this.webhookIdempotency.processOnce(
-      providerEventId,
-      'YOOKASSA',
-      eventType,
-      body,
-      async () => {
-        // Minimal handler: validate + enqueue job
-        await this.fulfillmentQueue.add('yookassa-webhook', {
+    const result = await this.webhookIdempotency.processOnce(providerEventId, 'YOOKASSA', eventType, body, async () => {
+      // Minimal handler: validate + enqueue job
+      await this.fulfillmentQueue.add(
+        'yookassa-webhook',
+        {
           providerEventId,
           eventType,
           paymentObject: paymentObj,
-        }, {
+        },
+        {
           attempts: 3,
           backoff: { type: 'exponential', delay: 5000 },
-        });
-        return eventType === 'payment.succeeded' ? 'QUEUED_PAID' : 'QUEUED_' + eventType.toUpperCase();
-      },
-    );
+        },
+      );
+      return eventType === 'payment.succeeded' ? 'QUEUED_PAID' : 'QUEUED_' + eventType.toUpperCase();
+    });
 
     return { status: 'ok', processed: result.processed, result: result.result };
   }
 
+  @Post('package')
+  @ApiOperation({ summary: 'Создать CheckoutPackage (v1) и инициировать оплату' })
+  createPackage(@Body() body: CreatePackageDto) {
+    return this.packageService.create(body);
+  }
+
   @Get(':packageId/status')
-  @ApiOperation({ summary: 'Статус пакета после оплаты' })
-  getStatus(@Param('packageId') packageId: string) {
-    return this.checkoutService.getStatus(packageId);
+  @ApiOperation({ summary: 'Статус пакета (CheckoutPackage или Trip Planner Package)' })
+  async getStatus(@Param('packageId') packageId: string) {
+    try {
+      return await this.packageService.getStatus(packageId);
+    } catch {
+      return this.checkoutService.getStatus(packageId);
+    }
   }
 
   // ============================
@@ -211,10 +234,7 @@ export class CheckoutController {
   @Post(':sessionId/pay')
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   @ApiOperation({ summary: 'Создать PaymentIntent для checkout session' })
-  createPayment(
-    @Param('sessionId') sessionId: string,
-    @Body() body: PayDto,
-  ) {
+  createPayment(@Param('sessionId') sessionId: string, @Body() body: PayDto) {
     return this.paymentService.createPaymentIntent(sessionId, body.idempotencyKey);
   }
 
@@ -249,9 +269,13 @@ export class CheckoutController {
         if (body.status === 'PAID' || body.status === 'succeeded') {
           await this.paymentService.markPaid(body.paymentIntentId, body.providerPaymentId);
           // Trigger fulfillment after PAID
-          await this.fulfillmentQueue.add('payment-paid', {
-            paymentIntentId: body.paymentIntentId,
-          }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
+          await this.fulfillmentQueue.add(
+            'payment-paid',
+            {
+              paymentIntentId: body.paymentIntentId,
+            },
+            { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+          );
           return 'PAID';
         }
         if (body.status === 'FAILED' || body.status === 'canceled') {

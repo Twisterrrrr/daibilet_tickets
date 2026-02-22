@@ -1,16 +1,23 @@
-import { Module, Global, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { forwardRef, Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+
+import { CatalogModule } from '../catalog/catalog.module';
+import { CheckoutModule } from '../checkout/checkout.module';
+import { ComboModule } from '../combo/combo.module';
 import { EmailProcessor } from './email.processor';
+import { FulfillmentProcessor } from './fulfillment.processor';
+import {
+  QUEUE_EMAILS,
+  QUEUE_FULFILLMENT,
+  QUEUE_PARTNER_WEBHOOKS,
+  QUEUE_REVIEW_TASKS,
+  QUEUE_SYNC,
+} from './queue.constants';
 import { ReviewTaskProcessor } from './review-task.processor';
 import { SyncProcessor } from './sync.processor';
-import { FulfillmentProcessor } from './fulfillment.processor';
-import { CatalogModule } from '../catalog/catalog.module';
-import { ComboModule } from '../combo/combo.module';
-import { CheckoutModule } from '../checkout/checkout.module';
-import { QUEUE_EMAILS, QUEUE_REVIEW_TASKS, QUEUE_PARTNER_WEBHOOKS, QUEUE_SYNC, QUEUE_FULFILLMENT } from './queue.constants';
 
-export { QUEUE_EMAILS, QUEUE_REVIEW_TASKS, QUEUE_PARTNER_WEBHOOKS, QUEUE_SYNC, QUEUE_FULFILLMENT };
+export { QUEUE_EMAILS, QUEUE_FULFILLMENT, QUEUE_PARTNER_WEBHOOKS, QUEUE_REVIEW_TASKS, QUEUE_SYNC };
 
 @Global()
 @Module({

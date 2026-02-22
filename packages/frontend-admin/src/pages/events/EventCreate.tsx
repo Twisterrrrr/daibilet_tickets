@@ -1,20 +1,16 @@
-import { useState, useEffect } from 'react';
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+
 import { adminApi } from '@/api/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
 import { EventTemplateFields } from './EventTemplateFields';
 
 // ─── Types ──────────────────────────────────────────────
@@ -33,19 +29,30 @@ const CATEGORY_OPTIONS = [
 
 const SUBCATEGORY_OPTIONS: Record<string, { value: string; label: string }[]> = {
   EXCURSION: [
-    { value: 'RIVER', label: 'Речная' }, { value: 'WALKING', label: 'Пешеходная' },
-    { value: 'BUS', label: 'Автобусная' }, { value: 'COMBINED', label: 'Комбинированная' },
-    { value: 'QUEST', label: 'Квест' }, { value: 'GASTRO', label: 'Гастро' }, { value: 'ROOFTOP', label: 'Крыши' },
+    { value: 'RIVER', label: 'Речная' },
+    { value: 'WALKING', label: 'Пешеходная' },
+    { value: 'BUS', label: 'Автобусная' },
+    { value: 'COMBINED', label: 'Комбинированная' },
+    { value: 'QUEST', label: 'Квест' },
+    { value: 'GASTRO', label: 'Гастро' },
+    { value: 'ROOFTOP', label: 'Крыши' },
   ],
   MUSEUM: [
-    { value: 'MUSEUM_CLASSIC', label: 'Музей' }, { value: 'EXHIBITION', label: 'Выставка' },
-    { value: 'GALLERY', label: 'Галерея' }, { value: 'PALACE', label: 'Дворец' }, { value: 'PARK', label: 'Парк' },
+    { value: 'MUSEUM_CLASSIC', label: 'Музей' },
+    { value: 'EXHIBITION', label: 'Выставка' },
+    { value: 'GALLERY', label: 'Галерея' },
+    { value: 'PALACE', label: 'Дворец' },
+    { value: 'PARK', label: 'Парк' },
   ],
   EVENT: [
-    { value: 'CONCERT', label: 'Концерт' }, { value: 'SHOW', label: 'Шоу' },
-    { value: 'STANDUP', label: 'Стендап' }, { value: 'THEATER', label: 'Театр' },
-    { value: 'SPORT', label: 'Спорт' }, { value: 'FESTIVAL', label: 'Фестиваль' },
-    { value: 'MASTERCLASS', label: 'Мастер-класс' }, { value: 'PARTY', label: 'Вечеринка' },
+    { value: 'CONCERT', label: 'Концерт' },
+    { value: 'SHOW', label: 'Шоу' },
+    { value: 'STANDUP', label: 'Стендап' },
+    { value: 'THEATER', label: 'Театр' },
+    { value: 'SPORT', label: 'Спорт' },
+    { value: 'FESTIVAL', label: 'Фестиваль' },
+    { value: 'MASTERCLASS', label: 'Мастер-класс' },
+    { value: 'PARTY', label: 'Вечеринка' },
   ],
 };
 
@@ -82,10 +89,13 @@ export function EventCreatePage() {
 
   // Load cities
   useEffect(() => {
-    adminApi.get<any>('/admin/cities').then((res: any) => {
-      const list = res.items || res;
-      setCities(Array.isArray(list) ? list : []);
-    }).catch((e) => console.error('Load cities failed:', e));
+    adminApi
+      .get<any>('/admin/cities')
+      .then((res: any) => {
+        const list = res.items || res;
+        setCities(Array.isArray(list) ? list : []);
+      })
+      .catch((e) => console.error('Load cities failed:', e));
   }, []);
 
   const canGoStep2 = title.trim() && cityId && category;
@@ -166,21 +176,36 @@ export function EventCreatePage() {
               <div className="space-y-2">
                 <Label>Город *</Label>
                 <Select value={cityId} onValueChange={setCityId}>
-                  <SelectTrigger><SelectValue placeholder="Выберите город" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите город" />
+                  </SelectTrigger>
                   <SelectContent>
                     {cities.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Категория *</Label>
-                <Select value={category} onValueChange={(v) => { setCategory(v); setSubcategories([]); setTemplateData({}); }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={category}
+                  onValueChange={(v) => {
+                    setCategory(v);
+                    setSubcategories([]);
+                    setTemplateData({});
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {CATEGORY_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -223,7 +248,9 @@ export function EventCreatePage() {
               <div className="space-y-2">
                 <Label>Аудитория</Label>
                 <Select value={audience} onValueChange={setAudience}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">Для всех</SelectItem>
                     <SelectItem value="KIDS">Детям</SelectItem>
@@ -233,7 +260,12 @@ export function EventCreatePage() {
               </div>
               <div className="space-y-2">
                 <Label>Длительность (мин.)</Label>
-                <Input type="number" value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} placeholder="60" />
+                <Input
+                  type="number"
+                  value={durationMinutes}
+                  onChange={(e) => setDurationMinutes(e.target.value)}
+                  placeholder="60"
+                />
               </div>
             </div>
 
@@ -250,17 +282,30 @@ export function EventCreatePage() {
 
             <div className="space-y-2">
               <Label>Адрес</Label>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Набережная Макарова, 2" />
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Набережная Макарова, 2"
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Краткое описание</Label>
-              <Input value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="Для каталога / SEO description" />
+              <Input
+                value={shortDescription}
+                onChange={(e) => setShortDescription(e.target.value)}
+                placeholder="Для каталога / SEO description"
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Описание</Label>
-              <Textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Полное описание события..." />
+              <Textarea
+                rows={5}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Полное описание события..."
+              />
             </div>
 
             <EventTemplateFields
@@ -296,7 +341,9 @@ export function EventCreatePage() {
                 onChange={(e) => setSkipOffer(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300"
               />
-              <Label htmlFor="skipOffer" className="cursor-pointer">Пропустить (создать без оффера)</Label>
+              <Label htmlFor="skipOffer" className="cursor-pointer">
+                Пропустить (создать без оффера)
+              </Label>
             </div>
 
             {!skipOffer && (
@@ -304,7 +351,9 @@ export function EventCreatePage() {
                 <div className="space-y-2">
                   <Label>Тип покупки</Label>
                   <Select value={purchaseType} onValueChange={setPurchaseType}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="REQUEST">Заявка на подтверждение</SelectItem>
                       <SelectItem value="REDIRECT">Внешняя ссылка</SelectItem>
@@ -323,19 +372,35 @@ export function EventCreatePage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Цена от (руб.)</Label>
-                    <Input type="number" value={priceFrom} onChange={(e) => setPriceFrom(e.target.value)} placeholder="0" />
+                    <Input
+                      type="number"
+                      value={priceFrom}
+                      onChange={(e) => setPriceFrom(e.target.value)}
+                      placeholder="0"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Комиссия %</Label>
-                    <Input type="number" step="0.1" value={commissionPercent} onChange={(e) => setCommissionPercent(e.target.value)} placeholder="0" />
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={commissionPercent}
+                      onChange={(e) => setCommissionPercent(e.target.value)}
+                      placeholder="0"
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Доступность</Label>
-                    <Select value={availabilityMode || '__none__'} onValueChange={(v) => setAvailabilityMode(v === '__none__' ? '' : v)}>
-                      <SelectTrigger><SelectValue placeholder="Не задано" /></SelectTrigger>
+                    <Select
+                      value={availabilityMode || '__none__'}
+                      onValueChange={(v) => setAvailabilityMode(v === '__none__' ? '' : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Не задано" />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">Не задано</SelectItem>
                         <SelectItem value="UNKNOWN">Неизвестно</SelectItem>
@@ -348,7 +413,9 @@ export function EventCreatePage() {
                   <div className="space-y-2">
                     <Label>Бейдж</Label>
                     <Select value={badge || '__none__'} onValueChange={(v) => setBadge(v === '__none__' ? '' : v)}>
-                      <SelectTrigger><SelectValue placeholder="Без бейджа" /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Без бейджа" />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">Без бейджа</SelectItem>
                         <SelectItem value="optimal">Оптимальный</SelectItem>

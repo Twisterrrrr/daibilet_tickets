@@ -1,8 +1,9 @@
 'use client';
 
+import { ChevronDown, Clock, ExternalLink, MapPin, Ship, Star, Users } from 'lucide-react';
 import { useState } from 'react';
+
 import { TcWidgetButton } from '@/components/ui/TcWidget';
-import { Clock, MapPin, Star, Users, ChevronDown, ExternalLink, Ship } from 'lucide-react';
 
 interface Variant {
   sessionId: string;
@@ -84,9 +85,7 @@ export function VariantCard({ variant: v, isBest }: VariantCardProps) {
   return (
     <div
       className={`rounded-2xl border bg-white shadow-sm transition-shadow ${
-        isBest
-          ? 'border-primary-300 ring-2 ring-primary-100'
-          : 'border-slate-200'
+        isBest ? 'border-primary-300 ring-2 ring-primary-100' : 'border-slate-200'
       } ${isSoldOut ? 'opacity-60' : ''}`}
     >
       <div className="p-4">
@@ -101,9 +100,7 @@ export function VariantCard({ variant: v, isBest }: VariantCardProps) {
         {/* Верхний ряд: время + цена */}
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-2xl font-black text-slate-900 leading-none">
-              {formatTime(v.startsAt)}
-            </div>
+            <div className="text-2xl font-black text-slate-900 leading-none">{formatTime(v.startsAt)}</div>
             <div className="mt-1 text-[13px] text-slate-500">{formatDate(v.startsAt)}</div>
           </div>
           <div className="text-right">
@@ -131,9 +128,7 @@ export function VariantCard({ variant: v, isBest }: VariantCardProps) {
         </div>
 
         {/* Название */}
-        <p className="mt-2 text-[13px] font-semibold text-slate-800 line-clamp-2">
-          {v.event.title}
-        </p>
+        <p className="mt-2 text-[13px] font-semibold text-slate-800 line-clamp-2">{v.event.title}</p>
 
         {/* Бейджи (pills) */}
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -144,9 +139,7 @@ export function VariantCard({ variant: v, isBest }: VariantCardProps) {
             </Pill>
           )}
           {isSoldOut ? (
-            <Pill className="border-red-200 bg-red-50 text-red-600">
-              Нет мест
-            </Pill>
+            <Pill className="border-red-200 bg-red-50 text-red-600">Нет мест</Pill>
           ) : v.availableTickets <= 10 ? (
             <Pill className="border-orange-200 bg-orange-50 text-orange-700">
               <Users className="h-3 w-3" />
@@ -158,9 +151,7 @@ export function VariantCard({ variant: v, isBest }: VariantCardProps) {
               Есть места
             </Pill>
           )}
-          <Pill className="border-slate-200 bg-slate-50 text-slate-600">
-            {formatDuration(v.event.durationMinutes)}
-          </Pill>
+          <Pill className="border-slate-200 bg-slate-50 text-slate-600">{formatDuration(v.event.durationMinutes)}</Pill>
         </div>
 
         {/* Раскрытие */}
@@ -169,20 +160,14 @@ export function VariantCard({ variant: v, isBest }: VariantCardProps) {
           className="mt-3 flex items-center gap-1 text-[12px] font-semibold text-primary-600 hover:text-primary-700"
         >
           Подробнее
-          <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          />
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
 
         {expanded && (
           <div className="mt-2.5 space-y-1.5 border-t border-slate-100 pt-2.5 text-[12px] text-slate-500">
-            {Number(v.event.rating) > 0 && (
-              <p>Рейтинг: {Number(v.event.rating).toFixed(1)} / 5</p>
-            )}
+            {Number(v.event.rating) > 0 && <p>Рейтинг: {Number(v.event.rating).toFixed(1)} / 5</p>}
             {v.event.reviewCount > 0 && <p>Отзывов: {v.event.reviewCount}</p>}
-            <p className="text-slate-400">
-              Цена и наличие подтверждаются в билетной системе организатора.
-            </p>
+            <p className="text-slate-400">Цена и наличие подтверждаются в билетной системе организатора.</p>
           </div>
         )}
 
@@ -209,23 +194,13 @@ export function VariantCard({ variant: v, isBest }: VariantCardProps) {
 }
 
 /** Mobile cards list */
-export function VariantCards({
-  variants,
-  bestDealIdx,
-}: {
-  variants: Variant[];
-  bestDealIdx: number | null;
-}) {
+export function VariantCards({ variants, bestDealIdx }: { variants: Variant[]; bestDealIdx: number | null }) {
   if (variants.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center md:hidden">
         <Ship className="mx-auto h-10 w-10 text-slate-300" />
-        <p className="mt-2 text-base font-semibold text-slate-500">
-          Нет доступных рейсов
-        </p>
-        <p className="mt-1 text-sm text-slate-400">
-          Попробуйте другую дату или сбросьте фильтры
-        </p>
+        <p className="mt-2 text-base font-semibold text-slate-500">Нет доступных рейсов</p>
+        <p className="mt-1 text-sm text-slate-400">Попробуйте другую дату или сбросьте фильтры</p>
       </div>
     );
   }
@@ -233,11 +208,7 @@ export function VariantCards({
   return (
     <div className="grid gap-3 md:hidden">
       {variants.map((v, idx) => (
-        <VariantCard
-          key={v.sessionId}
-          variant={v}
-          isBest={idx === bestDealIdx}
-        />
+        <VariantCard key={v.sessionId} variant={v} isBest={idx === bestDealIdx} />
       ))}
     </div>
   );

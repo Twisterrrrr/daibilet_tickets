@@ -3,9 +3,9 @@
  * Запуск: npx tsx prisma/fix-event-category.ts <slug> [category] [subcategory1,subcategory2]
  * Пример: npx tsx prisma/fix-event-category.ts trehchasovaya-vechernyaya-ekskursiya-na-avtobuse-po-moskve-s-poseshcheniem-treh- EXCURSION BUS
  */
-import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
 import { PrismaClient } from '@prisma/client';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 
 const envPaths = [resolve(__dirname, '../../.env'), resolve(__dirname, '../../../.env')];
 const envPath = envPaths.find(existsSync);
@@ -43,7 +43,9 @@ async function main() {
     select: { id: true },
   });
 
-  const systemUserId = await prisma.adminUser.findFirst({ where: { role: 'ADMIN' }, select: { id: true } }).then((u) => u?.id);
+  const systemUserId = await prisma.adminUser
+    .findFirst({ where: { role: 'ADMIN' }, select: { id: true } })
+    .then((u) => u?.id);
   const updatedBy = systemUserId || event.id;
 
   if (override) {

@@ -5,14 +5,15 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+
 import {
   BookingProvider,
-  ReserveRequest,
-  ReserveResult,
-  ConfirmRequest,
-  ConfirmResult,
   CancelRequest,
   CancelResult,
+  ConfirmRequest,
+  ConfirmResult,
+  ReserveRequest,
+  ReserveResult,
   StatusRequest,
   StatusResult,
 } from '../booking-provider.interface';

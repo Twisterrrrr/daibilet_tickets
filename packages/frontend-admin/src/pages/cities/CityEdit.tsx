@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
+import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
-import { SeoMetaEditor } from '@/components/SeoMetaEditor';
+import { Textarea } from '@/components/ui/textarea';
 
 interface CityDetail {
   id: string;
@@ -239,9 +240,7 @@ export function CityEditPage() {
                 type="number"
                 step="any"
                 value={form.lat ?? ''}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, lat: e.target.value ? Number(e.target.value) : null }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, lat: e.target.value ? Number(e.target.value) : null }))}
               />
             </div>
             <div className="space-y-2">
@@ -251,9 +250,7 @@ export function CityEditPage() {
                 type="number"
                 step="any"
                 value={form.lng ?? ''}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, lng: e.target.value ? Number(e.target.value) : null }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, lng: e.target.value ? Number(e.target.value) : null }))}
               />
             </div>
           </div>

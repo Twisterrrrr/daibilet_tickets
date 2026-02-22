@@ -1,35 +1,36 @@
-import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  CalendarDays,
-  Merge,
-  ShoppingCart,
-  MapPin,
-  Tag,
-  FileText,
-  Layers,
-  BookOpen,
-  MessageSquare,
-  ExternalLink,
-  DollarSign,
-  ClipboardList,
-  Settings,
-  ChevronLeft,
-  Ticket,
-  Inbox,
-  Users,
-  ShieldCheck,
-  Landmark,
-  HeadphonesIcon,
-  Scale,
-  LayoutList,
   AlertCircle,
+  BookOpen,
+  CalendarDays,
+  ChevronLeft,
+  ClipboardList,
+  DollarSign,
+  ExternalLink,
+  FileText,
+  HeadphonesIcon,
+  Inbox,
+  Landmark,
+  Layers,
+  LayoutDashboard,
+  LayoutList,
+  MapPin,
+  Merge,
+  MessageSquare,
+  Scale,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  Tag,
+  Ticket,
+  Users,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { NavLink, useLocation } from 'react-router-dom';
+
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface NavItem {
   to: string;
@@ -49,6 +50,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard },
       { to: '/events', label: 'События', icon: CalendarDays },
+      { to: '/schedules', label: 'Event Studio', icon: CalendarDays },
       { to: '/events/merge', label: 'Merge дублей', icon: Merge },
       { to: '/orders', label: 'Заказы', icon: ShoppingCart },
       { to: '/checkout', label: 'Заявки', icon: Inbox },
@@ -104,7 +106,12 @@ export function Sidebar({ collapsed = false, onCollapse }: SidebarProps) {
       )}
     >
       {/* Logo */}
-      <div className={cn('flex h-14 items-center border-b border-sidebar-border', collapsed ? 'justify-center px-2' : 'gap-2 px-4')}>
+      <div
+        className={cn(
+          'flex h-14 items-center border-b border-sidebar-border',
+          collapsed ? 'justify-center px-2' : 'gap-2 px-4',
+        )}
+      >
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
           <Ticket className="h-4 w-4 text-primary-foreground" />
         </div>
@@ -131,9 +138,7 @@ export function Sidebar({ collapsed = false, onCollapse }: SidebarProps) {
               )}
               <nav className="space-y-0.5">
                 {section.items.map((item) => {
-                  const isActive = item.to === '/'
-                    ? location.pathname === '/'
-                    : location.pathname.startsWith(item.to);
+                  const isActive = item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
 
                   const link = (
                     <NavLink

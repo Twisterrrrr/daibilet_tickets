@@ -1,10 +1,12 @@
+import { VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
+import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
-import { api } from '@/lib/api';
+
 import { VenueCard } from '@/components/ui/VenueCard';
+import { api } from '@/lib/api';
+
 import { VenueFilters } from './VenueFilters';
-import { VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
 
 export const revalidate = 3600;
 
@@ -55,7 +57,9 @@ export default async function VenuesPage({ searchParams }: Props) {
       <div className="bg-gray-50 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <nav className="flex items-center text-sm text-gray-500 gap-1.5">
-            <Link href="/" className="hover:text-gray-900">Главная</Link>
+            <Link href="/" className="hover:text-gray-900">
+              Главная
+            </Link>
             <ChevronRight size={14} />
             <span className="text-gray-900">Музеи и Арт</span>
           </nav>
@@ -106,9 +110,7 @@ export default async function VenuesPage({ searchParams }: Props) {
                   key={p}
                   href={`/venues?${params}`}
                   className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    p === currentPage
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    p === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   {p}
@@ -122,9 +124,8 @@ export default async function VenuesPage({ searchParams }: Props) {
         <div className="mt-12 prose prose-gray max-w-3xl">
           <h2>Музеи и арт-пространства</h2>
           <p>
-            На Дайбилет вы найдете билеты в лучшие музеи, галереи, дворцы и арт-пространства.
-            Покупайте билеты с открытой датой, без очередей и наценок.
-            Мы подобрали для вас самые интересные места с подробными описаниями,
+            На Дайбилет вы найдете билеты в лучшие музеи, галереи, дворцы и арт-пространства. Покупайте билеты с
+            открытой датой, без очередей и наценок. Мы подобрали для вас самые интересные места с подробными описаниями,
             актуальными часами работы и отзывами посетителей.
           </p>
         </div>

@@ -78,7 +78,7 @@ export class AdminCombosController {
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateComboDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
-    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as any;
+    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as UpdateComboDto & Record<string, unknown>;
 
     this.validateJsonFields(clean);
 

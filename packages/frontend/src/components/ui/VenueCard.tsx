@@ -1,7 +1,7 @@
-import Link from 'next/link';
-import Image from 'next/image';
-import { Star, MapPin, Train } from 'lucide-react';
 import { formatPrice, VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
+import { MapPin, Star, Train } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
 
 interface VenueCardProps {
   slug: string;

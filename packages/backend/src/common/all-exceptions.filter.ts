@@ -1,5 +1,6 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, Logger, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
+
 import { maskPiiInString } from './pii-mask.util';
 
 @Catch()
@@ -13,14 +14,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const requestId = req.id ?? 'n/a';
 
-    const status =
-      exception instanceof HttpException ? exception.getStatus() : 500;
+    const status = exception instanceof HttpException ? exception.getStatus() : 500;
     let message: string;
     if (exception instanceof HttpException) {
       const exResp = exception.getResponse();
-      const m = typeof exResp === 'object' && exResp !== null
-        ? (exResp as Record<string, unknown>).message
-        : exResp;
+      const m = typeof exResp === 'object' && exResp !== null ? (exResp as Record<string, unknown>).message : exResp;
       message = Array.isArray(m) ? m.join('; ') : (m as string) || exception.message;
     } else {
       message = (exception instanceof Error ? exception.message : null) || 'Internal Server Error';
@@ -30,12 +28,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const stack = exception instanceof Error ? exception.stack : undefined;
     const maskedStack = stack ? maskPiiInString(stack) : undefined;
 
-    this.logger.error(
-      `[requestId=${requestId}] ${req.method} ${req.url} ${status} ${maskedMessage}`,
-      maskedStack,
-    );
+    this.logger.error(`[requestId=${requestId}] ${req.method} ${req.url} ${status} ${maskedMessage}`, maskedStack);
 
-    res.setHeader('x-request-id', requestId);
+    res.setHeader('x-request-id', String(requestId));
     const body: Record<string, unknown> = {
       statusCode: status,
       message,

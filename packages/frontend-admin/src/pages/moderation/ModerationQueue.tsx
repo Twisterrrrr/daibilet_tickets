@@ -1,7 +1,8 @@
+import { CheckCircle, Clock, Eye, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
-import { CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
 
 export function ModerationQueuePage() {
   const [events, setEvents] = useState<any[]>([]);
@@ -16,7 +17,9 @@ export function ModerationQueuePage() {
     });
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const approve = async (id: string) => {
     try {
@@ -50,13 +53,30 @@ export function ModerationQueuePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl p-6 w-[400px] space-y-4 shadow-xl">
             <h3 className="font-semibold">Причина отклонения</h3>
-            <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm" rows={3} placeholder="Укажите причину..." />
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+              rows={3}
+              placeholder="Укажите причину..."
+            />
             <div className="flex gap-2 justify-end">
-              <button onClick={() => { setRejectId(null); setRejectReason(''); }}
-                className="px-4 py-2 border rounded-lg text-sm">Отмена</button>
-              <button onClick={reject} disabled={!rejectReason.trim()}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm disabled:opacity-50">Отклонить</button>
+              <button
+                onClick={() => {
+                  setRejectId(null);
+                  setRejectReason('');
+                }}
+                className="px-4 py-2 border rounded-lg text-sm"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={reject}
+                disabled={!rejectReason.trim()}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm disabled:opacity-50"
+              >
+                Отклонить
+              </button>
             </div>
           </div>
         </div>
@@ -93,18 +113,21 @@ export function ModerationQueuePage() {
                 )}
               </div>
               <p className="text-sm text-muted-foreground">
-                {event.city?.name} | Оператор: {event.operator?.companyName || event.operator?.name || '—'}
-                {' '} (Trust: {event.operator?.trustLevel})
-                {' '} | {event._count?.offers || 0} офферов
+                {event.city?.name} | Оператор: {event.operator?.companyName || event.operator?.name || '—'} (Trust:{' '}
+                {event.operator?.trustLevel}) | {event._count?.offers || 0} офферов
               </p>
             </div>
             <div className="flex gap-2 shrink-0">
-              <button onClick={() => approve(event.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">
+              <button
+                onClick={() => approve(event.id)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700"
+              >
                 <CheckCircle className="h-3.5 w-3.5" /> Одобрить
               </button>
-              <button onClick={() => setRejectId(event.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700">
+              <button
+                onClick={() => setRejectId(event.id)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700"
+              >
                 <XCircle className="h-3.5 w-3.5" /> Отклонить
               </button>
             </div>

@@ -1,6 +1,7 @@
+import { ArrowRight, BookOpen, Calendar, MapPin } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Calendar, MapPin, ArrowRight, BookOpen } from 'lucide-react';
+
 import { api } from '@/lib/api';
 
 export const metadata: Metadata = {
@@ -32,13 +33,13 @@ export default async function BlogPage() {
       <section className="bg-gradient-to-br from-slate-800 to-slate-900 py-16">
         <div className="container-page">
           <div className="flex items-center gap-2 text-sm text-slate-400">
-            <Link href="/" className="hover:text-white">Главная</Link>
+            <Link href="/" className="hover:text-white">
+              Главная
+            </Link>
             <span>/</span>
             <span className="text-white">Блог</span>
           </div>
-          <h1 className="mt-3 text-4xl font-extrabold text-white sm:text-5xl">
-            Блог Дайбилет
-          </h1>
+          <h1 className="mt-3 text-4xl font-extrabold text-white sm:text-5xl">Блог Дайбилет</h1>
           <p className="mt-4 max-w-2xl text-lg text-slate-300">
             Путеводители по городам, подборки лучших экскурсий и советы для путешественников
           </p>
@@ -93,9 +94,7 @@ export default async function BlogPage() {
                   </h2>
 
                   {article.excerpt && (
-                    <p className="mt-2 flex-1 text-sm text-slate-500 line-clamp-3">
-                      {article.excerpt}
-                    </p>
+                    <p className="mt-2 flex-1 text-sm text-slate-500 line-clamp-3">{article.excerpt}</p>
                   )}
 
                   {/* Tags */}
@@ -123,16 +122,9 @@ export default async function BlogPage() {
         ) : (
           <div className="rounded-xl border border-dashed border-slate-300 py-20 text-center">
             <BookOpen className="mx-auto h-12 w-12 text-slate-300" />
-            <h2 className="mt-4 text-xl font-semibold text-slate-700">
-              Статьи скоро появятся
-            </h2>
-            <p className="mt-2 text-slate-500">
-              Мы готовим полезные материалы о путешествиях по городам России
-            </p>
-            <Link
-              href="/events"
-              className="btn-primary mt-6 inline-flex items-center gap-2"
-            >
+            <h2 className="mt-4 text-xl font-semibold text-slate-700">Статьи скоро появятся</h2>
+            <p className="mt-2 text-slate-500">Мы готовим полезные материалы о путешествиях по городам России</p>
+            <Link href="/events" className="btn-primary mt-6 inline-flex items-center gap-2">
               Смотреть каталог событий
               <ArrowRight className="h-4 w-4" />
             </Link>

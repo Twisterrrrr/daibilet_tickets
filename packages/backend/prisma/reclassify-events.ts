@@ -7,9 +7,10 @@
  *
  * Пропускает события с EventOverride (category/subcategories) — ручные правки админа.
  */
-import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
 import { PrismaClient } from '@prisma/client';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
+
 import { classify } from '../src/catalog/event-classifier';
 
 const cwd = process.cwd();
@@ -125,7 +126,9 @@ async function main() {
     console.log('Дифф (old → new):');
     for (const c of changes.slice(0, 50)) {
       const catDiff = c.oldCat !== c.newCat ? ` ${c.oldCat}→${c.newCat}` : '';
-      const subDiff = !arraysEqual(c.oldSub, c.newSub) ? ` [${c.oldSub.join(',') || '-'}]→[${c.newSub.join(',') || '-'}]` : '';
+      const subDiff = !arraysEqual(c.oldSub, c.newSub)
+        ? ` [${c.oldSub.join(',') || '-'}]→[${c.newSub.join(',') || '-'}]`
+        : '';
       const audDiff = c.oldAud !== c.newAud ? ` aud:${c.oldAud}→${c.newAud}` : '';
       console.log(`  ${c.slug} | ${c.source} |${catDiff}${subDiff}${audDiff}`);
       console.log(`    "${c.title}..."`);

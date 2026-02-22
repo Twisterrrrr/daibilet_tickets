@@ -6,15 +6,16 @@
  */
 
 import { Injectable, Logger, Optional } from '@nestjs/common';
+
 import { TcApiService } from '../../catalog/tc-api.service';
 import {
   BookingProvider,
-  ReserveRequest,
-  ReserveResult,
-  ConfirmRequest,
-  ConfirmResult,
   CancelRequest,
   CancelResult,
+  ConfirmRequest,
+  ConfirmResult,
+  ReserveRequest,
+  ReserveResult,
   StatusRequest,
   StatusResult,
 } from '../booking-provider.interface';
@@ -29,7 +30,12 @@ export class TcBookingProvider implements BookingProvider {
   async reserve(request: ReserveRequest): Promise<ReserveResult> {
     try {
       if (!this.tcApi) {
-        return { success: false, errorCode: 'TC_NOT_CONFIGURED', errorMessage: 'TcApiService not available', retryable: false };
+        return {
+          success: false,
+          errorCode: 'TC_NOT_CONFIGURED',
+          errorMessage: 'TcApiService not available',
+          retryable: false,
+        };
       }
 
       this.logger.log(`TC reserve: offerId=${request.offerId}, qty=${request.quantity}`);

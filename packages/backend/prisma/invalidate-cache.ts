@@ -2,9 +2,9 @@
  * Инвалидация кэша Redis (cities, events, tags и т.д.).
  * Запуск: npx tsx prisma/invalidate-cache.ts
  */
-import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
+import { existsSync, readFileSync } from 'fs';
 import Redis from 'ioredis';
+import { resolve } from 'path';
 
 // Load .env from backend or project root
 const envPaths = [resolve(__dirname, '../../.env'), resolve(__dirname, '../../../.env')];
@@ -37,4 +37,7 @@ async function main() {
   await redis.quit();
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

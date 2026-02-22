@@ -1,11 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import {
-  Ticket, ChevronLeft, ChevronRight, Minus, Plus, Zap,
-  CheckCircle, ExternalLink, Clock,
-} from 'lucide-react';
 import { formatPrice } from '@daibilet/shared';
+import { CheckCircle, ChevronLeft, ChevronRight, Clock, ExternalLink, Minus, Plus, Ticket, Zap } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 // ─── Types ────────────────────────────────────────
 interface Offer {
@@ -29,13 +26,7 @@ interface TicketsBlockProps {
 }
 
 // ─── Mini Calendar ────────────────────────────────
-function MiniCalendar({
-  selectedDate,
-  onSelect,
-}: {
-  selectedDate: Date | null;
-  onSelect: (d: Date) => void;
-}) {
+function MiniCalendar({ selectedDate, onSelect }: { selectedDate: Date | null; onSelect: (d: Date) => void }) {
   const [viewMonth, setViewMonth] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -83,7 +74,9 @@ function MiniCalendar({
       {/* Day headers */}
       <div className="grid grid-cols-7 gap-0.5 mb-1">
         {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
-          <div key={d} className="text-center text-[10px] text-gray-400 font-medium py-1">{d}</div>
+          <div key={d} className="text-center text-[10px] text-gray-400 font-medium py-1">
+            {d}
+          </div>
         ))}
       </div>
 
@@ -117,15 +110,7 @@ function MiniCalendar({
 }
 
 // ─── Quantity Picker ──────────────────────────────
-function QuantityPicker({
-  value,
-  onChange,
-  max = 10,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  max?: number;
-}) {
+function QuantityPicker({ value, onChange, max = 10 }: { value: number; onChange: (v: number) => void; max?: number }) {
   return (
     <div className="flex items-center gap-3">
       <button
@@ -177,19 +162,21 @@ function OfferCard({
   else if (isOpenDate) ctaText = 'Выбрать дату';
 
   // Offer description hint
-  const descHint = offer.badge === 'Быстрее проход' || (offer.badge || '').toLowerCase().includes('очеред')
-    ? 'Проход без очереди, электронный билет'
-    : offer.badge === 'С аудиогидом'
-      ? 'Включён аудиогид на русском языке'
-      : 'Электронный билет с открытой датой';
+  const descHint =
+    offer.badge === 'Быстрее проход' || (offer.badge || '').toLowerCase().includes('очеред')
+      ? 'Проход без очереди, электронный билет'
+      : offer.badge === 'С аудиогидом'
+        ? 'Включён аудиогид на русском языке'
+        : 'Электронный билет с открытой датой';
 
   return (
     <div
       className={`
         rounded-xl border p-4 sm:p-5 transition-all
-        ${isPrimary
-          ? 'border-blue-300 bg-blue-50/60 ring-1 ring-blue-200 shadow-sm'
-          : 'border-gray-200 bg-white hover:border-gray-300'
+        ${
+          isPrimary
+            ? 'border-blue-300 bg-blue-50/60 ring-1 ring-blue-200 shadow-sm'
+            : 'border-gray-200 bg-white hover:border-gray-300'
         }
       `}
     >
@@ -201,9 +188,11 @@ function OfferCard({
           </span>
         )}
         {offer.badge && (
-          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-            isPrimary ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
-          }`}>
+          <span
+            className={`px-2 py-0.5 rounded text-xs font-medium ${
+              isPrimary ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+            }`}
+          >
             {offer.badge}
           </span>
         )}
@@ -239,7 +228,10 @@ function OfferCard({
         </div>
 
         {isSoldOut ? (
-          <button disabled className="px-5 py-2.5 rounded-xl bg-gray-200 text-gray-500 font-bold text-sm cursor-not-allowed">
+          <button
+            disabled
+            className="px-5 py-2.5 rounded-xl bg-gray-200 text-gray-500 font-bold text-sm cursor-not-allowed"
+          >
             Распродано
           </button>
         ) : offer.purchaseType === 'REDIRECT' && offer.deeplink ? (
@@ -249,9 +241,10 @@ function OfferCard({
             rel="noopener noreferrer"
             className={`
               inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors whitespace-nowrap
-              ${isPrimary
-                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20'
-                : 'bg-gray-900 text-white hover:bg-gray-800'
+              ${
+                isPrimary
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20'
+                  : 'bg-gray-900 text-white hover:bg-gray-800'
               }
             `}
           >
@@ -262,9 +255,10 @@ function OfferCard({
           <button
             className={`
               px-5 py-2.5 rounded-xl font-bold text-sm transition-colors whitespace-nowrap
-              ${isPrimary
-                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20'
-                : 'bg-gray-900 text-white hover:bg-gray-800'
+              ${
+                isPrimary
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20'
+                  : 'bg-gray-900 text-white hover:bg-gray-800'
               }
             `}
           >
@@ -276,8 +270,12 @@ function OfferCard({
       {/* Trust signals */}
       {isPrimary && (
         <div className="flex items-center gap-4 mt-3 pt-3 border-t border-blue-200/60 text-xs text-blue-700">
-          <span className="flex items-center gap-1"><CheckCircle size={12} /> Электронный билет</span>
-          <span className="flex items-center gap-1"><Clock size={12} /> Мгновенное получение</span>
+          <span className="flex items-center gap-1">
+            <CheckCircle size={12} /> Электронный билет
+          </span>
+          <span className="flex items-center gap-1">
+            <Clock size={12} /> Мгновенное получение
+          </span>
         </div>
       )}
     </div>
@@ -335,7 +333,8 @@ export function TicketsBlock({ offers, isOpenDate = false, venueName, website }:
                   <span className="font-semibold">
                     {selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'short' })}
                   </span>
-                  {' · '}{quantity} {quantity === 1 ? 'билет' : quantity < 5 ? 'билета' : 'билетов'}
+                  {' · '}
+                  {quantity} {quantity === 1 ? 'билет' : quantity < 5 ? 'билета' : 'билетов'}
                 </p>
               </div>
             )}

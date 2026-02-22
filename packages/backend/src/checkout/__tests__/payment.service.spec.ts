@@ -1,43 +1,46 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PaymentService } from '../payment.service';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { PaymentFlowType } from '../cart-partitioning';
+import { PaymentService } from '../payment.service';
 
 // ---------------------
 // Snapshot helper — creates valid SnapshotLineItem for partitionCart
 // ---------------------
 
 function makeSnapshot(lineTotal: number, overrides: Record<string, unknown> = {}) {
-  return [{
-    lineItemIndex: 0,
-    offerId: 'offer-1',
-    eventId: 'event-1',
-    source: 'MANUAL',
-    purchaseType: 'REQUEST',
-    purchaseFlow: PaymentFlowType.PLATFORM,
-    eventTitle: 'Test Event',
-    eventSlug: 'test',
-    eventImage: null,
-    badge: null,
-    operatorName: 'Op',
-    unitPrice: lineTotal,
-    quantity: 1,
-    lineTotal,
-    priceCurrency: 'RUB',
-    supplierId: null,
-    commissionRateSnapshot: null,
-    platformFeeSnapshot: null,
-    supplierAmountSnapshot: null,
-    deeplink: null,
-    widgetProvider: null,
-    widgetPayload: null,
-    meetingPoint: null,
-    meetingInstructions: null,
-    operationalPhone: null,
-    operationalNote: null,
-    snapshotAt: new Date().toISOString(),
-    ...overrides,
-  }];
+  return [
+    {
+      lineItemIndex: 0,
+      offerId: 'offer-1',
+      eventId: 'event-1',
+      source: 'MANUAL',
+      purchaseType: 'REQUEST',
+      purchaseFlow: PaymentFlowType.PLATFORM,
+      eventTitle: 'Test Event',
+      eventSlug: 'test',
+      eventImage: null,
+      badge: null,
+      operatorName: 'Op',
+      unitPrice: lineTotal,
+      quantity: 1,
+      lineTotal,
+      priceCurrency: 'RUB',
+      supplierId: null,
+      commissionRateSnapshot: null,
+      platformFeeSnapshot: null,
+      supplierAmountSnapshot: null,
+      deeplink: null,
+      widgetProvider: null,
+      widgetPayload: null,
+      meetingPoint: null,
+      meetingInstructions: null,
+      operationalPhone: null,
+      operationalNote: null,
+      snapshotAt: new Date().toISOString(),
+      ...overrides,
+    },
+  ];
 }
 
 // ---------------------
@@ -60,12 +63,12 @@ const CONFIG_DEFAULTS: Record<string, string> = {
 };
 
 const mockConfig = {
-  get: vi.fn().mockImplementation((key: string, fallback?: string) =>
-    CONFIG_DEFAULTS[key] ?? fallback ?? 'http://localhost:3000',
-  ),
-  getOrThrow: vi.fn().mockImplementation((key: string) =>
-    CONFIG_DEFAULTS[key] ?? 'http://localhost:3000',
-  ),
+  get: vi
+    .fn()
+    .mockImplementation(
+      (key: string, fallback?: string) => CONFIG_DEFAULTS[key] ?? fallback ?? 'http://localhost:3000',
+    ),
+  getOrThrow: vi.fn().mockImplementation((key: string) => CONFIG_DEFAULTS[key] ?? 'http://localhost:3000'),
 };
 
 // ---------------------
@@ -96,9 +99,7 @@ describe('PaymentService', () => {
     it('should throw NotFoundException when session not found', async () => {
       mockPrisma.checkoutSession.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.createPaymentIntent(checkoutSessionId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.createPaymentIntent(checkoutSessionId)).rejects.toThrow(NotFoundException);
       expect(mockPrisma.checkoutSession.findUnique).toHaveBeenCalledWith({
         where: { id: checkoutSessionId },
       });
@@ -112,9 +113,7 @@ describe('PaymentService', () => {
         offersSnapshot: [],
       });
 
-      await expect(
-        service.createPaymentIntent(checkoutSessionId),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createPaymentIntent(checkoutSessionId)).rejects.toThrow(BadRequestException);
     });
 
     it('should return existing intent if idempotencyKey already exists (idempotency)', async () => {
@@ -155,9 +154,7 @@ describe('PaymentService', () => {
         status: 'PENDING',
       });
 
-      await expect(
-        service.createPaymentIntent(checkoutSessionId),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.createPaymentIntent(checkoutSessionId)).rejects.toThrow(ConflictException);
       expect(mockPrisma.paymentIntent.findFirst).toHaveBeenCalledWith({
         where: {
           checkoutSessionId,
@@ -176,9 +173,7 @@ describe('PaymentService', () => {
       mockPrisma.paymentIntent.findUnique.mockResolvedValue(null);
       mockPrisma.paymentIntent.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.createPaymentIntent(checkoutSessionId),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createPaymentIntent(checkoutSessionId)).rejects.toThrow(BadRequestException);
     });
 
     it('should create intent with STUB provider (default)', async () => {
@@ -309,7 +304,7 @@ describe('PaymentService', () => {
         totalPrice: 5000,
         offersSnapshot: makeSnapshot(5000, {
           supplierId: 'op-1',
-          commissionRateSnapshot: 0.10, // promoRate was applied at snapshot time
+          commissionRateSnapshot: 0.1, // promoRate was applied at snapshot time
           platformFeeSnapshot: 500,
           supplierAmountSnapshot: 4500,
         }),
@@ -333,14 +328,14 @@ describe('PaymentService', () => {
         grossAmount: 5000,
         platformFee: 500,
         supplierAmount: 4500,
-        commissionRate: 0.10,
+        commissionRate: 0.1,
       });
 
       await service.createPaymentIntent(checkoutSessionId);
 
       expect(mockPrisma.paymentIntent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          commissionRate: 0.10,
+          commissionRate: 0.1,
           platformFee: 500,
           supplierAmount: 4500,
         }),
@@ -428,9 +423,7 @@ describe('PaymentService', () => {
     it('should throw NotFoundException when intent not found', async () => {
       mockPrisma.paymentIntent.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.markPaid(intentId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.markPaid(intentId)).rejects.toThrow(NotFoundException);
       expect(mockPrisma.paymentIntent.findUnique).toHaveBeenCalledWith({
         where: { id: intentId },
         include: { checkoutSession: true },
@@ -605,9 +598,7 @@ describe('PaymentService', () => {
     it('should throw NotFoundException when intent not found', async () => {
       mockPrisma.paymentIntent.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.markFailed(intentId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.markFailed(intentId)).rejects.toThrow(NotFoundException);
     });
 
     it('should transition intent to FAILED', async () => {
@@ -686,9 +677,7 @@ describe('PaymentService', () => {
     it('should throw NotFoundException when intent not found', async () => {
       mockPrisma.paymentIntent.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.cancelIntent(intentId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.cancelIntent(intentId)).rejects.toThrow(NotFoundException);
     });
 
     it('should transition intent to CANCELLED', async () => {
@@ -741,9 +730,7 @@ describe('PaymentService', () => {
     it('should throw in production', async () => {
       process.env.NODE_ENV = 'production';
 
-      await expect(
-        service.simulatePaid(intentId),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.simulatePaid(intentId)).rejects.toThrow(BadRequestException);
     });
 
     it('should call markPaid with simulated providerPaymentId in non-production', async () => {

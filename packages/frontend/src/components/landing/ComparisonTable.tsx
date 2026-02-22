@@ -1,7 +1,8 @@
 'use client';
 
+import { Clock, ExternalLink, MapPin, Ship, Star, Users } from 'lucide-react';
+
 import { TcWidgetButton } from '@/components/ui/TcWidget';
-import { Star, Users, Clock, MapPin, ExternalLink, Ship } from 'lucide-react';
 
 interface Variant {
   sessionId: string;
@@ -70,11 +71,7 @@ function shortenAddress(address: string | undefined): string {
 }
 
 function extractVessel(title: string): string {
-  const patterns = [
-    /теплоход[еу]?\s+[«"]?([^»"]+)[»"]?/i,
-    /на\s+[«"]([^»"]+)[»"]/i,
-    /—\s+(.+)$/i,
-  ];
+  const patterns = [/теплоход[еу]?\s+[«"]?([^»"]+)[»"]?/i, /на\s+[«"]([^»"]+)[»"]/i, /—\s+(.+)$/i];
   for (const p of patterns) {
     const m = title.match(p);
     if (m) return m[1].trim().slice(0, 25);
@@ -97,12 +94,8 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
     return (
       <div className="hidden rounded-2xl border border-slate-200 bg-white p-12 text-center md:block">
         <Ship className="mx-auto h-12 w-12 text-slate-300" />
-        <p className="mt-3 text-lg font-semibold text-slate-500">
-          Нет рейсов по выбранным фильтрам
-        </p>
-        <p className="mt-1 text-sm text-slate-400">
-          Попробуйте сбросить фильтры или выбрать другую дату
-        </p>
+        <p className="mt-3 text-lg font-semibold text-slate-500">Нет рейсов по выбранным фильтрам</p>
+        <p className="mt-1 text-sm text-slate-400">Попробуйте сбросить фильтры или выбрать другую дату</p>
       </div>
     );
   }
@@ -129,9 +122,7 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
               <tr
                 key={v.sessionId}
                 className={`transition-colors ${
-                  isBest
-                    ? 'bg-gradient-to-r from-primary-50/60 to-transparent'
-                    : 'hover:bg-slate-50/50'
+                  isBest ? 'bg-gradient-to-r from-primary-50/60 to-transparent' : 'hover:bg-slate-50/50'
                 } ${isSoldOut ? 'opacity-50' : ''}`}
               >
                 {/* Время */}
@@ -142,9 +133,7 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
                       Оптимальный
                     </div>
                   )}
-                  <div className="text-lg font-black text-slate-900 leading-none">
-                    {formatTime(v.startsAt)}
-                  </div>
+                  <div className="text-lg font-black text-slate-900 leading-none">{formatTime(v.startsAt)}</div>
                   <div className="mt-0.5 text-[12px] text-slate-400">
                     {formatDate(v.startsAt)} · {formatDuration(v.event.durationMinutes)}
                   </div>
@@ -152,12 +141,8 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
 
                 {/* Причал / оператор */}
                 <td className="px-4 py-3.5">
-                  <div className="font-bold text-slate-900">
-                    {shortenAddress(v.event.address)}
-                  </div>
-                  <div className="mt-0.5 text-[12px] text-slate-500">
-                    {extractVessel(v.event.title)}
-                  </div>
+                  <div className="font-bold text-slate-900">{shortenAddress(v.event.address)}</div>
+                  <div className="mt-0.5 text-[12px] text-slate-500">{extractVessel(v.event.title)}</div>
                 </td>
 
                 {/* Опции (pills) */}
@@ -174,9 +159,7 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
                       </Pill>
                     )}
                     {isSoldOut ? (
-                      <Pill className="border-red-200 bg-red-50 text-red-600">
-                        Нет мест
-                      </Pill>
+                      <Pill className="border-red-200 bg-red-50 text-red-600">Нет мест</Pill>
                     ) : v.availableTickets <= 10 ? (
                       <Pill className="border-orange-200 bg-orange-50 text-orange-700">
                         <Users className="h-3 w-3" />

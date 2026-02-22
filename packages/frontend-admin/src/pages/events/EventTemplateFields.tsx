@@ -15,12 +15,7 @@ interface EventTemplateFieldsProps {
 }
 
 /** Поля шаблона в зависимости от типа события (PageTemplateSpecs) */
-export function EventTemplateFields({
-  category,
-  subcategories,
-  templateData,
-  onChange,
-}: EventTemplateFieldsProps) {
+export function EventTemplateFields({ category, subcategories, templateData, onChange }: EventTemplateFieldsProps) {
   const update = (key: string, value: unknown) => {
     onChange({ ...templateData, [key]: value });
   };
@@ -37,7 +32,12 @@ export function EventTemplateFields({
   };
 
   const setArray = (key: string, text: string) => {
-    const arr = text.trim() ? text.split('\n').map((s) => s.trim()).filter(Boolean) : [];
+    const arr = text.trim()
+      ? text
+          .split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
     update(key, arr);
   };
 
@@ -162,7 +162,12 @@ export function EventTemplateFields({
               value={get('cast')}
               onChange={(e) => {
                 const text = e.target.value;
-                const lines = text.trim() ? text.split('\n').map((s) => s.trim()).filter(Boolean) : [];
+                const lines = text.trim()
+                  ? text
+                      .split('\n')
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                  : [];
                 const cast = lines.map((line) => {
                   const dash = line.indexOf(' — ');
                   if (dash > 0) return { name: line.slice(0, dash).trim(), role: line.slice(dash + 3).trim() };

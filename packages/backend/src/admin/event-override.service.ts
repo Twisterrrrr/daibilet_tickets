@@ -80,7 +80,7 @@ export class EventOverrideService {
           subcategories: override.subcategories?.length ? override.subcategories : event.subcategories,
           minAge: override.minAge ?? event.minAge,
           rating: override.manualRating ?? event.rating,
-          templateData: (override as any).templateData ?? null,
+          templateData: override.templateData ?? null,
           _hasOverride: true,
         };
       })

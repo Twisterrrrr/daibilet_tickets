@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
-import { api } from '@/lib/api';
+
 import { CityCard } from '@/components/ui/CityCard';
+import { api } from '@/lib/api';
 
 export const metadata: Metadata = {
   title: 'Города России — экскурсии, музеи и мероприятия',
@@ -21,9 +22,7 @@ export default async function CitiesPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900">Города</h1>
-        <p className="mt-2 text-lg text-slate-500">
-          Выберите город — найдём лучшие экскурсии, музеи и мероприятия
-        </p>
+        <p className="mt-2 text-lg text-slate-500">Выберите город — найдём лучшие экскурсии, музеи и мероприятия</p>
       </div>
 
       {/* Cities grid */}
@@ -46,9 +45,7 @@ export default async function CitiesPage() {
       ) : (
         <div className="rounded-xl border border-dashed border-slate-300 py-20 text-center">
           <p className="text-lg text-slate-400">Города загружаются...</p>
-          <p className="mt-1 text-sm text-slate-400">
-            Убедитесь, что API запущен на порту 4000
-          </p>
+          <p className="mt-1 text-sm text-slate-400">Убедитесь, что API запущен на порту 4000</p>
         </div>
       )}
     </div>

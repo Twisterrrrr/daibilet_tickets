@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
+
 import { api } from '@/lib/api';
-import { toUrlSetXml, SITE_URL, type SitemapUrl } from '@/lib/sitemap-xml';
+import { SITE_URL, type SitemapUrl, toUrlSetXml } from '@/lib/sitemap-xml';
 
 const FEATURED_CITY_SLUGS = [
-  'saint-petersburg', 'moscow', 'kazan', 'nizhny-novgorod', 'kaliningrad',
-  'sochi', 'ekaterinburg', 'vladivostok', 'novosibirsk', 'yaroslavl',
+  'saint-petersburg',
+  'moscow',
+  'kazan',
+  'nizhny-novgorod',
+  'kaliningrad',
+  'sochi',
+  'ekaterinburg',
+  'vladivostok',
+  'novosibirsk',
+  'yaroslavl',
 ];
 
 const LASTMOD = new Date().toISOString().slice(0, 10);
@@ -36,6 +45,7 @@ export async function GET() {
     // Лендинги, combo, подборки
     const landings = await api.getLandings();
     for (const lp of landings || []) {
+      if (!lp.city) continue;
       urls.push({
         loc: `${SITE_URL}/cities/${lp.city.slug}/${lp.slug}`,
         lastmod: lp.updatedAt ? new Date(lp.updatedAt).toISOString().slice(0, 10) : LASTMOD,

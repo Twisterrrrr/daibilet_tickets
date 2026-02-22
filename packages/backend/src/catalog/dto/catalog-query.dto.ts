@@ -1,7 +1,7 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsEnum } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { EventCategory, EventSource } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class CatalogQueryDto {
   @ApiPropertyOptional({ description: 'EXCURSION | EVENT → Event, MUSEUM → Venue' })
@@ -24,7 +24,10 @@ export class CatalogQueryDto {
   @IsString()
   q?: string;
 
-  @ApiPropertyOptional({ enum: EventSource, description: 'Фильтр по источнику: TC | TEPLOHOD | MANUAL (только для Event)' })
+  @ApiPropertyOptional({
+    enum: EventSource,
+    description: 'Фильтр по источнику: TC | TEPLOHOD | MANUAL (только для Event)',
+  })
   @IsOptional()
   @IsEnum(EventSource)
   source?: EventSource;

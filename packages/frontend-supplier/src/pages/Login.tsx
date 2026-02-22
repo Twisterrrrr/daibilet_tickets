@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+
 import { api, setToken } from '../lib/api';
 
 export default function Login() {
@@ -31,22 +32,37 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg" required />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg"
+              required
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Пароль</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg" required />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg"
+              required
+            />
           </div>
-          <button type="submit" disabled={loading}
-            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
             {loading ? 'Вход...' : 'Войти'}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-gray-500">
           Нет аккаунта?{' '}
-          <Link to="/register" className="text-blue-600 hover:underline">Зарегистрироваться</Link>
+          <Link to="/register" className="text-blue-600 hover:underline">
+            Зарегистрироваться
+          </Link>
         </p>
       </div>
     </div>

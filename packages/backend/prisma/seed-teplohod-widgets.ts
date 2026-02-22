@@ -17,7 +17,7 @@
  * По умолчанию: prisma/teplohod-widgets.json
  */
 import { PrismaClient } from '@prisma/client';
-import { readFileSync, existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import * as XLSX from 'xlsx';
 
@@ -35,12 +35,8 @@ if (envPath) {
 
 const prisma = new PrismaClient();
 
-const EVENT_COL_PATTERNS = [
-  /^id$/i, /^event_?id$/i, /^event\s*id$/i, /^tep$/i, /^прогулк/i, /^№\s*\d*$/i,
-];
-const WIDGET_COL_PATTERNS = [
-  /data-?id/i, /^widget/i, /виджет/i, /^widget_id$/i, /data_id/i,
-];
+const EVENT_COL_PATTERNS = [/^id$/i, /^event_?id$/i, /^event\s*id$/i, /^tep$/i, /^прогулк/i, /^№\s*\d*$/i];
+const WIDGET_COL_PATTERNS = [/data-?id/i, /^widget/i, /виджет/i, /^widget_id$/i, /data_id/i];
 
 function parseEventId(val: unknown): string | null {
   if (val == null) return null;
@@ -92,7 +88,11 @@ function loadMappingFromXlsx(filePath: string): Record<string, number> {
     return {};
   }
 
-  const headers = (rows[0] as any[]).map((h) => String(h ?? '').trim().toLowerCase());
+  const headers = (rows[0] as any[]).map((h) =>
+    String(h ?? '')
+      .trim()
+      .toLowerCase(),
+  );
   let eventCol = -1;
   let widgetCol = -1;
 
@@ -125,7 +125,9 @@ function loadMappingFromXlsx(filePath: string): Record<string, number> {
 }
 
 function loadMapping(filePath: string): Record<string, number> {
-  const abs = resolve(filePath.startsWith('/') || /^[A-Za-z]:/.test(filePath) ? filePath : resolve(process.cwd(), filePath));
+  const abs = resolve(
+    filePath.startsWith('/') || /^[A-Za-z]:/.test(filePath) ? filePath : resolve(process.cwd(), filePath),
+  );
   if (!existsSync(abs)) {
     throw new Error(`Файл не найден: ${abs}`);
   }
@@ -139,7 +141,9 @@ async function main() {
   const inspect = process.argv.includes('--inspect');
 
   if (inspect && filePath) {
-    const abs = resolve(filePath.startsWith('/') || /^[A-Za-z]:/.test(filePath) ? filePath : resolve(process.cwd(), filePath));
+    const abs = resolve(
+      filePath.startsWith('/') || /^[A-Za-z]:/.test(filePath) ? filePath : resolve(process.cwd(), filePath),
+    );
     if (existsSync(abs) && (abs.endsWith('.xlsx') || abs.endsWith('.xls'))) {
       inspectXlsx(abs);
     } else {
@@ -166,7 +170,10 @@ async function main() {
   }
 
   if (debug) {
-    console.log(`Прочитано ${tepKeys.length} пар (event → widget). Примеры:`, tepKeys.slice(0, 5).map((k) => `${k} → ${uniqueMapping[k]}`));
+    console.log(
+      `Прочитано ${tepKeys.length} пар (event → widget). Примеры:`,
+      tepKeys.slice(0, 5).map((k) => `${k} → ${uniqueMapping[k]}`),
+    );
   }
 
   const offers = await prisma.eventOffer.findMany({
@@ -220,7 +227,9 @@ async function main() {
   }
 
   const totalTepOffers = await prisma.eventOffer.count({ where: { source: 'TEPLOHOD', isDeleted: false } });
-  console.log(`\nОбновлено офферов: ${updated} из ${offers.length} найденных (всего TEPLOHOD-офферов в БД: ${totalTepOffers}).`);
+  console.log(
+    `\nОбновлено офферов: ${updated} из ${offers.length} найденных (всего TEPLOHOD-офферов в БД: ${totalTepOffers}).`,
+  );
   if (updated === 0 && totalTepOffers > 0 && tepKeys.length > 0) {
     const sampleIds = await prisma.eventOffer.findMany({
       where: { source: 'TEPLOHOD', isDeleted: false },

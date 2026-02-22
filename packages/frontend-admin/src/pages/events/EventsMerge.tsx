@@ -1,7 +1,8 @@
+import { ChevronRight, Merge, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Merge, RefreshCw, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +25,9 @@ export function EventsMergePage() {
     if (!confirm('Выполнить автодедупликацию? События с меньшим рейтингом будут деактивированы.')) return;
     setAutoMerging(true);
     try {
-      const res = await adminApi.post<{ candidates: Candidate[]; merged: number }>('/admin/events/deduplicate-fuzzy?dryRun=false');
+      const res = await adminApi.post<{ candidates: Candidate[]; merged: number }>(
+        '/admin/events/deduplicate-fuzzy?dryRun=false',
+      );
       toast.success(`Объединено: ${res.merged ?? 0} пар`);
       loadCandidates();
     } catch (e) {
@@ -105,25 +108,21 @@ export function EventsMergePage() {
                 >
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Link
-                        to={`/events/${c.eventA.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
+                      <Link to={`/events/${c.eventA.id}`} className="font-medium text-primary hover:underline">
                         {c.eventA.title}
                       </Link>
                       <span className="text-xs text-muted-foreground">({c.eventA.slug})</span>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Link
-                        to={`/events/${c.eventB.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
+                      <Link to={`/events/${c.eventB.id}`} className="font-medium text-primary hover:underline">
                         {c.eventB.title}
                       </Link>
                       <span className="text-xs text-muted-foreground">({c.eventB.slug})</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">Сходство: {Math.round(c.similarity * 100)}% ({c.reason})</p>
+                    <p className="text-xs text-muted-foreground">
+                      Сходство: {Math.round(c.similarity * 100)}% ({c.reason})
+                    </p>
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <Button

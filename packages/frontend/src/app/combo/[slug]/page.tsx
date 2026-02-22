@@ -1,19 +1,12 @@
+import { formatPrice } from '@daibilet/shared';
+import { Calendar, CheckCircle, ChevronRight, Clock, MapPin, Star, Users } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import {
-  ChevronRight,
-  Calendar,
-  Users,
-  Clock,
-  CheckCircle,
-  MapPin,
-  Star,
-} from 'lucide-react';
+
+import { FaqSection } from '@/components/landing/FaqSection';
 import { api } from '@/lib/api';
 import { getSeoMeta } from '@/lib/seo/getSeoMeta';
-import { formatPrice } from '@daibilet/shared';
-import { FaqSection } from '@/components/landing/FaqSection';
 
 export const revalidate = 21600;
 
@@ -40,13 +33,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const robots = seo?.robots ?? 'index,follow';
     const canonical = seo?.canonicalUrl ?? undefined;
     return {
-      title,
-      description,
+      title: title != null ? title : undefined,
+      description: description != null ? description : undefined,
       robots,
       ...(canonical && { alternates: { canonical } }),
       openGraph: {
-        title: seo?.ogTitle ?? title,
-        description: seo?.ogDescription ?? description,
+        title: (seo?.ogTitle ?? title) ?? undefined,
+        description: (seo?.ogDescription ?? description) ?? undefined,
         ...(seo?.ogImage && { images: [{ url: seo.ogImage }] }),
         type: 'website',
       },
@@ -91,19 +84,23 @@ export default async function ComboDetailPage({ params }: Props) {
         <div className="container mx-auto px-4">
           {/* Breadcrumbs */}
           <nav className="flex items-center text-sm text-indigo-300 mb-6 flex-wrap">
-            <Link href="/" className="hover:text-white">Главная</Link>
+            <Link href="/" className="hover:text-white">
+              Главная
+            </Link>
             <ChevronRight className="w-4 h-4 mx-1" />
-            <Link href="/combo" className="hover:text-white">Программы</Link>
+            <Link href="/combo" className="hover:text-white">
+              Программы
+            </Link>
             <ChevronRight className="w-4 h-4 mx-1" />
-            <Link href={`/cities/${data.city.slug}`} className="hover:text-white">{data.city.name}</Link>
+            <Link href={`/cities/${data.city.slug}`} className="hover:text-white">
+              {data.city.name}
+            </Link>
             <ChevronRight className="w-4 h-4 mx-1" />
             <span className="text-white">{data.title}</span>
           </nav>
 
           <h1 className="text-3xl md:text-5xl font-bold mb-4">{data.title}</h1>
-          {data.subtitle && (
-            <p className="text-xl text-indigo-200 max-w-3xl">{data.subtitle}</p>
-          )}
+          {data.subtitle && <p className="text-xl text-indigo-200 max-w-3xl">{data.subtitle}</p>}
 
           {/* Meta badges */}
           <div className="flex flex-wrap items-center gap-4 mt-6">
@@ -180,9 +177,7 @@ export default async function ComboDetailPage({ params }: Props) {
           <div className="space-y-8">
             {days.map((day: any) => (
               <div key={day.dayNumber}>
-                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                  День {day.dayNumber}
-                </h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">День {day.dayNumber}</h3>
                 <div className="space-y-4">
                   {day.slots.map((slot: any, si: number) => (
                     <div
@@ -191,7 +186,9 @@ export default async function ComboDetailPage({ params }: Props) {
                     >
                       {/* Time badge */}
                       <div className="flex md:flex-col items-center md:items-start gap-3 md:gap-1 flex-shrink-0 md:w-20">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${SLOT_COLORS[slot.slot] || 'bg-gray-50'}`}>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold border ${SLOT_COLORS[slot.slot] || 'bg-gray-50'}`}
+                        >
                           {SLOT_LABELS[slot.slot] || slot.slot}
                         </span>
                         <span className="text-sm text-gray-500 flex items-center gap-1">
@@ -240,9 +237,7 @@ export default async function ComboDetailPage({ params }: Props) {
                       {/* Price */}
                       {slot.adultPrice > 0 && (
                         <div className="text-right flex-shrink-0">
-                          <span className="text-lg font-bold text-indigo-700">
-                            {formatPrice(slot.adultPrice)}
-                          </span>
+                          <span className="text-lg font-bold text-indigo-700">{formatPrice(slot.adultPrice)}</span>
                           <span className="text-xs text-gray-400 block">/ чел.</span>
                         </div>
                       )}
@@ -255,8 +250,8 @@ export default async function ComboDetailPage({ params }: Props) {
         ) : (
           <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
             <p className="text-gray-500 mb-4">
-              Программа формируется из актуальных событий. 
-              Нажмите «Настроить под себя», чтобы получить персональный маршрут.
+              Программа формируется из актуальных событий. Нажмите «Настроить под себя», чтобы получить персональный
+              маршрут.
             </p>
             <Link
               href={`/events?city=${data.city.slug}`}
@@ -328,9 +323,7 @@ export default async function ComboDetailPage({ params }: Props) {
                 <div className="flex-1">
                   <h4 className="font-semibold text-gray-900">{upsell.name}</h4>
                   <p className="text-sm text-gray-600 mt-0.5">{upsell.description}</p>
-                  <span className="text-indigo-700 font-bold mt-2 block">
-                    +{formatPrice(upsell.priceKopecks)}
-                  </span>
+                  <span className="text-indigo-700 font-bold mt-2 block">+{formatPrice(upsell.priceKopecks)}</span>
                 </div>
               </div>
             ))}

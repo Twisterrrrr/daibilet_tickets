@@ -1,7 +1,8 @@
-import { Module, Global } from '@nestjs/common';
-import { UploadService } from './upload.service';
+import { Global, Module } from '@nestjs/common';
+
 import { LocalStorageProvider } from './local-storage.provider';
 import { STORAGE_PROVIDER } from './storage.provider';
+import { UploadService } from './upload.service';
 
 @Global()
 @Module({

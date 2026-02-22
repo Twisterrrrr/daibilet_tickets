@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { VenueService } from './venue.service';
+import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+
 import { ReviewService } from '../catalog/review.service';
+import { VenueService } from './venue.service';
 
 @ApiTags('venues')
 @Controller('venues')
@@ -54,11 +55,7 @@ export class VenueController {
   @ApiOperation({ summary: 'Одобренные отзывы места (с пагинацией)' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
-  getVenueReviews(
-    @Param('slug') slug: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
+  getVenueReviews(@Param('slug') slug: string, @Query('page') page?: string, @Query('limit') limit?: string) {
     return this.reviewService.getByVenueSlug(slug, Number(page) || 1, Number(limit) || 10);
   }
 }

@@ -3,9 +3,9 @@
  * Запуск: npx tsx prisma/hide-event.ts <slug>
  * Пример: npx tsx prisma/hide-event.ts novogodnyaya-ekskursiya-2026-na-avtobuse-ot-krasnoj-ploshchadi
  */
-import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
 import { PrismaClient } from '@prisma/client';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 
 const envPaths = [resolve(__dirname, '../../.env'), resolve(__dirname, '../../../.env')];
 const envPath = envPaths.find(existsSync);

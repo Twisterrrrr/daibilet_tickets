@@ -91,7 +91,8 @@ export class AdminTagsController {
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateTagDto) {
-    const { id: _, createdAt, updatedAt, events, articleTags, _count, version, ...clean } = data as any;
+    const { id: _, createdAt, updatedAt, events, articleTags, _count, version, ...clean } =
+      data as UpdateTagDto & Record<string, unknown>;
 
     if (data.version !== undefined) {
       const result = await this.prisma.tag.updateMany({

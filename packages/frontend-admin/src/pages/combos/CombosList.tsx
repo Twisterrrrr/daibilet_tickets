@@ -1,19 +1,14 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,51 +43,37 @@ const getColumns = (): ColumnDef<ComboItem>[] => [
   {
     accessorKey: 'title',
     header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
-    cell: ({ row }) => (
-      <div className="font-medium">{row.original.title}</div>
-    ),
+    cell: ({ row }) => <div className="font-medium">{row.original.title}</div>,
   },
   {
     id: 'city',
     accessorFn: (row) => row.city?.name ?? '',
     header: 'Город',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">
-        {row.original.city?.name ?? '—'}
-      </span>
-    ),
+    cell: ({ row }) => <span className="text-muted-foreground">{row.original.city?.name ?? '—'}</span>,
   },
   {
     accessorKey: 'intensity',
     header: 'Интенсивность',
     cell: ({ row }) => (
-      <Badge variant="outline">
-        {INTENSITY_LABELS[row.original.intensity] ?? row.original.intensity}
-      </Badge>
+      <Badge variant="outline">{INTENSITY_LABELS[row.original.intensity] ?? row.original.intensity}</Badge>
     ),
   },
   {
     accessorKey: 'dayCount',
     header: 'Дней',
-    cell: ({ row }) => (
-      <span className="tabular-nums text-sm">{row.original.dayCount}</span>
-    ),
+    cell: ({ row }) => <span className="tabular-nums text-sm">{row.original.dayCount}</span>,
   },
   {
     accessorKey: 'isActive',
     header: 'Активен',
     cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
-        {row.original.isActive ? 'Да' : 'Нет'}
-      </Badge>
+      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Да' : 'Нет'}</Badge>
     ),
   },
   {
     accessorKey: 'sortOrder',
     header: ({ column }) => <SortableHeader column={column}>Порядок</SortableHeader>,
-    cell: ({ row }) => (
-      <span className="tabular-nums text-sm">{row.original.sortOrder}</span>
-    ),
+    cell: ({ row }) => <span className="tabular-nums text-sm">{row.original.sortOrder}</span>,
   },
 ];
 
@@ -123,7 +104,7 @@ export function CombosListPage() {
     adminApi
       .get<CityItem[] | { items: CityItem[] }>('/admin/cities')
       .then((res) => {
-        const list = Array.isArray(res) ? res : (res as { items: CityItem[] }).items ?? [];
+        const list = Array.isArray(res) ? res : ((res as { items: CityItem[] }).items ?? []);
         setCities(list);
       })
       .catch((e) => console.error('Load cities failed:', e));
@@ -141,9 +122,7 @@ export function CombosListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Combo</h1>
-          <p className="text-muted-foreground">
-            Управление combo-страницами (маршруты, путешествия)
-          </p>
+          <p className="text-muted-foreground">Управление combo-страницами (маршруты, путешествия)</p>
         </div>
         <Button asChild>
           <Link to="/combos/new" className="gap-2">
@@ -163,16 +142,11 @@ export function CombosListPage() {
       <Card>
         <CardHeader>
           <CardTitle>Список combo</CardTitle>
-          <CardDescription>
-            Выберите город для фильтрации или оставьте «Все города»
-          </CardDescription>
+          <CardDescription>Выберите город для фильтрации или оставьте «Все города»</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Select
-              value={cityFilter || '__all__'}
-              onValueChange={(v) => setCityFilter(v === '__all__' ? '' : v)}
-            >
+            <Select value={cityFilter || '__all__'} onValueChange={(v) => setCityFilter(v === '__all__' ? '' : v)}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Все города" />
               </SelectTrigger>

@@ -1,7 +1,7 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as path from 'path';
 
 // ============================================================
@@ -109,10 +109,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
   private readonly apiKey: string;
 
   constructor(private readonly config: ConfigService) {
-    this.endpoint = this.config.get<string>(
-      'TC_GRPC_ENDPOINT',
-      'simple.ticketscloud.com:443',
-    );
+    this.endpoint = this.config.get<string>('TC_GRPC_ENDPOINT', 'simple.ticketscloud.com:443');
     this.apiKey = this.config.get<string>('TC_API_TOKEN', '');
   }
 
@@ -144,20 +141,19 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
   private async initClient(): Promise<void> {
     const protoDir = path.resolve(__dirname, '..', '..', 'proto', 'tc-simple');
 
-    const packageDefinition = await protoLoader.load(
-      path.join(protoDir, 'service.proto'),
-      {
-        keepCase: true,
-        longs: String,
-        enums: Number,
-        defaults: true,
-        oneofs: true,
-        includeDirs: [protoDir],
-      },
-    );
+    const packageDefinition = await protoLoader.load(path.join(protoDir, 'service.proto'), {
+      keepCase: true,
+      longs: String,
+      enums: Number,
+      defaults: true,
+      oneofs: true,
+      includeDirs: [protoDir],
+    });
 
     const proto = grpc.loadPackageDefinition(packageDefinition) as Record<string, Record<string, unknown>>;
-    const SimpleService = proto.v2?.Simple as (new (endpoint: string, credentials: grpc.ChannelCredentials) => grpc.Client) | undefined;
+    const SimpleService = proto.v2?.Simple as
+      | (new (endpoint: string, credentials: grpc.ChannelCredentials) => grpc.Client)
+      | undefined;
 
     if (!SimpleService) {
       throw new Error('Не удалось загрузить proto v2.Simple');
@@ -182,11 +178,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
   /**
    * Обёртка: собирает все элементы из server-side streaming RPC в массив.
    */
-  private collectStream<T>(
-    rpcMethod: string,
-    request: any,
-    timeoutMs = 30000,
-  ): Promise<T[]> {
+  private collectStream<T>(rpcMethod: string, request: any, timeoutMs = 30000): Promise<T[]> {
     return new Promise((resolve, reject) => {
       if (!this.client) {
         return reject(new Error('gRPC-клиент не инициализирован'));
@@ -200,12 +192,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
       const items: T[] = [];
       const deadline = new Date(Date.now() + timeoutMs);
 
-      const stream = method.call(
-        this.client,
-        request,
-        this.getMetadata(),
-        { deadline },
-      );
+      const stream = method.call(this.client, request, this.getMetadata(), { deadline });
 
       stream.on('data', (item: T) => {
         items.push(item);
@@ -229,11 +216,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
   /**
    * Обёртка: unary RPC.
    */
-  private unaryCall<TReq, TRes>(
-    rpcMethod: string,
-    request: TReq,
-    timeoutMs = 10000,
-  ): Promise<TRes> {
+  private unaryCall<TReq, TRes>(rpcMethod: string, request: TReq, timeoutMs = 10000): Promise<TRes> {
     return new Promise((resolve, reject) => {
       if (!this.client) {
         return reject(new Error('gRPC-клиент не инициализирован'));
@@ -246,16 +229,10 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
 
       const deadline = new Date(Date.now() + timeoutMs);
 
-      method.call(
-        this.client,
-        request,
-        this.getMetadata(),
-        { deadline },
-        (err: any, response: TRes) => {
-          if (err) return reject(new Error(`gRPC ${rpcMethod}: ${err.message}`));
-          resolve(response);
-        },
-      );
+      method.call(this.client, request, this.getMetadata(), { deadline }, (err: any, response: TRes) => {
+        if (err) return reject(new Error(`gRPC ${rpcMethod}: ${err.message}`));
+        resolve(response);
+      });
     });
   }
 
@@ -319,11 +296,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
     const request: any = {};
     if (ids?.length) request.ids = ids;
 
-    const metas = await this.collectStream<TcGrpcMetaEvent>(
-      'MetaEvents',
-      request,
-      30000,
-    );
+    const metas = await this.collectStream<TcGrpcMetaEvent>('MetaEvents', request, 30000);
 
     this.logger.log(`gRPC MetaEvents: получено ${metas.length} групп`);
     return metas;
@@ -336,11 +309,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
     const request: any = {};
     if (ids?.length) request.ids = ids;
 
-    const venues = await this.collectStream<TcGrpcVenue>(
-      'Venues',
-      request,
-      30000,
-    );
+    const venues = await this.collectStream<TcGrpcVenue>('Venues', request, 30000);
 
     this.logger.log(`gRPC Venues: получено ${venues.length} площадок`);
     return venues;
@@ -353,11 +322,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
     const request: any = {};
     if (ids?.length) request.ids = ids;
 
-    const cities = await this.collectStream<TcGrpcCity>(
-      'Cities',
-      request,
-      15000,
-    );
+    const cities = await this.collectStream<TcGrpcCity>('Cities', request, 15000);
 
     this.logger.log(`gRPC Cities: получено ${cities.length} городов`);
     return cities;
@@ -382,11 +347,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
     const request: any = {};
     if (ids?.length) request.ids = ids;
 
-    const cats = await this.collectStream<TcGrpcCategory>(
-      'Categories',
-      request,
-      15000,
-    );
+    const cats = await this.collectStream<TcGrpcCategory>('Categories', request, 15000);
 
     this.logger.log(`gRPC Categories: получено ${cats.length} категорий`);
     return cats;

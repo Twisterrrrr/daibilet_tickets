@@ -1,7 +1,7 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
 import { VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface VenueFiltersProps {
   cities: Array<{ slug: string; name: string }>;
@@ -16,12 +16,7 @@ const SORT_OPTIONS = [
   { value: 'name', label: 'По названию' },
 ];
 
-export function VenueFilters({
-  cities,
-  currentCity,
-  currentType,
-  currentSort,
-}: VenueFiltersProps) {
+export function VenueFilters({ cities, currentCity, currentType, currentSort }: VenueFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 

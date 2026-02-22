@@ -24,11 +24,14 @@ export function ScrollProgress() {
   if (percent <= 0) return null;
 
   return (
-    <div className="fixed left-0 right-0 top-0 z-[100] h-0.5 bg-slate-200 md:hidden" role="progressbar" aria-valuenow={Math.round(percent)} aria-valuemin={0} aria-valuemax={100}>
-      <div
-        className="h-full bg-primary-600 transition-[width] duration-150"
-        style={{ width: `${percent}%` }}
-      />
+    <div
+      className="fixed left-0 right-0 top-0 z-[100] h-0.5 bg-slate-200 md:hidden"
+      role="progressbar"
+      aria-valuenow={Math.round(percent)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <div className="h-full bg-primary-600 transition-[width] duration-150" style={{ width: `${percent}%` }} />
     </div>
   );
 }

@@ -1,19 +1,13 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
-import { RefreshCw, Eye, EyeOff, Star, MoreHorizontal, Plus } from 'lucide-react';
+import { Eye, EyeOff, MoreHorizontal, Plus, RefreshCw, Star } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +15,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -74,20 +69,14 @@ const columns: ColumnDef<EventItem>[] = [
     accessorKey: 'category',
     header: 'Категория',
     cell: ({ row }) => (
-      <Badge variant="secondary">
-        {CATEGORY_LABELS[row.original.category] || row.original.category}
-      </Badge>
+      <Badge variant="secondary">{CATEGORY_LABELS[row.original.category] || row.original.category}</Badge>
     ),
     filterFn: 'equals',
   },
   {
     accessorKey: 'source',
     header: 'Источник',
-    cell: ({ row }) => (
-      <Badge variant="outline">
-        {SOURCE_LABELS[row.original.source] || row.original.source}
-      </Badge>
-    ),
+    cell: ({ row }) => <Badge variant="outline">{SOURCE_LABELS[row.original.source] || row.original.source}</Badge>,
   },
   {
     accessorKey: 'rating',
@@ -111,10 +100,18 @@ const columns: ColumnDef<EventItem>[] = [
     cell: ({ row }) => {
       const isHidden = row.original.override?.isHidden ?? false;
       if (isHidden) {
-        return <Badge variant="destructive"><EyeOff className="mr-1 h-3 w-3" />Скрыт</Badge>;
+        return (
+          <Badge variant="destructive">
+            <EyeOff className="mr-1 h-3 w-3" />
+            Скрыт
+          </Badge>
+        );
       }
       return row.original.isActive ? (
-        <Badge variant="success"><Eye className="mr-1 h-3 w-3" />Активен</Badge>
+        <Badge variant="success">
+          <Eye className="mr-1 h-3 w-3" />
+          Активен
+        </Badge>
       ) : (
         <Badge variant="secondary">Неактивен</Badge>
       );
@@ -123,9 +120,7 @@ const columns: ColumnDef<EventItem>[] = [
   {
     id: 'sessions',
     header: 'Сеансы',
-    cell: ({ row }) => (
-      <span className="text-sm tabular-nums">{row.original._count?.sessions ?? 0}</span>
-    ),
+    cell: ({ row }) => <span className="text-sm tabular-nums">{row.original._count?.sessions ?? 0}</span>,
   },
   {
     accessorKey: 'updatedAt',

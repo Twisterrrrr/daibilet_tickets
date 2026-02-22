@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { DateMode, EventCategory, Prisma } from '@prisma/client';
+
+import { CACHE_TTL, cacheKeys, CacheService } from '../cache/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheService, CACHE_TTL, cacheKeys } from '../cache/cache.service';
-import { Prisma, DateMode, EventCategory } from '@prisma/client';
 
 @Injectable()
 export class RegionService {
@@ -51,9 +52,7 @@ export class RegionService {
       if (!region) return null;
 
       // Города региона, исключая хаб
-      const otherCityIds = region.cities
-        .map((rc) => rc.cityId)
-        .filter((id) => id !== cityId);
+      const otherCityIds = region.cities.map((rc) => rc.cityId).filter((id) => id !== cityId);
 
       if (otherCityIds.length === 0) return null;
 
@@ -73,9 +72,7 @@ export class RegionService {
         where: {
           ...this.activeEventFilter,
           cityId: { in: otherCityIds },
-          AND: [
-            { OR: [{ rating: { gte: 3.0 } }, { reviewCount: { gt: 0 } }] },
-          ],
+          AND: [{ OR: [{ rating: { gte: 3.0 } }, { reviewCount: { gt: 0 } }] }],
         },
         orderBy: { rating: 'desc' },
         take: 6,
@@ -131,21 +128,20 @@ export class RegionService {
       const cityIds = region.cities.map((rc) => rc.cityId);
 
       // Статистика по категориям
-      const [excursionCount, museumCount, eventCount, totalCount] =
-        await Promise.all([
-          this.prisma.event.count({
-            where: { ...this.activeEventFilter, cityId: { in: cityIds }, category: 'EXCURSION' },
-          }),
-          this.prisma.event.count({
-            where: { ...this.activeEventFilter, cityId: { in: cityIds }, category: 'MUSEUM' },
-          }),
-          this.prisma.event.count({
-            where: { ...this.activeEventFilter, cityId: { in: cityIds }, category: 'EVENT' },
-          }),
-          this.prisma.event.count({
-            where: { ...this.activeEventFilter, cityId: { in: cityIds } },
-          }),
-        ]);
+      const [excursionCount, museumCount, eventCount, totalCount] = await Promise.all([
+        this.prisma.event.count({
+          where: { ...this.activeEventFilter, cityId: { in: cityIds }, category: 'EXCURSION' },
+        }),
+        this.prisma.event.count({
+          where: { ...this.activeEventFilter, cityId: { in: cityIds }, category: 'MUSEUM' },
+        }),
+        this.prisma.event.count({
+          where: { ...this.activeEventFilter, cityId: { in: cityIds }, category: 'EVENT' },
+        }),
+        this.prisma.event.count({
+          where: { ...this.activeEventFilter, cityId: { in: cityIds } },
+        }),
+      ]);
 
       // Количество событий на город — один groupBy вместо N запросов
       const countsByCity = await this.prisma.event.groupBy({
@@ -260,10 +256,14 @@ export class RegionService {
 
   private getSort(sort?: string): Prisma.EventOrderByWithRelationInput {
     switch (sort) {
-      case 'price_asc': return { priceFrom: 'asc' };
-      case 'price_desc': return { priceFrom: 'desc' };
-      case 'rating': return { rating: 'desc' };
-      default: return { rating: 'desc' };
+      case 'price_asc':
+        return { priceFrom: 'asc' };
+      case 'price_desc':
+        return { priceFrom: 'desc' };
+      case 'rating':
+        return { rating: 'desc' };
+      default:
+        return { rating: 'desc' };
     }
   }
 }

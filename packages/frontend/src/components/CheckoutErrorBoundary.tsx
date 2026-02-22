@@ -23,12 +23,14 @@ export class CheckoutErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Checkout error:', error, errorInfo);
     if (typeof window !== 'undefined') {
-      import('@sentry/nextjs').then((Sentry) => {
-        Sentry.captureException(error, {
-          tags: { area: 'checkout' },
-          extra: { componentStack: errorInfo.componentStack },
-        });
-      }).catch(() => {});
+      import('@sentry/nextjs')
+        .then((Sentry) => {
+          Sentry.captureException(error, {
+            tags: { area: 'checkout' },
+            extra: { componentStack: errorInfo.componentStack },
+          });
+        })
+        .catch(() => {});
     }
   }
 
@@ -37,9 +39,7 @@ export class CheckoutErrorBoundary extends Component<Props, State> {
       return (
         <div className="mx-auto max-w-lg rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
           <div className="mb-4 text-4xl">⚠️</div>
-          <h3 className="mb-2 text-lg font-bold text-red-800">
-            Ошибка оформления заказа
-          </h3>
+          <h3 className="mb-2 text-lg font-bold text-red-800">Ошибка оформления заказа</h3>
           <p className="mb-4 text-sm text-red-600">
             Платёж временно недоступен. Пожалуйста, попробуйте ещё раз через несколько секунд.
           </p>

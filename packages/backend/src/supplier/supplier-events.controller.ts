@@ -120,7 +120,7 @@ export class SupplierEventsController {
 
     const event = await this.prisma.event.create({
       data: {
-        source: 'MANUAL' as any,
+        source: OfferSource.MANUAL,
         tcEventId: `supplier-${Date.now()}`,
         cityId: data.cityId,
         title: data.title,
@@ -137,7 +137,7 @@ export class SupplierEventsController {
         isActive: moderationStatus !== 'PENDING_REVIEW', // скрыть до модерации
         operatorId: req.user.operatorId,
         supplierId: req.user.operatorId,
-        moderationStatus: moderationStatus as any,
+        moderationStatus: moderationStatus as import('@prisma/client').ModerationStatus,
         createdByType: 'SUPPLIER',
         createdById: req.user.id,
       },

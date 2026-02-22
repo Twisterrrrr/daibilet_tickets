@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { DateMode, Prisma } from '@prisma/client';
 import { getFirstPriceKopecks } from '@daibilet/shared';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DateMode, Prisma } from '@prisma/client';
+
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class LandingService {
@@ -98,37 +99,46 @@ export class LandingService {
       prices: Prisma.JsonValue;
       isOpenDate: boolean;
       event: {
-        id: string; title: string; slug: string; address: string | null;
-        durationMinutes: number | null; imageUrl: string | null;
-        tcEventId: string; source: string; rating: any;
-        reviewCount: number; priceFrom: number | null;
+        id: string;
+        title: string;
+        slug: string;
+        address: string | null;
+        durationMinutes: number | null;
+        imageUrl: string | null;
+        tcEventId: string;
+        source: string;
+        rating: any;
+        reviewCount: number;
+        priceFrom: number | null;
       };
     }
 
     const variants: LandingVariant[] = events.flatMap((event) => {
       // OPEN_DATE события без сессий — выводим как один "вариант" без привязки к сеансу
       if (event.dateMode === DateMode.OPEN_DATE && event.sessions.length === 0) {
-        return [{
-          sessionId: null as string | null,
-          startsAt: null as Date | null,
-          endsAt: null as Date | null,
-          availableTickets: null as number | null,
-          prices: null as Prisma.JsonValue,
-          isOpenDate: true as boolean,
-          event: {
-            id: event.id,
-            title: event.title,
-            slug: event.slug,
-            address: event.address,
-            durationMinutes: event.durationMinutes,
-            imageUrl: event.imageUrl,
-            tcEventId: event.tcEventId,
-            source: event.source,
-            rating: event.rating,
-            reviewCount: event.reviewCount,
-            priceFrom: event.priceFrom,
+        return [
+          {
+            sessionId: null as string | null,
+            startsAt: null as Date | null,
+            endsAt: null as Date | null,
+            availableTickets: null as number | null,
+            prices: null as Prisma.JsonValue,
+            isOpenDate: true as boolean,
+            event: {
+              id: event.id,
+              title: event.title,
+              slug: event.slug,
+              address: event.address,
+              durationMinutes: event.durationMinutes,
+              imageUrl: event.imageUrl,
+              tcEventId: event.tcEventId,
+              source: event.source,
+              rating: event.rating,
+              reviewCount: event.reviewCount,
+              priceFrom: event.priceFrom,
+            },
           },
-        }];
+        ];
       }
       return event.sessions.map((session) => ({
         sessionId: session.id as string | null,
@@ -162,13 +172,7 @@ export class LandingService {
     });
 
     // Формируем фильтры для фронтенда
-    const piers = [
-      ...new Set(
-        events
-          .map((e) => e.address)
-          .filter(Boolean) as string[],
-      ),
-    ];
+    const piers = [...new Set(events.map((e) => e.address).filter(Boolean) as string[])];
 
     const allPrices = variants
       .map((v) => getFirstPriceKopecks(v.prices))
@@ -176,19 +180,13 @@ export class LandingService {
 
     const allDates = variants
       .filter((v) => v.startsAt != null)
-      .map((v) =>
-        new Date(v.startsAt!).toISOString().slice(0, 10),
-      );
+      .map((v) => new Date(v.startsAt!).toISOString().slice(0, 10));
     const uniqueDates = [...new Set(allDates)].sort();
 
     const filters = {
       piers,
-      priceRange: allPrices.length
-        ? [Math.min(...allPrices), Math.max(...allPrices)]
-        : [0, 0],
-      dateRange: uniqueDates.length
-        ? [uniqueDates[0], uniqueDates[uniqueDates.length - 1]]
-        : [],
+      priceRange: allPrices.length ? [Math.min(...allPrices), Math.max(...allPrices)] : [0, 0],
+      dateRange: uniqueDates.length ? [uniqueDates[0], uniqueDates[uniqueDates.length - 1]] : [],
       dates: uniqueDates,
     };
 

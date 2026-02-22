@@ -1,18 +1,20 @@
+import { ArrowDown, ChevronRight, Shield, Star, TrendingUp } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowDown, ChevronRight, Shield, Star, TrendingUp } from 'lucide-react';
-import { api } from '@/lib/api';
-import { LandingClient } from './LandingClient';
+
 import {
   HowToChoose,
   InfoBlocks,
+  LegalDisclaimer,
+  RelatedLinks,
   ReviewsSection,
   StatsBadge,
-  RelatedLinks,
-  LegalDisclaimer,
 } from '@/components/landing/ContentSections';
 import { FaqSection } from '@/components/landing/FaqSection';
+import { api } from '@/lib/api';
+
+import { LandingClient, type Filters, type Variant } from './LandingClient';
 
 // ISR: обновлять каждые 6 часов (21600 секунд)
 export const revalidate = 21600;
@@ -21,10 +23,9 @@ export const revalidate = 21600;
 export async function generateStaticParams() {
   try {
     const landings = await api.getLandings();
-    return landings.map((lp: any) => ({
-      slug: lp.city.slug,
-      landingSlug: lp.slug,
-    }));
+    return landings
+      .filter((lp) => lp.city)
+      .map((lp) => ({ slug: lp.city!.slug, landingSlug: lp.slug }));
   } catch {
     return [];
   }
@@ -38,9 +39,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { landingSlug } = await params;
   try {
     const data = await api.getLandingBySlug(landingSlug);
+    const landing = data.landing;
+    if (!landing) return { title: 'Страница не найдена' };
     return {
-      title: data.landing.metaTitle || data.landing.title,
-      description: data.landing.metaDescription || data.landing.subtitle,
+      title: landing.metaTitle || landing.title,
+      description: (landing.metaDescription || landing.subtitle) ?? undefined,
     };
   } catch {
     return { title: 'Страница не найдена' };
@@ -59,14 +62,14 @@ function pluralReis(n: number): string {
 export default async function LandingPage({ params }: Props) {
   const { slug: citySlug, landingSlug } = await params;
 
-  let data: any;
+  let data: Awaited<ReturnType<typeof api.getLandingBySlug>>;
   try {
     data = await api.getLandingBySlug(landingSlug);
   } catch {
     notFound();
   }
 
-  if (data.landing.city.slug !== citySlug) {
+  if (!data.landing?.city || data.landing.city.slug !== citySlug) {
     notFound();
   }
 
@@ -84,10 +87,7 @@ export default async function LandingPage({ params }: Props) {
               Главная
             </Link>
             <ChevronRight className="h-3.5 w-3.5" />
-            <Link
-              href={`/cities/${citySlug}`}
-              className="hover:text-white transition-colors"
-            >
+            <Link href={`/cities/${citySlug}`} className="hover:text-white transition-colors">
               {landing.city.name}
             </Link>
             <ChevronRight className="h-3.5 w-3.5" />
@@ -101,11 +101,7 @@ export default async function LandingPage({ params }: Props) {
                 {landing.title}
               </h1>
 
-              {landing.subtitle && (
-                <p className="mt-3 text-base text-primary-200/90 sm:text-lg">
-                  {landing.subtitle}
-                </p>
-              )}
+              {landing.subtitle && <p className="mt-3 text-base text-primary-200/90 sm:text-lg">{landing.subtitle}</p>}
 
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <a
@@ -134,7 +130,7 @@ export default async function LandingPage({ params }: Props) {
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-emerald-400 flex-shrink-0" />
                   <span className="text-sm text-primary-100">
-                    {total > 0 ? `${pluralReis(total)} доступно` : 'Рейсы появятся ближе к сезону'}
+                    {(total ?? 0) > 0 ? `${pluralReis(total ?? 0)} доступно` : 'Рейсы появятся ближе к сезону'}
                   </span>
                 </div>
                 {landing.stats?.totalSold && (
@@ -166,35 +162,40 @@ export default async function LandingPage({ params }: Props) {
       <div className="container-page py-6 sm:py-10">
         {/* Filters + Table/Cards */}
         <div id="variants">
-          <h2 className="mb-4 text-xl font-bold text-slate-900 sm:text-2xl">
-            Расписание рейсов
-          </h2>
-          <LandingClient
-            variants={variants}
-            filters={filters}
-          />
+          <h2 className="mb-4 text-xl font-bold text-slate-900 sm:text-2xl">Расписание рейсов</h2>
+          <LandingClient variants={(variants ?? []) as unknown as Variant[]} filters={(filters ?? {}) as unknown as Filters} />
         </div>
 
         {/* Stats Badge */}
-        {landing.stats && <div className="mt-10"><StatsBadge stats={landing.stats} /></div>}
+        {landing.stats && (
+          <div className="mt-10">
+            <StatsBadge
+              stats={{
+                soldTickets: (landing.stats as { soldTickets?: number; totalSold?: number }).soldTickets
+                  ?? (landing.stats as { totalSold?: number }).totalSold ?? 0,
+                avgRating: landing.stats.avgRating ?? 0,
+              }}
+            />
+          </div>
+        )}
 
         {/* How to Choose */}
-        <HowToChoose items={landing.howToChoose} />
+        <HowToChoose items={(landing.howToChoose ?? []) as Parameters<typeof HowToChoose>[0]['items']} />
 
         {/* Info Blocks (bridge schedule etc.) */}
-        <InfoBlocks items={landing.infoBlocks} />
+        <InfoBlocks items={(landing.infoBlocks ?? []) as Parameters<typeof InfoBlocks>[0]['items']} />
 
         {/* FAQ */}
-        <FaqSection items={landing.faq} />
+        <FaqSection items={(landing.faq ?? []) as Parameters<typeof FaqSection>[0]['items']} />
 
         {/* Reviews */}
-        <ReviewsSection items={landing.reviews} />
+        <ReviewsSection items={(landing.reviews ?? []) as Parameters<typeof ReviewsSection>[0]['items']} />
 
         {/* Related Links */}
-        <RelatedLinks items={landing.relatedLinks} />
+        <RelatedLinks items={(landing.relatedLinks ?? []) as Parameters<typeof RelatedLinks>[0]['items']} />
 
         {/* Legal */}
-        <LegalDisclaimer text={landing.legalText} />
+        <LegalDisclaimer text={landing.legalText ?? undefined} />
       </div>
     </>
   );

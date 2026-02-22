@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Loader2, CheckCircle, HelpCircle } from 'lucide-react';
+import { CheckCircle, HelpCircle, Loader2, MessageCircle, Send, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
@@ -166,9 +166,7 @@ export function SupportWidget() {
                   Код обращения: <span className="font-mono font-semibold">{ticketCode}</span>
                 </p>
               )}
-              <p className="text-xs text-slate-500 mb-4">
-                Мы ответим на ваш email в течение 24 часов.
-              </p>
+              <p className="text-xs text-slate-500 mb-4">Мы ответим на ваш email в течение 24 часов.</p>
               <button
                 onClick={resetAndClose}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"

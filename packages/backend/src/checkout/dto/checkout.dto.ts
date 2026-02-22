@@ -1,15 +1,15 @@
+import { Type } from 'class-transformer';
 import {
-  IsString,
-  IsUUID,
-  IsInt,
+  IsArray,
   IsEmail,
+  IsInt,
   IsNotEmpty,
   IsOptional,
-  IsArray,
+  IsString,
+  IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
 // ============================================================
 // Cart item DTO
@@ -152,6 +152,47 @@ export class CreateCheckoutSessionDto {
   @IsOptional()
   @IsString()
   giftCertificateCode?: string;
+}
+
+// ============================================================
+// Create CheckoutPackage DTO — POST /checkout/package
+// ============================================================
+
+export class CreatePackageItemDto {
+  @IsString()
+  type: 'SESSION' | 'OPEN_DATE';
+
+  @IsUUID()
+  offerId: string;
+
+  @IsOptional()
+  @IsUUID()
+  sessionId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  openDate?: string | null;
+
+  @IsInt()
+  @Min(1)
+  qty: number;
+}
+
+export class CreatePackageDto {
+  @IsUUID()
+  checkoutSessionId: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string | null;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreatePackageItemDto)
+  items: CreatePackageItemDto[];
 }
 
 export class ValidateGiftCertificateDto {

@@ -1,8 +1,9 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { PlannerService } from './planner.service';
+import { Body, Controller, Post } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+
 import { CalculatePlanDto } from './dto/calculate-plan.dto';
 import { CustomizePlanDto } from './dto/customize-plan.dto';
+import { PlannerService } from './planner.service';
 
 @ApiTags('planner')
 @Controller('planner')

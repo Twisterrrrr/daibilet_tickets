@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { Heart, Ticket } from 'lucide-react';
-import { api } from '@/lib/api';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
 import { EventCard } from '@/components/ui/EventCard';
 import { useFavorites } from '@/hooks/useFavorites';
+import { api } from '@/lib/api';
 
 export default function FavoritesPage() {
   const { slugs, mounted } = useFavorites();
@@ -64,13 +65,8 @@ export default function FavoritesPage() {
         <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-20">
           <Heart className="h-16 w-16 text-slate-300" />
           <p className="mt-4 text-lg font-medium text-slate-600">Пока пусто</p>
-          <p className="mt-1 text-slate-500">
-            Нажмите на сердечко на карточке события, чтобы добавить его сюда
-          </p>
-          <Link
-            href="/events"
-            className="btn-primary mt-6 inline-flex items-center gap-2"
-          >
+          <p className="mt-1 text-slate-500">Нажмите на сердечко на карточке события, чтобы добавить его сюда</p>
+          <Link href="/events" className="btn-primary mt-6 inline-flex items-center gap-2">
             <Ticket className="h-4 w-4" />
             Смотреть каталог
           </Link>

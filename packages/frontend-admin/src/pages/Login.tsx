@@ -1,12 +1,13 @@
-import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Ticket } from 'lucide-react';
+import { FormEvent, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import { api } from '@/api/client';
-import { setToken } from '@/lib/auth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { setToken } from '@/lib/auth';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -70,11 +71,7 @@ export function LoginPage() {
                 />
               </div>
 
-              {error && (
-                <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
+              {error && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
 
               <Button type="submit" disabled={loading} className="w-full">
                 {loading ? 'Вход...' : 'Войти'}

@@ -49,32 +49,32 @@ export enum CheckoutStatus {
 
 const CHECKOUT_TRANSITIONS: Record<CheckoutStatus, Partial<Record<TransitionActor, CheckoutStatus[]>>> = {
   [CheckoutStatus.STARTED]: {
-    user:   [CheckoutStatus.VALIDATED, CheckoutStatus.CANCELLED],
+    user: [CheckoutStatus.VALIDATED, CheckoutStatus.CANCELLED],
     system: [CheckoutStatus.EXPIRED],
   },
   [CheckoutStatus.VALIDATED]: {
-    user:   [CheckoutStatus.REDIRECTED, CheckoutStatus.PENDING_CONFIRMATION],
+    user: [CheckoutStatus.REDIRECTED, CheckoutStatus.PENDING_CONFIRMATION],
     system: [CheckoutStatus.EXPIRED],
-    admin:  [CheckoutStatus.CANCELLED],
+    admin: [CheckoutStatus.CANCELLED],
   },
   [CheckoutStatus.REDIRECTED]: {
     system: [CheckoutStatus.COMPLETED, CheckoutStatus.EXPIRED],
-    admin:  [CheckoutStatus.COMPLETED, CheckoutStatus.CANCELLED],
+    admin: [CheckoutStatus.COMPLETED, CheckoutStatus.CANCELLED],
   },
   [CheckoutStatus.PENDING_CONFIRMATION]: {
-    admin:  [CheckoutStatus.CONFIRMED, CheckoutStatus.CANCELLED],
+    admin: [CheckoutStatus.CONFIRMED, CheckoutStatus.CANCELLED],
     system: [CheckoutStatus.EXPIRED],
   },
   [CheckoutStatus.CONFIRMED]: {
-    admin:  [CheckoutStatus.AWAITING_PAYMENT, CheckoutStatus.COMPLETED, CheckoutStatus.CANCELLED],
+    admin: [CheckoutStatus.AWAITING_PAYMENT, CheckoutStatus.COMPLETED, CheckoutStatus.CANCELLED],
     system: [CheckoutStatus.COMPLETED],
   },
   [CheckoutStatus.AWAITING_PAYMENT]: {
     system: [CheckoutStatus.COMPLETED, CheckoutStatus.EXPIRED],
-    admin:  [CheckoutStatus.COMPLETED, CheckoutStatus.CANCELLED],
+    admin: [CheckoutStatus.COMPLETED, CheckoutStatus.CANCELLED],
   },
   [CheckoutStatus.COMPLETED]: {},
-  [CheckoutStatus.EXPIRED]:   {},
+  [CheckoutStatus.EXPIRED]: {},
   [CheckoutStatus.CANCELLED]: {},
 };
 
@@ -134,12 +134,12 @@ export enum OrderRequestStatus {
 
 const ORDER_REQUEST_TRANSITIONS: Record<OrderRequestStatus, Partial<Record<TransitionActor, OrderRequestStatus[]>>> = {
   [OrderRequestStatus.PENDING]: {
-    admin:  [OrderRequestStatus.CONFIRMED, OrderRequestStatus.REJECTED],
+    admin: [OrderRequestStatus.CONFIRMED, OrderRequestStatus.REJECTED],
     system: [OrderRequestStatus.EXPIRED],
   },
   [OrderRequestStatus.CONFIRMED]: {},
-  [OrderRequestStatus.REJECTED]:  {},
-  [OrderRequestStatus.EXPIRED]:   {},
+  [OrderRequestStatus.REJECTED]: {},
+  [OrderRequestStatus.EXPIRED]: {},
 };
 
 export const ORDER_REQUEST_TERMINAL: ReadonlySet<OrderRequestStatus> = new Set([
@@ -193,15 +193,15 @@ export enum PaymentIntentStatus {
 
 const PAYMENT_TRANSITIONS: Record<PaymentIntentStatus, Partial<Record<TransitionActor, PaymentIntentStatus[]>>> = {
   [PaymentIntentStatus.PENDING]: {
-    user:   [PaymentIntentStatus.CANCELLED],
+    user: [PaymentIntentStatus.CANCELLED],
     system: [PaymentIntentStatus.PROCESSING, PaymentIntentStatus.PAID, PaymentIntentStatus.FAILED],
   },
   [PaymentIntentStatus.PROCESSING]: {
     system: [PaymentIntentStatus.PAID, PaymentIntentStatus.FAILED],
-    user:   [PaymentIntentStatus.CANCELLED],
+    user: [PaymentIntentStatus.CANCELLED],
   },
   [PaymentIntentStatus.PAID]: {
-    admin:  [PaymentIntentStatus.REFUNDED],
+    admin: [PaymentIntentStatus.REFUNDED],
     system: [PaymentIntentStatus.REFUNDED],
   },
   [PaymentIntentStatus.FAILED]: {}, // терминальный (можно создать новый intent)

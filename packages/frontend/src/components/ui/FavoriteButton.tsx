@@ -1,6 +1,7 @@
 'use client';
 
 import { Heart } from 'lucide-react';
+
 import { useFavorites } from '@/hooks/useFavorites';
 
 interface FavoriteButtonProps {

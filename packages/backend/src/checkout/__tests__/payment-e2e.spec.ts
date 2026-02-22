@@ -14,20 +14,12 @@
  *   [7] Multi-item partial failure — partial refund
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { isSessionFullyFulfilled, partitionCart, PaymentFlowType, SnapshotLineItem } from '../cart-partitioning';
+import { tryTransitionCheckout, tryTransitionOrderRequest, tryTransitionPayment } from '../checkout-state-machine';
 import { PaymentService } from '../payment.service';
 import { WebhookIdempotencyService } from '../webhook-idempotency.service';
-import {
-  tryTransitionPayment,
-  tryTransitionCheckout,
-  tryTransitionOrderRequest,
-} from '../checkout-state-machine';
-import {
-  SnapshotLineItem,
-  PaymentFlowType,
-  partitionCart,
-  isSessionFullyFulfilled,
-} from '../cart-partitioning';
 
 // ============================================================
 // Shared Helpers
@@ -184,8 +176,7 @@ function createMockPrisma() {
     $transaction: vi.fn().mockImplementation(async (fn: any) => fn(mockPrisma)),
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  var mockPrisma: any;
+  let mockPrisma: any;
 }
 
 const mockConfig = {
@@ -276,7 +267,11 @@ describe('E2E Scenario 2: Duplicate Webhook is no-op', () => {
 
     // First call: should process
     const result1 = await idempotency.processOnce(
-      'yk-evt-123', 'YOOKASSA', 'payment.succeeded', { mock: true }, handler,
+      'yk-evt-123',
+      'YOOKASSA',
+      'payment.succeeded',
+      { mock: true },
+      handler,
     );
     expect(result1.processed).toBe(true);
     expect(result1.result).toBe('PAID');
@@ -284,7 +279,11 @@ describe('E2E Scenario 2: Duplicate Webhook is no-op', () => {
 
     // Second call: should be no-op
     const result2 = await idempotency.processOnce(
-      'yk-evt-123', 'YOOKASSA', 'payment.succeeded', { mock: true }, handler,
+      'yk-evt-123',
+      'YOOKASSA',
+      'payment.succeeded',
+      { mock: true },
+      handler,
     );
     expect(result2.processed).toBe(false);
     expect(result2.result).toBe('PAID');
@@ -305,7 +304,10 @@ describe('E2E Scenario 3: Out-of-order webhook events', () => {
 
     // First: unknown event type — handler returns IGNORED
     const result1 = await idempotency.processOnce(
-      'yk-evt-100', 'YOOKASSA', 'payment.waiting_for_capture', {},
+      'yk-evt-100',
+      'YOOKASSA',
+      'payment.waiting_for_capture',
+      {},
       async () => 'IGNORED',
     );
     expect(result1.processed).toBe(true);
@@ -313,13 +315,10 @@ describe('E2E Scenario 3: Out-of-order webhook events', () => {
 
     // Second: payment.succeeded — different providerEventId (unique per event)
     let fulfillmentTriggered = false;
-    const result2 = await idempotency.processOnce(
-      'yk-evt-101', 'YOOKASSA', 'payment.succeeded', {},
-      async () => {
-        fulfillmentTriggered = true;
-        return 'PAID';
-      },
-    );
+    const result2 = await idempotency.processOnce('yk-evt-101', 'YOOKASSA', 'payment.succeeded', {}, async () => {
+      fulfillmentTriggered = true;
+      return 'PAID';
+    });
     expect(result2.processed).toBe(true);
     expect(result2.result).toBe('PAID');
     expect(fulfillmentTriggered).toBe(true);

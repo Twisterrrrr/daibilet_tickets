@@ -1,14 +1,16 @@
+import { formatPrice } from '@daibilet/shared';
+import { ArrowRight, Calendar, MapPin, Star, Users } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MapPin, Calendar, Users, ArrowRight, Star } from 'lucide-react';
+
 import { api } from '@/lib/api';
-import { formatPrice } from '@daibilet/shared';
 
 export const revalidate = 21600;
 
 export const metadata: Metadata = {
   title: 'Готовые программы — маршруты по городам России | Дайбилет',
-  description: 'Готовые маршруты и программы для путешествий: Петербург, Москва, Казань. Все билеты и бронирования в одном месте.',
+  description:
+    'Готовые маршруты и программы для путешествий: Петербург, Москва, Казань. Все билеты и бронирования в одном месте.',
 };
 
 export default async function CombosListPage() {
@@ -34,12 +36,9 @@ export default async function CombosListPage() {
       {/* Hero */}
       <section className="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 text-white py-16">
         <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Готовые программы
-          </h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Готовые программы</h1>
           <p className="text-xl text-indigo-200 max-w-2xl mx-auto">
-            Не хотите планировать? Мы уже собрали лучшие маршруты. 
-            Все билеты включены — просто выберите программу.
+            Не хотите планировать? Мы уже собрали лучшие маршруты. Все билеты включены — просто выберите программу.
           </p>
         </div>
       </section>
@@ -49,10 +48,7 @@ export default async function CombosListPage() {
         {combos.length === 0 ? (
           <div className="text-center py-16 text-gray-500">
             <p className="text-lg">Скоро здесь появятся готовые программы.</p>
-            <Link
-              href="/events"
-              className="mt-4 inline-block text-indigo-600 hover:underline"
-            >
+            <Link href="/events" className="mt-4 inline-block text-indigo-600 hover:underline">
               Смотреть каталог событий &rarr;
             </Link>
           </div>
@@ -75,9 +71,7 @@ export default async function CombosListPage() {
                       <h3 className="text-lg font-bold text-gray-900 group-hover:text-indigo-700 transition-colors">
                         {combo.title}
                       </h3>
-                      {combo.subtitle && (
-                        <p className="text-sm text-gray-600 mt-1">{combo.subtitle}</p>
-                      )}
+                      {combo.subtitle && <p className="text-sm text-gray-600 mt-1">{combo.subtitle}</p>}
                     </div>
 
                     {/* Card body */}
@@ -89,7 +83,12 @@ export default async function CombosListPage() {
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
-                          {combo.intensity === 'RELAXED' ? 'Спокойный' : combo.intensity === 'ACTIVE' ? 'Активный' : 'Средний'} темп
+                          {combo.intensity === 'RELAXED'
+                            ? 'Спокойный'
+                            : combo.intensity === 'ACTIVE'
+                              ? 'Активный'
+                              : 'Средний'}{' '}
+                          темп
                         </span>
                       </div>
 
@@ -135,9 +134,7 @@ export default async function CombosListPage() {
       <section className="bg-white py-12 border-t">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold mb-4">Ищете что-то конкретное?</h2>
-          <p className="text-gray-600 mb-6">
-            Посмотрите все события по категориям, городам и датам
-          </p>
+          <p className="text-gray-600 mb-6">Посмотрите все события по категориям, городам и датам</p>
           <Link
             href="/events"
             className="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-indigo-700 transition-colors"

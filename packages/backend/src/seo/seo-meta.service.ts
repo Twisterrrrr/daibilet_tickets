@@ -4,9 +4,10 @@
  */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type SeoEntityType } from '@prisma/client';
+
 import { PrismaService } from '../prisma/prisma.service';
-import { UpsertSeoMetaDto } from './dto/upsert-seo-meta.dto';
 import type { SeoMetaResponse } from './dto/seo-meta.response';
+import { UpsertSeoMetaDto } from './dto/upsert-seo-meta.dto';
 
 type BaseEntity = {
   id: string;
@@ -66,7 +67,9 @@ export class SeoMetaService {
     return this.toResponse(saved);
   }
 
-  private toSeoMetaCreateInput(data: Record<string, unknown>): Omit<Prisma.SeoMetaCreateInput, 'entityType' | 'entityId'> {
+  private toSeoMetaCreateInput(
+    data: Record<string, unknown>,
+  ): Omit<Prisma.SeoMetaCreateInput, 'entityType' | 'entityId'> {
     const { entityType, entityId, ...rest } = data;
     const jsonLd = (rest.jsonLd === Prisma.JsonNull ? Prisma.JsonNull : rest.jsonLd) as Prisma.InputJsonValue;
     return { ...rest, jsonLd } as Omit<Prisma.SeoMetaCreateInput, 'entityType' | 'entityId'>;
@@ -112,7 +115,9 @@ export class SeoMetaService {
       entityType,
       entityId,
       title: city ? `${title} — ${city}` : title,
-      description: city ? `Билеты и подборки в ${city}. Актуальные цены, расписание и отзывы.` : `Билеты и подборки. Актуальные цены, расписание и отзывы.`,
+      description: city
+        ? `Билеты и подборки в ${city}. Актуальные цены, расписание и отзывы.`
+        : `Билеты и подборки. Актуальные цены, расписание и отзывы.`,
       h1: title,
       canonicalUrl: null,
       robots: 'index,follow',
@@ -169,7 +174,9 @@ export class SeoMetaService {
         description: `Купить билеты на "${title}"${cityName ? ` в ${cityName}` : ''}. Актуальное расписание, цены и отзывы. Онлайн-оплата.`,
         h1: title,
         ogTitle: title,
-        ogDescription: priceFrom ? `Билеты от ${priceFrom} ₽. Расписание и отзывы.` : 'Расписание и отзывы. Онлайн-оплата.',
+        ogDescription: priceFrom
+          ? `Билеты от ${priceFrom} ₽. Расписание и отзывы.`
+          : 'Расписание и отзывы. Онлайн-оплата.',
         ogImage: e.imageUrl ?? null,
         robots: 'index,follow',
         canonicalUrl: null,

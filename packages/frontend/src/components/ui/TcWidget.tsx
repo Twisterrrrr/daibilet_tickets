@@ -132,20 +132,14 @@ export function TcSessionSlot({
           {session.availableTickets} мест
         </span>
       ) : (
-        <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500">
-          Распродано
-        </span>
+        <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500">Распродано</span>
       )}
     </button>
   );
 }
 
 /** Fallback: статичная строка сеанса (без виджета) */
-function SessionRowContent({
-  session,
-}: {
-  session: { startsAt: string; availableTickets: number };
-}) {
+function SessionRowContent({ session }: { session: { startsAt: string; availableTickets: number } }) {
   const d = new Date(session.startsAt);
   const weekday = d.toLocaleDateString('ru-RU', { weekday: 'short' });
   const date = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
@@ -167,9 +161,7 @@ function SessionRowContent({
           {session.availableTickets} мест
         </span>
       ) : (
-        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-500">
-          Распродано
-        </span>
+        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-500">Распродано</span>
       )}
     </div>
   );

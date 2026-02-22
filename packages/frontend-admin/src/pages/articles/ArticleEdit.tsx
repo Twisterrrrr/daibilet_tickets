@@ -1,30 +1,19 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
-import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
-import { transliterate } from '@/lib/transliterate';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { transliterate } from '@/lib/transliterate';
+import { cn } from '@/lib/utils';
 
 interface City {
   id: string;
@@ -128,8 +117,7 @@ export function ArticleEditPage() {
     const payload = {
       ...form,
       cityId: form.cityId || null,
-      publishedAt:
-        form.isPublished && !form.publishedAt ? new Date().toISOString() : form.publishedAt,
+      publishedAt: form.isPublished && !form.publishedAt ? new Date().toISOString() : form.publishedAt,
     };
 
     if (isCreate) {
@@ -187,17 +175,13 @@ export function ArticleEditPage() {
             Назад
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {isCreate ? 'Новая статья' : 'Редактировать статью'}
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">{isCreate ? 'Новая статья' : 'Редактировать статью'}</h1>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Основные данные</CardTitle>
-          <CardDescription>
-            Заполните поля статьи. Slug генерируется автоматически при создании.
-          </CardDescription>
+          <CardDescription>Заполните поля статьи. Slug генерируется автоматически при создании.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -223,9 +207,7 @@ export function ArticleEditPage() {
               <Label htmlFor="city">Город</Label>
               <Select
                 value={form.cityId ?? '__none__'}
-                onValueChange={(v) =>
-                  setForm((f) => ({ ...f, cityId: v === '__none__' ? null : v }))
-                }
+                onValueChange={(v) => setForm((f) => ({ ...f, cityId: v === '__none__' ? null : v }))}
               >
                 <SelectTrigger id="city">
                   <SelectValue placeholder="Не привязан" />
@@ -249,10 +231,7 @@ export function ArticleEditPage() {
                   setForm((f) => ({
                     ...f,
                     isPublished: e.target.checked,
-                    publishedAt:
-                      e.target.checked && !f.publishedAt
-                        ? new Date().toISOString()
-                        : f.publishedAt,
+                    publishedAt: e.target.checked && !f.publishedAt ? new Date().toISOString() : f.publishedAt,
                   }))
                 }
                 className={cn(
@@ -270,17 +249,11 @@ export function ArticleEditPage() {
                 <Input
                   id="publishedAt"
                   type="datetime-local"
-                  value={
-                    form.publishedAt
-                      ? new Date(form.publishedAt).toISOString().slice(0, 16)
-                      : ''
-                  }
+                  value={form.publishedAt ? new Date(form.publishedAt).toISOString().slice(0, 16) : ''}
                   onChange={(e) =>
                     setForm((f) => ({
                       ...f,
-                      publishedAt: e.target.value
-                        ? new Date(e.target.value).toISOString()
-                        : null,
+                      publishedAt: e.target.value ? new Date(e.target.value).toISOString() : null,
                     }))
                   }
                 />
@@ -352,11 +325,7 @@ export function ArticleEditPage() {
               {saving ? 'Сохранение...' : 'Сохранить'}
             </Button>
             {!isCreate && (
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleting}
-              >
+              <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
                 {deleting ? 'Удаление...' : 'Удалить'}
               </Button>
             )}

@@ -22,10 +22,7 @@ export function getSeason(date?: Date): SeasonValue {
  * Подставляет переменные {{key}} из context в template.
  * Неизвестные ключи остаются как {{key}}.
  */
-export function renderTemplate(
-  template: string,
-  context: Record<string, string | number | undefined>,
-): string {
+export function renderTemplate(template: string, context: Record<string, string | number | undefined>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
     const v = context[key];
     return v !== undefined && v !== null ? String(v) : `{{${key}}}`;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
 
 export function SupplierDetailPage() {
@@ -26,12 +27,17 @@ export function SupplierDetailPage() {
       });
       setWebhookUrl(data.webhookUrl || '');
     });
-    adminApi.get(`/admin/suppliers/${id}/api-keys`).then((keys: any) => {
-      setApiKeys(keys || []);
-    }).catch((e) => console.error('Load API keys failed:', e));
+    adminApi
+      .get(`/admin/suppliers/${id}/api-keys`)
+      .then((keys: any) => {
+        setApiKeys(keys || []);
+      })
+      .catch((e) => console.error('Load API keys failed:', e));
   };
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    load();
+  }, [id]);
 
   const save = async () => {
     try {
@@ -54,7 +60,9 @@ export function SupplierDetailPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">{supplier.companyName || supplier.name}</h1>
-          <p className="text-sm text-muted-foreground">{supplier.contactEmail} | ИНН: {supplier.inn || '—'}</p>
+          <p className="text-sm text-muted-foreground">
+            {supplier.contactEmail} | ИНН: {supplier.inn || '—'}
+          </p>
         </div>
         <button onClick={() => navigate('/suppliers')} className="text-sm text-muted-foreground hover:underline">
           ← Назад
@@ -67,7 +75,10 @@ export function SupplierDetailPage() {
           { label: 'Заказов', value: supplier.financials?.totalOrders || 0 },
           { label: 'Оборот', value: `${((supplier.financials?.grossRevenue || 0) / 100).toLocaleString('ru')} руб` },
           { label: 'Комиссия', value: `${((supplier.financials?.platformFee || 0) / 100).toLocaleString('ru')} руб` },
-          { label: 'Доход поставщика', value: `${((supplier.financials?.supplierRevenue || 0) / 100).toLocaleString('ru')} руб` },
+          {
+            label: 'Доход поставщика',
+            value: `${((supplier.financials?.supplierRevenue || 0) / 100).toLocaleString('ru')} руб`,
+          },
         ].map((c) => (
           <div key={c.label} className="rounded-xl border bg-card p-4">
             <p className="text-xs text-muted-foreground">{c.label}</p>
@@ -82,8 +93,11 @@ export function SupplierDetailPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Trust Level</label>
-            <select value={form.trustLevel} onChange={(e) => setForm({ ...form, trustLevel: Number(e.target.value) })}
-              className="w-full px-3 py-2 border rounded-lg text-sm">
+            <select
+              value={form.trustLevel}
+              onChange={(e) => setForm({ ...form, trustLevel: Number(e.target.value) })}
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+            >
               <option value={0}>0 — Новый (модерация)</option>
               <option value={1}>1 — Проверенный (авто)</option>
               <option value={2}>2 — Доверенный</option>
@@ -91,38 +105,58 @@ export function SupplierDetailPage() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Комиссия (%)</label>
-            <input type="number" step="0.01" value={(Number(form.commissionRate) * 100).toFixed(0)}
+            <input
+              type="number"
+              step="0.01"
+              value={(Number(form.commissionRate) * 100).toFixed(0)}
               onChange={(e) => setForm({ ...form, commissionRate: Number(e.target.value) / 100 })}
-              className="w-full px-3 py-2 border rounded-lg text-sm" />
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Промо ставка (%)</label>
-            <input type="number" step="0.01"
+            <input
+              type="number"
+              step="0.01"
               value={form.promoRate ? (Number(form.promoRate) * 100).toFixed(0) : ''}
               onChange={(e) => setForm({ ...form, promoRate: e.target.value ? Number(e.target.value) / 100 : '' })}
-              className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Пусто = нет промо" />
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+              placeholder="Пусто = нет промо"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Промо до</label>
-            <input type="date" value={form.promoUntil}
+            <input
+              type="date"
+              value={form.promoUntil}
               onChange={(e) => setForm({ ...form, promoUntil: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg text-sm" />
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">YooKassa Account ID</label>
-            <input value={form.yookassaAccountId}
+            <input
+              value={form.yookassaAccountId}
               onChange={(e) => setForm({ ...form, yookassaAccountId: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Для split-платежей" />
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+              placeholder="Для split-платежей"
+            />
           </div>
           <div className="flex items-end">
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={form.isActive}
-                onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+              />
               <span className="text-sm">Активен</span>
             </label>
           </div>
         </div>
-        <button onClick={save} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90">
+        <button
+          onClick={save}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90"
+        >
           Сохранить
         </button>
       </div>
@@ -190,7 +224,9 @@ export function SupplierDetailPage() {
                               await adminApi.delete(`/admin/suppliers/${id}/api-keys/${k.id}`);
                               toast.success('Ключ деактивирован');
                               load();
-                            } catch (err: unknown) { toast.error(err instanceof Error ? err.message : String(err)); }
+                            } catch (err: unknown) {
+                              toast.error(err instanceof Error ? err.message : String(err));
+                            }
                           }}
                           className="text-xs text-destructive hover:underline"
                         >
@@ -220,12 +256,16 @@ export function SupplierDetailPage() {
             <button
               onClick={async () => {
                 try {
-                  const result = await adminApi.post(`/admin/suppliers/${id}/api-keys`, { name: newKeyName || 'default' });
+                  const result = await adminApi.post(`/admin/suppliers/${id}/api-keys`, {
+                    name: newKeyName || 'default',
+                  });
                   setNewKeyResult((result as any).key);
                   setNewKeyName('');
                   toast.success('API-ключ создан');
                   load();
-                } catch (err: unknown) { toast.error(err instanceof Error ? err.message : String(err)); }
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : String(err));
+                }
               }}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90"
             >
@@ -243,7 +283,10 @@ export function SupplierDetailPage() {
                 {newKeyResult}
               </code>
               <button
-                onClick={() => { navigator.clipboard.writeText(newKeyResult); toast.success('Скопировано'); }}
+                onClick={() => {
+                  navigator.clipboard.writeText(newKeyResult);
+                  toast.success('Скопировано');
+                }}
                 className="text-xs text-primary hover:underline"
               >
                 Копировать
@@ -279,7 +322,9 @@ export function SupplierDetailPage() {
                   if ((res as any).webhookSecret) {
                     toast.info(`Secret: ${(res as any).webhookSecret.slice(0, 12)}...`);
                   }
-                } catch (err: unknown) { toast.error(err instanceof Error ? err.message : String(err)); }
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : String(err));
+                }
               }}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90"
             >
@@ -290,7 +335,9 @@ export function SupplierDetailPage() {
                 try {
                   const res = await adminApi.patch(`/admin/suppliers/${id}/webhook`, { regenerateSecret: true });
                   toast.success('Секрет обновлён: ' + (res as any).webhookSecret?.slice(0, 12) + '...');
-                } catch (err: unknown) { toast.error(err instanceof Error ? err.message : String(err)); }
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : String(err));
+                }
               }}
               className="px-4 py-2 border rounded-lg text-sm hover:bg-muted"
             >

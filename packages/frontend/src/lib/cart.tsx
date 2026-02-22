@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -98,9 +91,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setItems((prev) => prev.filter((i) => i.offerId !== offerId));
       return;
     }
-    setItems((prev) =>
-      prev.map((i) => (i.offerId === offerId ? { ...i, quantity } : i)),
-    );
+    setItems((prev) => prev.map((i) => (i.offerId === offerId ? { ...i, quantity } : i)));
   }, []);
 
   const clearCart = useCallback(() => {
@@ -111,9 +102,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const totalPrice = items.reduce((sum, i) => sum + i.priceFrom * i.quantity, 0);
 
   return (
-    <CartContext.Provider
-      value={{ items, itemCount, totalPrice, addItem, removeItem, updateQuantity, clearCart }}
-    >
+    <CartContext.Provider value={{ items, itemCount, totalPrice, addItem, removeItem, updateQuantity, clearCart }}>
       {children}
     </CartContext.Provider>
   );

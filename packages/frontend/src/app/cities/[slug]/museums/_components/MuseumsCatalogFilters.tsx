@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useMemo } from 'react';
 
 const SORTS = [
   { id: 'popular', label: 'Популярные' },

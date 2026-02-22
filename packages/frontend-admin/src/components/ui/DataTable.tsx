@@ -1,38 +1,27 @@
-import { useState } from 'react';
+import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
 import {
   ColumnDef,
+  ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
   SortingState,
-  ColumnFiltersState,
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table';
 import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
+import { useState } from 'react';
+
 import { ScrollBar } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+
 import { Button } from './button';
 import { Input } from './input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from './table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 import { Skeleton } from './skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -172,7 +161,7 @@ export function DataTable<TData, TValue>({
                 ))}
               </TableHeader>
               <TableBody>
-            {                table.getRowModel().rows?.length ? (
+                {table.getRowModel().rows?.length ? (
                   table.getRowModel().rows.map((row) => (
                     <TableRow
                       key={row.id}
@@ -181,9 +170,7 @@ export function DataTable<TData, TValue>({
                       onClick={() => onRowClick?.(row.original)}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
+                        <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                       ))}
                     </TableRow>
                   ))

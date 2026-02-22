@@ -62,10 +62,7 @@ const EVENT_MAP: Record<string, Partial<QFEventParams>> = {
 /**
  * Применить QF slug к params для Event (excursion или event).
  */
-export function applyQFToEventParams(
-  type: 'excursion' | 'event',
-  slug: string,
-): Partial<QFEventParams> {
+export function applyQFToEventParams(type: 'excursion' | 'event', slug: string): Partial<QFEventParams> {
   const map = type === 'excursion' ? EXCURSION_MAP : EVENT_MAP;
   return map[slug] ?? {};
 }

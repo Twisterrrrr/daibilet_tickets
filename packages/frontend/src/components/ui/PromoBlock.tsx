@@ -1,14 +1,5 @@
+import { Baby, Heart, PartyPopper, Ship, Snowflake, Sparkles, Umbrella, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
-import {
-  Sparkles,
-  Ship,
-  PartyPopper,
-  Snowflake,
-  Heart,
-  UtensilsCrossed,
-  Baby,
-  Umbrella,
-} from 'lucide-react';
 
 interface PromoItem {
   slug: string;

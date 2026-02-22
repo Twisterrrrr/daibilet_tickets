@@ -2,7 +2,7 @@
  * Активирует города с событиями, генерирует описания, очищает кэш.
  * Запуск: npx ts-node prisma/fix-cities-for-catalog.ts
  */
-/* eslint-disable @typescript-eslint/no-require-imports */
+
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();

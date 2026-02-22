@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CacheService, cacheKeys } from './cache.service';
+
 import { PrismaService } from '../prisma/prisma.service';
+import { cacheKeys, CacheService } from './cache.service';
 
 /**
  * Централизованный сервис инвалидации кэша.
@@ -82,6 +83,7 @@ export class CacheInvalidationService {
     await Promise.all([
       this.cache.delByPrefix('cities:'),
       this.cache.delByPrefix('events:'),
+      this.cache.delByPrefix('catalog:'),
       this.cache.delByPrefix('tags:'),
       this.cache.delByPrefix('regions:'),
       this.cache.delByPrefix('landings:'),

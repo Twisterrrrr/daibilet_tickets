@@ -16,10 +16,7 @@ export function maskEmail(s: string | null | undefined): string {
   const domain = s.slice(at + 1);
   const maskedLocal = local.length <= 2 ? MASK : local[0] + MASK + local[local.length - 1];
   const dot = domain.lastIndexOf('.');
-  const maskedDomain =
-    dot <= 0
-      ? MASK
-      : domain.slice(0, Math.min(2, domain.indexOf('.'))) + MASK + domain.slice(dot);
+  const maskedDomain = dot <= 0 ? MASK : domain.slice(0, Math.min(2, domain.indexOf('.'))) + MASK + domain.slice(dot);
   return `${maskedLocal}@${maskedDomain}`;
 }
 
@@ -99,10 +96,7 @@ export function maskPii(obj: unknown): unknown {
 export function maskPiiInString(s: string | null | undefined): string {
   if (!s || typeof s !== 'string') return '';
   // Email: простой паттерн
-  let out = s.replace(
-    /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
-    (m) => maskEmail(m) || MASK,
-  );
+  let out = s.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, (m) => maskEmail(m) || MASK);
   // Телефон: 10-11 цифр подряд
   out = out.replace(/(\+?\d[\d\s-]{8,}\d)/g, (m) => maskPhone(m) || MASK);
   return out;

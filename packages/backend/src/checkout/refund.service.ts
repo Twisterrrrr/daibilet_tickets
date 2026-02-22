@@ -11,10 +11,11 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { PaymentService } from './payment.service';
+
 import { MailService } from '../mail/mail.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { tryTransitionPayment } from './checkout-state-machine';
+import { PaymentService } from './payment.service';
 
 @Injectable()
 export class RefundService {
@@ -74,15 +75,19 @@ export class RefundService {
       },
     });
 
-    this.logger.log(`[intent=${intentId}] [provider=${intent.provider}] [providerPmtId=${intent.providerPaymentId}] Full refund: amount=${intent.amount}, reason=${reason}`);
+    this.logger.log(
+      `[intent=${intentId}] [provider=${intent.provider}] [providerPmtId=${intent.providerPaymentId}] Full refund: amount=${intent.amount}, reason=${reason}`,
+    );
 
     // Email notification
     if (intent.checkoutSession.customerEmail) {
-      this.mailService.sendOrderRejected(intent.checkoutSession.customerEmail, {
-        customerName: intent.checkoutSession.customerName || 'Клиент',
-        shortCode: intent.checkoutSession.shortCode,
-        reason: `Возврат средств: ${reason}`,
-      }).catch((e: Error) => this.logger.error(`Refund email failed: ${e.message}`));
+      this.mailService
+        .sendOrderRejected(intent.checkoutSession.customerEmail, {
+          customerName: intent.checkoutSession.customerName || 'Клиент',
+          shortCode: intent.checkoutSession.shortCode,
+          reason: `Возврат средств: ${reason}`,
+        })
+        .catch((e: Error) => this.logger.error(`Refund email failed: ${e.message}`));
     }
   }
 
@@ -143,16 +148,18 @@ export class RefundService {
 
     this.logger.log(
       `[intent=${intent.id}] [provider=${intent.provider}] [providerPmtId=${intent.providerPaymentId}] ` +
-      `Partial refund for session ${checkoutSessionId}: ${failedItems.length} items, amount=${refundAmount}`,
+        `Partial refund for session ${checkoutSessionId}: ${failedItems.length} items, amount=${refundAmount}`,
     );
 
     // Email notification
     if (intent.checkoutSession.customerEmail) {
-      this.mailService.sendOrderRejected(intent.checkoutSession.customerEmail, {
-        customerName: intent.checkoutSession.customerName || 'Клиент',
-        shortCode: intent.checkoutSession.shortCode,
-        reason: `Частичный возврат (${failedItems.length} поз.): ${reason}`,
-      }).catch((e: Error) => this.logger.error(`Partial refund email failed: ${e.message}`));
+      this.mailService
+        .sendOrderRejected(intent.checkoutSession.customerEmail, {
+          customerName: intent.checkoutSession.customerName || 'Клиент',
+          shortCode: intent.checkoutSession.shortCode,
+          reason: `Частичный возврат (${failedItems.length} поз.): ${reason}`,
+        })
+        .catch((e: Error) => this.logger.error(`Partial refund email failed: ${e.message}`));
     }
   }
 

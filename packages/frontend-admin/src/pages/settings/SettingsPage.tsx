@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface SyncStatus {
   lastSyncAt: string | null;
@@ -43,11 +44,7 @@ function OpsButton({
   variant?: 'destructive';
 }) {
   return (
-    <Button
-      variant={variant === 'destructive' ? 'destructive' : 'outline'}
-      onClick={onClick}
-      disabled={loading}
-    >
+    <Button variant={variant === 'destructive' ? 'destructive' : 'outline'} onClick={onClick} disabled={loading}>
       {loading ? `${label}...` : label}
     </Button>
   );
@@ -101,8 +98,7 @@ export function SettingsPage() {
     }
   };
 
-  const formatDate = (d: string | null) =>
-    d ? new Date(d).toLocaleString('ru-RU') : 'никогда';
+  const formatDate = (d: string | null) => (d ? new Date(d).toLocaleString('ru-RU') : 'никогда');
 
   if (loading) {
     return (
@@ -227,11 +223,7 @@ export function SettingsPage() {
                   type="number"
                   step="0.1"
                   value={pricing.serviceFeePercent}
-                  onChange={(e) =>
-                    setPricing((p) =>
-                      p ? { ...p, serviceFeePercent: Number(e.target.value) } : p,
-                    )
-                  }
+                  onChange={(e) => setPricing((p) => (p ? { ...p, serviceFeePercent: Number(e.target.value) } : p))}
                 />
               </div>
               <div className="space-y-2">
@@ -241,11 +233,7 @@ export function SettingsPage() {
                   type="number"
                   step="0.1"
                   value={pricing.peakMarkupPercent}
-                  onChange={(e) =>
-                    setPricing((p) =>
-                      p ? { ...p, peakMarkupPercent: Number(e.target.value) } : p,
-                    )
-                  }
+                  onChange={(e) => setPricing((p) => (p ? { ...p, peakMarkupPercent: Number(e.target.value) } : p))}
                 />
               </div>
               <div className="space-y-2">
@@ -255,11 +243,7 @@ export function SettingsPage() {
                   type="number"
                   step="0.1"
                   value={pricing.lastMinutePercent}
-                  onChange={(e) =>
-                    setPricing((p) =>
-                      p ? { ...p, lastMinutePercent: Number(e.target.value) } : p,
-                    )
-                  }
+                  onChange={(e) => setPricing((p) => (p ? { ...p, lastMinutePercent: Number(e.target.value) } : p))}
                 />
               </div>
               <div className="space-y-2">
@@ -269,11 +253,7 @@ export function SettingsPage() {
                   type="number"
                   step="0.1"
                   value={pricing.tcCommissionPercent}
-                  onChange={(e) =>
-                    setPricing((p) =>
-                      p ? { ...p, tcCommissionPercent: Number(e.target.value) } : p,
-                    )
-                  }
+                  onChange={(e) => setPricing((p) => (p ? { ...p, tcCommissionPercent: Number(e.target.value) } : p))}
                 />
               </div>
             </div>

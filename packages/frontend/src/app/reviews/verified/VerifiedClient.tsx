@@ -1,8 +1,8 @@
 'use client';
 
+import { CheckCircle, Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { CheckCircle, Loader2 } from 'lucide-react';
 
 function VerifiedContent() {
   const searchParams = useSearchParams();

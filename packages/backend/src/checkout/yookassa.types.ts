@@ -9,12 +9,12 @@
 // ============================================================
 
 export interface YkAmount {
-  value: string;   // "1500.00"
+  value: string; // "1500.00"
   currency: string; // "RUB"
 }
 
 export interface YkConfirmation {
-  type: string;       // "redirect"
+  type: string; // "redirect"
   confirmation_url?: string;
   return_url?: string;
 }
@@ -87,8 +87,8 @@ export interface YkRefund {
 // ============================================================
 
 export interface YkWebhookEvent {
-  type: string;           // "notification"
-  event: string;          // "payment.succeeded", "payment.canceled", "refund.succeeded"
+  type: string; // "notification"
+  event: string; // "payment.succeeded", "payment.canceled", "refund.succeeded"
   object: YkPayment | YkRefund;
 }
 
@@ -122,6 +122,5 @@ export function isYkWebhookEvent(value: unknown): value is YkWebhookEvent {
 export function extractPaymentIdFromWebhook(webhookObj: unknown): string | null {
   if (!webhookObj || typeof webhookObj !== 'object') return null;
   const obj = webhookObj as Record<string, unknown>;
-  return (typeof obj.id === 'string' ? obj.id : null)
-    || (typeof obj.payment_id === 'string' ? obj.payment_id : null);
+  return (typeof obj.id === 'string' ? obj.id : null) || (typeof obj.payment_id === 'string' ? obj.payment_id : null);
 }

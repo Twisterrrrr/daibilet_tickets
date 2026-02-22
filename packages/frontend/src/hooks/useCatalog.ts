@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { api } from '@/lib/api';
 import type { CatalogItem } from '@daibilet/shared';
+import { useCallback, useEffect, useState } from 'react';
+
+import { api } from '@/lib/api';
 
 export interface UseCatalogParams {
   category?: string;

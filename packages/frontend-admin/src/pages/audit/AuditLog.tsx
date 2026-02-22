@@ -1,24 +1,14 @@
-import { useEffect, useState } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
+import { useEffect, useState } from 'react';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface AuditEntry {
   id: string;
@@ -101,36 +91,26 @@ export function AuditLogPage() {
       accessorKey: 'action',
       header: 'Действие',
       cell: ({ row }) => (
-        <Badge
-          variant={ACTION_VARIANTS[row.original.action] ?? 'secondary'}
-        >
-          {row.original.action}
-        </Badge>
+        <Badge variant={ACTION_VARIANTS[row.original.action] ?? 'secondary'}>{row.original.action}</Badge>
       ),
     },
     {
       accessorKey: 'entity',
       header: 'Сущность',
-      cell: ({ row }) => (
-        <span className="font-medium">{row.original.entity}</span>
-      ),
+      cell: ({ row }) => <span className="font-medium">{row.original.entity}</span>,
     },
     {
       accessorKey: 'entityId',
       header: 'ID',
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {row.original.entityId.substring(0, 8)}...
-        </span>
+        <span className="font-mono text-xs text-muted-foreground">{row.original.entityId.substring(0, 8)}...</span>
       ),
     },
     {
       accessorKey: 'userId',
       header: 'User',
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {row.original.userId.substring(0, 8)}...
-        </span>
+        <span className="font-mono text-xs text-muted-foreground">{row.original.userId.substring(0, 8)}...</span>
       ),
     },
     {
@@ -158,9 +138,7 @@ export function AuditLogPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Журнал аудита</h1>
-        <p className="text-muted-foreground">
-          История изменений, всего записей: {total}
-        </p>
+        <p className="text-muted-foreground">История изменений, всего записей: {total}</p>
       </div>
 
       <Card>
@@ -215,13 +193,7 @@ export function AuditLogPage() {
 
       <Card>
         <CardContent className="pt-6">
-          <DataTable
-            columns={columns}
-            data={items}
-            loading={loading}
-            emptyText="Нет записей"
-            pageSize={30}
-          />
+          <DataTable columns={columns} data={items} loading={loading} emptyText="Нет записей" pageSize={30} />
 
           {total > 30 && (
             <div className="mt-4 flex items-center justify-between">
@@ -237,12 +209,7 @@ export function AuditLogPage() {
                 >
                   Назад
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={page >= totalPages}
-                >
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages}>
                   Далее
                 </Button>
               </div>

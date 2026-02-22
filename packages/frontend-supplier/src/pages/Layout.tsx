@@ -1,5 +1,6 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut } from 'lucide-react';
+import { BarChart3, Calendar, LayoutDashboard, LogOut, Settings } from 'lucide-react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+
 import { clearToken } from '../lib/api';
 
 const NAV = [
@@ -27,17 +28,13 @@ export default function Layout() {
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {NAV.map((item) => {
-            const active = item.to === '/'
-              ? location.pathname === '/'
-              : location.pathname.startsWith(item.to);
+            const active = item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
             return (
               <Link
                 key={item.to}
                 to={item.to}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  active
-                    ? 'bg-blue-50 text-blue-700 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  active ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 <item.icon className="h-4 w-4" />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
 import { api } from '../lib/api';
 
 export default function Settings() {
@@ -35,18 +36,21 @@ export default function Settings() {
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <span className="text-gray-500">Комиссия:</span>{' '}
-            <span className="font-medium">{form.commissionRate ? `${(Number(form.commissionRate) * 100).toFixed(0)}%` : '-'}</span>
+            <span className="font-medium">
+              {form.commissionRate ? `${(Number(form.commissionRate) * 100).toFixed(0)}%` : '-'}
+            </span>
           </div>
           {form.promoRate && (
             <div>
               <span className="text-gray-500">Промо-ставка:</span>{' '}
               <span className="font-medium text-green-600">{(Number(form.promoRate) * 100).toFixed(0)}%</span>
-              {form.promoUntil && <span className="text-xs text-gray-400"> до {new Date(form.promoUntil).toLocaleDateString('ru')}</span>}
+              {form.promoUntil && (
+                <span className="text-xs text-gray-400"> до {new Date(form.promoUntil).toLocaleDateString('ru')}</span>
+              )}
             </div>
           )}
           <div>
-            <span className="text-gray-500">Trust Level:</span>{' '}
-            <span className="font-medium">{form.trustLevel}</span>
+            <span className="text-gray-500">Trust Level:</span> <span className="font-medium">{form.trustLevel}</span>
           </div>
           <div>
             <span className="text-gray-500">Верификация:</span>{' '}
@@ -66,7 +70,11 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Юр. название</label>
-            <input value={form.companyName || ''} onChange={set('companyName')} className="w-full px-3 py-2 border rounded-lg" />
+            <input
+              value={form.companyName || ''}
+              onChange={set('companyName')}
+              className="w-full px-3 py-2 border rounded-lg"
+            />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -76,21 +84,36 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Телефон</label>
-            <input value={form.contactPhone || ''} onChange={set('contactPhone')} className="w-full px-3 py-2 border rounded-lg" />
+            <input
+              value={form.contactPhone || ''}
+              onChange={set('contactPhone')}
+              className="w-full px-3 py-2 border rounded-lg"
+            />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>
-            <input value={form.contactEmail || ''} onChange={set('contactEmail')} className="w-full px-3 py-2 border rounded-lg" />
+            <input
+              value={form.contactEmail || ''}
+              onChange={set('contactEmail')}
+              className="w-full px-3 py-2 border rounded-lg"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Сайт</label>
-            <input value={form.website || ''} onChange={set('website')} className="w-full px-3 py-2 border rounded-lg" />
+            <input
+              value={form.website || ''}
+              onChange={set('website')}
+              className="w-full px-3 py-2 border rounded-lg"
+            />
           </div>
         </div>
-        <button type="submit" disabled={loading}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
           {loading ? 'Сохранение...' : 'Сохранить'}
         </button>
       </form>

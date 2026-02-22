@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+
 import VerifiedClient from './VerifiedClient';
 
 export const metadata: Metadata = {

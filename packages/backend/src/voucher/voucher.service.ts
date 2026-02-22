@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
-import * as QRCode from 'qrcode';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import * as QRCode from 'qrcode';
+
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class VoucherService {

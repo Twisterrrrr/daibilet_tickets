@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { SupportService } from './support.service';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+
 import { CreateSupportRequestDto } from './dto/support.dto';
+import { SupportService } from './support.service';
 
 /**
  * Публичные эндпоинты для поддержки (без авторизации).

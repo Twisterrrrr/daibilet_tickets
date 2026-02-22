@@ -1,11 +1,12 @@
 'use client';
 
-import Link from 'next/link';
+import { type EventCategory, formatPrice } from '@daibilet/shared';
+import { Award, Clock, Flame, MapPin, Star, Ticket } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Clock, MapPin, Star, Ticket, Award, Flame } from 'lucide-react';
+
 import { FavoriteButton } from './FavoriteButton';
-import { formatPrice, type EventCategory } from '@daibilet/shared';
 
 /** Убрать теги из описания, <br> → пробел */
 function stripDescription(html: string | null | undefined): string {
@@ -83,9 +84,7 @@ export function EventCardHorizontal({
 
   const LOW_TICKETS_THRESHOLD = 20;
   const showLowTickets =
-    totalAvailableTickets !== undefined &&
-    totalAvailableTickets > 0 &&
-    totalAvailableTickets <= LOW_TICKETS_THRESHOLD;
+    totalAvailableTickets !== undefined && totalAvailableTickets > 0 && totalAvailableTickets <= LOW_TICKETS_THRESHOLD;
 
   /** Показывать слоты времени только если ближайший сеанс — сегодня */
   const isToday = (() => {
@@ -93,9 +92,7 @@ export function EventCardHorizontal({
     const d = new Date(nextSessionAt);
     const today = new Date();
     return (
-      d.getFullYear() === today.getFullYear() &&
-      d.getMonth() === today.getMonth() &&
-      d.getDate() === today.getDate()
+      d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate()
     );
   })();
   const showPopular = reviewCount >= 100;
@@ -136,9 +133,7 @@ export function EventCardHorizontal({
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary-100 to-primary-50">
-            <span className="text-4xl">
-              {category === 'EXCURSION' ? '🚶' : category === 'MUSEUM' ? '🏛️' : '🎭'}
-            </span>
+            <span className="text-4xl">{category === 'EXCURSION' ? '🚶' : category === 'MUSEUM' ? '🏛️' : '🎭'}</span>
           </div>
         )}
 
@@ -195,9 +190,7 @@ export function EventCardHorizontal({
           <span className="flex items-center gap-0.5 shrink-0">
             <Star
               className={
-                Number(rating) > 0
-                  ? 'h-3 w-3 fill-amber-400 text-amber-400'
-                  : 'h-3 w-3 fill-slate-200 text-slate-200'
+                Number(rating) > 0 ? 'h-3 w-3 fill-amber-400 text-amber-400' : 'h-3 w-3 fill-slate-200 text-slate-200'
               }
             />
             {Number(rating) > 0 ? (
@@ -232,9 +225,7 @@ export function EventCardHorizontal({
             </span>
           )}
           {groupSize && <span>{groupSize}</span>}
-          {dateMode === 'OPEN_DATE' && (
-            <span className="font-medium text-emerald-600">Билет с открытой датой</span>
-          )}
+          {dateMode === 'OPEN_DATE' && <span className="font-medium text-emerald-600">Билет с открытой датой</span>}
           {dateMode !== 'OPEN_DATE' && nextSessionAt && (
             <span className="font-medium text-primary-600">
               {isToday && displaySlots.length > 0 ? 'Сегодня' : formatNextSession(nextSessionAt)}
@@ -294,7 +285,9 @@ export function EventCardHorizontal({
               {hasDiscount && priceOriginalKopecks && (
                 <span className="text-[11px] text-slate-400 line-through">{formatPrice(priceOriginalKopecks)}</span>
               )}
-              <span className="rounded-full bg-primary-600 px-5 py-2 text-base font-bold uppercase tracking-wide text-white shadow-sm sm:px-6 sm:py-2.5 sm:text-lg">от {formatPrice(priceFrom)}</span>
+              <span className="rounded-full bg-primary-600 px-5 py-2 text-base font-bold uppercase tracking-wide text-white shadow-sm sm:px-6 sm:py-2.5 sm:text-lg">
+                от {formatPrice(priceFrom)}
+              </span>
             </div>
           ) : (
             <span className="text-xs text-slate-400">Цена уточняется</span>

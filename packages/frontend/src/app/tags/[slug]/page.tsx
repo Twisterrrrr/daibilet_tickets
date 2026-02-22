@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+
 import { EventCard } from '@/components/ui/EventCard';
+import { api } from '@/lib/api';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -29,7 +30,9 @@ export default async function TagPage({ params }: Props) {
     return (
       <div className="container-page py-20 text-center">
         <h1 className="text-2xl font-bold text-slate-900">Тег не найден</h1>
-        <Link href="/events" className="btn-primary mt-6 inline-flex">К каталогу</Link>
+        <Link href="/events" className="btn-primary mt-6 inline-flex">
+          К каталогу
+        </Link>
       </div>
     );
   }
@@ -41,14 +44,14 @@ export default async function TagPage({ params }: Props) {
       {/* Header */}
       <div className="mb-8">
         <nav className="mb-3 flex items-center gap-2 text-sm text-slate-500">
-          <Link href="/events" className="hover:text-primary-600">Каталог</Link>
+          <Link href="/events" className="hover:text-primary-600">
+            Каталог
+          </Link>
           <span>/</span>
           <span className="text-slate-900">{tag.name}</span>
         </nav>
         <h1 className="text-3xl font-bold text-slate-900">{tag.name}</h1>
-        {tag.description && (
-          <p className="mt-2 text-lg text-slate-500">{tag.description}</p>
-        )}
+        {tag.description && <p className="mt-2 text-lg text-slate-500">{tag.description}</p>}
         <p className="mt-1 text-sm text-slate-400">{total} событий</p>
       </div>
 

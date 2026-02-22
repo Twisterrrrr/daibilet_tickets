@@ -11,31 +11,30 @@
  *   21-22: calculateExpiresAt
  */
 
-import { describe, test, expect, afterEach } from 'vitest';
+import {
+  CURRENT_PAYLOAD_VERSION,
+  ensurePayloadVersion,
+  PurchaseType,
+  resolvePurchaseType,
+  setCompatDisabled,
+  validateWidgetPayload,
+} from '@daibilet/shared';
+import { afterEach, describe, expect, test } from 'vitest';
 
 import {
+  calculateExpiresAt,
+  CHECKOUT_TERMINAL,
+  CheckoutStatus,
+  determineExpireReason,
+  ExpireReason,
+  ORDER_REQUEST_TERMINAL,
+  OrderRequestStatus,
+  PAYMENT_TERMINAL,
+  PaymentIntentStatus,
   tryTransitionCheckout,
   tryTransitionOrderRequest,
   tryTransitionPayment,
-  CheckoutStatus,
-  OrderRequestStatus,
-  PaymentIntentStatus,
-  CHECKOUT_TERMINAL,
-  ORDER_REQUEST_TERMINAL,
-  PAYMENT_TERMINAL,
-  calculateExpiresAt,
-  determineExpireReason,
-  ExpireReason,
 } from '../checkout-state-machine';
-
-import {
-  validateWidgetPayload,
-  ensurePayloadVersion,
-  resolvePurchaseType,
-  setCompatDisabled,
-  PurchaseType,
-  CURRENT_PAYLOAD_VERSION,
-} from '@daibilet/shared';
 
 // ========================================
 // 1-4: State machine forbidden transitions

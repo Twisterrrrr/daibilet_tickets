@@ -7,9 +7,9 @@
  *
  * Запуск: npx tsx prisma/fix-teplohod-river-excursions.ts
  */
+import { PrismaClient } from '@prisma/client';
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
-import { PrismaClient } from '@prisma/client';
 
 // Load .env: приоритет — корень проекта (pnpm run из packages/backend → cwd = packages/backend)
 const rootEnv = resolve(process.cwd(), '../../.env');
@@ -32,7 +32,19 @@ function hasExcursion(title: string | null, description: string | null): boolean
   return t.includes('экскурсия');
 }
 
-const WATER_MARKERS = ['теплоход', 'речн', 'катер', 'корабл', 'яхт', 'водн', 'по неве', 'по реке', 'круиз', 'развод мостов', 'палубн'];
+const WATER_MARKERS = [
+  'теплоход',
+  'речн',
+  'катер',
+  'корабл',
+  'яхт',
+  'водн',
+  'по неве',
+  'по реке',
+  'круиз',
+  'развод мостов',
+  'палубн',
+];
 
 function hasWaterContext(title: string | null, description: string | null): boolean {
   const t = `${(title || '').toLowerCase()} ${(description || '').toLowerCase()}`;

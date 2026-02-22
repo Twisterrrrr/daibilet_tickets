@@ -2,9 +2,9 @@
  * Удалить тег "Прогулки по Волге НН" отовсюду.
  * Запуск: npx tsx prisma/remove-tag.ts
  */
-import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
 import { PrismaClient } from '@prisma/client';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 
 const envPaths = [resolve(__dirname, '../../.env'), resolve(__dirname, '../../../.env')];
 const envPath = envPaths.find(existsSync);

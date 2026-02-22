@@ -26,9 +26,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     console.error('ErrorBoundary caught:', error, errorInfo);
     // Sentry integration
     if (typeof window !== 'undefined') {
-      import('@sentry/nextjs').then((Sentry) => {
-        Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
-      }).catch(() => {});
+      import('@sentry/nextjs')
+        .then((Sentry) => {
+          Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
+        })
+        .catch(() => {});
     }
   }
 
@@ -38,9 +40,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center px-4 text-center">
           <div className="mb-6 text-6xl">😔</div>
-          <h2 className="mb-3 text-2xl font-bold text-slate-800">
-            Что-то пошло не так
-          </h2>
+          <h2 className="mb-3 text-2xl font-bold text-slate-800">Что-то пошло не так</h2>
           <p className="mb-6 max-w-md text-slate-500">
             Произошла непредвиденная ошибка. Попробуйте обновить страницу или вернуться на главную.
           </p>
@@ -61,10 +61,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               На главную
             </a>
           </div>
-          <a
-            href="/help"
-            className="mt-4 text-sm text-slate-400 underline hover:text-slate-600"
-          >
+          <a href="/help" className="mt-4 text-sm text-slate-400 underline hover:text-slate-600">
             Связаться с поддержкой
           </a>
         </div>

@@ -1,17 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CacheService, CACHE_TTL, cacheKeys } from '../cache/cache.service';
-import { EventsQueryDto } from './dto/events-query.dto';
-import { CatalogQueryDto } from './dto/catalog-query.dto';
-import { Prisma, DateMode, EventCategory, EventSubcategory, TagCategory, LocationType } from '@prisma/client';
-import { EventOverrideService } from '../admin/event-override.service';
-import { RegionService } from './region.service';
 import { SUBCATEGORY_LABELS } from '@daibilet/shared';
+import { createHash } from 'node:crypto';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DateMode, EventCategory, EventSubcategory, LocationType, Prisma, TagCategory } from '@prisma/client';
+
+import { EventOverrideService } from '../admin/event-override.service';
+import { CACHE_TTL, cacheKeys, CacheService } from '../cache/cache.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { CatalogQueryDto } from './dto/catalog-query.dto';
+import { EventsQueryDto } from './dto/events-query.dto';
+import { RegionService } from './region.service';
 
 /** Сократить адрес до улицы и номера: "Дворцовая наб., 18, Санкт-Петербург" → "Дворцовая наб., 18" */
 function shortenAddressToStreet(addr: string | null | undefined): string {
   if (!addr || typeof addr !== 'string') return '';
-  const parts = addr.split(',').map((s) => s.trim()).filter(Boolean);
+  const parts = addr
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   return parts.length <= 2 ? addr.trim() : parts.slice(0, 2).join(', ');
 }
 
@@ -54,7 +59,10 @@ export class CatalogService {
                   isActive: true,
                   isDeleted: false,
                   OR: [
-                    { dateMode: DateMode.SCHEDULED, sessions: { some: { isActive: true, startsAt: { gte: new Date() } } } },
+                    {
+                      dateMode: DateMode.SCHEDULED,
+                      sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
+                    },
                     { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: new Date() } }] },
                   ],
                 },
@@ -96,14 +104,10 @@ export class CatalogService {
       );
 
       // Отфильтрованные города, которые реально отображаются в каталоге
-      const visibleCities = cities
-        .filter(
-          (c) =>
-            !hiddenCityIds.has(c.id) &&
-            c._count.events >= 2 &&
-            c.description != null &&
-            c.description.trim().length > 0,
-        );
+      const visibleCities = cities.filter(
+        (c) =>
+          !hiddenCityIds.has(c.id) && c._count.events >= 2 && c.description != null && c.description.trim().length > 0,
+      );
 
       // Счётчик «Музеи и арт» для списка городов:
       // museumCount = активные площадки (venues) + активные события с привязкой к площадке (venueId) в этом городе.
@@ -274,30 +278,29 @@ export class CatalogService {
         { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: new Date() } }] },
       ],
     };
-    const [excursionCount, eventCount, totalCount, venueCount, eventsAtVenuesCount] =
-      await Promise.all([
-        this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EXCURSION', ...hasFutureSessions },
-        }),
-        this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EVENT', ...hasFutureSessions },
-        }),
-        this.prisma.event.count({
-          where: { cityId: city.id, isActive: true, isDeleted: false, ...hasFutureSessions },
-        }),
-        this.prisma.venue.count({
-          where: { cityId: city.id, isActive: true, isDeleted: false },
-        }),
-        this.prisma.event.count({
-          where: {
-            cityId: city.id,
-            isActive: true,
-            isDeleted: false,
-            venueId: { not: null },
-            ...hasFutureSessions,
-          },
-        }),
-      ]);
+    const [excursionCount, eventCount, totalCount, venueCount, eventsAtVenuesCount] = await Promise.all([
+      this.prisma.event.count({
+        where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EXCURSION', ...hasFutureSessions },
+      }),
+      this.prisma.event.count({
+        where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EVENT', ...hasFutureSessions },
+      }),
+      this.prisma.event.count({
+        where: { cityId: city.id, isActive: true, isDeleted: false, ...hasFutureSessions },
+      }),
+      this.prisma.venue.count({
+        where: { cityId: city.id, isActive: true, isDeleted: false },
+      }),
+      this.prisma.event.count({
+        where: {
+          cityId: city.id,
+          isActive: true,
+          isDeleted: false,
+          venueId: { not: null },
+          ...hasFutureSessions,
+        },
+      }),
+    ]);
     const museumCount = venueCount + eventsAtVenuesCount;
 
     // Популярные теги в городе
@@ -320,9 +323,7 @@ export class CatalogService {
     });
 
     // Сортируем теги по количеству событий
-    const sortedTags = popularTags.sort(
-      (a, b) => b._count.events - a._count.events,
-    );
+    const sortedTags = popularTags.sort((a, b) => b._count.events - a._count.events);
 
     // Превью событий региона (если город — хаб)
     const regionPreview = await this.regionService.getRegionPreviewByHubCity(city.id);
@@ -343,26 +344,34 @@ export class CatalogService {
    * category=EXCURSION | EVENT → Event
    */
   async getCatalog(query: CatalogQueryDto) {
-    const { category, city, region, q, sort = 'popular', page = 1, limit = 20, qf } = query;
+    const paramsHash = createHash('sha256')
+      .update(JSON.stringify({ ...query, sort: query.sort ?? 'popular', page: query.page ?? 1, limit: query.limit ?? 20 }))
+      .digest('hex')
+      .slice(0, 16);
+    const cacheKey = cacheKeys.catalog.list(paramsHash);
 
-    if (category === 'MUSEUM') {
-      return this.getCatalogMuseumAndVenues({ city, region, q, sort, page, limit, qf });
-    }
-    // EXCURSION | EVENT | пусто → Events
-    const eventsDto: EventsQueryDto = {
-      category: category === 'EXCURSION' || category === 'EVENT' ? category : undefined,
-      city,
-      sort: sort === 'departing_soon' ? 'departing_soon' : sort,
-      page,
-      limit,
-    };
-    const res = await this.getEvents(eventsDto);
-    return {
-      items: res.items.map((e) => this.eventToCatalogItem(e)),
-      total: res.total,
-      page: res.page,
-      totalPages: res.totalPages,
-    };
+    return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_LIST, async () => {
+      const { category, city, region, q, sort = 'popular', page = 1, limit = 20, qf } = query;
+
+      if (category === 'MUSEUM') {
+        return this.getCatalogMuseumAndVenues({ city, region, q, sort, page, limit, qf });
+      }
+      // EXCURSION | EVENT | пусто → Events
+      const eventsDto: EventsQueryDto = {
+        category: category === 'EXCURSION' || category === 'EVENT' ? category : undefined,
+        city,
+        sort: sort === 'departing_soon' ? 'departing_soon' : sort,
+        page,
+        limit,
+      };
+      const res = await this.getEvents(eventsDto);
+      return {
+        items: res.items.map((e) => this.eventToCatalogItem(e)),
+        total: res.total,
+        page: res.page,
+        totalPages: res.totalPages,
+      };
+    });
   }
 
   private eventToCatalogItem(e: any) {
@@ -372,7 +381,10 @@ export class CatalogService {
       dateLabel = 'Открытая дата';
     } else if (nextSessionAt) {
       const d = new Date(nextSessionAt);
-      dateLabel = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      dateLabel =
+        d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) +
+        ', ' +
+        d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     } else {
       dateLabel = '';
     }
@@ -388,7 +400,8 @@ export class CatalogService {
       priceFrom: e.priceFrom,
       rating: Number(e.rating) || 0,
       badges: this.collectEventBadges(e),
-      location: (e.address || e.city?.name) ? { address: shortenAddressToStreet(e.address || ''), metro: null } : undefined,
+      location:
+        e.address || e.city?.name ? { address: shortenAddressToStreet(e.address || ''), metro: null } : undefined,
       dateLabel,
       // event-only
       startsAt: nextSessionAt,
@@ -515,10 +528,7 @@ export class CatalogService {
     const orderByPriceDesc = (a: { priceFrom?: number | null }, b: { priceFrom?: number | null }) =>
       (b.priceFrom ?? 0) - (a.priceFrom ?? 0);
 
-    const compare =
-      sort === 'price_asc' ? orderByPriceAsc :
-      sort === 'price_desc' ? orderByPriceDesc :
-      orderByRating;
+    const compare = sort === 'price_asc' ? orderByPriceAsc : sort === 'price_desc' ? orderByPriceDesc : orderByRating;
     combined.sort(compare);
 
     const total = combined.length;
@@ -540,19 +550,23 @@ export class CatalogService {
       isActive: true,
       isDeleted: false,
       ...(city && { city: { slug: city } }),
-      ...(q && q.trim() && {
-        OR: [
-          { title: { contains: q.trim(), mode: 'insensitive' } },
-          { shortTitle: { contains: q.trim(), mode: 'insensitive' } },
-        ],
-      }),
+      ...(q &&
+        q.trim() && {
+          OR: [
+            { title: { contains: q.trim(), mode: 'insensitive' } },
+            { shortTitle: { contains: q.trim(), mode: 'insensitive' } },
+          ],
+        }),
     };
 
     const orderBy: Prisma.VenueOrderByWithRelationInput =
-      sort === 'price_asc' ? { priceFrom: 'asc' } :
-      sort === 'price_desc' ? { priceFrom: 'desc' } :
-      sort === 'rating' ? { rating: 'desc' } :
-      { rating: 'desc' }; // popular = rating
+      sort === 'price_asc'
+        ? { priceFrom: 'asc' }
+        : sort === 'price_desc'
+          ? { priceFrom: 'desc' }
+          : sort === 'rating'
+            ? { rating: 'desc' }
+            : { rating: 'desc' }; // popular = rating
 
     const [raw, total] = await Promise.all([
       this.prisma.venue.findMany({
@@ -577,9 +591,7 @@ export class CatalogService {
 
   private venueToCatalogItem(v: any) {
     const openingHours = v.openingHours as Record<string, string | null> | null;
-    const openingHoursSummary = openingHours
-      ? this.formatOpeningHoursSummary(openingHours)
-      : 'Открытая дата';
+    const openingHoursSummary = openingHours ? this.formatOpeningHoursSummary(openingHours) : 'Открытая дата';
 
     return {
       type: 'venue' as const,
@@ -594,7 +606,10 @@ export class CatalogService {
       rating: Number(v.rating) || 0,
       reviewCount: v.reviewCount ?? 0,
       badges: v.isFeatured ? ['Популярное'] : [],
-      location: (v.address || v.metro) ? { address: v.address ? shortenAddressToStreet(v.address) : v.address, metro: v.metro } : undefined,
+      location:
+        v.address || v.metro
+          ? { address: v.address ? shortenAddressToStreet(v.address) : v.address, metro: v.metro }
+          : undefined,
       dateLabel: openingHoursSummary,
       // venue-only
       venueType: v.venueType,
@@ -615,7 +630,30 @@ export class CatalogService {
   // --- События ---
 
   async getEvents(query: EventsQueryDto & { cityIds?: string[] }) {
-    const { city, cityIds, category, subcategory, audience, tag, dateFrom, dateTo, sort, timeOfDay, pier, maxDuration, minDuration, maxMinAge, dateMode, venueId, priceMin, priceMax, page = 1, limit = 20, hasPhoto, slugs: slugsParam } = query;
+    const {
+      city,
+      cityIds,
+      category,
+      subcategory,
+      audience,
+      tag,
+      dateFrom,
+      dateTo,
+      sort,
+      timeOfDay,
+      pier,
+      maxDuration,
+      minDuration,
+      maxMinAge,
+      dateMode,
+      venueId,
+      priceMin,
+      priceMax,
+      page = 1,
+      limit = 20,
+      hasPhoto,
+      slugs: slugsParam,
+    } = query;
 
     // --- Фильтр сеансов: OPEN_DATE не требуют sessions ---
     // dateMode=OPEN_DATE → нет сеансов, показываем если isActive и не истёк endDate
@@ -627,8 +665,8 @@ export class CatalogService {
           // OPEN_DATE: нет сеансов, но проверяем что не истёк endDate (если задан)
           dateMode: DateMode.OPEN_DATE,
           OR: [
-            { endDate: null },                            // вечная экспозиция
-            { endDate: { gte: new Date() } },             // ещё не закончилась
+            { endDate: null }, // вечная экспозиция
+            { endDate: { gte: new Date() } }, // ещё не закончилась
           ],
         }
       : dateMode
@@ -657,17 +695,17 @@ export class CatalogService {
                     startsAt: {
                       ...(sort === 'departing_soon'
                         ? { gte: new Date(), lte: new Date(Date.now() + 2 * 60 * 60 * 1000) }
-                        : { gte: dateFrom ? new Date(dateFrom) : new Date(), ...(dateTo && { lte: new Date(dateTo) }) }),
+                        : {
+                            gte: dateFrom ? new Date(dateFrom) : new Date(),
+                            ...(dateTo && { lte: new Date(dateTo) }),
+                          }),
                     },
                   },
                 },
               },
               {
                 dateMode: DateMode.OPEN_DATE,
-                OR: [
-                  { endDate: null },
-                  { endDate: { gte: new Date() } },
-                ],
+                OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
               },
             ],
           };
@@ -685,35 +723,38 @@ export class CatalogService {
       // Фильтр сеансов с поддержкой OPEN_DATE
       ...sessionFilter,
       ...(category && { category }),
-      ...(subcategory && (subcategory === 'RIVER'
-        ? {
-            AND: [
-              { subcategories: { has: 'RIVER' as EventSubcategory } },
-              { NOT: { subcategories: { has: 'BUS' as EventSubcategory } } },
-            ],
-          }
-        : { subcategories: { has: subcategory as EventSubcategory } })),
+      ...(subcategory &&
+        (subcategory === 'RIVER'
+          ? {
+              AND: [
+                { subcategories: { has: 'RIVER' as EventSubcategory } },
+                { NOT: { subcategories: { has: 'BUS' as EventSubcategory } } },
+              ],
+            }
+          : { subcategories: { has: subcategory as EventSubcategory } })),
       ...(audience === 'KIDS' ? { audience: { in: ['KIDS', 'FAMILY'] } } : audience ? { audience } : {}),
       ...(tag && { tags: { some: { tag: { slug: tag } } } }),
       ...(pier && { startLocationId: pier }),
-      ...(maxDuration || minDuration ? {
-        durationMinutes: {
-          ...(maxDuration && { lte: maxDuration }),
-          ...(minDuration && { gte: minDuration }),
-        },
-      } : {}),
+      ...(maxDuration || minDuration
+        ? {
+            durationMinutes: {
+              ...(maxDuration && { lte: maxDuration }),
+              ...(minDuration && { gte: minDuration }),
+            },
+          }
+        : {}),
       ...(maxMinAge !== undefined && maxMinAge !== null ? { minAge: { lte: maxMinAge } } : {}),
       ...(venueId && { venueId }),
-      ...((priceMin != null || priceMax != null) ? {
-        priceFrom: {
-          ...(priceMin != null && { gte: priceMin }),
-          ...(priceMax != null && { lte: priceMax }),
-        },
-      } : {}),
-      // События без фото исключаем из главной и блоков (hasPhoto=true)
-      ...(hasPhoto === true
-        ? { AND: [{ imageUrl: { not: null } }, { imageUrl: { not: '' } }] }
+      ...(priceMin != null || priceMax != null
+        ? {
+            priceFrom: {
+              ...(priceMin != null && { gte: priceMin }),
+              ...(priceMax != null && { lte: priceMax }),
+            },
+          }
         : {}),
+      // События без фото исключаем из главной и блоков (hasPhoto=true)
+      ...(hasPhoto === true ? { AND: [{ imageUrl: { not: null } }, { imageUrl: { not: '' } }] } : {}),
       // Фильтр по slug для страницы избранного
       ...(slugsParam?.trim()
         ? {
@@ -734,10 +775,10 @@ export class CatalogService {
     if (timeOfDay) {
       // MSK hour ranges → convert to UTC by subtracting 3
       const mskRanges: Record<string, [number, number]> = {
-        morning: [6, 10],    // UTC 3–7
-        day: [10, 17],       // UTC 7–14
-        evening: [17, 22],   // UTC 14–19
-        night: [22, 6],      // UTC 19–3
+        morning: [6, 10], // UTC 3–7
+        day: [10, 17], // UTC 7–14
+        evening: [17, 22], // UTC 14–19
+        night: [22, 6], // UTC 19–3
       };
       const mskRange = mskRanges[timeOfDay];
       if (mskRange) {
@@ -927,14 +968,13 @@ export class CatalogService {
     // Рейтинг: до 10 отзывов — псевдослучайный. Салюты: 4.8–5, остальные: 4.5–5
     const rc = (overridden.reviewCount ?? 0) | 0;
     const rawR = Number(overridden.rating) || 0;
-    const h = String(overridden.id || overridden.slug || '').split('').reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0), 0);
+    const h = String(overridden.id || overridden.slug || '')
+      .split('')
+      .reduce((a, c) => (a << 5) - a + c.charCodeAt(0), 0);
     const ovTags = (overridden.tags || []).map((t: any) => t?.tag?.slug).filter(Boolean);
     const ovHasSalute = ovTags.some((s: string) => s === 'salute' || s === 'salyut-s-vody');
-    const displayRating = rc >= 10
-      ? rawR
-      : ovHasSalute
-        ? 4.8 + (Math.abs(h) % 21) / 100
-        : 4.5 + (Math.abs(h) % 51) / 100;
+    const displayRating =
+      rc >= 10 ? rawR : ovHasSalute ? 4.8 + (Math.abs(h) % 21) / 100 : 4.5 + (Math.abs(h) % 51) / 100;
 
     return {
       ...overridden,
@@ -943,7 +983,17 @@ export class CatalogService {
       primaryOffer,
       relatedEvents: relatedEvents.map((r: any) => ({
         ...r,
-        rating: (r.reviewCount ?? 0) >= 10 ? Number(r.rating) || 0 : 4.5 + (Math.abs(String(r.id || r.slug || '').split('').reduce((a: number, c: string) => ((a << 5) - a) + c.charCodeAt(0), 0)) % 51) / 100,
+        rating:
+          (r.reviewCount ?? 0) >= 10
+            ? Number(r.rating) || 0
+            : 4.5 +
+              (Math.abs(
+                String(r.id || r.slug || '')
+                  .split('')
+                  .reduce((a: number, c: string) => (a << 5) - a + c.charCodeAt(0), 0),
+              ) %
+                51) /
+                100,
         address: r.address ? shortenAddressToStreet(r.address) : r.address,
       })),
     };
@@ -1078,10 +1128,7 @@ export class CatalogService {
     const where: Prisma.EventWhereInput = {
       isActive: true,
       isDeleted: false,
-      OR: [
-        { title: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
-      ],
+      OR: [{ title: { contains: q, mode: 'insensitive' } }, { description: { contains: q, mode: 'insensitive' } }],
       ...(city && { city: { slug: city } }),
     };
 
@@ -1094,10 +1141,7 @@ export class CatalogService {
     const cities = await this.prisma.city.findMany({
       where: {
         isActive: true,
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { description: { contains: q, mode: 'insensitive' } },
-        ],
+        OR: [{ name: { contains: q, mode: 'insensitive' } }, { description: { contains: q, mode: 'insensitive' } }],
       },
       take: 5,
     });
@@ -1167,13 +1211,9 @@ export class CatalogService {
       const minutesUntilNext = nextSessionAt
         ? Math.round((new Date(nextSessionAt).getTime() - now.getTime()) / 60000)
         : null;
-      const departingSoonMinutes = minutesUntilNext !== null && minutesUntilNext > 0 && minutesUntilNext <= 120
-        ? minutesUntilNext
-        : null;
-      const totalAvailableTickets = sessions.reduce(
-        (sum, s) => sum + (s.availableTickets || 0),
-        0,
-      );
+      const departingSoonMinutes =
+        minutesUntilNext !== null && minutesUntilNext > 0 && minutesUntilNext <= 120 ? minutesUntilNext : null;
+      const totalAvailableTickets = sessions.reduce((sum, s) => sum + (s.availableTickets || 0), 0);
 
       // sessionTimes: слоты времени на сегодня (HH:mm)
       const sessionTimes: string[] = [];
@@ -1199,10 +1239,11 @@ export class CatalogService {
 
       // groupSize из templateData
       const templateData = (event.templateData || {}) as Record<string, unknown>;
-      const groupSize =
-        (typeof templateData.groupSize === 'string' && templateData.groupSize.trim()
+      const groupSize = (
+        typeof templateData.groupSize === 'string' && templateData.groupSize.trim()
           ? templateData.groupSize.trim()
-          : null) as string | null;
+          : null
+      ) as string | null;
 
       // highlights: 1) локация (очищенная), 2) маршрут, 3) подкатегории/теги
       const highlights: string[] = [];
@@ -1254,12 +1295,15 @@ export class CatalogService {
       // Рейтинг: до 10 отзывов — псевдослучайный. Салюты: 4.8–5, остальные: 4.5–5
       const reviewCount = (event.reviewCount ?? 0) | 0;
       const rawRating = Number(event.rating) || 0;
-      const hash = String(event.id || event.slug || '').split('').reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0), 0);
-      const displayRating = reviewCount >= 10
-        ? rawRating
-        : hasSaluteTag
-          ? 4.8 + (Math.abs(hash) % 21) / 100  // 4.80–5.00
-          : 4.5 + (Math.abs(hash) % 51) / 100; // 4.50–5.00
+      const hash = String(event.id || event.slug || '')
+        .split('')
+        .reduce((a, c) => (a << 5) - a + c.charCodeAt(0), 0);
+      const displayRating =
+        reviewCount >= 10
+          ? rawRating
+          : hasSaluteTag
+            ? 4.8 + (Math.abs(hash) % 21) / 100 // 4.80–5.00
+            : 4.5 + (Math.abs(hash) % 51) / 100; // 4.50–5.00
 
       const shortAddr = event.address ? shortenAddressToStreet(event.address) : '';
       return {
@@ -1283,9 +1327,7 @@ export class CatalogService {
     });
 
     // Нормализация для scoring
-    const prices = enriched
-      .map((e) => e.priceFrom || 0)
-      .filter((p) => p > 0);
+    const prices = enriched.map((e) => e.priceFrom || 0).filter((p) => p > 0);
     const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
     const maxPrice = prices.length > 0 ? Math.max(...prices) : 1;
     const priceRange = maxPrice - minPrice || 1;

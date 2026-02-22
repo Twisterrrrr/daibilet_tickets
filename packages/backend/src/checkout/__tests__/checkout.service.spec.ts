@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CheckoutService } from '../checkout.service';
 
 // ---------------------
@@ -58,12 +59,7 @@ describe('CheckoutService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new CheckoutService(
-      mockPrisma as any,
-      mockTcApi as any,
-      mockMailService as any,
-      mockConfig as any,
-    );
+    service = new CheckoutService(mockPrisma as any, mockTcApi as any, mockMailService as any, mockConfig as any);
   });
 
   // =========================================
@@ -187,23 +183,25 @@ describe('CheckoutService', () => {
       });
 
       // Offers snapshot
-      mockPrisma.eventOffer.findMany.mockResolvedValue([{
-        id: 'o1',
-        eventId: 'e1',
-        source: 'MANUAL',
-        purchaseType: 'REQUEST',
-        priceFrom: 1000,
-        deeplink: null,
-        widgetProvider: null,
-        widgetPayload: null,
-        badge: null,
-        meetingPoint: null,
-        meetingInstructions: null,
-        operationalPhone: null,
-        operationalNote: null,
-        event: { id: 'e1', title: 'Test Event', slug: 'test-event', imageUrl: null },
-        operator: { id: 'op-1', name: 'Test Op' },
-      }]);
+      mockPrisma.eventOffer.findMany.mockResolvedValue([
+        {
+          id: 'o1',
+          eventId: 'e1',
+          source: 'MANUAL',
+          purchaseType: 'REQUEST',
+          priceFrom: 1000,
+          deeplink: null,
+          widgetProvider: null,
+          widgetPayload: null,
+          badge: null,
+          meetingPoint: null,
+          meetingInstructions: null,
+          operationalPhone: null,
+          operationalNote: null,
+          event: { id: 'e1', title: 'Test Event', slug: 'test-event', imageUrl: null },
+          operator: { id: 'op-1', name: 'Test Op' },
+        },
+      ]);
 
       // Transaction: execute callback with mock tx
       mockPrisma.$transaction.mockImplementation(async (fn: any) => {
@@ -224,9 +222,7 @@ describe('CheckoutService', () => {
     });
 
     it('should throw BadRequestException for empty items', async () => {
-      await expect(
-        service.createCheckoutSession({ items: [], customer }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createCheckoutSession({ items: [], customer })).rejects.toThrow(BadRequestException);
     });
 
     it('should create session with PENDING_CONFIRMATION status for REQUEST items', async () => {

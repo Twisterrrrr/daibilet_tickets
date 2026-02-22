@@ -100,9 +100,7 @@ export function TepWidgetEmbed({
     const container = containerRef.current;
 
     const timer = setTimeout(() => {
-      const existing = document.querySelector(
-        'script[src*="teplohod.info/v1/widget/widget.js"]',
-      );
+      const existing = document.querySelector('script[src*="teplohod.info/v1/widget/widget.js"]');
       if (existing) {
         const script = document.createElement('script');
         script.src = 'https://api.teplohod.info/v1/widget/widget.js';
@@ -133,12 +131,7 @@ export function TepWidgetEmbed({
   return (
     <div className="mt-4">
       <style dangerouslySetInnerHTML={{ __html: TEP_BUTTON_CSS }} />
-      <div
-        ref={containerRef}
-        data-lang="ru-RU"
-        data-id={widgetId}
-        className="teplohod-info-wrapper"
-      />
+      <div ref={containerRef} data-lang="ru-RU" data-id={widgetId} className="teplohod-info-wrapper" />
     </div>
   );
 }

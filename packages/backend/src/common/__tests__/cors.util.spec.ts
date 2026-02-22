@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { parseCorsOrigins, getCorsOrigins } from '../cors.util';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { getCorsOrigins, parseCorsOrigins } from '../cors.util';
 
 describe('cors.util', () => {
   describe('parseCorsOrigins', () => {
@@ -7,16 +8,10 @@ describe('cors.util', () => {
       expect(parseCorsOrigins(undefined)).toEqual([]);
     });
     it('parses comma-separated', () => {
-      expect(parseCorsOrigins('https://a.com, https://b.com')).toEqual([
-        'https://a.com',
-        'https://b.com',
-      ]);
+      expect(parseCorsOrigins('https://a.com, https://b.com')).toEqual(['https://a.com', 'https://b.com']);
     });
     it('trims spaces', () => {
-      expect(parseCorsOrigins('  http://localhost  ,  http://other  ')).toEqual([
-        'http://localhost',
-        'http://other',
-      ]);
+      expect(parseCorsOrigins('  http://localhost  ,  http://other  ')).toEqual(['http://localhost', 'http://other']);
     });
     it('filters empty', () => {
       expect(parseCorsOrigins('a,,b,')).toEqual(['a', 'b']);

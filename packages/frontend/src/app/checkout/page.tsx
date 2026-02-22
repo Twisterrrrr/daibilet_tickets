@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
-import { CheckoutClient } from './CheckoutClient';
+
 import { CheckoutErrorBoundary } from '@/components/CheckoutErrorBoundary';
+
+import { CheckoutClient } from './CheckoutClient';
 
 export const metadata: Metadata = {
   title: 'Оформление заказа — Дайбилет',

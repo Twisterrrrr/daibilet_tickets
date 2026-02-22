@@ -1,28 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, ExternalLink } from 'lucide-react';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 
 interface ExternalReview {
   id: string;
@@ -83,7 +72,9 @@ export function ExternalReviewsListPage() {
     }
   }, []);
 
-  useEffect(() => { fetchReviews(); }, [fetchReviews]);
+  useEffect(() => {
+    fetchReviews();
+  }, [fetchReviews]);
 
   const handleAdd = async () => {
     try {
@@ -95,7 +86,15 @@ export function ExternalReviewsListPage() {
       });
       toast.success('Внешний отзыв добавлен');
       setShowAddDialog(false);
-      setForm({ eventId: '', source: 'yandex_maps', sourceUrl: '', authorName: '', rating: 5, text: '', publishedAt: '' });
+      setForm({
+        eventId: '',
+        source: 'yandex_maps',
+        sourceUrl: '',
+        authorName: '',
+        rating: 5,
+        text: '',
+        publishedAt: '',
+      });
       fetchReviews();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Ошибка');
@@ -178,9 +177,7 @@ export function ExternalReviewsListPage() {
                         {SOURCE_LABELS[r.source] || r.source}
                       </Badge>
                     </div>
-                    {r.event && (
-                      <p className="mt-1 text-xs text-primary">{r.event.title}</p>
-                    )}
+                    {r.event && <p className="mt-1 text-xs text-primary">{r.event.title}</p>}
                     <p className="mt-1 text-sm text-muted-foreground line-clamp-3">{r.text}</p>
                     {r.sourceUrl && (
                       <a
@@ -222,7 +219,9 @@ export function ExternalReviewsListPage() {
             <div>
               <Label>Источник</Label>
               <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="yandex_maps">Яндекс.Карты</SelectItem>
                   <SelectItem value="2gis">2ГИС</SelectItem>
@@ -233,10 +232,7 @@ export function ExternalReviewsListPage() {
             </div>
             <div>
               <Label>Автор *</Label>
-              <Input
-                value={form.authorName}
-                onChange={(e) => setForm({ ...form, authorName: e.target.value })}
-              />
+              <Input value={form.authorName} onChange={(e) => setForm({ ...form, authorName: e.target.value })} />
             </div>
             <div>
               <Label>Рейтинг (1-5)</Label>
@@ -250,11 +246,7 @@ export function ExternalReviewsListPage() {
             </div>
             <div>
               <Label>Текст *</Label>
-              <Textarea
-                value={form.text}
-                onChange={(e) => setForm({ ...form, text: e.target.value })}
-                rows={4}
-              />
+              <Textarea value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} rows={4} />
             </div>
             <div>
               <Label>URL оригинала</Label>
@@ -274,8 +266,12 @@ export function ExternalReviewsListPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Отмена</Button>
-            <Button onClick={handleAdd} disabled={!form.authorName || !form.text}>Добавить</Button>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleAdd} disabled={!form.authorName || !form.text}>
+              Добавить
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -288,7 +284,8 @@ export function ExternalReviewsListPage() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Вставьте JSON-массив отзывов. Каждый элемент: {'{'} eventId?, source, sourceUrl?, authorName, rating, text, publishedAt? {'}'}
+              Вставьте JSON-массив отзывов. Каждый элемент: {'{'} eventId?, source, sourceUrl?, authorName, rating,
+              text, publishedAt? {'}'}
             </p>
             <Textarea
               value={batchJson}
@@ -299,8 +296,12 @@ export function ExternalReviewsListPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBatchDialog(false)}>Отмена</Button>
-            <Button onClick={handleBatchImport} disabled={!batchJson.trim()}>Импортировать</Button>
+            <Button variant="outline" onClick={() => setShowBatchDialog(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleBatchImport} disabled={!batchJson.trim()}>
+              Импортировать
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,22 +1,17 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
-import { transliterate } from '@/lib/transliterate';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { transliterate } from '@/lib/transliterate';
 
 type TagCategory = 'THEME' | 'AUDIENCE' | 'SEASON' | 'SPECIAL';
 
@@ -78,7 +73,7 @@ export function TagEditPage() {
           metaTitle: data.metaTitle ?? '',
           metaDescription: data.metaDescription ?? '',
           isActive: data.isActive ?? true,
-        })
+        }),
       )
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
@@ -148,12 +143,8 @@ export function TagEditPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {isCreate ? 'Новый тег' : 'Редактирование тега'}
-          </h1>
-          <p className="text-muted-foreground">
-            {isCreate ? 'Создание нового тега' : form.name || 'Редактирование'}
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{isCreate ? 'Новый тег' : 'Редактирование тега'}</h1>
+          <p className="text-muted-foreground">{isCreate ? 'Создание нового тега' : form.name || 'Редактирование'}</p>
         </div>
       </div>
 
@@ -173,12 +164,7 @@ export function TagEditPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Название</Label>
-                <Input
-                  id="name"
-                  value={form.name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  required
-                />
+                <Input id="name" value={form.name} onChange={(e) => handleNameChange(e.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="slug">Slug</Label>
@@ -195,9 +181,7 @@ export function TagEditPage() {
               <Label htmlFor="category">Категория</Label>
               <Select
                 value={form.category}
-                onValueChange={(v) =>
-                  setForm((f) => ({ ...f, category: v as TagCategory }))
-                }
+                onValueChange={(v) => setForm((f) => ({ ...f, category: v as TagCategory }))}
               >
                 <SelectTrigger id="category">
                   <SelectValue placeholder="Выберите категорию" />
@@ -285,12 +269,7 @@ export function TagEditPage() {
               {saving ? 'Сохранение...' : 'Сохранить'}
             </Button>
             {!isCreate && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={saving}
-              >
+              <Button type="button" variant="destructive" onClick={handleDelete} disabled={saving}>
                 Удалить
               </Button>
             )}

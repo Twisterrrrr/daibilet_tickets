@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
 
 interface DedupCandidate {
@@ -19,11 +20,11 @@ export class FuzzyDedupService {
    */
   private normalize(title: string): string {
     return title
-      .replace(/\([^)]*\)/g, '')     // Remove parenthesized content like (18+), (NEW)
-      .replace(/[«»""'']/g, '')       // Remove quotes
-      .replace(/[—–-]/g, ' ')        // Replace dashes with spaces
+      .replace(/\([^)]*\)/g, '') // Remove parenthesized content like (18+), (NEW)
+      .replace(/[«»""'']/g, '') // Remove quotes
+      .replace(/[—–-]/g, ' ') // Replace dashes with spaces
       .toLowerCase()
-      .replace(/\s+/g, ' ')          // Collapse multiple spaces
+      .replace(/\s+/g, ' ') // Collapse multiple spaces
       .trim();
   }
 
@@ -41,11 +42,7 @@ export class FuzzyDedupService {
     for (let i = 1; i <= a.length; i++) {
       for (let j = 1; j <= b.length; j++) {
         const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j - 1] + cost,
-        );
+        matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost);
       }
     }
     return matrix[a.length][b.length];
@@ -138,8 +135,22 @@ export class FuzzyDedupService {
           const { similar, reason, score } = this.isSimilar(a, b);
           if (similar) {
             candidates.push({
-              eventA: { id: a.id, title: a.title, slug: a.slug, cityId: a.cityId, address: a.address, venueId: a.venueId },
-              eventB: { id: b.id, title: b.title, slug: b.slug, cityId: b.cityId, address: b.address, venueId: b.venueId },
+              eventA: {
+                id: a.id,
+                title: a.title,
+                slug: a.slug,
+                cityId: a.cityId,
+                address: a.address,
+                venueId: a.venueId,
+              },
+              eventB: {
+                id: b.id,
+                title: b.title,
+                slug: b.slug,
+                cityId: b.cityId,
+                address: b.address,
+                venueId: b.venueId,
+              },
               similarity: score,
               reason,
             });
@@ -181,7 +192,8 @@ export class FuzzyDedupService {
 
       if (!eventA || !eventB) continue;
 
-      const keepA = (eventA.rating ?? 0) > (eventB.rating ?? 0) ||
+      const keepA =
+        (eventA.rating ?? 0) > (eventB.rating ?? 0) ||
         ((eventA.rating ?? 0) === (eventB.rating ?? 0) && (eventA.reviewCount ?? 0) >= (eventB.reviewCount ?? 0));
 
       const [keepId, removeId] = keepA

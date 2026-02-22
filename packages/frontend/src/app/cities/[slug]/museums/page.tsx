@@ -1,13 +1,15 @@
-import type { Metadata } from 'next';
-import Link from 'next/link';
-import Image from 'next/image';
-import { api } from '@/lib/api';
-import { MuseumsSearch } from './_components/MuseumsSearch';
-import { MuseumsCatalogFilters } from './_components/MuseumsCatalogFilters';
-import { MuseumsSections } from './_components/MuseumsSections';
-import { MuseumRouteBuilder } from './_components/MuseumRouteBuilder';
-import { formatPrice } from '@daibilet/shared';
 import type { CatalogItem } from '@daibilet/shared';
+import { formatPrice } from '@daibilet/shared';
+import type { Metadata } from 'next';
+import Image from 'next/image';
+import Link from 'next/link';
+
+import { api } from '@/lib/api';
+
+import { MuseumRouteBuilder } from './_components/MuseumRouteBuilder';
+import { MuseumsCatalogFilters } from './_components/MuseumsCatalogFilters';
+import { MuseumsSearch } from './_components/MuseumsSearch';
+import { MuseumsSections } from './_components/MuseumsSections';
 
 export const revalidate = 300;
 
@@ -27,8 +29,7 @@ function getMuseumsLandingContent(citySlug: string) {
     return {
       cityTitle: 'Санкт-Петербурга',
       heroTitle: 'Музеи Санкт-Петербурга — билеты онлайн без очередей',
-      heroSubtitle:
-        'Более 40 музеев, дворцов и арт-пространств. Выберите лучший для своего маршрута.',
+      heroSubtitle: 'Более 40 музеев, дворцов и арт-пространств. Выберите лучший для своего маршрута.',
       anchors: [
         'ermitazh',
         'glavnyy-shtab-ermitazh',
@@ -165,10 +166,7 @@ export default async function CityMuseumsPage({ params, searchParams }: Props) {
 
   return (
     <main className="container-page mx-auto px-4 pb-16">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <nav className="py-4 text-sm text-slate-600">
         <Link className="hover:text-slate-900 transition-colors" href="/">
@@ -183,9 +181,7 @@ export default async function CityMuseumsPage({ params, searchParams }: Props) {
       </nav>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-          {content.heroTitle}
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{content.heroTitle}</h1>
         <p className="mt-2 max-w-2xl text-slate-600">{content.heroSubtitle}</p>
 
         <div className="mt-5">
@@ -194,9 +190,7 @@ export default async function CityMuseumsPage({ params, searchParams }: Props) {
 
         {content.bestChoice && (
           <div className="mt-6 rounded-xl bg-primary-50 p-4 border border-primary-100">
-            <div className="text-sm font-medium text-slate-900">
-              ⭐ Оптимальный выбор для первого визита
-            </div>
+            <div className="text-sm font-medium text-slate-900">⭐ Оптимальный выбор для первого визита</div>
             <div className="mt-1 font-semibold text-slate-900">{content.bestChoice.title}</div>
             <div className="mt-1 text-slate-700">{content.bestChoice.tip}</div>
             <div className="mt-3">
@@ -256,20 +250,14 @@ export default async function CityMuseumsPage({ params, searchParams }: Props) {
                   <div className="truncate font-medium text-slate-900">{it.title}</div>
                   <div className="mt-1 flex items-center gap-1 text-sm text-slate-600">
                     {it.location?.metro ? <span>{it.location.metro}</span> : null}
-                    {it.location?.metro && it.location?.address ? (
-                      <span className="text-slate-400">·</span>
-                    ) : null}
-                    {it.location?.address ? (
-                      <span className="line-clamp-1">{it.location.address}</span>
-                    ) : null}
+                    {it.location?.metro && it.location?.address ? <span className="text-slate-400">·</span> : null}
+                    {it.location?.address ? <span className="line-clamp-1">{it.location.address}</span> : null}
                   </div>
                 </div>
 
                 <div className="shrink-0 text-right">
                   <div className="text-sm font-semibold text-slate-900">
-                    {typeof it.priceFrom === 'number' && it.priceFrom > 0
-                      ? `от ${formatPrice(it.priceFrom)}`
-                      : '—'}
+                    {typeof it.priceFrom === 'number' && it.priceFrom > 0 ? `от ${formatPrice(it.priceFrom)}` : '—'}
                   </div>
                   {typeof it.rating === 'number' && it.rating > 0 ? (
                     <div className="mt-1 text-xs text-slate-600">⭐ {it.rating.toFixed(1)}</div>
@@ -280,10 +268,7 @@ export default async function CityMuseumsPage({ params, searchParams }: Props) {
               {it.badges && it.badges.length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {it.badges.slice(0, 3).map((b) => (
-                    <span
-                      key={b}
-                      className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700"
-                    >
+                    <span key={b} className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
                       {b}
                     </span>
                   ))}

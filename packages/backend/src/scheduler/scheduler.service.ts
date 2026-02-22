@@ -1,11 +1,12 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { TcSyncService } from '../catalog/tc-sync.service';
+
 import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
-import { RetentionService } from './retention.service';
+import { TcSyncService } from '../catalog/tc-sync.service';
 import { QUEUE_SYNC } from '../queue/queue.constants';
+import { RetentionService } from './retention.service';
 
 /**
  * Фиксированные jobId для защиты от перекрытия (overlap protection).
@@ -53,13 +54,17 @@ export class SchedulerService {
   async handleFullSync() {
     this.logger.log('=== CRON: Полная синхронизация → queue ===');
 
-    const job = await this.syncQueue.add('sync-full', {}, {
-      jobId: SYNC_FULL_JOB_ID,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 60_000 },
-      removeOnComplete: 50,
-      removeOnFail: 20,
-    });
+    const job = await this.syncQueue.add(
+      'sync-full',
+      {},
+      {
+        jobId: SYNC_FULL_JOB_ID,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 60_000 },
+        removeOnComplete: 50,
+        removeOnFail: 20,
+      },
+    );
 
     if (!job || !job.id) {
       this.logger.warn(
@@ -94,27 +99,27 @@ export class SchedulerService {
     if (fullSyncJob) {
       const state = await fullSyncJob.getState();
       if (state === 'active' || state === 'waiting' || state === 'delayed') {
-        this.logger.debug(
-          `sync-incremental: full sync в состоянии "${state}" — пропускаем (работа покрыта)`,
-        );
+        this.logger.debug(`sync-incremental: full sync в состоянии "${state}" — пропускаем (работа покрыта)`);
         return;
       }
     }
 
     this.logger.log('=== CRON: Инкрементальная синхронизация TC → queue ===');
 
-    const job = await this.syncQueue.add('sync-incremental', {}, {
-      jobId: SYNC_INCREMENTAL_JOB_ID,
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 30_000 },
-      removeOnComplete: 50,
-      removeOnFail: 20,
-    });
+    const job = await this.syncQueue.add(
+      'sync-incremental',
+      {},
+      {
+        jobId: SYNC_INCREMENTAL_JOB_ID,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 30_000 },
+        removeOnComplete: 50,
+        removeOnFail: 20,
+      },
+    );
 
     if (!job || !job.id) {
-      this.logger.warn(
-        `sync-incremental: job "${SYNC_INCREMENTAL_JOB_ID}" уже в очереди — дублирование предотвращено`,
-      );
+      this.logger.warn(`sync-incremental: job "${SYNC_INCREMENTAL_JOB_ID}" уже в очереди — дублирование предотвращено`);
       return;
     }
 
@@ -131,9 +136,7 @@ export class SchedulerService {
 
     try {
       const result = await this.tcSync.deduplicateExisting();
-      this.logger.log(
-        `Dedup: ${result.groupsProcessed} групп, ${result.duplicatesRemoved} дублей удалено`,
-      );
+      this.logger.log(`Dedup: ${result.groupsProcessed} групп, ${result.duplicatesRemoved} дублей удалено`);
     } catch (err: unknown) {
       this.logger.error(`Дедупликация — ошибка: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -141,9 +144,7 @@ export class SchedulerService {
     // Fuzzy dedup — dry-run only (logging candidates, no merge)
     try {
       const fuzzyResult = await this.fuzzyDedup.findDuplicates(true);
-      this.logger.log(
-        `Fuzzy dedup (dry-run): ${fuzzyResult.candidates.length} candidates found`,
-      );
+      this.logger.log(`Fuzzy dedup (dry-run): ${fuzzyResult.candidates.length} candidates found`);
     } catch (err: unknown) {
       this.logger.error(`Fuzzy dedup — ошибка: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -161,8 +162,8 @@ export class SchedulerService {
       const report = await this.retention.run();
       this.logger.log(
         `Retention: sessions ${report.eventSessions.deleted || report.eventSessions.wouldDelete}, ` +
-        `webhooks ${report.webhooks.deleted || report.webhooks.wouldDelete}, ` +
-        `audit ${report.auditLogs.deleted || report.auditLogs.wouldDelete} (dryRun=${report.dryRun})`,
+          `webhooks ${report.webhooks.deleted || report.webhooks.wouldDelete}, ` +
+          `audit ${report.auditLogs.deleted || report.auditLogs.wouldDelete} (dryRun=${report.dryRun})`,
       );
     } catch (err: unknown) {
       this.logger.error(`Retention — ошибка: ${err instanceof Error ? err.message : String(err)}`);

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+
 import { useUserAuth } from '@/hooks/useUserAuth';
 
 export default function LoginPage() {
@@ -36,9 +37,7 @@ export default function LoginPage() {
   return (
     <div className="container-page py-16">
       <div className="mx-auto max-w-sm">
-        <h1 className="text-2xl font-bold text-slate-900">
-          {mode === 'login' ? 'Вход' : 'Регистрация'}
-        </h1>
+        <h1 className="text-2xl font-bold text-slate-900">{mode === 'login' ? 'Вход' : 'Регистрация'}</h1>
         <p className="mt-2 text-slate-500">
           {mode === 'login'
             ? 'Войдите, чтобы сохранить избранное в учётной записи'
@@ -47,9 +46,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
           )}
           {mode === 'register' && (
             <div>

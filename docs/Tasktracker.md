@@ -75,6 +75,38 @@
 
 ---
 
+---
+
+## Checkout + Расписания + Event Studio (22.02.2026)
+
+> Спецификация: `docs/CheckoutSchedulesEventStudio.md`
+
+### Блок 1: Данные → Правила → API
+- [x] **1 (Критический)**: Prisma: EventSchedule + расширение EventSession + CheckoutPackage/Items
+- [x] **14 (Высокий)**: PriceSnapshotService
+- [x] **13 (Высокий)**: AvailabilityService
+- [x] **2 (Высокий)**: ONE_TIME + OPEN_DATE генерация
+- [x] **3 (Высокий)**: Recurrence generator (90 дней)
+- [x] **8 (Высокий)**: OccurrencePolicyService (delete/cancel/reschedule + unit tests)
+- [x] **4 (Высокий)**: Admin API: CRUD schedule/occurrences + generate + list
+- [x] **9 (Высокий)**: Checkout API v1: POST /checkout/package
+
+### Блок 2: Админка UI
+- [x] **5 (Средний)**: Event Studio Summary
+- [x] **6 (Средний)**: Schedule Builder wizard
+- [x] **7 (Средний)**: Occurrences list + Bulk edit
+
+### Блок 3: Frontend checkout
+- [x] **10 (Высокий)**: /checkout/:packageId
+- [x] **11 (Высокий)**: /checkout/:packageId/status
+- [x] **15 (Средний)**: /payment/success, /payment/fail
+- [x] **16 (Средний)**: /orders/[id] → redirect на track
+
+### Блок 4: Аудит
+- [x] **12 (Средний)**: AdminAuditLog для schedule/bulk/cancel/reschedule
+
+---
+
 ## Далее (приоритетная очередь)
 
 - [x] **Средний**: Admin UI для ручной merge дублей событий (поиск + выбор canonical event)

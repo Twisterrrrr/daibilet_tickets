@@ -1,11 +1,12 @@
+import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ColumnDef } from '@tanstack/react-table';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/input';
 
 interface CityItem {
   id: string;
@@ -44,31 +45,23 @@ const columns: ColumnDef<CityItem>[] = [
     accessorKey: 'isActive',
     header: 'Активен',
     cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
-        {row.original.isActive ? 'Да' : 'Нет'}
-      </Badge>
+      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Да' : 'Нет'}</Badge>
     ),
   },
   {
     id: 'eventsCount',
     header: 'Событий',
-    cell: ({ row }) => (
-      <span className="tabular-nums">{row.original._count?.events ?? 0}</span>
-    ),
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.events ?? 0}</span>,
   },
   {
     id: 'landingsCount',
     header: 'Лендингов',
-    cell: ({ row }) => (
-      <span className="tabular-nums">{row.original._count?.landings ?? 0}</span>
-    ),
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.landings ?? 0}</span>,
   },
   {
     id: 'combosCount',
     header: 'Combo',
-    cell: ({ row }) => (
-      <span className="tabular-nums">{row.original._count?.combos ?? 0}</span>
-    ),
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.combos ?? 0}</span>,
   },
 ];
 
@@ -107,9 +100,7 @@ export function CitiesListPage() {
       {/* Page Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Города</h1>
-        <p className="text-muted-foreground">
-          Управление городами для событий и лендингов
-        </p>
+        <p className="text-muted-foreground">Управление городами для событий и лендингов</p>
       </div>
 
       {error && (

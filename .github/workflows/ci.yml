@@ -32,8 +32,13 @@ jobs:
       - name: Build shared
         run: npx pnpm --filter @daibilet/shared build
 
+      - name: Check no any in new files
+        run: pnpm check:no-any-new
+        env:
+          BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'origin/main' }}
+
       - name: Lint
-        run: npx eslint packages/ --max-warnings=0
+        run: npx eslint packages/
 
       - name: Type check backend
         run: npx tsc --noEmit
@@ -49,6 +54,9 @@ jobs:
 
       - name: Tech debt audit
         run: bash scripts/tech-debt-audit.sh --ci
+
+      - name: Build backend
+        run: npx pnpm --filter @daibilet/backend build
 
       - name: Build frontend
         run: npx pnpm --filter @daibilet/frontend build

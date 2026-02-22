@@ -1,10 +1,11 @@
+import { CATEGORY_LABELS, cityToPrepositional, EventCategory } from '@daibilet/shared';
+import { ArrowRight, Headphones, Landmark, MapPin, Star, Ticket, TrendingUp, X } from 'lucide-react';
 import Link from 'next/link';
-import { ArrowRight, TrendingUp, Ticket, Landmark, MapPin, Star, Headphones, X } from 'lucide-react';
-import { CATEGORY_LABELS, EventCategory, cityToPrepositional } from '@daibilet/shared';
-import { api } from '@/lib/api';
+
 import { EventCard } from '@/components/ui/EventCard';
-import { PromoBlock } from '@/components/ui/PromoBlock';
 import { HeroCitySearch } from '@/components/ui/HeroCitySearch';
+import { PromoBlock } from '@/components/ui/PromoBlock';
+import { api } from '@/lib/api';
 
 // ISR: обновлять каждый час
 export const revalidate = 3600;
@@ -128,7 +129,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* ============ HERO ============ */}
       <section className="relative overflow-visible bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800">
         {/* Subtle pattern */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '32px 32px' }} />
+        <div
+          className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.03]"
+          style={{
+            backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
+            backgroundSize: '32px 32px',
+          }}
+        />
         <div className="container-page relative py-16 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
@@ -136,8 +143,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <span className="block text-primary-300">и мероприятия</span>
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-slate-300">
-              {totalEventsAndVenues > 0 ? `${totalEventsAndVenues}+ событий и мест` : 'Сотни событий и мест'} в {totalCities > 0 ? `${totalCities} городах` : 'городах'} России.
-              Экскурсии, музеи, концерты, шоу — выбирайте и покупайте онлайн.
+              {totalEventsAndVenues > 0 ? `${totalEventsAndVenues}+ событий и мест` : 'Сотни событий и мест'} в{' '}
+              {totalCities > 0 ? `${totalCities} городах` : 'городах'} России. Экскурсии, музеи, концерты, шоу —
+              выбирайте и покупайте онлайн.
             </p>
 
             {/* City search */}
@@ -187,7 +195,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   {cityName ? `Популярные события в ${cityToPrepositional(cityName)}` : 'Популярные события'}
                 </h2>
                 <p className="mt-1 text-slate-500">
-                  {cityName ? 'Лучшие экскурсии и мероприятия в выбранном городе' : 'Лучшие экскурсии и мероприятия по рейтингу'}
+                  {cityName
+                    ? 'Лучшие экскурсии и мероприятия в выбранном городе'
+                    : 'Лучшие экскурсии и мероприятия по рейтингу'}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -377,7 +387,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 {citySlug
                   ? 'В этом городе пока нет событий, которые начинаются скоро. Попробуйте другой город или '
                   : 'Пока нет событий, которые начинаются в ближайшее время. Посмотрите '}
-                <Link href={eventsHref} className="text-primary-600 hover:underline">весь каталог</Link>.
+                <Link href={eventsHref} className="text-primary-600 hover:underline">
+                  весь каталог
+                </Link>
+                .
               </p>
             )}
           </div>
@@ -403,10 +416,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <h2 className="text-3xl font-bold text-slate-900">Города</h2>
               <p className="mt-1 text-slate-500">Выберите город — покажем лучшие события</p>
             </div>
-            <Link
-              href="/cities"
-              className="text-sm font-medium text-primary-600 hover:text-primary-700"
-            >
+            <Link href="/cities" className="text-sm font-medium text-primary-600 hover:text-primary-700">
               Все города →
             </Link>
           </div>
@@ -434,14 +444,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       {pluralEvents(city._count?.events ?? 0)}
                     </span>
                     {/* Музеи и арт: площадки + события в них (museumCount с бэкенда, fallback на venues) */}
-                    {((city.museumCount as number | undefined) ?? (city._count?.venues ?? 0)) > 0 && (
+                    {((city.museumCount as number | undefined) ?? city._count?.venues ?? 0) > 0 && (
                       <span className="flex items-center gap-1.5 text-sm text-white/60">
-                        {((city.museumCount as number | undefined) ?? (city._count?.venues ?? 0))}{' '}
-                        {(((city.museumCount as number | undefined) ?? (city._count?.venues ?? 0)) === 1
+                        {(city.museumCount as number | undefined) ?? city._count?.venues ?? 0}{' '}
+                        {((city.museumCount as number | undefined) ?? city._count?.venues ?? 0) === 1
                           ? 'музей'
-                          : ((city.museumCount as number | undefined) ?? (city._count?.venues ?? 0)) < 5
+                          : ((city.museumCount as number | undefined) ?? city._count?.venues ?? 0) < 5
                             ? 'музея'
-                            : 'музеев')}
+                            : 'музеев'}
                       </span>
                     )}
                   </div>
@@ -465,9 +475,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               >
                 <span className="text-4xl">{emoji}</span>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    {CATEGORY_LABELS[category]}
-                  </h3>
+                  <h3 className="text-lg font-semibold text-slate-900">{CATEGORY_LABELS[category]}</h3>
                   <p className="text-sm text-slate-500">Смотреть все</p>
                 </div>
                 <ArrowRight className="ml-auto h-5 w-5 text-slate-400" />
@@ -534,9 +542,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100">
                 <MapPin className="h-6 w-6 text-amber-600" />
               </div>
-              <p className="mt-3 text-3xl font-extrabold text-slate-900">
-                {totalCities > 0 ? totalCities : '5'}
-              </p>
+              <p className="mt-3 text-3xl font-extrabold text-slate-900">{totalCities > 0 ? totalCities : '5'}</p>
               <p className="mt-1 text-sm text-slate-500">городов России</p>
             </div>
             <div className="text-center">
@@ -555,9 +561,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <div className="container-page">
           <div className="flex flex-col items-center gap-8 sm:flex-row sm:justify-between">
             <div className="text-center sm:text-left">
-              <h2 className="text-2xl font-bold text-white sm:text-3xl">
-                Нужна помощь с выбором?
-              </h2>
+              <h2 className="text-2xl font-bold text-white sm:text-3xl">Нужна помощь с выбором?</h2>
               <p className="mt-2 max-w-lg text-base text-white/70">
                 Напишите нам — подберём события под ваши даты, интересы и бюджет. Или посмотрите каталог самостоятельно.
               </p>

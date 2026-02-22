@@ -6,15 +6,12 @@
  * 2c. ProcessedWebhookEvent stores paymentIntentId for tracing
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ConflictException } from '@nestjs/common';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { partitionCart, PaymentFlowType, SnapshotLineItem } from '../cart-partitioning';
 import { PaymentService } from '../payment.service';
 import { WebhookIdempotencyService } from '../webhook-idempotency.service';
-import {
-  SnapshotLineItem,
-  PaymentFlowType,
-  partitionCart,
-} from '../cart-partitioning';
 
 // ============================================================
 // Helpers
@@ -38,7 +35,7 @@ function makeSnapshotItem(overrides: Partial<SnapshotLineItem> = {}): SnapshotLi
     lineTotal: 100000,
     priceCurrency: 'RUB',
     supplierId: 'supplier-1',
-    commissionRateSnapshot: 0.20,
+    commissionRateSnapshot: 0.2,
     platformFeeSnapshot: 20000,
     supplierAmountSnapshot: 80000,
     deeplink: null,
@@ -109,9 +106,7 @@ function createMockPrisma() {
       update: vi.fn().mockReturnValue(Promise.resolve(null)),
     },
     processedWebhookEvent: {
-      findUnique: vi.fn().mockImplementation(({ where }: any) =>
-        webhookEvents.get(where.providerEventId) || null,
-      ),
+      findUnique: vi.fn().mockImplementation(({ where }: any) => webhookEvents.get(where.providerEventId) || null),
       create: vi.fn().mockImplementation(({ data }: any) => {
         webhookEvents.set(data.providerEventId, data);
         return data;
@@ -120,8 +115,7 @@ function createMockPrisma() {
     $transaction: vi.fn().mockImplementation(async (fn: any) => fn(prisma)),
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  var prisma: any;
+  let prisma: any;
 }
 
 const mockConfig = {
@@ -157,9 +151,7 @@ describe('Invariant 2a: offersSnapshot immutability after PaymentIntent creation
     prisma.sessions.get('session-imm')!.offersSnapshot = tamperedSnapshot;
 
     // Second attempt: should be rejected due to invariant check
-    await expect(
-      service.createPaymentIntent('session-imm', 'key-second'),
-    ).rejects.toThrow(ConflictException);
+    await expect(service.createPaymentIntent('session-imm', 'key-second')).rejects.toThrow(ConflictException);
   });
 
   it('allows new intent when snapshot has not changed', async () => {
@@ -205,9 +197,26 @@ describe('Invariant 2a: offersSnapshot immutability after PaymentIntent creation
 describe('Invariant 2b: PaymentIntent amount matches snapshot sum', () => {
   it('amount equals partitionCart(snapshot).platformTotal', () => {
     const snapshot = [
-      makeSnapshotItem({ lineItemIndex: 0, lineTotal: 100000, platformFeeSnapshot: 20000, supplierAmountSnapshot: 80000 }),
-      makeSnapshotItem({ lineItemIndex: 1, offerId: 'offer-2', lineTotal: 200000, platformFeeSnapshot: 40000, supplierAmountSnapshot: 160000 }),
-      makeSnapshotItem({ lineItemIndex: 2, offerId: 'offer-3', lineTotal: 50000, platformFeeSnapshot: 10000, supplierAmountSnapshot: 40000 }),
+      makeSnapshotItem({
+        lineItemIndex: 0,
+        lineTotal: 100000,
+        platformFeeSnapshot: 20000,
+        supplierAmountSnapshot: 80000,
+      }),
+      makeSnapshotItem({
+        lineItemIndex: 1,
+        offerId: 'offer-2',
+        lineTotal: 200000,
+        platformFeeSnapshot: 40000,
+        supplierAmountSnapshot: 160000,
+      }),
+      makeSnapshotItem({
+        lineItemIndex: 2,
+        offerId: 'offer-3',
+        lineTotal: 50000,
+        platformFeeSnapshot: 10000,
+        supplierAmountSnapshot: 40000,
+      }),
     ];
 
     const partitioned = partitionCart(snapshot);
@@ -331,10 +340,17 @@ describe('Invariant 2c: ProcessedWebhookEvent stores paymentIntentId', () => {
 
     // Second call (duplicate)
     let handlerCalled = false;
-    const result = await idempotency.processOnce('yk-dup', 'YOOKASSA', 'payment.succeeded', {}, async () => {
-      handlerCalled = true;
-      return 'PAID';
-    }, 'intent-1');
+    const result = await idempotency.processOnce(
+      'yk-dup',
+      'YOOKASSA',
+      'payment.succeeded',
+      {},
+      async () => {
+        handlerCalled = true;
+        return 'PAID';
+      },
+      'intent-1',
+    );
 
     expect(result.processed).toBe(false);
     expect(handlerCalled).toBe(false);

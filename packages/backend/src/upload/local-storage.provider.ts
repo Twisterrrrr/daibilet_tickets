@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { StorageProvider } from './storage.provider';
+import { access, mkdir, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { mkdir, writeFile, unlink, access } from 'fs/promises';
+
+import { StorageProvider } from './storage.provider';
 
 /**
  * Локальное хранилище файлов.

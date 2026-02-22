@@ -1,17 +1,13 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, Copy, ExternalLink, Eye, EyeOff, Pencil, Plus, RotateCcw, Save, Star, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, RotateCcw, Eye, EyeOff, Star, ExternalLink, Plus, Copy, Pencil, Trash2 } from 'lucide-react';
+
 import { adminApi } from '@/api/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -20,23 +16,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+
 import { EventTemplateFields } from './EventTemplateFields';
-import { SeoMetaEditor } from '@/components/SeoMetaEditor';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,21 +40,33 @@ const CATEGORY_OPTIONS = [
 
 const SUBCATEGORY_OPTIONS: Record<string, { value: string; label: string }[]> = {
   EXCURSION: [
-    { value: 'RIVER', label: 'Речная' }, { value: 'WALKING', label: 'Пешеходная' },
-    { value: 'BUS', label: 'Автобусная' }, { value: 'COMBINED', label: 'Комбинированная' },
-    { value: 'QUEST', label: 'Квест' }, { value: 'GASTRO', label: 'Гастро' }, { value: 'ROOFTOP', label: 'Крыши' },
+    { value: 'RIVER', label: 'Речная' },
+    { value: 'WALKING', label: 'Пешеходная' },
+    { value: 'BUS', label: 'Автобусная' },
+    { value: 'COMBINED', label: 'Комбинированная' },
+    { value: 'QUEST', label: 'Квест' },
+    { value: 'GASTRO', label: 'Гастро' },
+    { value: 'ROOFTOP', label: 'Крыши' },
   ],
   MUSEUM: [
-    { value: 'MUSEUM_CLASSIC', label: 'Музей' }, { value: 'EXHIBITION', label: 'Выставка' },
-    { value: 'GALLERY', label: 'Галерея' }, { value: 'PALACE', label: 'Дворец' }, { value: 'PARK', label: 'Парк' },
-    { value: 'ART_SPACE', label: 'Арт-пространство' }, { value: 'SCULPTURE', label: 'Скульптура' },
+    { value: 'MUSEUM_CLASSIC', label: 'Музей' },
+    { value: 'EXHIBITION', label: 'Выставка' },
+    { value: 'GALLERY', label: 'Галерея' },
+    { value: 'PALACE', label: 'Дворец' },
+    { value: 'PARK', label: 'Парк' },
+    { value: 'ART_SPACE', label: 'Арт-пространство' },
+    { value: 'SCULPTURE', label: 'Скульптура' },
     { value: 'CONTEMPORARY', label: 'Совр. искусство' },
   ],
   EVENT: [
-    { value: 'CONCERT', label: 'Концерт' }, { value: 'SHOW', label: 'Шоу' },
-    { value: 'STANDUP', label: 'Стендап' }, { value: 'THEATER', label: 'Театр' },
-    { value: 'SPORT', label: 'Спорт' }, { value: 'FESTIVAL', label: 'Фестиваль' },
-    { value: 'MASTERCLASS', label: 'Мастер-класс' }, { value: 'PARTY', label: 'Вечеринка' },
+    { value: 'CONCERT', label: 'Концерт' },
+    { value: 'SHOW', label: 'Шоу' },
+    { value: 'STANDUP', label: 'Стендап' },
+    { value: 'THEATER', label: 'Театр' },
+    { value: 'SPORT', label: 'Спорт' },
+    { value: 'FESTIVAL', label: 'Фестиваль' },
+    { value: 'MASTERCLASS', label: 'Мастер-класс' },
+    { value: 'PARTY', label: 'Вечеринка' },
   ],
 };
 
@@ -179,7 +180,9 @@ const SOURCE_LABELS: Record<string, string> = {
 
 function formatPrice(kopecks: number | null): string {
   if (!kopecks) return '—';
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(kopecks / 100);
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(
+    kopecks / 100,
+  );
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -237,7 +240,7 @@ export function EventEditPage() {
           title: ov?.title ?? data.title,
           category: ov?.category ?? data.category,
           audience: ov?.audience ?? undefined,
-          subcategories: ov?.subcategories?.length ? ov.subcategories : (data.subcategories || []),
+          subcategories: ov?.subcategories?.length ? ov.subcategories : data.subcategories || [],
           imageUrl: ov?.imageUrl ?? data.imageUrl ?? '',
           manualRating: ov?.manualRating ?? data.rating,
           minAge: ov?.minAge ?? data.minAge,
@@ -280,9 +283,9 @@ export function EventEditPage() {
           venueId: form.venueId,
           dateMode: form.dateMode || 'SCHEDULED',
           isPermanent: form.isPermanent ?? false,
-          endDate: form.isPermanent ? null : (form.endDate || null),
+          endDate: form.isPermanent ? null : form.endDate || null,
         });
-        setEvent((prev) => prev ? { ...prev, ...venueData } : null);
+        setEvent((prev) => (prev ? { ...prev, ...venueData } : null));
       }
 
       toast.success('Сохранено');
@@ -308,7 +311,7 @@ export function EventEditPage() {
           title: ov?.title ?? data.title,
           category: ov?.category ?? data.category,
           audience: ov?.audience ?? undefined,
-          subcategories: ov?.subcategories?.length ? ov.subcategories : (data.subcategories || []),
+          subcategories: ov?.subcategories?.length ? ov.subcategories : data.subcategories || [],
           imageUrl: ov?.imageUrl ?? data.imageUrl ?? '',
           manualRating: ov?.manualRating ?? data.rating,
           minAge: ov?.minAge ?? data.minAge,
@@ -366,7 +369,9 @@ export function EventEditPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
-            <Link to="/events"><ArrowLeft className="h-4 w-4" /></Link>
+            <Link to="/events">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
           <div>
             <h1 className="text-xl font-bold tracking-tight">{event.title}</h1>
@@ -378,12 +383,7 @@ export function EventEditPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant={isHidden ? 'default' : 'outline'}
-            size="sm"
-            onClick={handleToggleHidden}
-            disabled={toggling}
-          >
+          <Button variant={isHidden ? 'default' : 'outline'} size="sm" onClick={handleToggleHidden} disabled={toggling}>
             {isHidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
             {isHidden ? 'Показать' : 'Скрыть'}
           </Button>
@@ -428,10 +428,7 @@ export function EventEditPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Название</Label>
-                  <Input
-                    value={form.title ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  />
+                  <Input value={form.title ?? ''} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -457,7 +454,7 @@ export function EventEditPage() {
                             setForm((f) => ({
                               ...f,
                               category: ov?.category ?? data.category,
-                              subcategories: ov?.subcategories?.length ? ov.subcategories : (data.subcategories || []),
+                              subcategories: ov?.subcategories?.length ? ov.subcategories : data.subcategories || [],
                             }));
                             toast.success('Категория сброшена к значениям из sync');
                           } catch (e) {
@@ -480,14 +477,19 @@ export function EventEditPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {CATEGORY_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Аудитория</Label>
-                  <Select value={form.audience ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, audience: v || null }))}>
+                  <Select
+                    value={form.audience ?? ''}
+                    onValueChange={(v) => setForm((f) => ({ ...f, audience: v || null }))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Авто (из синхронизации)" />
                     </SelectTrigger>
@@ -538,7 +540,7 @@ export function EventEditPage() {
                   </div>
                 </div>
                 {/* Venue & Date Mode — показываем для MUSEUM */}
-                {(form.category === 'MUSEUM') && (
+                {form.category === 'MUSEUM' && (
                   <>
                     <div className="space-y-2">
                       <Label>Место (Venue)</Label>
@@ -686,8 +688,11 @@ export function EventEditPage() {
                       <TableRow key={s.id}>
                         <TableCell className="font-medium">
                           {new Date(s.startsAt).toLocaleString('ru-RU', {
-                            day: '2-digit', month: '2-digit', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit',
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
                           })}
                         </TableCell>
                         <TableCell>{s.availableTickets}</TableCell>
@@ -736,7 +741,9 @@ export function EventEditPage() {
                     type="number"
                     step="0.1"
                     value={form.manualRating ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, manualRating: e.target.value ? Number(e.target.value) : null }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, manualRating: e.target.value ? Number(e.target.value) : null }))
+                    }
                   />
                 </div>
               </CardContent>
@@ -888,11 +895,14 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
   const [formData, setFormData] = useState<OfferFormData>(EMPTY_OFFER_FORM);
   const [formSaving, setFormSaving] = useState(false);
 
-  useEffect(() => { setOffers(initialOffers); }, [initialOffers]);
+  useEffect(() => {
+    setOffers(initialOffers);
+  }, [initialOffers]);
 
   // Load operators once
   useEffect(() => {
-    adminApi.get<any>('/admin/events/' + eventId)
+    adminApi
+      .get<any>('/admin/events/' + eventId)
       .then(() => adminApi.get<{ items: OperatorOption[] }>('/admin/settings/operators'))
       .catch(() => ({ items: [] }))
       .then((res: any) => {
@@ -906,7 +916,9 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
     try {
       const data = await adminApi.get<EventOffer[]>(`/admin/events/${eventId}/offers`);
       setOffers(data);
-    } catch (e) { console.error('Load offers failed:', e); }
+    } catch (e) {
+      console.error('Load offers failed:', e);
+    }
   }, [eventId]);
 
   const handleSetPrimary = async (offerId: string) => {
@@ -1079,11 +1091,13 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{SOURCE_LABELS[offer.source] || offer.source}</span>
-                        {offer.isPrimary && <Badge variant="default" className="text-[10px]">Primary</Badge>}
+                        {offer.isPrimary && (
+                          <Badge variant="default" className="text-[10px]">
+                            Primary
+                          </Badge>
+                        )}
                       </div>
-                      {offer.operator && (
-                        <span className="text-xs text-muted-foreground">{offer.operator.name}</span>
-                      )}
+                      {offer.operator && <span className="text-xs text-muted-foreground">{offer.operator.name}</span>}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -1096,11 +1110,19 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                   <TableCell className="tabular-nums">{offer._count?.sessions ?? 0}</TableCell>
                   <TableCell>
                     {offer.badge ? (
-                      <Badge variant="outline" className="text-[10px]">{offer.badge}</Badge>
-                    ) : '—'}
+                      <Badge variant="outline" className="text-[10px]">
+                        {offer.badge}
+                      </Badge>
+                    ) : (
+                      '—'
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={offer.status === 'ACTIVE' ? 'success' : offer.status === 'HIDDEN' ? 'warning' : 'destructive'}>
+                    <Badge
+                      variant={
+                        offer.status === 'ACTIVE' ? 'success' : offer.status === 'HIDDEN' ? 'warning' : 'destructive'
+                      }
+                    >
                       {offer.status}
                     </Badge>
                   </TableCell>
@@ -1187,7 +1209,9 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
               <div className="space-y-2">
                 <Label>Источник</Label>
                 <Select value={formData.source} onValueChange={(v) => updateField('source', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="MANUAL">Ручной</SelectItem>
                     <SelectItem value="TC">TicketsCloud</SelectItem>
@@ -1200,7 +1224,9 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
               <div className="space-y-2">
                 <Label>Тип покупки</Label>
                 <Select value={formData.purchaseType} onValueChange={(v) => updateField('purchaseType', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="WIDGET">Виджет (TC и др.)</SelectItem>
                     <SelectItem value="REDIRECT">Внешняя ссылка</SelectItem>
@@ -1282,7 +1308,9 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
               <div className="space-y-2">
                 <Label>Статус</Label>
                 <Select value={formData.status} onValueChange={(v) => updateField('status', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ACTIVE">Active</SelectItem>
                     <SelectItem value="HIDDEN">Hidden</SelectItem>
@@ -1300,7 +1328,9 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                   value={formData.availabilityMode || '__none__'}
                   onValueChange={(v) => updateField('availabilityMode', v === '__none__' ? '' : v)}
                 >
-                  <SelectTrigger><SelectValue placeholder="Не задано" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Не задано" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Не задано</SelectItem>
                     <SelectItem value="UNKNOWN">Неизвестно</SelectItem>
@@ -1316,10 +1346,14 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                   value={formData.badge || '__none__'}
                   onValueChange={(v) => updateField('badge', v === '__none__' ? '' : v)}
                 >
-                  <SelectTrigger><SelectValue placeholder="Без бейджа" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Без бейджа" />
+                  </SelectTrigger>
                   <SelectContent>
                     {BADGE_OPTIONS.map((o) => (
-                      <SelectItem key={o.value || '__none__'} value={o.value || '__none__'}>{o.label}</SelectItem>
+                      <SelectItem key={o.value || '__none__'} value={o.value || '__none__'}>
+                        {o.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1334,11 +1368,15 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                   value={formData.operatorId || '__none__'}
                   onValueChange={(v) => updateField('operatorId', v === '__none__' ? '' : v)}
                 >
-                  <SelectTrigger><SelectValue placeholder="Без оператора" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Без оператора" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Без оператора</SelectItem>
                     {operators.map((op) => (
-                      <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>
+                      <SelectItem key={op.id} value={op.id}>
+                        {op.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1349,8 +1387,8 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
             <div className="border-t pt-4 mt-2 space-y-3">
               <p className="text-sm font-semibold text-slate-700">Операционная информация</p>
               <p className="text-xs text-slate-500">
-                Показывается клиенту только после подтверждения заказа (в email и трекинге).
-                НЕ указывайте офисные контакты поставщика — только данные для визита.
+                Показывается клиенту только после подтверждения заказа (в email и трекинге). НЕ указывайте офисные
+                контакты поставщика — только данные для визита.
               </p>
               <div className="space-y-2">
                 <Label>Место встречи / адрес</Label>
@@ -1401,11 +1439,15 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                 onChange={(e) => updateField('isPrimary', e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300"
               />
-              <Label htmlFor="isPrimary" className="cursor-pointer">Основной оффер (Primary)</Label>
+              <Label htmlFor="isPrimary" className="cursor-pointer">
+                Основной оффер (Primary)
+              </Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Отмена
+            </Button>
             <Button onClick={handleSaveOffer} disabled={formSaving}>
               {formSaving ? 'Сохранение...' : dialogMode === 'create' ? 'Создать' : 'Сохранить'}
             </Button>

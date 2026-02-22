@@ -1,12 +1,20 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+
 import { MailService } from '../mail/mail.service';
 import { QUEUE_EMAILS } from './queue.constants';
 
 export type EmailJobData =
   | { type: 'review-verify'; to: string; authorName: string; eventTitle: string; verifyUrl: string }
-  | { type: 'review-request'; to: string; customerName: string; eventTitle: string; eventDate: string; reviewUrl: string }
+  | {
+      type: 'review-request';
+      to: string;
+      customerName: string;
+      eventTitle: string;
+      eventDate: string;
+      reviewUrl: string;
+    }
   | { type: 'review-approved'; to: string; authorName: string; eventTitle: string; eventUrl: string }
   | { type: 'admin-new-review'; authorName: string; eventTitle: string; rating: number; text: string }
   | {

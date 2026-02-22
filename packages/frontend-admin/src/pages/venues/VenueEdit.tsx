@@ -1,23 +1,18 @@
-import { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Save, ArrowLeft, Trash2, Plus, ExternalLink, Info } from 'lucide-react';
+import { getEffectiveCommission, VENUE_COMMISSION_DEFAULTS, VenueType } from '@daibilet/shared';
+import { ArrowLeft, ExternalLink, Info, Plus, Save, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
+import { SeoMetaEditor } from '@/components/SeoMetaEditor';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SeoMetaEditor } from '@/components/SeoMetaEditor';
-import { VenueType, VENUE_COMMISSION_DEFAULTS, getEffectiveCommission } from '@daibilet/shared';
+import { Textarea } from '@/components/ui/textarea';
 
 const VENUE_TYPES = [
   { value: 'MUSEUM', label: 'Музей' },
@@ -31,7 +26,13 @@ const VENUE_TYPES = [
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS: Record<string, string> = {
-  mon: 'Пн', tue: 'Вт', wed: 'Ср', thu: 'Чт', fri: 'Пт', sat: 'Сб', sun: 'Вс',
+  mon: 'Пн',
+  tue: 'Вт',
+  wed: 'Ср',
+  thu: 'Чт',
+  fri: 'Пт',
+  sat: 'Сб',
+  sun: 'Вс',
 };
 
 interface VenueFormData {
@@ -131,16 +132,22 @@ export function VenueEditPage() {
 
   useEffect(() => {
     // Load cities
-    adminApi.get<any>('/admin/cities').then((data) => {
-      const list = Array.isArray(data) ? data : data.items ?? [];
-      setCities(list);
-    }).catch((e) => console.error('Load cities failed:', e));
+    adminApi
+      .get<any>('/admin/cities')
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data.items ?? []);
+        setCities(list);
+      })
+      .catch((e) => console.error('Load cities failed:', e));
 
     // Load operators for venue partnership
-    adminApi.get<any>('/admin/suppliers').then((data) => {
-      const list = Array.isArray(data) ? data : data.items ?? [];
-      setOperators(list);
-    }).catch((e) => console.error('Load operators failed:', e));
+    adminApi
+      .get<any>('/admin/suppliers')
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data.items ?? []);
+        setOperators(list);
+      })
+      .catch((e) => console.error('Load operators failed:', e));
 
     if (!isNew && id) {
       setLoading(true);
@@ -198,9 +205,7 @@ export function VenueEditPage() {
         lat: form.lat ? Number(form.lat) : null,
         lng: form.lng ? Number(form.lng) : null,
         externalRating: form.externalRating ? Number(form.externalRating) : null,
-        openingHours: Object.fromEntries(
-          Object.entries(form.openingHours).map(([k, v]) => [k, v || null])
-        ),
+        openingHours: Object.fromEntries(Object.entries(form.openingHours).map(([k, v]) => [k, v || null])),
         operatorId: form.operatorId || null,
         highlights: form.highlights.length > 0 ? form.highlights : null,
         faq: form.faq.length > 0 ? form.faq : null,
@@ -316,11 +321,19 @@ export function VenueEditPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Название *</Label>
-                  <Input value={form.title} onChange={(e) => updateField('title', e.target.value)} placeholder="Государственный Эрмитаж" />
+                  <Input
+                    value={form.title}
+                    onChange={(e) => updateField('title', e.target.value)}
+                    placeholder="Государственный Эрмитаж"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Короткое название</Label>
-                  <Input value={form.shortTitle} onChange={(e) => updateField('shortTitle', e.target.value)} placeholder="Эрмитаж" />
+                  <Input
+                    value={form.shortTitle}
+                    onChange={(e) => updateField('shortTitle', e.target.value)}
+                    placeholder="Эрмитаж"
+                  />
                 </div>
               </div>
 
@@ -328,10 +341,14 @@ export function VenueEditPage() {
                 <div className="space-y-2">
                   <Label>Тип *</Label>
                   <Select value={form.venueType} onValueChange={(v) => updateField('venueType', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {VENUE_TYPES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -339,46 +356,78 @@ export function VenueEditPage() {
                 <div className="space-y-2">
                   <Label>Город *</Label>
                   <Select value={form.cityId} onValueChange={(v) => updateField('cityId', v)}>
-                    <SelectTrigger><SelectValue placeholder="Выберите город" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите город" />
+                    </SelectTrigger>
                     <SelectContent>
                       {cities.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Slug</Label>
-                  <Input value={form.slug} onChange={(e) => updateField('slug', e.target.value)} placeholder="ermitazh (авто)" />
+                  <Input
+                    value={form.slug}
+                    onChange={(e) => updateField('slug', e.target.value)}
+                    placeholder="ermitazh (авто)"
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label>Краткое описание</Label>
-                <Textarea value={form.shortDescription} onChange={(e) => updateField('shortDescription', e.target.value)} rows={2} />
+                <Textarea
+                  value={form.shortDescription}
+                  onChange={(e) => updateField('shortDescription', e.target.value)}
+                  rows={2}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Описание (HTML/Markdown)</Label>
-                <Textarea value={form.description} onChange={(e) => updateField('description', e.target.value)} rows={8} />
+                <Textarea
+                  value={form.description}
+                  onChange={(e) => updateField('description', e.target.value)}
+                  rows={8}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>URL обложки</Label>
-                  <Input value={form.imageUrl} onChange={(e) => updateField('imageUrl', e.target.value)} placeholder="https://..." />
+                  <Input
+                    value={form.imageUrl}
+                    onChange={(e) => updateField('imageUrl', e.target.value)}
+                    placeholder="https://..."
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Цена от (копейки)</Label>
-                  <Input type="number" value={form.priceFrom} onChange={(e) => updateField('priceFrom', e.target.value)} placeholder="50000" />
+                  <Input
+                    type="number"
+                    value={form.priceFrom}
+                    onChange={(e) => updateField('priceFrom', e.target.value)}
+                    placeholder="50000"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Партнёр-оператор</Label>
-                  <Select value={form.operatorId || 'none'} onValueChange={(v) => updateField('operatorId', v === 'none' ? '' : v)}>
-                    <SelectTrigger><SelectValue placeholder="Не выбран" /></SelectTrigger>
+                  <Select
+                    value={form.operatorId || 'none'}
+                    onValueChange={(v) => updateField('operatorId', v === 'none' ? '' : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Не выбран" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Не выбран</SelectItem>
                       {operators.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -388,27 +437,48 @@ export function VenueEditPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Телефон</Label>
-                  <Input value={form.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="+7 (812) 710-90-79" />
+                  <Input
+                    value={form.phone}
+                    onChange={(e) => updateField('phone', e.target.value)}
+                    placeholder="+7 (812) 710-90-79"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="info@hermitage.ru" />
+                  <Input
+                    value={form.email}
+                    onChange={(e) => updateField('email', e.target.value)}
+                    placeholder="info@hermitage.ru"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Сайт</Label>
-                  <Input value={form.website} onChange={(e) => updateField('website', e.target.value)} placeholder="https://hermitagemuseum.org" />
+                  <Input
+                    value={form.website}
+                    onChange={(e) => updateField('website', e.target.value)}
+                    placeholder="https://hermitagemuseum.org"
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Внешний рейтинг</Label>
-                  <Input value={form.externalRating} onChange={(e) => updateField('externalRating', e.target.value)} placeholder="4.8" />
+                  <Input
+                    value={form.externalRating}
+                    onChange={(e) => updateField('externalRating', e.target.value)}
+                    placeholder="4.8"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Источник рейтинга</Label>
-                  <Select value={form.externalSource || 'none'} onValueChange={(v) => updateField('externalSource', v === 'none' ? '' : v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={form.externalSource || 'none'}
+                    onValueChange={(v) => updateField('externalSource', v === 'none' ? '' : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Нет</SelectItem>
                       <SelectItem value="yandex_maps">Яндекс.Карты</SelectItem>
@@ -422,11 +492,21 @@ export function VenueEditPage() {
 
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.isActive} onChange={(e) => updateField('isActive', e.target.checked)} className="rounded" />
+                  <input
+                    type="checkbox"
+                    checked={form.isActive}
+                    onChange={(e) => updateField('isActive', e.target.checked)}
+                    className="rounded"
+                  />
                   <span className="text-sm">Активно</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.isFeatured} onChange={(e) => updateField('isFeatured', e.target.checked)} className="rounded" />
+                  <input
+                    type="checkbox"
+                    checked={form.isFeatured}
+                    onChange={(e) => updateField('isFeatured', e.target.checked)}
+                    className="rounded"
+                  />
                   <span className="text-sm">На главной</span>
                 </label>
               </div>
@@ -442,16 +522,28 @@ export function VenueEditPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Адрес</Label>
-                <Input value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="Дворцовая пл., 2" />
+                <Input
+                  value={form.address}
+                  onChange={(e) => updateField('address', e.target.value)}
+                  placeholder="Дворцовая пл., 2"
+                />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Метро</Label>
-                  <Input value={form.metro} onChange={(e) => updateField('metro', e.target.value)} placeholder="Адмиралтейская" />
+                  <Input
+                    value={form.metro}
+                    onChange={(e) => updateField('metro', e.target.value)}
+                    placeholder="Адмиралтейская"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Район</Label>
-                  <Input value={form.district} onChange={(e) => updateField('district', e.target.value)} placeholder="Центральный" />
+                  <Input
+                    value={form.district}
+                    onChange={(e) => updateField('district', e.target.value)}
+                    placeholder="Центральный"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -504,11 +596,20 @@ export function VenueEditPage() {
                   placeholder="URL изображения"
                   onKeyDown={(e) => e.key === 'Enter' && addGalleryUrl()}
                 />
-                <Button onClick={addGalleryUrl} size="sm"><Plus className="h-4 w-4" /></Button>
+                <Button onClick={addGalleryUrl} size="sm">
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
               {form.galleryUrls.map((url, i) => (
                 <div key={i} className="flex items-center gap-2 p-2 border rounded-lg">
-                  <img src={url} alt="" className="h-12 w-16 object-cover rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <img
+                    src={url}
+                    alt=""
+                    className="h-12 w-16 object-cover rounded"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
                   <span className="text-sm truncate flex-1">{url}</span>
                   <Button variant="ghost" size="sm" onClick={() => removeGalleryUrl(i)}>
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -541,7 +642,7 @@ export function VenueEditPage() {
                     step="0.5"
                     value={form.commissionRate}
                     onChange={(e) => updateField('commissionRate', e.target.value)}
-                    placeholder={`Авто: ${form.venueType && VENUE_COMMISSION_DEFAULTS[form.venueType as VenueType]?.defaultRate || 15}%`}
+                    placeholder={`Авто: ${(form.venueType && VENUE_COMMISSION_DEFAULTS[form.venueType as VenueType]?.defaultRate) || 15}%`}
                   />
                   <p className="text-xs text-muted-foreground">
                     Пустое = используется ставка по типу. Промо-ставка для новых: 7%.
@@ -572,17 +673,18 @@ export function VenueEditPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => updateField('highlights', form.highlights.filter((_, idx) => idx !== i))}
+                    onClick={() =>
+                      updateField(
+                        'highlights',
+                        form.highlights.filter((_, idx) => idx !== i),
+                      )
+                    }
                   >
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
                 </div>
               ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => updateField('highlights', [...form.highlights, ''])}
-              >
+              <Button variant="outline" size="sm" onClick={() => updateField('highlights', [...form.highlights, ''])}>
                 <Plus className="h-4 w-4 mr-1" /> Добавить факт
               </Button>
             </CardContent>
@@ -597,7 +699,10 @@ export function VenueEditPage() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {FEATURE_OPTIONS.map((feat) => (
-                  <label key={feat.value} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-muted/50">
+                  <label
+                    key={feat.value}
+                    className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-muted/50"
+                  >
                     <input
                       type="checkbox"
                       checked={form.features.includes(feat.value)}
@@ -605,7 +710,10 @@ export function VenueEditPage() {
                         if (e.target.checked) {
                           updateField('features', [...form.features, feat.value]);
                         } else {
-                          updateField('features', form.features.filter((f) => f !== feat.value));
+                          updateField(
+                            'features',
+                            form.features.filter((f) => f !== feat.value),
+                          );
                         }
                       }}
                       className="rounded"
@@ -631,7 +739,12 @@ export function VenueEditPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => updateField('faq', form.faq.filter((_, idx) => idx !== i))}
+                      onClick={() =>
+                        updateField(
+                          'faq',
+                          form.faq.filter((_, idx) => idx !== i),
+                        )
+                      }
                     >
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
@@ -657,11 +770,7 @@ export function VenueEditPage() {
                   />
                 </div>
               ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => updateField('faq', [...form.faq, { q: '', a: '' }])}
-              >
+              <Button variant="outline" size="sm" onClick={() => updateField('faq', [...form.faq, { q: '', a: '' }])}>
                 <Plus className="h-4 w-4 mr-1" /> Добавить вопрос
               </Button>
             </CardContent>
@@ -669,9 +778,7 @@ export function VenueEditPage() {
         </TabsContent>
 
         <TabsContent value="seo" className="space-y-4">
-          {!isNew && id && (
-            <SeoMetaEditor entityType="VENUE" entityId={id} defaultTitle={form.title} />
-          )}
+          {!isNew && id && <SeoMetaEditor entityType="VENUE" entityId={id} defaultTitle={form.title} />}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Legacy SEO (Venue)</CardTitle>
@@ -680,11 +787,19 @@ export function VenueEditPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Meta Title</Label>
-                <Input value={form.metaTitle} onChange={(e) => updateField('metaTitle', e.target.value)} placeholder="Авто: Название — билеты, часы работы | Дайбилет" />
+                <Input
+                  value={form.metaTitle}
+                  onChange={(e) => updateField('metaTitle', e.target.value)}
+                  placeholder="Авто: Название — билеты, часы работы | Дайбилет"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Meta Description</Label>
-                <Textarea value={form.metaDescription} onChange={(e) => updateField('metaDescription', e.target.value)} rows={3} />
+                <Textarea
+                  value={form.metaDescription}
+                  onChange={(e) => updateField('metaDescription', e.target.value)}
+                  rows={3}
+                />
               </div>
             </CardContent>
           </Card>
@@ -701,7 +816,10 @@ export function VenueEditPage() {
                 {events.length > 0 ? (
                   <div className="space-y-2">
                     {events.map((e: any) => (
-                      <div key={e.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                      <div
+                        key={e.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                      >
                         <div>
                           <span className="font-medium">{e.title}</span>
                           <div className="flex gap-2 mt-1">
@@ -745,7 +863,11 @@ export function VenueEditPage() {
                         <div>
                           <span className="font-medium">{o.source}</span>
                           <span className="ml-2 text-sm text-muted-foreground">{o.purchaseType}</span>
-                          {o.badge && <Badge className="ml-2" variant="outline">{o.badge}</Badge>}
+                          {o.badge && (
+                            <Badge className="ml-2" variant="outline">
+                              {o.badge}
+                            </Badge>
+                          )}
                         </div>
                         <span className="font-semibold">
                           {o.priceFrom ? `от ${(o.priceFrom / 100).toLocaleString('ru-RU')} ₽` : '—'}

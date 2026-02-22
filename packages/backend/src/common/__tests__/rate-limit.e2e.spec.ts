@@ -3,14 +3,15 @@
  * Минимальный NestJS app с ThrottlerModule.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { Test } from '@nestjs/testing';
 import { Controller, Get } from '@nestjs/common';
 import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_FILTER } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { AllExceptionsFilter } from '../all-exceptions.filter';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { Test } from '@nestjs/testing';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import * as http from 'http';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { AllExceptionsFilter } from '../all-exceptions.filter';
 
 @Controller()
 class TestController {
@@ -21,9 +22,7 @@ class TestController {
 }
 
 @Module({
-  imports: [
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 3 }]),
-  ],
+  imports: [ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 3 }])],
   controllers: [TestController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -1,6 +1,7 @@
+import { AlertCircle, Calendar, CheckCircle, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
 import { api } from '../lib/api';
-import { Calendar, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface DashboardData {
   operator: { name: string; trustLevel: number; commissionRate: string; successfulSales: number };
@@ -28,7 +29,12 @@ export default function Dashboard() {
     { label: 'Активных событий', value: data.events.active, icon: Calendar, color: 'text-blue-600' },
     { label: 'На модерации', value: data.events.pending, icon: AlertCircle, color: 'text-orange-500' },
     { label: 'Продаж', value: data.sales.totalOrders, icon: CheckCircle, color: 'text-green-600' },
-    { label: 'Доход (руб)', value: (data.sales.netRevenue / 100).toLocaleString('ru'), icon: TrendingUp, color: 'text-emerald-600' },
+    {
+      label: 'Доход (руб)',
+      value: (data.sales.netRevenue / 100).toLocaleString('ru'),
+      icon: TrendingUp,
+      color: 'text-emerald-600',
+    },
   ];
 
   return (
@@ -36,8 +42,8 @@ export default function Dashboard() {
       <div>
         <h1 className="text-2xl font-bold">{data.operator.name}</h1>
         <p className="text-sm text-gray-500">
-          Trust Level: {data.operator.trustLevel} ({TRUST_LABELS[data.operator.trustLevel] || '?'})
-          {' '} | Комиссия: {(Number(data.operator.commissionRate) * 100).toFixed(0)}%
+          Trust Level: {data.operator.trustLevel} ({TRUST_LABELS[data.operator.trustLevel] || '?'}) | Комиссия:{' '}
+          {(Number(data.operator.commissionRate) * 100).toFixed(0)}%
         </p>
       </div>
 

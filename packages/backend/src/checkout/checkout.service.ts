@@ -1,18 +1,19 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ensurePayloadVersion, resolvePurchaseType, validateWidgetPayload } from '@daibilet/shared';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+
 import { TcApiService } from '../catalog/tc-api.service';
 import { MailService } from '../mail/mail.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { PaymentFlowType, resolvePaymentFlow } from './cart-partitioning';
 import {
   calculateExpiresAt,
   CHECKOUT_SESSION_TTL_MINUTES,
-  QUICK_REQUEST_TTL_MINUTES,
   DEFAULT_REQUEST_SLA_MINUTES,
+  QUICK_REQUEST_TTL_MINUTES,
 } from './checkout-state-machine';
-import { resolvePurchaseType, validateWidgetPayload, ensurePayloadVersion } from '@daibilet/shared';
-import { Prisma } from '@prisma/client';
 import { CartItemDto, CreateGiftCertificateCheckoutDto, CreateTripPlanCheckoutDto } from './dto/checkout.dto';
-import { resolvePaymentFlow, PaymentFlowType } from './cart-partitioning';
 
 /**
  * Checkout Service — покупка билетов + корзина + заявки.
@@ -54,18 +55,11 @@ export class CheckoutService {
     // 1. Найти событие в нашей БД
     // tcEventId — это строка (TC ObjectId или tep-xxx), не UUID
     // id — UUID, slug — строка
-    const isUuid =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        body.eventId,
-      );
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.eventId);
 
     const event = await this.prisma.event.findFirst({
       where: {
-        OR: [
-          ...(isUuid ? [{ id: body.eventId }] : []),
-          { slug: body.eventId },
-          { tcEventId: body.eventId },
-        ],
+        OR: [...(isUuid ? [{ id: body.eventId }] : []), { slug: body.eventId }, { tcEventId: body.eventId }],
       },
     });
 
@@ -74,9 +68,7 @@ export class CheckoutService {
     }
 
     if (event.source !== 'TC') {
-      throw new BadRequestException(
-        'Прямая покупка пока доступна только для событий Ticketscloud',
-      );
+      throw new BadRequestException('Прямая покупка пока доступна только для событий Ticketscloud');
     }
 
     if (!event.tcEventId) {
@@ -99,9 +91,7 @@ export class CheckoutService {
     }
 
     // 3. Создать заказ в TC API
-    this.logger.log(
-      `Creating TC order: event=${event.tcEventId}, items=${JSON.stringify(random)}`,
-    );
+    this.logger.log(`Creating TC order: event=${event.tcEventId}, items=${JSON.stringify(random)}`);
 
     let tcOrder: any;
     try {
@@ -112,9 +102,7 @@ export class CheckoutService {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(`TC order creation failed: ${msg}`);
-      throw new BadRequestException(
-        `Не удалось создать заказ: ${msg}`,
-      );
+      throw new BadRequestException(`Не удалось создать заказ: ${msg}`);
     }
 
     const orderData = tcOrder?.data || tcOrder;
@@ -146,9 +134,7 @@ export class CheckoutService {
     let confirmedOrder: any = null;
     try {
       confirmedOrder = await this.tcApi.finishOrder(orderData.id);
-      this.logger.log(
-        `TC order ${orderData.id} confirmed (status: done). Tickets will be sent.`,
-      );
+      this.logger.log(`TC order ${orderData.id} confirmed (status: done). Tickets will be sent.`);
     } catch (err: unknown) {
       this.logger.error(`TC order confirmation failed: ${err instanceof Error ? err.message : String(err)}`);
       // Заказ создан, но не подтверждён — билеты зарезервированы
@@ -201,15 +187,13 @@ export class CheckoutService {
       const result = await this.tcApi.finishOrder(tcOrderId);
       return {
         success: true,
-        order: (result as any)?.data || result,
+        order: (result as { data?: unknown })?.data ?? result,
         message: 'Заказ подтверждён. Билеты будут отправлены на email.',
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(`TC order confirmation failed: ${msg}`);
-      throw new BadRequestException(
-        `Не удалось подтвердить заказ: ${msg}`,
-      );
+      throw new BadRequestException(`Не удалось подтвердить заказ: ${msg}`);
     }
   }
 
@@ -230,9 +214,7 @@ export class CheckoutService {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(`TC order cancellation failed: ${msg}`);
-      throw new BadRequestException(
-        `Не удалось отменить заказ: ${msg}`,
-      );
+      throw new BadRequestException(`Не удалось отменить заказ: ${msg}`);
     }
   }
 
@@ -305,7 +287,10 @@ export class CheckoutService {
 
   getGiftCertificateDenominations(): number[] {
     const raw = this.config.get<string>('GIFT_CERTIFICATE_DENOMINATIONS', '300000,500000,1000000');
-    return raw.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
+    return raw
+      .split(',')
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n) && n > 0);
   }
 
   // ============================
@@ -366,7 +351,10 @@ export class CheckoutService {
    * Валидировать подарочный сертификат по коду.
    * Возвращает discountAmount = min(amount, cartTotal) при успехе.
    */
-  async validateGiftCertificate(code: string, cartTotalKopecks: number): Promise<{
+  async validateGiftCertificate(
+    code: string,
+    cartTotalKopecks: number,
+  ): Promise<{
     valid: boolean;
     discountAmount?: number;
     amount?: number;
@@ -444,8 +432,12 @@ export class CheckoutService {
         event: { select: { id: true, title: true, slug: true, imageUrl: true, tcEventId: true } },
         operator: {
           select: {
-            id: true, name: true, isSupplier: true,
-            commissionRate: true, promoRate: true, promoUntil: true,
+            id: true,
+            name: true,
+            isSupplier: true,
+            commissionRate: true,
+            promoRate: true,
+            promoUntil: true,
           },
         },
       },
@@ -468,9 +460,10 @@ export class CheckoutService {
       let platformFeeSnapshot: number | null = null;
       let supplierAmountSnapshot: number | null = null;
       if (purchaseFlow === PaymentFlowType.PLATFORM && o.operator?.isSupplier) {
-        const effectiveRate = (o.operator.promoRate && o.operator.promoUntil && now < o.operator.promoUntil)
-          ? Number(o.operator.promoRate)
-          : Number(o.operator.commissionRate);
+        const effectiveRate =
+          o.operator.promoRate && o.operator.promoUntil && now < o.operator.promoUntil
+            ? Number(o.operator.promoRate)
+            : Number(o.operator.commissionRate);
         commissionRateSnapshot = effectiveRate;
         platformFeeSnapshot = Math.round(lineTotal * effectiveRate);
         supplierAmountSnapshot = lineTotal - platformFeeSnapshot;
@@ -485,7 +478,7 @@ export class CheckoutService {
         source: o.source,
         purchaseType: o.purchaseType,
         purchaseTypeResolved: resolvePurchaseType(o.purchaseType, `offer:${o.id}`),
-        purchaseFlow,                            // PLATFORM | EXTERNAL — единственный контракт
+        purchaseFlow, // PLATFORM | EXTERNAL — единственный контракт
         // === Content ===
         eventTitle: o.event.title,
         eventSlug: o.event.slug,
@@ -600,16 +593,18 @@ export class CheckoutService {
 
     // Send "order created" email
     if (data.customer.email) {
-      this.mailService.sendOrderCreated(data.customer.email, {
-        customerName: data.customer.name || 'Клиент',
-        shortCode,
-        items: data.items.map((item) => ({
-          title: item.eventTitle || 'Билет',
-          quantity: item.quantity,
-          price: Math.round(item.priceFrom / 100),
-        })),
-        totalPrice: Math.round(session.totalPrice ? session.totalPrice / 100 : 0),
-      }).catch((e) => this.logger.error('Order email failed: ' + e.message));
+      this.mailService
+        .sendOrderCreated(data.customer.email, {
+          customerName: data.customer.name || 'Клиент',
+          shortCode,
+          items: data.items.map((item) => ({
+            title: item.eventTitle || 'Билет',
+            quantity: item.quantity,
+            price: Math.round(item.priceFrom / 100),
+          })),
+          totalPrice: Math.round(session.totalPrice ? session.totalPrice / 100 : 0),
+        })
+        .catch((e) => this.logger.error('Order email failed: ' + e.message));
     }
 
     return {
@@ -652,9 +647,7 @@ export class CheckoutService {
     if (!event) throw new NotFoundException('Событие не найдено');
 
     // Find offer
-    let offer = data.offerId
-      ? event.offers.find((o) => o.id === data.offerId)
-      : event.offers[0];
+    const offer = data.offerId ? event.offers.find((o) => o.id === data.offerId) : event.offers[0];
 
     if (!offer) throw new BadRequestException('Активный оффер не найден');
 
@@ -715,9 +708,13 @@ export class CheckoutService {
           include: {
             eventOffer: {
               select: {
-                id: true, priceFrom: true, purchaseType: true,
-                meetingPoint: true, meetingInstructions: true,
-                operationalPhone: true, operationalNote: true,
+                id: true,
+                priceFrom: true,
+                purchaseType: true,
+                meetingPoint: true,
+                meetingInstructions: true,
+                operationalPhone: true,
+                operationalNote: true,
               },
             },
             event: {
@@ -749,19 +746,23 @@ export class CheckoutService {
         quantity: req.quantity,
         priceSnapshot: req.priceSnapshot,
         confirmedAt: req.confirmedAt,
-        event: req.event ? {
-          title: req.event.title,
-          slug: req.event.slug,
-          imageUrl: req.event.imageUrl,
-        } : null,
+        event: req.event
+          ? {
+              title: req.event.title,
+              slug: req.event.slug,
+              imageUrl: req.event.imageUrl,
+            }
+          : null,
         offerTitle: req.event?.title || null,
         // Operational info — only after confirmation
-        ...(showOperational && req.eventOffer ? {
-          meetingPoint: req.eventOffer.meetingPoint || null,
-          meetingInstructions: req.eventOffer.meetingInstructions || null,
-          operationalPhone: req.eventOffer.operationalPhone || null,
-          operationalNote: req.eventOffer.operationalNote || null,
-        } : {}),
+        ...(showOperational && req.eventOffer
+          ? {
+              meetingPoint: req.eventOffer.meetingPoint || null,
+              meetingInstructions: req.eventOffer.meetingInstructions || null,
+              operationalPhone: req.eventOffer.operationalPhone || null,
+              operationalNote: req.eventOffer.operationalNote || null,
+            }
+          : {}),
       })),
     };
   }

@@ -1,6 +1,7 @@
+import { CheckCircle, Clock, Eye, EyeOff, Plus, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Eye, EyeOff, Clock, CheckCircle, XCircle } from 'lucide-react';
+
 import { api } from '../../lib/api';
 
 const STATUS_ICONS: Record<string, any> = {
@@ -26,23 +27,26 @@ export default function EventsList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Мои события ({total})</h1>
-        <Link to="/events/new"
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+        <Link
+          to="/events/new"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+        >
           <Plus className="h-4 w-4" /> Создать событие
         </Link>
       </div>
 
       <div className="bg-white rounded-xl border divide-y">
         {events.length === 0 && (
-          <div className="p-8 text-center text-gray-500">
-            У вас пока нет событий. Создайте первое!
-          </div>
+          <div className="p-8 text-center text-gray-500">У вас пока нет событий. Создайте первое!</div>
         )}
         {events.map((event) => {
           const st = STATUS_ICONS[event.moderationStatus] || STATUS_ICONS.DRAFT;
           return (
-            <Link key={event.id} to={`/events/${event.id}`}
-              className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors">
+            <Link
+              key={event.id}
+              to={`/events/${event.id}`}
+              className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors"
+            >
               {event.imageUrl ? (
                 <img src={event.imageUrl} alt="" className="w-16 h-16 rounded-lg object-cover" />
               ) : (
@@ -52,7 +56,9 @@ export default function EventsList() {
               )}
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{event.title}</p>
-                <p className="text-sm text-gray-500">{event.city?.name} | {event._count?.offers || 0} офферов</p>
+                <p className="text-sm text-gray-500">
+                  {event.city?.name} | {event._count?.offers || 0} офферов
+                </p>
               </div>
               <div className="flex items-center gap-1.5">
                 <st.icon className={`h-4 w-4 ${st.color}`} />

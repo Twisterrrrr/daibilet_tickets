@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TagAssignmentService } from '../tag-assignment.service';
 import { TagCategory } from '@prisma/client';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { TagAssignmentService } from '../tag-assignment.service';
 
 // ---------------------
 // Mock factories
@@ -10,11 +11,7 @@ const mockPrisma = {
   tag: {
     upsert: vi.fn().mockResolvedValue({}),
     findUnique: vi.fn(),
-    findMany: vi.fn().mockResolvedValue([
-      { id: 'tag-bv' },
-      { id: 'tag-lm' },
-      { id: 'tag-ta' },
-    ]),
+    findMany: vi.fn().mockResolvedValue([{ id: 'tag-bv' }, { id: 'tag-lm' }, { id: 'tag-ta' }]),
   },
   eventTag: {
     deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -135,10 +132,7 @@ describe('TagAssignmentService', () => {
 
     it('should call $queryRaw for candidates', async () => {
       mockPrisma.tag.findUnique.mockResolvedValueOnce({ id: 'tag-bv' });
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        { eventId: 'event-1' },
-        { eventId: 'event-2' },
-      ]);
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ eventId: 'event-1' }, { eventId: 'event-2' }]);
 
       await (service as any).assignBestValue();
 
@@ -149,10 +143,7 @@ describe('TagAssignmentService', () => {
 
     it('should call createMany with eventIds and tag.id when candidates exist', async () => {
       mockPrisma.tag.findUnique.mockResolvedValueOnce({ id: 'tag-bv' });
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        { eventId: 'event-1' },
-        { eventId: 'event-2' },
-      ]);
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ eventId: 'event-1' }, { eventId: 'event-2' }]);
 
       await (service as any).assignBestValue();
 
@@ -204,9 +195,7 @@ describe('TagAssignmentService', () => {
 
     it('should call $queryRaw for candidates', async () => {
       mockPrisma.tag.findUnique.mockResolvedValueOnce({ id: 'tag-lm' });
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        { eventId: 'event-1' },
-      ]);
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ eventId: 'event-1' }]);
 
       await (service as any).assignLastMinute();
 
@@ -215,10 +204,7 @@ describe('TagAssignmentService', () => {
 
     it('should call createMany with eventIds and tag.id', async () => {
       mockPrisma.tag.findUnique.mockResolvedValueOnce({ id: 'tag-lm' });
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        { eventId: 'event-1' },
-        { eventId: 'event-2' },
-      ]);
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ eventId: 'event-1' }, { eventId: 'event-2' }]);
 
       await (service as any).assignLastMinute();
 
@@ -233,9 +219,7 @@ describe('TagAssignmentService', () => {
 
     it('should return count of candidates', async () => {
       mockPrisma.tag.findUnique.mockResolvedValueOnce({ id: 'tag-lm' });
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        { eventId: 'event-1' },
-      ]);
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ eventId: 'event-1' }]);
 
       const result = await (service as any).assignLastMinute();
 
@@ -259,9 +243,7 @@ describe('TagAssignmentService', () => {
 
     it('should call $queryRaw for candidates', async () => {
       mockPrisma.tag.findUnique.mockResolvedValueOnce({ id: 'tag-ta' });
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        { eventId: 'event-1' },
-      ]);
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ eventId: 'event-1' }]);
 
       await (service as any).assignTodayAvailable();
 
@@ -270,10 +252,7 @@ describe('TagAssignmentService', () => {
 
     it('should call createMany with eventIds and tag.id', async () => {
       mockPrisma.tag.findUnique.mockResolvedValueOnce({ id: 'tag-ta' });
-      mockPrisma.$queryRaw.mockResolvedValueOnce([
-        { eventId: 'event-1' },
-        { eventId: 'event-2' },
-      ]);
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ eventId: 'event-1' }, { eventId: 'event-2' }]);
 
       await (service as any).assignTodayAvailable();
 

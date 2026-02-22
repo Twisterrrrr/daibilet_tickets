@@ -1,4 +1,4 @@
-import { IsString, IsArray, ArrayMinSize } from 'class-validator';
+import { ArrayMinSize, IsArray, IsString } from 'class-validator';
 
 export class SyncFavoritesDto {
   @IsArray()

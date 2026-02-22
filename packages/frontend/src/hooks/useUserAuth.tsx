@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useCallback, useState, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+
 import { api } from '@/lib/api';
-import { getStoredToken, setStoredToken, clearStoredToken } from '@/lib/user-auth';
+import { clearStoredToken, getStoredToken, setStoredToken } from '@/lib/user-auth';
 
 interface User {
   id: string;

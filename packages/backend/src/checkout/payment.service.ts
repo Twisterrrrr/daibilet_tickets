@@ -11,18 +11,15 @@
  * - PAID → FulfillmentService → COMPLETED (не напрямую).
  */
 
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
-import { randomUUID, createHmac } from 'crypto';
-import {
-  tryTransitionPayment,
-  tryTransitionCheckout,
-  PaymentIntentStatus,
-} from './checkout-state-machine';
-import { partitionCart, SnapshotLineItem } from './cart-partitioning';
-import { YkPayment, YkRefund, isYkPayment } from './yookassa.types';
 import { Prisma } from '@prisma/client';
+import { createHmac, randomUUID } from 'crypto';
+
+import { PrismaService } from '../prisma/prisma.service';
+import { partitionCart, SnapshotLineItem } from './cart-partitioning';
+import { PaymentIntentStatus, tryTransitionCheckout, tryTransitionPayment } from './checkout-state-machine';
+import { isYkPayment, YkPayment, YkRefund } from './yookassa.types';
 
 @Injectable()
 export class PaymentService {
@@ -36,9 +33,10 @@ export class PaymentService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.appUrl = process.env.NODE_ENV === 'production'
-      ? this.config.getOrThrow<string>('APP_URL')
-      : this.config.get<string>('APP_URL', 'http://localhost:3000');
+    this.appUrl =
+      process.env.NODE_ENV === 'production'
+        ? this.config.getOrThrow<string>('APP_URL')
+        : this.config.get<string>('APP_URL', 'http://localhost:3000');
     this.provider = this.config.get<string>('PAYMENT_PROVIDER', 'STUB');
     this.yookassaShopId = this.config.get<string>('YOOKASSA_SHOP_ID', '');
     this.yookassaSecretKey = this.config.get<string>('YOOKASSA_SECRET_KEY', '');
@@ -51,10 +49,7 @@ export class PaymentService {
    * @param idempotencyKey — ключ для защиты от дублей (frontend генерирует uuid)
    * @returns PaymentIntent с payment_url
    */
-  async createPaymentIntent(
-    checkoutSessionId: string,
-    idempotencyKey?: string,
-  ) {
+  async createPaymentIntent(checkoutSessionId: string, idempotencyKey?: string) {
     // Проверяем сессию
     const session = await this.prisma.checkoutSession.findUnique({
       where: { id: checkoutSessionId },
@@ -95,8 +90,7 @@ export class PaymentService {
     });
     if (activeIntent) {
       throw new ConflictException(
-        `Уже есть активный PaymentIntent (${activeIntent.id}) для этой сессии. ` +
-        `Дождитесь завершения или отмените.`,
+        `Уже есть активный PaymentIntent (${activeIntent.id}) для этой сессии. ` + `Дождитесь завершения или отмените.`,
       );
     }
 
@@ -124,11 +118,9 @@ export class PaymentService {
       if (anyPreviousIntent.grossAmount && currentTotal !== anyPreviousIntent.grossAmount) {
         this.logger.error(
           `INVARIANT VIOLATION: snapshot amount changed after PaymentIntent creation. ` +
-          `Session=${checkoutSessionId}, previousAmount=${anyPreviousIntent.grossAmount}, currentAmount=${currentTotal}`,
+            `Session=${checkoutSessionId}, previousAmount=${anyPreviousIntent.grossAmount}, currentAmount=${currentTotal}`,
         );
-        throw new ConflictException(
-          'offersSnapshot был изменён после создания PaymentIntent. Это запрещено.',
-        );
+        throw new ConflictException('offersSnapshot был изменён после создания PaymentIntent. Это запрещено.');
       }
     }
 
@@ -184,7 +176,7 @@ export class PaymentService {
     if (this.provider === 'STUB') {
       providerPaymentId = `stub_${randomUUID().slice(0, 8)}`;
       paymentUrl = `${this.appUrl}/checkout/pay-mock/${providerPaymentId}`;
-      const snapshot = giftCert ? [] : ((session.offersSnapshot as SnapshotLineItem[] | null) || []);
+      const snapshot = giftCert ? [] : (session.offersSnapshot as SnapshotLineItem[] | null) || [];
       const partitioned = partitionCart(snapshot);
       providerData = {
         mock: true,
@@ -193,7 +185,9 @@ export class PaymentService {
         supplierAmount,
         platformItemCount: giftCert ? 0 : partitioned.platform.length,
         externalItemCount: giftCert ? 0 : partitioned.external.length,
-        note: giftCert ? 'STUB gift certificate' : 'STUB payment — POST /checkout/payment/:id/simulate-paid для имитации',
+        note: giftCert
+          ? 'STUB gift certificate'
+          : 'STUB payment — POST /checkout/payment/:id/simulate-paid для имитации',
       };
     } else if (this.provider === 'YOOKASSA') {
       const ykResult = await this.createYookassaPayment({
@@ -247,7 +241,7 @@ export class PaymentService {
 
     this.logger.log(
       `[intent=${intent.id}] [provider=${this.provider}] [providerPmtId=${providerPaymentId}] ` +
-      `Created PaymentIntent for session ${checkoutSessionId}, amount=${grossAmount}, supplierId=${supplierId}`,
+        `Created PaymentIntent for session ${checkoutSessionId}, amount=${grossAmount}, supplierId=${supplierId}`,
     );
 
     return {
@@ -257,6 +251,80 @@ export class PaymentService {
       currency: intent.currency,
       provider: intent.provider,
       status: intent.status,
+    };
+  }
+
+  /**
+   * Создать PaymentIntent для CheckoutPackage (минимальный flow, без offersSnapshot).
+   */
+  async createPaymentIntentForPackage(params: {
+    checkoutSessionId: string;
+    amount: number;
+    idempotencyKey: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    const session = await this.prisma.checkoutSession.findUnique({
+      where: { id: params.checkoutSessionId },
+    });
+    if (!session) throw new NotFoundException('Сессия не найдена');
+
+    const existing = await this.prisma.paymentIntent.findUnique({
+      where: { idempotencyKey: params.idempotencyKey },
+    });
+    if (existing) {
+      return {
+        paymentIntentId: existing.id,
+        paymentUrl: existing.paymentUrl,
+        provider: existing.provider,
+        providerPaymentId: existing.providerPaymentId,
+      };
+    }
+
+    let paymentUrl: string;
+    let providerPaymentId: string | null = null;
+    if (this.provider === 'STUB') {
+      providerPaymentId = `stub_${randomUUID().slice(0, 8)}`;
+      paymentUrl = `${this.appUrl}/checkout/pay-mock/${providerPaymentId}`;
+    } else {
+      const meta: Record<string, string> = { checkoutSessionId: params.checkoutSessionId };
+      if (params.metadata) {
+        for (const [k, v] of Object.entries(params.metadata)) {
+          meta[k] = String(v);
+        }
+      }
+      const yk = await this.createYookassaPayment({
+        amount: params.amount,
+        currency: 'RUB',
+        idempotencyKey: params.idempotencyKey,
+        returnUrl: `${this.appUrl}/checkout/result?session=${params.checkoutSessionId}`,
+        description: `Заказ ${session.shortCode}`,
+        metadata: meta,
+        supplierId: null,
+        supplierAmount: null,
+      });
+      providerPaymentId = yk.paymentId;
+      paymentUrl = yk.confirmationUrl;
+    }
+
+    const intent = await this.prisma.paymentIntent.create({
+      data: {
+        checkoutSessionId: params.checkoutSessionId,
+        idempotencyKey: params.idempotencyKey,
+        amount: params.amount,
+        currency: 'RUB',
+        status: 'PENDING',
+        provider: this.provider,
+        providerPaymentId,
+        paymentUrl,
+        grossAmount: params.amount,
+      },
+    });
+
+    return {
+      paymentIntentId: intent.id,
+      paymentUrl,
+      provider: intent.provider,
+      providerPaymentId,
     };
   }
 
@@ -297,11 +365,7 @@ export class PaymentService {
     if (!payResult.allowed) throw new BadRequestException(payResult.reason);
 
     // State machine: CheckoutSession → COMPLETED
-    const csResult = tryTransitionCheckout(
-      intent.checkoutSession.status,
-      'COMPLETED',
-      'system',
-    );
+    const csResult = tryTransitionCheckout(intent.checkoutSession.status, 'COMPLETED', 'system');
 
     return this.prisma.$transaction(async (tx) => {
       const updatedIntent = await tx.paymentIntent.update({
@@ -321,16 +385,18 @@ export class PaymentService {
         });
         this.logger.log(
           `[intent=${intentId}] [provider=${intent.provider}] [providerPmtId=${intent.providerPaymentId}] ` +
-          `Session ${intent.checkoutSessionId} → COMPLETED`,
+            `Session ${intent.checkoutSessionId} → COMPLETED`,
         );
       }
 
       // Инкрементируем successfulSales для поставщика
       if (intent.supplierId) {
-        await tx.operator.update({
-          where: { id: intent.supplierId },
-          data: { successfulSales: { increment: 1 } },
-        }).catch((e) => this.logger.error('payment callback failed: ' + (e as Error).message));
+        await tx.operator
+          .update({
+            where: { id: intent.supplierId },
+            data: { successfulSales: { increment: 1 } },
+          })
+          .catch((e) => this.logger.error('payment callback failed: ' + (e as Error).message));
       }
 
       return updatedIntent;
@@ -430,13 +496,15 @@ export class PaymentService {
         select: { yookassaAccountId: true },
       });
       if (supplier?.yookassaAccountId) {
-        body.transfers = [{
-          account_id: supplier.yookassaAccountId,
-          amount: {
-            value: (supplierAmount / 100).toFixed(2),
-            currency,
+        body.transfers = [
+          {
+            account_id: supplier.yookassaAccountId,
+            amount: {
+              value: (supplierAmount / 100).toFixed(2),
+              currency,
+            },
           },
-        }];
+        ];
       }
     }
 
@@ -446,7 +514,7 @@ export class PaymentService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${auth}`,
+        Authorization: `Basic ${auth}`,
         'Idempotence-Key': idempotencyKey,
       },
       body: JSON.stringify(body),
@@ -507,7 +575,7 @@ export class PaymentService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${auth}`,
+        Authorization: `Basic ${auth}`,
         'Idempotence-Key': idempotencyKey,
       },
       body: JSON.stringify(body),
@@ -520,7 +588,7 @@ export class PaymentService {
       throw new BadRequestException(`YooKassa refund error: ${response.status}`);
     }
 
-    const data = await response.json() as YkRefund;
+    const data = (await response.json()) as YkRefund;
 
     return {
       refundId: data.id,

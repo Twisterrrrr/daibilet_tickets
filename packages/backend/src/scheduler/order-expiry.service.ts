@@ -1,14 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../prisma/prisma.service';
-import { MailService } from '../mail/mail.service';
 import { CheckoutStatus } from '@prisma/client';
+
 import {
-  tryTransitionOrderRequest,
-  tryTransitionCheckout,
-  determineExpireReason,
   CHECKOUT_TERMINAL,
+  determineExpireReason,
+  tryTransitionCheckout,
+  tryTransitionOrderRequest,
 } from '../checkout/checkout-state-machine';
+import { MailService } from '../mail/mail.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Cron-сервис для автоматического истечения OrderRequest и CheckoutSession по SLA/TTL.
@@ -79,11 +80,13 @@ export class OrderExpiryService {
           select: { shortCode: true },
         });
         if (session) {
-          this.mailService.sendOrderExpired(req.customerEmail, {
-            customerName: req.customerName || 'Клиент',
-            shortCode: session.shortCode,
-            reason: reason === 'SLA' ? 'Оператор не успел подтвердить вовремя' : 'Истекло время ожидания',
-          }).catch((e) => this.logger.error('Expiry email failed: ' + e.message));
+          this.mailService
+            .sendOrderExpired(req.customerEmail, {
+              customerName: req.customerName || 'Клиент',
+              shortCode: session.shortCode,
+              reason: reason === 'SLA' ? 'Оператор не успел подтвердить вовремя' : 'Истекло время ожидания',
+            })
+            .catch((e) => this.logger.error('Expiry email failed: ' + e.message));
         }
       }
     }

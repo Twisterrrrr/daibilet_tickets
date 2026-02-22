@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { adminApi } from '../../api/client';
+
 import { Skeleton } from '@/components/ui/skeleton';
+
+import { adminApi } from '../../api/client';
 
 type Intensity = 'RELAXED' | 'NORMAL' | 'ACTIVE';
 
@@ -82,7 +84,7 @@ export function ComboEditPage() {
     adminApi
       .get<CityItem[] | { items: CityItem[] }>('/admin/cities')
       .then((res) => {
-        const list = Array.isArray(res) ? res : (res as any).items ?? [];
+        const list = Array.isArray(res) ? res : ((res as any).items ?? []);
         setCities(list);
       })
       .catch((e) => console.error('Load cities failed:', e));
@@ -107,8 +109,7 @@ export function ComboEditPage() {
           heroImage: data.heroImage ?? '',
           intensity: data.intensity ?? 'NORMAL',
           dayCount: data.dayCount ?? 1,
-          suggestedPriceRub:
-            data.suggestedPrice != null ? Math.round(data.suggestedPrice / 100) : '',
+          suggestedPriceRub: data.suggestedPrice != null ? Math.round(data.suggestedPrice / 100) : '',
           metaTitle: data.metaTitle ?? '',
           metaDescription: data.metaDescription ?? '',
           isActive: data.isActive ?? true,
@@ -124,10 +125,7 @@ export function ComboEditPage() {
   }, [id, isCreate]);
 
   const buildPayload = () => {
-    const suggestedPrice =
-      form.suggestedPriceRub !== ''
-        ? Math.round(Number(form.suggestedPriceRub) * 100)
-        : null;
+    const suggestedPrice = form.suggestedPriceRub !== '' ? Math.round(Number(form.suggestedPriceRub) * 100) : null;
     return {
       slug: form.slug,
       cityId: form.cityId,
@@ -191,13 +189,9 @@ export function ComboEditPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold text-gray-900">
-        {isCreate ? 'Новый combo' : 'Редактирование combo'}
-      </h1>
+      <h1 className="mb-6 text-xl font-bold text-gray-900">{isCreate ? 'Новый combo' : 'Редактирование combo'}</h1>
 
-      {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
-      )}
+      {error && <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
         <div>
@@ -267,9 +261,7 @@ export function ComboEditPage() {
           <label className="mb-1 block text-sm font-medium text-gray-700">Интенсивность</label>
           <select
             value={form.intensity}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, intensity: e.target.value as Intensity }))
-            }
+            onChange={(e) => setForm((f) => ({ ...f, intensity: e.target.value as Intensity }))}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           >
             {INTENSITY_OPTIONS.map((o) => (
@@ -285,16 +277,12 @@ export function ComboEditPage() {
             type="number"
             min={1}
             value={form.dayCount}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, dayCount: parseInt(e.target.value, 10) || 1 }))
-            }
+            onChange={(e) => setForm((f) => ({ ...f, dayCount: parseInt(e.target.value, 10) || 1 }))}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Ориентировочная цена (руб.)
-          </label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Ориентировочная цена (руб.)</label>
           <input
             type="number"
             min={0}
@@ -345,9 +333,7 @@ export function ComboEditPage() {
             <input
               type="number"
               value={form.sortOrder}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))}
               className="w-24 rounded-lg border border-gray-200 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
           </div>

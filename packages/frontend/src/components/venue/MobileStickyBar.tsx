@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import { formatPrice } from '@daibilet/shared';
+import { useEffect, useRef, useState } from 'react';
 
 interface MobileStickyBarProps {
   priceFrom: number | null;
@@ -36,7 +36,7 @@ export function MobileStickyBar({
         // Show bar when sentinel is NOT visible (scrolled past hero CTA)
         setVisible(!entry.isIntersecting);
       },
-      { threshold: 0 }
+      { threshold: 0 },
     );
 
     observer.observe(sentinel);

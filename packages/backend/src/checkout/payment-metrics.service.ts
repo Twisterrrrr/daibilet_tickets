@@ -60,13 +60,15 @@ export class PaymentMetricsService {
     this.counters[metric]++;
 
     // Structured log (JSON-friendly)
-    this.logger.log(JSON.stringify({
-      event: 'payment_metric',
-      metric,
-      value: this.counters[metric],
-      ...context,
-      timestamp: new Date().toISOString(),
-    }));
+    this.logger.log(
+      JSON.stringify({
+        event: 'payment_metric',
+        metric,
+        value: this.counters[metric],
+        ...context,
+        timestamp: new Date().toISOString(),
+      }),
+    );
   }
 
   /**

@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 
 interface Upsell {
   id: string;
@@ -29,42 +30,30 @@ const columns: ColumnDef<Upsell>[] = [
   {
     accessorKey: 'title',
     header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
-    cell: ({ row }) => (
-      <span className="font-medium">{row.original.title}</span>
-    ),
+    cell: ({ row }) => <span className="font-medium">{row.original.title}</span>,
   },
   {
     accessorKey: 'category',
     header: ({ column }) => <SortableHeader column={column}>Категория</SortableHeader>,
-    cell: ({ row }) => (
-      <Badge variant="secondary">{row.original.category}</Badge>
-    ),
+    cell: ({ row }) => <Badge variant="secondary">{row.original.category}</Badge>,
   },
   {
     accessorKey: 'citySlug',
     header: 'Город',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">{row.original.citySlug || 'Все'}</span>
-    ),
+    cell: ({ row }) => <span className="text-muted-foreground">{row.original.citySlug || 'Все'}</span>,
   },
   {
     accessorKey: 'priceKopecks',
     header: ({ column }) => <SortableHeader column={column}>Цена</SortableHeader>,
     cell: ({ row }) => (
-      <span className="tabular-nums">
-        {(row.original.priceKopecks / 100).toLocaleString('ru-RU')} ₽
-      </span>
+      <span className="tabular-nums">{(row.original.priceKopecks / 100).toLocaleString('ru-RU')} ₽</span>
     ),
   },
   {
     accessorKey: 'isActive',
     header: 'Статус',
     cell: ({ row }) =>
-      row.original.isActive ? (
-        <Badge variant="success">Активен</Badge>
-      ) : (
-        <Badge variant="secondary">Выкл</Badge>
-      ),
+      row.original.isActive ? <Badge variant="success">Активен</Badge> : <Badge variant="secondary">Выкл</Badge>,
   },
   {
     id: 'actions',
@@ -85,7 +74,10 @@ export function UpsellsListPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminApi.get<Upsell[]>('/admin/upsells').then(setItems).finally(() => setLoading(false));
+    adminApi
+      .get<Upsell[]>('/admin/upsells')
+      .then(setItems)
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -93,9 +85,7 @@ export function UpsellsListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Upsells</h1>
-          <p className="text-muted-foreground">
-            {items.length} позиций
-          </p>
+          <p className="text-muted-foreground">{items.length} позиций</p>
         </div>
         <Button asChild>
           <Link to="/upsells/new" className="gap-2">

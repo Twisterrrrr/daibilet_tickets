@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  SeoEntityType,
-  SeoMetaResponse,
-  generateSeo,
-  getSeo,
-  upsertSeo,
-} from '@/lib/api/seo';
+
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { generateSeo, getSeo, SeoEntityType, SeoMetaResponse, upsertSeo } from '@/lib/api/seo';
 
 type Props = {
   entityType: SeoEntityType;
@@ -61,7 +56,18 @@ export function SeoMetaEditor({ entityType, entityId, defaultTitle }: Props) {
         });
       })
       .catch(() => {
-        if (mounted) setForm({ title: defaultTitle ?? '', description: '', h1: '', canonicalUrl: '', robots: '', ogTitle: '', ogDescription: '', ogImage: '', jsonLdText: '' });
+        if (mounted)
+          setForm({
+            title: defaultTitle ?? '',
+            description: '',
+            h1: '',
+            canonicalUrl: '',
+            robots: '',
+            ogTitle: '',
+            ogDescription: '',
+            ogImage: '',
+            jsonLdText: '',
+          });
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -195,11 +201,7 @@ export function SeoMetaEditor({ entityType, entityId, defaultTitle }: Props) {
           </div>
           <div>
             <Label>Robots</Label>
-            <Input
-              value={form.robots}
-              onChange={onChange('robots')}
-              placeholder="index,follow"
-            />
+            <Input value={form.robots} onChange={onChange('robots')} placeholder="index,follow" />
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -227,9 +229,7 @@ export function SeoMetaEditor({ entityType, entityId, defaultTitle }: Props) {
           />
         </div>
         {(!titleOk || !descOk) && (
-          <p className="text-xs text-amber-700">
-            Для сохранения: title ≥ 10 символов и description ≥ 50 символов.
-          </p>
+          <p className="text-xs text-amber-700">Для сохранения: title ≥ 10 символов и description ≥ 50 символов.</p>
         )}
       </div>
     </div>

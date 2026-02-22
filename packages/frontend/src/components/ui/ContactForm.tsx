@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { CheckCircle, Loader2, Send } from 'lucide-react';
 import Link from 'next/link';
-import { Send, Loader2, CheckCircle } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
@@ -23,7 +23,7 @@ export function ContactForm() {
       name: data.get('name') as string,
       email: data.get('email') as string,
       category: data.get('category') as string,
-      orderCode: data.get('orderCode') as string || undefined,
+      orderCode: (data.get('orderCode') as string) || undefined,
       message: data.get('message') as string,
     };
 
@@ -62,7 +62,10 @@ export function ContactForm() {
         )}
         <p className="text-sm text-slate-500 mb-4">Мы ответим на ваш email в течение 24 часов.</p>
         <button
-          onClick={() => { setStep('form'); formRef.current?.reset(); }}
+          onClick={() => {
+            setStep('form');
+            formRef.current?.reset();
+          }}
           className="text-sm text-blue-600 hover:underline"
         >
           Отправить ещё одно обращение
@@ -73,9 +76,7 @@ export function ContactForm() {
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="p-3 bg-red-50 text-red-700 text-sm rounded-xl">{error}</div>
-      )}
+      {error && <div className="p-3 bg-red-50 text-red-700 text-sm rounded-xl">{error}</div>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Имя</label>
@@ -140,7 +141,9 @@ export function ContactForm() {
       </button>
       <p className="text-xs text-slate-400 text-center">
         Отправляя форму, вы соглашаетесь с{' '}
-        <Link href="/privacy" className="underline hover:text-slate-600">Политикой конфиденциальности</Link>
+        <Link href="/privacy" className="underline hover:text-slate-600">
+          Политикой конфиденциальности
+        </Link>
       </p>
     </form>
   );

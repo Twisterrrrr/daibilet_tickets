@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class BlogService {
@@ -40,7 +41,19 @@ export class BlogService {
       include: {
         city: { select: { slug: true, name: true } },
         articleEvents: {
-          include: { event: { select: { id: true, slug: true, title: true, imageUrl: true, priceFrom: true, category: true, rating: true } } },
+          include: {
+            event: {
+              select: {
+                id: true,
+                slug: true,
+                title: true,
+                imageUrl: true,
+                priceFrom: true,
+                category: true,
+                rating: true,
+              },
+            },
+          },
         },
         articleTags: { include: { tag: { select: { slug: true, name: true } } } },
       },
@@ -101,9 +114,11 @@ export class BlogService {
 
         // Связать с событиями
         for (const event of city.events.slice(0, 5)) {
-          await this.prisma.articleEvent.create({
-            data: { articleId: article.id, eventId: event.id },
-          }).catch((e) => this.logger.error('blog link failed: ' + (e as Error).message));
+          await this.prisma.articleEvent
+            .create({
+              data: { articleId: article.id, eventId: event.id },
+            })
+            .catch((e) => this.logger.error('blog link failed: ' + (e as Error).message));
         }
 
         created++;
@@ -134,9 +149,11 @@ export class BlogService {
           });
 
           for (const event of excursions.slice(0, 5)) {
-            await this.prisma.articleEvent.create({
-              data: { articleId: article.id, eventId: event.id },
-            }).catch((e) => this.logger.error('blog link failed: ' + (e as Error).message));
+            await this.prisma.articleEvent
+              .create({
+                data: { articleId: article.id, eventId: event.id },
+              })
+              .catch((e) => this.logger.error('blog link failed: ' + (e as Error).message));
           }
 
           created++;
@@ -149,12 +166,7 @@ export class BlogService {
 
   // --- Content builders ---
 
-  private buildCityOverviewContent(
-    city: any,
-    excursions: any[],
-    museums: any[],
-    events: any[],
-  ): string {
+  private buildCityOverviewContent(city: any, excursions: any[], museums: any[], events: any[]): string {
     let md = `# Что посмотреть в ${city.name}\n\n`;
     md += `${city.name} — один из самых интересных городов для путешественников. `;
     md += `В нашем каталоге **${city._count.events} событий** с возможностью онлайн-покупки билетов.\n\n`;

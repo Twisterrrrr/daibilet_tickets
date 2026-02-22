@@ -1,7 +1,8 @@
-import { Injectable, Logger, BadRequestException, Inject } from '@nestjs/common';
-import { STORAGE_PROVIDER, StorageProvider } from './storage.provider';
-import sharp from 'sharp';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import sharp from 'sharp';
+
+import { STORAGE_PROVIDER, StorageProvider } from './storage.provider';
 
 export interface ProcessedImage {
   /** Основное изображение (1200px max) */
@@ -21,9 +22,7 @@ const THUMB_DIMENSION = 300;
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
 
-  constructor(
-    @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
-  ) {}
+  constructor(@Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider) {}
 
   /**
    * Обработать и сохранить изображение.
@@ -32,9 +31,7 @@ export class UploadService {
   async processAndSave(file: Express.Multer.File): Promise<ProcessedImage> {
     // Валидация
     if (!ALLOWED_MIMES.includes(file.mimetype)) {
-      throw new BadRequestException(
-        `Допустимые форматы: JPEG, PNG, WebP. Получен: ${file.mimetype}`,
-      );
+      throw new BadRequestException(`Допустимые форматы: JPEG, PNG, WebP. Получен: ${file.mimetype}`);
     }
     if (file.size > MAX_FILE_SIZE) {
       throw new BadRequestException(
@@ -78,9 +75,6 @@ export class UploadService {
    * Удалить изображение и его thumbnail.
    */
   async deleteImage(filename: string, thumbFilename: string): Promise<void> {
-    await Promise.all([
-      this.storage.delete(filename),
-      this.storage.delete(thumbFilename),
-    ]);
+    await Promise.all([this.storage.delete(filename), this.storage.delete(thumbFilename)]);
   }
 }

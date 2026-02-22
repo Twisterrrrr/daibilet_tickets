@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+
 import { BlogService } from './blog.service';
 
 @ApiTags('blog')
@@ -12,11 +13,7 @@ export class BlogController {
   @ApiQuery({ name: 'city', required: false })
   @ApiQuery({ name: 'tag', required: false })
   @ApiQuery({ name: 'page', required: false })
-  getArticles(
-    @Query('city') city?: string,
-    @Query('tag') tag?: string,
-    @Query('page') page?: string,
-  ) {
+  getArticles(@Query('city') city?: string, @Query('tag') tag?: string, @Query('page') page?: string) {
     return this.blogService.getArticles({
       city,
       tag,

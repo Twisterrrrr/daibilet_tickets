@@ -3,15 +3,16 @@
  * Минимальный NestJS app без Prisma/Redis.
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { Test } from '@nestjs/testing';
-import { Controller, Get, NotFoundException } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
-import { RequestIdMiddleware } from '../request-id.middleware';
-import { AllExceptionsFilter } from '../all-exceptions.filter';
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Controller, Get, NotFoundException } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
+import { Test } from '@nestjs/testing';
 import * as http from 'http';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { AllExceptionsFilter } from '../all-exceptions.filter';
+import { RequestIdMiddleware } from '../request-id.middleware';
 
 // Minimal controller for E2E
 @Controller()

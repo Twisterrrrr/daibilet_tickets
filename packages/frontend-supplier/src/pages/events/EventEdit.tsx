@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+
 import { api } from '../../lib/api';
 
 export default function EventEdit() {
@@ -10,9 +11,16 @@ export default function EventEdit() {
   const [loading, setLoading] = useState(false);
   const [cities, setCities] = useState<any[]>([]);
   const [form, setForm] = useState({
-    title: '', cityId: '', description: '', shortDescription: '',
-    category: 'EXCURSION', audience: 'ALL', durationMinutes: '',
-    address: '', imageUrl: '', priceFrom: '',
+    title: '',
+    cityId: '',
+    description: '',
+    shortDescription: '',
+    category: 'EXCURSION',
+    audience: 'ALL',
+    durationMinutes: '',
+    address: '',
+    imageUrl: '',
+    priceFrom: '',
   });
 
   useEffect(() => {
@@ -74,12 +82,21 @@ export default function EventEdit() {
           <label className="block text-sm font-medium mb-1">Город *</label>
           <select value={form.cityId} onChange={set('cityId')} className="w-full px-3 py-2 border rounded-lg" required>
             <option value="">Выберите город</option>
-            {cities.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {cities.map((c: any) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Описание</label>
-          <textarea value={form.description} onChange={set('description')} rows={4} className="w-full px-3 py-2 border rounded-lg" />
+          <textarea
+            value={form.description}
+            onChange={set('description')}
+            rows={4}
+            className="w-full px-3 py-2 border rounded-lg"
+          />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -102,11 +119,21 @@ export default function EventEdit() {
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Длительность (мин)</label>
-            <input type="number" value={form.durationMinutes} onChange={set('durationMinutes')} className="w-full px-3 py-2 border rounded-lg" />
+            <input
+              type="number"
+              value={form.durationMinutes}
+              onChange={set('durationMinutes')}
+              className="w-full px-3 py-2 border rounded-lg"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Цена от (коп)</label>
-            <input type="number" value={form.priceFrom} onChange={set('priceFrom')} className="w-full px-3 py-2 border rounded-lg" />
+            <input
+              type="number"
+              value={form.priceFrom}
+              onChange={set('priceFrom')}
+              className="w-full px-3 py-2 border rounded-lg"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Адрес</label>
@@ -115,15 +142,28 @@ export default function EventEdit() {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Изображение (URL)</label>
-          <input value={form.imageUrl} onChange={set('imageUrl')} className="w-full px-3 py-2 border rounded-lg" placeholder="https://..." />
+          <input
+            value={form.imageUrl}
+            onChange={set('imageUrl')}
+            className="w-full px-3 py-2 border rounded-lg"
+            placeholder="https://..."
+          />
         </div>
         <div className="flex gap-3 pt-4">
-          <button type="submit" disabled={loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
             {loading ? 'Сохранение...' : isNew ? 'Создать' : 'Сохранить'}
           </button>
-          <button type="button" onClick={() => navigate('/events')}
-            className="px-6 py-2 border rounded-lg hover:bg-gray-50">Отмена</button>
+          <button
+            type="button"
+            onClick={() => navigate('/events')}
+            className="px-6 py-2 border rounded-lg hover:bg-gray-50"
+          >
+            Отмена
+          </button>
         </div>
       </form>
     </div>

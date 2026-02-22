@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+
 import { LandingController } from './landing.controller';
 import { LandingService } from './landing.service';
 

@@ -1,5 +1,5 @@
+import { ArrowRight, Landmark, MapPin } from 'lucide-react';
 import Link from 'next/link';
-import { MapPin, Landmark, ArrowRight } from 'lucide-react';
 
 interface CityCardRegion {
   slug: string;
@@ -36,13 +36,19 @@ function pluralVenues(n: number): string {
   return `${n} музеев`;
 }
 
-export function CityCard({ slug, name, heroImage, eventCount, venueCount, description, large = false, region }: CityCardProps) {
+export function CityCard({
+  slug,
+  name,
+  heroImage,
+  eventCount,
+  venueCount,
+  description,
+  large = false,
+  region,
+}: CityCardProps) {
   return (
     <div className="flex flex-col">
-      <Link
-        href={`/cities/${slug}`}
-        className={`card group relative overflow-hidden ${large ? 'h-64' : 'h-48'}`}
-      >
+      <Link href={`/cities/${slug}`} className={`card group relative overflow-hidden ${large ? 'h-64' : 'h-48'}`}>
         {heroImage ? (
           <img
             src={heroImage}
@@ -56,12 +62,8 @@ export function CityCard({ slug, name, heroImage, eventCount, venueCount, descri
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
         <div className="absolute bottom-0 left-0 right-0 p-5">
-          <h3 className={`font-bold text-white ${large ? 'text-2xl' : 'text-xl'}`}>
-            {name}
-          </h3>
-          {description && large && (
-            <p className="mt-1 line-clamp-2 text-sm text-white/70">{description}</p>
-          )}
+          <h3 className={`font-bold text-white ${large ? 'text-2xl' : 'text-xl'}`}>{name}</h3>
+          {description && large && <p className="mt-1 line-clamp-2 text-sm text-white/70">{description}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/80">
             <span className="flex items-center gap-1.5">
               <MapPin className="h-4 w-4" />
@@ -82,12 +84,8 @@ export function CityCard({ slug, name, heroImage, eventCount, venueCount, descri
           href={`/regions/${region.slug}`}
           className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm transition-all hover:border-primary-300 hover:shadow-md"
         >
-          <span className="font-medium text-slate-700 truncate">
-            + {region.name}
-          </span>
-          <span className="shrink-0 text-slate-400">
-            {pluralEvents(region.eventCount)}
-          </span>
+          <span className="font-medium text-slate-700 truncate">+ {region.name}</span>
+          <span className="shrink-0 text-slate-400">{pluralEvents(region.eventCount)}</span>
           <ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-400" />
         </Link>
       )}

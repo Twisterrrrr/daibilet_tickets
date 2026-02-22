@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
+
 import { runWithLimit, withRetry } from '../common/api-rate-limit.util';
+import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
 
 /**
  * Клиент API teplohod.info v1.
@@ -38,7 +39,10 @@ export class TepApiService {
       });
 
       if (!res.ok) {
-        const text = await res.text().catch((e) => { this.logger.warn('TEP API call failed: ' + (e as Error).message); return ''; });
+        const text = await res.text().catch((e) => {
+          this.logger.warn('TEP API call failed: ' + (e as Error).message);
+          return '';
+        });
         this.logger.error(`TEP API ${res.status}: ${text.slice(0, 500)}`);
         throw new Error(`TEP API returned ${res.status}: ${text.slice(0, 200)}`);
       }
@@ -46,15 +50,12 @@ export class TepApiService {
       return res.json() as Promise<T>;
     };
 
-    const { data, retries } = await withRetry(
-      () => runWithLimit(doFetch),
-      {
-        maxRetries: 3,
-        initialBackoffMs: 1000,
-        onRetry: (attempt, delayMs, status) =>
-          this.logger.warn(`TEP API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
-      },
-    );
+    const { data, retries } = await withRetry(() => runWithLimit(doFetch), {
+      maxRetries: 3,
+      initialBackoffMs: 1000,
+      onRetry: (attempt, delayMs, status) =>
+        this.logger.warn(`TEP API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
+    });
     if (retries > 0) {
       this.logger.log(`TEP API completed after ${retries} retries`);
     }
@@ -72,9 +73,7 @@ export class TepApiService {
    * События с полными данными (включая расписание eventTimes).
    */
   async getEvents(cityId?: number, signal?: AbortSignal): Promise<TepEvent[]> {
-    const fullPath = cityId
-      ? `/events?city_id=${cityId}`
-      : '/events';
+    const fullPath = cityId ? `/events?city_id=${cityId}` : '/events';
     try {
       const events = await this.request<TepEvent[]>(fullPath, signal);
       // Проверяем, что получили полные данные (есть eventTimes)
@@ -85,11 +84,11 @@ export class TepApiService {
       // Если eventTimes отсутствует — IP не в белом списке
       this.logger.warn('TEP: eventTimes not found, IP may not be whitelisted. Fallback to compact.');
     } catch (err: unknown) {
-      this.logger.warn(`TEP full API failed: ${err instanceof Error ? err.message : String(err)}. Fallback to compact.`);
+      this.logger.warn(
+        `TEP full API failed: ${err instanceof Error ? err.message : String(err)}. Fallback to compact.`,
+      );
     }
-    const compactPath = cityId
-      ? `/events?compact&city_id=${cityId}`
-      : '/events?compact';
+    const compactPath = cityId ? `/events?compact&city_id=${cityId}` : '/events?compact';
     return this.request<TepEvent[]>(compactPath, signal);
   }
 
@@ -123,9 +122,7 @@ export class TepApiService {
    *  - 'closed'      — виджет показывает «Закрыто» или «нет доступного расписания»
    *  - 'unavailable' — виджет удалён (deleted-block) или ошибка
    */
-  async checkWidgetStatusByTepWidgetId(
-    tepWidgetId: string | number,
-  ): Promise<'working' | 'closed' | 'unavailable'> {
+  async checkWidgetStatusByTepWidgetId(tepWidgetId: string | number): Promise<'working' | 'closed' | 'unavailable'> {
     return this.checkWidgetStatusByEmbed(tepWidgetId);
   }
 
@@ -143,10 +140,8 @@ export class TepApiService {
       const html = await res.text();
       if (html.includes('deleted-block')) return 'unavailable';
       if (html.includes('ti-tickets-event-tickets-buy-closed')) return 'closed';
-      if (html.includes('нет доступного расписания') || html.includes('регистрация закрыта'))
-        return 'closed';
-      if (html.includes('ti-tickets-event-tickets-buy') || html.includes('Купить билеты'))
-        return 'working';
+      if (html.includes('нет доступного расписания') || html.includes('регистрация закрыта')) return 'closed';
+      if (html.includes('ti-tickets-event-tickets-buy') || html.includes('Купить билеты')) return 'working';
       return 'unavailable';
     } catch {
       return 'unavailable';

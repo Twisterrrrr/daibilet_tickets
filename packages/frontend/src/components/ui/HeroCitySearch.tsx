@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { MapPin, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Search, MapPin } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface City {
   slug: string;

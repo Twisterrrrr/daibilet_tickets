@@ -4,6 +4,45 @@
 
 ---
 
+## 23.02.2026 — Checkout + Расписания + Event Studio: 16 задач выполнены
+
+### Наблюдения
+
+- Все 16 задач из спецификации CheckoutSchedulesEventStudio.md реализованы. Backend: Prisma-модели (EventSchedule, EventSession, CheckoutPackage/Items), ScheduleService, AvailabilityService, PriceSnapshotService, OccurrencePolicyService, Admin API schedules, POST /checkout/package. Admin UI: Event Studio (список, pause/resume, generate), Schedule Builder (диалог), Occurrences list + bulk (pause/resume/cancel). Frontend: /checkout/[packageId], /checkout/[packageId]/status, /payment/success, /payment/fail, /orders/[id]→track.
+
+### Решения
+
+- **Admin API**: PATCH schedules/:id (isActive), POST occurrences/bulk — маршрут bulk перенесён выше :sessionId, чтобы избежать конфликта.
+- **Event Studio**: кнопки Пауза/Запуск на карточке расписания; Schedule Builder — диалог с offerId, type, rule; ScheduleDetailPage — чекбоксы, bulk pause/resume/cancel.
+- **Frontend**: checkout/[packageId] — прогресс, сводка; status — polling, CTA; payment/success|fail — лендинги; orders/[id] — редирект на track.
+- **Audit**: schedules → EventSchedule в audit.interceptor.ts уже настроен.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 22.02.2026 — Спецификация Checkout + Расписания + Event Studio
+
+### Наблюдения
+
+- Входная спецификация: 16 задач, Prisma-модели (EventSchedule, расширение EventSession, CheckoutPackage/Items), миграционный план, RBAC Admin vs Supplier.
+- Текущая схема: EventSession (offerId, startsAt), EventOffer (operatorId), CheckoutSession, AuditLog. Партиционирование event_sessions по startsAt — см. PartitioningPlan.
+- Supplier: защита по operatorId только из токена; если supplier подставляет чужой offerId — backend возвращает 404/403 (не косметика UI).
+
+### Решения
+
+- **docs/CheckoutSchedulesEventStudio.md** — полная спецификация: enum'ы, Prisma-модели, миграционный план, AvailabilityService, PriceSnapshotService, OccurrencePolicyService, RBAC, DoD по задачам.
+- **Project.md** — ссылки на EventSession/CheckoutPackage, секция «Checkout + Расписания + Event Studio».
+- **Tasktracker.md** — блок задач 1–16 (4 блока: Данные/API, Админка UI, Frontend checkout, Аудит).
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 22.02.2026 — Backend Tech Debt: A3, A4, B1, B4, A1-Pino, A2
 
 ### Наблюдения

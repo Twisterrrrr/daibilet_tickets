@@ -1,12 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import {
-  maskEmail,
-  maskPhone,
-  maskSecret,
-  maskAuthorization,
-  maskPii,
-  maskPiiInString,
-} from '../pii-mask.util';
+import { describe, expect, it } from 'vitest';
+
+import { maskAuthorization, maskEmail, maskPhone, maskPii, maskPiiInString, maskSecret } from '../pii-mask.util';
 
 describe('pii-mask.util', () => {
   describe('maskEmail', () => {

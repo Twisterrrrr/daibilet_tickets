@@ -1,13 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Clock, AlertTriangle, Send, Eye, EyeOff,
-  CheckCircle, MessageSquare, User, Bot,
+  AlertTriangle,
+  ArrowLeft,
+  Bot,
+  CheckCircle,
+  Clock,
+  Eye,
+  EyeOff,
+  MessageSquare,
+  Send,
+  User,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 const API = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -65,17 +74,35 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 // Quick reply templates
 const TEMPLATES = [
-  { label: 'Принято в работу', text: 'Здравствуйте! Спасибо за обращение. Ваш вопрос принят в работу, мы разберёмся и вернёмся с ответом.' },
-  { label: 'Требуется код заказа', text: 'Пожалуйста, уточните код заказа (формат CS-XXXX) — он указан в email-подтверждении. Это поможет нам быстрее найти информацию.' },
-  { label: 'Возврат инструкция', text: 'Для оформления возврата билета, пожалуйста, перейдите на сайт оператора, через который был оформлен заказ. Ссылка на оператора указана в вашем электронном билете.' },
-  { label: 'Проблема решена', text: 'Рады сообщить, что ваш вопрос решён! Если остались дополнительные вопросы — не стесняйтесь обращаться.' },
-  { label: 'Билет отправлен повторно', text: 'Мы повторно отправили электронный билет на ваш email. Если письмо не пришло — проверьте папку «Спам».' },
+  {
+    label: 'Принято в работу',
+    text: 'Здравствуйте! Спасибо за обращение. Ваш вопрос принят в работу, мы разберёмся и вернёмся с ответом.',
+  },
+  {
+    label: 'Требуется код заказа',
+    text: 'Пожалуйста, уточните код заказа (формат CS-XXXX) — он указан в email-подтверждении. Это поможет нам быстрее найти информацию.',
+  },
+  {
+    label: 'Возврат инструкция',
+    text: 'Для оформления возврата билета, пожалуйста, перейдите на сайт оператора, через который был оформлен заказ. Ссылка на оператора указана в вашем электронном билете.',
+  },
+  {
+    label: 'Проблема решена',
+    text: 'Рады сообщить, что ваш вопрос решён! Если остались дополнительные вопросы — не стесняйтесь обращаться.',
+  },
+  {
+    label: 'Билет отправлен повторно',
+    text: 'Мы повторно отправили электронный билет на ваш email. Если письмо не пришло — проверьте папку «Спам».',
+  },
 ];
 
 function formatDate(d: string) {
   return new Intl.DateTimeFormat('ru-RU', {
-    day: 'numeric', month: 'long', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(new Date(d));
 }
 
@@ -96,11 +123,15 @@ export function SupportDetailPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setTicket(await res.json());
-    } catch (e) { console.error('Load ticket failed:', e); }
+    } catch (e) {
+      console.error('Load ticket failed:', e);
+    }
     setLoading(false);
   }, [id, token]);
 
-  useEffect(() => { fetchTicket(); }, [fetchTicket]);
+  useEffect(() => {
+    fetchTicket();
+  }, [fetchTicket]);
 
   const updateStatus = async (newStatus: string) => {
     try {
@@ -110,7 +141,9 @@ export function SupportDetailPage() {
         body: JSON.stringify({ status: newStatus }),
       });
       fetchTicket();
-    } catch (e) { console.error('Update status failed:', e); }
+    } catch (e) {
+      console.error('Update status failed:', e);
+    }
   };
 
   const sendReply = async () => {
@@ -129,15 +162,19 @@ export function SupportDetailPage() {
       setReplyText('');
       setIsInternal(false);
       fetchTicket();
-    } catch (e) { console.error('Send reply failed:', e); }
+    } catch (e) {
+      console.error('Send reply failed:', e);
+    }
     setSending(false);
   };
 
   if (loading) return <div className="p-8 text-center text-slate-400">Загрузка...</div>;
   if (!ticket) return <div className="p-8 text-center text-red-500">Тикет не найден</div>;
 
-  const isSlaBreached = ticket.slaDeadline && new Date(ticket.slaDeadline) < new Date()
-    && (ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS');
+  const isSlaBreached =
+    ticket.slaDeadline &&
+    new Date(ticket.slaDeadline) < new Date() &&
+    (ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS');
 
   return (
     <div className="space-y-6">
@@ -184,16 +221,22 @@ export function SupportDetailPage() {
             <Card key={resp.id} className={resp.isInternal ? 'border-amber-200 bg-amber-50/50' : ''}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    resp.authorType === 'admin'
-                      ? 'bg-green-100 text-green-600'
-                      : resp.authorType === 'system'
-                      ? 'bg-slate-100 text-slate-500'
-                      : 'bg-blue-100 text-blue-600'
-                  }`}>
-                    {resp.authorType === 'admin' ? <CheckCircle className="h-4 w-4" /> :
-                     resp.authorType === 'system' ? <Bot className="h-4 w-4" /> :
-                     <User className="h-4 w-4" />}
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      resp.authorType === 'admin'
+                        ? 'bg-green-100 text-green-600'
+                        : resp.authorType === 'system'
+                          ? 'bg-slate-100 text-slate-500'
+                          : 'bg-blue-100 text-blue-600'
+                    }`}
+                  >
+                    {resp.authorType === 'admin' ? (
+                      <CheckCircle className="h-4 w-4" />
+                    ) : resp.authorType === 'system' ? (
+                      <Bot className="h-4 w-4" />
+                    ) : (
+                      <User className="h-4 w-4" />
+                    )}
                   </div>
                   <div className="flex-1">
                     <p className="font-medium text-sm">{resp.authorName || resp.authorType}</p>

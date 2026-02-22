@@ -18,9 +18,7 @@ declare global {
   }
 }
 
-const YM_ID = typeof window !== 'undefined'
-  ? Number(process.env.NEXT_PUBLIC_YM_ID || '0')
-  : 0;
+const YM_ID = typeof window !== 'undefined' ? Number(process.env.NEXT_PUBLIC_YM_ID || '0') : 0;
 
 /**
  * Отправить цель в Яндекс Метрику.

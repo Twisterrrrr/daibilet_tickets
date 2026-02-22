@@ -1,12 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { Cron } from '@nestjs/schedule';
+import { Queue } from 'bullmq';
 import { randomBytes } from 'crypto';
-import { QUEUE_EMAILS, QUEUE_REVIEW_TASKS } from '../queue/queue.constants';
+
+import { PrismaService } from '../prisma/prisma.service';
 import { EmailJobData } from '../queue/email.processor';
+import { QUEUE_EMAILS, QUEUE_REVIEW_TASKS } from '../queue/queue.constants';
 import { ReviewTaskData } from '../queue/review-task.processor';
 
 /**

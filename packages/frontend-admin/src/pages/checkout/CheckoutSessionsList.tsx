@@ -1,13 +1,22 @@
-import { useEffect, useState, useCallback } from 'react';
+import {
+  BarChart3,
+  CheckCircle,
+  Clock,
+  Download,
+  Eye,
+  RefreshCw,
+  Search,
+  Timer,
+  TrendingUp,
+  XCircle,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Search, RefreshCw, CheckCircle, XCircle, Clock, Eye, BarChart3, Timer, TrendingUp, Download } from 'lucide-react';
+
 import { adminApi } from '@/api/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -16,8 +25,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -81,13 +93,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 function formatPrice(kopecks: number | null): string {
   if (!kopecks) return '—';
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(kopecks / 100);
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(
+    kopecks / 100,
+  );
 }
 
 function formatDate(date: string): string {
   return new Date(date).toLocaleString('ru-RU', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
@@ -147,17 +164,23 @@ function OrderRequestsTab() {
       const res = await adminApi.get<any>(`/admin/checkout/requests?${params}`);
       setRequests(res.items || []);
       setTotal(res.total || 0);
-    } catch (e) { console.error('Load requests failed:', e); }
+    } catch (e) {
+      console.error('Load requests failed:', e);
+    }
     setLoading(false);
   }, [search, statusFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleAction = async () => {
     if (!actionDialog) return;
     setActing(true);
     try {
-      await adminApi.post(`/admin/checkout/requests/${actionDialog.id}/${actionDialog.action}`, { adminNote: adminNote || undefined });
+      await adminApi.post(`/admin/checkout/requests/${actionDialog.id}/${actionDialog.action}`, {
+        adminNote: adminNote || undefined,
+      });
       toast.success(actionDialog.action === 'confirm' ? 'Заявка подтверждена' : 'Заявка отклонена');
       setActionDialog(null);
       setAdminNote('');
@@ -212,7 +235,9 @@ function OrderRequestsTab() {
         {/* List */}
         {loading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20" />)}
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-20" />
+            ))}
           </div>
         ) : requests.length === 0 ? (
           <p className="text-center py-8 text-sm text-muted-foreground">Нет заявок</p>
@@ -236,12 +261,8 @@ function OrderRequestsTab() {
                     <span>Сумма: {formatPrice(req.priceSnapshot)}</span>
                     <span>{formatDate(req.createdAt)}</span>
                   </div>
-                  {req.customerComment && (
-                    <p className="text-xs text-slate-500 italic">"{req.customerComment}"</p>
-                  )}
-                  {req.adminNote && (
-                    <p className="text-xs text-amber-600">Заметка: {req.adminNote}</p>
-                  )}
+                  {req.customerComment && <p className="text-xs text-slate-500 italic">"{req.customerComment}"</p>}
+                  {req.adminNote && <p className="text-xs text-amber-600">Заметка: {req.adminNote}</p>}
                 </div>
                 <div className="flex items-center gap-2">
                   {req.status === 'PENDING' && (
@@ -249,7 +270,10 @@ function OrderRequestsTab() {
                       <Button
                         size="sm"
                         variant="default"
-                        onClick={() => { setActionDialog({ id: req.id, action: 'confirm' }); setAdminNote(''); }}
+                        onClick={() => {
+                          setActionDialog({ id: req.id, action: 'confirm' });
+                          setAdminNote('');
+                        }}
                       >
                         <CheckCircle className="mr-1 h-3.5 w-3.5" />
                         Подтвердить
@@ -258,7 +282,10 @@ function OrderRequestsTab() {
                         size="sm"
                         variant="outline"
                         className="text-destructive"
-                        onClick={() => { setActionDialog({ id: req.id, action: 'reject' }); setAdminNote(''); }}
+                        onClick={() => {
+                          setActionDialog({ id: req.id, action: 'reject' });
+                          setAdminNote('');
+                        }}
                       >
                         <XCircle className="mr-1 h-3.5 w-3.5" />
                         Отклонить
@@ -276,9 +303,7 @@ function OrderRequestsTab() {
       <Dialog open={!!actionDialog} onOpenChange={(open) => !open && setActionDialog(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>
-              {actionDialog?.action === 'confirm' ? 'Подтвердить заявку' : 'Отклонить заявку'}
-            </DialogTitle>
+            <DialogTitle>{actionDialog?.action === 'confirm' ? 'Подтвердить заявку' : 'Отклонить заявку'}</DialogTitle>
             <DialogDescription>
               {actionDialog?.action === 'confirm'
                 ? 'Места будут зарезервированы. Клиент получит уведомление.'
@@ -297,7 +322,9 @@ function OrderRequestsTab() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setActionDialog(null)}>Отмена</Button>
+            <Button variant="outline" onClick={() => setActionDialog(null)}>
+              Отмена
+            </Button>
             <Button
               variant={actionDialog?.action === 'confirm' ? 'default' : 'destructive'}
               onClick={handleAction}
@@ -334,11 +361,15 @@ function CheckoutSessionsTab() {
       const res = await adminApi.get<any>(`/admin/checkout/sessions?${params}`);
       setSessions(res.items || []);
       setTotal(res.total || 0);
-    } catch (e) { console.error('Load sessions failed:', e); }
+    } catch (e) {
+      console.error('Load sessions failed:', e);
+    }
     setLoading(false);
   }, [search, statusFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const loadDetail = async (id: string) => {
     setDetailId(id);
@@ -384,7 +415,7 @@ function CheckoutSessionsTab() {
                 size="sm"
                 onClick={() => setStatusFilter(s)}
               >
-                {s ? (STATUS_LABELS[s] || s) : 'Все'}
+                {s ? STATUS_LABELS[s] || s : 'Все'}
               </Button>
             ))}
           </div>
@@ -393,7 +424,9 @@ function CheckoutSessionsTab() {
         {/* List */}
         {loading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16" />)}
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16" />
+            ))}
           </div>
         ) : sessions.length === 0 ? (
           <p className="text-center py-8 text-sm text-muted-foreground">Нет сессий</p>
@@ -448,10 +481,22 @@ function CheckoutSessionsTab() {
                   <span className="text-muted-foreground">Сумма:</span>
                   <span className="font-medium ml-2">{formatPrice(detail.totalPrice)}</span>
                 </div>
-                <div><span className="text-muted-foreground">Имя:</span> <span className="ml-1">{detail.customerName || '—'}</span></div>
-                <div><span className="text-muted-foreground">Email:</span> <span className="ml-1">{detail.customerEmail || '—'}</span></div>
-                <div><span className="text-muted-foreground">Телефон:</span> <span className="ml-1">{detail.customerPhone || '—'}</span></div>
-                <div><span className="text-muted-foreground">Создано:</span> <span className="ml-1">{formatDate(detail.createdAt)}</span></div>
+                <div>
+                  <span className="text-muted-foreground">Имя:</span>{' '}
+                  <span className="ml-1">{detail.customerName || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Email:</span>{' '}
+                  <span className="ml-1">{detail.customerEmail || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Телефон:</span>{' '}
+                  <span className="ml-1">{detail.customerPhone || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Создано:</span>{' '}
+                  <span className="ml-1">{formatDate(detail.createdAt)}</span>
+                </div>
               </div>
 
               {detail.utmSource && (
@@ -476,9 +521,7 @@ function CheckoutSessionsTab() {
                         <div className="text-xs text-muted-foreground">
                           Кол-во: {req.quantity} | Event: {req.eventId.slice(0, 8)}...
                         </div>
-                        {req.customerComment && (
-                          <p className="text-xs italic">"{req.customerComment}"</p>
-                        )}
+                        {req.customerComment && <p className="text-xs italic">"{req.customerComment}"</p>}
                       </div>
                     ))}
                   </div>
@@ -585,12 +628,16 @@ function AnalyticsTab() {
     }
   }, []);
 
-  useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
 
   if (loading) {
     return (
       <div className="grid gap-4 md:grid-cols-3">
-        {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-32" />)}
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Skeleton key={i} className="h-32" />
+        ))}
       </div>
     );
   }
@@ -621,9 +668,11 @@ function AnalyticsTab() {
                 <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                   <div
                     className={`h-full rounded-full ${
-                      item.purchaseType === 'WIDGET' ? 'bg-blue-500' :
-                      item.purchaseType === 'REDIRECT' ? 'bg-emerald-500' :
-                      'bg-amber-500'
+                      item.purchaseType === 'WIDGET'
+                        ? 'bg-blue-500'
+                        : item.purchaseType === 'REDIRECT'
+                          ? 'bg-emerald-500'
+                          : 'bg-amber-500'
                     }`}
                     style={{ width: `${totalOffers > 0 ? (item.count / totalOffers) * 100 : 0}%` }}
                   />
@@ -686,24 +735,31 @@ function AnalyticsTab() {
                 { label: 'Завершено (COMPLETED)', value: data.dropOff.completed, color: 'bg-emerald-600' },
                 { label: 'Истекло (EXPIRED)', value: data.dropOff.expired, color: 'bg-red-400' },
                 { label: 'Отменено (CANCELLED)', value: data.dropOff.cancelled, color: 'bg-red-600' },
-              ].filter((s) => s.value > 0).map((step) => {
-                const maxVal = Math.max(
-                  data.dropOff.started, data.dropOff.validated,
-                  data.dropOff.redirected, data.dropOff.pendingConfirmation,
-                  data.dropOff.completed, 1,
-                );
-                return (
-                  <div key={step.label} className="flex items-center gap-3">
-                    <span className="text-sm w-48 text-right text-muted-foreground truncate">{step.label}</span>
-                    <div className="flex-1 h-6 bg-muted rounded overflow-hidden">
-                      <div className={`h-full ${step.color} rounded flex items-center pl-2`}
-                        style={{ width: `${Math.max((step.value / maxVal) * 100, 5)}%` }}>
-                        <span className="text-xs font-medium text-white">{step.value}</span>
+              ]
+                .filter((s) => s.value > 0)
+                .map((step) => {
+                  const maxVal = Math.max(
+                    data.dropOff.started,
+                    data.dropOff.validated,
+                    data.dropOff.redirected,
+                    data.dropOff.pendingConfirmation,
+                    data.dropOff.completed,
+                    1,
+                  );
+                  return (
+                    <div key={step.label} className="flex items-center gap-3">
+                      <span className="text-sm w-48 text-right text-muted-foreground truncate">{step.label}</span>
+                      <div className="flex-1 h-6 bg-muted rounded overflow-hidden">
+                        <div
+                          className={`h-full ${step.color} rounded flex items-center pl-2`}
+                          style={{ width: `${Math.max((step.value / maxVal) * 100, 5)}%` }}
+                        >
+                          <span className="text-xs font-medium text-white">{step.value}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </CardContent>
         </Card>
@@ -801,9 +857,7 @@ function AnalyticsTab() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-xs text-muted-foreground">
-                50% заявок подтверждены быстрее
-              </div>
+              <div className="text-xs text-muted-foreground">50% заявок подтверждены быстрее</div>
             </CardContent>
           </Card>
 
@@ -816,9 +870,11 @@ function AnalyticsTab() {
             </CardHeader>
             <CardContent>
               <div className="text-xs text-muted-foreground">
-                {data.sla.p90ConfirmMinutes !== null && data.sla.p90ConfirmMinutes > data.sla.defaultSlaMinutes
-                  ? <span className="text-red-500">Превышает SLA — проблема в операционке</span>
-                  : '90% заявок подтверждены быстрее'}
+                {data.sla.p90ConfirmMinutes !== null && data.sla.p90ConfirmMinutes > data.sla.defaultSlaMinutes ? (
+                  <span className="text-red-500">Превышает SLA — проблема в операционке</span>
+                ) : (
+                  '90% заявок подтверждены быстрее'
+                )}
               </div>
             </CardContent>
           </Card>
@@ -826,7 +882,9 @@ function AnalyticsTab() {
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>SLA Breach Rate</CardDescription>
-              <CardTitle className={`text-2xl ${data.sla.slaBreachRate > 20 ? 'text-red-600' : data.sla.slaBreachRate > 10 ? 'text-amber-600' : 'text-emerald-600'}`}>
+              <CardTitle
+                className={`text-2xl ${data.sla.slaBreachRate > 20 ? 'text-red-600' : data.sla.slaBreachRate > 10 ? 'text-amber-600' : 'text-emerald-600'}`}
+              >
                 {data.sla.slaBreachRate}%
               </CardTitle>
             </CardHeader>
@@ -837,9 +895,11 @@ function AnalyticsTab() {
               <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                 <div
                   className={`h-full rounded-full ${
-                    data.sla.slaBreachRate > 20 ? 'bg-red-500' :
-                    data.sla.slaBreachRate > 10 ? 'bg-amber-500' :
-                    'bg-emerald-500'
+                    data.sla.slaBreachRate > 20
+                      ? 'bg-red-500'
+                      : data.sla.slaBreachRate > 10
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
                   }`}
                   style={{ width: `${Math.min(data.sla.slaBreachRate, 100)}%` }}
                 />
@@ -859,7 +919,7 @@ function AnalyticsTab() {
                 {data.requestsByExpireReason.map((item) => (
                   <div key={item.reason || 'unknown'} className="flex items-center justify-between">
                     <span className="text-sm">
-                      {item.reason ? (EXPIRE_REASON_LABELS[item.reason] || item.reason) : 'Не указана (legacy)'}
+                      {item.reason ? EXPIRE_REASON_LABELS[item.reason] || item.reason : 'Не указана (legacy)'}
                     </span>
                     <span className="text-sm font-medium">{item.count}</span>
                   </div>

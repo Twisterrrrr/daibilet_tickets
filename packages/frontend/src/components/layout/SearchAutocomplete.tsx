@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  Search, X, MapPin, Ticket, Loader2, ArrowRight,
-} from 'lucide-react';
-import { api } from '@/lib/api';
 import { formatPrice } from '@daibilet/shared';
+import { ArrowRight, Loader2, MapPin, Search, Ticket, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { api } from '@/lib/api';
 
 interface SearchResult {
   events: any[];
@@ -126,7 +125,11 @@ export function SearchAutocomplete() {
               {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
               <button
                 type="button"
-                onClick={() => { setOpen(false); setQuery(''); setResults(null); }}
+                onClick={() => {
+                  setOpen(false);
+                  setQuery('');
+                  setResults(null);
+                }}
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X className="h-5 w-5" />

@@ -121,9 +121,11 @@ const FULFILLMENT_TERMINAL = new Set(['CONFIRMED', 'FAILED', 'CANCELLED', 'REFUN
  * Инвариант: CheckoutSession.COMPLETED только когда все line items
  * либо CONFIRMED, либо компенсированы (REFUNDED/CANCELLED).
  */
-export function isSessionFullyFulfilled(
-  fulfillmentStatuses: string[],
-): { fulfilled: boolean; allConfirmed: boolean; hasFailures: boolean } {
+export function isSessionFullyFulfilled(fulfillmentStatuses: string[]): {
+  fulfilled: boolean;
+  allConfirmed: boolean;
+  hasFailures: boolean;
+} {
   if (fulfillmentStatuses.length === 0) return { fulfilled: false, allConfirmed: false, hasFailures: false };
 
   const allTerminal = fulfillmentStatuses.every((s) => FULFILLMENT_TERMINAL.has(s));

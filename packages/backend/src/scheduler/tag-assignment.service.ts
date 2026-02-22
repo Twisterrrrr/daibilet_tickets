@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { TagCategory } from '@prisma/client';
+
 import { PrismaService } from '../prisma/prisma.service';
 
 const DYNAMIC_TAG_SLUGS = ['best-value', 'last-minute', 'today-available'] as const;

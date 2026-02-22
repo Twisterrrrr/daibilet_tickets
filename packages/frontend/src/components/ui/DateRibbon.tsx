@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface DateRibbonProps {
   /** ISO-дата выбранного дня (yyyy-mm-dd) или null */
@@ -63,7 +63,20 @@ function getWeekdayMonFirst(d: Date): number {
 }
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const MONTHS = [
+  'Январь',
+  'Февраль',
+  'Март',
+  'Апрель',
+  'Май',
+  'Июнь',
+  'Июль',
+  'Август',
+  'Сентябрь',
+  'Октябрь',
+  'Ноябрь',
+  'Декабрь',
+];
 
 export function DateRibbon({ selected, onChange }: DateRibbonProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -108,7 +121,8 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
     }
   }, [selected]);
 
-  const isOtherDateSelected = selected && !days.some((d) => d.iso === selected) && selected !== `${weekendSat}..${weekendSun}`;
+  const isOtherDateSelected =
+    selected && !days.some((d) => d.iso === selected) && selected !== `${weekendSat}..${weekendSun}`;
 
   // При открытии календаря показывать месяц выбранной даты или текущий
   useEffect(() => {
@@ -226,18 +240,18 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
                     : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
               }`}
             >
-              <span className={`text-[10px] uppercase leading-tight ${
-                isSelected ? 'text-white/80' : day.isWeekend ? 'text-amber-600' : 'text-slate-400'
-              }`}>
+              <span
+                className={`text-[10px] uppercase leading-tight ${
+                  isSelected ? 'text-white/80' : day.isWeekend ? 'text-amber-600' : 'text-slate-400'
+                }`}
+              >
                 {day.label || weekdayShort(day.date)}
               </span>
               <span className="text-sm font-semibold leading-tight mt-0.5">
                 {day.label ? dayMonth(day.date) : day.date.getDate()}
               </span>
               {!day.label && (
-                <span className={`text-[10px] leading-tight ${
-                  isSelected ? 'text-white/70' : 'text-slate-400'
-                }`}>
+                <span className={`text-[10px] leading-tight ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>
                   {day.date.toLocaleDateString('ru-RU', { month: 'short' })}
                 </span>
               )}

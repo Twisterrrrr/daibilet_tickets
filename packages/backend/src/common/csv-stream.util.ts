@@ -65,10 +65,7 @@ export async function streamCsv(options: CsvStreamOptions): Promise<void> {
 
   // Заголовки HTTP
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${filename}-${Date.now()}.csv"`,
-  );
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}-${Date.now()}.csv"`);
 
   // BOM для Excel + заголовки CSV
   const headerLine = fields.map((f) => f.header).join(',');

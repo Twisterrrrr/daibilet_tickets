@@ -1,21 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { formatPrice } from '@daibilet/shared';
 import {
-  ArrowLeft,
-  ShoppingCart,
-  ExternalLink,
-  Send,
-  CheckCircle,
   AlertCircle,
+  ArrowLeft,
+  CheckCircle,
+  ExternalLink,
   Loader2,
-  Trash2,
   Minus,
   Plus,
+  Send,
+  ShoppingCart,
+  Trash2,
 } from 'lucide-react';
-import { useCart, type CartItem } from '@/lib/cart';
-import { formatPrice } from '@daibilet/shared';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
+import { type CartItem, useCart } from '@/lib/cart';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
@@ -49,7 +50,11 @@ export function CheckoutClient() {
     requestItems?: number;
   } | null>(null);
   const [giftCertCode, setGiftCertCode] = useState('');
-  const [giftCertValidation, setGiftCertValidation] = useState<{ valid: boolean; discountAmount?: number; message?: string } | null>(null);
+  const [giftCertValidation, setGiftCertValidation] = useState<{
+    valid: boolean;
+    discountAmount?: number;
+    message?: string;
+  } | null>(null);
   const [validatingCert, setValidatingCert] = useState(false);
 
   // Separate items by type (3 типа: WIDGET, REDIRECT, REQUEST)
@@ -174,15 +179,21 @@ export function CheckoutClient() {
           {['Проверка', 'Контакты', 'Готово'].map((label, idx) => {
             const stepIdx = idx === 0 ? 'review' : idx === 1 ? 'contact' : 'done';
             const isActive = step === stepIdx || step === 'processing';
-            const isDone = (idx === 0 && (step === 'contact' || step === 'processing' || step === 'done')) ||
-                           (idx === 1 && (step === 'processing' || step === 'done')) ||
-                           (idx === 2 && step === 'done');
+            const isDone =
+              (idx === 0 && (step === 'contact' || step === 'processing' || step === 'done')) ||
+              (idx === 1 && (step === 'processing' || step === 'done')) ||
+              (idx === 2 && step === 'done');
             return (
               <div key={label} className="flex items-center gap-2 flex-1">
-                <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                  isDone ? 'bg-emerald-500 text-white' :
-                  isActive ? 'bg-primary-600 text-white' : 'bg-slate-200 text-slate-500'
-                }`}>
+                <div
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                    isDone
+                      ? 'bg-emerald-500 text-white'
+                      : isActive
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-slate-200 text-slate-500'
+                  }`}
+                >
                   {isDone ? <CheckCircle className="h-4 w-4" /> : idx + 1}
                 </div>
                 <span className={`text-sm ${isActive || isDone ? 'font-medium text-slate-900' : 'text-slate-400'}`}>
@@ -219,13 +230,19 @@ export function CheckoutClient() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <Link href={`/events/${item.eventSlug}`} className="text-sm font-medium text-slate-900 line-clamp-1 hover:text-primary-600">
+                      <Link
+                        href={`/events/${item.eventSlug}`}
+                        className="text-sm font-medium text-slate-900 line-clamp-1 hover:text-primary-600"
+                      >
                         {item.eventTitle}
                       </Link>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-slate-400">
-                          {item.purchaseType === 'REQUEST' ? 'Заявка' :
-                           item.purchaseType === 'REDIRECT' ? 'Партнёр' : 'Билет'}
+                          {item.purchaseType === 'REQUEST'
+                            ? 'Заявка'
+                            : item.purchaseType === 'REDIRECT'
+                              ? 'Партнёр'
+                              : 'Билет'}
                         </span>
                         {item.badge && (
                           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
@@ -312,9 +329,7 @@ export function CheckoutClient() {
               <div className="flex items-center justify-between">
                 <span className="text-slate-600">Итого:</span>
                 <span className="text-xl font-bold text-slate-900">
-                  {formatPrice(
-                    totalPrice - (giftCertValidation?.valid ? (giftCertValidation.discountAmount ?? 0) : 0),
-                  )}
+                  {formatPrice(totalPrice - (giftCertValidation?.valid ? (giftCertValidation.discountAmount ?? 0) : 0))}
                 </span>
               </div>
               {redirectItems.length > 0 && requestItems.length > 0 && (
@@ -329,11 +344,7 @@ export function CheckoutClient() {
               disabled={validating}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
             >
-              {validating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Продолжить'
-              )}
+              {validating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Продолжить'}
             </button>
           </div>
         )}
@@ -355,13 +366,13 @@ export function CheckoutClient() {
                   <ExternalLink className="h-5 w-5 text-blue-600" />
                   <h3 className="text-sm font-semibold text-blue-800">Оплата на сайте партнёра</h3>
                 </div>
-                <p className="text-xs text-blue-600">
-                  После оформления вы будете перенаправлены для оплаты
-                </p>
+                <p className="text-xs text-blue-600">После оформления вы будете перенаправлены для оплаты</p>
                 {redirectItems.map((item) => (
                   <div key={item.offerId} className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
                     <span className="text-sm text-slate-700 line-clamp-1">{item.eventTitle}</span>
-                    <span className="text-sm font-medium text-slate-900">{formatPrice(item.priceFrom * item.quantity)}</span>
+                    <span className="text-sm font-medium text-slate-900">
+                      {formatPrice(item.priceFrom * item.quantity)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -374,13 +385,13 @@ export function CheckoutClient() {
                   <Send className="h-5 w-5 text-amber-600" />
                   <h3 className="text-sm font-semibold text-amber-800">Заявка на подтверждение</h3>
                 </div>
-                <p className="text-xs text-amber-600">
-                  Оператор свяжется с вами для подтверждения и оплаты
-                </p>
+                <p className="text-xs text-amber-600">Оператор свяжется с вами для подтверждения и оплаты</p>
                 {requestItems.map((item) => (
                   <div key={item.offerId} className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
                     <span className="text-sm text-slate-700 line-clamp-1">{item.eventTitle}</span>
-                    <span className="text-sm font-medium text-slate-900">{formatPrice(item.priceFrom * item.quantity)}</span>
+                    <span className="text-sm font-medium text-slate-900">
+                      {formatPrice(item.priceFrom * item.quantity)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -496,8 +507,8 @@ export function CheckoutClient() {
                   Заявки на подтверждение: {result.requestItems ?? 0}
                 </h3>
                 <p className="mt-1 text-xs text-amber-600">
-                  Оператор свяжется с вами в ближайшее время для подтверждения мест и оплаты.
-                  Заявка действительна 30 минут.
+                  Оператор свяжется с вами в ближайшее время для подтверждения мест и оплаты. Заявка действительна 30
+                  минут.
                 </p>
               </div>
             )}

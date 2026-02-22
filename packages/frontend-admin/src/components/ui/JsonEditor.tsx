@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface JsonEditorProps {
   value: any;
@@ -47,18 +47,12 @@ export function JsonEditor({ value, onChange, label, schema, rows = 10 }: JsonEd
       {label && (
         <div className="flex items-center justify-between">
           <label className="block text-sm font-medium text-gray-700">{label}</label>
-          <button
-            type="button"
-            onClick={handlePrettify}
-            className="text-xs text-primary-600 hover:text-primary-700"
-          >
+          <button type="button" onClick={handlePrettify} className="text-xs text-primary-600 hover:text-primary-700">
             Форматировать
           </button>
         </div>
       )}
-      {schema && (
-        <p className="text-xs text-gray-400">{schema}</p>
-      )}
+      {schema && <p className="text-xs text-gray-400">{schema}</p>}
       <textarea
         value={text}
         onChange={(e) => handleChange(e.target.value)}
@@ -70,9 +64,7 @@ export function JsonEditor({ value, onChange, label, schema, rows = 10 }: JsonEd
             : 'border-gray-300 bg-gray-50 focus:border-primary-500 focus:ring-1 focus:ring-primary-500'
         }`}
       />
-      {error && (
-        <p className="text-xs text-red-500">JSON ошибка: {error}</p>
-      )}
+      {error && <p className="text-xs text-red-500">JSON ошибка: {error}</p>}
     </div>
   );
 }

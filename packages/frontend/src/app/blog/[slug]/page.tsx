@@ -1,10 +1,11 @@
+import { ArrowLeft, Calendar, MapPin, Tag } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Calendar, MapPin, ArrowLeft, Tag } from 'lucide-react';
-import { api } from '@/lib/api';
-import { getSeoMeta } from '@/lib/seo/getSeoMeta';
+
 import { EventCard } from '@/components/ui/EventCard';
 import { VenueCard } from '@/components/ui/VenueCard';
+import { api } from '@/lib/api';
+import { getSeoMeta } from '@/lib/seo/getSeoMeta';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -20,13 +21,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const robots = seo?.robots ?? 'index,follow';
     const canonical = seo?.canonicalUrl ?? undefined;
     return {
-      title,
-      description,
+      title: title != null ? title : undefined,
+      description: description != null ? description : undefined,
       robots,
       ...(canonical && { alternates: { canonical } }),
       openGraph: {
-        title: seo?.ogTitle ?? title,
-        description: seo?.ogDescription ?? description,
+        title: (seo?.ogTitle ?? title) ?? undefined,
+        description: (seo?.ogDescription ?? description) ?? undefined,
         ...(seo?.ogImage && { images: [{ url: seo.ogImage }] }),
         type: 'article',
       },
@@ -51,7 +52,10 @@ function renderMarkdown(md: string): string {
     .replace(/^### (.+)$/gm, '<h3 class="mt-6 mb-3 text-lg font-bold text-slate-900">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 class="mt-8 mb-4 text-xl font-bold text-slate-900">$1</h2>')
     .replace(/^# (.+)$/gm, '<h1 class="mt-8 mb-4 text-2xl font-bold text-slate-900">$1</h1>')
-    .replace(/\*\*\[(.+?)\]\((.+?)\)\*\*/g, '<a href="$2" class="font-semibold text-primary-600 hover:underline">$1</a>')
+    .replace(
+      /\*\*\[(.+?)\]\((.+?)\)\*\*/g,
+      '<a href="$2" class="font-semibold text-primary-600 hover:underline">$1</a>',
+    )
     .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-primary-600 hover:underline">$1</a>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc text-slate-700">$1</li>')
@@ -96,17 +100,12 @@ export default async function ArticlePage({ params }: Props) {
       {/* Hero */}
       <section className="bg-gradient-to-br from-slate-800 to-slate-900 py-12">
         <div className="container-page max-w-3xl">
-          <Link
-            href="/blog"
-            className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white"
-          >
+          <Link href="/blog" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white">
             <ArrowLeft className="h-3.5 w-3.5" />
             Все статьи
           </Link>
 
-          <h1 className="mt-4 text-3xl font-extrabold text-white sm:text-4xl">
-            {article.title}
-          </h1>
+          <h1 className="mt-4 text-3xl font-extrabold text-white sm:text-4xl">{article.title}</h1>
 
           <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-400">
             {article.publishedAt && (
@@ -116,10 +115,7 @@ export default async function ArticlePage({ params }: Props) {
               </span>
             )}
             {article.city && (
-              <Link
-                href={`/cities/${article.city.slug}`}
-                className="flex items-center gap-1.5 hover:text-white"
-              >
+              <Link href={`/cities/${article.city.slug}`} className="flex items-center gap-1.5 hover:text-white">
                 <MapPin className="h-4 w-4" />
                 {article.city.name}
               </Link>
@@ -146,11 +142,7 @@ export default async function ArticlePage({ params }: Props) {
       {/* Cover image */}
       {article.coverImage && (
         <div className="container-page max-w-3xl -mt-2">
-          <img
-            src={article.coverImage}
-            alt={article.title}
-            className="w-full rounded-2xl shadow-lg"
-          />
+          <img src={article.coverImage} alt={article.title} className="w-full rounded-2xl shadow-lg" />
         </div>
       )}
 

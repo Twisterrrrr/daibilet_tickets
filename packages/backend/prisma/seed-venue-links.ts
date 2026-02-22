@@ -31,7 +31,11 @@ const VENUE_EVENT_MATCHES: VenueEventMatch[] = [
   { venueSlug: 'russkij-muzej', keywords: ['русский музей', 'русского музея'], citySlug: 'saint-petersburg' },
   { venueSlug: 'muzej-faberze', keywords: ['фаберже', 'faberge'], citySlug: 'saint-petersburg' },
   { venueSlug: 'kunstkamera', keywords: ['кунсткамера', 'kunstkamera'], citySlug: 'saint-petersburg' },
-  { venueSlug: 'petropavlovskaya-krepost', keywords: ['петропавловск', 'peter and paul'], citySlug: 'saint-petersburg' },
+  {
+    venueSlug: 'petropavlovskaya-krepost',
+    keywords: ['петропавловск', 'peter and paul'],
+    citySlug: 'saint-petersburg',
+  },
   { venueSlug: 'planetarij-1', keywords: ['планетарий'], citySlug: 'saint-petersburg' },
   { venueSlug: 'generalnyj-shtab', keywords: ['генеральн', 'генштаб'], citySlug: 'saint-petersburg' },
   // Москва
@@ -58,9 +62,7 @@ async function linkEventsToVenues(): Promise<number> {
     }
 
     // Ищем события по ключевым словам
-    const cityFilter = match.citySlug
-      ? { city: { slug: match.citySlug } }
-      : {};
+    const cityFilter = match.citySlug ? { city: { slug: match.citySlug } } : {};
 
     const events = await prisma.event.findMany({
       where: {
@@ -143,7 +145,8 @@ async function createOpenDateOffer(): Promise<boolean> {
         cityId: city.id,
         title: 'Эрмитаж — входной билет',
         slug: `ermitazh-vhodnoj-bilet`,
-        shortDescription: 'Входной билет в Государственный Эрмитаж с открытой датой посещения. Главный музейный комплекс, Генштаб и другие здания.',
+        shortDescription:
+          'Входной билет в Государственный Эрмитаж с открытой датой посещения. Главный музейный комплекс, Генштаб и другие здания.',
         description: `<p>Государственный Эрмитаж — один из крупнейших художественных и культурно-исторических музеев мира. Коллекция насчитывает более 3 миллионов экспонатов.</p>
 <p>Входной билет даёт доступ в Главный музейный комплекс (Зимний дворец), Главный штаб и другие выставочные пространства.</p>
 <p><strong>Что включено:</strong></p>
@@ -181,8 +184,10 @@ async function createOpenDateOffer(): Promise<boolean> {
       badge: 'Официальный сайт',
       availabilityMode: 'UNKNOWN',
       meetingPoint: 'Дворцовая площадь, 2 — Главный вход через ворота',
-      meetingInstructions: 'Метро «Адмиралтейская» (выход на Невский проспект, далее 10 мин пешком в сторону Дворцовой площади). Электронный билет — отдельный вход без очереди.',
-      operationalNote: 'Билет действителен в течение 180 дней с момента покупки. Крупные сумки сдаются в гардероб (бесплатно).',
+      meetingInstructions:
+        'Метро «Адмиралтейская» (выход на Невский проспект, далее 10 мин пешком в сторону Дворцовой площади). Электронный билет — отдельный вход без очереди.',
+      operationalNote:
+        'Билет действителен в течение 180 дней с момента покупки. Крупные сумки сдаются в гардероб (бесплатно).',
     },
   });
 
@@ -223,16 +228,12 @@ const VENUE_IMAGES: VenueImages[] = [
   {
     slug: 'muzej-faberze',
     imageUrl: 'https://images.unsplash.com/photo-1612878010854-1250dfc5bfcf?w=1200&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1612878010854-1250dfc5bfcf?w=800&q=80',
-    ],
+    galleryUrls: ['https://images.unsplash.com/photo-1612878010854-1250dfc5bfcf?w=800&q=80'],
   },
   {
     slug: 'kunstkamera',
     imageUrl: 'https://images.unsplash.com/photo-1584444744680-21e4f08b7e2e?w=1200&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1584444744680-21e4f08b7e2e?w=800&q=80',
-    ],
+    galleryUrls: ['https://images.unsplash.com/photo-1584444744680-21e4f08b7e2e?w=800&q=80'],
   },
   {
     slug: 'petropavlovskaya-krepost',
@@ -253,30 +254,22 @@ const VENUE_IMAGES: VenueImages[] = [
   {
     slug: 'pushkinskij-muzej',
     imageUrl: 'https://images.unsplash.com/photo-1565008576549-57569a49371d?w=1200&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1565008576549-57569a49371d?w=800&q=80',
-    ],
+    galleryUrls: ['https://images.unsplash.com/photo-1565008576549-57569a49371d?w=800&q=80'],
   },
   {
     slug: 'muzej-garazh',
     imageUrl: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=1200&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1568667256549-094345857637?w=800&q=80',
-    ],
+    galleryUrls: ['https://images.unsplash.com/photo-1568667256549-094345857637?w=800&q=80'],
   },
   {
     slug: 'kazanskij-kreml',
     imageUrl: 'https://images.unsplash.com/photo-1623413711353-fa0af7a98d36?w=1200&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1623413711353-fa0af7a98d36?w=800&q=80',
-    ],
+    galleryUrls: ['https://images.unsplash.com/photo-1623413711353-fa0af7a98d36?w=800&q=80'],
   },
   {
     slug: 'muzej-mirovogo-okeana',
     imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=1200&q=80',
-    galleryUrls: [
-      'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80',
-    ],
+    galleryUrls: ['https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80'],
   },
 ];
 
@@ -309,7 +302,9 @@ async function updateVenueImages(): Promise<number> {
       data: updateData,
     });
 
-    console.log(`  ✓ Images for "${vi.slug}": imageUrl=${!!updateData.imageUrl}, gallery=${updateData.galleryUrls?.length || 0}`);
+    console.log(
+      `  ✓ Images for "${vi.slug}": imageUrl=${!!updateData.imageUrl}, gallery=${updateData.galleryUrls?.length || 0}`,
+    );
     updated++;
   }
 

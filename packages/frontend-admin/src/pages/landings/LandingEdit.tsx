@@ -1,22 +1,17 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
+
 import { adminApi } from '@/api/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -105,7 +100,7 @@ export function LandingEditPage() {
     adminApi
       .get<CityItem[] | { items: CityItem[] }>('/admin/cities')
       .then((res) => {
-        const list = Array.isArray(res) ? res : (res as { items: CityItem[] }).items ?? [];
+        const list = Array.isArray(res) ? res : ((res as { items: CityItem[] }).items ?? []);
         setCities(list);
       })
       .catch((e) => console.error('Load cities failed:', e));
@@ -225,9 +220,7 @@ export function LandingEditPage() {
             {isCreate ? 'Новый лендинг' : 'Редактирование лендинга'}
           </h1>
           <p className="text-muted-foreground">
-            {isCreate
-              ? 'Создайте новый лендинг для города и тега'
-              : 'Изменения сохранятся при нажатии «Сохранить»'}
+            {isCreate ? 'Создайте новый лендинг для города и тега' : 'Изменения сохранятся при нажатии «Сохранить»'}
           </p>
         </div>
         <Button variant="outline" onClick={() => navigate('/landings')} className="gap-2">
@@ -264,9 +257,7 @@ export function LandingEditPage() {
                 <Label htmlFor="city">Город</Label>
                 <Select
                   value={form.cityId || '__none__'}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, cityId: v === '__none__' ? '' : v }))
-                  }
+                  onValueChange={(v) => setForm((f) => ({ ...f, cityId: v === '__none__' ? '' : v }))}
                   required
                 >
                   <SelectTrigger id="city">
@@ -327,9 +318,7 @@ export function LandingEditPage() {
                   id="isActive"
                   checked={form.isActive}
                   onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                  className={cn(
-                    'h-4 w-4 rounded border-input accent-primary',
-                  )}
+                  className={cn('h-4 w-4 rounded border-input accent-primary')}
                 />
                 <Label htmlFor="isActive" className="cursor-pointer font-normal">
                   Активен
@@ -342,9 +331,7 @@ export function LandingEditPage() {
                   type="number"
                   className="w-24"
                   value={form.sortOrder}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))}
                 />
               </div>
             </div>
@@ -419,22 +406,12 @@ export function LandingEditPage() {
             {saving ? 'Сохранение...' : 'Сохранить'}
           </Button>
           {!isCreate && (
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={saving}
-              className="gap-2"
-            >
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={saving} className="gap-2">
               <Trash2 className="h-4 w-4" />
               Удалить
             </Button>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate('/landings')}
-          >
+          <Button type="button" variant="outline" onClick={() => navigate('/landings')}>
             Отмена
           </Button>
         </div>

@@ -1,10 +1,11 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+
+import { CacheService } from '../cache/cache.service';
 import { TcSyncService } from '../catalog/tc-sync.service';
 import { TepSyncService } from '../catalog/tep-sync.service';
 import { ComboService } from '../combo/combo.service';
-import { CacheService } from '../cache/cache.service';
 import { QUEUE_SYNC } from './queue.constants';
 
 export type SyncJobData = Record<string, never>;
@@ -19,8 +20,8 @@ export type SyncJobData = Record<string, never>;
  * Full sync: TC + TEP + retag + combo + cache → нормально 10–30 мин, лимит 90 мин.
  * Incremental: только TC + cache → нормально 2–10 мин, лимит 30 мин.
  */
-const FULL_SYNC_TIMEOUT_MS = 90 * 60_000;      // 90 минут
-const INCREMENTAL_TIMEOUT_MS = 30 * 60_000;     // 30 минут
+const FULL_SYNC_TIMEOUT_MS = 90 * 60_000; // 90 минут
+const INCREMENTAL_TIMEOUT_MS = 30 * 60_000; // 30 минут
 
 /**
  * SyncProcessor — обработчик задач синхронизации.
@@ -55,18 +56,10 @@ export class SyncProcessor extends WorkerHost {
     try {
       switch (job.name) {
         case 'sync-full':
-          return await this.withTimeout(
-            (signal) => this.handleFullSync(signal),
-            FULL_SYNC_TIMEOUT_MS,
-            job,
-          );
+          return await this.withTimeout((signal) => this.handleFullSync(signal), FULL_SYNC_TIMEOUT_MS, job);
 
         case 'sync-incremental':
-          return await this.withTimeout(
-            (signal) => this.handleIncrementalSync(signal),
-            INCREMENTAL_TIMEOUT_MS,
-            job,
-          );
+          return await this.withTimeout((signal) => this.handleIncrementalSync(signal), INCREMENTAL_TIMEOUT_MS, job);
 
         default:
           this.logger.warn(`[sync] Unknown job name: ${job.name}`);
@@ -90,11 +83,7 @@ export class SyncProcessor extends WorkerHost {
    * 4. Если остались attempts — BullMQ retry с exponential backoff
    * 5. Если attempts исчерпаны — job в failed, следующий cron-тик создаст новый
    */
-  private withTimeout<T>(
-    fn: (signal: AbortSignal) => Promise<T>,
-    timeoutMs: number,
-    job: Job,
-  ): Promise<T> {
+  private withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>, timeoutMs: number, job: Job): Promise<T> {
     const limitMin = Math.round(timeoutMs / 60_000);
     const ctrl = new AbortController();
 
@@ -102,12 +91,10 @@ export class SyncProcessor extends WorkerHost {
       const timer = setTimeout(() => {
         this.logger.error(
           `[sync] TIMEOUT: job ${job.name} (id=${job.id}) превысил лимит ${limitMin} мин ` +
-          `(attempt ${job.attemptsMade + 1}/${job.opts.attempts ?? '?'}) — abort + failed`,
+            `(attempt ${job.attemptsMade + 1}/${job.opts.attempts ?? '?'}) — abort + failed`,
         );
         ctrl.abort();
-        reject(
-          new Error(`Sync job "${job.name}" timed out after ${limitMin} minutes`),
-        );
+        reject(new Error(`Sync job "${job.name}" timed out after ${limitMin} minutes`));
       }, timeoutMs);
 
       fn(ctrl.signal)
@@ -134,23 +121,17 @@ export class SyncProcessor extends WorkerHost {
 
     // 2. Teplohod sync
     const tepResult = await this.tepSync.syncAll(signal);
-    this.logger.log(
-      `TEP sync: ${tepResult.eventsSynced} событий, статус: ${tepResult.status}`,
-    );
+    this.logger.log(`TEP sync: ${tepResult.eventsSynced} событий, статус: ${tepResult.status}`);
 
     // 3. Финальный retag
     const retagResult = await this.tcSync.retagAll();
-    this.logger.log(
-      `Retag: ${retagResult.eventsProcessed} событий, ${retagResult.tagsLinked} тегов`,
-    );
+    this.logger.log(`Retag: ${retagResult.eventsProcessed} событий, ${retagResult.tagsLinked} тегов`);
 
     // 4. Smart populate combo
     let populateResult = { checked: 0, changed: 0 };
     try {
       populateResult = await this.combo.populateAll();
-      this.logger.log(
-        `Combo populate: ${populateResult.checked} проверено, ${populateResult.changed} обновлено`,
-      );
+      this.logger.log(`Combo populate: ${populateResult.checked} проверено, ${populateResult.changed} обновлено`);
     } catch (err: unknown) {
       this.logger.warn(`Combo populate ошибка: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -171,9 +152,7 @@ export class SyncProcessor extends WorkerHost {
    */
   private async handleIncrementalSync(signal?: AbortSignal) {
     const tcResult = await this.tcSync.syncAll(signal);
-    this.logger.log(
-      `TC incremental: ${tcResult.uniqueEvents} событий, статус: ${tcResult.status}`,
-    );
+    this.logger.log(`TC incremental: ${tcResult.uniqueEvents} событий, статус: ${tcResult.status}`);
 
     await this.cache.invalidateAfterSync();
 

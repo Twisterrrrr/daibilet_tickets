@@ -1,6 +1,6 @@
-import { IsInt, IsUUID, IsObject, Min } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsInt, IsObject, IsUUID, Min } from 'class-validator';
 
 export class CustomizePlanDto {
   @ApiProperty()

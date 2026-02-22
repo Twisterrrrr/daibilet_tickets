@@ -1,10 +1,11 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import { useState, useEffect, Suspense } from 'react';
-import { api } from '@/lib/api';
-import { ReviewSection } from '@/components/ui/ReviewSection';
 import { CheckCircle, Loader2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+
+import { ReviewSection } from '@/components/ui/ReviewSection';
+import { api } from '@/lib/api';
 
 function ReviewWriteContent() {
   const searchParams = useSearchParams();
@@ -49,9 +50,7 @@ function ReviewWriteContent() {
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
         <p className="text-lg font-medium text-slate-900">{error || 'Ссылка недействительна'}</p>
-        <p className="mt-2 text-sm text-slate-500">
-          Попробуйте оставить отзыв на странице мероприятия.
-        </p>
+        <p className="mt-2 text-sm text-slate-500">Попробуйте оставить отзыв на странице мероприятия.</p>
         <a
           href="/"
           className="mt-6 inline-block rounded-lg bg-primary-600 px-6 py-3 text-sm font-medium text-white hover:bg-primary-700 transition"
@@ -65,12 +64,8 @@ function ReviewWriteContent() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-slate-900">
-          Как вам {eventData.eventTitle}?
-        </h1>
-        <p className="mt-2 text-sm text-slate-500">
-          Ваш отзыв будет автоматически отмечен как подтверждённая покупка
-        </p>
+        <h1 className="text-2xl font-bold text-slate-900">Как вам {eventData.eventTitle}?</h1>
+        <p className="mt-2 text-sm text-slate-500">Ваш отзыв будет автоматически отмечен как подтверждённая покупка</p>
       </div>
 
       <ReviewSection

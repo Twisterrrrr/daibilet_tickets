@@ -1,19 +1,14 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,42 +34,30 @@ const getColumns = (): ColumnDef<LandingItem>[] => [
   {
     accessorKey: 'title',
     header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
-    cell: ({ row }) => (
-      <div className="font-medium">{row.original.title}</div>
-    ),
+    cell: ({ row }) => <div className="font-medium">{row.original.title}</div>,
   },
   {
     id: 'city',
     accessorFn: (row) => row.city?.name ?? '',
     header: 'Город',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">
-        {row.original.city?.name ?? '—'}
-      </span>
-    ),
+    cell: ({ row }) => <span className="text-muted-foreground">{row.original.city?.name ?? '—'}</span>,
   },
   {
     accessorKey: 'filterTag',
     header: 'Фильтр-тег',
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">{row.original.filterTag}</span>
-    ),
+    cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.filterTag}</span>,
   },
   {
     accessorKey: 'isActive',
     header: 'Активен',
     cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
-        {row.original.isActive ? 'Да' : 'Нет'}
-      </Badge>
+      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Да' : 'Нет'}</Badge>
     ),
   },
   {
     accessorKey: 'sortOrder',
     header: ({ column }) => <SortableHeader column={column}>Порядок</SortableHeader>,
-    cell: ({ row }) => (
-      <span className="tabular-nums text-sm">{row.original.sortOrder}</span>
-    ),
+    cell: ({ row }) => <span className="tabular-nums text-sm">{row.original.sortOrder}</span>,
   },
 ];
 
@@ -105,7 +88,7 @@ export function LandingsListPage() {
     adminApi
       .get<CityItem[] | { items: CityItem[] }>('/admin/cities')
       .then((res) => {
-        const list = Array.isArray(res) ? res : (res as { items: CityItem[] }).items ?? [];
+        const list = Array.isArray(res) ? res : ((res as { items: CityItem[] }).items ?? []);
         setCities(list);
       })
       .catch((e) => console.error('Load cities failed:', e));
@@ -123,9 +106,7 @@ export function LandingsListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Лендинги</h1>
-          <p className="text-muted-foreground">
-            Управление лендинг-страницами по городам и тегам
-          </p>
+          <p className="text-muted-foreground">Управление лендинг-страницами по городам и тегам</p>
         </div>
         <Button asChild>
           <Link to="/landings/new" className="gap-2">
@@ -145,16 +126,11 @@ export function LandingsListPage() {
       <Card>
         <CardHeader>
           <CardTitle>Список лендингов</CardTitle>
-          <CardDescription>
-            Выберите город для фильтрации или оставьте «Все города»
-          </CardDescription>
+          <CardDescription>Выберите город для фильтрации или оставьте «Все города»</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Select
-              value={cityFilter || '__all__'}
-              onValueChange={(v) => setCityFilter(v === '__all__' ? '' : v)}
-            >
+            <Select value={cityFilter || '__all__'} onValueChange={(v) => setCityFilter(v === '__all__' ? '' : v)}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Все города" />
               </SelectTrigger>

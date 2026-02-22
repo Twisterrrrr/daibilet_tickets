@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { RegionService } from '../region.service';
 
 // ---------------------
@@ -31,10 +32,7 @@ describe('RegionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new RegionService(
-      mockPrisma as any,
-      mockCache as any,
-    );
+    service = new RegionService(mockPrisma as any, mockCache as any);
   });
 
   // =========================================
@@ -72,11 +70,7 @@ describe('RegionService', () => {
         name: 'Московская область',
         hubCityId: 'hub-1',
         isActive: true,
-        cities: [
-          { cityId: 'hub-1' },
-          { cityId: 'city-2' },
-          { cityId: 'city-3' },
-        ],
+        cities: [{ cityId: 'hub-1' }, { cityId: 'city-2' }, { cityId: 'city-3' }],
       });
 
       const mockEvents = [
@@ -100,10 +94,7 @@ describe('RegionService', () => {
         name: 'Small Region',
         hubCityId: 'hub-1',
         isActive: true,
-        cities: [
-          { cityId: 'hub-1' },
-          { cityId: 'city-2' },
-        ],
+        cities: [{ cityId: 'hub-1' }, { cityId: 'city-2' }],
       });
 
       // First call (quality filter: rating >= 3.0 OR reviewCount > 0) → only 1 event
@@ -131,16 +122,11 @@ describe('RegionService', () => {
         name: 'Empty Region',
         hubCityId: 'hub-1',
         isActive: true,
-        cities: [
-          { cityId: 'hub-1' },
-          { cityId: 'city-2' },
-        ],
+        cities: [{ cityId: 'hub-1' }, { cityId: 'city-2' }],
       });
 
       // Quality filter → 0 events, fallback → also 0
-      mockPrisma.event.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      mockPrisma.event.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       const result = await service.getRegionPreviewByHubCity('hub-1');
 
@@ -170,7 +156,7 @@ describe('RegionService', () => {
 
       mockPrisma.event.count
         .mockResolvedValueOnce(20) // excursionCount
-        .mockResolvedValueOnce(5)  // museumCount
+        .mockResolvedValueOnce(5) // museumCount
         .mockResolvedValueOnce(10) // eventCount
         .mockResolvedValueOnce(35); // totalCount
 
@@ -200,9 +186,7 @@ describe('RegionService', () => {
         heroImage: 'region-hero.jpg',
         isActive: true,
         hubCity: { id: 'hub-1', slug: 'city', name: 'City', heroImage: 'city-hero.jpg' },
-        cities: [
-          { cityId: 'hub-1', city: { id: 'hub-1', slug: 'city', name: 'City' } },
-        ],
+        cities: [{ cityId: 'hub-1', city: { id: 'hub-1', slug: 'city', name: 'City' } }],
       });
       mockPrisma.event.count.mockResolvedValue(0);
       mockPrisma.event.groupBy.mockResolvedValue([]);
@@ -221,9 +205,7 @@ describe('RegionService', () => {
         heroImage: null,
         isActive: true,
         hubCity: { id: 'hub-1', slug: 'city', name: 'City', heroImage: 'city-hero.jpg' },
-        cities: [
-          { cityId: 'hub-1', city: { id: 'hub-1', slug: 'city', name: 'City' } },
-        ],
+        cities: [{ cityId: 'hub-1', city: { id: 'hub-1', slug: 'city', name: 'City' } }],
       });
       mockPrisma.event.count.mockResolvedValue(0);
       mockPrisma.event.groupBy.mockResolvedValue([]);

@@ -1,20 +1,15 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type TagCategory = 'THEME' | 'AUDIENCE' | 'SEASON' | 'SPECIAL';
 
@@ -64,17 +59,13 @@ const columns: ColumnDef<TagItem>[] = [
   {
     id: 'eventsCount',
     header: 'Событий',
-    cell: ({ row }) => (
-      <span className="tabular-nums">{row.original._count?.events ?? 0}</span>
-    ),
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.events ?? 0}</span>,
   },
   {
     accessorKey: 'isActive',
     header: 'Активен',
     cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
-        {row.original.isActive ? 'Да' : 'Нет'}
-      </Badge>
+      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Да' : 'Нет'}</Badge>
     ),
   },
 ];
@@ -96,7 +87,7 @@ export function TagsListPage() {
 
     adminApi
       .get<TagItem[] | { items: TagItem[] }>(`/admin/tags${params.toString() ? `?${params}` : ''}`)
-      .then((res) => setData(Array.isArray(res) ? res : (res as any).items ?? res))
+      .then((res) => setData(Array.isArray(res) ? res : ((res as any).items ?? res)))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   }, [category, search]);
@@ -111,9 +102,7 @@ export function TagsListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Теги</h1>
-          <p className="text-muted-foreground">
-            Управление тегами для категоризации событий
-          </p>
+          <p className="text-muted-foreground">Управление тегами для категоризации событий</p>
         </div>
         <Button asChild>
           <Link to="/tags/new">

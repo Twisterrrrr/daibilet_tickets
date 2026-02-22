@@ -2,7 +2,7 @@
  * Однократная активация городов, у которых есть события, но isActive=false.
  * Запуск: npx ts-node prisma/activate-cities-with-events.ts
  */
-/* eslint-disable @typescript-eslint/no-require-imports */
+
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();

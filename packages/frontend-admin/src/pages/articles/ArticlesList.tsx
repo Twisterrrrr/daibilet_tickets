@@ -1,20 +1,15 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
 import { adminApi } from '@/api/client';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface ArticleItem {
@@ -62,16 +57,12 @@ const columns: ColumnDef<ArticleItem>[] = [
   {
     id: 'eventsCount',
     header: 'События',
-    cell: ({ row }) => (
-      <span className="tabular-nums">{row.original._count?.articleEvents ?? 0}</span>
-    ),
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.articleEvents ?? 0}</span>,
   },
   {
     id: 'tagsCount',
     header: 'Теги',
-    cell: ({ row }) => (
-      <span className="tabular-nums">{row.original._count?.articleTags ?? 0}</span>
-    ),
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.articleTags ?? 0}</span>,
   },
   {
     accessorKey: 'updatedAt',
@@ -159,9 +150,7 @@ export function ArticlesListPage() {
             />
             <Select
               value={filters.city || '__all__'}
-              onValueChange={(v) =>
-                setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))
-              }
+              onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Все города" />

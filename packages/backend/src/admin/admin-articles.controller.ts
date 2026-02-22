@@ -83,14 +83,18 @@ export class AdminArticlesController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateArticleDto) {
-    const { articleEvents, articleTags, ...articleData } = data as any;
+    const { articleEvents, articleTags, ...articleData } = data as CreateArticleDto & {
+      articleEvents?: unknown;
+      articleTags?: unknown;
+    };
     return this.prisma.article.create({ data: articleData });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateArticleDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
-    const { id: _, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data as any;
+    const { id: _, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data as UpdateArticleDto &
+      Record<string, unknown>;
 
     if (data.version !== undefined) {
       const before = await this.prisma.article.findUnique({ where: { id } });

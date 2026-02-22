@@ -1,21 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { formatPrice } from '@daibilet/shared';
 import {
-  X,
+  AlertTriangle,
   Calendar,
-  Ticket,
+  CheckCircle,
+  ChevronDown,
   ExternalLink,
-  Shield,
+  Loader2,
+  MapPin,
   Minus,
   Plus,
-  ChevronDown,
-  MapPin,
-  Loader2,
-  CheckCircle,
-  AlertTriangle,
+  Shield,
+  Ticket,
+  X,
 } from 'lucide-react';
-import { formatPrice } from '@daibilet/shared';
+import { useCallback, useEffect, useState } from 'react';
+
 import { shortenAddressToStreet } from '@/lib/address';
 
 // ========================
@@ -105,9 +106,7 @@ export function BuyModal({
     return s.isActive && d > new Date() && s.availableTickets > 0;
   });
 
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
-    activeSessions[0]?.id || null,
-  );
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(activeSessions[0]?.id || null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [sessionDropdownOpen, setSessionDropdownOpen] = useState(false);
   const [checkoutState, setCheckoutState] = useState<CheckoutState>('select');
@@ -208,10 +207,7 @@ export function BuyModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
       {/* Modal */}
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
@@ -219,11 +215,7 @@ export function BuyModal({
         <div className="relative flex-shrink-0">
           {eventImage && (
             <div className="h-32 overflow-hidden sm:h-40">
-              <img
-                src={eventImage}
-                alt={eventTitle}
-                className="h-full w-full object-cover"
-              />
+              <img src={eventImage} alt={eventTitle} className="h-full w-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
             </div>
           )}
@@ -242,7 +234,9 @@ export function BuyModal({
             {(address || venueName) && (
               <p className={`mt-1 flex items-center gap-1 text-xs ${eventImage ? 'text-white/80' : 'text-slate-500'}`}>
                 <MapPin className="h-3 w-3 flex-shrink-0" />
-                {venueName}{venueName && address ? ' · ' : ''}{shortenAddressToStreet(address) || address}
+                {venueName}
+                {venueName && address ? ' · ' : ''}
+                {shortenAddressToStreet(address) || address}
               </p>
             )}
           </div>
@@ -259,28 +253,20 @@ export function BuyModal({
               <h3 className="mt-4 text-lg font-bold text-slate-900">
                 {orderResult.confirmed ? 'Заказ оформлен!' : 'Билеты зарезервированы!'}
               </h3>
-              <p className="mt-2 text-sm text-slate-500">
-                Заказ #{orderResult.order.number}
-              </p>
+              <p className="mt-2 text-sm text-slate-500">Заказ #{orderResult.order.number}</p>
 
               <div className="mt-4 rounded-xl bg-slate-50 p-4 text-left">
-                <p className="text-sm font-medium text-slate-700">
-                  {orderResult.event.title}
-                </p>
+                <p className="text-sm font-medium text-slate-700">{orderResult.event.title}</p>
                 <div className="mt-2 space-y-1">
                   {orderResult.order.tickets.map((t: any) => (
                     <div key={t.id} className="flex justify-between text-sm">
                       <span className="text-slate-500">Билет #{t.number}</span>
-                      <span className="font-medium text-slate-700">
-                        {formatPrice(t.price)}
-                      </span>
+                      <span className="font-medium text-slate-700">{formatPrice(t.price)}</span>
                     </div>
                   ))}
                   <div className="mt-2 border-t border-slate-200 pt-2 flex justify-between">
                     <span className="text-sm font-semibold text-slate-700">Итого</span>
-                    <span className="text-sm font-bold text-slate-900">
-                      {orderResult.order.totalPriceFormatted}
-                    </span>
+                    <span className="text-sm font-bold text-slate-900">{orderResult.order.totalPriceFormatted}</span>
                   </div>
                 </div>
               </div>
@@ -290,12 +276,10 @@ export function BuyModal({
                   <div className="flex items-start gap-2">
                     <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
                     <div className="text-left">
-                      <p className="text-sm font-medium text-emerald-800">
-                        Билеты отправлены на почту
-                      </p>
+                      <p className="text-sm font-medium text-emerald-800">Билеты отправлены на почту</p>
                       <p className="mt-1 text-xs text-emerald-600">
-                        Проверьте вашу почту — билеты придут в течение нескольких минут.
-                        Если не нашли, проверьте папку «Спам».
+                        Проверьте вашу почту — билеты придут в течение нескольких минут. Если не нашли, проверьте папку
+                        «Спам».
                       </p>
                     </div>
                   </div>
@@ -305,12 +289,8 @@ export function BuyModal({
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
                     <div className="text-left">
-                      <p className="text-sm font-medium text-amber-800">
-                        Билеты зарезервированы на 15 минут
-                      </p>
-                      <p className="mt-1 text-xs text-amber-600">
-                        Для завершения покупки свяжитесь с нами.
-                      </p>
+                      <p className="text-sm font-medium text-amber-800">Билеты зарезервированы на 15 минут</p>
+                      <p className="mt-1 text-xs text-amber-600">Для завершения покупки свяжитесь с нами.</p>
                     </div>
                   </div>
                 </div>
@@ -331,12 +311,8 @@ export function BuyModal({
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
                 <AlertTriangle className="h-8 w-8 text-red-600" />
               </div>
-              <h3 className="mt-4 text-lg font-bold text-slate-900">
-                Не удалось создать заказ
-              </h3>
-              <p className="mt-2 text-sm text-slate-500">
-                {errorMessage}
-              </p>
+              <h3 className="mt-4 text-lg font-bold text-slate-900">Не удалось создать заказ</h3>
+              <p className="mt-2 text-sm text-slate-500">{errorMessage}</p>
               <button
                 onClick={() => setCheckoutState('select')}
                 className="mt-4 w-full rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-700"
@@ -350,9 +326,7 @@ export function BuyModal({
           {checkoutState === 'loading' && (
             <div className="flex flex-col items-center py-12">
               <Loader2 className="h-10 w-10 animate-spin text-primary-600" />
-              <p className="mt-4 text-sm font-medium text-slate-600">
-                Резервируем билеты...
-              </p>
+              <p className="mt-4 text-sm font-medium text-slate-600">Резервируем билеты...</p>
             </div>
           )}
 
@@ -363,9 +337,7 @@ export function BuyModal({
                 <div className="py-8 text-center">
                   <Calendar className="mx-auto h-10 w-10 text-slate-300" />
                   <p className="mt-3 text-sm font-medium text-slate-600">Нет доступных сеансов</p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Следите за обновлениями — новые даты появятся скоро
-                  </p>
+                  <p className="mt-1 text-xs text-slate-400">Следите за обновлениями — новые даты появятся скоро</p>
                 </div>
               ) : (
                 <>
@@ -387,7 +359,10 @@ export function BuyModal({
                           <p className="text-xs text-slate-500">
                             {formatSessionDate(activeSessions[0].startsAt).time}
                             {activeSessions[0].availableTickets > 0 && (
-                              <> · <span className="text-emerald-600">{activeSessions[0].availableTickets} мест</span></>
+                              <>
+                                {' '}
+                                · <span className="text-emerald-600">{activeSessions[0].availableTickets} мест</span>
+                              </>
                             )}
                           </p>
                         </div>
@@ -438,9 +413,7 @@ export function BuyModal({
                                 >
                                   <div
                                     className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold ${
-                                      isSelected
-                                        ? 'bg-primary-600 text-white'
-                                        : 'bg-slate-100 text-slate-600'
+                                      isSelected ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600'
                                     }`}
                                   >
                                     {fmt.weekday}
@@ -449,9 +422,7 @@ export function BuyModal({
                                     <p className="text-sm font-medium text-slate-900">{fmt.date}</p>
                                     <p className="text-xs text-slate-500">{fmt.time}</p>
                                   </div>
-                                  <span className="text-xs text-emerald-600">
-                                    {session.availableTickets} мест
-                                  </span>
+                                  <span className="text-xs text-emerald-600">{session.availableTickets} мест</span>
                                 </button>
                               );
                             })}
@@ -464,9 +435,7 @@ export function BuyModal({
                   {/* Ticket types */}
                   {selectedSession && selectedSession.prices.length > 0 && (
                     <div className="mt-5">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        Билеты
-                      </label>
+                      <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Билеты</label>
                       <div className="mt-2 space-y-2">
                         {selectedSession.prices.map((priceItem) => {
                           const qty = quantities[priceItem.setId] || 0;
@@ -475,16 +444,12 @@ export function BuyModal({
                             <div
                               key={priceItem.setId}
                               className={`flex items-center justify-between rounded-xl border px-4 py-3 transition ${
-                                qty > 0
-                                  ? 'border-primary-200 bg-primary-50/50'
-                                  : 'border-slate-200 bg-white'
+                                qty > 0 ? 'border-primary-200 bg-primary-50/50' : 'border-slate-200 bg-white'
                               }`}
                             >
                               <div>
                                 <p className="text-sm font-medium text-slate-900">{priceItem.name}</p>
-                                <p className="text-sm font-bold text-primary-600">
-                                  {formatPrice(priceItem.price)}
-                                </p>
+                                <p className="text-sm font-bold text-primary-600">{formatPrice(priceItem.price)}</p>
                               </div>
 
                               {/* Quantity controls */}
@@ -526,8 +491,7 @@ export function BuyModal({
               <>
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-sm text-slate-500">
-                    Итого ({totalItems}{' '}
-                    {totalItems === 1 ? 'билет' : totalItems < 5 ? 'билета' : 'билетов'})
+                    Итого ({totalItems} {totalItems === 1 ? 'билет' : totalItems < 5 ? 'билета' : 'билетов'})
                   </span>
                   <span className="text-xl font-bold text-slate-900">{formatPrice(totalPrice)}</span>
                 </div>
@@ -560,16 +524,12 @@ export function BuyModal({
                   ? 'Перейти на teplohod.info'
                   : `Оформить за ${formatPrice(totalPrice)}`
                 : 'Выберите билеты'}
-              {source === 'TEPLOHOD' && totalItems > 0 && (
-                <ExternalLink className="ml-1 h-3.5 w-3.5 opacity-60" />
-              )}
+              {source === 'TEPLOHOD' && totalItems > 0 && <ExternalLink className="ml-1 h-3.5 w-3.5 opacity-60" />}
             </button>
 
             <div className="mt-3 flex items-center justify-center gap-1.5">
               <Shield className="h-3.5 w-3.5 text-emerald-500" />
-              <span className="text-xs text-slate-400">
-                Безопасная покупка через {getSourceLabel(source)}
-              </span>
+              <span className="text-xs text-slate-400">Безопасная покупка через {getSourceLabel(source)}</span>
             </div>
           </div>
         )}

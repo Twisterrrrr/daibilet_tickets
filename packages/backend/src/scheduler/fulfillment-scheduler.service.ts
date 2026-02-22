@@ -6,19 +6,18 @@
  * - Каждую 1 мин: auto-compensate FAILED items после 15-мин окна
  */
 
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+
 import { QUEUE_FULFILLMENT } from '../queue/queue.constants';
 
 @Injectable()
 export class FulfillmentSchedulerService {
   private readonly logger = new Logger(FulfillmentSchedulerService.name);
 
-  constructor(
-    @InjectQueue(QUEUE_FULFILLMENT) private readonly fulfillmentQueue: Queue,
-  ) {}
+  constructor(@InjectQueue(QUEUE_FULFILLMENT) private readonly fulfillmentQueue: Queue) {}
 
   /**
    * Retry pending fulfillment items (every 2 minutes).
@@ -26,10 +25,14 @@ export class FulfillmentSchedulerService {
   @Cron(CronExpression.EVERY_MINUTE)
   async retryPendingItems() {
     try {
-      await this.fulfillmentQueue.add('fulfillment-retry', {}, {
-        removeOnComplete: 50,
-        removeOnFail: 20,
-      });
+      await this.fulfillmentQueue.add(
+        'fulfillment-retry',
+        {},
+        {
+          removeOnComplete: 50,
+          removeOnFail: 20,
+        },
+      );
     } catch (error) {
       this.logger.error(`Fulfillment retry cron failed: ${(error as Error).message}`);
     }
@@ -41,10 +44,14 @@ export class FulfillmentSchedulerService {
   @Cron(CronExpression.EVERY_MINUTE)
   async autoCompensate() {
     try {
-      await this.fulfillmentQueue.add('auto-compensate', {}, {
-        removeOnComplete: 50,
-        removeOnFail: 20,
-      });
+      await this.fulfillmentQueue.add(
+        'auto-compensate',
+        {},
+        {
+          removeOnComplete: 50,
+          removeOnFail: 20,
+        },
+      );
     } catch (error) {
       this.logger.error(`Auto-compensate cron failed: ${(error as Error).message}`);
     }

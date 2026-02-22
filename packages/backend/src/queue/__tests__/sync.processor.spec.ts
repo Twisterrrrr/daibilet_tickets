@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SyncProcessor } from '../sync.processor';
 import { Job } from 'bullmq';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { SyncProcessor } from '../sync.processor';
 
 // ---------------------
 // Mock factories
@@ -36,11 +37,12 @@ const mockCache = {
   invalidateAfterSync: vi.fn().mockResolvedValue(undefined),
 };
 
-const makeJob = (name: string, attemptsMade = 0): Job<any, any, string> => ({
-  name,
-  attemptsMade,
-  data: {},
-}) as any;
+const makeJob = (name: string, attemptsMade = 0): Job<any, any, string> =>
+  ({
+    name,
+    attemptsMade,
+    data: {},
+  }) as any;
 
 // ---------------------
 // Tests
@@ -51,12 +53,7 @@ describe('SyncProcessor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    processor = new SyncProcessor(
-      mockTcSync as any,
-      mockTepSync as any,
-      mockCombo as any,
-      mockCache as any,
-    );
+    processor = new SyncProcessor(mockTcSync as any, mockTepSync as any, mockCombo as any, mockCache as any);
   });
 
   // =========================================

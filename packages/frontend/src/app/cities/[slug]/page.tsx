@@ -1,20 +1,13 @@
+import { CATEGORY_LABELS, EventCategory, formatPrice } from '@daibilet/shared';
+import { ArrowRight, Clock, Star, Tag, Ticket, TrendingUp, Users } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import Image from 'next/image';
-import {
-  ArrowRight,
-  Ticket,
-  Star,
-  Tag,
-  TrendingUp,
-  Users,
-  Clock,
-} from 'lucide-react';
-import { api } from '@/lib/api';
-import { getSeoMeta } from '@/lib/seo/getSeoMeta';
+import Link from 'next/link';
+
 import { EventCard } from '@/components/ui/EventCard';
 import { VenueCard } from '@/components/ui/VenueCard';
-import { CATEGORY_LABELS, EventCategory, formatPrice } from '@daibilet/shared';
+import { api } from '@/lib/api';
+import { getSeoMeta } from '@/lib/seo/getSeoMeta';
 
 // ISR: обновлять каждые 6 часов
 export const revalidate = 21600;
@@ -38,10 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const city = await api.getCityBySlug(slug);
     const seo = await getSeoMeta('CITY', city.id);
-    const title =
-      seo?.title ??
-      city.metaTitle ??
-      `${city.name} — экскурсии, музеи и билеты на мероприятия | Дайбилет`;
+    const title = seo?.title ?? city.metaTitle ?? `${city.name} — экскурсии, музеи и билеты на мероприятия | Дайбилет`;
     const description =
       seo?.description ??
       city.metaDescription ??
@@ -80,7 +70,7 @@ function declineRegionName(name: string): string {
   // Словарь исключений
   const exceptions: Record<string, string> = {
     'Золотое кольцо': 'Золотом кольце',
-    'Татарстан': 'Татарстане',
+    Татарстан: 'Татарстане',
   };
   if (exceptions[name]) return exceptions[name];
 
@@ -95,10 +85,7 @@ function declineRegionName(name: string): string {
 }
 
 /** Краткая информация о городе — рекомендации и must-see */
-const CITY_INFO: Record<
-  string,
-  { brief: string; mustSee: Array<{ name: string; desc: string }> }
-> = {
+const CITY_INFO: Record<string, { brief: string; mustSee: Array<{ name: string; desc: string }> }> = {
   'saint-petersburg': {
     brief:
       'Культурная столица России с более чем 300 музеями, величественными дворцами, каналами и белыми ночами. Петербург — обязательный пункт для любого путешественника.',
@@ -161,7 +148,10 @@ const CITY_INFO: Record<
       'Столица Золотого кольца — тысячелетний город на Волге с историческим центром, включённым в список ЮНЕСКО. Стрелка, уникальные церкви XVII века и набережная Волги.',
     mustSee: [
       { name: 'Стрелка', desc: 'Место основания города — слияние Волги и Которосли' },
-      { name: 'Спасо-Преображенский монастырь', desc: 'Кремль Ярославля XII века, место находки «Слова о полку Игореве»' },
+      {
+        name: 'Спасо-Преображенский монастырь',
+        desc: 'Кремль Ярославля XII века, место находки «Слова о полку Игореве»',
+      },
       { name: 'Церковь Ильи Пророка', desc: 'Шедевр XVII века с уникальными фресками' },
       { name: 'Набережная Волги', desc: 'Лучшая набережная Поволжья — 3 км вдоль великой реки' },
       { name: 'Толгский монастырь', desc: 'Древняя обитель XIV века с кедровой рощей' },
@@ -186,8 +176,7 @@ const CITY_INFO: Record<
     ],
   },
   novosibirsk: {
-    brief:
-      'Крупнейший город Сибири — научный центр с легендарным Академгородком, зоопарком и оперным театром.',
+    brief: 'Крупнейший город Сибири — научный центр с легендарным Академгородком, зоопарком и оперным театром.',
     mustSee: [
       { name: 'Новосибирский оперный театр', desc: 'Крупнейший театр России — «Сибирский Колизей»' },
       { name: 'Академгородок', desc: 'Научный центр мирового уровня в сосновом бору' },
@@ -240,24 +229,17 @@ export default async function CityPage({ params }: Props) {
       {/* Hero */}
       <section className="relative bg-gradient-to-br from-primary-700 to-primary-900 py-16 sm:py-20">
         {city.heroImage && (
-          <Image
-            src={city.heroImage}
-            alt={city.name}
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover opacity-20"
-          />
+          <Image src={city.heroImage} alt={city.name} fill priority sizes="100vw" className="object-cover opacity-20" />
         )}
         <div className="container-page relative">
           <div className="flex items-center gap-2 text-sm text-primary-200">
-            <Link href="/" className="hover:text-white">Главная</Link>
+            <Link href="/" className="hover:text-white">
+              Главная
+            </Link>
             <span>/</span>
             <span className="text-white">{city.name}</span>
           </div>
-          <h1 className="mt-3 text-4xl font-extrabold text-white sm:text-5xl">
-            {city.name}
-          </h1>
+          <h1 className="mt-3 text-4xl font-extrabold text-white sm:text-5xl">{city.name}</h1>
           <p className="mt-4 max-w-2xl text-lg text-primary-100">
             {info?.brief || city.description || `Экскурсии, музеи и мероприятия в ${city.name}`}
           </p>
@@ -269,23 +251,22 @@ export default async function CityPage({ params }: Props) {
                 <TrendingUp className="h-4 w-4 text-emerald-300" />
                 {pluralEvents(stats.totalCount)} в каталоге
               </div>
-              {categories.filter(c => c.count > 0).map(({ category, emoji, count }) => (
-                <div
-                  key={category}
-                  className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80"
-                >
-                  <span>{emoji}</span>
-                  {CATEGORY_LABELS[category]}: {count}
-                </div>
-              ))}
+              {categories
+                .filter((c) => c.count > 0)
+                .map(({ category, emoji, count }) => (
+                  <div
+                    key={category}
+                    className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80"
+                  >
+                    <span>{emoji}</span>
+                    {CATEGORY_LABELS[category]}: {count}
+                  </div>
+                ))}
             </div>
           )}
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href={`/events?city=${slug}`}
-              className="btn-primary bg-white !text-primary-700 hover:!bg-primary-50"
-            >
+            <Link href={`/events?city=${slug}`} className="btn-primary bg-white !text-primary-700 hover:!bg-primary-50">
               <Ticket className="mr-2 h-4 w-4" />
               Все события в {city.name}
             </Link>
@@ -318,12 +299,8 @@ export default async function CityPage({ params }: Props) {
       {/* Must-see places */}
       {info?.mustSee && info.mustSee.length > 0 && (
         <section className="container-page py-12">
-          <h2 className="text-2xl font-bold text-slate-900">
-            Что обязательно посетить в {city.name}
-          </h2>
-          <p className="mt-2 text-slate-500">
-            Главные достопримечательности, которые стоит увидеть
-          </p>
+          <h2 className="text-2xl font-bold text-slate-900">Что обязательно посетить в {city.name}</h2>
+          <p className="mt-2 text-slate-500">Главные достопримечательности, которые стоит увидеть</p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {info.mustSee.map((place, i) => (
               <div
@@ -348,19 +325,19 @@ export default async function CityPage({ params }: Props) {
         <div className="container-page">
           <div className="grid gap-3 sm:grid-cols-3">
             {categories.map(({ category, emoji, count }) => (
-            <Link
-                  key={category}
-                  href={category === EventCategory.MUSEUM ? `/cities/${slug}/museums` : `/events?city=${slug}&category=${category}`}
+              <Link
+                key={category}
+                href={
+                  category === EventCategory.MUSEUM
+                    ? `/cities/${slug}/museums`
+                    : `/events?city=${slug}&category=${category}`
+                }
                 className="card flex items-center gap-4 p-5 transition-transform hover:scale-[1.02]"
               >
                 <span className="text-3xl">{emoji}</span>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-slate-900">
-                    {CATEGORY_LABELS[category]}
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    {count > 0 ? pluralEvents(count) : 'Скоро'}
-                  </p>
+                  <h3 className="font-semibold text-slate-900">{CATEGORY_LABELS[category]}</h3>
+                  <p className="text-sm text-slate-500">{count > 0 ? pluralEvents(count) : 'Скоро'}</p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-slate-400" />
               </Link>
@@ -374,12 +351,8 @@ export default async function CityPage({ params }: Props) {
         <section className="container-page py-10">
           <div className="flex items-end justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">
-                Музеи и искусство
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Музеи, галереи и арт-пространства
-              </p>
+              <h2 className="text-2xl font-bold text-slate-900">Музеи и искусство</h2>
+              <p className="mt-1 text-sm text-slate-500">Музеи, галереи и арт-пространства</p>
             </div>
             <Link
               href={`/cities/${slug}/museums`}
@@ -409,9 +382,7 @@ export default async function CityPage({ params }: Props) {
               >
                 <Tag className="h-3.5 w-3.5" />
                 {t.name}
-                {t._count?.events > 0 && (
-                  <span className="text-xs text-slate-400">({t._count.events})</span>
-                )}
+                {t._count?.events > 0 && <span className="text-xs text-slate-400">({t._count.events})</span>}
               </Link>
             ))}
           </div>
@@ -423,12 +394,8 @@ export default async function CityPage({ params }: Props) {
         <section className="container-page pb-12">
           <div className="flex items-end justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">
-                Рекомендуем в {city.name}
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Топ событий по рейтингу
-              </p>
+              <h2 className="text-2xl font-bold text-slate-900">Рекомендуем в {city.name}</h2>
+              <p className="mt-1 text-sm text-slate-500">Топ событий по рейтингу</p>
             </div>
             <Link
               href={`/events?city=${slug}`}
@@ -478,10 +445,7 @@ export default async function CityPage({ params }: Props) {
             ))}
           </div>
           <div className="mt-6 text-center">
-            <Link
-              href={`/events?city=${slug}`}
-              className="btn-secondary inline-flex items-center gap-2"
-            >
+            <Link href={`/events?city=${slug}`} className="btn-secondary inline-flex items-center gap-2">
               Все события в {city.name}
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -498,9 +462,7 @@ export default async function CityPage({ params }: Props) {
                 <h2 className="text-2xl font-bold text-slate-900">
                   Также в {declineRegionName(city.regionPreview.regionName)}
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  События из соседних городов региона
-                </p>
+                <p className="mt-1 text-sm text-slate-500">События из соседних городов региона</p>
               </div>
               <Link
                 href={`/regions/${city.regionPreview.regionSlug}`}
@@ -548,12 +510,9 @@ export default async function CityPage({ params }: Props) {
         <section className="container-page pb-16">
           <div className="rounded-xl border border-dashed border-slate-300 py-16 text-center">
             <p className="text-4xl">🎭</p>
-            <h2 className="mt-4 text-xl font-semibold text-slate-700">
-              События скоро появятся
-            </h2>
+            <h2 className="mt-4 text-xl font-semibold text-slate-700">События скоро появятся</h2>
             <p className="mt-2 text-slate-500">
-              Мы подключаем билетные системы — события в {city.name} будут доступны
-              в ближайшее время
+              Мы подключаем билетные системы — события в {city.name} будут доступны в ближайшее время
             </p>
           </div>
         </section>
@@ -568,13 +527,14 @@ export default async function CityPage({ params }: Props) {
             '@type': 'Place',
             name: city.name,
             description: city.description || city.metaDescription || `Экскурсии и мероприятия в городе ${city.name}`,
-            ...(city.lat && city.lng && {
-              geo: {
-                '@type': 'GeoCoordinates',
-                latitude: Number(city.lat),
-                longitude: Number(city.lng),
-              },
-            }),
+            ...(city.lat &&
+              city.lng && {
+                geo: {
+                  '@type': 'GeoCoordinates',
+                  latitude: Number(city.lat),
+                  longitude: Number(city.lng),
+                },
+              }),
             url: `https://daibilet.ru/cities/${city.slug}`,
             image: city.heroImage || undefined,
           }),

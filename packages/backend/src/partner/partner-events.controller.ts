@@ -14,6 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { OfferSource } from '@prisma/client';
 import type { PartnerAuthUser } from '../auth/auth.types';
 import type { Request as ExpressRequest } from 'express';
 
@@ -91,7 +92,7 @@ export class PartnerEventsController {
 
     return this.prisma.event.create({
       data: {
-        source: 'MANUAL' as any,
+        source: OfferSource.MANUAL,
         tcEventId,
         cityId: data.cityId,
         title: data.title,
@@ -108,7 +109,7 @@ export class PartnerEventsController {
         isActive: moderationStatus !== 'PENDING_REVIEW',
         operatorId,
         supplierId: operatorId,
-        moderationStatus: moderationStatus as any,
+        moderationStatus,
       },
     });
   }
@@ -187,7 +188,7 @@ export class PartnerEventsController {
     if (!event) throw new NotFoundException(`Event ${eventExternalId} not found`);
 
     const offerExternalId = data.externalId || eventExternalId;
-    const source = (data.source || 'MANUAL') as any;
+    const source = (data.source || OfferSource.MANUAL) as OfferSource;
 
     // Ищем существующий оффер
     const existing = await this.prisma.eventOffer.findFirst({

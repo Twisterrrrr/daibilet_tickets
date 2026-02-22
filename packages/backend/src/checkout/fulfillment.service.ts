@@ -11,16 +11,17 @@
  * Partial failure → escalation → auto-refund через 15 мин.
  */
 
-import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { SnapshotLineItem, PaymentFlowType, isSessionFullyFulfilled } from './cart-partitioning';
-import { BookingProvider, BookingProviderRegistry, BOOKING_PROVIDER_TOKEN } from './booking-provider.interface';
-import { tryTransitionCheckout } from './checkout-state-machine';
+import { Queue } from 'bullmq';
+
 import { MailService } from '../mail/mail.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { QUEUE_EMAILS } from '../queue/queue.constants';
+import { BOOKING_PROVIDER_TOKEN, BookingProvider, BookingProviderRegistry } from './booking-provider.interface';
+import { isSessionFullyFulfilled, PaymentFlowType, SnapshotLineItem } from './cart-partitioning';
+import { tryTransitionCheckout } from './checkout-state-machine';
 
 /** Max retry attempts per fulfillment item */
 const MAX_RETRY_ATTEMPTS = 3;
@@ -55,7 +56,12 @@ export class FulfillmentService {
     }
 
     // Подарочный сертификат: создать GiftCertificate и завершить сессию
-    const giftCert = session.giftCertificateSnapshot as { amount: number; recipientEmail: string; senderName?: string; message?: string } | null;
+    const giftCert = session.giftCertificateSnapshot as {
+      amount: number;
+      recipientEmail: string;
+      senderName?: string;
+      message?: string;
+    } | null;
     if (giftCert?.amount) {
       await this.fulfillGiftCertificate(checkoutSessionId, session, giftCert);
       return;
@@ -103,8 +109,8 @@ export class FulfillmentService {
 
     this.logger.log(
       `[session=${checkoutSessionId}] Created ${items.length} fulfillment items for ${session.shortCode}: ` +
-      `${items.filter((i) => i.purchaseFlow === 'PLATFORM').length} PLATFORM, ` +
-      `${items.filter((i) => i.purchaseFlow === 'EXTERNAL').length} EXTERNAL`,
+        `${items.filter((i) => i.purchaseFlow === 'PLATFORM').length} PLATFORM, ` +
+        `${items.filter((i) => i.purchaseFlow === 'EXTERNAL').length} EXTERNAL`,
     );
   }
 
@@ -270,7 +276,12 @@ export class FulfillmentService {
       });
 
       if (!reserveResult.success) {
-        await this.handleItemFailure(item.id, reserveResult.errorCode || 'RESERVE_FAILED', reserveResult.errorMessage || 'Reserve failed', reserveResult.retryable !== false);
+        await this.handleItemFailure(
+          item.id,
+          reserveResult.errorCode || 'RESERVE_FAILED',
+          reserveResult.errorMessage || 'Reserve failed',
+          reserveResult.retryable !== false,
+        );
         continue;
       }
 
@@ -293,7 +304,12 @@ export class FulfillmentService {
       });
 
       if (!confirmResult.success) {
-        await this.handleItemFailure(item.id, confirmResult.errorCode || 'CONFIRM_FAILED', confirmResult.errorMessage || 'Confirm failed', true);
+        await this.handleItemFailure(
+          item.id,
+          confirmResult.errorCode || 'CONFIRM_FAILED',
+          confirmResult.errorMessage || 'Confirm failed',
+          true,
+        );
         continue;
       }
 
@@ -303,7 +319,9 @@ export class FulfillmentService {
         data: { status: 'CONFIRMED' },
       });
 
-      this.logger.log(`[session=${checkoutSessionId}] [item=${item.id}] [provider=${item.provider}] Fulfillment item CONFIRMED`);
+      this.logger.log(
+        `[session=${checkoutSessionId}] [item=${item.id}] [provider=${item.provider}] Fulfillment item CONFIRMED`,
+      );
     }
 
     // Check if session is fully fulfilled
@@ -313,12 +331,7 @@ export class FulfillmentService {
   /**
    * Handle item failure: retry or escalate.
    */
-  async handleItemFailure(
-    itemId: string,
-    errorCode: string,
-    errorMessage: string,
-    retryable: boolean,
-  ): Promise<void> {
+  async handleItemFailure(itemId: string, errorCode: string, errorMessage: string, retryable: boolean): Promise<void> {
     const item = await this.prisma.fulfillmentItem.findUnique({ where: { id: itemId } });
     if (!item) return;
 
@@ -335,7 +348,9 @@ export class FulfillmentService {
           nextRetryAt: new Date(Date.now() + delayMs),
         },
       });
-      this.logger.warn(`[item=${itemId}] Fulfillment retry ${newAttemptCount}/${MAX_RETRY_ATTEMPTS} in ${delayMs}ms [error=${errorCode}]`);
+      this.logger.warn(
+        `[item=${itemId}] Fulfillment retry ${newAttemptCount}/${MAX_RETRY_ATTEMPTS} in ${delayMs}ms [error=${errorCode}]`,
+      );
     } else {
       // Max retries exhausted → FAILED + escalate
       await this.prisma.fulfillmentItem.update({
@@ -347,7 +362,9 @@ export class FulfillmentService {
           escalatedAt: new Date(),
         },
       });
-      this.logger.error(`[item=${itemId}] Fulfillment FAILED after ${newAttemptCount} attempts: ${errorCode} — ${errorMessage}`);
+      this.logger.error(
+        `[item=${itemId}] Fulfillment FAILED after ${newAttemptCount} attempts: ${errorCode} — ${errorMessage}`,
+      );
     }
   }
 
@@ -380,7 +397,9 @@ export class FulfillmentService {
         where: { id: checkoutSessionId },
         data: { status: targetStatus, completedAt: new Date() },
       });
-      this.logger.log(`[session=${checkoutSessionId}] Session → ${targetStatus} (all items terminal, allConfirmed=${allConfirmed})`);
+      this.logger.log(
+        `[session=${checkoutSessionId}] Session → ${targetStatus} (all items terminal, allConfirmed=${allConfirmed})`,
+      );
     }
   }
 

@@ -1,7 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { MailService } from '../mail/mail.service';
 import { TicketCategory, TicketPriority, TicketStatus } from '@prisma/client';
+
+import { MailService } from '../mail/mail.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /** Auto-priority based on category + order linkage */
 function autoDetectPriority(category: string, orderCode?: string): string {
@@ -15,11 +16,16 @@ function autoDetectPriority(category: string, orderCode?: string): string {
 /** Auto-subject based on category */
 function autoSubject(category: string): string {
   switch (category) {
-    case 'ORDER': return 'Вопрос по заказу';
-    case 'REFUND': return 'Запрос на возврат';
-    case 'VENUE': return 'Вопрос о месте / мероприятии';
-    case 'TECHNICAL': return 'Техническая проблема';
-    default: return 'Обращение в поддержку';
+    case 'ORDER':
+      return 'Вопрос по заказу';
+    case 'REFUND':
+      return 'Запрос на возврат';
+    case 'VENUE':
+      return 'Вопрос о месте / мероприятии';
+    case 'TECHNICAL':
+      return 'Техническая проблема';
+    default:
+      return 'Обращение в поддержку';
   }
 }
 
@@ -78,13 +84,15 @@ export class SupportService {
     });
 
     // Notify admin
-    this.mailService.notifyAdminNewTicket({
-      ticketCode: shortCode,
-      name: data.name,
-      email: data.email,
-      category,
-      message: data.message,
-    }).catch((err) => this.logger.error(`Failed to notify admin: ${err.message}`));
+    this.mailService
+      .notifyAdminNewTicket({
+        ticketCode: shortCode,
+        name: data.name,
+        email: data.email,
+        category,
+        message: data.message,
+      })
+      .catch((err) => this.logger.error(`Failed to notify admin: ${err.message}`));
 
     this.logger.log(`Created support ticket ${shortCode} [${category}/${priority}]`);
 
@@ -114,13 +122,7 @@ export class SupportService {
   // Admin methods
   // ===========================
 
-  async listTickets(params: {
-    status?: string;
-    category?: string;
-    search?: string;
-    page: number;
-    limit: number;
-  }) {
+  async listTickets(params: { status?: string; category?: string; search?: string; page: number; limit: number }) {
     const where: any = {};
     if (params.status) where.status = params.status;
     if (params.category) where.category = params.category;
@@ -171,12 +173,15 @@ export class SupportService {
     });
   }
 
-  async addResponse(id: string, data: {
-    message: string;
-    authorType: string;
-    authorName: string;
-    isInternal: boolean;
-  }) {
+  async addResponse(
+    id: string,
+    data: {
+      message: string;
+      authorType: string;
+      authorName: string;
+      isInternal: boolean;
+    },
+  ) {
     const ticket = await this.prisma.supportTicket.findUnique({ where: { id } });
     if (!ticket) throw new NotFoundException('Тикет не найден');
 
@@ -198,11 +203,13 @@ export class SupportService {
         data: { status: TicketStatus.WAITING_CUSTOMER },
       });
 
-      this.mailService.sendTicketReply(ticket.email, {
-        customerName: ticket.name,
-        ticketCode: ticket.shortCode,
-        message: data.message,
-      }).catch((e) => this.logger.error('Ticket reply email failed: ' + e.message));
+      this.mailService
+        .sendTicketReply(ticket.email, {
+          customerName: ticket.name,
+          ticketCode: ticket.shortCode,
+          message: data.message,
+        })
+        .catch((e) => this.logger.error('Ticket reply email failed: ' + e.message));
     }
 
     return response;

@@ -1,42 +1,45 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+
 import { Layout } from './components/layout/Layout';
-import { LoginPage } from './pages/Login';
-import { DashboardPage } from './pages/Dashboard';
-import { EventsListPage } from './pages/events/EventsList';
-import { EventsMergePage } from './pages/events/EventsMerge';
-import { EventEditPage } from './pages/events/EventEdit';
-import { EventCreatePage } from './pages/events/EventCreate';
+import { isAuthenticated } from './lib/auth';
+import { ArticleEditPage } from './pages/articles/ArticleEdit';
+import { ArticlesListPage } from './pages/articles/ArticlesList';
+import { AuditLogPage } from './pages/audit/AuditLog';
+import { CheckoutSessionsListPage } from './pages/checkout/CheckoutSessionsList';
 import { CitiesListPage } from './pages/cities/CitiesList';
 import { CityEditPage } from './pages/cities/CityEdit';
-import { TagsListPage } from './pages/tags/TagsList';
-import { TagEditPage } from './pages/tags/TagEdit';
-import { LandingsListPage } from './pages/landings/LandingsList';
-import { LandingEditPage } from './pages/landings/LandingEdit';
-import { CombosListPage } from './pages/combos/CombosList';
-import { ComboEditPage } from './pages/combos/ComboEdit';
-import { ArticlesListPage } from './pages/articles/ArticlesList';
-import { ArticleEditPage } from './pages/articles/ArticleEdit';
-import { OrdersListPage } from './pages/orders/OrdersList';
-import { OrderDetailPage } from './pages/orders/OrderDetail';
-import { UpsellsListPage } from './pages/upsells/UpsellsList';
-import { UpsellEditPage } from './pages/upsells/UpsellEdit';
-import { ReviewsListPage } from './pages/reviews/ReviewsList';
-import { ExternalReviewsListPage } from './pages/reviews/ExternalReviewsList';
-import { CheckoutSessionsListPage } from './pages/checkout/CheckoutSessionsList';
-import { AuditLogPage } from './pages/audit/AuditLog';
-import { SettingsPage } from './pages/settings/SettingsPage';
-import { SuppliersListPage } from './pages/suppliers/SuppliersList';
-import { SupplierDetailPage } from './pages/suppliers/SupplierDetail';
-import { ModerationQueuePage } from './pages/moderation/ModerationQueue';
-import { VenuesListPage } from './pages/venues/VenuesList';
-import { VenueEditPage } from './pages/venues/VenueEdit';
-import { CollectionsListPage } from './pages/collections/CollectionsList';
 import { CollectionEditPage } from './pages/collections/CollectionEdit';
-import { SupportListPage } from './pages/support/SupportList';
-import { SupportDetailPage } from './pages/support/SupportDetail';
-import ReconciliationPage from './pages/reconciliation/ReconciliationPage';
+import { CollectionsListPage } from './pages/collections/CollectionsList';
+import { ComboEditPage } from './pages/combos/ComboEdit';
+import { CombosListPage } from './pages/combos/CombosList';
+import { DashboardPage } from './pages/Dashboard';
+import { EventCreatePage } from './pages/events/EventCreate';
+import { EventEditPage } from './pages/events/EventEdit';
+import { EventsListPage } from './pages/events/EventsList';
+import { EventsMergePage } from './pages/events/EventsMerge';
 import { FailedJobsPage } from './pages/jobs/FailedJobsPage';
-import { isAuthenticated } from './lib/auth';
+import { LandingEditPage } from './pages/landings/LandingEdit';
+import { LandingsListPage } from './pages/landings/LandingsList';
+import { LoginPage } from './pages/Login';
+import { ModerationQueuePage } from './pages/moderation/ModerationQueue';
+import { OrderDetailPage } from './pages/orders/OrderDetail';
+import { OrdersListPage } from './pages/orders/OrdersList';
+import ReconciliationPage from './pages/reconciliation/ReconciliationPage';
+import { ExternalReviewsListPage } from './pages/reviews/ExternalReviewsList';
+import { ReviewsListPage } from './pages/reviews/ReviewsList';
+import { EventStudioPage } from './pages/schedules/EventStudioPage';
+import { ScheduleDetailPage } from './pages/schedules/ScheduleDetailPage';
+import { SettingsPage } from './pages/settings/SettingsPage';
+import { SupplierDetailPage } from './pages/suppliers/SupplierDetail';
+import { SuppliersListPage } from './pages/suppliers/SuppliersList';
+import { SupportDetailPage } from './pages/support/SupportDetail';
+import { SupportListPage } from './pages/support/SupportList';
+import { TagEditPage } from './pages/tags/TagEdit';
+import { TagsListPage } from './pages/tags/TagsList';
+import { UpsellEditPage } from './pages/upsells/UpsellEdit';
+import { UpsellsListPage } from './pages/upsells/UpsellsList';
+import { VenueEditPage } from './pages/venues/VenueEdit';
+import { VenuesListPage } from './pages/venues/VenuesList';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated()) {
@@ -61,6 +64,8 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="events" element={<EventsListPage />} />
           <Route path="events/merge" element={<EventsMergePage />} />
+          <Route path="schedules" element={<EventStudioPage />} />
+          <Route path="schedules/:id" element={<ScheduleDetailPage />} />
           <Route path="events/new" element={<EventCreatePage />} />
           <Route path="events/:id" element={<EventEditPage />} />
           <Route path="cities" element={<CitiesListPage />} />

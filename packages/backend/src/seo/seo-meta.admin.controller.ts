@@ -1,10 +1,11 @@
-import { Controller, Get, Put, Post, Param, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SeoEntityType } from '@prisma/client';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
-import { SeoMetaService } from './seo-meta.service';
+import { Roles, RolesGuard } from '../auth/roles.guard';
 import { UpsertSeoMetaDto } from './dto/upsert-seo-meta.dto';
+import { SeoMetaService } from './seo-meta.service';
 
 @ApiTags('admin')
 @ApiBearerAuth()

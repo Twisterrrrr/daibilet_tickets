@@ -14,6 +14,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface ProcessOnceResult {
@@ -87,9 +88,7 @@ export class WebhookIdempotencyService {
     } catch (error) {
       // Unique constraint violation = параллельная обработка, кто-то успел первым
       if ((error as Record<string, unknown>)?.code === 'P2002') {
-        this.logger.warn(
-          `Webhook race condition (concurrent): provider=${provider}, eventId=${providerEventId}`,
-        );
+        this.logger.warn(`Webhook race condition (concurrent): provider=${provider}, eventId=${providerEventId}`);
         const race = await this.prisma.processedWebhookEvent.findUnique({
           where: { providerEventId },
         });
@@ -100,8 +99,8 @@ export class WebhookIdempotencyService {
 
     this.logger.log(
       `[provider=${provider}] [eventId=${providerEventId}] [eventType=${eventType}]` +
-      (paymentIntentId ? ` [intent=${paymentIntentId}]` : '') +
-      ` Webhook processed: result=${result}`,
+        (paymentIntentId ? ` [intent=${paymentIntentId}]` : '') +
+        ` Webhook processed: result=${result}`,
     );
 
     return { processed: true, result };

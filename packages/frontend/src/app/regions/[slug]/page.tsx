@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowRight, MapPin, TrendingUp } from 'lucide-react';
-import { api } from '@/lib/api';
-import { EventCard } from '@/components/ui/EventCard';
 import { CATEGORY_LABELS, EventCategory } from '@daibilet/shared';
+import { ArrowRight, MapPin, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+
+import { EventCard } from '@/components/ui/EventCard';
+import { api } from '@/lib/api';
 
 const categories = [
   { value: '', label: 'Все' },
@@ -48,9 +49,13 @@ export default function RegionPage() {
 
   // Загрузка данных региона (один раз)
   useEffect(() => {
-    api.getRegionBySlug(slug)
+    api
+      .getRegionBySlug(slug)
       .then(setRegion)
-      .catch((e) => { console.error('Region page error:', e); setError(true); });
+      .catch((e) => {
+        console.error('Region page error:', e);
+        setError(true);
+      });
   }, [slug]);
 
   // Загрузка событий (при изменении фильтров)
@@ -64,7 +69,8 @@ export default function RegionPage() {
     if (selectedCity) params.city = selectedCity;
     if (category) params.category = category;
 
-    api.getRegionEvents(slug, params)
+    api
+      .getRegionEvents(slug, params)
       .then((res) => {
         setEvents(res.items);
         setTotal(res.total);
@@ -111,7 +117,9 @@ export default function RegionPage() {
         )}
         <div className="container-page relative">
           <div className="flex items-center gap-2 text-sm text-primary-200">
-            <Link href="/" className="hover:text-white">Главная</Link>
+            <Link href="/" className="hover:text-white">
+              Главная
+            </Link>
             <span>/</span>
             {region?.hubCity && (
               <>
@@ -123,14 +131,8 @@ export default function RegionPage() {
             )}
             <span className="text-white">{region?.name || 'Регион'}</span>
           </div>
-          <h1 className="mt-3 text-3xl font-extrabold text-white sm:text-4xl">
-            {region?.name || 'Загрузка...'}
-          </h1>
-          {region?.description && (
-            <p className="mt-4 max-w-2xl text-base text-primary-100">
-              {region.description}
-            </p>
-          )}
+          <h1 className="mt-3 text-3xl font-extrabold text-white sm:text-4xl">{region?.name || 'Загрузка...'}</h1>
+          {region?.description && <p className="mt-4 max-w-2xl text-base text-primary-100">{region.description}</p>}
 
           {/* Stats badges */}
           {stats.totalCount > 0 && (
@@ -139,15 +141,17 @@ export default function RegionPage() {
                 <TrendingUp className="h-4 w-4 text-emerald-300" />
                 {pluralEvents(stats.totalCount)} в регионе
               </div>
-              {regionCategories.filter(c => c.count > 0).map(({ category: cat, emoji, count }) => (
-                <div
-                  key={cat}
-                  className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80"
-                >
-                  <span>{emoji}</span>
-                  {CATEGORY_LABELS[cat]}: {count}
-                </div>
-              ))}
+              {regionCategories
+                .filter((c) => c.count > 0)
+                .map(({ category: cat, emoji, count }) => (
+                  <div
+                    key={cat}
+                    className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/80"
+                  >
+                    <span>{emoji}</span>
+                    {CATEGORY_LABELS[cat]}: {count}
+                  </div>
+                ))}
             </div>
           )}
         </div>
@@ -160,7 +164,10 @@ export default function RegionPage() {
             <h3 className="mb-3 text-sm font-medium text-slate-500">Города региона</h3>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => { setSelectedCity(''); setPage(1); }}
+                onClick={() => {
+                  setSelectedCity('');
+                  setPage(1);
+                }}
                 className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                   !selectedCity
                     ? 'bg-primary-600 text-white shadow-sm'
@@ -169,14 +176,15 @@ export default function RegionPage() {
               >
                 <MapPin className="h-3.5 w-3.5" />
                 Все города
-                {stats.totalCount > 0 && (
-                  <span className="text-xs opacity-70">({stats.totalCount})</span>
-                )}
+                {stats.totalCount > 0 && <span className="text-xs opacity-70">({stats.totalCount})</span>}
               </button>
               {region.cities.map((c: any) => (
                 <button
                   key={c.id}
-                  onClick={() => { setSelectedCity(c.slug); setPage(1); }}
+                  onClick={() => {
+                    setSelectedCity(c.slug);
+                    setPage(1);
+                  }}
                   className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     selectedCity === c.slug
                       ? 'bg-primary-600 text-white shadow-sm'
@@ -184,9 +192,7 @@ export default function RegionPage() {
                   }`}
                 >
                   {c.name}
-                  {c.eventCount > 0 && (
-                    <span className="text-xs opacity-70">({c.eventCount})</span>
-                  )}
+                  {c.eventCount > 0 && <span className="text-xs opacity-70">({c.eventCount})</span>}
                 </button>
               ))}
             </div>
@@ -200,11 +206,12 @@ export default function RegionPage() {
             {categories.map((cat) => (
               <button
                 key={cat.value}
-                onClick={() => { setCategory(cat.value); setPage(1); }}
+                onClick={() => {
+                  setCategory(cat.value);
+                  setPage(1);
+                }}
                 className={`flex-shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  category === cat.value
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
+                  category === cat.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
                 {cat.label}
@@ -215,11 +222,16 @@ export default function RegionPage() {
           {/* Sort */}
           <select
             value={sort}
-            onChange={(e) => { setSort(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setSort(e.target.value);
+              setPage(1);
+            }}
             className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           >
             {sortOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
         </div>
@@ -261,9 +273,7 @@ export default function RegionPage() {
           <div className="rounded-xl border border-dashed border-slate-300 py-16 text-center">
             <p className="text-4xl">🔍</p>
             <h2 className="mt-4 text-lg font-semibold text-slate-700">Событий пока нет</h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Попробуйте изменить фильтры или выбрать другой город
-            </p>
+            <p className="mt-2 text-sm text-slate-500">Попробуйте изменить фильтры или выбрать другой город</p>
           </div>
         )}
 

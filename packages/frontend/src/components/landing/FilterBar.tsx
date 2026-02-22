@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { X, RotateCcw } from 'lucide-react';
+import { RotateCcw, X } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
 export interface FilterState {
   date: string;
@@ -186,9 +186,7 @@ export function FilterBar({ piers, priceRange, dates, onFilterChange }: FilterBa
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {priceRange[1] > 0 && (
           <>
-            <span className="hidden text-xs font-semibold uppercase tracking-wider text-slate-400 sm:inline">
-              Цена
-            </span>
+            <span className="hidden text-xs font-semibold uppercase tracking-wider text-slate-400 sm:inline">Цена</span>
             {[100000, 200000, 300000, 500000]
               .filter((p) => p <= priceRange[1])
               .map((p) => (
@@ -235,9 +233,7 @@ export function FilterBar({ piers, priceRange, dates, onFilterChange }: FilterBa
 
       {/* Строка активных фильтров */}
       {activeLabels.length > 0 && (
-        <div className="mt-2 text-[13px] text-slate-400">
-          Активно: {activeLabels.join(' · ')}
-        </div>
+        <div className="mt-2 text-[13px] text-slate-400">Активно: {activeLabels.join(' · ')}</div>
       )}
     </div>
   );

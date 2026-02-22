@@ -1,9 +1,10 @@
+import { ArrowRight, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
-import { api } from '@/lib/api';
+import Link from 'next/link';
+
 import { EventCard } from '@/components/ui/EventCard';
+import { api } from '@/lib/api';
 
 // ISR: обновлять каждые 6 часов
 export const revalidate = 21600;
@@ -18,12 +19,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const data = await api.getCollectionBySlug(slug);
     const c = data.collection;
+    if (!c) return { title: 'Подборка не найдена' };
     return {
       title: c.metaTitle || `${c.title} | Дайбилет`,
-      description:
-        c.metaDescription ||
-        c.description?.slice(0, 160) ||
-        `${c.title} — подборка событий на Дайбилет`,
+      description: c.metaDescription || c.description?.slice(0, 160) || `${c.title} — подборка событий на Дайбилет`,
       openGraph: {
         title: c.metaTitle || c.title,
         description: c.metaDescription || c.description?.slice(0, 160),
@@ -57,7 +56,10 @@ export default async function CollectionPage({ params, searchParams }: Props) {
       <div className="mx-auto max-w-7xl px-4 py-20 text-center">
         <h1 className="text-2xl font-bold text-slate-900">Подборка не найдена</h1>
         <p className="mt-2 text-slate-500">Вероятно, подборка была удалена или деактивирована.</p>
-        <Link href="/podborki" className="mt-6 inline-block rounded-lg bg-primary-600 px-6 py-3 text-white hover:bg-primary-700">
+        <Link
+          href="/podborki"
+          className="mt-6 inline-block rounded-lg bg-primary-600 px-6 py-3 text-white hover:bg-primary-700"
+        >
           Все подборки
         </Link>
       </div>
@@ -65,7 +67,9 @@ export default async function CollectionPage({ params, searchParams }: Props) {
   }
 
   const { collection, events, total, totalPages, relatedCollections } = data;
-  const infoBlocks: { title: string; text: string }[] = Array.isArray(collection.infoBlocks) ? collection.infoBlocks : [];
+  const infoBlocks: { title: string; text: string }[] = Array.isArray(collection.infoBlocks)
+    ? collection.infoBlocks
+    : [];
   const faqItems: { question: string; answer: string }[] = Array.isArray(collection.faq) ? collection.faq : [];
 
   // JSON-LD: CollectionPage
@@ -87,10 +91,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* ── HERO ── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800">
@@ -110,9 +111,13 @@ export default async function CollectionPage({ params, searchParams }: Props) {
         <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-16 sm:pb-16 sm:pt-20">
           {/* Breadcrumbs */}
           <nav className="mb-6 flex items-center gap-2 text-sm text-white/60">
-            <Link href="/" className="hover:text-white/80 transition-colors">Главная</Link>
+            <Link href="/" className="hover:text-white/80 transition-colors">
+              Главная
+            </Link>
             <span>/</span>
-            <Link href="/podborki" className="hover:text-white/80 transition-colors">Подборки</Link>
+            <Link href="/podborki" className="hover:text-white/80 transition-colors">
+              Подборки
+            </Link>
             <span>/</span>
             {collection.city && (
               <>
@@ -125,13 +130,9 @@ export default async function CollectionPage({ params, searchParams }: Props) {
             <span className="text-white/90">{collection.title}</span>
           </nav>
 
-          <h1 className="text-3xl font-bold text-white sm:text-4xl lg:text-5xl">
-            {collection.title}
-          </h1>
+          <h1 className="text-3xl font-bold text-white sm:text-4xl lg:text-5xl">{collection.title}</h1>
 
-          {collection.subtitle && (
-            <p className="mt-3 max-w-2xl text-lg text-white/80">{collection.subtitle}</p>
-          )}
+          {collection.subtitle && <p className="mt-3 max-w-2xl text-lg text-white/80">{collection.subtitle}</p>}
 
           <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-white/60">
             {collection.city && (
@@ -200,9 +201,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
                   key={p}
                   href={`/podborki/${slug}${p > 1 ? `?page=${p}` : ''}`}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                    p === page
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    p === page ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   {p}
@@ -221,7 +220,9 @@ export default async function CollectionPage({ params, searchParams }: Props) {
                   <h3 className="mb-3 text-lg font-bold text-slate-900">{block.title}</h3>
                   <div className="text-slate-600 leading-relaxed">
                     {block.text.split('\n').map((line: string, j: number) => (
-                      <p key={j} className={j > 0 ? 'mt-2' : ''}>{line}</p>
+                      <p key={j} className={j > 0 ? 'mt-2' : ''}>
+                        {line}
+                      </p>
                     ))}
                   </div>
                 </div>
@@ -241,9 +242,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
                     {item.question}
                     <ChevronDown className="h-5 w-5 text-slate-400 transition-transform group-open:rotate-180" />
                   </summary>
-                  <div className="px-6 pb-4 text-slate-600 leading-relaxed">
-                    {item.answer}
-                  </div>
+                  <div className="px-6 pb-4 text-slate-600 leading-relaxed">{item.answer}</div>
                 </details>
               ))}
             </div>
@@ -290,9 +289,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
                   )}
                   <div className="relative z-10">
                     <h3 className="text-lg font-bold text-white">{rc.title}</h3>
-                    {rc.subtitle && (
-                      <p className="mt-0.5 text-sm text-white/70">{rc.subtitle}</p>
-                    )}
+                    {rc.subtitle && <p className="mt-0.5 text-sm text-white/70">{rc.subtitle}</p>}
                   </div>
                 </Link>
               ))}

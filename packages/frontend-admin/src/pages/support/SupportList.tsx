@@ -1,11 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  HeadphonesIcon, Search, Filter, Clock, AlertTriangle, CheckCircle,
-  MessageSquare, ChevronRight, RefreshCw,
+  AlertTriangle,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  Filter,
+  HeadphonesIcon,
+  MessageSquare,
+  RefreshCw,
+  Search,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -69,8 +77,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 function formatDate(d: string) {
   return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit', month: '2-digit', year: '2-digit',
-    hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(new Date(d));
 }
 
@@ -120,11 +131,15 @@ export function SupportListPage() {
       if (statsRes.ok) {
         setStats(await statsRes.json());
       }
-    } catch (e) { console.error('Load tickets failed:', e); }
+    } catch (e) {
+      console.error('Load tickets failed:', e);
+    }
     setLoading(false);
   }, [status, category, search, page, token]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const setFilter = (key: string, value: string) => {
     const p = new URLSearchParams(searchParams);
@@ -157,10 +172,30 @@ export function SupportListPage() {
       {/* Stats cards */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-          <StatCard label="Открытые" value={stats.open} color="text-red-600" onClick={() => setFilter('status', 'OPEN')} />
-          <StatCard label="В работе" value={stats.inProgress} color="text-blue-600" onClick={() => setFilter('status', 'IN_PROGRESS')} />
-          <StatCard label="Ожидание" value={stats.waitingCustomer} color="text-amber-600" onClick={() => setFilter('status', 'WAITING_CUSTOMER')} />
-          <StatCard label="Решены" value={stats.resolved} color="text-green-600" onClick={() => setFilter('status', 'RESOLVED')} />
+          <StatCard
+            label="Открытые"
+            value={stats.open}
+            color="text-red-600"
+            onClick={() => setFilter('status', 'OPEN')}
+          />
+          <StatCard
+            label="В работе"
+            value={stats.inProgress}
+            color="text-blue-600"
+            onClick={() => setFilter('status', 'IN_PROGRESS')}
+          />
+          <StatCard
+            label="Ожидание"
+            value={stats.waitingCustomer}
+            color="text-amber-600"
+            onClick={() => setFilter('status', 'WAITING_CUSTOMER')}
+          />
+          <StatCard
+            label="Решены"
+            value={stats.resolved}
+            color="text-green-600"
+            onClick={() => setFilter('status', 'RESOLVED')}
+          />
           <StatCard label="SLA нарушен" value={stats.slaBreached} color="text-red-600" />
           <StatCard label="Всего" value={stats.total} color="text-slate-600" onClick={() => setFilter('status', '')} />
         </div>
@@ -223,16 +258,21 @@ export function SupportListPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-xs text-slate-500">{ticket.shortCode}</span>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[ticket.status] || ''}`}>
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[ticket.status] || ''}`}
+                      >
                         {STATUS_LABELS[ticket.status] || ticket.status}
                       </span>
-                      <span className="text-xs text-slate-500">{CATEGORY_LABELS[ticket.category] || ticket.category}</span>
+                      <span className="text-xs text-slate-500">
+                        {CATEGORY_LABELS[ticket.category] || ticket.category}
+                      </span>
                       <span className="text-xs">{PRIORITY_LABELS[ticket.priority] || ticket.priority}</span>
-                      {isSlaBreached(ticket.slaDeadline) && (ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') && (
-                        <span className="flex items-center gap-0.5 text-xs text-red-600 font-medium">
-                          <AlertTriangle className="h-3 w-3" /> SLA
-                        </span>
-                      )}
+                      {isSlaBreached(ticket.slaDeadline) &&
+                        (ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') && (
+                          <span className="flex items-center gap-0.5 text-xs text-red-600 font-medium">
+                            <AlertTriangle className="h-3 w-3" /> SLA
+                          </span>
+                        )}
                     </div>
                     <p className="font-medium text-sm text-slate-900 mt-1 truncate">{ticket.subject}</p>
                     <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
@@ -261,12 +301,7 @@ export function SupportListPage() {
       {/* Pagination */}
       {total > 25 && (
         <div className="flex justify-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setFilter('page', String(page - 1))}
-          >
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setFilter('page', String(page - 1))}>
             Назад
           </Button>
           <span className="text-sm text-slate-500 self-center">
@@ -286,7 +321,17 @@ export function SupportListPage() {
   );
 }
 
-function StatCard({ label, value, color, onClick }: { label: string; value: number; color: string; onClick?: () => void }) {
+function StatCard({
+  label,
+  value,
+  color,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  onClick?: () => void;
+}) {
   return (
     <Card className={`${onClick ? 'cursor-pointer hover:shadow-md' : ''} transition-shadow`} onClick={onClick}>
       <CardContent className="p-3 text-center">

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { withRetry, createApiLimiter, runWithLimit } from '../api-rate-limit.util';
+import { describe, expect, it, vi } from 'vitest';
+
+import { createApiLimiter, runWithLimit, withRetry } from '../api-rate-limit.util';
 
 describe('api-rate-limit.util', () => {
   describe('withRetry', () => {
@@ -12,9 +13,7 @@ describe('api-rate-limit.util', () => {
     });
 
     it('retries on 429 and succeeds', async () => {
-      const fn = vi.fn()
-        .mockRejectedValueOnce(new Error('API returned 429'))
-        .mockResolvedValueOnce('ok');
+      const fn = vi.fn().mockRejectedValueOnce(new Error('API returned 429')).mockResolvedValueOnce('ok');
 
       const result = await withRetry(fn, { initialBackoffMs: 5 });
       expect(result.data).toBe('ok');
@@ -23,9 +22,7 @@ describe('api-rate-limit.util', () => {
     });
 
     it('retries on 5xx and succeeds', async () => {
-      const fn = vi.fn()
-        .mockRejectedValueOnce(new Error('API returned 502'))
-        .mockResolvedValueOnce('ok');
+      const fn = vi.fn().mockRejectedValueOnce(new Error('API returned 502')).mockResolvedValueOnce('ok');
 
       const result = await withRetry(fn, { initialBackoffMs: 5 });
       expect(result.data).toBe('ok');

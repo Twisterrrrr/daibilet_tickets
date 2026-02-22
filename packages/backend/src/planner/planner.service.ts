@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { PricingService, MarkupContext } from '../pricing/pricing.service';
-import { CalculatePlanDto } from './dto/calculate-plan.dto';
 import { getPriceByTypeKopecks } from '@daibilet/shared';
+import { Injectable, Logger } from '@nestjs/common';
+
+import { MarkupContext, PricingService } from '../pricing/pricing.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { CalculatePlanDto } from './dto/calculate-plan.dto';
 
 // ==========================================
 // Planner Service — ядро Trip Planner
@@ -39,15 +40,15 @@ const SLOT_RANGES: Record<string, { start: number; end: number }> = {
 
 // Насколько хорошо категория события подходит для слота (0-30)
 const CATEGORY_SLOT_FIT: Record<string, Record<string, number>> = {
-  MUSEUM:     { MORNING: 28, AFTERNOON: 22, EVENING: 8 },
-  EXCURSION:  { MORNING: 20, AFTERNOON: 28, EVENING: 18 },
-  EVENT:      { MORNING: 8, AFTERNOON: 15, EVENING: 30 },
+  MUSEUM: { MORNING: 28, AFTERNOON: 22, EVENING: 8 },
+  EXCURSION: { MORNING: 20, AFTERNOON: 28, EVENING: 18 },
+  EVENT: { MORNING: 8, AFTERNOON: 15, EVENING: 30 },
 };
 
 const VARIANT_CONFIG: Record<VariantTier, { name: string; priceWeight: number; ratingWeight: number }> = {
-  economy:  { name: 'Эконом', priceWeight: -0.4, ratingWeight: 0.2 },
-  optimal:  { name: 'Оптимальный', priceWeight: 0.0, ratingWeight: 0.4 },
-  premium:  { name: 'Премиум', priceWeight: 0.3, ratingWeight: 0.5 },
+  economy: { name: 'Эконом', priceWeight: -0.4, ratingWeight: 0.2 },
+  optimal: { name: 'Оптимальный', priceWeight: 0.0, ratingWeight: 0.4 },
+  premium: { name: 'Премиум', priceWeight: 0.3, ratingWeight: 0.5 },
 };
 
 @Injectable()
@@ -74,7 +75,7 @@ export class PlannerService {
 
     this.logger.log(
       `Planner: city=${city}, ${dateFrom}→${dateTo} (${dayCount}д), ` +
-      `${adults}+${children || 0}, intensity=${intensity}`,
+        `${adults}+${children || 0}, intensity=${intensity}`,
     );
 
     // 2. Загрузить события с сессиями
@@ -110,8 +111,14 @@ export class PlannerService {
       return {
         variants: [],
         meta: {
-          city, dateFrom, dateTo, dayCount, adults, children: children || 0,
-          intensity, availableEventsCount: 0,
+          city,
+          dateFrom,
+          dateTo,
+          dayCount,
+          adults,
+          children: children || 0,
+          intensity,
+          availableEventsCount: 0,
           message: 'Не найдено доступных событий для указанных параметров.',
         },
       };
@@ -128,9 +135,17 @@ export class PlannerService {
 
     for (const tier of tiers) {
       const variant = await this.buildVariant(
-        tier, events, start, dayCount, iConfig, adults, children || 0, city, dateFrom,
+        tier,
+        events,
+        start,
+        dayCount,
+        iConfig,
+        adults,
+        children || 0,
+        city,
+        dateFrom,
       );
-      if (variant && variant.days.some(d => d.slots.length > 0)) {
+      if (variant && variant.days.some((d) => d.slots.length > 0)) {
         variants.push(variant);
       }
     }
@@ -159,12 +174,7 @@ export class PlannerService {
   /**
    * Заменить событие в слоте.
    */
-  async customize(body: {
-    variant: any;
-    dayNumber: number;
-    slotIndex: number;
-    newEventId: string;
-  }) {
+  async customize(body: { variant: any; dayNumber: number; slotIndex: number; newEventId: string }) {
     const event = await this.prisma.event.findUnique({
       where: { id: body.newEventId },
       include: {
@@ -208,7 +218,10 @@ export class PlannerService {
       0,
     );
 
-    const breakdown = await this.pricing.calculateBreakdown(totalPrice, slot.tickets.adult.count + slot.tickets.child.count);
+    const breakdown = await this.pricing.calculateBreakdown(
+      totalPrice,
+      slot.tickets.adult.count + slot.tickets.child.count,
+    );
 
     body.variant.totalPrice = breakdown.basePrice;
     body.variant.serviceFee = breakdown.serviceFee;
@@ -249,9 +262,7 @@ export class PlannerService {
 
       for (const slotType of slotTypes) {
         // Скоринг всех событий для этого слота
-        const scored = this.scoreEventsForSlot(
-          allEvents, slotType, date, config, usedEventIds, totalPersons,
-        );
+        const scored = this.scoreEventsForSlot(allEvents, slotType, date, config, usedEventIds, totalPersons);
 
         if (scored.length === 0) continue;
 
@@ -292,9 +303,7 @@ export class PlannerService {
       daysUntilTrip,
     };
 
-    const breakdown = await this.pricing.calculateBreakdown(
-      totalBasePrice, totalPersons, [], markupContext,
-    );
+    const breakdown = await this.pricing.calculateBreakdown(totalBasePrice, totalPersons, [], markupContext);
 
     return {
       name: config.name,
@@ -321,7 +330,7 @@ export class PlannerService {
     events: any[],
     slotType: string,
     date: Date,
-    variantConfig: typeof VARIANT_CONFIG[VariantTier],
+    variantConfig: (typeof VARIANT_CONFIG)[VariantTier],
     usedEventIds: Set<string>,
     totalPersons: number,
   ): ScoredEvent[] {
@@ -330,9 +339,7 @@ export class PlannerService {
     if (!slotRange) return scored;
 
     // Ценовой диапазон для нормализации
-    const allPrices = events
-      .map(e => this.getAdultPrice(e.sessions))
-      .filter(p => p > 0);
+    const allPrices = events.map((e) => this.getAdultPrice(e.sessions)).filter((p) => p > 0);
     const maxPrice = Math.max(...allPrices, 1);
     const minPrice = Math.min(...allPrices, 0);
     const priceRange = maxPrice - minPrice || 1;
@@ -347,8 +354,8 @@ export class PlannerService {
       // Проверить доступность
       if (session.availableTickets < totalPersons) continue;
 
-        const adultPrice = getPriceByTypeKopecks(session.prices, 'adult');
-        const childPrice = getPriceByTypeKopecks(session.prices, 'child') || adultPrice;
+      const adultPrice = getPriceByTypeKopecks(session.prices, 'adult');
+      const childPrice = getPriceByTypeKopecks(session.prices, 'child') || adultPrice;
 
       if (adultPrice <= 0) continue;
 
@@ -411,7 +418,7 @@ export class PlannerService {
     const targetDay = targetDate.toISOString().split('T')[0];
 
     // Сессии на нужный день в нужном временном диапазоне
-    const candidates = sessions.filter(s => {
+    const candidates = sessions.filter((s) => {
       const sDate = new Date(s.startsAt);
       const sDay = sDate.toISOString().split('T')[0];
       const sHour = sDate.getUTCHours();
@@ -421,7 +428,7 @@ export class PlannerService {
     if (candidates.length > 0) return candidates[0];
 
     // Фолбэк: любая сессия на этот день
-    const sameDaySessions = sessions.filter(s => {
+    const sameDaySessions = sessions.filter((s) => {
       const sDay = new Date(s.startsAt).toISOString().split('T')[0];
       return sDay === targetDay;
     });
@@ -439,9 +446,12 @@ export class PlannerService {
 
   private getSlotsForDay(config: ReturnType<typeof this.getIntensityConfig>): string[] {
     switch (config.slotsPerDay) {
-      case 2: return ['MORNING', 'AFTERNOON'];
-      case 4: return ['MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING'];
-      default: return ['MORNING', 'AFTERNOON', 'EVENING']; // 3 слота
+      case 2:
+        return ['MORNING', 'AFTERNOON'];
+      case 4:
+        return ['MORNING', 'AFTERNOON', 'LATE_AFTERNOON', 'EVENING'];
+      default:
+        return ['MORNING', 'AFTERNOON', 'EVENING']; // 3 слота
     }
   }
 
@@ -475,11 +485,9 @@ export class PlannerService {
    */
   private deduplicateVariants(variants: any[]): any[] {
     const seen = new Set<string>();
-    return variants.filter(v => {
+    return variants.filter((v) => {
       // Fingerprint: набор eventId в порядке слотов
-      const fp = v.days
-        .flatMap((d: any) => d.slots.map((s: any) => s.event.id))
-        .join(',');
+      const fp = v.days.flatMap((d: any) => d.slots.map((s: any) => s.event.id)).join(',');
       if (seen.has(fp)) return false;
       seen.add(fp);
       return true;
@@ -487,7 +495,10 @@ export class PlannerService {
   }
 
   private getIntensityConfig(intensity: string) {
-    const configs: Record<string, { slotsPerDay: number; breakMinutes: number; eveningChance: number; startTime: string }> = {
+    const configs: Record<
+      string,
+      { slotsPerDay: number; breakMinutes: number; eveningChance: number; startTime: string }
+    > = {
       RELAXED: { slotsPerDay: 2, breakMinutes: 150, eveningChance: 0.3, startTime: '10:00' },
       NORMAL: { slotsPerDay: 3, breakMinutes: 75, eveningChance: 0.5, startTime: '09:30' },
       ACTIVE: { slotsPerDay: 4, breakMinutes: 45, eveningChance: 1.0, startTime: '09:00' },
