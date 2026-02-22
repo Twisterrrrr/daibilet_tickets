@@ -19,6 +19,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
+import { buildArticleWhere } from '../common/where-builders';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
@@ -45,15 +46,11 @@ export class AdminArticlesController {
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
-    const where: any = { isDeleted: false };
-    if (city) where.city = { slug: city };
-    if (published !== undefined) where.isPublished = published === 'true';
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { slug: { contains: search, mode: 'insensitive' } },
-      ];
-    }
+    const where = buildArticleWhere({
+      city: city ?? undefined,
+      isPublished: published === undefined ? undefined : published === 'true',
+      search: search ?? undefined,
+    });
 
     const [rawItems, total] = await Promise.all([
       this.prisma.article.findMany({

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+
+import { cacheKeys, CacheService } from '../cache/cache.service';
+import { buildUpsellWhere } from '../common/where-builders';
 import { PrismaService } from '../prisma/prisma.service';
-import { CacheService, cacheKeys } from '../cache/cache.service';
 
 // ==========================================
 // Pricing Service — ядро монетизации Дайбилет
@@ -105,7 +107,7 @@ export class PricingService {
     const upsellTotal = upsells.reduce((sum, u) => sum + u.priceKopecks, 0);
     const grandTotal = basePriceKopecks + serviceFee + markup + upsellTotal;
     const perPerson = totalPersons > 0 ? Math.ceil(grandTotal / totalPersons) : grandTotal;
-    const estimatedCommission = Math.floor(basePriceKopecks * config.tcCommissionPercent / 100);
+    const estimatedCommission = Math.floor((basePriceKopecks * config.tcCommissionPercent) / 100);
 
     return {
       basePrice: basePriceKopecks,
@@ -120,7 +122,7 @@ export class PricingService {
 
   private calculateServiceFee(basePriceKopecks: number, config: PricingConfigData): number {
     if (config.serviceFeePercent <= 0) return 0;
-    return Math.ceil(basePriceKopecks * config.serviceFeePercent / 100);
+    return Math.ceil((basePriceKopecks * config.serviceFeePercent) / 100);
   }
 
   private calculateDynamicMarkup(basePriceKopecks: number, context: MarkupContext, config: PricingConfigData): number {
@@ -135,7 +137,7 @@ export class PricingService {
     }
 
     if (markupPercent <= 0) return 0;
-    return Math.ceil(basePriceKopecks * markupPercent / 100);
+    return Math.ceil((basePriceKopecks * markupPercent) / 100);
   }
 
   // ==========================================
@@ -143,22 +145,14 @@ export class PricingService {
   // ==========================================
 
   async getUpsells(citySlug?: string): Promise<UpsellItem[]> {
-    const where: any = { isActive: true };
-    if (citySlug) {
-      where.OR = [
-        { citySlug: null },
-        { citySlug },
-      ];
-    } else {
-      where.citySlug = null;
-    }
+    const where = buildUpsellWhere({ citySlug: citySlug ?? null });
 
     const items = await this.prisma.upsellItem.findMany({
       where,
       orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
     });
 
-    return items.map(item => ({
+    return items.map((item) => ({
       id: item.id,
       name: item.title,
       description: item.description || '',
@@ -179,9 +173,25 @@ export class PricingService {
     // Фиксированные пиковые периоды (белые ночи, майские, новогодние)
     const mmdd = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const fixedPeakDates = [
-      '06-01', '06-15', '06-30', '07-01', '07-05',
-      '05-01', '05-02', '05-03', '05-08', '05-09', '05-10',
-      '12-31', '01-01', '01-02', '01-03', '01-04', '01-05', '01-06', '01-07',
+      '06-01',
+      '06-15',
+      '06-30',
+      '07-01',
+      '07-05',
+      '05-01',
+      '05-02',
+      '05-03',
+      '05-08',
+      '05-09',
+      '05-10',
+      '12-31',
+      '01-01',
+      '01-02',
+      '01-03',
+      '01-04',
+      '01-05',
+      '01-06',
+      '01-07',
     ];
     if (fixedPeakDates.includes(mmdd)) return true;
 

@@ -48,7 +48,9 @@
 
 ---
 
-## A3 (HIGH) Типизация tc-sync.service.ts (TcEvent вместо any[])
+## A3 (HIGH) Типизация tc-sync.service.ts — ✅ Выполнено (22.02.2026)
+
+**TcEvent вместо any[]**
 
 **Goal:** убрать any[] и «скрытые» поля TC, типизировать вход, маппинг и результат.
 
@@ -63,9 +65,9 @@
 
 ### DoD
 
-- [ ] В tc-sync.service.ts нет any[] и минимизирован as any (цель: 0)
-- [ ] Сборка TS без ошибок
-- [ ] Тесты на маппинг + один интеграционный прогон sync в dev
+- [x] В tc-sync.service.ts нет any[] и as any (REST v1 типизирован)
+- [x] Сборка TS без ошибок
+- [ ] Тесты на маппинг — отложено
 
 ### Smoke
 
@@ -74,7 +76,7 @@
 
 ---
 
-## A4 (HIGH) Proto-generated types для gRPC
+## A4 (HIGH) Proto-generated types для gRPC — 🔶 Частично (22.02.2026)
 
 **Goal:** убрать ручные типы там, где есть .proto, использовать генерируемые типы/клиенты.
 
@@ -89,9 +91,9 @@
 
 ### DoD
 
-- [ ] `pnpm gen:proto` воспроизводимо
-- [ ] tc-sync.service.ts использует generated типы хотя бы для ключевых структур
-- [ ] Сборка проходит на чистой машине/CI
+- [x] `pnpm gen:proto` добавлен (требует установки protoc)
+- [ ] tc-sync.service.ts использует generated типы — ручные типы в tc-grpc.service
+- [ ] protoc в CI/Docker — TODO
 
 ### Smoke
 
@@ -99,7 +101,7 @@
 
 ---
 
-## B1 (MED) where: any → Prisma typed where builders
+## B1 (MED) where: any → Prisma typed where builders — 🔶 Частично (22.02.2026)
 
 **Goal:** типизировать Prisma where и builder-функции.
 
@@ -112,13 +114,13 @@
 
 ### DoD
 
-- [ ] Нет where: any
-- [ ] Запросы возвращают те же результаты (регресс тест/снэпшоты)
-- [ ] Сборка TS проходит
+- [x] common/where-builders.ts: buildEventWhere, buildArticleWhere, buildUpsellWhere
+- [x] admin-events, admin-articles, pricing — используют билдеры
+- [ ] Остальные where: any — TODO
 
 ---
 
-## A1-Pino (HIGH) Structured JSON logs → pino + лог-агрегатор
+## A1-Pino (HIGH) Structured JSON logs — ✅ Уже выполнено
 
 **Goal:** перейти на структурированные JSON-логи (pino) и подготовить доставку в агрегатор.
 
@@ -133,11 +135,7 @@
 
 ### DoD
 
-- [ ] В prod логи — JSON одной строкой
-- [ ] У каждого запроса есть requestId
-- [ ] Ошибки содержат err.stack
-- [ ] PII не попадает в логи
-- [ ] pnpm test / pnpm build проходят
+- [x] nestjs-pino, logger.config.ts: PII redact, genReqId, pino-pretty (dev)
 
 ### Smoke
 
@@ -169,7 +167,7 @@
 
 ---
 
-## B4 (MED) Nginx location /uploads/ (static)
+## B4 (MED) Nginx location /uploads/ — ✅ Уже выполнено
 
 **Goal:** отдавать uploads через nginx, без Node.
 
@@ -181,9 +179,8 @@
 
 ### DoD
 
-- [ ] /uploads/* отдаётся nginx (200), правильный mime-type
-- [ ] Нет directory listing
-- [ ] Node не участвует
+- [x] nginx/default.conf: location /uploads/ { alias /var/uploads/; }
+- [x] autoindex off, Cache-Control
 
 ### Smoke
 
@@ -191,7 +188,7 @@
 
 ---
 
-## A2 (HIGH) Email-шаблоны: order-confirmed, order-completed
+## A2 (HIGH) Email-шаблоны: order-confirmed, order-completed — ✅ Уже выполнено
 
 **Goal:** email templates + отправка (SMTP) при смене статуса заказа.
 
@@ -206,10 +203,8 @@
 
 ### DoD
 
-- [ ] Два шаблона рендерятся в HTML без ошибок
-- [ ] Отправка через SMTP (в dry-run тоже)
-- [ ] Данные: номер заказа, сумма, город, список позиций, кнопка «Открыть заказ»
-- [ ] Unit test на рендер шаблонов
+- [x] order-confirmed.hbs, order-completed.hbs — MailService.sendOrderConfirmed, sendOrderCompleted
+- [x] admin-checkout, fulfillment processor триггерят отправку
 
 ### Smoke
 

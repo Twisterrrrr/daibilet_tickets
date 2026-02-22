@@ -1,11 +1,24 @@
+import { normalizeEventTitle } from '@daibilet/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
+
 import { PrismaService } from '../prisma/prisma.service';
-import { TcApiService } from './tc-api.service';
-import { TcGrpcService, TcGrpcEvent, TcGrpcMetaEvent, TcGrpcVenue, TcGrpcCity, TcGrpcTicketSet } from './tc-grpc.service';
-import { normalizeEventTitle } from '@daibilet/shared';
-import { EventCategory, EventSubcategory, EventAudience, Prisma } from '@prisma/client';
 import { classify } from './event-classifier';
+import {
+  SessionPrice,
+  TcRestEventV1,
+  TcRestTicketSetV1,
+} from './tc-api.types';
+import { TcApiService } from './tc-api.service';
+import {
+  TcGrpcCity,
+  TcGrpcEvent,
+  TcGrpcMetaEvent,
+  TcGrpcService,
+  TcGrpcTicketSet,
+  TcGrpcVenue,
+} from './tc-grpc.service';
 
 /**
  * Сервис синхронизации данных из Ticketscloud в нашу БД.
@@ -135,7 +148,7 @@ export class TcSyncService {
 
     this.logger.log(
       `gRPC: ${grpcEvents.length} events, ${grpcMetas.length} metas, ` +
-      `${grpcVenues.length} venues, ${grpcCities.length} cities`,
+        `${grpcVenues.length} venues, ${grpcCities.length} cities`,
     );
 
     if (grpcEvents.length === 0) {
@@ -196,9 +209,7 @@ export class TcSyncService {
       }
     }
 
-    this.logger.log(
-      `Группировка: ${metaGroups.size} MetaEvent-групп + ${standaloneEvents.length} одиночных`,
-    );
+    this.logger.log(`Группировка: ${metaGroups.size} MetaEvent-групп + ${standaloneEvents.length} одиночных`);
 
     // Step 5: Синхронизируем MetaEvent-группы
     let uniqueCount = 0;
@@ -331,9 +342,7 @@ export class TcSyncService {
     const isActive = events.some((ev) => ev.status === 1); // PUBLIC
 
     // Ищем существующее событие: сначала по tcMetaEventId, потом по tcEventId, потом по title+city
-    let event = tcMetaEventId
-      ? await this.prisma.event.findFirst({ where: { tcMetaEventId, source: 'TC' } })
-      : null;
+    let event = tcMetaEventId ? await this.prisma.event.findFirst({ where: { tcMetaEventId, source: 'TC' } }) : null;
 
     if (!event) {
       event = await this.prisma.event.findFirst({
@@ -364,9 +373,7 @@ export class TcSyncService {
           audience,
           minAge,
           durationMinutes:
-            durationMinutes && durationMinutes > 0 && durationMinutes < 2880
-              ? durationMinutes
-              : event.durationMinutes,
+            durationMinutes && durationMinutes > 0 && durationMinutes < 2880 ? durationMinutes : event.durationMinutes,
           lat: lat ?? event.lat,
           lng: lng ?? event.lng,
           address: address || event.address,
@@ -391,10 +398,7 @@ export class TcSyncService {
           subcategories,
           audience,
           minAge,
-          durationMinutes:
-            durationMinutes && durationMinutes > 0 && durationMinutes < 2880
-              ? durationMinutes
-              : null,
+          durationMinutes: durationMinutes && durationMinutes > 0 && durationMinutes < 2880 ? durationMinutes : null,
           lat,
           lng,
           address,
@@ -468,6 +472,7 @@ export class TcSyncService {
     const prices = this.extractPricesGrpc(ev.sets);
     const isActive = ev.status === 1 && availableTickets > 0; // PUBLIC + есть билеты
 
+    const pricesJson = prices as unknown as Prisma.InputJsonValue;
     await this.prisma.eventSession.upsert({
       where: { tcSessionId },
       update: {
@@ -476,7 +481,7 @@ export class TcSyncService {
         startsAt: dates.start,
         endsAt: dates.finish,
         availableTickets,
-        prices,
+        prices: pricesJson,
         isActive,
       },
       create: {
@@ -486,7 +491,7 @@ export class TcSyncService {
         startsAt: dates.start,
         endsAt: dates.finish,
         availableTickets,
-        prices,
+        prices: pricesJson,
         isActive,
       },
     });
@@ -618,17 +623,14 @@ export class TcSyncService {
   // ============================================================
 
   /** Парсинг protobuf Lifetime → Date */
-  private parseGrpcLifetime(
-    lifetime?: { start?: { seconds: string | number }; finish?: { seconds: string | number } },
-  ): { start: Date | null; finish: Date | null } {
+  private parseGrpcLifetime(lifetime?: {
+    start?: { seconds: string | number };
+    finish?: { seconds: string | number };
+  }): { start: Date | null; finish: Date | null } {
     if (!lifetime) return { start: null, finish: null };
 
-    const start = lifetime.start?.seconds
-      ? new Date(Number(lifetime.start.seconds) * 1000)
-      : null;
-    const finish = lifetime.finish?.seconds
-      ? new Date(Number(lifetime.finish.seconds) * 1000)
-      : null;
+    const start = lifetime.start?.seconds ? new Date(Number(lifetime.start.seconds) * 1000) : null;
+    const finish = lifetime.finish?.seconds ? new Date(Number(lifetime.finish.seconds) * 1000) : null;
 
     return { start, finish };
   }
@@ -659,7 +661,7 @@ export class TcSyncService {
   }
 
   /** Цены из gRPC TicketSets → JSON для EventSession.prices */
-  private extractPricesGrpc(sets: TcGrpcTicketSet[]): any[] {
+  private extractPricesGrpc(sets: TcGrpcTicketSet[]): SessionPrice[] {
     if (!sets?.length) return [];
     return sets
       .map((set) => {
@@ -730,9 +732,10 @@ export class TcSyncService {
     const newCitiesCreated: string[] = [];
     this.cityCache.clear();
 
-    let allTcEvents: any[] = [];
+    let allTcEvents: TcRestEventV1[] = [];
     try {
-      allTcEvents = await this.tcApi.getEvents({ signal });
+      const raw = await this.tcApi.getEvents({ signal });
+      allTcEvents = Array.isArray(raw) ? (raw as TcRestEventV1[]) : [];
       this.logger.log(`Получено ${allTcEvents.length} TC-записей`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -774,7 +777,7 @@ export class TcSyncService {
     }
 
     // Группируем по title + cityGeoId
-    const groups = new Map<string, any[]>();
+    const groups = new Map<string, TcRestEventV1[]>();
     for (const tc of allTcEvents) {
       const title = tc.title?.text?.trim() || '';
       if (!title) continue;
@@ -910,10 +913,10 @@ export class TcSyncService {
       const allSessions = await this.prisma.eventSession.findMany({
         where: { eventId: master.id },
       });
-      const allPrices = allSessions
-        .flatMap((s: any) =>
-          (s.prices as any[] || []).map((p: any) => p.price).filter((p: number) => p > 0),
-        );
+      const allPrices = allSessions.flatMap((s) => {
+        const prices = (s.prices as SessionPrice[] | null) ?? [];
+        return prices.map((p) => p.price).filter((p): p is number => typeof p === 'number' && p > 0);
+      });
       const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : master.priceFrom;
 
       await this.prisma.event.update({
@@ -934,7 +937,7 @@ export class TcSyncService {
   }
 
   /** REST v1: синхронизация группы TC events */
-  private async syncEventGroup(tcEvents: any[]): Promise<number> {
+  private async syncEventGroup(tcEvents: TcRestEventV1[]): Promise<number> {
     if (tcEvents.length === 0) return 0;
 
     tcEvents.sort((a, b) => {
@@ -949,18 +952,15 @@ export class TcSyncService {
     const tcId = String(best.id);
     const title = normalizeEventTitle(best.title?.text || '');
     const description = best.title?.desc || null;
-    const { category, subcategories } = this.classifyRest(best);
+    const { category, subcategories } = this.classifyRest(best, description);
     const minAge = typeof best.age_rating === 'number' ? best.age_rating : 0;
 
     const cityGeoId = best?.venue?.city?.id;
+    if (cityGeoId == null) return 0;
     const cityId = this.cityCache.get(cityGeoId);
     if (!cityId) return 0;
 
-    const imageUrl =
-      this.findBestImage(tcEvents) ||
-      best.media?.cover_original?.url ||
-      best.media?.cover?.url ||
-      null;
+    const imageUrl = this.findBestImage(tcEvents) || best.media?.cover_original?.url || best.media?.cover?.url || null;
 
     const address = best.venue?.address || null;
     const coords = best.venue?.point?.coordinates;
@@ -969,7 +969,7 @@ export class TcSyncService {
 
     const allPrices: number[] = [];
     for (const tc of tcEvents) {
-      const p = this.extractMinPrice(tc.sets);
+      const p = this.extractMinPrice(tc.sets ?? []);
       if (p) allPrices.push(p);
     }
     const priceFrom = allPrices.length > 0 ? Math.min(...allPrices) : null;
@@ -991,16 +991,14 @@ export class TcSyncService {
           subcategories,
           minAge,
           durationMinutes:
-            durationMinutes && durationMinutes > 0 && durationMinutes < 2880
-              ? durationMinutes
-              : event.durationMinutes,
+            durationMinutes && durationMinutes > 0 && durationMinutes < 2880 ? durationMinutes : event.durationMinutes,
           lat: lat || event.lat,
           lng: lng || event.lng,
           address: address || event.address,
           imageUrl: imageUrl || event.imageUrl,
           priceFrom,
           isActive,
-          tcData: best,
+          tcData: best as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
       });
@@ -1016,17 +1014,14 @@ export class TcSyncService {
           category,
           subcategories,
           minAge,
-          durationMinutes:
-            durationMinutes && durationMinutes > 0 && durationMinutes < 2880
-              ? durationMinutes
-              : null,
+          durationMinutes: durationMinutes && durationMinutes > 0 && durationMinutes < 2880 ? durationMinutes : null,
           lat,
           lng,
           address,
           imageUrl,
           priceFrom,
           isActive,
-          tcData: best,
+          tcData: best as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
       });
@@ -1044,26 +1039,27 @@ export class TcSyncService {
         allTags.add(tag);
       }
     }
-    await this.syncTags(event.id, [...allTags], title, description);
+    await this.syncTags(event.id, [...allTags], title, description ?? undefined);
 
     return sessionCount;
   }
 
   /** REST v1: сессия */
-  private async syncSession(eventId: string, tc: any): Promise<boolean> {
+  private async syncSession(eventId: string, tc: TcRestEventV1): Promise<boolean> {
     const tcId = String(tc.id);
     const dates = this.parseVevent(tc.lifetime);
     if (!dates.start) return false;
 
     const tcSessionId = `${tcId}-main`;
     const availableTickets = tc.tickets_amount_vacant || 0;
-    const prices = this.extractPrices(tc.sets);
+    const prices = this.extractPrices(tc.sets ?? []);
     const isActive = tc.status === 'public' && availableTickets > 0;
 
+    const pricesJson = prices as unknown as Prisma.InputJsonValue;
     await this.prisma.eventSession.upsert({
       where: { tcSessionId },
-      update: { eventId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices, isActive },
-      create: { eventId, tcSessionId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices, isActive },
+      update: { eventId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices: pricesJson, isActive },
+      create: { eventId, tcSessionId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices: pricesJson, isActive },
     });
 
     return true;
@@ -1074,82 +1070,82 @@ export class TcSyncService {
   // ============================================================
 
   private static readonly TC_TAG_MAP: Record<string, string[]> = {
-    'детям': ['s-detmi'],
-    'шоу': ['shou-programma'],
-    'концерты': ['zhivaya-muzyka'],
-    'экскурсии': [],
-    'музеи': ['iskusstvo', 'istoriya'],
-    'театры': ['iskusstvo'],
-    'кино': [],
+    детям: ['s-detmi'],
+    шоу: ['shou-programma'],
+    концерты: ['zhivaya-muzyka'],
+    экскурсии: [],
+    музеи: ['iskusstvo', 'istoriya'],
+    театры: ['iskusstvo'],
+    кино: [],
   };
 
   private static readonly KEYWORD_TAG_MAP: Record<string, string[]> = {
-    'теплоход': ['panoramnyi', 'water'],
+    теплоход: ['panoramnyi', 'water'],
     'прогулка по неве': ['panoramnyi', 'water'],
-    'речн': ['panoramnyi', 'water'],
+    речн: ['panoramnyi', 'water'],
     'белые ночи': ['white-nights', 'belye-nochi'],
     'развод мостов': ['bridges', 'nochnye-mosty', 'nochnye'],
     'разводные мосты': ['bridges', 'nochnye-mosty', 'nochnye'],
     'разводка мостов': ['bridges', 'nochnye-mosty'],
     'под разводными': ['bridges', 'nochnye-mosty'],
-    'ночн': ['nochnye', 'night'],
-    'бар': ['kafe-bar'],
-    'ресторан': ['restoran', 'gastro'],
-    'кафе': ['kafe-bar'],
-    'ужин': ['s-pitaniem', 'gastro'],
-    'обед': ['s-pitaniem', 'gastro'],
-    'фуршет': ['gastro', 's-pitaniem'],
-    'гастро': ['gastro'],
-    'дегустац': ['gastro'],
-    'квест': ['kvesty', 'interactive'],
-    'дет': ['s-detmi'],
-    'ребён': ['s-detmi'],
-    'семей': ['s-detmi'],
-    'романтик': ['romantika', 'romantic'],
-    'свидан': ['romantika', 'romantic'],
+    ночн: ['nochnye', 'night'],
+    бар: ['kafe-bar'],
+    ресторан: ['restoran', 'gastro'],
+    кафе: ['kafe-bar'],
+    ужин: ['s-pitaniem', 'gastro'],
+    обед: ['s-pitaniem', 'gastro'],
+    фуршет: ['gastro', 's-pitaniem'],
+    гастро: ['gastro'],
+    дегустац: ['gastro'],
+    квест: ['kvesty', 'interactive'],
+    дет: ['s-detmi'],
+    ребён: ['s-detmi'],
+    семей: ['s-detmi'],
+    романтик: ['romantika', 'romantic'],
+    свидан: ['romantika', 'romantic'],
     'для двоих': ['romantika', 'romantic'],
-    'компани': ['dlya-kompanii'],
-    'корпоратив': ['dlya-kompanii'],
-    'группо': ['dlya-kompanii'],
-    'дискотек': ['diskoteka'],
-    'танц': ['diskoteka'],
-    'dj': ['diskoteka'],
+    компани: ['dlya-kompanii'],
+    корпоратив: ['dlya-kompanii'],
+    группо: ['dlya-kompanii'],
+    дискотек: ['diskoteka'],
+    танц: ['diskoteka'],
+    dj: ['diskoteka'],
     'живая музыка': ['zhivaya-muzyka'],
     'живой музык': ['zhivaya-muzyka'],
-    'джаз': ['zhivaya-muzyka'],
-    'выставк': ['iskusstvo'],
-    'галере': ['iskusstvo'],
-    'музей': ['iskusstvo', 'istoriya'],
-    'истори': ['istoriya'],
-    'дворц': ['istoriya'],
-    'собор': ['istoriya'],
-    'храм': ['istoriya'],
-    'крепост': ['istoriya'],
-    'природ': ['priroda'],
-    'парк': ['priroda'],
-    'сад': ['priroda'],
-    'фото': ['fotogenichnye'],
-    'инстаграм': ['fotogenichnye'],
-    'хит': ['hit-prodazh'],
-    'популярн': ['hit-prodazh'],
-    'бестселлер': ['hit-prodazh'],
-    'новинк': ['novinka'],
-    'премьер': ['novinka'],
+    джаз: ['zhivaya-muzyka'],
+    выставк: ['iskusstvo'],
+    галере: ['iskusstvo'],
+    музей: ['iskusstvo', 'istoriya'],
+    истори: ['istoriya'],
+    дворц: ['istoriya'],
+    собор: ['istoriya'],
+    храм: ['istoriya'],
+    крепост: ['istoriya'],
+    природ: ['priroda'],
+    парк: ['priroda'],
+    сад: ['priroda'],
+    фото: ['fotogenichnye'],
+    инстаграм: ['fotogenichnye'],
+    хит: ['hit-prodazh'],
+    популярн: ['hit-prodazh'],
+    бестселлер: ['hit-prodazh'],
+    новинк: ['novinka'],
+    премьер: ['novinka'],
     'ночной мост': ['nochnye-mosty'],
     'ночные мосты': ['nochnye-mosty'],
-    'салют': ['salute', 'salyut-s-vody'],
-    'салюты': ['salute'],
-    'фейерверк': ['salute', 'salyut-s-vody'],
+    салют: ['salute', 'salyut-s-vody'],
+    салюты: ['salute'],
+    фейерверк: ['salute', 'salyut-s-vody'],
     'алые паруса': ['scarlet-sails'],
     'день победы': ['salyut-s-vody'],
     '9 мая': ['salyut-s-vody'],
-    'метеор': ['meteor-petergof'],
-    'петергоф': ['meteor-petergof'],
-    'петродворец': ['meteor-petergof'],
-    'свияжск': ['sviyazhsk'],
+    метеор: ['meteor-petergof'],
+    петергоф: ['meteor-petergof'],
+    петродворец: ['meteor-petergof'],
+    свияжск: ['sviyazhsk'],
     'остров-град': ['sviyazhsk'],
-    'куршск': ['kurshskaya-kosa'],
-    'коса': ['kurshskaya-kosa'],
+    куршск: ['kurshskaya-kosa'],
+    коса: ['kurshskaya-kosa'],
     'танцующий лес': ['kurshskaya-kosa'],
     'золотые ворота': ['zolotye-vorota-vlad'],
     'успенский собор': ['zolotye-vorota-vlad'],
@@ -1157,55 +1153,60 @@ export class TcSyncService {
     'золотое кольцо': ['zolotoe-koltso-vlad'],
     'стрелка ярославл': ['strelka-yaroslavl'],
     'спасо-преображенский': ['strelka-yaroslavl'],
-    'которосл': ['strelka-yaroslavl'],
-    'стрелка': ['progulki-volga-nn'],
-    'волга': ['progulki-volga-nn'],
-    'ока': ['progulki-volga-nn'],
+    которосл: ['strelka-yaroslavl'],
+    стрелка: ['progulki-volga-nn'],
+    волга: ['progulki-volga-nn'],
+    ока: ['progulki-volga-nn'],
     'нижегородский кремль': ['kreml-nn'],
-    'нижегородск': ['kreml-nn'],
+    нижегородск: ['kreml-nn'],
     // System tags (filtering, badges, ranking)
-    'ночь': ['night'],
-    'полуночн': ['night'],
-    'night': ['night'],
-    'катер': ['water'],
-    'яхт': ['water'],
-    'водн': ['water'],
+    ночь: ['night'],
+    полуночн: ['night'],
+    night: ['night'],
+    катер: ['water'],
+    яхт: ['water'],
+    водн: ['water'],
     'по неве': ['water', 'panoramnyi'],
     'по реке': ['water'],
     'по каналам': ['water'],
-    'boat': ['water'],
-    'river': ['water'],
-    'romantic': ['romantic'],
+    boat: ['water'],
+    river: ['water'],
+    romantic: ['romantic'],
     'с гидом': ['with-guide'],
-    'экскурсовод': ['with-guide'],
-    'сопровожден': ['with-guide'],
+    экскурсовод: ['with-guide'],
+    сопровожден: ['with-guide'],
     'гид ': ['with-guide'],
-    'guided': ['with-guide'],
-    'обзорн': ['first-time-city'],
-    'закрыт': ['bad-weather-ok'],
+    guided: ['with-guide'],
+    обзорн: ['first-time-city'],
+    закрыт: ['bad-weather-ok'],
     'в помещени': ['bad-weather-ok'],
-    'крытый': ['bad-weather-ok'],
-    'indoor': ['bad-weather-ok'],
+    крытый: ['bad-weather-ok'],
+    indoor: ['bad-weather-ok'],
     'знакомство с город': ['first-time-city'],
     'главные достопримечательност': ['first-time-city'],
     'must see': ['first-time-city'],
     'топ ': ['first-time-city'],
     'лучшие места': ['first-time-city'],
-    'интерактив': ['interactive'],
-    'игров': ['interactive'],
-    'interactive': ['interactive'],
-    'quest': ['interactive'],
-    'аудиогид': ['audioguide'],
+    интерактив: ['interactive'],
+    игров: ['interactive'],
+    interactive: ['interactive'],
+    quest: ['interactive'],
+    аудиогид: ['audioguide'],
     'аудио-гид': ['audioguide'],
-    'audioguide': ['audioguide'],
+    audioguide: ['audioguide'],
     'audio guide': ['audioguide'],
     'без очеред': ['no-queue'],
-    'приоритетн': ['no-queue'],
+    приоритетн: ['no-queue'],
     'skip the line': ['no-queue'],
     'fast track': ['no-queue'],
   };
 
-  private async syncTags(eventId: string, tagNames: string[], title?: string, description?: string): Promise<void> {
+  private async syncTags(
+    eventId: string,
+    tagNames: string[],
+    title?: string | null,
+    description?: string | null,
+  ): Promise<void> {
     const slugsToLink = new Set<string>();
 
     for (const tcTag of tagNames || []) {
@@ -1260,12 +1261,12 @@ export class TcSyncService {
 
     let tagsLinked = 0;
     for (const ev of events) {
-      const tc = (ev.tcData as any) || {};
-      const tcTags = (tc.tags || []) as string[];
+      const tc = (ev.tcData as { tags?: string[] } | null) ?? {};
+      const tcTags = tc.tags ?? [];
       const before = await this.prisma.eventTag.count({ where: { eventId: ev.id } });
       await this.syncTags(ev.id, tcTags, ev.title, ev.description || '');
       const after = await this.prisma.eventTag.count({ where: { eventId: ev.id } });
-      tagsLinked += (after - before);
+      tagsLinked += after - before;
     }
 
     this.logger.log(`Обработано ${events.length} событий, привязано ${tagsLinked} новых тегов`);
@@ -1276,7 +1277,7 @@ export class TcSyncService {
   // REST v1 Города (legacy)
   // ============================================================
 
-  private async ensureCity(geoId: number, sampleEvent: any): Promise<string | null> {
+  private async ensureCity(geoId: number, sampleEvent: TcRestEventV1): Promise<string | null> {
     if (this.cityCache.has(geoId)) return null;
 
     let slug = this.CITY_MAP[geoId] || null;
@@ -1312,7 +1313,14 @@ export class TcSyncService {
     } catch {
       const fallbackSlug = `${slug}-${geoId}`;
       city = await this.prisma.city.create({
-        data: { slug: fallbackSlug, name: cityName, timezone, lat: coords?.[1] || null, lng: coords?.[0] || null, isActive: true },
+        data: {
+          slug: fallbackSlug,
+          name: cityName,
+          timezone,
+          lat: coords?.[1] || null,
+          lng: coords?.[0] || null,
+          isActive: true,
+        },
       });
       this.cityCache.set(geoId, city.id);
       return fallbackSlug;
@@ -1331,7 +1339,7 @@ export class TcSyncService {
       .toLowerCase();
   }
 
-  private findBestImage(tcEvents: any[]): string | null {
+  private findBestImage(tcEvents: TcRestEventV1[]): string | null {
     for (const tc of tcEvents) {
       const url = tc.media?.cover_original?.url || tc.media?.cover?.url || tc.media?.cover_small?.url;
       if (url) return url;
@@ -1339,7 +1347,7 @@ export class TcSyncService {
     return null;
   }
 
-  private extractDuration(tc: any): number | null {
+  private extractDuration(tc: TcRestEventV1): number | null {
     const dates = this.parseVevent(tc.lifetime);
     if (dates.start && dates.finish) {
       const min = Math.round((dates.finish.getTime() - dates.start.getTime()) / 60000);
@@ -1349,20 +1357,22 @@ export class TcSyncService {
   }
 
   private async getCleanSlug(title: string, currentEventId: string): Promise<string> {
-    const base = this.transliterate(title).slice(0, 80) || 'event';
+    const base = this.transliterate(String(title)).slice(0, 80) || 'event';
     const existing = await this.prisma.event.findUnique({ where: { slug: base } });
     if (!existing || existing.id === currentEventId) return base;
     const current = await this.prisma.event.findUnique({ where: { id: currentEventId } });
     return current?.slug || base;
   }
 
-  private parseVevent(vevent: string | null): { start: Date | null; finish: Date | null } {
+  private parseVevent(vevent: string | null | undefined): { start: Date | null; finish: Date | null } {
     if (!vevent) return { start: null, finish: null };
     let start: Date | null = null;
     let finish: Date | null = null;
     const startMatch = vevent.match(/DTSTART[^:]*:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?/);
     if (startMatch) {
-      start = new Date(`${startMatch[1]}-${startMatch[2]}-${startMatch[3]}T${startMatch[4]}:${startMatch[5]}:${startMatch[6]}Z`);
+      start = new Date(
+        `${startMatch[1]}-${startMatch[2]}-${startMatch[3]}T${startMatch[4]}:${startMatch[5]}:${startMatch[6]}Z`,
+      );
     }
     const endMatch = vevent.match(/DTEND[^:]*:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?/);
     if (endMatch) {
@@ -1371,19 +1381,19 @@ export class TcSyncService {
     return { start, finish };
   }
 
-  private classifyRest(tc: any) {
-    const tags = (tc.tags || []).map((t: string) => t.toLowerCase());
+  private classifyRest(tc: TcRestEventV1, descOverride?: string | null) {
+    const tags = (tc.tags ?? []).map((t: string) => t.toLowerCase());
     const title = String(tc.title?.text || '');
-    const desc = String(tc.title?.desc || '');
+    const desc = descOverride ?? String(tc.title?.desc || '');
     return classify(title, desc, tags);
   }
 
-  private extractMinPrice(sets: any[]): number | null {
+  private extractMinPrice(sets: TcRestTicketSetV1[]): number | null {
     if (!sets || !Array.isArray(sets)) return null;
     const prices: number[] = [];
     for (const set of sets) {
       if (set.price) {
-        const p = Math.round(parseFloat(set.price) * 100);
+        const p = Math.round(parseFloat(String(set.price)) * 100);
         if (p > 0) prices.push(p);
       }
       if (set.rules) {
@@ -1398,10 +1408,10 @@ export class TcSyncService {
     return prices.length > 0 ? Math.min(...prices) : null;
   }
 
-  private extractPrices(sets: any[]): any[] {
+  private extractPrices(sets: TcRestTicketSetV1[]): SessionPrice[] {
     if (!sets || !Array.isArray(sets)) return [];
     return sets
-      .map((set: any) => {
+      .map((set) => {
         let priceCopecks = 0;
         let priceOrg = 0;
         let priceExtra = 0;
@@ -1411,10 +1421,10 @@ export class TcSyncService {
           priceOrg = Math.round(parseFloat(currentRule.price_org || '0') * 100);
           priceExtra = Math.round(parseFloat(currentRule.price_extra || '0') * 100);
         } else if (set.price) {
-          priceCopecks = Math.round(parseFloat(set.price) * 100);
+          priceCopecks = Math.round(parseFloat(String(set.price)) * 100);
         }
         return {
-          setId: set.id,
+          setId: String(set.id ?? ''),
           name: set.name || 'standard',
           price: priceCopecks,
           priceOrg,
@@ -1424,10 +1434,10 @@ export class TcSyncService {
           withSeats: set.with_seats || false,
         };
       })
-      .filter((p: any) => p.price > 0);
+      .filter((p) => p.price > 0);
   }
 
-  private getCityName(tcCity: any): string {
+  private getCityName(tcCity: { name?: string | Record<string, string> } | undefined | null): string {
     if (!tcCity?.name) return 'unknown';
     if (typeof tcCity.name === 'string') return tcCity.name;
     return tcCity.name.ru || tcCity.name.default || tcCity.name.en || 'unknown';
@@ -1445,10 +1455,38 @@ export class TcSyncService {
 
   private transliterate(text: string): string {
     const map: Record<string, string> = {
-      а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'zh',
-      з: 'z', и: 'i', й: 'j', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o',
-      п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts',
-      ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu',
+      а: 'a',
+      б: 'b',
+      в: 'v',
+      г: 'g',
+      д: 'd',
+      е: 'e',
+      ё: 'yo',
+      ж: 'zh',
+      з: 'z',
+      и: 'i',
+      й: 'j',
+      к: 'k',
+      л: 'l',
+      м: 'm',
+      н: 'n',
+      о: 'o',
+      п: 'p',
+      р: 'r',
+      с: 's',
+      т: 't',
+      у: 'u',
+      ф: 'f',
+      х: 'h',
+      ц: 'ts',
+      ч: 'ch',
+      ш: 'sh',
+      щ: 'shch',
+      ъ: '',
+      ы: 'y',
+      ь: '',
+      э: 'e',
+      ю: 'yu',
       я: 'ya',
     };
     return text

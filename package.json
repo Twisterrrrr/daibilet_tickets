@@ -12,15 +12,17 @@
     "lint:fix": "npx eslint packages/ --fix",
     "format": "npx prettier --write \"packages/**/*.{ts,tsx,json}\"",
     "format:check": "npx prettier --check \"packages/**/*.{ts,tsx,json}\"",
+    "format:write": "npx prettier --write \"packages/**/*.{ts,tsx,json}\"",
     "db:generate": "pnpm --filter @daibilet/backend db:generate",
     "db:migrate": "pnpm --filter @daibilet/backend db:migrate",
     "db:seed": "pnpm --filter @daibilet/backend db:seed",
     "db:studio": "pnpm --filter @daibilet/backend db:studio",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "audit:debt": "bash scripts/tech-debt-audit.sh",
+    "check:no-any-new":"npx tsx tools/check-no-any-new-files.ts","audit:debt": "bash scripts/tech-debt-audit.sh",
     "audit:debt:ci": "bash scripts/tech-debt-audit.sh --ci",
-    "typecheck": "pnpm --filter @daibilet/backend exec tsc --noEmit && pnpm --filter @daibilet/frontend exec tsc --noEmit"
+    "typecheck": "pnpm --filter @daibilet/backend exec tsc --noEmit && pnpm --filter @daibilet/frontend exec tsc --noEmit",
+    "gen:proto": "pnpm --filter @daibilet/backend gen:proto"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
@@ -28,6 +30,8 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "prettier": "^3.8.1",
     "typescript-eslint": "^8.55.0"
   },

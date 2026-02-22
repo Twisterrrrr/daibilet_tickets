@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
+
 import { runWithLimit, withRetry } from '../common/api-rate-limit.util';
+import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
 
 /**
  * Сервис для работы с Ticketscloud API.
@@ -37,11 +38,7 @@ export class TcApiService {
    * C3: concurrency limit + retry с backoff на 429/5xx.
    * @param signal — опционально, для отмены при job timeout
    */
-  private async request<T = any>(
-    path: string,
-    params?: Record<string, string>,
-    signal?: AbortSignal,
-  ): Promise<T> {
+  private async request<T = any>(path: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T> {
     const doFetch = async (): Promise<T> => {
       const url = new URL(path, this.baseUrl);
       if (params) {
@@ -65,7 +62,10 @@ export class TcApiService {
       });
 
       if (!res.ok) {
-        const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
+        const text = await res.text().catch((e) => {
+          this.logger.warn('TC API call failed: ' + (e as Error).message);
+          return '';
+        });
         this.logger.error(`TC API ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
         throw new Error(`TC API returned ${res.status}: ${text.slice(0, 200)}`);
       }
@@ -73,15 +73,12 @@ export class TcApiService {
       return res.json() as Promise<T>;
     };
 
-    const { data, retries } = await withRetry(
-      () => runWithLimit(doFetch),
-      {
-        maxRetries: 3,
-        initialBackoffMs: 1000,
-        onRetry: (attempt, delayMs, status) =>
-          this.logger.warn(`TC API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
-      },
-    );
+    const { data, retries } = await withRetry(() => runWithLimit(doFetch), {
+      maxRetries: 3,
+      initialBackoffMs: 1000,
+      onRetry: (attempt, delayMs, status) =>
+        this.logger.warn(`TC API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
+    });
     if (retries > 0) {
       this.logger.log(`TC API completed after ${retries} retries`);
     }
@@ -106,7 +103,7 @@ export class TcApiService {
     city?: number;
     status?: string;
     signal?: AbortSignal;
-  }): Promise<any[]> {
+  }): Promise<import('./tc-api.types').TcRestEventV1[]> {
     const params: Record<string, string> = {};
 
     if (opts?.page) params.page = String(opts.page);
@@ -144,11 +141,7 @@ export class TcApiService {
    * Создать заказ.
    * POST /v2/resources/orders
    */
-  async createOrder(payload: {
-    event?: string;
-    random?: Record<string, number>;
-    tickets?: string[];
-  }): Promise<any> {
+  async createOrder(payload: { event?: string; random?: Record<string, number>; tickets?: string[] }): Promise<any> {
     const url = new URL('/v2/resources/orders', this.baseUrl);
 
     const res = await fetch(url.toString(), {
@@ -163,7 +156,10 @@ export class TcApiService {
     });
 
     if (!res.ok) {
-      const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
+      const text = await res.text().catch((e) => {
+        this.logger.warn('TC API call failed: ' + (e as Error).message);
+        return '';
+      });
       throw new Error(`TC create order failed ${res.status}: ${text.slice(0, 200)}`);
     }
 
@@ -189,7 +185,10 @@ export class TcApiService {
     });
 
     if (!res.ok) {
-      const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
+      const text = await res.text().catch((e) => {
+        this.logger.warn('TC API call failed: ' + (e as Error).message);
+        return '';
+      });
       throw new Error(`TC update order failed ${res.status}: ${text.slice(0, 200)}`);
     }
 
@@ -230,7 +229,10 @@ export class TcApiService {
       signal: AbortSignal.timeout(this.getTimeoutMs()),
     });
     if (!res.ok) {
-      const text = await res.text().catch((e) => { this.logger.warn('TC API call failed: ' + (e as Error).message); return ''; });
+      const text = await res.text().catch((e) => {
+        this.logger.warn('TC API call failed: ' + (e as Error).message);
+        return '';
+      });
       throw new Error(`TC get order failed ${res.status}: ${text.slice(0, 200)}`);
     }
     return res.json();

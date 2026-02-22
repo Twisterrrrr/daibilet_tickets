@@ -103,6 +103,8 @@
 
 - [x] **A5 (HIGH)**: JwtPayload вместо req: any (22.02)
 - [x] **B2 (MED)**: RBAC Supplier (guards, operatorId boundary) (22.02)
+- [x] **A3 (HIGH)**: Типизация tc-sync.service.ts (22.02)
+- [x] **B1 (MED)**: Prisma where builders — частично (22.02)
 - [ ] **A3 (HIGH)**: Типизация tc-sync.service.ts (TcEvent вместо any[])
 - [ ] **A4 (HIGH)**: Proto-generated types для gRPC
 - [ ] **B1 (MED)**: where: any → Prisma typed where builders

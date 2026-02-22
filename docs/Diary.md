@@ -4,6 +4,28 @@
 
 ---
 
+## 22.02.2026 — Backend Tech Debt: A3, A4, B1, B4, A1-Pino, A2
+
+### Наблюдения
+
+- tc-sync.service.ts: REST v1 использовал any[] для событий и any для tcData/sets.
+- A4 (proto): protoc не установлен глобально; ts-proto добавлен, скрипт gen:proto готов.
+- B4, A1-Pino, A2 уже реализованы (nginx uploads, pino, email templates).
+
+### Решения
+
+**A3:** TcRestEventV1, TcRestTicketSetV1, SessionPrice в tc-api.types.ts; tc-sync переведён на типы.
+
+**A4:** Добавлен pnpm gen:proto (требует protoc).
+
+**B1:** common/where-builders.ts: buildEventWhere, buildArticleWhere, buildUpsellWhere; применены в admin-events, admin-articles, pricing.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 22.02.2026 — A5 JwtPayload + B2 RBAC Supplier (Backend Tech Debt)
 
 ### Наблюдения

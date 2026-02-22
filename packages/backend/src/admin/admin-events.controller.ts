@@ -29,6 +29,8 @@ import {
 } from '@prisma/client';
 import type { Request as ExpressRequest, Response } from 'express';
 
+import { buildEventWhere } from '../common/where-builders';
+
 import type { AdminAuthUser } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -77,20 +79,13 @@ export class AdminEventsController {
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
-    const where: any = {};
-    if (city) where.city = { slug: city };
-    if (category) where.category = category;
-    if (source) where.source = source;
-    if (active !== undefined) where.isActive = active === 'true';
-    if (search) {
-      const trimmed = search.trim();
-      where.OR = [
-        { title: { contains: trimmed, mode: 'insensitive' } },
-        { slug: { contains: trimmed, mode: 'insensitive' } },
-        { tcEventId: trimmed },
-        { offers: { some: { externalEventId: trimmed } } },
-      ];
-    }
+    const where = buildEventWhere({
+      city: city ?? undefined,
+      category: category ?? undefined,
+      source: source ?? undefined,
+      isActive: active === undefined ? undefined : active === 'true',
+      search: search ?? undefined,
+    });
 
     const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({

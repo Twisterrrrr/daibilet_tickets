@@ -118,6 +118,56 @@ export interface TcGrpcTicketSet {
 }
 
 // ============================================================
+// TC REST v1 (/v1/services/simple/events) — формат для sync fallback
+// ============================================================
+
+export interface TcRestEventV1 {
+  id?: string | number;
+  title?: { text?: string; desc?: string };
+  venue?: {
+    city?: { id?: number; name?: string | Record<string, string>; timezone?: string };
+    address?: string;
+    point?: { coordinates?: [number, number] };
+  };
+  media?: { cover_original?: { url?: string }; cover?: { url?: string }; cover_small?: { url?: string } };
+  tags?: string[];
+  sets?: TcRestTicketSetV1[];
+  lifetime?: string | null;
+  status?: string;
+  tickets_amount_vacant?: number;
+  age_rating?: number | string;
+  [key: string]: unknown;
+}
+
+export interface TcRestTicketSetV1 {
+  id?: string;
+  name?: string;
+  price?: string | number;
+  amount?: number;
+  amount_vacant?: number;
+  with_seats?: boolean;
+  rules?: Array<{
+    current?: boolean;
+    price?: string;
+    price_org?: string;
+    price_extra?: string;
+  }>;
+  [key: string]: unknown;
+}
+
+/** Цена сессии (EventSession.prices) */
+export interface SessionPrice {
+  setId: string;
+  name: string;
+  price: number;
+  priceOrg?: number;
+  priceExtra?: number;
+  amount?: number;
+  amountVacant?: number;
+  withSeats?: boolean;
+}
+
+// ============================================================
 // Type Guards
 // ============================================================
 
@@ -135,6 +185,12 @@ export function isTcOrder(value: unknown): value is TcOrder {
   if (!value || typeof value !== 'object') return false;
   const obj = value as Record<string, unknown>;
   return typeof obj._id === 'string' || typeof obj.id === 'string';
+}
+
+export function isTcRestEventV1(value: unknown): value is TcRestEventV1 {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (typeof obj.id === 'string' || typeof obj.id === 'number') && (obj.title != null || obj.venue != null);
 }
 
 // ============================================================
@@ -159,8 +215,6 @@ export function extractTcPosterUrl(event: TcEvent): string | null {
 
 /** Безопасно извлечь минимальную цену из sets */
 export function extractTcMinPrice(sets: TcTicketSet[]): number | null {
-  const prices = sets
-    .map((s) => s.price)
-    .filter((p): p is number => typeof p === 'number' && p > 0);
+  const prices = sets.map((s) => s.price).filter((p): p is number => typeof p === 'number' && p > 0);
   return prices.length > 0 ? Math.min(...prices) : null;
 }
