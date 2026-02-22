@@ -4,6 +4,49 @@
 
 ---
 
+## 22.02.2026 — JSON-LD, useSearchParams Suspense, gift-certificate dynamic
+
+### Наблюдения
+
+- Next.js 15 требует оборачивать `useSearchParams()` в `<Suspense>` при пререндере.
+- JsonLd компонент с `'use client'` не может вызывать `buildOrganizationSchema()` из layout (серверный компонент).
+- Страница /gift-certificate вызывает API при билде — падает, если backend не запущен.
+
+### Решения
+
+**JsonLd.tsx** — удалён `'use client'`. Компонент и `buildOrganizationSchema` выполняются на сервере; layout вызывает их без ошибки.
+
+**useSearchParams + Suspense** — обёрнуты в Suspense: HeaderCitySelect в Header; OrderTrackContent в orders/track; PlannerContent в planner; EventsPageContent в events. Fallback — минимальный скелетон или null.
+
+**gift-certificate/page.tsx** — добавлен `export const dynamic = 'force-dynamic'`, страница не пререндерится при билде.
+
+### Проблемы
+
+- Windows EPERM при билде standalone (symlink) — среда, не код. Сборка страниц проходит успешно.
+- og-default.png отсутствует в public/ — для OG-тегов нужен файл 1200×630 в `packages/frontend/public/og-default.png`.
+
+---
+
+## 22.02.2026 — Pre-deploy checklist, env и smoke-план
+
+### Наблюдения
+
+- Нужен единый чеклист перед deploy: env, security, health, логи.
+
+### Решения
+
+**docs/PreDeployChecklist.md** — чеклист: (1) Production env — .env.example как источник истины, обязательные переменные; (2) Security B1–B4 — Helmet, CORS, rate limit, brute-force; (3) Health и smoke-план — daibilet.ru, admin, /health, виджеты; (4) Логи requestId + PII — включено в prod (AppModule).
+
+**docker-compose.prod.yml** — TC_API_TOKEN и TC_WIDGET_TOKEN с `:?` — compose падает при отсутствии.
+
+**.env.example** — уточнён комментарий про источник истины и ссылку на PreDeployChecklist.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 22.02.2026 — Production Hardening C3–F2 (реализация)
 
 ### Наблюдения
@@ -33,6 +76,9 @@
 ### Проблемы
 
 - pnpm install требуется для p-limit. Тесты sync.processor, payment.service — падения из-за моков (job.opts), не связаны с C3–F2.
+- TS: onRetry(attempt, status?, delayMs) — required после optional. Исправлено: onRetry(attempt, delayMs, status?).
+
+**Smoke-check (22.02):** /events 200 + x-request-id, /health 200, /admin/ops/health без auth → 401.
 
 ---
 

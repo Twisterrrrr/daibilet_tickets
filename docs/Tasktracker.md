@@ -1,6 +1,6 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-02-21. Решения по 13 вопросам — `docs/OpenQuestions.md`.
+> Последнее обновление: 2026-02-22. Решения по 13 вопросам — `docs/OpenQuestions.md`.
 
 ---
 
@@ -70,7 +70,7 @@
 - [x] **RBAC-чеклист** — матрица прав по ролям, проверки доступа, эндпоинты Supplier (секция 10 в SupplierArchitecture.md)
 
 ### To-do (Supplier)
-- [ ] **Средний**: Добавить Event.createdByType, Venue.createdByType, createdById (миграция Prisma)
+- [x] **Средний**: Добавить Event.createdByType, Venue.createdByType, createdById (миграция 20260221110000)
 - [ ] **Средний**: Реализовать RBAC для Supplier (guards, decorators, проверка operatorId)
 
 ---
@@ -148,6 +148,7 @@
 - [x] **Средний**: ESLint `no-console: error` + исключения для тестов/seed
 
 ### Выполнено (22.02.2026)
+- [x] **Frontend build fixes**: JsonLd server-component (без 'use client'), useSearchParams в Suspense (Header, orders/track, planner, events), gift-certificate dynamic
 - [x] **C3 — Rate limiting TC/TEP**: api-rate-limit.util (p-limit, withRetry 429/5xx), TcApiService/TepApiService
 - [x] **D1 — CacheService контракт**: cacheKeys, delByPrefix, все сервисы переведены
 - [x] **D2 — Инвалидация кэша**: CacheInvalidationMatrix.md
@@ -165,7 +166,7 @@
 - [x] **Высокий**: Prisma migrate deploy — идемпотентные миграции (20260215_pre_yookassa_gates, 20260215_review_venue_id, 20260215_soft_delete_and_cascade_safety) для совместимости с базами после db push / migrate dev
 
 ### Отложено (backlog)
-- [ ] **Средний**: ESLint правило: запретить `any` в новых файлах (warning)
+- [x] **Средний**: ESLint правило: запретить `any` в новых файлах — tools/check-no-any-new-files.ts, pnpm check:no-any-new (22.02)
 - [ ] **Низкий**: Типизация `as any` в бэкенде (31 место) — заменить на type guards постепенно
 - [ ] **Низкий**: Frontend `any` (100+) — начать с api.ts и DTO types
 
@@ -240,7 +241,7 @@
 - [ ] **Высокий**: Web Vitals: LCP < 2.5s, CLS < 0.1 — lazy images, font preload, critical CSS
 - [x] **Высокий**: /venues/* в sitemap (priority 0.9)
 - [ ] **Высокий**: Мобильная корзина: проверить UX на 375px, fixed bottom bar для «Оформить»
-- [ ] **Средний**: Breadcrumbs на страницах события и площадки (SEO + навигация)
+- [x] **Средний**: Breadcrumbs на страницах события и площадки (SEO + навигация) — уже были
 - [ ] **Средний**: Фильтры на /events: по дате, по цене, по категории — расширение текущих
 
 ### Неделя 3 — Техдолг + конверсия
@@ -268,7 +269,7 @@
 #### Backend
 - [ ] **Высокий**: Feature flags: отключение EXTERNAL по городам с достаточным INTERNAL покрытием
 - [ ] **Высокий**: Supplier self-service: портал для добавления событий
-- [ ] **Высокий**: Review.venueId — отзывы на площадки
+- [x] **Высокий**: Review.venueId — отзывы на площадки (выполнено ранее)
 - [ ] **Средний**: Нагрузочное тестирование checkout
 
 #### Контент
@@ -299,8 +300,8 @@
 - [x] **Средний**: Backend: highlights/faq/features/commissionRate в admin create/update endpoints
 
 ### Следующие шаги (конверсия)
-- [ ] **Средний**: Scroll-progress indicator на мобиле (% прочитанного)
-- [ ] **Средний**: «Похожие места» блок на venue page
+- [x] **Средний**: Scroll-progress indicator на мобиле (% прочитанного) — уже в UX
+- [x] **Средний**: «Похожие места» блок на venue page — уже в UX
 - [ ] **Низкий**: A/B тестирование CTA-текстов («Купить билет» vs «Выбрать дату»)
 - [ ] **Низкий**: Micro-animations для offer cards (hover, selection feedback)
 
@@ -478,8 +479,8 @@
 - [x] **Критический**: API `getEvents` / `getEventBySlug`: include offers, primaryOffer в ответе, фильтр дублей (canonicalOfId)
 - [x] **Высокий**: Admin: секция офферов (таблица, status toggle, set primary) + endpoints (GET/PATCH/POST merge)
 - [x] **Высокий**: Frontend BuyCard: CTA по primaryOffer.purchaseType (TC_WIDGET / REDIRECT / BuyModal)
-- [ ] **Средний**: Admin: UI для ручного merge дублей (поиск + выбор canonical event)
-- [ ] **Средний**: Автодедуп: fuzzy matching по названию + площадка + дата (Фаза будущая)
+- [x] **Средний**: Admin: UI для ручного merge дублей (поиск + выбор canonical event)
+- [x] **Средний**: Автодедуп: fuzzy matching по названию + площадка + дата (Фаза будущая)
 - [ ] **Низкий**: Автовыбор primary по правилам (комиссия/цена/наличие)
 
 ### Этап 2: SEO-машина + новые страницы (планируется)
@@ -517,8 +518,8 @@
 - [x] **Критический**: Инициализировать monorepo (pnpm workspaces): `packages/backend`, `packages/frontend`, `packages/shared`
 - [x] **Критический**: Docker Compose: postgres:16, redis:7 (порт 5433 из-за конфликта)
 - [x] **Критический**: Настроить `.env.example` со всеми переменными (без секретов)
-- [ ] **Высокий**: Настроить ESLint + Prettier для всего monorepo
-- [ ] **Средний**: GitHub Actions: lint → test → build (без деплоя на первом этапе)
+- [x] **Высокий**: Настроить ESLint + Prettier для всего monorepo (22.02: eslint.config.mjs, simple-import-sort, react-hooks, format:check/write, pnpm lint)
+- [x] **Средний**: GitHub Actions: lint → test → build — check-no-any-new, lint, typecheck, test, build (22.02)
 
 ### 1.3 Подготовка к продакшен-деплою
 
@@ -536,6 +537,8 @@
 - [ ] **Средний**: CI/CD: GitHub Actions для автодеплоя на VPS
 
 ### 1.5 Деплой на Timeweb Cloud
+
+> **Перед deploy:** пройти `docs/PreDeployChecklist.md` (env, security, smoke-план).
 
 - [ ] **Критический**: Создать VPS на Timeweb Cloud (Ubuntu 22.04/24.04, 2 CPU, 4 GB RAM, 50 GB NVMe)
 - [ ] **Критический**: Настроить DNS A-записи: daibilet.ru, www.daibilet.ru, admin.daibilet.ru → IP VPS
@@ -1173,8 +1176,8 @@
 - [x] **Высокий**: Admin UI: список тикетов, фильтры, детали, ответы, шаблоны, внутренние заметки
 - [x] **Высокий**: Виджет обратной связи (floating button + modal) на всех страницах
 - [x] **Высокий**: Клиентская форма ContactForm на /help
-- [ ] **Средний**: Scroll-progress indicator на мобиле (% прочитанного)
-- [ ] **Средний**: «Похожие места» блок на venue page
+- [x] **Средний**: Scroll-progress indicator на мобиле (% прочитанного) — дубль
+- [x] **Средний**: «Похожие места» блок на venue page — дубль
 - [ ] **Низкий**: A/B тестирование CTA-текстов («Купить билет» vs «Выбрать дату»)
 - [ ] **Низкий**: Micro-animations для offer cards (hover, selection feedback)
 

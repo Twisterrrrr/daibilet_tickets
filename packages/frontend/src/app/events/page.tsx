@@ -1,24 +1,25 @@
 'use client';
 
-import Link from 'next/link';
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { X, LayoutGrid, List as ListIcon } from 'lucide-react';
-import { api } from '@/lib/api';
-import { EventCard } from '@/components/ui/EventCard';
-import { EventCardHorizontal } from '@/components/ui/EventCardHorizontal';
-import { CatalogCard } from '@/components/ui/CatalogCard';
-import { DateRibbon } from '@/components/ui/DateRibbon';
-import { PromoBlock } from '@/components/ui/PromoBlock';
 import {
-  CATEGORY_LABELS,
-  EventCategory,
-  EventAudience,
   AUDIENCE_LABELS,
-  QUICK_FILTERS,
+  CATEGORY_LABELS,
+  EventAudience,
+  EventCategory,
   formatPrice,
+  QUICK_FILTERS,
   type QuickFilter,
 } from '@daibilet/shared';
+import { LayoutGrid, List as ListIcon, X } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+
+import { CatalogCard } from '@/components/ui/CatalogCard';
+import { DateRibbon } from '@/components/ui/DateRibbon';
+import { EventCard } from '@/components/ui/EventCard';
+import { EventCardHorizontal } from '@/components/ui/EventCardHorizontal';
+import { PromoBlock } from '@/components/ui/PromoBlock';
+import { api } from '@/lib/api';
 
 const categories = [
   { value: '', label: 'Все' },
@@ -62,7 +63,7 @@ const HIDDEN_REGION_HEADERS = ['Золотое кольцо'];
 const REGION_HUB_CITIES: Record<string, string> = {
   'Ленинградская область': 'Санкт-Петербург',
   'Московская область': 'Москва',
-  'Татарстан': 'Казань',
+  Татарстан: 'Казань',
   'Свердловская область': 'Екатеринбург',
   'Кемеровская область': 'Кемерово',
   'Нижегородская область': 'Нижний Новгород',
@@ -114,9 +115,7 @@ function MuseumsListByCity({ items }: { items: any[] }) {
         if (showRegion) lastRegion = block.regionName;
         return (
           <div key={`${block.regionName}-${block.cityName}-${idx}`}>
-            {showRegion && (
-              <h3 className="mb-2 text-sm font-semibold text-slate-500">{block.regionName}</h3>
-            )}
+            {showRegion && <h3 className="mb-2 text-sm font-semibold text-slate-500">{block.regionName}</h3>}
             <h2 className="mb-3 text-lg font-semibold text-slate-800 sm:text-xl">{block.cityName}</h2>
             <div className="grid grid-cols-1 gap-y-3 min-[800px]:grid-cols-2 min-[800px]:gap-x-6 min-[800px]:gap-y-2">
               {block.items.map((item: any) => {
@@ -165,7 +164,7 @@ function filtersFromParams(sp: URLSearchParams) {
     category: sp.get('category') || '',
     audience: sp.get('audience') || '',
     sort,
-    timeOfDay: isSoon ? 'soon' : (sp.get('timeOfDay') || ''),
+    timeOfDay: isSoon ? 'soon' : sp.get('timeOfDay') || '',
     tag: sp.get('tag') || '',
     date: sp.get('date') || null,
     pier: sp.get('pier') || '',
@@ -177,7 +176,7 @@ function filtersFromParams(sp: URLSearchParams) {
   };
 }
 
-export default function EventsPage() {
+function EventsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -240,10 +239,7 @@ export default function EventsPage() {
   const vitrineKey = audience === 'KIDS' ? 'KIDS' : category || '';
 
   // Текущие быстрые фильтры для витрины
-  const quickFilters = useMemo<QuickFilter[]>(
-    () => (vitrineKey ? QUICK_FILTERS[vitrineKey] || [] : []),
-    [vitrineKey],
-  );
+  const quickFilters = useMemo<QuickFilter[]>(() => (vitrineKey ? QUICK_FILTERS[vitrineKey] || [] : []), [vitrineKey]);
 
   // Параметры от активного quick filter
   const quickFilterParams = useMemo(() => {
@@ -258,12 +254,23 @@ export default function EventsPage() {
   const effectiveTimeOfDay = isSoonMode ? '' : timeOfDay;
 
   useEffect(() => {
-    api.getCities().then(setCities).catch((e) => { console.error('Events page error:', e); });
+    api
+      .getCities()
+      .then(setCities)
+      .catch((e) => {
+        console.error('Events page error:', e);
+      });
   }, []);
 
   useEffect(() => {
     if (city) {
-      api.getLocations(city, 'PIER').then(setPiers).catch((e) => { console.error('Events page error:', e); setPiers([]); });
+      api
+        .getLocations(city, 'PIER')
+        .then(setPiers)
+        .catch((e) => {
+          console.error('Events page error:', e);
+          setPiers([]);
+        });
     } else {
       setPiers([]);
       setPier('');
@@ -292,11 +299,24 @@ export default function EventsPage() {
     if (isMuseumFromUrl) {
       // Музеи → единый каталог. В режиме «Списком» — region для областных музеев (СПб + Выборг, Пушкин и др.)
       const effectiveLimit = vmFromUrl === 'list' ? 200 : limitFromUrl;
-      const params: Record<string, string | number> = { category: 'MUSEUM', page: vmFromUrl === 'list' ? 1 : pageFromUrl, sort: sortFromUrl, limit: effectiveLimit };
+      const params: Record<string, string | number> = {
+        category: 'MUSEUM',
+        page: vmFromUrl === 'list' ? 1 : pageFromUrl,
+        sort: sortFromUrl,
+        limit: effectiveLimit,
+      };
       if (vmFromUrl === 'list') {
         // region — города региона (хаб + областные). Пустой город — все музеи всех городов
         const citySlug = cityFromUrl || '';
-        const regionByCity: Record<string, string> = { 'saint-petersburg': 'leningradskaya-oblast', moscow: 'moskovskaya-oblast', kazan: 'tatarstan', yaroslavl: 'zolotoe-koltso', ekaterinburg: 'sverdlovskaya-oblast', kemerovo: 'kemerovskaya-oblast', 'nizhny-novgorod': 'nizhegorodskaya-oblast' };
+        const regionByCity: Record<string, string> = {
+          'saint-petersburg': 'leningradskaya-oblast',
+          moscow: 'moskovskaya-oblast',
+          kazan: 'tatarstan',
+          yaroslavl: 'zolotoe-koltso',
+          ekaterinburg: 'sverdlovskaya-oblast',
+          kemerovo: 'kemerovskaya-oblast',
+          'nizhny-novgorod': 'nizhegorodskaya-oblast',
+        };
         const regionSlug = citySlug ? regionByCity[citySlug] : undefined;
         if (regionSlug) params.region = regionSlug;
         else if (citySlug) params.city = citySlug;
@@ -306,8 +326,17 @@ export default function EventsPage() {
       }
       api
         .getCatalog(params)
-        .then((res) => { setCatalogItems(res.items); setEvents([]); setTotal(res.total); })
-        .catch((e) => { console.error('Catalog error:', e); setCatalogItems([]); setEvents([]); setTotal(0); })
+        .then((res) => {
+          setCatalogItems(res.items);
+          setEvents([]);
+          setTotal(res.total);
+        })
+        .catch((e) => {
+          console.error('Catalog error:', e);
+          setCatalogItems([]);
+          setEvents([]);
+          setTotal(0);
+        })
         .finally(() => setLoading(false));
       return;
     }
@@ -340,12 +369,31 @@ export default function EventsPage() {
 
     api
       .getEvents(params)
-      .then((res) => { setEvents(res.items); setCatalogItems([]); setTotal(res.total); })
-      .catch((e) => { console.error('Events page error:', e); setEvents([]); setCatalogItems([]); setTotal(0); })
+      .then((res) => {
+        setEvents(res.items);
+        setCatalogItems([]);
+        setTotal(res.total);
+      })
+      .catch((e) => {
+        console.error('Events page error:', e);
+        setEvents([]);
+        setCatalogItems([]);
+        setTotal(0);
+      })
       .finally(() => setLoading(false));
   }, [searchParams, quickFilterParams]);
 
-  const activeFiltersCount = [city, category, selectedDate, audience, urlTag, timeOfDay, pier, priceMax, activeQuickFilter].filter(Boolean).length;
+  const activeFiltersCount = [
+    city,
+    category,
+    selectedDate,
+    audience,
+    urlTag,
+    timeOfDay,
+    pier,
+    priceMax,
+    activeQuickFilter,
+  ].filter(Boolean).length;
 
   const clearAllFilters = useCallback(() => {
     updateUrl({
@@ -385,11 +433,7 @@ export default function EventsPage() {
   // Города для дропдауна: в режиме "Начнутся скоро" — только города с событиями в текущей выдаче
   const dropdownCities = useMemo(() => {
     if (!isSoonMode) return cities;
-    const slugsWithSoon = new Set(
-      events
-        .filter((e: any) => e.city)
-        .map((e: any) => e.city.slug),
-    );
+    const slugsWithSoon = new Set(events.filter((e: any) => e.city).map((e: any) => e.city.slug));
     return cities.filter((c: any) => slugsWithSoon.has(c.slug));
   }, [isSoonMode, cities, events]);
 
@@ -400,7 +444,9 @@ export default function EventsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Каталог событий</h1>
           <p className="mt-1 text-sm text-slate-500 sm:text-base">
-            {total > 0 ? `${total} ${isMuseumCategory ? 'мест' : 'событий'}` : 'Экскурсии, музеи и мероприятия по городам России'}
+            {total > 0
+              ? `${total} ${isMuseumCategory ? 'мест' : 'событий'}`
+              : 'Экскурсии, музеи и мероприятия по городам России'}
           </p>
         </div>
         {/* Limit selector + View mode toggle */}
@@ -413,60 +459,62 @@ export default function EventsPage() {
               className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               {LIMIT_OPTIONS.map((n) => (
-                <option key={n} value={n}>{n}</option>
+                <option key={n} value={n}>
+                  {n}
+                </option>
               ))}
             </select>
           </label>
           {isMuseumCategory ? (
-          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-slate-500 shadow-sm">
-            <button
-              type="button"
-              onClick={() => updateUrl({ vm: 'grid', page: 1 })}
-              className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
-                museumViewMode === 'grid' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
-              }`}
-              title="Карточками"
-              aria-label="Показать карточками"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => updateUrl({ vm: 'list', page: 1 })}
-              className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
-                museumViewMode === 'list' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
-              }`}
-              title="Списком"
-              aria-label="Списком с разбивкой по городам"
-            >
-              <ListIcon className="h-4 w-4" />
-            </button>
-          </div>
+            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-slate-500 shadow-sm">
+              <button
+                type="button"
+                onClick={() => updateUrl({ vm: 'grid', page: 1 })}
+                className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
+                  museumViewMode === 'grid' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
+                }`}
+                title="Карточками"
+                aria-label="Показать карточками"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => updateUrl({ vm: 'list', page: 1 })}
+                className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
+                  museumViewMode === 'list' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
+                }`}
+                title="Списком"
+                aria-label="Списком с разбивкой по городам"
+              >
+                <ListIcon className="h-4 w-4" />
+              </button>
+            </div>
           ) : (
-          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-slate-500 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
-                viewMode === 'grid' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
-              }`}
-              title="Карточками"
-              aria-label="Показать карточками"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
-                viewMode === 'list' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
-              }`}
-              title="Списком"
-              aria-label="Показать списком"
-            >
-              <ListIcon className="h-4 w-4" />
-            </button>
-          </div>
+            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-slate-500 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
+                  viewMode === 'grid' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
+                }`}
+                title="Карточками"
+                aria-label="Показать карточками"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`inline-flex items-center justify-center rounded-md px-2.5 py-1.5 ${
+                  viewMode === 'list' ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50'
+                }`}
+                title="Списком"
+                aria-label="Показать списком"
+              >
+                <ListIcon className="h-4 w-4" />
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -490,9 +538,7 @@ export default function EventsPage() {
           <button
             onClick={handleAudienceKids}
             className={`flex-shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              audience === 'KIDS'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+              audience === 'KIDS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             {AUDIENCE_LABELS[EventAudience.KIDS]}
@@ -551,10 +597,7 @@ export default function EventsPage() {
 
       {/* Date ribbon */}
       <div className="-mx-4 mb-4 px-4 sm:mx-0 sm:mb-5 sm:px-0">
-        <DateRibbon
-          selected={selectedDate}
-          onChange={(date) => updateUrl({ date: date || null, page: 1 })}
-        />
+        <DateRibbon selected={selectedDate} onChange={(date) => updateUrl({ date: date || null, page: 1 })} />
       </div>
 
       {/* Time-of-day chips (left) + City / Pier / Sort (right) — single row */}
@@ -568,7 +611,11 @@ export default function EventsPage() {
                 if (opt.value === 'soon') {
                   updateUrl({ sort: 'departing_soon', timeOfDay: null, page: 1 });
                 } else {
-                  updateUrl({ timeOfDay: opt.value || null, sort: sort === 'departing_soon' ? 'popular' : sort, page: 1 });
+                  updateUrl({
+                    timeOfDay: opt.value || null,
+                    sort: sort === 'departing_soon' ? 'popular' : sort,
+                    page: 1,
+                  });
                 }
               }}
               className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -593,7 +640,9 @@ export default function EventsPage() {
           >
             <option value="">Все города</option>
             {dropdownCities.map((c: any) => (
-              <option key={c.slug} value={c.slug}>{c.name}</option>
+              <option key={c.slug} value={c.slug}>
+                {c.name}
+              </option>
             ))}
           </select>
 
@@ -605,7 +654,9 @@ export default function EventsPage() {
             >
               <option value="">Все причалы</option>
               {piers.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.shortTitle || p.title}</option>
+                <option key={p.id} value={p.id}>
+                  {p.shortTitle || p.title}
+                </option>
               ))}
             </select>
           )}
@@ -617,7 +668,9 @@ export default function EventsPage() {
               className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               {PRICE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
             </select>
           )}
@@ -635,7 +688,9 @@ export default function EventsPage() {
             className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           >
             {sortOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
         </div>
@@ -659,11 +714,11 @@ export default function EventsPage() {
         museumViewMode === 'list' ? (
           <MuseumsListByCity items={catalogItems} />
         ) : (
-        <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-          {catalogItems.map((item: any) => (
-            <CatalogCard key={item.id} item={item} />
-          ))}
-        </div>
+          <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            {catalogItems.map((item: any) => (
+              <CatalogCard key={item.id} item={item} />
+            ))}
+          </div>
         )
       ) : events.length > 0 ? (
         viewMode === 'grid' ? (
@@ -727,9 +782,7 @@ export default function EventsPage() {
         <div className="rounded-xl border border-dashed border-slate-300 py-16 sm:py-20 text-center">
           <p className="text-4xl">🔍</p>
           <h2 className="mt-4 text-lg font-semibold text-slate-700 sm:text-xl">Событий пока нет</h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Попробуйте изменить фильтры или выбрать другую категорию
-          </p>
+          <p className="mt-2 text-sm text-slate-500">Попробуйте изменить фильтры или выбрать другую категорию</p>
         </div>
       )}
 
@@ -756,5 +809,13 @@ export default function EventsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function EventsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[40vh] flex items-center justify-center"><LayoutGrid className="h-8 w-8 animate-pulse text-slate-400" /></div>}>
+      <EventsPageContent />
+    </Suspense>
   );
 }

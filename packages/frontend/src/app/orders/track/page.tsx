@@ -1,13 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { Suspense } from 'react';
 import {
-  Package, CheckCircle, XCircle, Clock, AlertTriangle,
-  ChevronRight, Loader2, Search, ArrowLeft, CalendarCheck,
-  HelpCircle, MapPin, Phone, Info,
+  AlertTriangle,
+  ArrowLeft,
+  CalendarCheck,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  HelpCircle,
+  Info,
+  Loader2,
+  MapPin,
+  Package,
+  Phone,
+  Search,
+  XCircle,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
@@ -75,7 +87,9 @@ function formatDate(dateStr: string) {
 }
 
 function formatPrice(kopecks: number) {
-  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(kopecks / 100);
+  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(
+    kopecks / 100,
+  );
 }
 
 // ─── Timeline ─────────────────────────────────
@@ -89,9 +103,15 @@ const TIMELINE_STEPS = [
 ];
 
 const STATUS_ORDER: Record<string, number> = {
-  STARTED: 0, VALIDATED: 1, REDIRECTED: 2,
-  PENDING_CONFIRMATION: 2, CONFIRMED: 3, AWAITING_PAYMENT: 3,
-  COMPLETED: 4, EXPIRED: -1, CANCELLED: -1,
+  STARTED: 0,
+  VALIDATED: 1,
+  REDIRECTED: 2,
+  PENDING_CONFIRMATION: 2,
+  CONFIRMED: 3,
+  AWAITING_PAYMENT: 3,
+  COMPLETED: 4,
+  EXPIRED: -1,
+  CANCELLED: -1,
 };
 
 function Timeline({ status }: { status: string }) {
@@ -109,9 +129,12 @@ function Timeline({ status }: { status: string }) {
               <div
                 className={`
                   w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold
-                  ${isActive
-                    ? isCurrent ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-green-500 text-white'
-                    : 'bg-slate-200 text-slate-500'
+                  ${
+                    isActive
+                      ? isCurrent
+                        ? 'bg-blue-600 text-white ring-4 ring-blue-100'
+                        : 'bg-green-500 text-white'
+                      : 'bg-slate-200 text-slate-500'
                   }
                 `}
               >
@@ -122,7 +145,9 @@ function Timeline({ status }: { status: string }) {
               </span>
             </div>
             {i < TIMELINE_STEPS.length - 1 && (
-              <div className={`w-8 sm:w-12 h-0.5 mx-1 mt-[-12px] ${currentIndex > i && !isTerminalBad ? 'bg-green-400' : 'bg-slate-200'}`} />
+              <div
+                className={`w-8 sm:w-12 h-0.5 mx-1 mt-[-12px] ${currentIndex > i && !isTerminalBad ? 'bg-green-400' : 'bg-slate-200'}`}
+              />
             )}
           </div>
         );
@@ -133,7 +158,7 @@ function Timeline({ status }: { status: string }) {
 
 // ─── Component ────────────────────────────────
 
-export default function OrderTrackPage() {
+function OrderTrackContent() {
   const searchParams = useSearchParams();
   const initialCode = searchParams.get('code') || '';
 
@@ -184,9 +209,7 @@ export default function OrderTrackPage() {
             Отслеживание заказа
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">Статус вашего заказа</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Введите код заказа из email-подтверждения (формат CS-XXXX)
-          </p>
+          <p className="mt-2 text-sm text-slate-600">Введите код заказа из email-подтверждения (формат CS-XXXX)</p>
 
           {/* Search */}
           <form
@@ -223,7 +246,10 @@ export default function OrderTrackPage() {
             <div>
               <p className="font-medium">Заказ не найден</p>
               <p className="mt-1 text-red-600">{error}</p>
-              <Link href="/help" className="mt-2 inline-flex items-center gap-1 text-red-700 hover:underline font-medium">
+              <Link
+                href="/help"
+                className="mt-2 inline-flex items-center gap-1 text-red-700 hover:underline font-medium"
+              >
                 <HelpCircle className="h-3.5 w-3.5" />
                 Перейти в Помощь
               </Link>
@@ -240,7 +266,9 @@ export default function OrderTrackPage() {
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Заказ</p>
                   <p className="text-lg font-bold text-slate-900">{result.shortCode}</p>
                 </div>
-                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold ${statusInfo.color}`}>
+                <div
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold ${statusInfo.color}`}
+                >
                   <statusInfo.icon className="h-4 w-4" />
                   {statusInfo.label}
                 </div>
@@ -317,18 +345,25 @@ export default function OrderTrackPage() {
                             )}
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-xs text-slate-500">× {item.quantity}</span>
-                              <span className="text-xs font-medium text-slate-700">{formatPrice(item.priceSnapshot * item.quantity)}</span>
+                              <span className="text-xs font-medium text-slate-700">
+                                {formatPrice(item.priceSnapshot * item.quantity)}
+                              </span>
                             </div>
                           </div>
 
                           {/* Status badge */}
-                          <span className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${reqStatus.color}`}>
+                          <span
+                            className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${reqStatus.color}`}
+                          >
                             {reqStatus.label}
                           </span>
                         </div>
 
                         {/* Operational info — only when confirmed */}
-                        {(item.meetingPoint || item.meetingInstructions || item.operationalPhone || item.operationalNote) && (
+                        {(item.meetingPoint ||
+                          item.meetingInstructions ||
+                          item.operationalPhone ||
+                          item.operationalNote) && (
                           <div className="mx-4 mb-3 p-3 bg-blue-50 border border-blue-100 rounded-lg space-y-1.5">
                             <p className="text-xs font-semibold text-blue-800 flex items-center gap-1">
                               <MapPin className="h-3 w-3" />
@@ -347,7 +382,9 @@ export default function OrderTrackPage() {
                             {item.operationalPhone && (
                               <p className="text-xs text-blue-700 flex items-center gap-1">
                                 <Phone className="h-3 w-3" />
-                                <a href={`tel:${item.operationalPhone}`} className="underline">{item.operationalPhone}</a>
+                                <a href={`tel:${item.operationalPhone}`} className="underline">
+                                  {item.operationalPhone}
+                                </a>
                               </p>
                             )}
                             {item.operationalNote && (
@@ -367,7 +404,10 @@ export default function OrderTrackPage() {
 
             {/* Help link */}
             <div className="text-center pt-2">
-              <Link href="/help" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition-colors">
+              <Link
+                href="/help"
+                className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition-colors"
+              >
                 <HelpCircle className="h-4 w-4" />
                 Есть вопросы? Перейти в Помощь
               </Link>
@@ -383,5 +423,13 @@ export default function OrderTrackPage() {
         )}
       </section>
     </div>
+  );
+}
+
+export default function OrderTrackPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>}>
+      <OrderTrackContent />
+    </Suspense>
   );
 }

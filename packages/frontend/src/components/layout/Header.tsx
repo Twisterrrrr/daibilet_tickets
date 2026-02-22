@@ -1,22 +1,16 @@
 'use client';
 
+import { ChevronDown, Compass, Heart, HelpCircle, MapPin, Menu, Search, X } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  Menu,
-  X,
-  Compass,
-  HelpCircle,
-  MapPin,
-  ChevronDown,
-  Heart,
-  Search,
-} from 'lucide-react';
-import { api } from '@/lib/api';
-import { SearchAutocomplete } from './SearchAutocomplete';
+import { Suspense } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUserAuthOptional } from '@/hooks/useUserAuth';
+import { api } from '@/lib/api';
+
+import { SearchAutocomplete } from './SearchAutocomplete';
 
 const navigation = [
   { name: 'Экскурсии', href: '/events?category=EXCURSION' },
@@ -171,7 +165,9 @@ export function Header() {
 
         {/* Right side: city selector (desktop) + search + help + mobile menu */}
         <div className="flex items-center gap-1 sm:gap-2">
-          <HeaderCitySelect />
+          <Suspense fallback={null}>
+            <HeaderCitySelect />
+          </Suspense>
           <SearchAutocomplete />
           <Link
             href="/favorites"
