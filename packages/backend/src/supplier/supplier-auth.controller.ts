@@ -1,9 +1,12 @@
-import { Controller, Post, Get, Body, Req, Res, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { Response, Request } from 'express';
-import { SupplierAuthService } from './supplier-auth.service';
+import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
+
+import type { RequestWithUser, SupplierAuthUser } from '../auth/auth.types';
+
+import { SupplierLoginDto, SupplierRegisterDto } from './dto/supplier-auth.dto';
 import { SupplierJwtGuard } from './supplier.guard';
-import { SupplierRegisterDto, SupplierLoginDto } from './dto/supplier-auth.dto';
+import { SupplierAuthService } from './supplier-auth.service';
 
 @ApiTags('supplier')
 @Controller('supplier/auth')
@@ -12,10 +15,7 @@ export class SupplierAuthController {
 
   @Post('register')
   @ApiOperation({ summary: 'Регистрация поставщика' })
-  async register(
-    @Body() body: SupplierRegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async register(@Body() body: SupplierRegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register({
       ...body,
       companyName: body.companyName || body.name,
@@ -31,10 +31,7 @@ export class SupplierAuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'Вход поставщика' })
-  async login(
-    @Body() body: SupplierLoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async login(@Body() body: SupplierLoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(body.email, body.password);
     res.cookie('supplier_refresh_token', result.refreshToken, {
       httpOnly: true,
@@ -65,7 +62,7 @@ export class SupplierAuthController {
   @UseGuards(SupplierJwtGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Выход поставщика' })
-  async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: RequestWithUser<SupplierAuthUser>, @Res({ passthrough: true }) res: Response) {
     await this.authService.logout(req.user.id);
     res.clearCookie('supplier_refresh_token');
     return { message: 'Logged out' };
@@ -75,7 +72,7 @@ export class SupplierAuthController {
   @UseGuards(SupplierJwtGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Профиль поставщика' })
-  async me(@Req() req: any) {
+  async me(@Req() req: RequestWithUser<SupplierAuthUser>) {
     return this.authService.getProfile(req.user.id);
   }
 }

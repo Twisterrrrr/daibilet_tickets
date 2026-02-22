@@ -1,10 +1,7 @@
-import {
-  IsString, IsOptional, IsBoolean, IsNumber, IsArray,
-  IsInt, IsEnum, IsNotEmpty, IsUUID,
-} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import { Intensity } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateComboDto {
   @ApiProperty()

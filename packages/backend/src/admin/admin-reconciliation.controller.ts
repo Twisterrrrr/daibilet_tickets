@@ -12,15 +12,19 @@
  *   GET  /admin/ops/health                    — Operational health dashboard
  */
 
-import { Controller, Get, Post, Param, Query, UseGuards, Body, Logger, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { Body, Controller, Get, Logger, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import type { Request as ExpressRequest } from 'express';
+
+import type { AdminAuthUser } from '../auth/auth.types';
 import { AuthGuard } from '@nestjs/passport';
-import { PrismaService } from '../prisma/prisma.service';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+
 import { FulfillmentService } from '../checkout/fulfillment.service';
-import { RefundService } from '../checkout/refund.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
+import { RefundService } from '../checkout/refund.service';
+import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
+import { PrismaService } from '../prisma/prisma.service';
 import { ReconciliationRefundDto, ReconciliationResolveDto } from './dto/admin.dto';
-import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 
 @ApiTags('admin/reconciliation')
 @ApiBearerAuth()
@@ -116,7 +120,7 @@ export class AdminReconciliationController {
       this.prisma.paymentIntent.count({ where }),
     ]);
 
-    return buildPaginatedResult(rawItems as (typeof rawItems[number] & { id: string })[], total, pagination.limit);
+    return buildPaginatedResult(rawItems as ((typeof rawItems)[number] & { id: string })[], total, pagination.limit);
   }
 
   @Get('reconciliation/mismatches')
@@ -139,8 +143,14 @@ export class AdminReconciliationController {
         fulfillmentItems: {
           where: { status: 'FAILED' },
           select: {
-            id: true, lineItemIndex: true, offerId: true, provider: true,
-            amount: true, lastError: true, escalatedAt: true, resolvedBy: true,
+            id: true,
+            lineItemIndex: true,
+            offerId: true,
+            provider: true,
+            amount: true,
+            lastError: true,
+            escalatedAt: true,
+            resolvedBy: true,
           },
         },
       },
@@ -210,11 +220,11 @@ export class AdminReconciliationController {
     const webhookTotal = dedupStats.webhook_received;
 
     return {
-      ...buildPaginatedResult(rawItems as (typeof rawItems[number] & { id: string })[], total, pagination.limit),
+      ...buildPaginatedResult(rawItems as ((typeof rawItems)[number] & { id: string })[], total, pagination.limit),
       dedupStats: {
         totalReceived: webhookTotal,
         duplicatesSkipped: webhookDeduplicates,
-        dedupRate: webhookTotal > 0 ? +(webhookDeduplicates / webhookTotal * 100).toFixed(2) : 0,
+        dedupRate: webhookTotal > 0 ? +((webhookDeduplicates / webhookTotal) * 100).toFixed(2) : 0,
       },
     };
   }
@@ -242,10 +252,7 @@ export class AdminReconciliationController {
 
   @Post('reconciliation/:intentId/refund')
   @ApiOperation({ summary: 'Ручной refund для PaymentIntent' })
-  async forceRefund(
-    @Param('intentId') intentId: string,
-    @Body() body: ReconciliationRefundDto,
-  ) {
+  async forceRefund(@Param('intentId') intentId: string, @Body() body: ReconciliationRefundDto) {
     this.logger.log(`Admin force refund: intent ${intentId}, partial=${body.partial}`);
 
     const intent = await this.prisma.paymentIntent.findUnique({
@@ -255,15 +262,9 @@ export class AdminReconciliationController {
     if (!intent) return { error: 'Intent not found' };
 
     if (body.partial) {
-      await this.refundService.partialRefund(
-        intent.checkoutSessionId,
-        body.reason || 'Admin manual partial refund',
-      );
+      await this.refundService.partialRefund(intent.checkoutSessionId, body.reason || 'Admin manual partial refund');
     } else {
-      await this.refundService.fullRefund(
-        intentId,
-        body.reason || 'Admin manual full refund',
-      );
+      await this.refundService.fullRefund(intentId, body.reason || 'Admin manual full refund');
     }
 
     return { status: 'refunded', intentId };
@@ -274,7 +275,7 @@ export class AdminReconciliationController {
   async resolveItem(
     @Param('itemId') itemId: string,
     @Body() body: ReconciliationResolveDto,
-    @Req() req: { user: { id: string } },
+    @Req() req: ExpressRequest & { user: AdminAuthUser },
   ) {
     await this.prisma.fulfillmentItem.update({
       where: { id: itemId },
@@ -298,17 +299,14 @@ export class AdminReconciliationController {
 
     // Calculate alert rates
     const reserveTotal = raw.fulfillment_reserve_success + raw.fulfillment_reserve_fail;
-    const fulfillmentFailRate = reserveTotal > 0
-      ? +(raw.fulfillment_reserve_fail / reserveTotal * 100).toFixed(2)
-      : 0;
+    const fulfillmentFailRate =
+      reserveTotal > 0 ? +((raw.fulfillment_reserve_fail / reserveTotal) * 100).toFixed(2) : 0;
 
-    const autoCompensateRate = raw.payment_intent_paid > 0
-      ? +(raw.auto_compensate_triggered / raw.payment_intent_paid * 100).toFixed(2)
-      : 0;
+    const autoCompensateRate =
+      raw.payment_intent_paid > 0 ? +((raw.auto_compensate_triggered / raw.payment_intent_paid) * 100).toFixed(2) : 0;
 
-    const webhookDedupRate = raw.webhook_received > 0
-      ? +(raw.webhook_duplicate / raw.webhook_received * 100).toFixed(2)
-      : 0;
+    const webhookDedupRate =
+      raw.webhook_received > 0 ? +((raw.webhook_duplicate / raw.webhook_received) * 100).toFixed(2) : 0;
 
     // Threshold alerts
     const alerts: { metric: string; level: 'ok' | 'warn' | 'critical'; value: number }[] = [];
@@ -373,8 +371,10 @@ export class AdminReconciliationController {
     ]);
 
     const status: 'healthy' | 'degraded' | 'critical' =
-      (failedUnresolved > 10 || pendingStale > 5) ? 'critical'
-        : (failedUnresolved > 3 || pendingStale > 2 || escalatedOpen > 0) ? 'degraded'
+      failedUnresolved > 10 || pendingStale > 5
+        ? 'critical'
+        : failedUnresolved > 3 || pendingStale > 2 || escalatedOpen > 0
+          ? 'degraded'
           : 'healthy';
 
     return {

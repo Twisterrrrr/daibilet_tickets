@@ -1,8 +1,6 @@
-import {
-  IsString, IsOptional, IsBoolean, IsNumber, IsInt, IsArray,
-} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class UpdateSupplierDto {
   @ApiPropertyOptional({ description: 'Trust level: 0, 1, 2' })

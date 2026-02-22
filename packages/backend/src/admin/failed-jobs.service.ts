@@ -1,13 +1,14 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { Job } from 'bullmq';
+
 import {
   QUEUE_EMAILS,
   QUEUE_FULFILLMENT,
-  QUEUE_SYNC,
-  QUEUE_REVIEW_TASKS,
   QUEUE_PARTNER_WEBHOOKS,
+  QUEUE_REVIEW_TASKS,
+  QUEUE_SYNC,
 } from '../queue/queue.constants';
 import { AuditService } from './audit.service';
 
@@ -79,9 +80,7 @@ export class FailedJobsService {
   }
 
   async getFailedJobs(queueName?: string, start = 0, limit = 50): Promise<{ jobs: FailedJobDto[]; total: number }> {
-    const targetQueues = queueName && this.queues.has(queueName)
-      ? [queueName]
-      : QUEUE_NAMES;
+    const targetQueues = queueName && this.queues.has(queueName) ? [queueName] : QUEUE_NAMES;
 
     const results: FailedJobDto[] = [];
     let total = 0;

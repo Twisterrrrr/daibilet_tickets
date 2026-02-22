@@ -1,15 +1,26 @@
 import {
-  Controller, Get, Post, Patch, Delete,
-  Param, Query, Body, UseGuards, UseInterceptors,
-  NotFoundException, ConflictException, BadRequestException,
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateCollectionDto, UpdateCollectionDto } from './dto/admin-collection.dto';
-import { parsePagination, paginationArgs } from '../common/pagination';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -34,10 +45,7 @@ export class AdminCollectionsController {
       isDeleted: false,
       ...(city && { city: { slug: city } }),
       ...(search && {
-        OR: [
-          { title: { contains: search, mode: 'insensitive' } },
-          { slug: { contains: search, mode: 'insensitive' } },
-        ],
+        OR: [{ title: { contains: search, mode: 'insensitive' } }, { slug: { contains: search, mode: 'insensitive' } }],
       }),
     };
 

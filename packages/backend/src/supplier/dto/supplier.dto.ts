@@ -1,25 +1,20 @@
-import {
-  IsOptional,
-  IsString,
-  IsEmail,
-  IsUUID,
-  IsInt,
-  IsNumber,
-  IsEnum,
-  IsArray,
-  IsObject,
-  Min,
-} from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ApiProperty } from '@nestjs/swagger';
-import { PartialType, OmitType } from '@nestjs/swagger';
+import { OmitType, PartialType } from '@nestjs/swagger';
+import { EventAudience, EventCategory, OfferStatus, PurchaseType } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
-  EventCategory,
-  EventAudience,
-  PurchaseType,
-  OfferStatus,
-} from '@prisma/client';
+  IsArray,
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
 
 // ============================
 // Settings
@@ -126,9 +121,7 @@ export class CreateSupplierEventDto {
   priceFrom?: number;
 }
 
-export class UpdateSupplierEventDto extends PartialType(
-  OmitType(CreateSupplierEventDto, ['cityId'] as const),
-) {}
+export class UpdateSupplierEventDto extends PartialType(OmitType(CreateSupplierEventDto, ['cityId'] as const)) {}
 
 // ============================
 // Offers

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { LoginBruteForceService } from '../login-brute-force.service';
-import { CacheService } from '../../cache/cache.service';
 import { ConfigService } from '@nestjs/config';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { CacheService } from '../../cache/cache.service';
+import { LoginBruteForceService } from '../login-brute-force.service';
 
 describe('LoginBruteForceService', () => {
   let service: LoginBruteForceService;

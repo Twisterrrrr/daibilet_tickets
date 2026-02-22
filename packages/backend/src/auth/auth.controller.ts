@@ -1,10 +1,12 @@
-import { Controller, Post, Get, Body, UseGuards, Request, Res, Req, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req, Request, Res, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Request as ExpressRequest, Response } from 'express';
+
+import type { AdminAuthUser } from './auth.types';
 import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 const REFRESH_COOKIE = 'daibilet_refresh';
 const REFRESH_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -17,11 +19,7 @@ export class AuthController {
   @Post('login')
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @HttpCode(200)
-  async login(
-    @Body() dto: LoginDto,
-    @Req() req: ExpressRequest,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async login(@Body() dto: LoginDto, @Req() req: ExpressRequest, @Res({ passthrough: true }) res: Response) {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || req.socket?.remoteAddress;
     const result = await this.auth.login(ip, dto.email, dto.password);
 
@@ -36,7 +34,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   async refresh(
-    @Request() req: any,
+    @Request() req: ExpressRequest,
     @Body('refreshToken') bodyToken: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -70,7 +68,7 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async me(@Request() req: any) {
+  async me(@Request() req: ExpressRequest & { user: AdminAuthUser }) {
     return this.auth.getProfile(req.user.id);
   }
 

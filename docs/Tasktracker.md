@@ -101,8 +101,8 @@
 
 **Порядок:** A5 → B2 → A3 → A4 → B1 → A1-Pino → B3 → B4 → A2 → C1 → C2
 
-- [ ] **A5 (HIGH)**: JwtPayload вместо req: any
-- [ ] **B2 (MED)**: RBAC Supplier (guards, operatorId boundary)
+- [x] **A5 (HIGH)**: JwtPayload вместо req: any (22.02)
+- [x] **B2 (MED)**: RBAC Supplier (guards, operatorId boundary) (22.02)
 - [ ] **A3 (HIGH)**: Типизация tc-sync.service.ts (TcEvent вместо any[])
 - [ ] **A4 (HIGH)**: Proto-generated types для gRPC
 - [ ] **B1 (MED)**: where: any → Prisma typed where builders

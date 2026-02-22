@@ -1,7 +1,22 @@
-import { Controller, Get, Post, Param, Query, Body, Req, UseGuards, UseInterceptors, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import type { AdminAuthUser } from '../auth/auth.types';
+import type { Request as ExpressRequest } from 'express';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { RejectModerationDto } from './dto/admin-moderation.dto';
@@ -18,11 +33,7 @@ export class AdminModerationController {
    * Очередь модерации: события со статусом PENDING_REVIEW или AUTO_APPROVED (пост-модерация).
    */
   @Get('queue')
-  async queue(
-    @Query('status') status?: string,
-    @Query('page') pageRaw = '1',
-    @Query('limit') limitRaw = '25',
-  ) {
+  async queue(@Query('status') status?: string, @Query('page') pageRaw = '1', @Query('limit') limitRaw = '25') {
     const page = Number(pageRaw) || 1;
     const limit = Number(limitRaw) || 25;
 
@@ -67,7 +78,7 @@ export class AdminModerationController {
    */
   @Post(':id/approve')
   @Roles('ADMIN', 'EDITOR')
-  async approve(@Param('id') id: string, @Req() req: any) {
+  async approve(@Param('id') id: string, @Req() req: ExpressRequest & { user: AdminAuthUser }) {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) throw new NotFoundException('Событие не найдено');
 
@@ -102,11 +113,7 @@ export class AdminModerationController {
    */
   @Post(':id/reject')
   @Roles('ADMIN', 'EDITOR')
-  async reject(
-    @Param('id') id: string,
-    @Req() req: any,
-    @Body() body: RejectModerationDto,
-  ) {
+  async reject(@Param('id') id: string, @Req() req: ExpressRequest & { user: AdminAuthUser }, @Body() body: RejectModerationDto) {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) throw new NotFoundException('Событие не найдено');
 

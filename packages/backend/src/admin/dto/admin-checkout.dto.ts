@@ -1,6 +1,6 @@
-import { IsOptional, IsEnum, IsString, IsISO8601 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { CheckoutStatus } from '@prisma/client';
+import { IsEnum, IsISO8601, IsOptional, IsString } from 'class-validator';
 
 // ─── Update Session Status (PATCH sessions/:id) ───────────────────
 

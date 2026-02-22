@@ -1,36 +1,54 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, Res, UseGuards, UseInterceptors, Request, NotFoundException, BadRequestException } from '@nestjs/common';
-import type { Response } from 'express';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
-import { PrismaService } from '../prisma/prisma.service';
-import { AuditInterceptor } from './audit.interceptor';
-import { streamCsv } from '../common/csv-stream.util';
-import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
-import { EventOverrideService } from './event-override.service';
-import { CacheInvalidationService } from '../cache/cache-invalidation.service';
-import { ReviewService } from '../catalog/review.service';
-import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
-import { validateWidgetPayload, ensurePayloadVersion, normalizeEventTitle } from '@daibilet/shared';
+import { ensurePayloadVersion, normalizeEventTitle, validateWidgetPayload } from '@daibilet/shared';
 import {
-  OfferSource,
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Request,
+  Res,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  DateMode,
+  EventAudience,
   EventCategory,
   EventSubcategory,
-  EventAudience,
-  PurchaseType,
+  OfferSource,
   OfferStatus,
-  DateMode,
   Prisma,
+  PurchaseType,
 } from '@prisma/client';
+import type { Request as ExpressRequest, Response } from 'express';
+
+import type { AdminAuthUser } from '../auth/auth.types';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { CacheInvalidationService } from '../cache/cache-invalidation.service';
+import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
+import { ReviewService } from '../catalog/review.service';
+import { streamCsv } from '../common/csv-stream.util';
+import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditInterceptor } from './audit.interceptor';
 import {
   CreateEventDto,
   CreateEventOfferDto,
-  UpdateEventOfferDto,
-  PatchEventOfferDto,
-  OverrideEventDto,
-  VenueSettingsDto,
   ExternalRatingDto,
+  OverrideEventDto,
+  PatchEventOfferDto,
+  UpdateEventOfferDto,
+  VenueSettingsDto,
 } from './dto/admin-event.dto';
+import { EventOverrideService } from './event-override.service';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -161,10 +179,7 @@ export class AdminEventsController {
    */
   @Patch(':id/mark-duplicate')
   @Roles('ADMIN')
-  async markDuplicate(
-    @Param('id') eventId: string,
-    @Body('canonicalOfId') canonicalOfId: string,
-  ) {
+  async markDuplicate(@Param('id') eventId: string, @Body('canonicalOfId') canonicalOfId: string) {
     if (!canonicalOfId) throw new BadRequestException('canonicalOfId обязателен');
     if (eventId === canonicalOfId) throw new BadRequestException('Нельзя пометить событие дублем самого себя');
 
@@ -201,61 +216,63 @@ export class AdminEventsController {
     if (!city) throw new NotFoundException('Город не найден');
 
     // Create in transaction
-    const result = await this.prisma.$transaction(async (tx): Promise<{ event: { id: string }; offer: { id: string } | null }> => {
-      // Create event — generate a unique tcEventId for manual events
-      const event = await tx.event.create({
-        data: {
-          source: OfferSource.MANUAL,
-          tcEventId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          cityId: data.cityId,
-          title: normalizeEventTitle(data.title || ''),
-          slug,
-          description: data.description || null,
-          shortDescription: data.shortDescription || null,
-          category: data.category as EventCategory,
-          subcategories: (data.subcategories || []) as EventSubcategory[],
-          audience: (data.audience as EventAudience) || EventAudience.ALL,
-          minAge: data.minAge || 0,
-          durationMinutes: data.durationMinutes || null,
-          address: data.address || null,
-          lat: data.lat || null,
-          lng: data.lng || null,
-          imageUrl: data.imageUrl || null,
-          galleryUrls: data.galleryUrls || [],
-          priceFrom: data.offer?.priceFrom || null,
-          isActive: true,
-          createdByType: 'ADMIN',
-          createdById: req.user.id,
-        },
-      });
-
-      // Create first offer if provided
-      let offer = null;
-      if (data.offer) {
-        offer = await tx.eventOffer.create({
+    const result = await this.prisma.$transaction(
+      async (tx): Promise<{ event: { id: string }; offer: { id: string } | null }> => {
+        // Create event — generate a unique tcEventId for manual events
+        const event = await tx.event.create({
           data: {
-            eventId: event.id,
-            source: (data.offer.source as OfferSource) || OfferSource.MANUAL,
-            purchaseType: data.offer.purchaseType as PurchaseType,
-            deeplink: data.offer.deeplink || null,
-            priceFrom: data.offer.priceFrom || null,
-            commissionPercent: data.offer.commissionPercent || null,
-            availabilityMode: data.offer.availabilityMode || null,
-            badge: data.offer.badge || null,
-            operatorId: data.offer.operatorId || null,
-            isPrimary: true,
-            status: 'ACTIVE',
+            source: OfferSource.MANUAL,
+            tcEventId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            cityId: data.cityId,
+            title: normalizeEventTitle(data.title || ''),
+            slug,
+            description: data.description || null,
+            shortDescription: data.shortDescription || null,
+            category: data.category as EventCategory,
+            subcategories: (data.subcategories || []) as EventSubcategory[],
+            audience: (data.audience as EventAudience) || EventAudience.ALL,
+            minAge: data.minAge || 0,
+            durationMinutes: data.durationMinutes || null,
+            address: data.address || null,
+            lat: data.lat || null,
+            lng: data.lng || null,
+            imageUrl: data.imageUrl || null,
+            galleryUrls: data.galleryUrls || [],
+            priceFrom: data.offer?.priceFrom || null,
+            isActive: true,
+            createdByType: 'ADMIN',
+            createdById: req.user.id,
           },
         });
-      }
 
-      // Create override with templateData if provided
-      if (data.templateData && Object.keys(data.templateData).length > 0) {
-        await this.overrideService.upsert(event.id, { templateData: data.templateData }, req.user.id);
-      }
+        // Create first offer if provided
+        let offer = null;
+        if (data.offer) {
+          offer = await tx.eventOffer.create({
+            data: {
+              eventId: event.id,
+              source: (data.offer.source as OfferSource) || OfferSource.MANUAL,
+              purchaseType: data.offer.purchaseType as PurchaseType,
+              deeplink: data.offer.deeplink || null,
+              priceFrom: data.offer.priceFrom || null,
+              commissionPercent: data.offer.commissionPercent || null,
+              availabilityMode: data.offer.availabilityMode || null,
+              badge: data.offer.badge || null,
+              operatorId: data.offer.operatorId || null,
+              isPrimary: true,
+              status: 'ACTIVE',
+            },
+          });
+        }
 
-      return { event, offer };
-    });
+        // Create override with templateData if provided
+        if (data.templateData && Object.keys(data.templateData).length > 0) {
+          await this.overrideService.upsert(event.id, { templateData: data.templateData }, req.user.id);
+        }
+
+        return { event, offer };
+      },
+    );
 
     return result;
   }
@@ -263,11 +280,39 @@ export class AdminEventsController {
   /** Транслитерация заголовка в slug */
   private transliterate(text: string): string {
     const map: Record<string, string> = {
-      'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
-      'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'j', 'к': 'k', 'л': 'l', 'м': 'm',
-      'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
-      'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
-      'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+      а: 'a',
+      б: 'b',
+      в: 'v',
+      г: 'g',
+      д: 'd',
+      е: 'e',
+      ё: 'yo',
+      ж: 'zh',
+      з: 'z',
+      и: 'i',
+      й: 'j',
+      к: 'k',
+      л: 'l',
+      м: 'm',
+      н: 'n',
+      о: 'o',
+      п: 'p',
+      р: 'r',
+      с: 's',
+      т: 't',
+      у: 'u',
+      ф: 'f',
+      х: 'kh',
+      ц: 'ts',
+      ч: 'ch',
+      ш: 'sh',
+      щ: 'shch',
+      ъ: '',
+      ы: 'y',
+      ь: '',
+      э: 'e',
+      ю: 'yu',
+      я: 'ya',
     };
     return text
       .toLowerCase()
@@ -306,7 +351,7 @@ export class AdminEventsController {
    */
   @Patch(':id/override')
   @Roles('ADMIN', 'EDITOR')
-  async upsertOverride(@Param('id') id: string, @Body() data: OverrideEventDto, @Request() req: any) {
+  async upsertOverride(@Param('id') id: string, @Body() data: OverrideEventDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
     const result = await this.overrideService.upsert(id, data, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
@@ -328,7 +373,7 @@ export class AdminEventsController {
    */
   @Patch(':id/hide')
   @Roles('ADMIN', 'EDITOR')
-  async toggleHide(@Param('id') id: string, @Body('isHidden') isHidden: boolean, @Request() req: any) {
+  async toggleHide(@Param('id') id: string, @Body('isHidden') isHidden: boolean, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
     const result = await this.overrideService.toggleHidden(id, isHidden, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
@@ -560,11 +605,7 @@ export class AdminEventsController {
    */
   @Patch(':id/offers/:offerId')
   @Roles('ADMIN', 'EDITOR')
-  async updateOffer(
-    @Param('id') eventId: string,
-    @Param('offerId') offerId: string,
-    @Body() data: PatchEventOfferDto,
-  ) {
+  async updateOffer(@Param('id') eventId: string, @Param('offerId') offerId: string, @Body() data: PatchEventOfferDto) {
     const offer = await this.prisma.eventOffer.findFirst({
       where: { id: offerId, eventId },
     });
@@ -594,17 +635,16 @@ export class AdminEventsController {
    */
   @Delete(':id/offers/:offerId')
   @Roles('ADMIN', 'EDITOR')
-  async deleteOffer(
-    @Param('id') eventId: string,
-    @Param('offerId') offerId: string,
-  ) {
+  async deleteOffer(@Param('id') eventId: string, @Param('offerId') offerId: string) {
     const offer = await this.prisma.eventOffer.findFirst({
       where: { id: offerId, eventId },
     });
     if (!offer) throw new NotFoundException('Оффер не найден');
 
     if (offer.source !== 'MANUAL') {
-      throw new BadRequestException('Удалять можно только MANUAL-офферы. Синхронизированные офферы скрывайте через статус DISABLED.');
+      throw new BadRequestException(
+        'Удалять можно только MANUAL-офферы. Синхронизированные офферы скрывайте через статус DISABLED.',
+      );
     }
 
     // Soft-deactivate related sessions
@@ -627,10 +667,7 @@ export class AdminEventsController {
    */
   @Post(':id/offers/:offerId/clone')
   @Roles('ADMIN', 'EDITOR')
-  async cloneOffer(
-    @Param('id') eventId: string,
-    @Param('offerId') offerId: string,
-  ) {
+  async cloneOffer(@Param('id') eventId: string, @Param('offerId') offerId: string) {
     const offer = await this.prisma.eventOffer.findFirst({
       where: { id: offerId, eventId },
     });

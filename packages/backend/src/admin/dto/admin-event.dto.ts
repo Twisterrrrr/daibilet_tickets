@@ -1,31 +1,31 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsEnum,
-  IsUUID,
-  IsNumber,
-  IsInt,
-  IsBoolean,
-  IsArray,
-  IsUrl,
-  IsObject,
-  IsISO8601,
-  Min,
-  ValidateNested,
-  ValidateIf,
-} from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
+  DateMode,
+  EventAudience,
   EventCategory,
   EventSubcategory,
-  EventAudience,
   OfferSource,
-  PurchaseType,
   OfferStatus,
-  DateMode,
+  PurchaseType,
 } from '@prisma/client';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsISO8601,
+  IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+  Min,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
 
 // ─── Nested: Create Event Offer ────────────────────────────────────
 
@@ -302,7 +302,9 @@ export class OverrideEventDto {
   @IsString({ each: true })
   tagsRemove?: string[];
 
-  @ApiPropertyOptional({ description: 'Category-specific: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)' })
+  @ApiPropertyOptional({
+    description: 'Category-specific: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)',
+  })
   @IsOptional()
   @IsObject()
   templateData?: Record<string, unknown>;

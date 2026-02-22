@@ -1,14 +1,12 @@
-import {
-  Controller, Get, Post, Delete, Param, Body, Query,
-  UseGuards, UseInterceptors,
-} from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
-import { AuditInterceptor } from './audit.interceptor';
+import { Roles, RolesGuard } from '../auth/roles.guard';
 import { ReviewService } from '../catalog/review.service';
-import { CreateExternalReviewDto, BatchExternalReviewsDto } from './dto/admin.dto';
 import { parsePagination } from '../common/pagination';
+import { AuditInterceptor } from './audit.interceptor';
+import { BatchExternalReviewsDto, CreateExternalReviewDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()

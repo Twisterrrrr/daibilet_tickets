@@ -1,16 +1,17 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { PassportStrategy } from '@nestjs/passport';
 import { SupplierRole } from '@prisma/client';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface SupplierJwtPayload {
-  sub: string;         // supplierUser.id
+  sub: string; // supplierUser.id
   email: string;
   role: SupplierRole;
-  operatorId: string;  // operator/supplier ID
-  type: 'supplier';    // отличает от admin JWT
+  operatorId: string; // operator/supplier ID
+  type: 'supplier'; // отличает от admin JWT
 }
 
 @Injectable()

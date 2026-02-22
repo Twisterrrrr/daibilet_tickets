@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, SetMetadata } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AdminRole } from '@prisma/client';
 

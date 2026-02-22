@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { SupplierRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+
 import { PrismaService } from '../prisma/prisma.service';
-import { SupplierRole } from '@prisma/client';
 import { SupplierJwtPayload } from './supplier-jwt.strategy';
 
 @Injectable()
@@ -32,12 +33,14 @@ export class SupplierAuthService {
     if (existing) throw new ConflictException('Email уже зарегистрирован');
 
     const passwordHash = await bcrypt.hash(data.password, 10);
-    const slug = data.companyName
-      .toLowerCase()
-      .replace(/[^a-zа-яё0-9]/gi, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      + '-' + Date.now().toString(36);
+    const slug =
+      data.companyName
+        .toLowerCase()
+        .replace(/[^a-zа-яё0-9]/gi, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') +
+      '-' +
+      Date.now().toString(36);
 
     // Транзакция: Operator + SupplierUser
     const result = await this.prisma.$transaction(async (tx) => {
@@ -49,7 +52,7 @@ export class SupplierAuthService {
           isActive: true,
           isSupplier: true,
           trustLevel: 0,
-          commissionRate: 0.2500,
+          commissionRate: 0.25,
           companyName: data.companyName,
           inn: data.inn || null,
           contactEmail: data.email,
@@ -106,8 +109,13 @@ export class SupplierAuthService {
       const user = await this.prisma.supplierUser.findUnique({
         where: { id: payload.sub },
         select: {
-          id: true, email: true, name: true, role: true,
-          isActive: true, refreshTokenHash: true, operatorId: true,
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          refreshTokenHash: true,
+          operatorId: true,
         },
       });
 
@@ -136,13 +144,29 @@ export class SupplierAuthService {
     return this.prisma.supplierUser.findUnique({
       where: { id: userId },
       select: {
-        id: true, email: true, name: true, role: true, lastLoginAt: true, createdAt: true,
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        lastLoginAt: true,
+        createdAt: true,
         operator: {
           select: {
-            id: true, name: true, slug: true, logo: true, website: true,
-            trustLevel: true, commissionRate: true, promoRate: true, promoUntil: true,
-            companyName: true, inn: true, contactEmail: true, contactPhone: true,
-            verifiedAt: true, successfulSales: true,
+            id: true,
+            name: true,
+            slug: true,
+            logo: true,
+            website: true,
+            trustLevel: true,
+            commissionRate: true,
+            promoRate: true,
+            promoUntil: true,
+            companyName: true,
+            inn: true,
+            contactEmail: true,
+            contactPhone: true,
+            verifiedAt: true,
+            successfulSales: true,
           },
         },
       },

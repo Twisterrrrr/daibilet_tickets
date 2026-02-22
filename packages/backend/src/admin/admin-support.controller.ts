@@ -1,10 +1,22 @@
-import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
-import { AuditInterceptor } from './audit.interceptor';
+import { Roles, RolesGuard } from '../auth/roles.guard';
 import { SupportService } from '../support/support.service';
-import { UpdateTicketDto, ReplyTicketDto } from './dto/admin-support.dto';
+import { AuditInterceptor } from './audit.interceptor';
+import { ReplyTicketDto, UpdateTicketDto } from './dto/admin-support.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -39,10 +51,7 @@ export class AdminSupportController {
 
   @Patch('tickets/:id')
   @Roles('ADMIN', 'EDITOR')
-  async updateTicket(
-    @Param('id') id: string,
-    @Body() body: UpdateTicketDto,
-  ) {
+  async updateTicket(@Param('id') id: string, @Body() body: UpdateTicketDto) {
     if (body.status) {
       return this.supportService.updateTicketStatus(id, body.status, body.assignedTo);
     }
@@ -51,10 +60,7 @@ export class AdminSupportController {
 
   @Post('tickets/:id/reply')
   @Roles('ADMIN', 'EDITOR')
-  async replyToTicket(
-    @Param('id') id: string,
-    @Body() body: ReplyTicketDto,
-  ) {
+  async replyToTicket(@Param('id') id: string, @Body() body: ReplyTicketDto) {
     return this.supportService.addResponse(id, {
       message: body.message,
       authorType: 'admin',

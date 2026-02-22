@@ -1,16 +1,32 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, Req, UseGuards, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { PrismaService } from '../prisma/prisma.service';
-import { SupplierJwtGuard, SupplierRolesGuard, SupplierRoles } from './supplier.guard';
-import { validateWidgetPayload, ensurePayloadVersion } from '@daibilet/shared';
+import { ensurePayloadVersion, validateWidgetPayload } from '@daibilet/shared';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OfferSource, Prisma } from '@prisma/client';
-import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
+import type { RequestWithUser } from '../auth/auth.types';
+import type { SupplierAuthUser } from '../auth/auth.types';
+
+import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateSupplierEventDto,
-  UpdateSupplierEventDto,
   CreateSupplierOfferDto,
+  UpdateSupplierEventDto,
   UpdateSupplierOfferDto,
 } from './dto/supplier.dto';
+import { SupplierJwtGuard, SupplierRoles, SupplierRolesGuard } from './supplier.guard';
 
 @ApiTags('supplier')
 @ApiBearerAuth()
@@ -25,7 +41,7 @@ export class SupplierEventsController {
   @Get()
   @ApiOperation({ summary: 'Мои события' })
   async list(
-    @Req() req: any,
+    @Req() req: RequestWithUser<SupplierAuthUser>,
     @Query('status') status?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
@@ -57,7 +73,7 @@ export class SupplierEventsController {
    */
   @Get(':id')
   @ApiOperation({ summary: 'Детали события' })
-  async getEvent(@Req() req: any, @Param('id') id: string) {
+  async getEvent(@Req() req: RequestWithUser<SupplierAuthUser>, @Param('id') id: string) {
     const event = await this.prisma.event.findFirst({
       where: { id, operatorId: req.user.operatorId },
       include: {
@@ -76,7 +92,7 @@ export class SupplierEventsController {
   @Post()
   @SupplierRoles('OWNER', 'MANAGER')
   @ApiOperation({ summary: 'Создать событие' })
-  async create(@Req() req: any, @Body() data: CreateSupplierEventDto) {
+  async create(@Req() req: RequestWithUser<SupplierAuthUser>, @Body() data: CreateSupplierEventDto) {
     const operator = await this.prisma.operator.findUnique({
       where: { id: req.user.operatorId },
       select: { trustLevel: true },
@@ -93,12 +109,14 @@ export class SupplierEventsController {
     }
 
     // Генерация slug
-    const slug = (data.title || 'event')
-      .toLowerCase()
-      .replace(/[^a-zа-яё0-9]/gi, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      + '-' + Date.now().toString(36);
+    const slug =
+      (data.title || 'event')
+        .toLowerCase()
+        .replace(/[^a-zа-яё0-9]/gi, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') +
+      '-' +
+      Date.now().toString(36);
 
     const event = await this.prisma.event.create({
       data: {
@@ -134,7 +152,7 @@ export class SupplierEventsController {
   @Put(':id')
   @SupplierRoles('OWNER', 'MANAGER')
   @ApiOperation({ summary: 'Обновить событие' })
-  async update(@Req() req: any, @Param('id') id: string, @Body() data: UpdateSupplierEventDto) {
+  async update(@Req() req: RequestWithUser<SupplierAuthUser>, @Param('id') id: string, @Body() data: UpdateSupplierEventDto) {
     const event = await this.prisma.event.findFirst({
       where: { id, operatorId: req.user.operatorId },
     });
@@ -163,7 +181,7 @@ export class SupplierEventsController {
   @Post(':id/submit')
   @SupplierRoles('OWNER', 'MANAGER')
   @ApiOperation({ summary: 'Отправить на модерацию' })
-  async submit(@Req() req: any, @Param('id') id: string) {
+  async submit(@Req() req: RequestWithUser<SupplierAuthUser>, @Param('id') id: string) {
     const event = await this.prisma.event.findFirst({
       where: { id, operatorId: req.user.operatorId },
     });
@@ -185,7 +203,7 @@ export class SupplierEventsController {
 
   @Get(':eventId/offers')
   @ApiOperation({ summary: 'Офферы события' })
-  async listOffers(@Req() req: any, @Param('eventId') eventId: string) {
+  async listOffers(@Req() req: RequestWithUser<SupplierAuthUser>, @Param('eventId') eventId: string) {
     const event = await this.prisma.event.findFirst({
       where: { id: eventId, operatorId: req.user.operatorId },
     });
@@ -200,11 +218,7 @@ export class SupplierEventsController {
   @Post(':eventId/offers')
   @SupplierRoles('OWNER', 'MANAGER')
   @ApiOperation({ summary: 'Добавить оффер' })
-  async createOffer(
-    @Req() req: any,
-    @Param('eventId') eventId: string,
-    @Body() data: CreateSupplierOfferDto,
-  ) {
+  async createOffer(@Req() req: RequestWithUser<SupplierAuthUser>, @Param('eventId') eventId: string, @Body() data: CreateSupplierOfferDto) {
     const event = await this.prisma.event.findFirst({
       where: { id: eventId, operatorId: req.user.operatorId },
     });
@@ -246,7 +260,7 @@ export class SupplierEventsController {
   @SupplierRoles('OWNER', 'MANAGER')
   @ApiOperation({ summary: 'Обновить оффер' })
   async updateOffer(
-    @Req() req: any,
+    @Req() req: RequestWithUser<SupplierAuthUser>,
     @Param('eventId') eventId: string,
     @Param('offerId') offerId: string,
     @Body() data: UpdateSupplierOfferDto,
@@ -275,11 +289,7 @@ export class SupplierEventsController {
   @Delete(':eventId/offers/:offerId')
   @SupplierRoles('OWNER')
   @ApiOperation({ summary: 'Удалить оффер' })
-  async deleteOffer(
-    @Req() req: any,
-    @Param('eventId') eventId: string,
-    @Param('offerId') offerId: string,
-  ) {
+  async deleteOffer(@Req() req: RequestWithUser<SupplierAuthUser>, @Param('eventId') eventId: string, @Param('offerId') offerId: string) {
     const offer = await this.prisma.eventOffer.findFirst({
       where: { id: offerId, eventId, event: { operatorId: req.user.operatorId } },
     });

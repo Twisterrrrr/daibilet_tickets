@@ -1,8 +1,9 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
-import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { AuditService } from './audit.service';
 
 @ApiTags('admin')

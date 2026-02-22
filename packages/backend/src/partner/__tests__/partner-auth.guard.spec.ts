@@ -1,15 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ApiKeyGuard } from '../partner-auth.guard';
 
 // ---------------------
 // Helpers
 // ---------------------
 
-function createMockContext(
-  headers: Record<string, string> = {},
-  ip = '127.0.0.1',
-) {
+function createMockContext(headers: Record<string, string> = {}, ip = '127.0.0.1') {
   const request = {
     headers,
     ip,
@@ -110,18 +108,14 @@ describe('ApiKeyGuard', () => {
 
   it('should throw ForbiddenException when API key is inactive', async () => {
     const { context } = createMockContext({ authorization: 'Bearer dbl_test_key_1234567890' });
-    mockPrisma.apiKey.findUnique.mockResolvedValue(
-      makeApiKeyRecord({ isActive: false }),
-    );
+    mockPrisma.apiKey.findUnique.mockResolvedValue(makeApiKeyRecord({ isActive: false }));
 
     await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
   });
 
   it('should throw ForbiddenException when API key is expired', async () => {
     const { context } = createMockContext({ authorization: 'Bearer dbl_test_key_1234567890' });
-    mockPrisma.apiKey.findUnique.mockResolvedValue(
-      makeApiKeyRecord({ expiresAt: new Date('2020-01-01') }),
-    );
+    mockPrisma.apiKey.findUnique.mockResolvedValue(makeApiKeyRecord({ expiresAt: new Date('2020-01-01') }));
 
     await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
   });
@@ -138,13 +132,8 @@ describe('ApiKeyGuard', () => {
   });
 
   it('should throw ForbiddenException when IP not in whitelist', async () => {
-    const { context } = createMockContext(
-      { authorization: 'Bearer dbl_test_key_1234567890' },
-      '10.0.0.1',
-    );
-    mockPrisma.apiKey.findUnique.mockResolvedValue(
-      makeApiKeyRecord({ ipWhitelist: ['192.168.1.1', '192.168.1.2'] }),
-    );
+    const { context } = createMockContext({ authorization: 'Bearer dbl_test_key_1234567890' }, '10.0.0.1');
+    mockPrisma.apiKey.findUnique.mockResolvedValue(makeApiKeyRecord({ ipWhitelist: ['192.168.1.1', '192.168.1.2'] }));
 
     await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
   });
@@ -184,14 +173,9 @@ describe('ApiKeyGuard', () => {
   });
 
   it('should allow access when IP is in the whitelist', async () => {
-    const { context } = createMockContext(
-      { authorization: 'Bearer dbl_test_key_1234567890' },
-      '192.168.1.1',
-    );
+    const { context } = createMockContext({ authorization: 'Bearer dbl_test_key_1234567890' }, '192.168.1.1');
 
-    mockPrisma.apiKey.findUnique.mockResolvedValue(
-      makeApiKeyRecord({ ipWhitelist: ['192.168.1.1', '10.0.0.1'] }),
-    );
+    mockPrisma.apiKey.findUnique.mockResolvedValue(makeApiKeyRecord({ ipWhitelist: ['192.168.1.1', '10.0.0.1'] }));
 
     const result = await guard.canActivate(context);
 
@@ -199,14 +183,9 @@ describe('ApiKeyGuard', () => {
   });
 
   it('should skip IP check when whitelist is empty', async () => {
-    const { context } = createMockContext(
-      { authorization: 'Bearer dbl_test_key_1234567890' },
-      '99.99.99.99',
-    );
+    const { context } = createMockContext({ authorization: 'Bearer dbl_test_key_1234567890' }, '99.99.99.99');
 
-    mockPrisma.apiKey.findUnique.mockResolvedValue(
-      makeApiKeyRecord({ ipWhitelist: [] }),
-    );
+    mockPrisma.apiKey.findUnique.mockResolvedValue(makeApiKeyRecord({ ipWhitelist: [] }));
 
     const result = await guard.canActivate(context);
 
@@ -218,9 +197,7 @@ describe('ApiKeyGuard', () => {
       authorization: 'Bearer dbl_test_key_1234567890',
     });
 
-    mockPrisma.apiKey.findUnique.mockResolvedValue(
-      makeApiKeyRecord({ expiresAt: new Date('2099-12-31') }),
-    );
+    mockPrisma.apiKey.findUnique.mockResolvedValue(makeApiKeyRecord({ expiresAt: new Date('2099-12-31') }));
 
     const result = await guard.canActivate(context);
 

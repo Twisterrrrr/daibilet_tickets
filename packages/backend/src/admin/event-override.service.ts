@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -54,17 +55,17 @@ export class EventOverrideService {
   async applyOverrides(events: any[]): Promise<any[]> {
     if (events.length === 0) return events;
 
-    const eventIds = events.map(e => e.id);
+    const eventIds = events.map((e) => e.id);
     const overrides = await this.prisma.eventOverride.findMany({
       where: { eventId: { in: eventIds } },
     });
 
     if (overrides.length === 0) return events;
 
-    const overrideMap = new Map(overrides.map(o => [o.eventId, o]));
+    const overrideMap = new Map(overrides.map((o) => [o.eventId, o]));
 
     return events
-      .map(event => {
+      .map((event) => {
         const override = overrideMap.get(event.id);
         if (!override) return event;
         if (override.isHidden) return null; // Фильтруем скрытые

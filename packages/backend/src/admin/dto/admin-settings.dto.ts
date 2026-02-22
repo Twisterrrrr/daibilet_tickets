@@ -1,8 +1,6 @@
-import {
-  IsOptional, IsNumber, IsArray,
-} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { IsArray, IsNumber, IsOptional } from 'class-validator';
 
 export class UpdatePricingDto {
   @ApiPropertyOptional({ description: 'Сервисный сбор (%)' })

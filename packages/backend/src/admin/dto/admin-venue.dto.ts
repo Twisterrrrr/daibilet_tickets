@@ -1,10 +1,17 @@
-import {
-  IsString, IsOptional, IsBoolean, IsNumber, IsArray,
-  IsEnum, IsObject, IsUUID, IsNotEmpty,
-} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import { VenueType } from '@prisma/client';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateVenueDto {
   @ApiProperty()

@@ -1,12 +1,26 @@
-import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, UseInterceptors, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import * as crypto from 'crypto';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
-import { UpdateSupplierDto, CreateApiKeyDto, UpdateWebhookDto } from './dto/admin-supplier.dto';
-import * as crypto from 'crypto';
+import { CreateApiKeyDto, UpdateSupplierDto, UpdateWebhookDto } from './dto/admin-supplier.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -256,15 +270,14 @@ export class AdminSuppliersController {
     ]);
 
     // Enriched top suppliers
-    const topSupplierIds = topByRevenue
-      .map((t) => t.supplierId)
-      .filter(Boolean) as string[];
-    const topSupplierNames = topSupplierIds.length > 0
-      ? await this.prisma.operator.findMany({
-          where: { id: { in: topSupplierIds } },
-          select: { id: true, name: true },
-        })
-      : [];
+    const topSupplierIds = topByRevenue.map((t) => t.supplierId).filter(Boolean) as string[];
+    const topSupplierNames =
+      topSupplierIds.length > 0
+        ? await this.prisma.operator.findMany({
+            where: { id: { in: topSupplierIds } },
+            select: { id: true, name: true },
+          })
+        : [];
     const nameMap = new Map(topSupplierNames.map((s) => [s.id, s.name]));
 
     return {

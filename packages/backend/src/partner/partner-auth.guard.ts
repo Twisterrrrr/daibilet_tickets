@@ -1,5 +1,13 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException, Logger } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as crypto from 'crypto';
+
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -60,10 +68,12 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     // Fire-and-forget: update lastUsedAt
-    this.prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { lastUsedAt: new Date() },
-    }).catch((e) => this.logger.error('lastUsedAt update failed: ' + (e as Error).message));
+    this.prisma.apiKey
+      .update({
+        where: { id: apiKey.id },
+        data: { lastUsedAt: new Date() },
+      })
+      .catch((e) => this.logger.error('lastUsedAt update failed: ' + (e as Error).message));
 
     // Attach partner context to request
     request.user = {

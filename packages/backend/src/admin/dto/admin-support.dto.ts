@@ -1,8 +1,6 @@
-import {
-  IsString, IsOptional, IsBoolean, IsEnum, IsNotEmpty,
-} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TicketStatus } from '@prisma/client';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UpdateTicketDto {
   @ApiPropertyOptional({ enum: TicketStatus })

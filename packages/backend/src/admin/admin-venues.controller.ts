@@ -1,15 +1,26 @@
 import {
-  Controller, Get, Post, Patch, Delete,
-  Param, Query, Body, UseGuards, UseInterceptors,
-  NotFoundException, ConflictException, BadRequestException,
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateVenueDto, UpdateVenueDto } from './dto/admin-venue.dto';
-import { parsePagination, paginationArgs } from '../common/pagination';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -93,22 +104,37 @@ export class AdminVenuesController {
           where: { isActive: true },
           orderBy: [{ isPermanent: 'desc' }, { createdAt: 'desc' }],
           select: {
-            id: true, slug: true, title: true, dateMode: true,
-            isPermanent: true, endDate: true, priceFrom: true, imageUrl: true,
+            id: true,
+            slug: true,
+            title: true,
+            dateMode: true,
+            isPermanent: true,
+            endDate: true,
+            priceFrom: true,
+            imageUrl: true,
           },
         },
         offers: {
           where: { status: 'ACTIVE' },
           orderBy: { priority: 'desc' },
           select: {
-            id: true, source: true, purchaseType: true, priceFrom: true,
-            deeplink: true, badge: true, status: true,
+            id: true,
+            source: true,
+            purchaseType: true,
+            priceFrom: true,
+            deeplink: true,
+            badge: true,
+            status: true,
           },
         },
       },
     });
     if (!venue) throw new NotFoundException('Venue not found');
-    return { ...venue, rating: Number(venue.rating), externalRating: venue.externalRating ? Number(venue.externalRating) : null };
+    return {
+      ...venue,
+      rating: Number(venue.rating),
+      externalRating: venue.externalRating ? Number(venue.externalRating) : null,
+    };
   }
 
   @Post()
@@ -217,13 +243,17 @@ export class AdminVenuesController {
         ...(body.isFeatured !== undefined && { isFeatured: body.isFeatured }),
         ...(body.metaTitle !== undefined && { metaTitle: body.metaTitle || null }),
         ...(body.metaDescription !== undefined && { metaDescription: body.metaDescription || null }),
-        ...(body.externalRating !== undefined && { externalRating: body.externalRating ? Number(body.externalRating) : null }),
+        ...(body.externalRating !== undefined && {
+          externalRating: body.externalRating ? Number(body.externalRating) : null,
+        }),
         ...(body.externalSource !== undefined && { externalSource: body.externalSource || null }),
         // Conversion fields
         ...(body.highlights !== undefined && { highlights: body.highlights }),
         ...(body.faq !== undefined && { faq: body.faq }),
         ...(body.features !== undefined && { features: body.features }),
-        ...(body.commissionRate !== undefined && { commissionRate: body.commissionRate ? Number(body.commissionRate) : null }),
+        ...(body.commissionRate !== undefined && {
+          commissionRate: body.commissionRate ? Number(body.commissionRate) : null,
+        }),
         version: { increment: 1 },
       },
     });
@@ -272,19 +302,45 @@ export class AdminVenuesController {
     }
 
     if (errors.length > 0) {
-      throw new BadRequestException(
-        `Для публикации заполните обязательные поля: ${errors.join(', ')}`,
-      );
+      throw new BadRequestException(`Для публикации заполните обязательные поля: ${errors.join(', ')}`);
     }
   }
 
   private generateSlug(title: string): string {
     const translitMap: Record<string, string> = {
-      'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
-      'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'j', 'к': 'k', 'л': 'l', 'м': 'm',
-      'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
-      'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
-      'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+      а: 'a',
+      б: 'b',
+      в: 'v',
+      г: 'g',
+      д: 'd',
+      е: 'e',
+      ё: 'yo',
+      ж: 'zh',
+      з: 'z',
+      и: 'i',
+      й: 'j',
+      к: 'k',
+      л: 'l',
+      м: 'm',
+      н: 'n',
+      о: 'o',
+      п: 'p',
+      р: 'r',
+      с: 's',
+      т: 't',
+      у: 'u',
+      ф: 'f',
+      х: 'kh',
+      ц: 'ts',
+      ч: 'ch',
+      ш: 'sh',
+      щ: 'shch',
+      ъ: '',
+      ы: 'y',
+      ь: '',
+      э: 'e',
+      ю: 'yu',
+      я: 'ya',
     };
     return title
       .toLowerCase()

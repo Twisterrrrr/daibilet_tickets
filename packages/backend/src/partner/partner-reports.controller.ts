@@ -1,6 +1,8 @@
 import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { Response } from 'express';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { PartnerAuthUser } from '../auth/auth.types';
+import type { Request as ExpressRequest, Response } from 'express';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiKeyGuard } from './partner-auth.guard';
 
@@ -17,7 +19,7 @@ export class PartnerReportsController {
   @Get('sales')
   @ApiOperation({ summary: 'Продажи за период' })
   async salesReport(
-    @Req() req: any,
+    @Req() req: ExpressRequest & { user: PartnerAuthUser },
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('format') format?: string,
@@ -62,8 +64,9 @@ export class PartnerReportsController {
 
     if (format === 'csv' && res) {
       const header = 'id,checkoutSessionId,grossAmount,platformFee,supplierAmount,commissionRate,status,createdAt';
-      const rows = payments.map((p) =>
-        `${p.id},${p.checkoutSessionId},${p.grossAmount || 0},${p.platformFee || 0},${p.supplierAmount || 0},${p.commissionRate || ''},${p.status},${p.createdAt.toISOString()}`
+      const rows = payments.map(
+        (p) =>
+          `${p.id},${p.checkoutSessionId},${p.grossAmount || 0},${p.platformFee || 0},${p.supplierAmount || 0},${p.commissionRate || ''},${p.status},${p.createdAt.toISOString()}`,
       );
       const csv = [header, ...rows].join('\n');
 

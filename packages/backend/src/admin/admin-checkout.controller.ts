@@ -1,20 +1,40 @@
-import { Controller, Get, Post, Patch, Param, Query, Body, Res, UseGuards, UseInterceptors, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import type { Response } from 'express';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
-import { PrismaService } from '../prisma/prisma.service';
-import { CheckoutStatus, Prisma } from '@prisma/client';
-import { MailService } from '../mail/mail.service';
-import { AuditInterceptor } from './audit.interceptor';
+import { getCompatMetrics } from '@daibilet/shared';
 import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Logger,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { CheckoutStatus, Prisma } from '@prisma/client';
+import type { Response } from 'express';
+
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import {
+  DEFAULT_REQUEST_SLA_MINUTES,
   tryTransitionCheckout,
   tryTransitionOrderRequest,
-  DEFAULT_REQUEST_SLA_MINUTES,
 } from '../checkout/checkout-state-machine';
-import { getCompatMetrics } from '@daibilet/shared';
 import { streamCsv } from '../common/csv-stream.util';
-import { UpdateSessionStatusDto, AdminNoteDto, ExportRequestsCsvDto, ExportSessionsCsvDto } from './dto/admin-checkout.dto';
+import { MailService } from '../mail/mail.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditInterceptor } from './audit.interceptor';
+import {
+  AdminNoteDto,
+  ExportRequestsCsvDto,
+  ExportSessionsCsvDto,
+  UpdateSessionStatusDto,
+} from './dto/admin-checkout.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -196,23 +216,25 @@ export class AdminCheckoutController {
         },
       });
       if (session) {
-        this.mailService.sendOrderConfirmed(request.customerEmail, {
-          customerName: request.customerName || 'Клиент',
-          shortCode: session.shortCode,
-          items: session.orderRequests.map((r) => ({
-            title: r.event?.title || 'Билет',
-            quantity: r.quantity,
-            price: Math.round(r.priceSnapshot / 100),
-          })),
-          totalPrice: Math.round((session.totalPrice || 0) / 100),
-          operationalItems: session.orderRequests.map((r) => ({
-            eventTitle: r.event?.title || 'Билет',
-            meetingPoint: r.eventOffer?.meetingPoint,
-            meetingInstructions: r.eventOffer?.meetingInstructions,
-            operationalPhone: r.eventOffer?.operationalPhone,
-            operationalNote: r.eventOffer?.operationalNote,
-          })),
-        }).catch((e) => this.logger.error('Confirm email failed: ' + e.message));
+        this.mailService
+          .sendOrderConfirmed(request.customerEmail, {
+            customerName: request.customerName || 'Клиент',
+            shortCode: session.shortCode,
+            items: session.orderRequests.map((r) => ({
+              title: r.event?.title || 'Билет',
+              quantity: r.quantity,
+              price: Math.round(r.priceSnapshot / 100),
+            })),
+            totalPrice: Math.round((session.totalPrice || 0) / 100),
+            operationalItems: session.orderRequests.map((r) => ({
+              eventTitle: r.event?.title || 'Билет',
+              meetingPoint: r.eventOffer?.meetingPoint,
+              meetingInstructions: r.eventOffer?.meetingInstructions,
+              operationalPhone: r.eventOffer?.operationalPhone,
+              operationalNote: r.eventOffer?.operationalNote,
+            })),
+          })
+          .catch((e) => this.logger.error('Confirm email failed: ' + e.message));
       }
     }
 
@@ -250,11 +272,13 @@ export class AdminCheckoutController {
         select: { shortCode: true },
       });
       if (session) {
-        this.mailService.sendOrderRejected(request.customerEmail, {
-          customerName: request.customerName || 'Клиент',
-          shortCode: session.shortCode,
-          reason: data.adminNote || undefined,
-        }).catch((e) => this.logger.error('Reject email failed: ' + e.message));
+        this.mailService
+          .sendOrderRejected(request.customerEmail, {
+            customerName: request.customerName || 'Клиент',
+            shortCode: session.shortCode,
+            reason: data.adminNote || undefined,
+          })
+          .catch((e) => this.logger.error('Reject email failed: ' + e.message));
       }
     }
 
@@ -266,8 +290,11 @@ export class AdminCheckoutController {
   // ============================
 
   private async logDeniedTransition(
-    entity: string, entityId: string,
-    fromStatus: string, toStatus: string, reason?: string,
+    entity: string,
+    entityId: string,
+    fromStatus: string,
+    toStatus: string,
+    reason?: string,
   ): Promise<void> {
     try {
       await this.prisma.auditLog.create({
@@ -280,7 +307,9 @@ export class AdminCheckoutController {
           after: { attemptedStatus: toStatus, reason } as Prisma.InputJsonValue,
         },
       });
-    } catch { /* не блокируем основной флоу */ }
+    } catch {
+      /* не блокируем основной флоу */
+    }
   }
 
   // ============================
@@ -338,7 +367,9 @@ export class AdminCheckoutController {
 
     // 7. Drop-off по шагам checkout
     const statusCounts: Record<string, number> = {};
-    sessionsByStatus.forEach((s) => { statusCounts[s.status] = s._count.id; });
+    sessionsByStatus.forEach((s) => {
+      statusCounts[s.status] = s._count.id;
+    });
 
     const dropOff = {
       started: statusCounts['STARTED'] || 0,
@@ -391,9 +422,8 @@ export class AdminCheckoutController {
       slaBreachCount = durations.filter((d) => d.minutes > d.sla).length;
     }
 
-    const slaBreachRate = confirmedWithTime.length > 0
-      ? Math.round((slaBreachCount / confirmedWithTime.length) * 10000) / 100
-      : 0;
+    const slaBreachRate =
+      confirmedWithTime.length > 0 ? Math.round((slaBreachCount / confirmedWithTime.length) * 10000) / 100 : 0;
 
     // 9. Payment intents по статусу
     const paymentsByStatus = await this.prisma.paymentIntent.groupBy({
@@ -436,22 +466,16 @@ export class AdminCheckoutController {
       conversion: {
         totalSessions,
         completedSessions,
-        sessionConversionRate: totalSessions > 0
-          ? Math.round((completedSessions / totalSessions) * 10000) / 100
-          : 0,
+        sessionConversionRate: totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 10000) / 100 : 0,
         totalRequests,
         confirmedRequests,
         expiredRequests,
         pendingRequests,
-        requestConversionRate: totalRequests > 0
-          ? Math.round((confirmedRequests / totalRequests) * 10000) / 100
-          : 0,
+        requestConversionRate: totalRequests > 0 ? Math.round((confirmedRequests / totalRequests) * 10000) / 100 : 0,
         totalPayments,
         paidPayments,
         failedPayments,
-        paymentSuccessRate: totalPayments > 0
-          ? Math.round((paidPayments / totalPayments) * 10000) / 100
-          : 0,
+        paymentSuccessRate: totalPayments > 0 ? Math.round((paidPayments / totalPayments) * 10000) / 100 : 0,
       },
       sla: {
         avgConfirmMinutes,
@@ -474,10 +498,7 @@ export class AdminCheckoutController {
    */
   @Get('export/requests')
   @Roles('ADMIN')
-  async exportRequestsCsv(
-    @Res() res: Response,
-    @Query() query: ExportRequestsCsvDto,
-  ) {
+  async exportRequestsCsv(@Res() res: Response, @Query() query: ExportRequestsCsvDto) {
     const dateFrom = query.dateFrom ? new Date(query.dateFrom) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const dateTo = query.dateTo ? new Date(query.dateTo) : new Date();
 
@@ -525,10 +546,7 @@ export class AdminCheckoutController {
    */
   @Get('export/sessions')
   @Roles('ADMIN')
-  async exportSessionsCsv(
-    @Res() res: Response,
-    @Query() query: ExportSessionsCsvDto,
-  ) {
+  async exportSessionsCsv(@Res() res: Response, @Query() query: ExportSessionsCsvDto) {
     const dateFrom = query.dateFrom ? new Date(query.dateFrom) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const dateTo = query.dateTo ? new Date(query.dateTo) : new Date();
 

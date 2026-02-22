@@ -1,11 +1,27 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, UseInterceptors, ConflictException, Request } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Body,
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import type { AdminAuthUser } from '../auth/auth.types';
+import type { Request as ExpressRequest } from 'express';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
-import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 import { CreateArticleDto, UpdateArticleDto } from './dto/admin-article.dto';
 
 @ApiTags('admin')
@@ -76,7 +92,7 @@ export class AdminArticlesController {
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: UpdateArticleDto, @Request() req: any) {
+  async update(@Param('id') id: string, @Body() data: UpdateArticleDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
     const { id: _, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data as any;
 
     if (data.version !== undefined) {

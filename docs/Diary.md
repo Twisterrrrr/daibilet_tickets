@@ -4,6 +4,32 @@
 
 ---
 
+## 22.02.2026 — A5 JwtPayload + B2 RBAC Supplier (Backend Tech Debt)
+
+### Наблюдения
+
+- req: any в 30+ местах (admin, supplier, partner, user controllers).
+- Passport типизирует user как User — конфликт с AdminAuthUser, SupplierAuthUser и т.д.
+
+### Решения
+
+**A5 JwtPayload:**
+- auth.types.ts: AdminAuthUser, SupplierAuthUser, UserAuthUser, PartnerAuthUser, RequestWithUser<T>
+- types/express.d.ts: расширение Express.Request
+- JwtStrategy: добавлен type: 'admin'
+- auth-user.decorator.ts: @AuthUser()
+- Контроллеры: req: any заменён на RequestWithUser<...> или ExpressRequest & { user: AdminAuthUser }
+
+**B2 RBAC Supplier:**
+- supplier-settings: RequestWithUser<SupplierAuthUser>
+- Supplier CRUD уже использует operatorId из req.user в where
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 22.02.2026 — Backend Tech Debt: задачи с DoD
 
 ### Наблюдения

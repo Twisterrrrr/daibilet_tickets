@@ -1,5 +1,7 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { RequestWithUser, SupplierAuthUser } from '../auth/auth.types';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { SupplierJwtGuard } from './supplier.guard';
 
@@ -12,16 +14,10 @@ export class SupplierDashboardController {
 
   @Get()
   @ApiOperation({ summary: 'Dashboard поставщика' })
-  async dashboard(@Req() req: any) {
+  async dashboard(@Req() req: RequestWithUser<SupplierAuthUser>) {
     const operatorId = req.user.operatorId;
 
-    const [
-      totalEvents,
-      activeEvents,
-      pendingEvents,
-      totalOffers,
-      operator,
-    ] = await Promise.all([
+    const [totalEvents, activeEvents, pendingEvents, totalOffers, operator] = await Promise.all([
       this.prisma.event.count({ where: { operatorId } }),
       this.prisma.event.count({ where: { operatorId, isActive: true } }),
       this.prisma.event.count({ where: { operatorId, moderationStatus: 'PENDING_REVIEW' } }),
@@ -29,8 +25,12 @@ export class SupplierDashboardController {
       this.prisma.operator.findUnique({
         where: { id: operatorId },
         select: {
-          name: true, trustLevel: true, commissionRate: true,
-          promoRate: true, promoUntil: true, successfulSales: true,
+          name: true,
+          trustLevel: true,
+          commissionRate: true,
+          promoRate: true,
+          promoUntil: true,
+          successfulSales: true,
           verifiedAt: true,
         },
       }),

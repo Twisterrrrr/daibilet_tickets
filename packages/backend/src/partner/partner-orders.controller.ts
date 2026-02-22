@@ -1,12 +1,24 @@
 import {
-  Controller, Get, Post, Param, Body, Query, Req,
-  UseGuards, NotFoundException, BadRequestException, ForbiddenException,
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { PartnerAuthUser } from '../auth/auth.types';
+import type { Request as ExpressRequest } from 'express';
+
+import { tryTransitionCheckout, tryTransitionOrderRequest } from '../checkout/checkout-state-machine';
 import { PrismaService } from '../prisma/prisma.service';
-import { ApiKeyGuard } from './partner-auth.guard';
-import { tryTransitionOrderRequest, tryTransitionCheckout } from '../checkout/checkout-state-machine';
 import { ConfirmOrderDto, RejectOrderDto } from './dto/partner.dto';
+import { ApiKeyGuard } from './partner-auth.guard';
 
 @ApiTags('partner')
 @ApiBearerAuth()
@@ -21,7 +33,7 @@ export class PartnerOrdersController {
   @Get()
   @ApiOperation({ summary: 'Список заказов поставщика' })
   async listOrders(
-    @Req() req: any,
+    @Req() req: ExpressRequest & { user: PartnerAuthUser },
     @Query('status') status?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
@@ -37,7 +49,7 @@ export class PartnerOrdersController {
       where: { operatorId },
       select: { id: true },
     });
-    const eventIds = events.map(e => e.id);
+    const eventIds = events.map((e) => e.id);
 
     if (eventIds.length === 0) {
       return { items: [], total: 0, page: parseInt(page), limit: take };
@@ -58,12 +70,14 @@ export class PartnerOrdersController {
     const orderRequests = await this.prisma.orderRequest.findMany({
       where: {
         ...(status ? { status: status.toUpperCase() } : {}),
-        ...(from || to ? {
-          createdAt: {
-            ...(from ? { gte: new Date(from) } : {}),
-            ...(to ? { lte: new Date(to) } : {}),
-          },
-        } : {}),
+        ...(from || to
+          ? {
+              createdAt: {
+                ...(from ? { gte: new Date(from) } : {}),
+                ...(to ? { lte: new Date(to) } : {}),
+              },
+            }
+          : {}),
         checkoutSession: {
           // Фильтр: сессии содержащие офферы от этого оператора
           // Через offersSnapshot (в JSON хранится operatorId)
@@ -130,7 +144,7 @@ export class PartnerOrdersController {
    */
   @Get(':id')
   @ApiOperation({ summary: 'Детали заказа' })
-  async getOrder(@Req() req: any, @Param('id') id: string) {
+  async getOrder(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Param('id') id: string) {
     const order = await this.prisma.orderRequest.findUnique({
       where: { id },
       include: {
@@ -174,7 +188,7 @@ export class PartnerOrdersController {
    */
   @Post(':id/confirm')
   @ApiOperation({ summary: 'Подтвердить заказ' })
-  async confirmOrder(@Req() req: any, @Param('id') id: string, @Body() data?: ConfirmOrderDto) {
+  async confirmOrder(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Param('id') id: string, @Body() data?: ConfirmOrderDto) {
     const order = await this.prisma.orderRequest.findUnique({
       where: { id },
       include: { checkoutSession: { select: { id: true, status: true } } },
@@ -217,7 +231,7 @@ export class PartnerOrdersController {
    */
   @Post(':id/reject')
   @ApiOperation({ summary: 'Отклонить заказ' })
-  async rejectOrder(@Req() req: any, @Param('id') id: string, @Body() data: RejectOrderDto) {
+  async rejectOrder(@Req() req: ExpressRequest & { user: PartnerAuthUser }, @Param('id') id: string, @Body() data: RejectOrderDto) {
     const order = await this.prisma.orderRequest.findUnique({
       where: { id },
       include: { checkoutSession: { select: { id: true, status: true } } },

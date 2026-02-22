@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
+import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import * as crypto from 'crypto';
-import { PrismaService } from '../prisma/prisma.service';
 
+import { PrismaService } from '../prisma/prisma.service';
 import { QUEUE_PARTNER_WEBHOOKS } from '../queue/queue.constants';
 export { QUEUE_PARTNER_WEBHOOKS };
 

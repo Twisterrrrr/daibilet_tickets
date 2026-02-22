@@ -1,14 +1,17 @@
-import { Controller, Get, Post, Patch, Body, Query, UseGuards, UseInterceptors, Logger, Request } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
-import { PrismaService } from '../prisma/prisma.service';
-import { CacheService, cacheKeys } from '../cache/cache.service';
-import { TcSyncService } from '../catalog/tc-sync.service';
-import { AuditInterceptor } from './audit.interceptor';
-import { PeakRangeSchema, validateJson } from './json-schemas';
+import { Body, Controller, Get, Logger, Patch, Post, Query, Request, UseGuards, UseInterceptors } from '@nestjs/common';
+import type { AdminAuthUser } from '../auth/auth.types';
+import type { Request as ExpressRequest } from 'express';
 import { BadRequestException } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { cacheKeys, CacheService } from '../cache/cache.service';
+import { TcSyncService } from '../catalog/tc-sync.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditInterceptor } from './audit.interceptor';
 import { UpdatePricingDto } from './dto/admin-settings.dto';
+import { PeakRangeSchema, validateJson } from './json-schemas';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -65,7 +68,7 @@ export class AdminSettingsController {
 
   @Patch('pricing')
   @Roles('ADMIN')
-  async updatePricing(@Body() data: UpdatePricingDto, @Request() req: any) {
+  async updatePricing(@Body() data: UpdatePricingDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
     try {
       if (data.peakRanges !== undefined) {
         validateJson(PeakRangeSchema, data.peakRanges, 'peakRanges');
@@ -197,9 +200,7 @@ export class AdminSettingsController {
     // 3. Очищаем кэш городов
     await this.cache.delByPrefix('cities:');
 
-    this.logger.log(
-      `fix-cities: активировано ${activated.count}, описаний: ${descResult.updated}`,
-    );
+    this.logger.log(`fix-cities: активировано ${activated.count}, описаний: ${descResult.updated}`);
     return {
       success: true,
       activated: activated.count,

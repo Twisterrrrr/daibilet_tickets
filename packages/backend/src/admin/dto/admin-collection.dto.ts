@@ -1,9 +1,16 @@
-import {
-  IsString, IsOptional, IsBoolean, IsNumber, IsArray,
-  IsObject, IsUUID, IsNotEmpty, IsInt,
-} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateCollectionDto {
   @ApiProperty({ description: 'URL-slug (уникальный)' })

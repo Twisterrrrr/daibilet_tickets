@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CacheService } from '../cache/cache.service';
 import * as crypto from 'crypto';
+
+import { CacheService } from '../cache/cache.service';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_COOLDOWN_SEC = 600; // 10 min
@@ -47,15 +48,13 @@ export class LoginBruteForceService {
    */
   async recordFailedAttempt(ip: string, email: string): Promise<{ blocked: boolean; retryAfterSec?: number }> {
     const key = this.key(ip, email);
-    const existing = await this.cache.get<{ attempts: number; blockedUntil?: number }>(key) ?? { attempts: 0 };
+    const existing = (await this.cache.get<{ attempts: number; blockedUntil?: number }>(key)) ?? { attempts: 0 };
     const attempts = existing.attempts + 1;
 
     if (attempts >= this.maxAttempts) {
       const blockedUntil = Date.now() + this.cooldownSec * 1000;
       await this.cache.set(key, { attempts, blockedUntil }, this.cooldownSec);
-      this.logger.warn(
-        `Admin login brute-force: blocked ip=${this.maskIp(ip)} emailHash=*** attempts=${attempts}`,
-      );
+      this.logger.warn(`Admin login brute-force: blocked ip=${this.maskIp(ip)} emailHash=*** attempts=${attempts}`);
       return { blocked: true, retryAfterSec: this.cooldownSec };
     }
 

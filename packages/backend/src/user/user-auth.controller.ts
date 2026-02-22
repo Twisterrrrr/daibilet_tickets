@@ -1,10 +1,12 @@
-import { Controller, Post, Get, Body, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { Response, Request } from 'express';
-import { UserAuthService } from './user-auth.service';
+import type { Request, Response } from 'express';
+
+import type { UserAuthUser } from '../auth/auth.types';
+import { UserLoginDto, UserRegisterDto } from './dto/user-auth.dto';
 import { UserJwtGuard } from './user.guard';
-import { UserRegisterDto, UserLoginDto } from './dto/user-auth.dto';
+import { UserAuthService } from './user-auth.service';
 
 @ApiTags('user')
 @Controller('user/auth')
@@ -14,10 +16,7 @@ export class UserAuthController {
   @Post('register')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Регистрация пользователя сайта' })
-  async register(
-    @Body() body: UserRegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async register(@Body() body: UserRegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(body);
     res.cookie('user_refresh_token', result.refreshToken, {
       httpOnly: true,
@@ -31,10 +30,7 @@ export class UserAuthController {
   @Post('login')
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: 'Вход пользователя' })
-  async login(
-    @Body() body: UserLoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async login(@Body() body: UserLoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(body.email, body.password);
     res.cookie('user_refresh_token', result.refreshToken, {
       httpOnly: true,
@@ -66,7 +62,7 @@ export class UserAuthController {
   @UseGuards(UserJwtGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Выход' })
-  async logout(@Req() req: { user: { id: string } }, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request & { user: UserAuthUser }, @Res({ passthrough: true }) res: Response) {
     await this.authService.logout(req.user.id);
     res.clearCookie('user_refresh_token');
     return { message: 'Logged out' };
@@ -76,7 +72,7 @@ export class UserAuthController {
   @UseGuards(UserJwtGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Профиль пользователя' })
-  async me(@Req() req: { user: { id: string } }) {
+  async me(@Req() req: Request & { user: UserAuthUser }) {
     return this.authService.getProfile(req.user.id);
   }
 }

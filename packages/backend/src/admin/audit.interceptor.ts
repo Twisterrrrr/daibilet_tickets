@@ -1,17 +1,12 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  Logger,
-} from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
+
 import { AuditService } from './audit.service';
 
 /**
  * Interceptor для автоматического логирования POST/PATCH/DELETE
  * на маршрутах /admin/*.
- * 
+ *
  * Использование: навесить @UseInterceptors(AuditInterceptor) на контроллер.
  * Пользователь берётся из req.user (JwtAuthGuard),
  * entity и entityId определяются из пути.
@@ -36,15 +31,11 @@ export class AuditInterceptor implements NestInterceptor {
     // Определяем entity из пути: /api/v1/admin/<entity>/...
     const pathParts = (req.route?.path || req.path || '').split('/').filter(Boolean);
     const adminIdx = pathParts.indexOf('admin');
-    const entity = adminIdx >= 0 && pathParts[adminIdx + 1]
-      ? this.normalizeEntity(pathParts[adminIdx + 1])
-      : 'Unknown';
+    const entity = adminIdx >= 0 && pathParts[adminIdx + 1] ? this.normalizeEntity(pathParts[adminIdx + 1]) : 'Unknown';
 
     const entityId = req.params?.id || 'new';
 
-    const action = method === 'DELETE' ? 'DELETE'
-      : method === 'POST' ? 'CREATE'
-      : 'UPDATE';
+    const action = method === 'DELETE' ? 'DELETE' : method === 'POST' ? 'CREATE' : 'UPDATE';
 
     const before = method !== 'POST' ? undefined : undefined; // before снимается в контроллере при необходимости
     const body = req.body;
@@ -52,7 +43,9 @@ export class AuditInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap((result) => {
         // Записываем в аудит после успешного выполнения
-        this.audit.log(userId, action, entity, entityId, before, body).catch((e) => this.logger.error('Audit log failed: ' + (e as Error).message));
+        this.audit
+          .log(userId, action, entity, entityId, before, body)
+          .catch((e) => this.logger.error('Audit log failed: ' + (e as Error).message));
       }),
     );
   }

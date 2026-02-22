@@ -1,17 +1,39 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, UseInterceptors, ConflictException, BadRequestException, Request } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import type { AdminAuthUser } from '../auth/auth.types';
+import type { Request as ExpressRequest } from 'express';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
+import { CreateLandingDto, UpdateLandingDto } from './dto/admin-landing.dto';
 import {
-  FaqSchema, ReviewSchema, StatsSchema, RelatedLinkSchema,
-  HowToChooseSchema, InfoBlockSchema, AdditionalFiltersSchema,
+  AdditionalFiltersSchema,
+  FaqSchema,
+  HowToChooseSchema,
+  InfoBlockSchema,
+  RelatedLinkSchema,
+  ReviewSchema,
+  StatsSchema,
   validateJson,
 } from './json-schemas';
-import { CreateLandingDto, UpdateLandingDto } from './dto/admin-landing.dto';
-import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -64,7 +86,7 @@ export class AdminLandingsController {
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: UpdateLandingDto, @Request() req: any) {
+  async update(@Param('id') id: string, @Body() data: UpdateLandingDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
     const { id: _, createdAt, updatedAt, city, version, ...clean } = data as any;
 
     this.validateJsonFields(clean);
@@ -109,7 +131,8 @@ export class AdminLandingsController {
       if (data.relatedLinks !== undefined) validateJson(RelatedLinkSchema, data.relatedLinks, 'relatedLinks');
       if (data.howToChoose !== undefined) validateJson(HowToChooseSchema, data.howToChoose, 'howToChoose');
       if (data.infoBlocks !== undefined) validateJson(InfoBlockSchema, data.infoBlocks, 'infoBlocks');
-      if (data.additionalFilters !== undefined) validateJson(AdditionalFiltersSchema, data.additionalFilters, 'additionalFilters');
+      if (data.additionalFilters !== undefined)
+        validateJson(AdditionalFiltersSchema, data.additionalFilters, 'additionalFilters');
     } catch (e: unknown) {
       throw new BadRequestException(e instanceof Error ? e.message : String(e));
     }

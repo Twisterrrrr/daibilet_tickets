@@ -1,14 +1,15 @@
-import { Controller, Get, Post, UseGuards, UseInterceptors, Logger } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { InjectQueue } from '@nestjs/bullmq';
+import { Controller, Get, Logger, Post, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Queue } from 'bullmq';
-import { PrismaService } from '../prisma/prisma.service';
-import { PaymentMetricsService } from '../checkout/payment-metrics.service';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
-import { AuditInterceptor } from './audit.interceptor';
-import { QUEUE_SYNC, QUEUE_EMAILS } from '../queue/queue.constants';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { PaymentMetricsService } from '../checkout/payment-metrics.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
 import { TagAssignmentService } from '../scheduler/tag-assignment.service';
+import { AuditInterceptor } from './audit.interceptor';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -34,13 +35,7 @@ export class AdminOpsController {
   async getHealth() {
     const now = new Date();
 
-    const [
-      pendingStale,
-      failedUnresolved,
-      escalatedOpen,
-      activeIntents,
-      syncCounts,
-    ] = await Promise.all([
+    const [pendingStale, failedUnresolved, escalatedOpen, activeIntents, syncCounts] = await Promise.all([
       this.prisma.orderRequest.count({
         where: {
           status: 'PENDING',
@@ -76,11 +71,13 @@ export class AdminOpsController {
   @Roles('ADMIN')
   async getMetrics() {
     const m = this.metrics.getMetrics();
-    const fulfillmentTotal = m.fulfillment_reserve_success + m.fulfillment_reserve_fail
-      + m.fulfillment_confirm_success + m.fulfillment_confirm_fail;
-    const fulfillmentFailRate = fulfillmentTotal > 0
-      ? (m.fulfillment_reserve_fail + m.fulfillment_confirm_fail) / fulfillmentTotal
-      : 0;
+    const fulfillmentTotal =
+      m.fulfillment_reserve_success +
+      m.fulfillment_reserve_fail +
+      m.fulfillment_confirm_success +
+      m.fulfillment_confirm_fail;
+    const fulfillmentFailRate =
+      fulfillmentTotal > 0 ? (m.fulfillment_reserve_fail + m.fulfillment_confirm_fail) / fulfillmentTotal : 0;
     const webhookDedupRate = m.webhook_received > 0 ? m.webhook_duplicate / m.webhook_received : 0;
 
     return {

@@ -1,9 +1,6 @@
-import {
-  IsString, IsOptional, IsBoolean, IsArray, IsObject,
-  IsInt, IsNotEmpty, IsUUID,
-} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateLandingDto {
   @ApiProperty()

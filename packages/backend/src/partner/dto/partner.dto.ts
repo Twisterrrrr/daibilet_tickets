@@ -1,22 +1,7 @@
-import {
-  IsOptional,
-  IsString,
-  IsUUID,
-  IsInt,
-  IsNumber,
-  IsBoolean,
-  IsEnum,
-  IsArray,
-  Min,
-} from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  EventCategory,
-  EventAudience,
-  PurchaseType,
-  OfferStatus,
-} from '@prisma/client';
+import { EventAudience, EventCategory, OfferStatus, PurchaseType } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 // ============================
 // Events

@@ -1,9 +1,10 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { PackageItemStatus, PackageStatus } from '@prisma/client';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
-import { PackageStatus, PackageItemStatus } from '@prisma/client';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -22,7 +23,12 @@ export class AdminDashboardController {
     const d60 = new Date(now);
     d60.setDate(d60.getDate() - 60);
 
-    const paidStatuses: PackageStatus[] = [PackageStatus.PAID, PackageStatus.FULFILLING, PackageStatus.FULFILLED, PackageStatus.PARTIALLY_FULFILLED];
+    const paidStatuses: PackageStatus[] = [
+      PackageStatus.PAID,
+      PackageStatus.FULFILLING,
+      PackageStatus.FULFILLED,
+      PackageStatus.PARTIALLY_FULFILLED,
+    ];
 
     // Параллельные запросы для основных метрик
     const [
@@ -120,12 +126,13 @@ export class AdminDashboardController {
 
     // Fetch event details for top events
     const topEventIds = topEventItems.map((e) => e.eventId);
-    const topEventsDetails = topEventIds.length > 0
-      ? await this.prisma.event.findMany({
-          where: { id: { in: topEventIds } },
-          select: { id: true, title: true, slug: true, category: true, imageUrl: true },
-        })
-      : [];
+    const topEventsDetails =
+      topEventIds.length > 0
+        ? await this.prisma.event.findMany({
+            where: { id: { in: topEventIds } },
+            select: { id: true, title: true, slug: true, category: true, imageUrl: true },
+          })
+        : [];
     const topEvents = topEventItems.map((item) => {
       const ev = topEventsDetails.find((e) => e.id === item.eventId);
       return {

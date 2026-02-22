@@ -1,9 +1,11 @@
-import { Controller, Get, Query, Req, Res, UseGuards, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { RequestWithUser, SupplierAuthUser } from '../auth/auth.types';
 import type { Response } from 'express';
+
+import { streamCsv } from '../common/csv-stream.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupplierJwtGuard } from './supplier.guard';
-import { streamCsv } from '../common/csv-stream.util';
 
 @ApiTags('supplier')
 @ApiBearerAuth()
@@ -18,7 +20,7 @@ export class SupplierReportsController {
   @Get('sales')
   @ApiOperation({ summary: 'Отчёт о продажах' })
   async salesReport(
-    @Req() req: any,
+    @Req() req: RequestWithUser<SupplierAuthUser>,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('page') pageRaw = '1',
@@ -41,7 +43,9 @@ export class SupplierReportsController {
         include: {
           checkoutSession: {
             select: {
-              shortCode: true, customerName: true, customerEmail: true,
+              shortCode: true,
+              customerName: true,
+              customerEmail: true,
               offersSnapshot: true,
             },
           },
@@ -86,12 +90,7 @@ export class SupplierReportsController {
    */
   @Get('sales/export')
   @ApiOperation({ summary: 'Экспорт продаж в CSV' })
-  async exportCsv(
-    @Req() req: any,
-    @Res() res: Response,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
+  async exportCsv(@Req() req: RequestWithUser<SupplierAuthUser>, @Res() res: Response, @Query('from') from?: string, @Query('to') to?: string) {
     const operatorId = req.user.operatorId;
 
     // Validate and set date range (default: last 30 days, max: 93 days)
@@ -119,7 +118,7 @@ export class SupplierReportsController {
         { header: 'Сумма (руб)', accessor: (i) => ((i.grossAmount || 0) / 100).toFixed(2) },
         { header: 'Комиссия (руб)', accessor: (i) => ((i.platformFee || 0) / 100).toFixed(2) },
         { header: 'Ваш доход (руб)', accessor: (i) => ((i.supplierAmount || 0) / 100).toFixed(2) },
-        { header: 'Ставка', accessor: (i) => i.commissionRate ? `${Number(i.commissionRate) * 100}%` : '' },
+        { header: 'Ставка', accessor: (i) => (i.commissionRate ? `${Number(i.commissionRate) * 100}%` : '') },
       ],
       fetchBatch: (cursor, take) =>
         this.prisma.paymentIntent.findMany({

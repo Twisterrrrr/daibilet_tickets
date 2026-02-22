@@ -1,16 +1,30 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, UseInterceptors, ConflictException, BadRequestException, Request } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import type { AdminAuthUser } from '../auth/auth.types';
+import type { Request as ExpressRequest } from 'express';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard, Roles } from '../auth/roles.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
-import {
-  FaqSchema, FeatureSchema, CuratedEventSchema, IncludesSchema,
-  validateJson,
-} from './json-schemas';
 import { CreateComboDto, UpdateComboDto } from './dto/admin-combo.dto';
-import { parsePagination, paginationArgs, buildPaginatedResult } from '../common/pagination';
+import { CuratedEventSchema, FaqSchema, FeatureSchema, IncludesSchema, validateJson } from './json-schemas';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -63,7 +77,7 @@ export class AdminCombosController {
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: UpdateComboDto, @Request() req: any) {
+  async update(@Param('id') id: string, @Body() data: UpdateComboDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
     const { id: _, createdAt, updatedAt, city, version, ...clean } = data as any;
 
     this.validateJsonFields(clean);

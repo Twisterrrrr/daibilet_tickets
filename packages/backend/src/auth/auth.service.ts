@@ -2,9 +2,10 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+
 import { PrismaService } from '../prisma/prisma.service';
-import { LoginBruteForceService } from './login-brute-force.service';
 import { JwtPayload } from './jwt.strategy';
+import { LoginBruteForceService } from './login-brute-force.service';
 
 @Injectable()
 export class AuthService {

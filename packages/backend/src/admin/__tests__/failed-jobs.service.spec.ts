@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FailedJobsService } from '../failed-jobs.service';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { AuditService } from '../audit.service';
+import { FailedJobsService } from '../failed-jobs.service';
 
 const createMockQueue = (
   failedJobs: Array<{
@@ -14,9 +15,9 @@ const createMockQueue = (
   }>,
 ) => {
   const retryFn = vi.fn().mockResolvedValue(undefined);
-  const getFailed = vi.fn().mockResolvedValue(
-    failedJobs.map((j) => ({ ...j, retry: retryFn, getState: () => 'failed' })),
-  );
+  const getFailed = vi
+    .fn()
+    .mockResolvedValue(failedJobs.map((j) => ({ ...j, retry: retryFn, getState: () => 'failed' })));
   const getFailedCount = vi.fn().mockResolvedValue(failedJobs.length);
   const getJob = vi.fn().mockImplementation((id: string) => {
     const j = failedJobs.find((x) => x.id === id);

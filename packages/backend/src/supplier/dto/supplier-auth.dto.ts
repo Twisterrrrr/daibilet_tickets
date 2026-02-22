@@ -1,7 +1,5 @@
-import {
-  IsString, IsOptional, IsEmail, MinLength,
-} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class SupplierRegisterDto {
   @ApiProperty()

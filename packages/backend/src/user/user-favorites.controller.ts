@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Delete, Body, Param, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { UserFavoritesService } from './user-favorites.service';
-import { UserJwtGuard } from './user.guard';
-import { SyncFavoritesDto } from './dto/user-favorites.dto';
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+
 import type { AddFavoriteDto } from './dto/user-favorites.dto';
+import { SyncFavoritesDto } from './dto/user-favorites.dto';
+import { UserJwtGuard } from './user.guard';
+import { UserFavoritesService } from './user-favorites.service';
 
 interface RequestWithUser {
   user: { id: string };

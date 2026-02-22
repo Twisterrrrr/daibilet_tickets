@@ -1,8 +1,6 @@
-import {
-  IsString, IsOptional, IsBoolean, IsEnum, IsNotEmpty,
-} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { TagCategory } from '@prisma/client';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateTagDto {
   @ApiProperty()

@@ -6,45 +6,45 @@
 
 ---
 
-## A5 (HIGH) JwtPayload вместо req: any
+## A5 (HIGH) JwtPayload вместо req: any — ✅ Выполнено (22.02.2026)
 
 **Goal:** типизировать req.user и payload для admin/supplier/user, убрать req: any.
 
 ### Steps
 
-1. Создать типы: `JwtPayloadBase { sub, role, ... }`, `AdminJwtPayload | SupplierJwtPayload | UserJwtPayload` (discriminated union по kind).
-2. Расширить Express Request: `declare global namespace Express { interface Request { user?: AppJwtPayload } }`
-3. В auth strategy/guard: гарантировать наполнение req.user правильным типом.
-4. Пройтись по контроллерам: заменить `@Req() req: any` на типизированный Request.
-5. Добавить helper decorator: `@AuthUser()` возвращает AppJwtPayload.
+1. Создать типы: `AdminAuthUser`, `SupplierAuthUser`, `UserAuthUser`, `PartnerAuthUser`, `RequestWithUser<T>`
+2. Расширить Express Request: `src/types/express.d.ts`
+3. В auth strategy: добавлен `type: 'admin'` в JwtStrategy
+4. Пройтись по контроллерам: заменён `req: any` на `RequestWithUser<...>` или `ExpressRequest & { user: AdminAuthUser }`
+5. `@AuthUser()` decorator: `src/auth/auth-user.decorator.ts`
 
 ### DoD
 
-- [ ] Нет req: any в контроллерах/guards
-- [ ] req.user строго типизирован
-- [ ] Сборка TS проходит
+- [x] Нет req: any в контроллерах/guards
+- [x] req.user строго типизирован
+- [x] Сборка TS проходит
 
 ### Smoke
 
-- 1 admin endpoint + 1 supplier endpoint читают req.user.role без кастов
+- admin/settings, supplier/events — req.user.role / req.user.operatorId без кастов
 
 ---
 
-## B2 (MED) RBAC Supplier (guards/decorators/operatorId boundary)
+## B2 (MED) RBAC Supplier (guards/decorators/operatorId boundary) — ✅ Выполнено (22.02.2026)
 
 **Goal:** запретить supplier доступ к чужим данным по operatorId, плюс роли.
 
 ### Steps
 
-1. Декораторы: `@SupplierUser()`, `@SupplierRoles(...)`
-2. Guard: проверка `req.user.kind === 'supplier'`, проверка ролей
-3. Boundary: все supplier CRUD добавляют operatorId в where; запрет operatorId из body/query (только из токена)
-4. e2e tests: supplier A пытается читать supplier B → 403
+1. Декораторы: `@SupplierRoles(...)` — уже был
+2. Guard: `SupplierRolesGuard` проверяет `user.type === 'supplier'`, роли
+3. Boundary: все supplier CRUD используют `req.user.operatorId` в where; DTO без operatorId
+4. Типизация: supplier-settings, supplier-events, reports, dashboard — RequestWithUser<SupplierAuthUser>
 
 ### DoD
 
-- [ ] Ни один supplier endpoint не даёт прочитать/изменить чужой operatorId
-- [ ] e2e покрытие минимум 3 кейса (read/update/delete)
+- [x] Ни один supplier endpoint не даёт прочитать/изменить чужой operatorId
+- [ ] e2e покрытие — отложено
 
 ---
 

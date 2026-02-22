@@ -12,11 +12,13 @@ export const FaqSchema = z.array(FaqItemSchema);
 // ========================
 // Reviews
 // ========================
-export const ReviewSchema = z.array(z.object({
-  text: z.string().min(1),
-  author: z.string().min(1),
-  rating: z.number().min(1).max(5),
-}));
+export const ReviewSchema = z.array(
+  z.object({
+    text: z.string().min(1),
+    author: z.string().min(1),
+    rating: z.number().min(1).max(5),
+  }),
+);
 
 // ========================
 // Stats
@@ -29,45 +31,55 @@ export const StatsSchema = z.object({
 // ========================
 // Related Links
 // ========================
-export const RelatedLinkSchema = z.array(z.object({
-  title: z.string().min(1),
-  href: z.string().min(1),
-}));
+export const RelatedLinkSchema = z.array(
+  z.object({
+    title: z.string().min(1),
+    href: z.string().min(1),
+  }),
+);
 
 // ========================
 // HowToChoose
 // ========================
-export const HowToChooseSchema = z.array(z.object({
-  title: z.string().min(1),
-  text: z.string().min(1),
-}));
+export const HowToChooseSchema = z.array(
+  z.object({
+    title: z.string().min(1),
+    text: z.string().min(1),
+  }),
+);
 
 // ========================
 // Info Blocks
 // ========================
-export const InfoBlockSchema = z.array(z.object({
-  title: z.string().min(1),
-  text: z.string().min(1),
-}));
+export const InfoBlockSchema = z.array(
+  z.object({
+    title: z.string().min(1),
+    text: z.string().min(1),
+  }),
+);
 
 // ========================
 // Features (Combo USP)
 // ========================
-export const FeatureSchema = z.array(z.object({
-  icon: z.string().min(1),
-  title: z.string().min(1),
-  text: z.string().min(1),
-}));
+export const FeatureSchema = z.array(
+  z.object({
+    icon: z.string().min(1),
+    title: z.string().min(1),
+    text: z.string().min(1),
+  }),
+);
 
 // ========================
 // Curated Events (Combo)
 // ========================
-export const CuratedEventSchema = z.array(z.object({
-  eventId: z.string().uuid(),
-  dayNumber: z.number().int().positive(),
-  slot: z.enum(['MORNING', 'AFTERNOON', 'EVENING']),
-  time: z.string(),
-}));
+export const CuratedEventSchema = z.array(
+  z.object({
+    eventId: z.string().uuid(),
+    dayNumber: z.number().int().positive(),
+    slot: z.enum(['MORNING', 'AFTERNOON', 'EVENING']),
+    time: z.string(),
+  }),
+);
 
 // ========================
 // Includes (Combo)
@@ -77,22 +89,26 @@ export const IncludesSchema = z.array(z.string().min(1));
 // ========================
 // Additional Filters (Landing)
 // ========================
-export const AdditionalFiltersSchema = z.object({
-  category: z.string().optional(),
-  source: z.string().optional(),
-  minDuration: z.number().optional(),
-  maxDuration: z.number().optional(),
-  features: z.array(z.string()).optional(),
-}).optional();
+export const AdditionalFiltersSchema = z
+  .object({
+    category: z.string().optional(),
+    source: z.string().optional(),
+    minDuration: z.number().optional(),
+    maxDuration: z.number().optional(),
+    features: z.array(z.string()).optional(),
+  })
+  .optional();
 
 // ========================
 // Peak Ranges (PricingConfig)
 // ========================
-export const PeakRangeSchema = z.array(z.object({
-  dateFrom: z.string(),
-  dateTo: z.string(),
-  cities: z.array(z.string()).optional(),
-}));
+export const PeakRangeSchema = z.array(
+  z.object({
+    dateFrom: z.string(),
+    dateTo: z.string(),
+    cities: z.array(z.string()).optional(),
+  }),
+);
 
 // ========================
 // Валидатор-хелпер
