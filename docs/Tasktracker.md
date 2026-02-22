@@ -95,8 +95,23 @@
 - [x] **Средний** (высокий ROI): SeoMeta на venues, cities, blog, combo (21.02)
 - [x] **Средний** (частично): createdByType + createdById в Event/Venue (миграция 20260221110000), admin/supplier create. RBAC guards — [ ] в плане
 - [x] **Низкий**: Frontend typecheck — ошибки TS исправлены (21.02): VenueCard, CheckoutClient, sitemaps, CatalogCard, page.tsx, events, cities/museums
-- [ ] **Низкий**: Типизация `any` (backend ~31, frontend 100+)
 - Полный список и обоснование — `docs/TechnicalDebt.md`
+
+### Backend и техдолг (очередность в docs/BackendTechDebtTasks.md)
+
+**Порядок:** A5 → B2 → A3 → A4 → B1 → A1-Pino → B3 → B4 → A2 → C1 → C2
+
+- [ ] **A5 (HIGH)**: JwtPayload вместо req: any
+- [ ] **B2 (MED)**: RBAC Supplier (guards, operatorId boundary)
+- [ ] **A3 (HIGH)**: Типизация tc-sync.service.ts (TcEvent вместо any[])
+- [ ] **A4 (HIGH)**: Proto-generated types для gRPC
+- [ ] **B1 (MED)**: where: any → Prisma typed where builders
+- [ ] **A1-Pino (HIGH)**: Structured JSON logs (pino) + лог-агрегатор
+- [ ] **B3 (MED)**: Redis-кэш: списки/детали/сессии (TTL)
+- [ ] **B4 (MED)**: Nginx location /uploads/ (static)
+- [ ] **A2 (HIGH)**: Email-шаблоны: order-confirmed, order-completed
+- [ ] **C1 (LOW)**: Убрать as any в бэкенде (~31 место)
+- [ ] **C2 (LOW)**: Frontend any (api.ts, DTO) 100+
 
 ---
 
@@ -167,8 +182,7 @@
 
 ### Отложено (backlog)
 - [x] **Средний**: ESLint правило: запретить `any` в новых файлах — tools/check-no-any-new-files.ts, pnpm check:no-any-new (22.02)
-- [ ] **Низкий**: Типизация `as any` в бэкенде (31 место) — заменить на type guards постепенно
-- [ ] **Низкий**: Frontend `any` (100+) — начать с api.ts и DTO types
+- [ ] **Низкий**: C1, C2 — см. docs/BackendTechDebtTasks.md
 
 ---
 

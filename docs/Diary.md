@@ -4,6 +4,29 @@
 
 ---
 
+## 22.02.2026 — Backend Tech Debt: задачи с DoD
+
+### Наблюдения
+
+- Блок «Backend и техдолг» требовал декомпозиции на автономные задачи с чёткими DoD и Smoke.
+
+### Решения
+
+**docs/BackendTechDebtTasks.md** — 11 задач с полной спецификацией:
+- A5 (JwtPayload), B2 (RBAC Supplier), A3 (tc-sync typing), A4 (proto), B1 (Prisma where)
+- A1-Pino (pino + лог-агрегатор) — переименовано, т.к. A1 (requestId + PII) уже выполнён
+- B3 (Redis cache), B4 (nginx uploads), A2 (email templates), C1/C2 (any cleanup)
+
+Очередность: A5 → B2 → A3 → A4 → B1 → A1-Pino → B3 → B4 → A2 → C1 → C2.
+
+**docs/Tasktracker.md** — раздел «Технические долги» обновлён: ссылка на BackendTechDebtTasks, список задач в нужном порядке.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 22.02.2026 — JSON-LD, useSearchParams Suspense, gift-certificate dynamic
 
 ### Наблюдения
