@@ -600,7 +600,6 @@ export default function EventsPage() {
                 durationMinutes={event.durationMinutes}
                 city={event.city}
                 address={event.address}
-                description={event.shortDescription ?? event.description}
                 totalAvailableTickets={event.totalAvailableTickets}
                 departingSoonMinutes={event.departingSoonMinutes}
                 nextSessionAt={event.nextSessionAt}
@@ -617,7 +616,6 @@ export default function EventsPage() {
                 slug={event.slug}
                 title={event.title}
                 category={event.category}
-                subcategories={event.subcategories}
                 imageUrl={event.imageUrl}
                 priceFrom={event.priceFrom}
                 rating={event.rating}

@@ -400,6 +400,8 @@ export class TcSyncService {
           imageUrl,
           priceFrom,
           isActive,
+          createdByType: 'IMPORT',
+          createdById: null,
           tcData: best as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
@@ -906,9 +908,10 @@ export class TcSyncService {
       const allSessions = await this.prisma.eventSession.findMany({
         where: { eventId: master.id },
       });
-      const allPrices = allSessions.flatMap((s: any) =>
-        ((s.prices as any[]) || []).map((p: any) => p.price).filter((p: number) => p > 0),
-      );
+      const allPrices = allSessions.flatMap((s) => {
+        const prices = (s.prices as Array<{ price?: number }> | null) ?? [];
+        return prices.map((p) => p.price).filter((p): p is number => typeof p === 'number' && p > 0);
+      });
       const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : master.priceFrom;
 
       await this.prisma.event.update({
@@ -1013,6 +1016,8 @@ export class TcSyncService {
           imageUrl,
           priceFrom,
           isActive,
+          createdByType: 'IMPORT',
+          createdById: null,
           tcData: JSON.parse(JSON.stringify(best)) as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
@@ -1247,8 +1252,8 @@ export class TcSyncService {
 
     let tagsLinked = 0;
     for (const ev of events) {
-      const tc = (ev.tcData as any) || {};
-      const tcTags = (tc.tags || []) as string[];
+      const tc = (ev.tcData as { tags?: string[] } | null) ?? {};
+      const tcTags: string[] = tc.tags ?? [];
       const before = await this.prisma.eventTag.count({ where: { eventId: ev.id } });
       await this.syncTags(ev.id, tcTags, ev.title, ev.description || '');
       const after = await this.prisma.eventTag.count({ where: { eventId: ev.id } });

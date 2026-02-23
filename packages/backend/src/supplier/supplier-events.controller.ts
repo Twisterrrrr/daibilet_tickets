@@ -14,7 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { OfferSource, Prisma } from '@prisma/client';
+import { ModerationStatus, OfferSource, Prisma } from '@prisma/client';
 
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
@@ -24,11 +24,15 @@ import {
   UpdateSupplierEventDto,
   UpdateSupplierOfferDto,
 } from './dto/supplier.dto';
+import { CurrentSupplierUser } from '../common/decorators/current-supplier-user.decorator';
+import type { SupplierAuthUser } from '../common/decorators/current-supplier-user.decorator';
+import { OperatorScope } from '../common/guards/operator-scope.guard';
+import { OperatorScopeGuard } from '../common/guards/operator-scope.guard';
 import { SupplierJwtGuard, SupplierRoles, SupplierRolesGuard } from './supplier.guard';
 
 @ApiTags('supplier')
 @ApiBearerAuth()
-@UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+@UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
 @Controller('supplier/events')
 export class SupplierEventsController {
   constructor(private readonly prisma: PrismaService) {}
@@ -39,16 +43,16 @@ export class SupplierEventsController {
   @Get()
   @ApiOperation({ summary: 'Мои события' })
   async list(
-    @Req() req: any,
+    @CurrentSupplierUser() user: SupplierAuthUser,
     @Query('status') status?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit: limit || '25' });
-    const where: any = { operatorId: req.user.operatorId };
+    const where: Prisma.EventWhereInput = { operatorId: user.operatorId };
 
-    if (status) where.moderationStatus = status;
+    if (status) where.moderationStatus = status as Prisma.EnumModerationStatusFilter;
 
     const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
@@ -92,7 +96,6 @@ export class SupplierEventsController {
   @ApiOperation({ summary: 'Создать событие (черновик)' })
   async create(@Req() req: any, @Body() data: CreateSupplierEventDto) {
     // T18: создаём draft (status=DRAFT). Submit отправит на модерацию.
-    const moderationStatus = 'DRAFT';
 
     // Генерация slug
     const slug =
@@ -106,7 +109,7 @@ export class SupplierEventsController {
 
     const event = await this.prisma.event.create({
       data: {
-        source: 'MANUAL' as any,
+        source: OfferSource.MANUAL,
         tcEventId: `supplier-${Date.now()}`,
         cityId: data.cityId,
         title: data.title,
@@ -123,7 +126,7 @@ export class SupplierEventsController {
         isActive: false, // DRAFT — не в каталоге до модерации
         operatorId: req.user.operatorId,
         supplierId: req.user.operatorId,
-        moderationStatus: moderationStatus as any,
+        moderationStatus: ModerationStatus.DRAFT,
         createdByType: 'SUPPLIER',
         createdById: req.user.id,
       },
@@ -136,6 +139,7 @@ export class SupplierEventsController {
    * Обновить событие (только своё). Аудит: updatedById.
    */
   @Put(':id')
+  @OperatorScope('Event', 'id')
   @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
   @ApiOperation({ summary: 'Обновить событие' })
   async update(@Req() req: any, @Param('id') id: string, @Body() data: UpdateSupplierEventDto) {
@@ -274,6 +278,7 @@ export class SupplierEventsController {
   }
 
   @Delete(':eventId/offers/:offerId')
+  @OperatorScope('Event', 'eventId')
   @SupplierRoles('OWNER')
   @ApiOperation({ summary: 'Удалить оффер' })
   async deleteOffer(@Req() req: any, @Param('eventId') eventId: string, @Param('offerId') offerId: string) {

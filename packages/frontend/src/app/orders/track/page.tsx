@@ -424,3 +424,7 @@ function OrderTrackContent() {
     </div>
   );
 }
+
+export default function Page() {
+  return <OrderTrackContent />;
+}

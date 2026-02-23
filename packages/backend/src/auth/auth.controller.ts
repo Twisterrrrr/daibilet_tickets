@@ -20,7 +20,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Request() req: { ip?: string },
   ) {
-    const ip = req?.ip ?? (req as any)?.connection?.remoteAddress;
+    const ip = req?.ip ?? (req as { connection?: { remoteAddress?: string } })?.connection?.remoteAddress;
     const result = await this.auth.login(ip, dto.email, dto.password);
 
     this.setRefreshCookie(res, result.refreshToken);

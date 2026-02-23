@@ -916,7 +916,7 @@ model Venue {
   highlights       Json?                           // ["3 млн экспонатов","В центре города","Детям бесплатно"]
   faq              Json?                           // [{q:"Можно ли вернуть билет?",a:"Да, до начала визита"}]
   features         String[]   @default([])         // ["no_queue","audio_guide","kids_friendly","wheelchair"]
-  commissionRate   Decimal?   @db.Decimal(4, 2)    // индивидуальная комиссия для музея (%)
+  commissionRate   Decimal?   @db.Decimal(4, 2)    // Индивидуальная ставка (госмузеи и др.), админ может менять
   metaTitle        String?
   metaDescription  String?    @db.Text
   version          Int        @default(0)
@@ -985,8 +985,8 @@ model Operator {
   // === Supplier Portal ===
   isSupplier        Boolean   @default(false)
   trustLevel        Int       @default(0)           // 0=модерация, 1=авто+постмод, 2=доверенный
-  commissionRate    Decimal   @default(0.25) @db.Decimal(5, 4)  // Базовая комиссия (25%, включает комиссию YooKassa ~3%)
-  promoRate         Decimal?  @db.Decimal(5, 4)     // Промо-комиссия (7%)
+  commissionRate    Decimal   @default(0.25) @db.Decimal(5, 4)  // Базовая ставка 25% для всех (включает YooKassa)
+  promoRate         Decimal?  @default(0.10) @db.Decimal(5, 4)  // Промо-ставка 10% до promoUntil
   promoUntil        DateTime?                        // Окончание промо
   yookassaAccountId String?                          // Sub-merchant ID в YooKassa
   companyName       String?
@@ -1405,7 +1405,25 @@ model FulfillmentItem {
 }
 
 // ========================
-// Webhook Idempotency
+// Webhook — raw event log (accept & log, idempotent)
+// ========================
+
+model PaymentEventLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  provider       String   // YOOKASSA | TC | PARTNER
+  eventType      String   // payment.succeeded, payment.canceled, etc.
+  paymentId      String   // ID платежа (object.id от YK)
+  idempotencyKey String   // eventType + paymentId (для дедупликации)
+  payload        Json     // Raw payload webhook
+  receivedAt     DateTime @default(now())
+
+  @@unique([provider, eventType, paymentId])
+  @@index([provider, eventType])
+  @@map("payment_event_logs")
+}
+
+// ========================
+// Webhook Idempotency (ProcessedWebhookEvent)
 // ========================
 
 model ProcessedWebhookEvent {

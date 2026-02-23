@@ -40,10 +40,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { landingSlug } = await params;
   try {
     const data = await api.getLandingBySlug(landingSlug);
-    return {
-      title: data.landing.metaTitle || data.landing.title,
-      description: data.landing.metaDescription || data.landing.subtitle,
-    };
+    const l = data.landing;
+    const title = typeof l.metaTitle === 'string' ? l.metaTitle : l.title;
+    const description =
+      (typeof l.metaDescription === 'string' ? l.metaDescription : null) ||
+      (typeof l.subtitle === 'string' ? l.subtitle : null) ||
+      undefined;
+    return { title, description };
   } catch {
     return { title: 'Страница не найдена' };
   }
@@ -168,7 +171,7 @@ export default async function LandingPage({ params }: Props) {
         {/* Stats Badge */}
         {landing.stats && (
           <div className="mt-10">
-            <StatsBadge stats={landing.stats as { totalSold?: number; soldTickets?: number; avgRating?: number }} />
+            <StatsBadge stats={landing.stats} />
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, EventSubcategory, Prisma } from '@prisma/client';
+import { DateMode, EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
 
 import { CACHE_TTL, cacheKeys, CacheService } from '../cache/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -272,7 +272,7 @@ export class CollectionService {
 
     // Фильтр по категории
     if (collection.filterCategory) {
-      where.category = collection.filterCategory as any;
+      where.category = collection.filterCategory as EventCategory;
     }
 
     // Фильтр по подкатегории
@@ -283,24 +283,31 @@ export class CollectionService {
     // Фильтр по аудитории
     if (collection.filterAudience) {
       if (collection.filterAudience === 'KIDS') {
-        where.audience = { in: ['KIDS', 'FAMILY'] as any };
+        where.audience = { in: [EventAudience.KIDS, EventAudience.FAMILY] };
       } else {
-        where.audience = collection.filterAudience as any;
+        where.audience = collection.filterAudience as EventAudience;
       }
     }
 
     // Дополнительные фильтры из JSON
-    const additional = collection.additionalFilters as any;
+    const additional = collection.additionalFilters as {
+      citySlugs?: string[];
+      maxDuration?: number;
+      minDuration?: number;
+      dateMode?: string;
+    } | null;
     if (additional) {
       // Мульти-городской фильтр (slug-и городов)
       if (Array.isArray(additional.citySlugs) && additional.citySlugs.length > 0) {
         where.city = { slug: { in: additional.citySlugs }, isActive: true };
       }
       if (additional.maxDuration) {
-        where.durationMinutes = { ...((where.durationMinutes as any) || {}), lte: additional.maxDuration };
+        const prev = (where.durationMinutes ?? {}) as Prisma.IntFilter;
+        where.durationMinutes = { ...prev, lte: additional.maxDuration };
       }
       if (additional.minDuration) {
-        where.durationMinutes = { ...((where.durationMinutes as any) || {}), gte: additional.minDuration };
+        const prev = (where.durationMinutes ?? {}) as Prisma.IntFilter;
+        where.durationMinutes = { ...prev, gte: additional.minDuration };
       }
       if (additional.dateMode) {
         // Переопределяем OR-фильтр на конкретный dateMode

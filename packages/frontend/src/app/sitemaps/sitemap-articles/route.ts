@@ -11,9 +11,12 @@ export async function GET() {
   try {
     const { items: articles } = await api.getArticles({ limit: 500 });
     for (const a of articles ?? []) {
+      const lastmod = typeof a.updatedAt === 'string' || typeof a.updatedAt === 'number' || a.updatedAt instanceof Date
+        ? new Date(a.updatedAt as string | number | Date).toISOString().slice(0, 10)
+        : LASTMOD;
       urls.push({
         loc: `${SITE_URL}/blog/${a.slug}`,
-        lastmod: a.updatedAt ? new Date(a.updatedAt).toISOString().slice(0, 10) : LASTMOD,
+        lastmod,
         changefreq: 'monthly',
         priority: 0.5,
       });

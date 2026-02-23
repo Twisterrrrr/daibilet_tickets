@@ -96,7 +96,7 @@
 
 ### To-do (Supplier)
 - [x] **Средний**: Добавить Event.createdByType, Venue.createdByType, createdById, Event.updatedById (схема + миграция 20260222120000)
-- [ ] **Средний**: Реализовать RBAC для Supplier (guards, decorators, проверка operatorId)
+- [x] **Средний**: Реализовать RBAC для Supplier (guards, decorators, проверка operatorId) — AUTO-1, AUTO-2
 
 ---
 
@@ -547,6 +547,7 @@
 - [x] **Высокий**: `.env.example` — обновлён с production checklist и командами генерации
 - [x] **Высокий**: `deploy.sh` — полный скрипт: Docker, Git, UFW, SAN-SSL, авто-пароли, миграции, seed, cron
 - [x] **Высокий**: `REPO_URL` заполнен в deploy.sh (github.com/Twisterrrrr/daibilet_tickets.git)
+- [x] **Высокий**: `docs/deploy/staging-prod-vds.md` — архитектура prod + staging на одном VPS (23.02)
 - [ ] **Средний**: CI/CD: GitHub Actions для автодеплоя на VPS
 
 ### 1.5 Деплой на Timeweb Cloud

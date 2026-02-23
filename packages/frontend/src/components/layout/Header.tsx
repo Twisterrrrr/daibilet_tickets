@@ -18,6 +18,7 @@ const navigation = [
   { name: 'Подборки', href: '/podborki' },
   { name: 'Города', href: '/cities' },
   { name: 'Блог', href: '/blog' },
+  { name: 'Стать партнёром', href: '/partner' },
 ];
 
 interface HeaderCity {

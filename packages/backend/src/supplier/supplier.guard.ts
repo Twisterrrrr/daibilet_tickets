@@ -1,11 +1,14 @@
-import { CanActivate, ExecutionContext, Injectable, SetMetadata } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { SupplierRole } from '@prisma/client';
 
-/** JWT Guard для поставщиков (стратегия jwt-supplier) */
+/** JWT Guard для поставщиков (стратегия jwt-supplier). Алиас: SupplierJwtAuthGuard */
 @Injectable()
 export class SupplierJwtGuard extends AuthGuard('jwt-supplier') {}
+
+/** Алиас для совместимости с naming (admin: JwtAuthGuard) */
+export const SupplierJwtAuthGuard = SupplierJwtGuard;
 
 /** Decorator: требуемые роли поставщика */
 export const SUPPLIER_ROLES_KEY = 'supplier_roles';
@@ -25,8 +28,12 @@ export class SupplierRolesGuard implements CanActivate {
     if (!requiredRoles || requiredRoles.length === 0) return true;
 
     const { user } = context.switchToHttp().getRequest();
-    if (!user || user.type !== 'supplier') return false;
-
-    return requiredRoles.includes(user.role);
+    if (!user || user.type !== 'supplier') {
+      throw new ForbiddenException('FORBIDDEN_INSUFFICIENT_ROLE');
+    }
+    if (!requiredRoles.includes(user.role)) {
+      throw new ForbiddenException('FORBIDDEN_INSUFFICIENT_ROLE');
+    }
+    return true;
   }
 }

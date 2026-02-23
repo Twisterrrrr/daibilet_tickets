@@ -32,6 +32,7 @@ import {
   ValidateGiftCertificateDto,
   YookassaWebhookDto,
 } from './dto/checkout.dto';
+import { PaymentEventLogService } from './payment-event-log.service';
 import { PaymentService } from './payment.service';
 import { WebhookIdempotencyService } from './webhook-idempotency.service';
 import { extractPaymentIdFromWebhook, isYkWebhookEvent } from './yookassa.types';
@@ -45,6 +46,7 @@ export class CheckoutController {
     private readonly checkoutService: CheckoutService,
     private readonly paymentService: PaymentService,
     private readonly webhookIdempotency: WebhookIdempotencyService,
+    private readonly paymentEventLog: PaymentEventLogService,
     @InjectQueue(QUEUE_FULFILLMENT) private readonly fulfillmentQueue: Queue,
   ) {}
 
@@ -97,7 +99,7 @@ export class CheckoutController {
 
   @Post('webhook/yookassa')
   @SkipThrottle()
-  @ApiOperation({ summary: 'Webhook от YooKassa (IP-validated, idempotent, queue-backed)' })
+  @ApiOperation({ summary: 'Webhook от YooKassa (IP-validated, raw body, PaymentEventLog, idempotent)' })
   async handleYookassaWebhook(@Body() body: YookassaWebhookDto, @Req() req: Request) {
     // 1. IP whitelist check
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
@@ -112,9 +114,9 @@ export class CheckoutController {
       return { status: 'ignored', reason: 'invalid structure' };
     }
 
-    // 3. Extract provider event ID
-    const providerEventId = extractPaymentIdFromWebhook(body.object);
-    if (!providerEventId) {
+    // 3. Extract payment ID and event type
+    const paymentId = extractPaymentIdFromWebhook(body.object);
+    if (!paymentId) {
       this.logger.warn('YooKassa webhook: missing object.id');
       return { status: 'ignored', reason: 'missing event id' };
     }
@@ -122,13 +124,21 @@ export class CheckoutController {
     const paymentObj = body.object as unknown as Record<string, unknown>;
     const eventType = body.event;
 
-    // 4. Idempotent processing → queue
+    // 4. PaymentEventLog: accept & log (idempotent). Duplicate → 200 OK, no retry.
+    const logged = await this.paymentEventLog.logOnce(eventType, paymentId, body);
+    if (!logged) {
+      this.logger.debug(`YooKassa webhook: duplicate eventType=${eventType} paymentId=${paymentId}, returning 200`);
+      return { status: 'ok', processed: false, result: 'DUPLICATE' };
+    }
+
+    // 5. Idempotent processing → queue (ProcessedWebhookEvent + fulfillment)
+    const providerEventId = paymentId; // для payment.* = object.id, для refund.* = object.id
     const result = await this.webhookIdempotency.processOnce(providerEventId, 'YOOKASSA', eventType, body, async () => {
       // Minimal handler: validate + enqueue job
       await this.fulfillmentQueue.add(
         'yookassa-webhook',
-        {
-          providerEventId,
+      {
+        providerEventId,
           eventType,
           paymentObject: paymentObj,
         },

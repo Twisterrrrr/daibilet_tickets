@@ -1,8 +1,7 @@
 import { ArrowLeft, Calendar, MapPin, Tag } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Calendar, MapPin, ArrowLeft, Tag } from 'lucide-react';
-import { api } from '@/lib/api';
+
 import { EventCard } from '@/components/ui/EventCard';
 import { VenueCard } from '@/components/ui/VenueCard';
 import { api } from '@/lib/api';
@@ -173,7 +172,19 @@ export default async function ArticlePage({ params }: Props) {
           </h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {relatedVenues.map((venue: any) => (
-              <VenueCard key={venue.id} venue={venue} />
+              <VenueCard
+                key={venue.id}
+                slug={venue.slug}
+                title={venue.title}
+                venueType={venue.venueType ?? ''}
+                imageUrl={venue.imageUrl}
+                address={venue.address}
+                metro={venue.metro}
+                priceFrom={venue.priceFrom}
+                rating={Number(venue.rating) || 0}
+                reviewCount={venue.reviewCount ?? 0}
+                city={venue.city}
+              />
             ))}
           </div>
         </section>

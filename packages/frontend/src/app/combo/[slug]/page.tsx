@@ -6,8 +6,6 @@ import { notFound } from 'next/navigation';
 
 import { FaqSection } from '@/components/landing/FaqSection';
 import { api } from '@/lib/api';
-import { formatPrice } from '@daibilet/shared';
-import { FaqSection } from '@/components/landing/FaqSection';
 
 export const revalidate = 21600;
 
@@ -28,9 +26,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   try {
     const data = await api.getComboBySlug(slug);
+    const metaTitle = typeof data.metaTitle === 'string' ? data.metaTitle : null;
+    const title = typeof data.title === 'string' ? data.title : '';
+    const metaDesc = typeof data.metaDescription === 'string' ? data.metaDescription : null;
+    const subtitle = typeof data.subtitle === 'string' ? data.subtitle : null;
+    const desc = typeof data.description === 'string' ? data.description : null;
     return {
-      title: data.metaTitle || `${data.title} | Дайбилет`,
-      description: data.metaDescription || data.subtitle || data.description,
+      title: metaTitle || `${title} | Дайбилет`,
+      description: metaDesc || subtitle || desc || undefined,
     };
   } catch {
     return { title: 'Программа не найдена | Дайбилет' };

@@ -10,6 +10,8 @@ if (SENTRY_DSN) {
 }
 
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import * as express from 'express';
 import { setCompatDisabled, setCompatLogger } from '@daibilet/shared';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -31,7 +33,10 @@ async function bootstrap() {
     logger.warn('PurchaseType COMPAT disabled — legacy values will throw');
   }
 
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+    bodyParser: false, // используем свой парсер с raw body для webhook
+  });
   app.useLogger(app.get(PinoLogger));
 
   if (process.env.SENTRY_DSN) {
@@ -66,6 +71,14 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
+  // JSON body parser с сохранением raw body (для webhook signature verification)
+  app.use(
+    express.json({
+      verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(cookieParser());
 
   app.useGlobalPipes(

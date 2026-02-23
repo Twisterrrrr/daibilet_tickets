@@ -31,23 +31,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const city = await api.getCityBySlug(slug);
     const seo = await getSeoMeta('CITY', city.id);
-    const title = seo?.title ?? city.metaTitle ?? `${city.name} — экскурсии, музеи и билеты на мероприятия | Дайбилет`;
-    const description =
+    const title = String(seo?.title ?? city.metaTitle ?? `${city.name} — экскурсии, музеи и билеты на мероприятия | Дайбилет`);
+    const description = String(
       seo?.description ??
-      city.metaDescription ??
-      city.description ??
-      `Лучшие экскурсии, музеи и мероприятия в ${city.name}. Покупайте билеты онлайн на Дайбилет.`;
-    const robots = seo?.robots ?? 'index,follow';
-    const canonical = seo?.canonicalUrl ?? undefined;
+        city.metaDescription ??
+        city.description ??
+        `Лучшие экскурсии, музеи и мероприятия в ${city.name}. Покупайте билеты онлайн на Дайбилет.`,
+    );
+    const robots = String(seo?.robots ?? 'index,follow');
+    const canonical = typeof seo?.canonicalUrl === 'string' ? seo.canonicalUrl : undefined;
+    const ogTitle = typeof (seo?.ogTitle ?? title) === 'string' ? (seo?.ogTitle ?? title) : title;
+    const ogDescription = typeof (seo?.ogDescription ?? description) === 'string' ? (seo?.ogDescription ?? description) : description;
+    const ogImage = typeof seo?.ogImage === 'string' ? seo.ogImage : undefined;
     return {
       title,
       description,
       robots,
       ...(canonical && { alternates: { canonical } }),
       openGraph: {
-        title: seo?.ogTitle ?? title,
-        description: seo?.ogDescription ?? description,
-        ...(seo?.ogImage && { images: [{ url: seo.ogImage }] }),
+        title: ogTitle,
+        description: ogDescription,
+        ...(ogImage && { images: [{ url: ogImage }] }),
         type: 'website',
       },
     };

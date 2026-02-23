@@ -477,7 +477,7 @@ export class ReviewService {
 
     return {
       items,
-      externalReviews: [] as any[],
+      externalReviews: [] as Array<{ id: string; source: string; authorName: string; rating: number; text: string }>,
       total,
       page,
       totalPages: Math.ceil(total / limit),

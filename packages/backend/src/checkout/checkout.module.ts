@@ -7,6 +7,7 @@ import { CheckoutController } from './checkout.controller';
 import { CheckoutService } from './checkout.service';
 import { FeatureFlagService } from './feature-flag.service';
 import { FulfillmentService } from './fulfillment.service';
+import { PaymentEventLogService } from './payment-event-log.service';
 import { PaymentService } from './payment.service';
 import { InternalBookingProvider } from './providers/internal-booking.provider';
 import { PartnerBookingProvider } from './providers/partner-booking.provider';
@@ -23,6 +24,7 @@ import { WebhookIdempotencyService } from './webhook-idempotency.service';
     FulfillmentService,
     RefundService,
     WebhookIdempotencyService,
+    PaymentEventLogService,
     FeatureFlagService,
     // Booking providers (adapters)
     TcBookingProvider,

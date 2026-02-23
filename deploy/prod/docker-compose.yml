@@ -1,0 +1,112 @@
+# ============================================
+# Дайбилет PROD — /opt/daibilet/prod/
+# Запуск: docker compose up -d --build
+# Сборка из корня репо (context ../.. при запуске из deploy/prod/)
+# ============================================
+
+name: daibilet-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: daibilet-prod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-daibilet_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-daibilet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - prod_postgres_data:/var/lib/postgresql/data
+    networks: [prod_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-daibilet}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: daibilet-prod-redis
+    restart: unless-stopped
+    command: ["sh", "-c", "redis-server --appendonly yes $${REDIS_PASSWORD:+--requirepass \"$$REDIS_PASSWORD\"}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - prod_redis_data:/data
+    networks: [prod_net]
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.backend
+    image: daibilet/backend:prod
+    container_name: daibilet-prod-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      APP_ENV: prod
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-daibilet}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-daibilet_prod}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://daibilet.ru,https://admin.daibilet.ru}
+      APP_URL: ${APP_URL:-https://daibilet.ru}
+      TC_API_TOKEN: ${TC_API_TOKEN:-}
+      TC_WIDGET_TOKEN: ${TC_WIDGET_TOKEN:-}
+      YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
+      YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
+      ADMIN_INITIAL_EMAIL: ${ADMIN_INITIAL_EMAIL:-admin@daibilet.ru}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?ADMIN_INITIAL_PASSWORD is required}
+    volumes:
+      - prod_uploads:/var/www/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [prod_net]
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.frontend
+    image: daibilet/frontend:prod
+    container_name: daibilet-prod-frontend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      INTERNAL_API_URL: http://backend:4000/api/v1
+      NEXT_PUBLIC_API_URL: /api/v1
+      NEXT_PUBLIC_SITE_URL: ${APP_URL:-https://daibilet.ru}
+      NEXT_PUBLIC_TC_WIDGET_TOKEN: ${TC_WIDGET_TOKEN:-}
+      NEXT_PUBLIC_YM_ID: ${NEXT_PUBLIC_YM_ID:-}
+    depends_on:
+      - backend
+    networks: [prod_net]
+
+  admin:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.admin
+    image: daibilet/admin:prod
+    container_name: daibilet-prod-admin
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks: [prod_net]
+
+networks:
+  prod_net:
+    name: daibilet_prod_net
+
+volumes:
+  prod_postgres_data:
+  prod_redis_data:
+  prod_uploads:

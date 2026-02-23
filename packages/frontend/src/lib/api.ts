@@ -15,6 +15,22 @@ import type {
   VoucherData,
 } from '@daibilet/shared';
 
+import type {
+  ArticleDetail,
+  ArticleListItem,
+  CityDetail,
+  CollectionDetailResponse,
+  LandingItem,
+  LandingPageResponse,
+  LocationItem,
+  PlanCalculateMeta,
+  RegionDetail,
+  ReviewsResponse,
+  SeoMetaResponse,
+  TagDetailPage,
+  ValidateGiftCertificateResponse,
+} from './api.types';
+
 /**
  * Единая схема: и SSR, и CSR идут через Next.js rewrites (/api/v1).
  * SSR запрашивает свой же origin (localhost:3000), Next проксирует на backend.
@@ -69,9 +85,9 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   // Города
   getCities: (featured?: boolean) =>
-    fetchApi<any[]>(featured !== undefined ? `/cities?featured=${featured}` : '/cities'),
+    fetchApi<CityListItem[]>(featured !== undefined ? `/cities?featured=${featured}` : '/cities'),
 
-  getCityBySlug: (slug: string) => fetchApi<any>(`/cities/${slug}`),
+  getCityBySlug: (slug: string) => fetchApi<CityDetail>(`/cities/${slug}`),
 
   // Локации
   getLocations: (city?: string, type?: string) => {
@@ -79,14 +95,14 @@ export const api = {
     if (city) params.set('city', city);
     if (type) params.set('type', type);
     const query = params.toString() ? `?${params}` : '';
-    return fetchApi<any[]>(`/locations${query}`);
+    return fetchApi<LocationItem[]>(`/locations${query}`);
   },
 
   getNearestLocations: (lat: number, lng: number, type?: string, limit?: number) => {
     const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
     if (type) params.set('type', type);
     if (limit) params.set('limit', String(limit));
-    return fetchApi<any[]>(`/locations/nearest?${params}`);
+    return fetchApi<LocationItem[]>(`/locations/nearest?${params}`);
   },
 
   // Единый каталог (Event + Venue при category=MUSEUM)
@@ -127,7 +143,7 @@ export const api = {
     if (city) params.set('city', city);
     if (page) params.set('page', String(page));
     const query = params.toString() ? `?${params}` : '';
-    return fetchApi<any>(`/tags/${slug}${query}`);
+    return fetchApi<TagDetailPage>(`/tags/${slug}${query}`);
   },
 
   // Поиск
@@ -139,7 +155,7 @@ export const api = {
 
   // Planner
   calculatePlan: (data: PlanRequest) =>
-    fetchApi<{ variants: PlanVariant[]; upsells: UpsellItem[]; meta: any }>('/planner/calculate', {
+    fetchApi<{ variants: PlanVariant[]; upsells: UpsellItem[]; meta: PlanCalculateMeta }>('/planner/calculate', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -184,16 +200,27 @@ export const api = {
             .map(([k, v]) => [k, String(v)]),
         ).toString()
       : '';
-    return fetchApi<any>(`/blog${query}`);
+    return fetchApi<PaginatedResponse<ArticleListItem>>(`/blog${query}`);
   },
 
-  getArticleBySlug: (slug: string) => fetchApi<any>(`/blog/${slug}`),
+  getArticleBySlug: (slug: string) => fetchApi<ArticleDetail>(`/blog/${slug}`),
 
   // Voucher
   getVoucher: (shortCode: string) => fetchApi<VoucherData>(`/vouchers/${shortCode}`),
 
+  // SEO
+  getSeoMeta: (entityType: string, entityId: string) =>
+    fetchApi<SeoMetaResponse | null>(`/seo/${entityType}/${entityId}`),
+
+  // Подарочный сертификат — валидация кода
+  validateGiftCertificate: (code: string, cartTotalKopecks: number) =>
+    fetchApi<ValidateGiftCertificateResponse>('/checkout/validate-gift-certificate', {
+      method: 'POST',
+      body: JSON.stringify({ code, cartTotalKopecks }),
+    }),
+
   // Регионы (города по области / зоне доступности)
-  getRegionBySlug: (slug: string) => fetchApi<any>(`/regions/${slug}`),
+  getRegionBySlug: (slug: string) => fetchApi<RegionDetail>(`/regions/${slug}`),
 
   getRegionEvents: (slug: string, params?: Record<string, string | number>) => {
     const query = params
@@ -204,11 +231,11 @@ export const api = {
             .map(([k, v]) => [k, String(v)]),
         ).toString()
       : '';
-    return fetchApi<any>(`/regions/${slug}/events${query}`);
+    return fetchApi<PaginatedResponse<EventListItem>>(`/regions/${slug}/events${query}`);
   },
 
   // Топ городов для футера (по количеству событий и мест)
-  getTopCities: () => fetchApi<any[]>(`/cities`),
+  getTopCities: () => fetchApi<CityListItem[]>(`/cities`),
 
   // Venues (музеи, галереи, арт-пространства)
   getVenues: (params?: Record<string, string | number>) => {
@@ -226,33 +253,33 @@ export const api = {
   getVenueBySlug: (slug: string) => fetchApi<VenueDetail>(`/venues/${slug}`),
 
   // Лендинги (посадочные страницы)
-  getLandings: (city?: string) => fetchApi<any[]>(city ? `/landings?city=${city}` : '/landings'),
+  getLandings: (city?: string) => fetchApi<LandingItem[]>(city ? `/landings?city=${city}` : '/landings'),
 
-  getLandingBySlug: (slug: string) => fetchApi<any>(`/landings/${slug}`),
+  getLandingBySlug: (slug: string) => fetchApi<LandingPageResponse>(`/landings/${slug}`),
 
   // Подборки (тематические посадочные страницы)
-  getCollections: (city?: string) => fetchApi<any[]>(city ? `/collections?city=${city}` : '/collections'),
+  getCollections: (city?: string) => fetchApi<LandingItem[]>(city ? `/collections?city=${city}` : '/collections'),
 
   getCollectionBySlug: (slug: string, page?: number) => {
     const params = new URLSearchParams();
     if (page && page > 1) params.set('page', String(page));
     const query = params.toString() ? `?${params}` : '';
-    return fetchApi<any>(`/collections/${slug}${query}`);
+    return fetchApi<CollectionDetailResponse>(`/collections/${slug}${query}`);
   },
 
   // Combo-программы (готовые маршруты)
-  getCombos: (city?: string) => fetchApi<any[]>(city ? `/combos?city=${city}` : '/combos'),
+  getCombos: (city?: string) => fetchApi<LandingItem[]>(city ? `/combos?city=${city}` : '/combos'),
 
-  getComboBySlug: (slug: string) => fetchApi<any>(`/combos/${slug}`),
+  getComboBySlug: (slug: string) => fetchApi<LandingItem>(`/combos/${slug}`),
 
   // Pricing / Upsells
-  getUpsells: (city?: string) => fetchApi<any[]>(city ? `/pricing/upsells?city=${city}` : '/pricing/upsells'),
+  getUpsells: (city?: string) => fetchApi<UpsellItem[]>(city ? `/pricing/upsells?city=${city}` : '/pricing/upsells'),
 
   // Отзывы
-  getEventReviews: (slug: string, page = 1) => fetchApi<any>(`/events/${slug}/reviews?page=${page}`),
+  getEventReviews: (slug: string, page = 1) => fetchApi<ReviewsResponse>(`/events/${slug}/reviews?page=${page}`),
 
   getVenueReviews: (slug: string, page = 1, limit = 10) =>
-    fetchApi<any>(`/venues/${slug}/reviews?page=${page}&limit=${limit}`),
+    fetchApi<ReviewsResponse>(`/venues/${slug}/reviews?page=${page}&limit=${limit}`),
 
   submitReview: (data: {
     eventId?: string;
@@ -267,25 +294,29 @@ export const api = {
     formStartedAt?: number;
     reviewRequestToken?: string;
   }) =>
-    fetchApi<any>('/reviews', {
+    fetchApi<{ id: string; [key: string]: unknown }>('/reviews', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  uploadReviewPhotos: async (reviewId: string, files: File[], authorEmail?: string) => {
+  uploadReviewPhotos: async (
+    reviewId: string,
+    files: File[],
+    authorEmail?: string,
+  ): Promise<{ url?: string; urls?: string[]; [key: string]: unknown }> => {
     const formData = new FormData();
     files.forEach((f) => formData.append('photos', f));
     if (authorEmail) formData.append('authorEmail', authorEmail);
     const url = `${API_BASE}/reviews/${reviewId}/photos`;
     const res = await fetch(url, { method: 'POST', body: formData });
     if (!res.ok) {
-      const err = await res.json().catch((e) => {
+      const err = (await res.json().catch((e) => {
         console.error('API error:', e);
         return { message: 'Ошибка загрузки фото' };
-      });
+      })) as { message?: string };
       throw new Error(err.message || `HTTP ${res.status}`);
     }
-    return res.json();
+    return res.json() as Promise<{ url?: string; urls?: string[]; [key: string]: unknown }>;
   },
 
   voteReview: (reviewId: string, helpful: boolean) =>

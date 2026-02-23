@@ -1,0 +1,49 @@
+# ============================================
+# Дайбилет — Edge nginx + certbot
+# /opt/daibilet/nginx/
+# Подключается к prod_net и stg_net (external)
+# Запускать ПОСЛЕ prod и staging (сети должны существовать)
+# ============================================
+
+name: daibilet-edge
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: daibilet-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - uploads_prod:/var/www/uploads:ro
+      - uploads_staging:/var/www/uploads-staging:ro
+    networks:
+      - daibilet_prod_net
+      - daibilet_stg_net
+    depends_on: []
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: daibilet-certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+networks:
+  daibilet_prod_net:
+    external: true
+  daibilet_stg_net:
+    external: true
+
+volumes:
+  uploads_prod:
+    external: true
+    name: daibilet-prod_prod_uploads
+  uploads_staging:
+    external: true
+    name: daibilet-staging_stg_uploads

@@ -11,6 +11,7 @@ const staticFooterLinks = {
   ],
   Компания: [
     { name: 'О сервисе', href: '/about' },
+    { name: 'Стать партнёром', href: '/partner' },
     { name: 'Подарочный сертификат', href: '/gift-certificate' },
     { name: 'Блог', href: '/blog' },
     { name: 'Помощь', href: '/help' },

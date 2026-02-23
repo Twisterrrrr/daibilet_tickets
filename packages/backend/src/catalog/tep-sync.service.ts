@@ -290,6 +290,8 @@ export class TepSyncService {
           galleryUrls,
           priceFrom,
           isActive: true,
+          createdByType: 'IMPORT',
+          createdById: null,
           tcData: tep as unknown as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },

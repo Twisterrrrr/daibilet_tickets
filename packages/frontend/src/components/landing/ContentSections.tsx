@@ -81,24 +81,28 @@ export function ReviewsSection({ items }: { items: Review[] }) {
 
 /* ---- StatsBadge ---- */
 interface Stats {
-  soldTickets: number;
-  avgRating: number;
+  soldTickets?: number;
+  totalSold?: number;
+  avgRating?: number;
 }
 
 export function StatsBadge({ stats }: { stats: Stats }) {
   if (!stats) return null;
+  const sold = stats.soldTickets ?? stats.totalSold ?? 0;
+  const rating = stats.avgRating ?? 0;
+  if (sold === 0 && rating === 0) return null;
   return (
     <div className="flex flex-wrap items-center justify-center gap-6 rounded-2xl border border-slate-200 bg-gradient-to-r from-primary-50 to-white py-5 text-center">
-      {stats.soldTickets > 0 && (
+      {sold > 0 && (
         <div>
-          <div className="text-2xl font-bold text-primary-700">{stats.soldTickets.toLocaleString('ru-RU')}+</div>
+          <div className="text-2xl font-bold text-primary-700">{sold.toLocaleString('ru-RU')}+</div>
           <div className="text-xs text-slate-500">билетов продано за сезон</div>
         </div>
       )}
-      {stats.avgRating > 0 && (
+      {rating > 0 && (
         <div>
           <div className="flex items-center justify-center gap-1 text-2xl font-bold text-primary-700">
-            {stats.avgRating.toFixed(1)}
+            {rating.toFixed(1)}
             <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
           </div>
           <div className="text-xs text-slate-500">средняя оценка</div>

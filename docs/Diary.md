@@ -4,6 +4,46 @@
 
 ---
 
+## 23.02.2026 — Диагностика «сайт не открывается», staging/prod docs
+
+### Наблюдения
+
+1. **pnpm не в PATH** — в PowerShell (Cursor Integrated Terminal) `pnpm` иногда не распознаётся, если Node/npm не загружены в сессии.
+2. **Главная требует бэкенд** — при открытии `/` фронт делает SSR-запросы к `/api/v1/cities`, `/api/v1/events`. Next проксирует на backend:4000. Если backend не запущен — ECONNREFUSED, HomePage падает с ошибкой, страница «не открывается».
+3. **Страница /partner** — почти полностью статична, должна открываться без API. Прямой переход на http://localhost:3000/partner работает при работающем фронте.
+
+### Решения
+
+- **Запуск**: `pnpm dev` — backend + frontend через concurrently. Или `pnpm dev:frontend` + `pnpm dev:backend` в отдельных терминалах.
+- **Для просмотра /partner**: достаточно `pnpm dev:frontend`, переход на http://localhost:3000/partner.
+- **staging-prod-vds.md** — документ по архитектуре prod/staging на одном VPS (разные порты, env, nginx, certbot).
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 22.02.2026 — Комиссии, партнёрская страница, Venue vs Operator
+
+### Наблюдения
+
+1. **Venue и Operator** — концептуально Venue можно считать вариантом Operator: площадка (музей, галерея), продающая билеты с open-date. Venue привязан к Operator (operatorId). EventOffer с venueId — прямой оффер к площадке. Комиссия для venue-офферов: 15% базовая (или venue.commissionRate), для event-офферов: 20%.
+2. **Pier (причал)** — тип Location (LocationType.PIER). Частное обозначение локации для речных мероприятий и экскурсий на воде. Используется в фильтрах каталога, лендингах, LandingClient.
+3. **Текущие комиссии** — Operator.commissionRate 25%, promoRate 7%. Нужны: promoRate 10% (включает YooKassa), базовая 20% events / 15% venues до promoUntil (3 мес), админ может менять для любого оператора или площадки.
+
+### Решения
+
+- **Комиссии**: Operator.commissionRate default 0.20, promoRate default 0.10. Venue.commissionRate — индивидуальная ставка (15% по умолчанию для venue-офферов). Логика в checkout.service: inPromo → promoRate; venue offer → venue.commissionRate ?? 0.15; event offer → operator.commissionRate.
+- **Регистрация поставщика**: supplier-auth.service — promoUntil = now + 90 дней при создании Operator.
+- **Страница «Стать партнёром»**: `/partner` с CTA на https://daibilet-supplier.lovable.app/ — варианты сотрудничества. Добавлена в Header, Footer, sitemap-static.
+
+### Проблемы
+
+- Prisma migrate dev падает на shadow DB (EventSubcategory). Миграция для commission/promo — создать вручную при необходимости.
+
+---
+
 ## 22.02.2026 — T19–T26: Checkout flow (полный цикл)
 
 ### Наблюдения

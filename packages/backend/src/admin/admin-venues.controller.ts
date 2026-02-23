@@ -10,14 +10,18 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { paginationArgs, parsePagination } from '../common/pagination';
+import { Prisma } from '@prisma/client';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateVenueDto, UpdateVenueDto } from './dto/admin-venue.dto';
@@ -139,7 +143,7 @@ export class AdminVenuesController {
 
   @Post()
   @Roles('ADMIN', 'EDITOR')
-  async create(@Body() body: CreateVenueDto) {
+  async create(@Body() body: CreateVenueDto, @Req() req: Request & { user?: { id: string } }) {
     if (!body.title || !body.cityId || !body.venueType) {
       throw new BadRequestException('title, cityId, venueType required');
     }
@@ -175,7 +179,7 @@ export class AdminVenuesController {
         phone: body.phone || null,
         email: body.email || null,
         website: body.website || null,
-        openingHours: (body.openingHours || undefined) as any,
+        openingHours: (body.openingHours ?? undefined) as Prisma.InputJsonValue | undefined,
         priceFrom: body.priceFrom ? Number(body.priceFrom) : null,
         operatorId: body.operatorId || null,
         isActive: wantsActive,
@@ -183,10 +187,11 @@ export class AdminVenuesController {
         metaTitle: body.metaTitle || null,
         metaDescription: body.metaDescription || null,
         createdByType: 'ADMIN',
+        createdById: req.user?.id ?? null,
         externalRating: body.externalRating ? Number(body.externalRating) : null,
         externalSource: body.externalSource || null,
-        highlights: (body.highlights ?? undefined) as any,
-        faq: (body.faq ?? undefined) as any,
+        highlights: (body.highlights ?? undefined) as Prisma.InputJsonValue | undefined,
+        faq: (body.faq ?? undefined) as Prisma.InputJsonValue | undefined,
         features: body.features || [],
         commissionRate: body.commissionRate ? Number(body.commissionRate) : null,
       },
