@@ -11,11 +11,19 @@
 
 - [x] T1–T7: Nginx uploads, Feature Flags, Pino logs, Sentry backend/frontend (22.02)
 - [x] T8–T10: TcEvent[], gen:proto script, Prisma where builders (22.02)
-- [ ] T11–T12: Redis cache + подключение к каталогу
-- [ ] T13–T14: Email order-confirmed, order-completed
-- [x] T15: Каталог view toggle + localStorage (22.02); [ ] T16–T17: venue detail, Teplohod widgets
-- [ ] T18: Supplier RBAC + self-service drafts
-- [ ] T19–T26: Checkout (package flow, YooKassa, orders трекинг, webhook idempotency)
+- [x] T11–T12: catalog keys, getOrSet, nocache bypass, list/detail cache (22.02)
+- [x] T13–T14, T25: Email order-confirmed (шаблон), order-completed (voucher/QR), вызов sendOrderConfirmed при PAID (22.02)
+- [x] T15: Каталог view toggle + localStorage (22.02); [x] T16–T17: venue detail loading skeleton, Teplohod widgets (22.02)
+- [x] T18: Supplier RBAC + self-service drafts (22.02)
+- [x] T19: /checkout/[packageId] page + API + polling (22.02)
+- [x] T20–T26: Checkout flow (22.02)
+  - T20: Progress bar + шаги (Состав → Контакты → Оплата → Готово)
+  - T21: createPackage (POST /checkout/package), AddToCartButton → redirect /checkout/[id]
+  - T22: YooKassa через createPackagePayment → paymentUrl
+  - T23: /checkout/result → redirect, ?return=success|fail|cancel
+  - T24: /orders/[id] + GET /orders/:id (UUID/shortCode)
+  - T25: Email при PAID (уже было в markPaid)
+  - T26: Webhook idempotency (WebhookIdempotencyService)
 
 Миграции: M1 feature_flags → M8 order_tracking_public.
 
@@ -87,7 +95,7 @@
 - [x] **RBAC-чеклист** — матрица прав по ролям, проверки доступа, эндпоинты Supplier (секция 10 в SupplierArchitecture.md)
 
 ### To-do (Supplier)
-- [ ] **Средний**: Добавить Event.createdByType, Venue.createdByType, createdById (миграция Prisma)
+- [x] **Средний**: Добавить Event.createdByType, Venue.createdByType, createdById, Event.updatedById (схема + миграция 20260222120000)
 - [ ] **Средний**: Реализовать RBAC для Supplier (guards, decorators, проверка operatorId)
 
 ---

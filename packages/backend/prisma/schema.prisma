@@ -179,6 +179,12 @@ enum ReviewStatus {
   REJECTED
 }
 
+enum CreatedByType {
+  ADMIN
+  SUPPLIER
+  IMPORT
+}
+
 // ========================
 // Администраторы
 // ========================
@@ -369,6 +375,9 @@ model Event {
   moderationNote      String?
   moderatedAt         DateTime?
   moderatedBy         String?          @db.Uuid
+  createdByType       CreatedByType?   @default(IMPORT)
+  createdById         String?          @db.Uuid
+  updatedById         String?          @db.Uuid
 
   // === Venue / DateMode (Музеи и Арт) ===
   venueId          String?       @db.Uuid
@@ -913,6 +922,8 @@ model Venue {
   version          Int        @default(0)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
+  createdByType    CreatedByType? @default(ADMIN)
+  createdById      String?    @db.Uuid
 
   city      City         @relation(fields: [cityId], references: [id])
   operator  Operator?    @relation("VenueOperator", fields: [operatorId], references: [id])
@@ -1430,6 +1441,48 @@ model FeatureFlag {
   @@unique([key, scope, scopeValue])
   @@index([key, scope])
   @@map("feature_flags")
+}
+
+// ========================
+// External Widgets (Teplohod.info и др.)
+// ========================
+
+enum ExternalWidgetProviderKind {
+  TEPLOHOD
+}
+
+model ExternalWidgetProvider {
+  id        String   @id @default(cuid())
+  kind      ExternalWidgetProviderKind @unique
+  name      String
+  baseUrl   String?
+  isActive  Boolean  @default(true)
+  metaJson  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  widgets   ExternalWidget[]
+
+  @@index([isActive])
+  @@map("external_widget_providers")
+}
+
+model ExternalWidget {
+  id          String   @id @default(cuid())
+  providerId  String
+  provider    ExternalWidgetProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  externalId  String   // widgetId из teplohod.info
+  title       String?
+  url         String?
+  metaJson    Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([providerId, externalId])
+  @@index([providerId])
+  @@index([isActive])
+  @@index([updatedAt])
+  @@map("external_widgets")
 }
 
 // ════════════════════════════════════════════

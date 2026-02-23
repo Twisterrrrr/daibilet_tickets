@@ -290,15 +290,24 @@ export class MailService {
   }
 
   /**
-   * Заказ завершён — запрос отзыва (через X дней после визита).
+   * Заказ завершён — ваучер/QR (если есть) + запрос отзыва.
+   * T14: условные блоки ваучер/QR.
    */
   async sendOrderCompleted(
     to: string,
     data: {
       customerName: string;
       shortCode: string;
-      eventTitle: string;
-      reviewUrl: string;
+      eventTitle?: string;
+      reviewUrl?: string;
+      /** Код ваучера (показывается при наличии) */
+      voucherCode?: string | null;
+      /** Ссылка на PDF/страницу ваучера */
+      voucherUrl?: string | null;
+      /** Текст QR (данные для сканирования) */
+      qrData?: string | null;
+      /** URL изображения QR-кода */
+      qrImageUrl?: string | null;
     },
   ): Promise<boolean> {
     if (!this.enabled) {
@@ -306,14 +315,22 @@ export class MailService {
       return false;
     }
     try {
+      const hasVoucher = !!(data.voucherCode || data.voucherUrl);
+      const hasQr = !!(data.qrData || data.qrImageUrl);
+      const subject = hasVoucher || hasQr
+        ? `Ваш заказ ${data.shortCode} готов — Дайбилет`
+        : `Как прошёл визит? Оцените ${data.eventTitle ?? 'экскурсию'} — Дайбилет`;
       await this.mailer.sendMail({
         to,
-        subject: `Как прошёл визит? Оцените ${data.eventTitle} — Дайбилет`,
+        subject,
         template: 'order-completed',
         context: {
           ...data,
           trackUrl: `${this.appUrl}/orders/track?code=${data.shortCode}`,
           appUrl: this.appUrl,
+          hasVoucher,
+          hasQr,
+          eventTitle: data.eventTitle ?? 'экскурсию',
         },
       });
       this.logger.log(`Order completed email sent → ${to} (${data.shortCode})`);

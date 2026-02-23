@@ -24,6 +24,7 @@ import { AdminReviewsController } from './admin-reviews.controller';
 import { AdminSettingsController } from './admin-settings.controller';
 import { AdminSuppliersController } from './admin-suppliers.controller';
 import { AdminSupportController } from './admin-support.controller';
+import { AdminWidgetsController } from './admin-widgets.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminReconciliationController } from './admin-reconciliation.controller';
 import { SupportModule } from '../support/support.module';
@@ -63,6 +64,7 @@ import { CatalogModule } from '../catalog/catalog.module';
     AdminSuppliersController,
     AdminModerationController,
     AdminVenuesController,
+    AdminWidgetsController,
     AdminCollectionsController,
     AdminSupportController,
     AdminOpsController,

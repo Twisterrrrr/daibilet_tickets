@@ -13,7 +13,12 @@ import {
   DEFAULT_REQUEST_SLA_MINUTES,
   QUICK_REQUEST_TTL_MINUTES,
 } from './checkout-state-machine';
-import { CartItemDto, CreateGiftCertificateCheckoutDto, CreateTripPlanCheckoutDto } from './dto/checkout.dto';
+import {
+  CartItemDto,
+  CreateGiftCertificateCheckoutDto,
+  CreatePackageDto,
+  CreateTripPlanCheckoutDto,
+} from './dto/checkout.dto';
 
 /**
  * Checkout Service — покупка билетов + корзина + заявки.
@@ -695,6 +700,97 @@ export class CheckoutService {
   // Public order tracking (no auth)
   // ============================
 
+  /** T24: Получить заказ по id (UUID session) или shortCode */
+  async getOrderById(id: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid) {
+      const session = await this.prisma.checkoutSession.findUnique({
+        where: { id },
+        include: {
+          orderRequests: {
+            include: {
+              eventOffer: {
+                select: {
+                  id: true, priceFrom: true, purchaseType: true,
+                  meetingPoint: true, meetingInstructions: true, operationalPhone: true, operationalNote: true,
+                },
+              },
+              event: { select: { id: true, title: true, slug: true, imageUrl: true } },
+            },
+          },
+        },
+      });
+      if (!session) return null;
+      return this.formatTrackingResult(session);
+    }
+    return this.trackByShortCode(id);
+  }
+
+  private formatTrackingResult(session: {
+    shortCode: string;
+    status: string;
+    totalPrice: number | null;
+    customerName: string | null;
+    customerEmail: string | null;
+    customerPhone: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    completedAt: Date | null;
+    expiresAt: Date | null;
+    offersSnapshot: unknown;
+    orderRequests: Array<{
+      id: string;
+      status: string;
+      quantity: number;
+      priceSnapshot: number;
+      confirmedAt: Date | null;
+      eventOffer?: { meetingPoint?: string; meetingInstructions?: string; operationalPhone?: string; operationalNote?: string } | null;
+      event?: { title: string; slug: string; imageUrl: string | null } | null;
+    }>;
+  }) {
+    const showOperational = ['CONFIRMED', 'COMPLETED', 'AWAITING_PAYMENT'].includes(session.status);
+    const snapshot = (session.offersSnapshot as Array<{ eventTitle: string; eventSlug: string; eventImage?: string; quantity: number; lineTotal: number }>) || [];
+    const items = session.orderRequests.length > 0
+      ? session.orderRequests.map((req) => ({
+          id: req.id,
+          status: req.status,
+          quantity: req.quantity,
+          priceSnapshot: req.priceSnapshot,
+          confirmedAt: req.confirmedAt,
+          event: req.event ? { title: req.event.title, slug: req.event.slug, imageUrl: req.event.imageUrl } : null,
+          offerTitle: req.event?.title || null,
+          ...(showOperational && req.eventOffer ? {
+            meetingPoint: req.eventOffer.meetingPoint || null,
+            meetingInstructions: req.eventOffer.meetingInstructions || null,
+            operationalPhone: req.eventOffer.operationalPhone || null,
+            operationalNote: req.eventOffer.operationalNote || null,
+          } : {}),
+        }))
+      : snapshot.map((s, i) => ({
+          id: `snap-${i}`,
+          status: 'CONFIRMED',
+          quantity: s.quantity,
+          priceSnapshot: s.lineTotal / s.quantity,
+          confirmedAt: null,
+          event: { title: s.eventTitle, slug: s.eventSlug, imageUrl: s.eventImage || null },
+          offerTitle: s.eventTitle,
+        }));
+    return {
+      id: session.shortCode,
+      shortCode: session.shortCode,
+      status: session.status,
+      totalPrice: session.totalPrice,
+      customerName: session.customerName,
+      customerEmail: session.customerEmail,
+      customerPhone: session.customerPhone,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      completedAt: session.completedAt,
+      expiresAt: session.expiresAt,
+      items,
+    };
+  }
+
   async trackByShortCode(shortCode: string) {
     const session = await this.prisma.checkoutSession.findFirst({
       where: { shortCode: shortCode.toUpperCase() },
@@ -721,45 +817,7 @@ export class CheckoutService {
     });
 
     if (!session) return null;
-
-    // Operational info is visible ONLY when session is CONFIRMED or COMPLETED
-    const showOperational = ['CONFIRMED', 'COMPLETED', 'AWAITING_PAYMENT'].includes(session.status);
-
-    // Return safe public-facing data (no internal fields)
-    return {
-      shortCode: session.shortCode,
-      status: session.status,
-      totalPrice: session.totalPrice,
-      customerName: session.customerName,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-      completedAt: session.completedAt,
-      expiresAt: session.expiresAt,
-      items: session.orderRequests.map((req) => ({
-        id: req.id,
-        status: req.status,
-        quantity: req.quantity,
-        priceSnapshot: req.priceSnapshot,
-        confirmedAt: req.confirmedAt,
-        event: req.event
-          ? {
-              title: req.event.title,
-              slug: req.event.slug,
-              imageUrl: req.event.imageUrl,
-            }
-          : null,
-        offerTitle: req.event?.title || null,
-        // Operational info — only after confirmation
-        ...(showOperational && req.eventOffer
-          ? {
-              meetingPoint: req.eventOffer.meetingPoint || null,
-              meetingInstructions: req.eventOffer.meetingInstructions || null,
-              operationalPhone: req.eventOffer.operationalPhone || null,
-              operationalNote: req.eventOffer.operationalNote || null,
-            }
-          : {}),
-      })),
-    };
+    return this.formatTrackingResult(session as any);
   }
 
   // ============================
@@ -791,25 +849,187 @@ export class CheckoutService {
     };
   }
 
+  /**
+   * T21: Создать CheckoutSession из 1+ items (без customer) → редирект на /checkout/[id].
+   */
+  async createPackage(body: CreatePackageDto) {
+    if (!body.items?.length) {
+      throw new BadRequestException('Добавьте хотя бы один товар');
+    }
+    const validation = await this.validateCart(body.items);
+    if (!validation.allValid) {
+      throw new BadRequestException('Некоторые позиции недоступны');
+    }
+    const shortCode = `CS-${Date.now().toString(36).toUpperCase()}`;
+    const expiresAt = calculateExpiresAt(CHECKOUT_SESSION_TTL_MINUTES);
+    const offerIds = body.items.map((i) => i.offerId);
+    const offersData = await this.prisma.eventOffer.findMany({
+      where: { id: { in: offerIds } },
+      include: {
+        event: { select: { id: true, title: true, slug: true, imageUrl: true, cityId: true } },
+        operator: {
+          select: {
+            id: true, name: true, isSupplier: true,
+            commissionRate: true, promoRate: true, promoUntil: true,
+          },
+        },
+      },
+    });
+    const cartByOffer = new Map(body.items.map((i) => [i.offerId, i]));
+    const now = new Date();
+    const offersSnapshot = offersData.map((o) => {
+      const cartItem = cartByOffer.get(o.id);
+      const quantity = cartItem?.quantity || 1;
+      const unitPrice = o.priceFrom || 0;
+      const lineTotal = unitPrice * quantity;
+      const purchaseFlow = resolvePaymentFlow(o.purchaseType);
+      let commissionRateSnapshot: number | null = null;
+      let platformFeeSnapshot: number | null = null;
+      let supplierAmountSnapshot: number | null = null;
+      if (purchaseFlow === PaymentFlowType.PLATFORM && o.operator?.isSupplier) {
+        const effectiveRate =
+          o.operator.promoRate && o.operator.promoUntil && now < o.operator.promoUntil
+            ? Number(o.operator.promoRate)
+            : Number(o.operator.commissionRate);
+        commissionRateSnapshot = effectiveRate;
+        platformFeeSnapshot = Math.round(lineTotal * effectiveRate);
+        supplierAmountSnapshot = lineTotal - platformFeeSnapshot;
+      }
+      return {
+        lineItemIndex: 0,
+        offerId: o.id,
+        eventId: o.eventId,
+        source: o.source,
+        purchaseType: o.purchaseType,
+        purchaseFlow,
+        eventTitle: o.event.title,
+        eventSlug: o.event.slug,
+        eventImage: o.event.imageUrl,
+        operatorName: o.operator?.name || null,
+        unitPrice,
+        quantity,
+        lineTotal,
+        priceCurrency: 'RUB',
+        supplierId: o.operator?.id || null,
+        commissionRateSnapshot,
+        platformFeeSnapshot,
+        supplierAmountSnapshot,
+        snapshotAt: now.toISOString(),
+      };
+    });
+    const totalPrice = offersSnapshot.reduce((s, x) => s + x.lineTotal, 0);
+    const platformItems = offersSnapshot.filter((s: { purchaseFlow: string }) => s.purchaseFlow === PaymentFlowType.PLATFORM);
+    const session = await this.prisma.checkoutSession.create({
+      data: {
+        shortCode,
+        cartSnapshot: body.items,
+        validatedSnapshot: validation.items,
+        offersSnapshot,
+        customerName: null,
+        customerEmail: null,
+        customerPhone: null,
+        status: platformItems.length > 0 ? 'VALIDATED' : 'STARTED',
+        totalPrice,
+        expiresAt,
+        utmSource: body.utm?.source,
+        utmMedium: body.utm?.medium,
+        utmCampaign: body.utm?.campaign,
+      },
+    });
+    this.logger.log(`Created package session ${session.id} (${session.shortCode}), packageId=${session.id}`);
+    return { packageId: session.id, code: session.shortCode };
+  }
+
   async handleWebhook(body: any) {
     // TODO: Верификация IP + подпись, обработка payment.succeeded / payment.canceled
     return { status: 'ok' };
   }
 
   async getStatus(packageId: string) {
+    // Поддержка Package (Trip Planner) и CheckoutSession (cart flow)
     const pkg = await this.prisma.package.findUnique({
       where: { id: packageId },
       include: {
-        items: { include: { event: true } },
+        items: {
+          include: {
+            event: { select: { id: true, title: true, slug: true, imageUrl: true } },
+            session: { select: { startsAt: true } },
+          },
+        },
         voucher: true,
       },
     });
-
-    if (!pkg) throw new NotFoundException('Пакет не найден');
-
-    return {
-      status: pkg.status,
-      voucherUrl: pkg.voucher?.publicUrl || null,
+    if (pkg) {
+      return {
+        id: pkg.id,
+        code: pkg.code,
+        status: pkg.status,
+        totalPrice: pkg.totalPrice,
+        voucherUrl: pkg.voucher?.publicUrl || null,
+        paidAt: pkg.paidAt?.toISOString() || null,
+        trackUrl: null,
+        items: pkg.items.map((item) => ({
+          id: item.id,
+          event: item.event,
+          sessionStartsAt: item.session?.startsAt?.toISOString() || null,
+          adultTickets: item.adultTickets,
+          childTickets: item.childTickets,
+          subtotal: item.subtotal,
+        })),
+      };
+    }
+    const session = await this.prisma.checkoutSession.findUnique({
+      where: { id: packageId },
+      include: { paymentIntents: { orderBy: { createdAt: 'desc' }, take: 1 } },
+    });
+    if (!session) throw new NotFoundException('Заказ не найден');
+    const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
+    const offersSnapshot = (session.offersSnapshot as Array<{ eventTitle: string; eventSlug: string; eventImage?: string; unitPrice: number; quantity: number; lineTotal: number }>) || [];
+    const statusMap: Record<string, string> = {
+      STARTED: 'DRAFT',
+      VALIDATED: 'DRAFT',
+      CONFIRMED: 'PENDING_PAYMENT',
+      AWAITING_PAYMENT: 'PENDING_PAYMENT',
+      COMPLETED: 'PAID',
+      CANCELLED: 'FAILED',
+      EXPIRED: 'FAILED',
     };
+    const lastIntent = session.paymentIntents[0];
+    const voucherUrl = lastIntent?.paidAt ? `${appUrl}/orders/track?code=${session.shortCode}` : null;
+    return {
+      id: session.id,
+      code: session.shortCode,
+      status: statusMap[session.status] || session.status,
+      totalPrice: session.totalPrice || 0,
+      voucherUrl,
+      paidAt: lastIntent?.paidAt?.toISOString() || null,
+      trackUrl: `${appUrl}/orders/track?code=${session.shortCode}`,
+      items: offersSnapshot.map((s, i) => ({
+        id: `snap-${i}`,
+        event: { id: '', title: s.eventTitle, slug: s.eventSlug, imageUrl: s.eventImage || null },
+        sessionStartsAt: null,
+        adultTickets: s.quantity,
+        childTickets: 0,
+        subtotal: s.lineTotal,
+      })),
+    };
+  }
+
+  async updatePackageContacts(packageId: string, customer: { name: string; email: string; phone: string }) {
+    const session = await this.prisma.checkoutSession.findUnique({ where: { id: packageId } });
+    if (!session) throw new NotFoundException('Заказ не найден');
+    if (!['STARTED', 'VALIDATED'].includes(session.status)) {
+      throw new BadRequestException('Контактные данные уже заполнены');
+    }
+    await this.prisma.checkoutSession.update({
+      where: { id: packageId },
+      data: {
+        customerName: customer.name,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        status: 'CONFIRMED',
+      },
+    });
+    return { ok: true };
   }
 }

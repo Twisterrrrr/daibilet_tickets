@@ -127,6 +127,34 @@ export class CreateGiftCertificateCheckoutDto {
 }
 
 // ============================================================
+// Create quick package/session — POST /checkout/package (T21)
+// ============================================================
+
+export class CreatePackageDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CartItemDto)
+  items: CartItemDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UtmDto)
+  utm?: UtmDto;
+}
+
+export class UpdatePackageContactsDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  phone: string;
+}
+
+// ============================================================
 // Create checkout session DTO  — POST /checkout/session
 // ============================================================
 

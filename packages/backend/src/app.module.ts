@@ -20,6 +20,7 @@ import { HealthModule } from './health/health.module';
 import { PublicModule } from './public/public.module';
 import { LandingModule } from './landing/landing.module';
 import { MailModule } from './mail/mail.module';
+import { OrdersModule } from './orders/orders.module';
 import { PartnerModule } from './partner/partner.module';
 import { PlannerModule } from './planner/planner.module';
 import { PricingModule } from './pricing/pricing.module';
@@ -66,6 +67,7 @@ import { VoucherModule } from './voucher/voucher.module';
     CatalogModule,
     PlannerModule,
     CheckoutModule,
+    OrdersModule,
     VoucherModule,
     BlogModule,
     HealthModule,

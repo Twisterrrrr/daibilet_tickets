@@ -4,6 +4,7 @@ import { CreditCard, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { api } from '@/lib/api';
 import { type CartItem, useCart } from '@/lib/cart';
 
 interface AddToCartButtonProps {
@@ -21,30 +22,40 @@ interface AddToCartButtonProps {
   className?: string;
 }
 
-/** Прямой checkout (корзина скрыта до унификации платежей — OpenQuestions §4) */
+/** T21: Прямой checkout — создаёт package и редирект на /checkout/[packageId]. Fallback: корзина. */
 export function AddToCartButton(props: AddToCartButtonProps) {
   const { addItem } = useCart();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  const handleBuy = () => {
-    const item: CartItem = {
-      eventId: props.eventId,
-      offerId: props.offerId,
-      sessionId: props.sessionId,
-      quantity: 1,
-      eventTitle: props.eventTitle,
-      eventSlug: props.eventSlug,
-      imageUrl: props.imageUrl,
-      priceFrom: props.priceFrom,
-      purchaseType: props.purchaseType,
-      source: props.source,
-      deeplink: props.deeplink,
-      badge: props.badge,
-    };
-    addItem(item);
+  const handleBuy = async () => {
+    const items = [
+      {
+        eventId: props.eventId,
+        offerId: props.offerId,
+        sessionId: props.sessionId,
+        quantity: 1,
+        eventTitle: props.eventTitle,
+        eventSlug: props.eventSlug,
+        imageUrl: props.imageUrl,
+        priceFrom: props.priceFrom,
+        purchaseType: props.purchaseType,
+        source: props.source,
+        deeplink: props.deeplink,
+        badge: props.badge,
+      },
+    ];
     setLoading(true);
-    router.push('/checkout');
+    try {
+      const res = await api.createPackage(items);
+      router.push(`/checkout/${res.packageId}`);
+    } catch {
+      const item: CartItem = { ...items[0], quantity: 1 };
+      addItem(item);
+      router.push('/checkout');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -22,10 +22,12 @@ import {
   CreateCheckoutSessionDto,
   CreateGiftCertificateCheckoutDto,
   CreateOrderRequestDto,
+  CreatePackageDto,
   CreateTcOrderDto,
   CreateTripPlanCheckoutDto,
   PayDto,
   PaymentWebhookDto,
+  UpdatePackageContactsDto,
   ValidateCartDto,
   ValidateGiftCertificateDto,
   YookassaWebhookDto,
@@ -78,6 +80,19 @@ export class CheckoutController {
   @ApiOperation({ summary: 'Создать пакет и инициировать оплату (Trip Planner)' })
   createCheckout(@Body() body: CreateTripPlanCheckoutDto) {
     return this.checkoutService.create(body);
+  }
+
+  @Post('package')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: 'T21: Создать checkout-пакет из каталога (редирект на /checkout/[id])' })
+  createPackage(@Body() body: CreatePackageDto) {
+    return this.checkoutService.createPackage(body);
+  }
+
+  @Post('package/:id/contacts')
+  @ApiOperation({ summary: 'Обновить контакты пакета' })
+  updatePackageContacts(@Param('id') id: string, @Body() body: UpdatePackageContactsDto) {
+    return this.checkoutService.updatePackageContacts(id, body);
   }
 
   @Post('webhook/yookassa')

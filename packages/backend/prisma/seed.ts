@@ -1457,6 +1457,21 @@ async function main() {
     console.log('  ✓ OpsStatus (initial)');
   }
 
+  // ========================
+  // ExternalWidgetProvider TEPLOHOD
+  // ========================
+  await prisma.externalWidgetProvider.upsert({
+    where: { kind: 'TEPLOHOD' },
+    update: { name: 'Teplohod.info', baseUrl: 'https://teplohod.info' },
+    create: {
+      kind: 'TEPLOHOD',
+      name: 'Teplohod.info',
+      baseUrl: 'https://teplohod.info',
+      isActive: true,
+    },
+  });
+  console.log('  ✓ ExternalWidgetProvider TEPLOHOD');
+
   console.log('Seed completed!');
 }
 

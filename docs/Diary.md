@@ -4,6 +4,107 @@
 
 ---
 
+## 22.02.2026 — T19–T26: Checkout flow (полный цикл)
+
+### Наблюдения
+
+- getStatus поддерживал только Package; CheckoutSession — основа корзины.
+- AddToCartButton вёл на /checkout (корзина); нужен flow: Купить → package → оплата.
+
+### Решения
+
+- **T19**: Расширен getStatus: Package + CheckoutSession; единый формат ответа.
+- **T20**: CheckoutPackageClient — Progress bar, шаги review → contact → payment → done.
+- **T21**: createPackage (POST /checkout/package) создаёт CheckoutSession из items; updatePackageContacts. AddToCartButton вызывает createPackage → redirect /checkout/[id].
+- **T22**: createPackagePayment → POST /checkout/:id/pay (существующий PaymentService).
+- **T23**: Страница /checkout/result — redirect на /checkout/[sessionId]?return=success|fail|cancel.
+- **T24**: OrdersModule, GET /orders/:id (UUID или shortCode), getOrderById; formatTrackingResult для offersSnapshot. Страница /orders/[id].
+- **T25**: markPaid уже вызывает sendOrderConfirmed.
+- **T26**: WebhookIdempotencyService используется в YooKassa webhook.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 22.02.2026 — T19: Страница /checkout/[packageId]
+
+### Наблюдения
+
+- API `getCheckoutStatus` уже есть; backend `getStatus` возвращал только status и voucherUrl.
+- Package-модель содержит items с event/session.
+
+### Решения
+
+- Расширен `CheckoutService.getStatus`: возвращает id, code, status, totalPrice, voucherUrl, paidAt, items (event, subtotal, adultTickets, childTickets).
+- Создана страница `/checkout/[packageId]`: CheckoutPackageClient с загрузкой, polling (3 с), fallback UI при ошибке/404.
+- Парсинг `?return=success|fail|cancel` (T23) — отображается feedback, при success выполняется refetch после 1.5 с.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 22.02.2026 — T18: Supplier RBAC + self-service drafts
+
+### Наблюдения
+
+- Контроллер supplier-events уже создавал DRAFT, использовал createdByType/createdById/updatedById.
+- В Prisma schema этих полей не было (миграция 20260221110000 добавила их в БД, схема не синхронизирована).
+- Прогресс блокировался: Prisma-клиент не знает о полях — возможны ошибки.
+
+### Решения
+
+- Добавлен enum `CreatedByType` (ADMIN, SUPPLIER, IMPORT) в schema.prisma.
+- Event: добавлены `createdByType`, `createdById`, `updatedById` в секцию Supplier/Moderation.
+- Venue: добавлены `createdByType`, `createdById`.
+- Создана миграция `20260222120000_add_event_updated_by_id` (добавляет колонку updatedById).
+
+### Проблемы
+
+- Prisma generate на Windows — EPERM при lock query_engine DLL (процесс backend держит файл). Решение: остановить backend, выполнить `pnpm db:generate` и `pnpm db:migrate`.
+
+---
+
+## 22.02.2026 — T16–T17: Venue skeleton, Teplohod widgets
+
+### Наблюдения
+
+- Venue detail page уже имела hero, инфо, CTA; отсутствовал skeleton loading.
+- ExternalWidgetProvider, ExternalWidget в схеме отсутствовали — план M2 описан в InfraTypizationUXCheckoutPlan.md.
+
+### Решения
+
+- **T16**: Добавлен `loading.tsx` для `/venues/[slug]` — skeleton hero, blocks, sidebar.
+- **T17**: Prisma enum `ExternalWidgetProviderKind`, модели `ExternalWidgetProvider`, `ExternalWidget`; миграция `20260222000000_add_external_widgets`; AdminWidgetsController (providers, list, get, create, update, delete); админ UI: WidgetsList (поиск, фильтр по провайдеру, копирование widgetId), WidgetEdit (создание/редактирование, кнопка Copy widgetId); seed — TEPLOHOD provider; Sidebar — «Виджеты Teplohod».
+
+### Проблемы
+
+- Prisma migrate dev на Windows (shadow DB) — возможен P3006; migration SQL создан вручную.
+- Prisma generate — EPERM при переименовании DLL (lock процесса).
+
+---
+
+## 22.02.2026 — T13–T14, T25: Email при PAID, order-completed voucher/QR
+
+### Наблюдения
+
+- CheckoutModule не импортировал MailModule; PaymentService не имел MailService.
+- order-confirmed шаблон и sendOrderConfirmed уже были; order-completed — только запрос отзыва, без voucher/QR.
+
+### Решения
+
+- **T25**: CheckoutModule импортирует MailModule; PaymentService инжектит MailService; при markPaid (PAID → COMPLETED) вызывается sendOrderConfirmed с данными из offersSnapshot (items, totalPrice, operationalItems). Ошибка письма не отменяет checkout.
+- **T14**: sendOrderCompleted расширен опциями voucherCode, voucherUrl, qrData, qrImageUrl; order-completed.hbs — условные блоки «Ваш ваучер готов» и «Ваш билет» (QR). При отсутствии данных — блок «Как прошёл визит?» с reviewUrl.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 22.02.2026 — T8–T12: типизация, where builders, Redis cache
 
 ### Наблюдения

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { CatalogModule } from '../catalog/catalog.module';
+import { MailModule } from '../mail/mail.module';
 import { BOOKING_PROVIDER_TOKEN, BookingProviderRegistry } from './booking-provider.interface';
 import { CheckoutController } from './checkout.controller';
 import { CheckoutService } from './checkout.service';
@@ -14,7 +15,7 @@ import { RefundService } from './refund.service';
 import { WebhookIdempotencyService } from './webhook-idempotency.service';
 
 @Module({
-  imports: [CatalogModule],
+  imports: [CatalogModule, MailModule],
   controllers: [CheckoutController],
   providers: [
     CheckoutService,
@@ -45,6 +46,6 @@ import { WebhookIdempotencyService } from './webhook-idempotency.service';
       inject: [TcBookingProvider, InternalBookingProvider, PartnerBookingProvider],
     },
   ],
-  exports: [PaymentService, FulfillmentService, RefundService, WebhookIdempotencyService, FeatureFlagService],
+  exports: [CheckoutService, PaymentService, FulfillmentService, RefundService, WebhookIdempotencyService, FeatureFlagService],
 })
 export class CheckoutModule {}

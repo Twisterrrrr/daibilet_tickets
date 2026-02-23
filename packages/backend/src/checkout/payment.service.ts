@@ -17,6 +17,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { createHmac, randomUUID } from 'crypto';
 
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { partitionCart, SnapshotLineItem } from './cart-partitioning';
 import { PaymentIntentStatus, tryTransitionCheckout, tryTransitionPayment } from './checkout-state-machine';
@@ -33,6 +34,7 @@ export class PaymentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly mailService: MailService,
   ) {
     this.appUrl =
       process.env.NODE_ENV === 'production'
@@ -326,6 +328,61 @@ export class PaymentService {
           .catch((e) => this.logger.error('payment callback failed: ' + (e as Error).message));
       }
 
+      return updatedIntent;
+    }).then(async (updatedIntent) => {
+      // T25: при PAID → order-confirmed. Ошибка письма не ломает checkout.
+      const session = await this.prisma.checkoutSession.findUnique({
+        where: { id: intent.checkoutSessionId },
+        select: {
+          customerEmail: true,
+          customerName: true,
+          shortCode: true,
+          offersSnapshot: true,
+          giftCertificateSnapshot: true,
+          totalPrice: true,
+        },
+      });
+      if (session?.customerEmail && csResult.allowed && !csResult.noOp) {
+        const giftCert = session.giftCertificateSnapshot as { amount?: number } | null;
+        const items: Array<{ title: string; quantity: number; price: number }> = [];
+        let totalPrice = 0;
+        if (giftCert?.amount) {
+          items.push({ title: 'Подарочный сертификат', quantity: 1, price: Math.round(giftCert.amount / 100) });
+          totalPrice = Math.round(giftCert.amount / 100);
+        } else {
+          const snapshot = (session.offersSnapshot as SnapshotLineItem[] | null) || [];
+          for (const s of snapshot) {
+            items.push({
+              title: s.eventTitle || 'Билет',
+              quantity: s.quantity,
+              price: Math.round(s.lineTotal / 100),
+            });
+            totalPrice += Math.round(s.lineTotal / 100);
+          }
+        }
+        const operationalItems = (session.offersSnapshot as SnapshotLineItem[] | null) || []
+          .filter((s) => s.meetingPoint || s.meetingInstructions || s.operationalPhone || s.operationalNote)
+          .map((s) => ({
+            eventTitle: s.eventTitle,
+            meetingPoint: s.meetingPoint,
+            meetingInstructions: s.meetingInstructions,
+            operationalPhone: s.operationalPhone,
+            operationalNote: s.operationalNote,
+          }));
+        this.mailService
+          .sendOrderConfirmed(session.customerEmail, {
+            customerName: session.customerName || 'Клиент',
+            shortCode: session.shortCode,
+            items,
+            totalPrice: totalPrice || Math.round((session.totalPrice ?? 0) / 100),
+            operationalItems: operationalItems.length > 0 ? operationalItems : undefined,
+          })
+          .catch((e) =>
+            this.logger.error(
+              `[intent=${intentId}] Order-confirmed email failed: ${e instanceof Error ? e.message : String(e)}`,
+            ),
+          );
+      }
       return updatedIntent;
     });
   }

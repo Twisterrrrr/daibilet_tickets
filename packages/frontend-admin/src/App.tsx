@@ -28,6 +28,8 @@ import ReconciliationPage from './pages/reconciliation/ReconciliationPage';
 import { ExternalReviewsListPage } from './pages/reviews/ExternalReviewsList';
 import { ReviewsListPage } from './pages/reviews/ReviewsList';
 import { SettingsPage } from './pages/settings/SettingsPage';
+import { WidgetEditPage } from './pages/widgets/WidgetEdit';
+import { WidgetsListPage } from './pages/widgets/WidgetsList';
 import { SupplierDetailPage } from './pages/suppliers/SupplierDetail';
 import { SuppliersListPage } from './pages/suppliers/SuppliersList';
 import { SupportDetailPage } from './pages/support/SupportDetail';
@@ -97,6 +99,9 @@ export default function App() {
           <Route path="jobs/failed" element={<FailedJobsPage />} />
           <Route path="reconciliation" element={<ReconciliationPage />} />
           <Route path="audit" element={<AuditLogPage />} />
+          <Route path="widgets" element={<WidgetsListPage />} />
+          <Route path="widgets/new" element={<WidgetEditPage />} />
+          <Route path="widgets/:id" element={<WidgetEditPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

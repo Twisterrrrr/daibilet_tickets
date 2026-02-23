@@ -85,26 +85,14 @@ export class SupplierEventsController {
   }
 
   /**
-   * Создать событие. Trust level определяет moderationStatus.
+   * Создать событие. T18: всегда DRAFT, submit → PENDING_REVIEW.
    */
   @Post()
-  @SupplierRoles('OWNER', 'MANAGER')
-  @ApiOperation({ summary: 'Создать событие' })
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
+  @ApiOperation({ summary: 'Создать событие (черновик)' })
   async create(@Req() req: any, @Body() data: CreateSupplierEventDto) {
-    const operator = await this.prisma.operator.findUnique({
-      where: { id: req.user.operatorId },
-      select: { trustLevel: true },
-    });
-
-    // ModerationStatus по trust level
-    let moderationStatus: string;
-    if (operator!.trustLevel >= 2) {
-      moderationStatus = 'AUTO_APPROVED';
-    } else if (operator!.trustLevel >= 1) {
-      moderationStatus = 'AUTO_APPROVED'; // но попадёт в очередь пост-модерации
-    } else {
-      moderationStatus = 'PENDING_REVIEW';
-    }
+    // T18: создаём draft (status=DRAFT). Submit отправит на модерацию.
+    const moderationStatus = 'DRAFT';
 
     // Генерация slug
     const slug =
@@ -132,10 +120,12 @@ export class SupplierEventsController {
         imageUrl: data.imageUrl || null,
         galleryUrls: data.galleryUrls || [],
         priceFrom: data.priceFrom || null,
-        isActive: moderationStatus !== 'PENDING_REVIEW', // скрыть до модерации
+        isActive: false, // DRAFT — не в каталоге до модерации
         operatorId: req.user.operatorId,
         supplierId: req.user.operatorId,
         moderationStatus: moderationStatus as any,
+        createdByType: 'SUPPLIER',
+        createdById: req.user.id,
       },
     });
 
@@ -143,10 +133,10 @@ export class SupplierEventsController {
   }
 
   /**
-   * Обновить событие (только своё, не в статусе APPROVED_LOCKED).
+   * Обновить событие (только своё). Аудит: updatedById.
    */
   @Put(':id')
-  @SupplierRoles('OWNER', 'MANAGER')
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
   @ApiOperation({ summary: 'Обновить событие' })
   async update(@Req() req: any, @Param('id') id: string, @Body() data: UpdateSupplierEventDto) {
     const event = await this.prisma.event.findFirst({
@@ -167,6 +157,7 @@ export class SupplierEventsController {
         imageUrl: data.imageUrl,
         galleryUrls: data.galleryUrls,
         priceFrom: data.priceFrom,
+        updatedById: req.user.id,
       },
     });
   }

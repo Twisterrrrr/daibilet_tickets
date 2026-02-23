@@ -152,7 +152,27 @@ export const api = {
     }),
 
   getCheckoutStatus: (packageId: string) =>
-    fetchApi<{ status: string; voucherUrl: string | null }>(`/checkout/${packageId}/status`),
+    fetchApi<{ status: string; voucherUrl: string | null; totalPrice?: number; items?: unknown[]; code?: string }>(
+      `/checkout/${packageId}/status`,
+    ),
+
+  createPackage: (items: Array<{ eventId: string; offerId: string; quantity: number; eventTitle: string; eventSlug: string; priceFrom: number; purchaseType: string; source: string; imageUrl?: string; sessionId?: string }>) =>
+    fetchApi<{ packageId: string; code: string }>('/checkout/package', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+
+  updatePackageContacts: (packageId: string, customer: { name: string; email: string; phone: string }) =>
+    fetchApi<{ ok: boolean }>(`/checkout/package/${packageId}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify(customer),
+    }),
+
+  createPackagePayment: (packageId: string, idempotencyKey?: string) =>
+    fetchApi<{ paymentIntentId: string; paymentUrl: string; amount: number; status: string }>(
+      `/checkout/${packageId}/pay`,
+      { method: 'POST', body: JSON.stringify({ idempotencyKey }) },
+    ),
 
   // Блог
   getArticles: (params?: Record<string, string | number>) => {

@@ -23,11 +23,7 @@ import {
   Tag,
   Ticket,
   Users,
-  ShieldCheck,
-  Landmark,
-  HeadphonesIcon,
-  Scale,
-  LayoutList,
+  Window,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
@@ -71,6 +67,7 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/landings', label: 'Лендинги', icon: FileText },
       { to: '/combos', label: 'Combo', icon: Layers },
       { to: '/articles', label: 'Статьи', icon: BookOpen },
+      { to: '/widgets', label: 'Виджеты Teplohod', icon: Window },
     ],
   },
   {
