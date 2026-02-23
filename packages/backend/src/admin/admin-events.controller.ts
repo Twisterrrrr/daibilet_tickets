@@ -238,6 +238,8 @@ export class AdminEventsController {
           galleryUrls: data.galleryUrls || [],
           priceFrom: data.offer?.priceFrom || null,
           isActive: true,
+          createdByType: 'ADMIN',
+          createdById: req.user.id,
         },
       });
 
@@ -245,35 +247,6 @@ export class AdminEventsController {
       let offer = null;
       if (data.offer) {
         offer = await tx.eventOffer.create({
-          data: {
-            source: OfferSource.MANUAL,
-            tcEventId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            cityId: data.cityId,
-            title: normalizeEventTitle(data.title || ''),
-            slug,
-            description: data.description || null,
-            shortDescription: data.shortDescription || null,
-            category: data.category as EventCategory,
-            subcategories: (data.subcategories || []) as EventSubcategory[],
-            audience: (data.audience as EventAudience) || EventAudience.ALL,
-            minAge: data.minAge || 0,
-            durationMinutes: data.durationMinutes || null,
-            address: data.address || null,
-            lat: data.lat || null,
-            lng: data.lng || null,
-            imageUrl: data.imageUrl || null,
-            galleryUrls: data.galleryUrls || [],
-            priceFrom: data.offer?.priceFrom || null,
-            isActive: true,
-            createdByType: 'ADMIN',
-            createdById: req.user.id,
-          },
-        });
-
-        // Create first offer if provided
-        let offer = null;
-        if (data.offer) {
-          offer = await tx.eventOffer.create({
             data: {
               eventId: event.id,
               source: (data.offer.source as OfferSource) || OfferSource.MANUAL,
@@ -288,16 +261,15 @@ export class AdminEventsController {
               status: 'ACTIVE',
             },
           });
-        }
+      }
 
-        // Create override with templateData if provided
-        if (data.templateData && Object.keys(data.templateData).length > 0) {
-          await this.overrideService.upsert(event.id, { templateData: data.templateData }, req.user.id);
-        }
+      // Create override with templateData if provided
+      if (data.templateData && Object.keys(data.templateData).length > 0) {
+        await this.overrideService.upsert(event.id, { templateData: data.templateData }, req.user.id);
+      }
 
-        return { event, offer };
-      },
-    );
+      return { event, offer };
+    });
 
     return result;
   }
