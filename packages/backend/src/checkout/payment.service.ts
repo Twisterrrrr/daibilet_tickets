@@ -360,9 +360,10 @@ export class PaymentService {
             totalPrice += Math.round(s.lineTotal / 100);
           }
         }
-        const operationalItems = (session.offersSnapshot as SnapshotLineItem[] | null) || []
-          .filter((s) => s.meetingPoint || s.meetingInstructions || s.operationalPhone || s.operationalNote)
-          .map((s) => ({
+        const snapshotItems = (session.offersSnapshot as SnapshotLineItem[] | null) || [];
+        const operationalItems = snapshotItems
+          .filter((s: SnapshotLineItem) => s.meetingPoint || s.meetingInstructions || s.operationalPhone || s.operationalNote)
+          .map((s: SnapshotLineItem) => ({
             eventTitle: s.eventTitle,
             meetingPoint: s.meetingPoint,
             meetingInstructions: s.meetingInstructions,

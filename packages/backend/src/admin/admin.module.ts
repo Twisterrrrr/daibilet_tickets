@@ -4,10 +4,14 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { RedisCacheModule } from '../cache/cache.module';
 import { CatalogModule } from '../catalog/catalog.module';
-import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
+import { CheckoutModule } from '../checkout/checkout.module';
+import { ReviewService } from '../catalog/review.service';
 import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
+import { TagAssignmentService } from '../scheduler/tag-assignment.service';
+import { SupportModule } from '../support/support.module';
 
-import { AdminDashboardController } from './admin-dashboard.controller';
+import { AdminArticlesController } from './admin-articles.controller';
+import { AdminAuditController } from './admin-audit.controller';
 import { AdminCitiesController } from './admin-cities.controller';
 import { AdminCollectionsController } from './admin-collections.controller';
 import { AdminCombosController } from './admin-combos.controller';
@@ -24,17 +28,17 @@ import { AdminReviewsController } from './admin-reviews.controller';
 import { AdminSettingsController } from './admin-settings.controller';
 import { AdminSuppliersController } from './admin-suppliers.controller';
 import { AdminSupportController } from './admin-support.controller';
+import { AdminTagsController } from './admin-tags.controller';
+import { AdminUpsellsController } from './admin-upsells.controller';
+import { AdminVenuesController } from './admin-venues.controller';
 import { AdminWidgetsController } from './admin-widgets.controller';
-import { AdminOpsController } from './admin-ops.controller';
-import { AdminReconciliationController } from './admin-reconciliation.controller';
-import { SupportModule } from '../support/support.module';
-import { TagAssignmentService } from '../scheduler/tag-assignment.service';
-import { CheckoutModule } from '../checkout/checkout.module';
-import { CatalogModule } from '../catalog/catalog.module';
+import { AdminCheckoutController } from './admin-checkout.controller';
+import { AuditService } from './audit.service';
+import { EventOverrideService } from './event-override.service';
+import { PaymentMetricsService } from '../checkout/payment-metrics.service';
 
 @Module({
   imports: [
-    PrismaModule,
     AuthModule,
     RedisCacheModule,
     SupportModule,

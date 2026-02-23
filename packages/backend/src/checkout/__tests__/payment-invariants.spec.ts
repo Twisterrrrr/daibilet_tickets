@@ -123,6 +123,8 @@ const mockConfig = {
   getOrThrow: vi.fn().mockReturnValue('http://localhost:3000'),
 };
 
+const mockMailService = { sendOrderConfirmed: vi.fn().mockResolvedValue(true) };
+
 // ============================================================
 // 2a. offersSnapshot Immutability
 // ============================================================
@@ -140,7 +142,7 @@ describe('Invariant 2a: offersSnapshot immutability after PaymentIntent creation
       totalPrice: 100000,
     });
 
-    const service = new PaymentService(prisma as any, mockConfig as any);
+    const service = new PaymentService(prisma as any, mockConfig as any, mockMailService as any);
 
     // First intent succeeds
     const result1 = await service.createPaymentIntent('session-imm', 'key-first');
@@ -166,7 +168,7 @@ describe('Invariant 2a: offersSnapshot immutability after PaymentIntent creation
       totalPrice: 150000,
     });
 
-    const service = new PaymentService(prisma as any, mockConfig as any);
+    const service = new PaymentService(prisma as any, mockConfig as any, mockMailService as any);
 
     // First intent
     const result1 = await service.createPaymentIntent('session-ok', 'key-a');
@@ -247,7 +249,7 @@ describe('Invariant 2b: PaymentIntent amount matches snapshot sum', () => {
       totalPrice: 500000,
     });
 
-    const service = new PaymentService(prisma as any, mockConfig as any);
+    const service = new PaymentService(prisma as any, mockConfig as any, mockMailService as any);
     const result = await service.createPaymentIntent('session-amt', 'key-amt');
 
     const expectedTotal = partitionCart(snapshot).platformTotal;

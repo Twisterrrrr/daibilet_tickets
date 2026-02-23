@@ -933,8 +933,8 @@ export class TcSyncService {
     if (tcEvents.length === 0) return 0;
 
     tcEvents.sort((a, b) => {
-      const aVacant = a.tickets_amount_vacant || 0;
-      const bVacant = b.tickets_amount_vacant || 0;
+      const aVacant = Number(a.tickets_amount_vacant) || 0;
+      const bVacant = Number(b.tickets_amount_vacant) || 0;
       if (a.status === 'public' && b.status !== 'public') return -1;
       if (a.status !== 'public' && b.status === 'public') return 1;
       return bVacant - aVacant;
@@ -943,11 +943,12 @@ export class TcSyncService {
     const best = tcEvents[0];
     const tcId = String(best.id);
     const title = normalizeEventTitle(best.title?.text || '');
-    const description = best.title?.desc || null;
+    const description = typeof best.title?.desc === 'string' ? best.title.desc : null;
     const { category, subcategories } = this.classifyRest(best);
     const minAge = typeof best.age_rating === 'number' ? best.age_rating : 0;
 
     const cityGeoId = best?.venue?.city?.id;
+    if (cityGeoId == null) return 0;
     const cityId = this.cityCache.get(cityGeoId);
     if (!cityId) return 0;
 
@@ -960,7 +961,7 @@ export class TcSyncService {
 
     const allPrices: number[] = [];
     for (const tc of tcEvents) {
-      const p = this.extractMinPrice(tc.sets);
+      const p = this.extractMinPrice(tc.sets ?? []);
       if (p) allPrices.push(p);
     }
     const priceFrom = allPrices.length > 0 ? Math.min(...allPrices) : null;
@@ -989,7 +990,7 @@ export class TcSyncService {
           imageUrl: imageUrl || event.imageUrl,
           priceFrom,
           isActive,
-          tcData: best,
+          tcData: JSON.parse(JSON.stringify(best)) as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
       });
@@ -1012,7 +1013,7 @@ export class TcSyncService {
           imageUrl,
           priceFrom,
           isActive,
-          tcData: best,
+          tcData: JSON.parse(JSON.stringify(best)) as Prisma.InputJsonValue,
           lastSyncAt: new Date(),
         },
       });
@@ -1030,7 +1031,7 @@ export class TcSyncService {
         allTags.add(tag);
       }
     }
-    await this.syncTags(event.id, [...allTags], title, description);
+    await this.syncTags(event.id, [...allTags], title, description ?? undefined);
 
     return sessionCount;
   }
@@ -1043,7 +1044,7 @@ export class TcSyncService {
 
     const tcSessionId = `${tcId}-main`;
     const availableTickets = tc.tickets_amount_vacant || 0;
-    const prices = this.extractPrices(tc.sets);
+    const prices = this.extractPrices(tc.sets ?? []);
     const isActive = tc.status === 'public' && availableTickets > 0;
 
     await this.prisma.eventSession.upsert({

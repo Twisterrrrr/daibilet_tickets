@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import type { ExpressRequest } from '../common/http/express.types';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
 import { CreateArticleDto, UpdateArticleDto } from './dto/admin-article.dto';
@@ -90,7 +91,7 @@ export class AdminArticlesController {
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: UpdateArticleDto, @Request() req: ExpressRequest & { user: AdminAuthUser }) {
+  async update(@Param('id') id: string, @Body() data: UpdateArticleDto, @Request() req: ExpressRequest) {
     const { id: _, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data as any;
 
     if (data.version !== undefined) {
@@ -108,7 +109,7 @@ export class AdminArticlesController {
       }
 
       const after = await this.prisma.article.findUnique({ where: { id } });
-      await this.audit.log(req.user.id, 'UPDATE', 'Article', id, before, after);
+      await this.audit.log(req.user!.id, 'UPDATE', 'Article', id, before, after);
       return after;
     }
 

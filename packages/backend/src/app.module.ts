@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
@@ -43,7 +44,7 @@ import { VoucherModule } from './voucher/voucher.module';
         transport: process.env.NODE_ENV !== 'production'
           ? { target: 'pino-pretty', options: { singleLine: true } }
           : undefined,
-        genReqId: (req) => (req.headers['x-request-id'] as string) || undefined,
+        genReqId: (req) => (req.headers['x-request-id'] as string) ?? randomUUID(),
       },
     }),
     ConfigModule.forRoot({

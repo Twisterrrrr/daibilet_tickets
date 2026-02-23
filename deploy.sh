@@ -191,8 +191,12 @@ else
   fi
 fi
 
-# ---- 8. Сборка и запуск контейнеров ----
-echo "[8/9] Сборка и запуск контейнеров..."
+# ---- 8. Volume для staging (нужен nginx для будущего staging) ----
+echo "[8/10] Подготовка volumes..."
+docker volume create uploads_staging 2>/dev/null || true
+
+# ---- 9. Сборка и запуск контейнеров ----
+echo "[9/10] Сборка и запуск контейнеров..."
 cd "$PROJECT_DIR"
 docker compose -f "$COMPOSE_FILE" up -d --build
 
@@ -210,8 +214,8 @@ until docker exec daibilet-backend wget -qO- http://localhost:4000/api/v1/health
   echo "  ...ожидание (${WAITED}с)..."
 done
 
-# ---- 9. Миграции и seed ----
-echo "[9/9] Применение миграций и seed..."
+# ---- 10. Миграции и seed ----
+echo "[10/10] Применение миграций и seed..."
 docker exec daibilet-backend npx prisma migrate deploy
 echo "Миграции применены."
 

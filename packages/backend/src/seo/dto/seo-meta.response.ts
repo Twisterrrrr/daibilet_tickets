@@ -1,4 +1,4 @@
-import type { SeoEntityType } from '@prisma/client';
+import type { SeoEntityType } from '../seo.types';
 
 export type SeoMetaResponse = {
   entityType: SeoEntityType;

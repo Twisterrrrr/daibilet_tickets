@@ -17,6 +17,8 @@ import { Logger as PinoLogger } from 'nestjs-pino';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
+import { Prisma } from '@prisma/client';
+
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
 

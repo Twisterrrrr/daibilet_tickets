@@ -30,7 +30,7 @@ export interface WithRetryOptions {
   initialBackoffMs?: number;
   /** Проверка, нужно ли ретраить (429, 5xx). */
   shouldRetry?: (status?: number, err?: Error) => boolean;
-  onRetry?: (attempt: number, status?: number, delayMs: number) => void;
+  onRetry?: (attempt: number, delayMs: number, status?: number) => void;
 }
 
 /** Выполняет fn с retry при 429/5xx. */
@@ -65,7 +65,7 @@ export async function withRetry<T>(
       if (!shouldRetry(lastStatus, lastError)) throw lastError;
 
       const delayMs = initialBackoffMs * Math.pow(2, attempt);
-      opts?.onRetry?.(attempt + 1, lastStatus, delayMs);
+      opts?.onRetry?.(attempt + 1, delayMs, lastStatus);
       await sleep(delayMs);
       retries++;
     }

@@ -13,9 +13,8 @@
  */
 
 import { Controller, Get, Post, Param, Query, UseGuards, Body, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
 
 import { FulfillmentService } from '../checkout/fulfillment.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';

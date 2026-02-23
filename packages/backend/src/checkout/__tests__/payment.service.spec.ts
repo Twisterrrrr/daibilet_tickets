@@ -71,6 +71,8 @@ const mockConfig = {
   getOrThrow: vi.fn().mockImplementation((key: string) => CONFIG_DEFAULTS[key] ?? 'http://localhost:3000'),
 };
 
+const mockMailService = { sendOrderConfirmed: vi.fn().mockResolvedValue(true) };
+
 // ---------------------
 // Tests
 // ---------------------
@@ -81,7 +83,7 @@ describe('PaymentService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NODE_ENV = 'test';
-    service = new PaymentService(mockPrisma as any, mockConfig as any);
+    service = new PaymentService(mockPrisma as any, mockConfig as any, mockMailService as any);
   });
 
   // =========================================

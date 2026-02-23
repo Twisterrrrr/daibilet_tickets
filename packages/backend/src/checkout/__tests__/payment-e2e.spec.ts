@@ -184,6 +184,8 @@ const mockConfig = {
   getOrThrow: vi.fn().mockReturnValue('http://localhost:3000'),
 };
 
+const mockMailService = { sendOrderConfirmed: vi.fn().mockResolvedValue(true) };
+
 // ============================================================
 // Scenario 1: Happy Path — PLATFORM, 1 позиция
 // ============================================================
@@ -209,7 +211,7 @@ describe('E2E Scenario 1: Happy Path (PLATFORM → PAID → FULFILLED → COMPLE
     });
 
     // Step 1: Create PaymentIntent
-    const service = new PaymentService(prisma as any, mockConfig as any);
+    const service = new PaymentService(prisma as any, mockConfig as any, mockMailService as any);
     const result = await service.createPaymentIntent('session-1', 'key-1');
 
     expect(result.paymentIntentId).toBeDefined();
@@ -418,7 +420,7 @@ describe('E2E Scenario 6: Cancel and Expiry flows', () => {
       checkoutSessionId: 'session-cancel',
     });
 
-    const service = new PaymentService(prisma as any, mockConfig as any);
+    const service = new PaymentService(prisma as any, mockConfig as any, mockMailService as any);
     const result = await service.cancelIntent('intent-cancel');
 
     expect(result!.status).toBe('CANCELLED');

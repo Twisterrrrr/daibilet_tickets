@@ -744,7 +744,7 @@ export class CheckoutService {
       quantity: number;
       priceSnapshot: number;
       confirmedAt: Date | null;
-      eventOffer?: { meetingPoint?: string; meetingInstructions?: string; operationalPhone?: string; operationalNote?: string } | null;
+      eventOffer?: { meetingPoint?: string | null; meetingInstructions?: string | null; operationalPhone?: string | null; operationalNote?: string | null } | null;
       event?: { title: string; slug: string; imageUrl: string | null } | null;
     }>;
   }) {
@@ -760,10 +760,10 @@ export class CheckoutService {
           event: req.event ? { title: req.event.title, slug: req.event.slug, imageUrl: req.event.imageUrl } : null,
           offerTitle: req.event?.title || null,
           ...(showOperational && req.eventOffer ? {
-            meetingPoint: req.eventOffer.meetingPoint || null,
-            meetingInstructions: req.eventOffer.meetingInstructions || null,
-            operationalPhone: req.eventOffer.operationalPhone || null,
-            operationalNote: req.eventOffer.operationalNote || null,
+            meetingPoint: req.eventOffer.meetingPoint || undefined,
+            meetingInstructions: req.eventOffer.meetingInstructions || undefined,
+            operationalPhone: req.eventOffer.operationalPhone || undefined,
+            operationalNote: req.eventOffer.operationalNote || undefined,
           } : {}),
         }))
       : snapshot.map((s, i) => ({
@@ -922,9 +922,9 @@ export class CheckoutService {
     const session = await this.prisma.checkoutSession.create({
       data: {
         shortCode,
-        cartSnapshot: body.items,
-        validatedSnapshot: validation.items,
-        offersSnapshot,
+        cartSnapshot: JSON.parse(JSON.stringify(body.items)) as Prisma.InputJsonValue,
+        validatedSnapshot: JSON.parse(JSON.stringify(validation.items)) as Prisma.InputJsonValue,
+        offersSnapshot: JSON.parse(JSON.stringify(offersSnapshot)) as Prisma.InputJsonValue,
         customerName: null,
         customerEmail: null,
         customerPhone: null,

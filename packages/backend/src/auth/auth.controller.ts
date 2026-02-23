@@ -15,8 +15,13 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.auth.login(dto.email, dto.password);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+    @Request() req: { ip?: string },
+  ) {
+    const ip = req?.ip ?? (req as any)?.connection?.remoteAddress;
+    const result = await this.auth.login(ip, dto.email, dto.password);
 
     this.setRefreshCookie(res, result.refreshToken);
 

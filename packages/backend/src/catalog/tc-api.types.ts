@@ -29,10 +29,18 @@ export interface TcEvent {
     city?: {
       id?: number;
       name?: string;
+      timezone?: string;
       [key: string]: unknown;
     };
     address?: string;
     title?: string;
+    point?: { coordinates?: [number, number] | number[] };
+    [key: string]: unknown;
+  };
+  media?: {
+    cover_original?: { url?: string };
+    cover?: { url?: string };
+    cover_small?: { url?: string };
     [key: string]: unknown;
   };
   description?: {

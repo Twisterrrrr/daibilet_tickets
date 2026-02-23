@@ -114,7 +114,7 @@ export class SyncProcessor extends WorkerHost {
    */
   private async handleFullSync(signal?: AbortSignal) {
     // 1. TC sync (retag встроен в конце syncAll)
-    const tcResult = await this.tcSync.syncAll(signal);
+    const tcResult = await this.tcSync.syncAll();
     this.logger.log(
       `TC sync: ${tcResult.uniqueEvents} событий, ${tcResult.sessionsSynced} сессий, статус: ${tcResult.status}`,
     );
@@ -151,7 +151,7 @@ export class SyncProcessor extends WorkerHost {
    * Инкрементальная синхронизация: только TC + cache invalidation.
    */
   private async handleIncrementalSync(signal?: AbortSignal) {
-    const tcResult = await this.tcSync.syncAll(signal);
+    const tcResult = await this.tcSync.syncAll();
     this.logger.log(`TC incremental: ${tcResult.uniqueEvents} событий, статус: ${tcResult.status}`);
 
     await this.cache.invalidateAfterSync();
