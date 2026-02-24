@@ -30,5 +30,5 @@ export class UpdatePricingDto {
   @ApiPropertyOptional({ description: 'JSON: [{dateFrom, dateTo, cities?}]' })
   @IsOptional()
   @IsArray()
-  peakRanges?: any[];
+  peakRanges?: Record<string, unknown>[];
 }

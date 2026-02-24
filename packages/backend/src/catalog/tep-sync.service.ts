@@ -4,6 +4,7 @@ import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
+import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';
 import { TepApiService, TepCity, TepEvent } from './tep-api.service';
 
@@ -436,7 +437,7 @@ export class TepSyncService {
    *
    * Используем batch INSERT ... ON CONFLICT для производительности.
    */
-  private async syncSession(sourceId: string, tep: TepEvent, prices: any[]): Promise<number> {
+  private async syncSession(sourceId: string, tep: TepEvent, prices: Record<string, unknown>[]): Promise<number> {
     const event = await this.prisma.event.findUnique({
       where: { tcEventId: sourceId },
       select: { id: true },
@@ -541,12 +542,13 @@ export class TepSyncService {
       select: { startsAt: true },
     });
     const startsAt = existing && new Date(existing.startsAt) > now ? existing.startsAt : tomorrow;
+    const pricesForUpsert = toJsonValue(prices);
 
     await this.prisma.eventSession.upsert({
       where: { tcSessionId: sessionId },
       update: {
         offerId: offer?.id ?? undefined,
-        prices,
+        prices: pricesForUpsert,
         availableTickets: totalVacant * 10,
         isActive: hasAvailableSlots,
         startsAt,
@@ -557,7 +559,7 @@ export class TepSyncService {
         tcSessionId: sessionId,
         startsAt: tomorrow,
         availableTickets: totalVacant * 10,
-        prices,
+        prices: pricesForUpsert,
         isActive: hasAvailableSlots,
       },
     });
@@ -937,7 +939,7 @@ export class TepSyncService {
   /**
    * Все типы билетов → наш формат prices.
    */
-  private extractPrices(tickets: TepEvent['eventTickets']): any[] {
+  private extractPrices(tickets: TepEvent['eventTickets']): Record<string, unknown>[] {
     if (!tickets?.length) return [];
 
     return tickets.map((t) => ({

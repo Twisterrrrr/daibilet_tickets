@@ -1,4 +1,6 @@
+import type { CityListItem, EventListItem } from '@daibilet/shared';
 import { CATEGORY_LABELS, cityToPrepositional, EventCategory } from '@daibilet/shared';
+import type { TagWithCount } from '@/lib/api.types';
 import { ArrowRight, Headphones, Landmark, MapPin, Star, Ticket, TrendingUp, X } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,7 +35,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
   const citySlug = params?.city || '';
 
-  let cities: any[] = [];
+  let cities: CityListItem[] = [];
   try {
     cities = await api.getCities();
   } catch (e) {
@@ -41,7 +43,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     cities = [];
   }
 
-  let popularEvents: any[] = [];
+  let popularEvents: EventListItem[] = [];
   try {
     const res = await api.getEvents({
       sort: 'popular',
@@ -78,8 +80,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         limit: 8 - popularEvents.length,
         hasPhoto: 1,
       });
-      const ids = new Set(popularEvents.map((e: any) => e.id));
-      const extra = (res.items || []).filter((e: any) => !ids.has(e.id));
+      const ids = new Set(popularEvents.map((e) => e.id));
+      const extra = (res.items || []).filter((e) => !ids.has(e.id));
       popularEvents = [...popularEvents, ...extra];
     } catch {
       // игнорируем
@@ -87,7 +89,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   }
 
   // Ближайшие события (departing_soon) — с фильтром по городу из URL
-  let nearestEvents: any[] = [];
+  let nearestEvents: EventListItem[] = [];
   try {
     const nearestRes = await api.getEvents({
       sort: 'departing_soon',
@@ -101,26 +103,26 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     nearestEvents = [];
   }
 
-  let popularTags: any[] = [];
+  let popularTags: TagWithCount[] = [];
   try {
     const allTags = await api.getTags();
-    popularTags = (allTags as any[])
-      .filter((t: any) => t._count?.events > 0)
+    popularTags = allTags
+      .filter((t) => (t._count?.events ?? 0) > 0)
       // Явно исключаем НН-лендинговые теги, чтобы не засорять главную
-      .filter((t: any) => !['progulki-volga-nn', 'kanatka-nn'].includes(t.slug))
-      .sort((a: any, b: any) => (b._count?.events ?? 0) - (a._count?.events ?? 0))
+      .filter((t) => !['progulki-volga-nn', 'kanatka-nn'].includes(t.slug))
+      .sort((a, b) => (b._count?.events ?? 0) - (a._count?.events ?? 0))
       .slice(0, 20);
   } catch {
     popularTags = [];
   }
 
   // Счётчики Hero: по городам, которые реально отображаются
-  const totalEvents = cities.reduce((sum: number, c: any) => sum + (c._count?.events ?? 0), 0);
-  const totalVenues = cities.reduce((sum: number, c: any) => sum + (c._count?.venues ?? 0), 0);
+  const totalEvents = cities.reduce((sum, c) => sum + (c._count?.events ?? 0), 0);
+  const totalVenues = cities.reduce((sum, c) => sum + (c._count?.venues ?? 0), 0);
   const totalEventsAndVenues = totalEvents + totalVenues;
   const totalCities = cities.length;
 
-  const cityName = citySlug ? cities.find((c: any) => c.slug === citySlug)?.name : null;
+  const cityName = citySlug ? cities.find((c) => c.slug === citySlug)?.name : null;
   const eventsHref = citySlug ? `/events?city=${citySlug}` : '/events';
   const nearestHref = citySlug ? `/events?sort=departing_soon&city=${citySlug}` : '/events?sort=departing_soon';
 
@@ -148,25 +150,24 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               выбирайте и покупайте онлайн.
             </p>
 
+            {/* Partner CTA */}
+            <div className="mt-6 flex justify-center">
+              <Link
+                href="/partner"
+                className="inline-flex items-center justify-center rounded-full border border-amber-300/70 bg-amber-500/20 px-5 py-2 text-sm font-semibold text-amber-100 backdrop-blur-sm transition-all hover:bg-amber-500/30 hover:text-white"
+              >
+                Стать партнёром
+              </Link>
+            </div>
+
             {/* City search */}
-            <div className="mx-auto mt-10 max-w-lg">
+            <div className="mx-auto mt-8 max-w-xl">
               <HeroCitySearch cities={cities} initialCitySlug={citySlug || undefined} />
             </div>
 
-            {/* Quick links — переключатель фильтра по городу */}
+            {/* Quick links — переключатель фильтра по городу (без кнопки \"Все города\" в hero) */}
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/"
-                scroll={false}
-                className={`rounded-full border px-4 py-1.5 text-sm font-medium backdrop-blur-sm transition-all ${
-                  !citySlug
-                    ? 'border-white/40 bg-white/20 text-white'
-                    : 'border-white/20 bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
-                }`}
-              >
-                Все города
-              </Link>
-              {cities.slice(0, 4).map((city: any) => (
+              {cities.slice(0, 5).map((city) => (
                 <Link
                   key={city.slug}
                   href={`/?city=${city.slug}`}
@@ -222,7 +223,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 >
                   Все города
                 </Link>
-                {cities.slice(0, 5).map((city: any) => (
+                {cities.slice(0, 5).map((city) => (
                   <Link
                     key={city.slug}
                     href={`/?city=${city.slug}`}
@@ -238,8 +239,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 ))}
               </div>
             </div>
-            <div className="mt-6 grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-4">
-              {popularEvents.map((event: any) => (
+            <div className="mt-6 grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+              {popularEvents.map((event) => (
                 <EventCard
                   key={event.id}
                   slug={event.slug}
@@ -247,18 +248,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   category={event.category}
                   subcategories={event.subcategories}
                   imageUrl={event.imageUrl}
-                  priceFrom={event.priceFrom}
-                  priceOriginalKopecks={event.priceOriginalKopecks}
-                  rating={event.rating}
-                  reviewCount={event.reviewCount}
-                  durationMinutes={event.durationMinutes}
-                  city={event.city}
+                  priceFrom={event.priceFrom ?? null}
+                  priceOriginalKopecks={event.priceOriginalKopecks ?? null}
+                  rating={Number(event.rating) || 0}
+                  reviewCount={Number(event.reviewCount) ?? 0}
+                  durationMinutes={event.durationMinutes ?? null}
+                  city={event.city ?? undefined}
                   totalAvailableTickets={event.totalAvailableTickets}
-                  departingSoonMinutes={event.departingSoonMinutes}
-                  nextSessionAt={event.nextSessionAt}
+                  departingSoonMinutes={event.departingSoonMinutes ?? undefined}
+                  nextSessionAt={typeof event.nextSessionAt === 'string' ? event.nextSessionAt : undefined}
                   isOptimalChoice={event.isOptimalChoice}
                   dateMode={event.dateMode}
-                  groupSize={event.groupSize ?? event.templateData?.groupSize}
+                  groupSize={typeof event.groupSize === 'string' ? event.groupSize : (typeof (event.templateData as Record<string, unknown> | null)?.groupSize === 'string' ? (event.templateData as Record<string, unknown>).groupSize as string : undefined) ?? undefined}
                   sessionTimes={event.sessionTimes ?? []}
                   highlights={event.highlights ?? []}
                   compact
@@ -320,7 +321,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 >
                   Все города
                 </Link>
-                {cities.slice(0, 5).map((city: any) => (
+                {cities.slice(0, 5).map((city) => (
                   <Link
                     key={city.slug}
                     href={`/?city=${city.slug}`}
@@ -338,8 +339,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </div>
             {nearestEvents.length > 0 ? (
               <>
-                <div className="mt-6 grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-4">
-                  {nearestEvents.map((event: any) => (
+                <div className="mt-6 grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+                  {nearestEvents.map((event) => (
                     <EventCard
                       key={event.id}
                       slug={event.slug}
@@ -347,18 +348,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       category={event.category}
                       subcategories={event.subcategories}
                       imageUrl={event.imageUrl}
-                      priceFrom={event.priceFrom}
-                      priceOriginalKopecks={event.priceOriginalKopecks}
-                      rating={event.rating}
-                      reviewCount={event.reviewCount}
-                      durationMinutes={event.durationMinutes}
-                      city={event.city}
+                      priceFrom={event.priceFrom ?? null}
+                      priceOriginalKopecks={event.priceOriginalKopecks ?? null}
+                      rating={Number(event.rating) || 0}
+                      reviewCount={Number(event.reviewCount) ?? 0}
+                      durationMinutes={event.durationMinutes ?? null}
+                      city={event.city ?? undefined}
                       totalAvailableTickets={event.totalAvailableTickets}
-                      departingSoonMinutes={event.departingSoonMinutes}
-                      nextSessionAt={event.nextSessionAt}
+                      departingSoonMinutes={event.departingSoonMinutes ?? undefined}
+                      nextSessionAt={typeof event.nextSessionAt === 'string' ? event.nextSessionAt : undefined}
                       isOptimalChoice={event.isOptimalChoice}
                       dateMode={event.dateMode}
-                      groupSize={event.groupSize ?? event.templateData?.groupSize}
+                      groupSize={typeof event.groupSize === 'string' ? event.groupSize : (typeof (event.templateData as Record<string, unknown> | null)?.groupSize === 'string' ? (event.templateData as Record<string, unknown>).groupSize as string : undefined) ?? undefined}
                       sessionTimes={event.sessionTimes ?? []}
                       highlights={event.highlights ?? []}
                       compact
@@ -421,7 +422,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </Link>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {cities.map((city: any) => (
+            {cities.map((city) => (
               <Link
                 key={city.slug}
                 href={`/cities/${city.slug}`}
@@ -444,12 +445,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       {pluralEvents(city._count?.events ?? 0)}
                     </span>
                     {/* Музеи и арт: площадки + события в них (museumCount с бэкенда, fallback на venues) */}
-                    {((city.museumCount as number | undefined) ?? city._count?.venues ?? 0) > 0 && (
+                    {(city.museumCount ?? city._count?.venues ?? 0) > 0 && (
                       <span className="flex items-center gap-1.5 text-sm text-white/60">
-                        {(city.museumCount as number | undefined) ?? city._count?.venues ?? 0}{' '}
-                        {((city.museumCount as number | undefined) ?? city._count?.venues ?? 0) === 1
+                        {city.museumCount ?? city._count?.venues ?? 0}{' '}
+                        {(city.museumCount ?? city._count?.venues ?? 0) === 1
                           ? 'музей'
-                          : ((city.museumCount as number | undefined) ?? city._count?.venues ?? 0) < 5
+                          : (city.museumCount ?? city._count?.venues ?? 0) < 5
                             ? 'музея'
                             : 'музеев'}
                       </span>
@@ -498,7 +499,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div className="mt-8">
               <h3 className="text-lg font-semibold text-slate-700">Популярные темы</h3>
               <div className="mt-3 flex flex-wrap gap-2">
-                {popularTags.map((tag: any) => (
+                {popularTags.map((tag) => (
                   <Link
                     key={tag.slug}
                     href={`/events?tag=${tag.slug}`}
@@ -519,7 +520,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* ============ SOCIAL PROOF ============ */}
       <section className="py-16 sm:py-20">
         <div className="container-page">
-          <div className="grid grid-cols-2 gap-6 sm:gap-8 md:grid-cols-4">
+          <div className="grid grid-cols-1 min-[361px]:grid-cols-2 gap-6 sm:gap-8 md:grid-cols-3 lg:grid-cols-4">
             <div className="text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-100">
                 <Ticket className="h-6 w-6 text-primary-600" />

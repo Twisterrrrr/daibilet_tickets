@@ -172,9 +172,9 @@ export function EventCard({
           )}
         </div>
 
-        {/* Top-right: избранное — inline-flex чтобы не растягивался flex-родителем */}
-        <div className="absolute right-2 top-2 flex shrink-0 items-center justify-center sm:right-3 sm:top-3">
-          <FavoriteButton slug={slug} size="sm" />
+        {/* Top-right: избранное — строго круг (overflow-hidden обрезает до круга) */}
+        <div className="absolute right-2 top-2 size-8 shrink-0 overflow-hidden rounded-full sm:right-3 sm:top-3 sm:size-9">
+          <FavoriteButton slug={slug} size="sm" className="h-full w-full" />
         </div>
 
         {/* Bottom-right фото: цена — синий pill */}
@@ -252,22 +252,6 @@ export function EventCard({
           )}
         </div>
 
-        {/* Слоты времени — только если ближайший сеанс сегодня */}
-        {isToday && displaySlots.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {displaySlots.map((time) => (
-              <button
-                key={time}
-                type="button"
-                onClick={(e) => handleSlotClick(e, time)}
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-0.5 text-[10px] font-normal text-slate-800 transition-colors hover:border-primary-400 hover:bg-primary-50"
-              >
-                {time}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* 3 highlights */}
         {displayHighlights.length > 0 && (
           <ul className="mt-2 space-y-0.5 text-[10px] text-slate-600 sm:text-xs">
@@ -278,6 +262,22 @@ export function EventCard({
               </li>
             ))}
           </ul>
+        )}
+
+        {/* Слоты времени — под хайлайтами, только если ближайший сеанс сегодня */}
+        {isToday && displaySlots.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {displaySlots.map((time) => (
+              <button
+                key={time}
+                type="button"
+                onClick={(e) => handleSlotClick(e, time)}
+                className="inline-btn box-border inline-flex h-6 min-h-6 shrink-0 items-center justify-center self-start rounded-lg border border-slate-300 bg-white px-2.5 text-[10px] leading-none text-slate-800 transition-colors hover:border-primary-400 hover:bg-primary-50"
+              >
+                {time}
+              </button>
+            ))}
+          </div>
         )}
 
         {/* Footer: Подробнее прижат влево (цена на фото) */}

@@ -5,9 +5,10 @@ import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
 type MetricHandler = (metric: { name: string; value: number; id: string }) => void;
 
 const sendToAnalytics: MetricHandler = (metric) => {
-  // Яндекс.Метрика
-  if (typeof window !== 'undefined' && (window as any).ym) {
-    (window as any).ym((window as any).__YM_ID__, 'params', {
+  // Яндекс.Метрика: ym(counterId, action, params)
+  if (typeof window !== 'undefined' && window.ym && window.__YM_ID__ !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window.ym as (id: number, action: string, params?: any) => void)(window.__YM_ID__, 'params', {
       web_vitals: { [metric.name]: Math.round(metric.value) },
     });
   }

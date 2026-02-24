@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 
-import { UserLoginDto, UserRegisterDto } from './dto/user-auth.dto';
+import { UserForgotPasswordDto, UserLoginDto, UserRegisterDto, UserResetPasswordDto } from './dto/user-auth.dto';
 import { UserJwtGuard } from './user.guard';
 import { UserAuthService } from './user-auth.service';
 
@@ -73,5 +73,22 @@ export class UserAuthController {
   @ApiOperation({ summary: 'Профиль пользователя' })
   async me(@Req() req: { user: { id: string } }) {
     return this.authService.getProfile(req.user.id);
+  }
+
+  @Post('forgot-password')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @ApiOperation({ summary: 'Запрос на сброс пароля (отправка ссылки на email)' })
+  async forgotPassword(@Body() body: UserForgotPasswordDto) {
+    await this.authService.requestPasswordReset(body.email);
+    // Всегда возвращаем ok, чтобы не раскрывать, есть ли такой email
+    return { ok: true };
+  }
+
+  @Post('reset-password')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: 'Сброс пароля по токену' })
+  async resetPassword(@Body() body: UserResetPasswordDto) {
+    await this.authService.resetPassword(body.token, body.password);
+    return { ok: true };
   }
 }

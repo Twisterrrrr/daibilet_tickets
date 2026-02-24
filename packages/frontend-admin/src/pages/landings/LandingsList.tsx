@@ -78,8 +78,8 @@ export function LandingsListPage() {
     if (cityFilter) params.set('city', cityFilter);
 
     adminApi
-      .get<LandingItem[]>(`/admin/landings${params.toString() ? `?${params}` : ''}`)
-      .then((res) => setData(Array.isArray(res) ? res : []))
+      .get<LandingItem[] | { items: LandingItem[] }>(`/admin/landings${params.toString() ? `?${params}` : ''}`)
+      .then((res) => setData(Array.isArray(res) ? res : (res?.items ?? [])))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   }, [cityFilter]);

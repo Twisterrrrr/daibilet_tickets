@@ -12,6 +12,7 @@ import {
   Gift,
   Loader2,
   MapPin,
+  RefreshCw,
   Shield,
   Sparkles,
   Star,
@@ -91,6 +92,13 @@ export default function PlannerPage() {
   const [selectedVariant, setSelectedVariant] = useState(0);
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
   const [selectedUpsells, setSelectedUpsells] = useState<Set<string>>(new Set());
+  const [replaceModal, setReplaceModal] = useState<{
+    dayNumber: number;
+    slotIndex: number;
+    slot: { event?: { id?: string }; slot?: string };
+  } | null>(null);
+  const [replaceEvents, setReplaceEvents] = useState<any[]>([]);
+  const [replaceLoading, setReplaceLoading] = useState(false);
 
   useEffect(() => {
     api
@@ -157,6 +165,43 @@ export default function PlannerPage() {
       else next.add(id);
       return next;
     });
+  };
+
+  // Fetch events for Replace modal
+  useEffect(() => {
+    if (!replaceModal || !city) return;
+    setReplaceLoading(true);
+    api
+      .getEvents({ city, limit: 30, sort: 'popular' })
+      .then((r) => setReplaceEvents(r.items || []))
+      .catch(() => setReplaceEvents([]))
+      .finally(() => setReplaceLoading(false));
+  }, [replaceModal, city]);
+
+  const handleReplaceEvent = async (newEventId: string) => {
+    if (!replaceModal || !result) return;
+    const variant = result.variants[selectedVariant];
+    if (!variant) return;
+    setReplaceLoading(true);
+    try {
+      const res = await api.customizePlan({
+        variant: { ...variant },
+        dayNumber: replaceModal.dayNumber,
+        slotIndex: replaceModal.slotIndex,
+        newEventId,
+      });
+      if (res.success && res.variant) {
+        setResult((prev: any) => ({
+          ...prev,
+          variants: prev.variants.map((v: any, i: number) => (i === selectedVariant ? res.variant : v)),
+        }));
+        setReplaceModal(null);
+      }
+    } catch (e) {
+      console.error('Replace failed:', e);
+    } finally {
+      setReplaceLoading(false);
+    }
   };
 
   const calculate = async () => {
@@ -570,18 +615,32 @@ export default function PlannerPage() {
                                       </div>
                                     </div>
 
-                                    {/* Price column */}
-                                    <div className="flex-shrink-0 text-right">
+                                    {/* Price + Replace */}
+                                    <div className="flex-shrink-0 flex flex-col items-end gap-1">
                                       <span className="font-bold text-sm text-slate-900">
                                         {formatPrice(slot.subtotal)}
                                       </span>
-                                      <div className="text-[10px] text-slate-400 mt-0.5">
+                                      <div className="text-[10px] text-slate-400">
                                         {slot.tickets.adult.count} взр.
                                         {slot.tickets.child.count > 0 ? ` + ${slot.tickets.child.count} дет.` : ''}
                                       </div>
                                       <div className="text-[10px] text-slate-400">
                                         {formatPrice(slot.tickets.adult.unitPrice)} / взр.
                                       </div>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setReplaceModal({
+                                            dayNumber: day.dayNumber,
+                                            slotIndex: si,
+                                            slot,
+                                          })
+                                        }
+                                        className="mt-2 flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                                      >
+                                        <RefreshCw className="h-3 w-3" />
+                                        Заменить
+                                      </button>
                                     </div>
                                   </div>
                                 ))}
@@ -711,6 +770,70 @@ export default function PlannerPage() {
                     Смотреть готовые программы
                   </Link>
                 </div>
+
+                {/* Replace event modal */}
+                {replaceModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="max-h-[80vh] w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
+                      <div className="border-b border-slate-200 p-4">
+                        <h3 className="font-semibold text-slate-900">Заменить событие</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Выберите другое событие для этого слота
+                        </p>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto p-4">
+                        {replaceLoading ? (
+                          <div className="flex items-center justify-center py-12">
+                            <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {replaceEvents
+                              .filter((e: any) => e.id !== replaceModal.slot.event?.id)
+                              .slice(0, 15)
+                              .map((e: any) => (
+                                <button
+                                  key={e.id}
+                                  type="button"
+                                  onClick={() => handleReplaceEvent(e.id)}
+                                  className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50"
+                                >
+                                  {e.imageUrl && (
+                                    <img
+                                      src={e.imageUrl}
+                                      alt=""
+                                      className="h-12 w-12 rounded-lg object-cover"
+                                    />
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-slate-900 truncate">{e.title}</p>
+                                    <p className="text-xs text-slate-500">
+                                      {e.priceFrom != null ? formatPrice(e.priceFrom) : ''}
+                                      {e.city?.name && ` · ${e.city.name}`}
+                                    </p>
+                                  </div>
+                                </button>
+                              ))}
+                            {!replaceLoading && replaceEvents.length === 0 && (
+                              <p className="py-8 text-center text-sm text-slate-500">
+                                Нет доступных событий
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="border-t border-slate-200 p-4">
+                        <button
+                          type="button"
+                          onClick={() => setReplaceModal(null)}
+                          className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             ) : result?.meta?.message ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center">

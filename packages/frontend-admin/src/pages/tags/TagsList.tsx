@@ -87,7 +87,7 @@ export function TagsListPage() {
 
     adminApi
       .get<TagItem[] | { items: TagItem[] }>(`/admin/tags${params.toString() ? `?${params}` : ''}`)
-      .then((res) => setData(Array.isArray(res) ? res : ((res as any).items ?? res)))
+      .then((res) => setData(Array.isArray(res) ? res : ((res as { items?: TagItem[] }).items ?? [])))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   }, [category, search]);

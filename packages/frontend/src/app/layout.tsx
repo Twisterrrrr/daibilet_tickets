@@ -5,6 +5,7 @@ import Script from 'next/script';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Footer } from '@/components/layout/Footer';
+import { CookieConsent } from '@/components/ui/CookieConsent';
 import { Header } from '@/components/layout/Header';
 import { ScrollProgress } from '@/components/ui/ScrollProgress';
 import { SupportWidget } from '@/components/ui/SupportWidget';
@@ -30,17 +31,18 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
-      <body className="flex min-h-screen flex-col">
+      <body className="flex min-h-screen min-w-0 flex-col">
         <ScrollProgress />
         <WebVitalsReporter />
         <CartProvider>
           <UserAuthProvider>
             <Header />
-            <main className="flex-1">
+            <main className="min-w-0 flex-1">
               <ErrorBoundary>{children}</ErrorBoundary>
             </main>
             <Footer />
             <SupportWidget />
+            <CookieConsent />
           </UserAuthProvider>
         </CartProvider>
 

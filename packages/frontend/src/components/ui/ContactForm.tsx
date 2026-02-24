@@ -25,6 +25,7 @@ export function ContactForm() {
       category: data.get('category') as string,
       orderCode: (data.get('orderCode') as string) || undefined,
       message: data.get('message') as string,
+      newsletterConsent: (data.get('newsletterConsent') as string) === 'on',
     };
 
     setStep('sending');
@@ -120,6 +121,18 @@ export function ContactForm() {
           className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           placeholder="CS-XXXX"
         />
+      </div>
+      <div>
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            name="newsletterConsent"
+            className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+          />
+          <span className="text-sm text-slate-600">
+            Я согласен получать новости и спецпредложения от Daibilet.ru
+          </span>
+        </label>
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Сообщение</label>

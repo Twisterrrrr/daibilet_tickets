@@ -88,8 +88,10 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM pg_enum
-    WHERE enumtypid = '"EventSubcategory"'::regtype AND enumlabel = 'KIDS_SHOW'
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'EventSubcategory' AND e.enumlabel = 'KIDS_SHOW'
   ) THEN
     UPDATE "events"
     SET subcategories = array_remove(
@@ -145,8 +147,10 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM pg_enum
-    WHERE enumtypid = '"EventSubcategory"'::regtype AND enumlabel = 'KIDS_SHOW'
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'EventSubcategory' AND e.enumlabel = 'KIDS_SHOW'
   ) THEN
     ALTER TYPE "EventSubcategory" RENAME TO "EventSubcategory_old";
     CREATE TYPE "EventSubcategory" AS ENUM (

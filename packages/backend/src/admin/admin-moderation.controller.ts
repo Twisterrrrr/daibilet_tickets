@@ -17,7 +17,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { RejectModerationDto } from './dto/admin-moderation.dto';
+import { RejectModerationDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -35,7 +35,7 @@ export class AdminModerationController {
     const page = Number(pageRaw) || 1;
     const limit = Number(limitRaw) || 25;
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
     if (status) {
       where.moderationStatus = status;
     } else {
@@ -76,7 +76,7 @@ export class AdminModerationController {
    */
   @Post(':id/approve')
   @Roles('ADMIN', 'EDITOR')
-  async approve(@Param('id') id: string, @Req() req: any) {
+  async approve(@Param('id') id: string, @Req() req: { user: { id: string } }) {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) throw new NotFoundException('Событие не найдено');
 
@@ -111,7 +111,7 @@ export class AdminModerationController {
    */
   @Post(':id/reject')
   @Roles('ADMIN', 'EDITOR')
-  async reject(@Param('id') id: string, @Req() req: any, @Body() body: RejectModerationDto) {
+  async reject(@Param('id') id: string, @Req() req: { user: { id: string } }, @Body() body: RejectModerationDto) {
     const event = await this.prisma.event.findUnique({ where: { id } });
     if (!event) throw new NotFoundException('Событие не найдено');
 

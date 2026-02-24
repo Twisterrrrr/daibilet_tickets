@@ -2,6 +2,8 @@
 
 Структура для развёртывания на VPS: изолированные prod и staging, общий nginx на 80/443.
 
+> **Первый раз?** См. `scripts/README.md` — пошаговая инструкция + скрипт настройки.
+
 ## Структура на VPS
 
 **Вариант A** — репо в корне, deploy внутри:
@@ -60,13 +62,15 @@ A-записи на IP VPS:
 - staging.daibilet.ru
 - admin-staging.daibilet.ru
 
-### 2. Клонирование
+### 2. Клонирование или копирование
 
 ```bash
-cd /opt
-git clone <repo> daibilet
-cd daibilet
-# Репо в /opt/daibilet/, deploy в deploy/prod, deploy/staging, deploy/nginx
+# Вариант A — git (если репо на GitHub)
+cd /opt && git clone <repo> daibilet
+
+# Вариант B — scp с локальной машины (содержимое сразу в /opt/daibilet)
+# ssh root@IP "mkdir -p /opt/daibilet"
+# scp -r F:\coding\SPBBOATS/. root@IP:/opt/daibilet/
 ```
 
 ### 3. Создание .env
@@ -80,28 +84,20 @@ cp /opt/daibilet/deploy/staging/.env.example /opt/daibilet/deploy/staging/.env
 ### 4. Запуск prod и staging (порядок важен)
 
 ```bash
-cd /opt/daibilet
-
-# Prod (создаёт daibilet_prod_net, volumes)
-cd deploy/prod
+cd /opt/daibilet/deploy/prod
 docker compose up -d --build
 
-# Staging (создаёт daibilet_stg_net, volumes)
-cd ../staging
+cd /opt/daibilet/deploy/staging
 docker compose up -d --build
 
-# Certbot директории
-mkdir -p ../nginx/certbot/www ../nginx/certbot/conf
+mkdir -p /opt/daibilet/deploy/nginx/certbot/{www,conf}
 ```
 
 ### 5. Выпуск TLS (certbot)
 
 ```bash
-# Убедиться что nginx ещё не запущен на 80, или временно отключить
-# Либо: сначала nginx без SSL (только 80 для ACME), потом certbot
-
-cd /opt/daibilet/nginx
-# Временно закомментировать SSL server blocks, оставить только HTTP с location /.well-known/
+cd /opt/daibilet/deploy/nginx
+# Убедиться что порт 80 свободен; временно закомментировать SSL блоки в conf.d при необходимости
 
 docker compose up -d nginx
 docker compose run --rm certbot certbot certonly --webroot \
@@ -120,7 +116,7 @@ docker compose restart nginx
 ### 6. Запуск nginx
 
 ```bash
-cd /opt/daibilet/nginx
+cd /opt/daibilet/deploy/nginx
 docker compose up -d
 ```
 
@@ -148,7 +144,8 @@ docker exec -it daibilet-prod-backend pnpm run db:seed:seo
 
 1. `cd /opt/daibilet/deploy/prod && docker compose up -d --build`
 2. `cd /opt/daibilet/deploy/staging && docker compose up -d --build`
-3. `cd /opt/daibilet/deploy/nginx && docker compose up -d`
+3. `mkdir -p /opt/daibilet/deploy/nginx/certbot/{www,conf}`
+4. `cd /opt/daibilet/deploy/nginx && docker compose up -d`
 
 ## Изоляция env
 

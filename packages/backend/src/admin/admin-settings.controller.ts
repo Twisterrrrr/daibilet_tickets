@@ -8,7 +8,7 @@ import { cacheKeys, CacheService } from '../cache/cache.service';
 import { TcSyncService } from '../catalog/tc-sync.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { UpdatePricingDto } from './dto/admin-settings.dto';
+import { UpdatePricingDto } from './dto/admin.dto';
 import { PeakRangeSchema, validateJson } from './json-schemas';
 
 @ApiTags('admin')
@@ -66,7 +66,7 @@ export class AdminSettingsController {
 
   @Patch('pricing')
   @Roles('ADMIN')
-  async updatePricing(@Body() data: UpdatePricingDto, @Request() req: any) {
+  async updatePricing(@Body() data: UpdatePricingDto, @Request() req: { user: { id: string } }) {
     try {
       if (data.peakRanges !== undefined) {
         validateJson(PeakRangeSchema, data.peakRanges, 'peakRanges');
@@ -77,7 +77,7 @@ export class AdminSettingsController {
 
     const config = await this.getOrCreatePricingConfig();
 
-    const { id: _, updatedAt, ...clean } = data as any;
+    const { id: _, updatedAt, ...clean } = data as Record<string, unknown>;
 
     const updated = await this.prisma.pricingConfig.update({
       where: { id: config.id },
@@ -234,7 +234,7 @@ export class AdminSettingsController {
     return status;
   }
 
-  private async updateOpsStatus(data: any) {
+  private async updateOpsStatus(data: Record<string, unknown>) {
     const status = await this.getOpsStatus();
     return this.prisma.opsStatus.update({
       where: { id: status.id },

@@ -3,6 +3,7 @@ import { SUBCATEGORY_LABELS } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DateMode, EventCategory, EventSubcategory, LocationType, Prisma, TagCategory } from '@prisma/client';
 
+import { asCatalogEntityLite, asCityLite, toDateSafe } from '../common/typing';
 import { EventOverrideService } from '../admin/event-override.service';
 import { CACHE_TTL, cacheKeys, CacheService } from '../cache/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -142,7 +143,10 @@ export class CatalogService {
         });
 
         eventsAtVenuesByCity = new Map(
-          eventsAtVenues.map((row: any) => [row.cityId as string, Number(row._count._all)]),
+          eventsAtVenues.map((row: { cityId: string; _count: { _all: number | bigint } }) => [
+          row.cityId,
+          Number(row._count._all),
+        ]),
         );
       }
 
@@ -367,8 +371,9 @@ export class CatalogService {
     };
   }
 
-  private eventToCatalogItem(e: any) {
-    const nextSessionAt = e.nextSessionAt ? new Date(e.nextSessionAt).toISOString() : null;
+  private eventToCatalogItem(e: Record<string, unknown>) {
+    const d = toDateSafe(e.nextSessionAt);
+    const nextSessionAt = d ? d.toISOString() : null;
     let dateLabel: string;
     if (e.dateMode === 'OPEN_DATE') {
       dateLabel = 'Открытая дата';
@@ -387,14 +392,16 @@ export class CatalogService {
       slug: e.slug,
       title: e.title,
       cityId: e.cityId,
-      citySlug: e.city?.slug,
-      cityName: e.city?.name,
+      citySlug: asCityLite(e.city).slug,
+      cityName: asCityLite(e.city).name,
       imageUrl: e.imageUrl,
       priceFrom: e.priceFrom,
       rating: Number(e.rating) || 0,
       badges: this.collectEventBadges(e),
       location:
-        e.address || e.city?.name ? { address: shortenAddressToStreet(e.address || ''), metro: null } : undefined,
+        e.address || asCityLite(e.city).name
+          ? { address: shortenAddressToStreet(String(e.address ?? '')), metro: null }
+          : undefined,
       dateLabel,
       // event-only
       startsAt: nextSessionAt,
@@ -405,7 +412,7 @@ export class CatalogService {
     };
   }
 
-  private collectEventBadges(e: any): string[] {
+  private collectEventBadges(e: Record<string, unknown>): string[] {
     const badges: string[] = [];
     if (e.departingSoonMinutes) badges.push(`Через ${e.departingSoonMinutes} мин`);
     if (e.isOptimalChoice) badges.push('Лучший выбор');
@@ -494,23 +501,33 @@ export class CatalogService {
       !qLower || title.toLowerCase().includes(qLower) || (desc && desc.toLowerCase().includes(qLower));
 
     const eventItems = eventsRes.items
-      .filter((e: any) => matchesQ(e.title, e.description))
+      .filter((e: { title?: string | null; description?: string | null }) =>
+        matchesQ(String(e.title ?? ''), e.description ? String(e.description) : undefined),
+      )
       .map((e) => this.eventToCatalogItem(e));
     const venueItems = venuesRaw.map((v) => this.venueToCatalogItem(v));
 
     const combined = [...eventItems, ...venueItems];
 
     // Регион для каждого города (для группировки «Списком»)
-    const combinedCityIds = [...new Set(combined.map((i: any) => i.cityId).filter(Boolean))];
+    const combinedCityIds = [
+      ...new Set(combined.map((i) => asCatalogEntityLite(i)?.cityId).filter((id): id is string => !!id)),
+    ];
     if (combinedCityIds.length > 0) {
       const regionCities = await this.prisma.regionCity.findMany({
         where: { cityId: { in: combinedCityIds } },
         include: { region: { select: { name: true, slug: true } } },
       });
       const regionByCityId = new Map(regionCities.map((rc) => [rc.cityId, rc.region]));
-      combined.forEach((item: any) => {
-        item.regionName = regionByCityId.get(item.cityId)?.name ?? null;
-        item.regionSlug = regionByCityId.get(item.cityId)?.slug ?? null;
+      combined.forEach((item) => {
+        const entity = asCatalogEntityLite(item);
+        const cityId = entity?.cityId;
+        if (cityId) {
+          (item as { regionName?: string | null; regionSlug?: string | null }).regionName =
+            regionByCityId.get(cityId)?.name ?? null;
+          (item as { regionName?: string | null; regionSlug?: string | null }).regionSlug =
+            regionByCityId.get(cityId)?.slug ?? null;
+        }
       });
     }
 
@@ -521,7 +538,12 @@ export class CatalogService {
     const orderByPriceDesc = (a: { priceFrom?: number | null }, b: { priceFrom?: number | null }) =>
       (b.priceFrom ?? 0) - (a.priceFrom ?? 0);
 
-    const compare = sort === 'price_asc' ? orderByPriceAsc : sort === 'price_desc' ? orderByPriceDesc : orderByRating;
+    const compare =
+      sort === 'price_asc'
+        ? (a: unknown, b: unknown) => orderByPriceAsc(a as { priceFrom?: number | null }, b as { priceFrom?: number | null })
+        : sort === 'price_desc'
+          ? (a: unknown, b: unknown) => orderByPriceDesc(a as { priceFrom?: number | null }, b as { priceFrom?: number | null })
+          : (a: unknown, b: unknown) => orderByRating(a as { rating?: number }, b as { rating?: number });
     combined.sort(compare);
 
     const total = combined.length;
@@ -571,7 +593,7 @@ export class CatalogService {
     };
   }
 
-  private venueToCatalogItem(v: any) {
+  private venueToCatalogItem(v: Record<string, unknown>) {
     const openingHours = v.openingHours as Record<string, string | null> | null;
     const openingHoursSummary = openingHours ? this.formatOpeningHoursSummary(openingHours) : 'Открытая дата';
 
@@ -581,8 +603,8 @@ export class CatalogService {
       slug: v.slug,
       title: v.title,
       cityId: v.cityId,
-      citySlug: v.city?.slug,
-      cityName: v.city?.name,
+      citySlug: asCityLite(v.city).slug,
+      cityName: asCityLite(v.city).name,
       imageUrl: v.imageUrl,
       priceFrom: v.priceFrom,
       rating: Number(v.rating) || 0,
@@ -590,7 +612,7 @@ export class CatalogService {
       badges: v.isFeatured ? ['Популярное'] : [],
       location:
         v.address || v.metro
-          ? { address: v.address ? shortenAddressToStreet(v.address) : v.address, metro: v.metro }
+          ? { address: v.address ? shortenAddressToStreet(String(v.address)) : String(v.address ?? ''), metro: v.metro }
           : undefined,
       dateLabel: openingHoursSummary,
       // venue-only
@@ -857,8 +879,8 @@ export class CatalogService {
 
       const sorted = this.moveNoPhotoToEnd(
         withSessions.sort((a, b) => {
-          const aAt = a.nextSessionAt ? new Date(a.nextSessionAt).getTime() : Infinity;
-          const bAt = b.nextSessionAt ? new Date(b.nextSessionAt).getTime() : Infinity;
+          const aAt = a.nextSessionAt ? toDateSafe(a.nextSessionAt)?.getTime() ?? Infinity : Infinity;
+          const bAt = b.nextSessionAt ? toDateSafe(b.nextSessionAt)?.getTime() ?? Infinity : Infinity;
           return aAt - bAt;
         }),
       );
@@ -933,13 +955,13 @@ export class CatalogService {
     const relatedEvents = await this.fetchRelatedEvents(overridden);
 
     // Рейтинг: до 10 отзывов — псевдослучайный. Салюты: 4.8–5, остальные: 4.5–5
-    const rc = (overridden.reviewCount ?? 0) | 0;
+    const rc = Number(overridden.reviewCount ?? 0) | 0;
     const rawR = Number(overridden.rating) || 0;
     const h = String(overridden.id || overridden.slug || '')
       .split('')
       .reduce((a, c) => (a << 5) - a + c.charCodeAt(0), 0);
-    const ovTags = (overridden.tags || []).map((t: any) => t?.tag?.slug).filter(Boolean);
-    const ovHasSalute = ovTags.some((s: string) => s === 'salute' || s === 'salyut-s-vody');
+    const ovTags = (overridden.tags || []).map((t: { tag?: { slug?: string } | null }) => t?.tag?.slug).filter((s): s is string => !!s);
+    const ovHasSalute = ovTags.some((s) => s === 'salute' || s === 'salyut-s-vody');
     const displayRating =
       rc >= 10 ? rawR : ovHasSalute ? 4.8 + (Math.abs(h) % 21) / 100 : 4.5 + (Math.abs(h) % 51) / 100;
 
@@ -948,10 +970,10 @@ export class CatalogService {
       rating: displayRating,
       address: overridden.address ? shortenAddressToStreet(overridden.address) : overridden.address,
       primaryOffer,
-      relatedEvents: relatedEvents.map((r: any) => ({
+      relatedEvents: relatedEvents.map((r: Record<string, unknown>) => ({
         ...r,
         rating:
-          (r.reviewCount ?? 0) >= 10
+          Number(r.reviewCount ?? 0) >= 10
             ? Number(r.rating) || 0
             : 4.5 +
               (Math.abs(
@@ -961,7 +983,7 @@ export class CatalogService {
               ) %
                 51) /
                 100,
-        address: r.address ? shortenAddressToStreet(r.address) : r.address,
+        address: r.address ? shortenAddressToStreet(String(r.address)) : r.address,
       })),
     };
   }
@@ -1162,7 +1184,7 @@ export class CatalogService {
    *
    * Scoring: rating 40% + price-efficiency 30% + occupancy 30%
    */
-  private enrichWithBadges(events: any[]): any[] {
+  private enrichWithBadges(events: Record<string, unknown>[]): Record<string, unknown>[] {
     if (events.length === 0) return events;
 
     const todayStart = new Date();
@@ -1172,7 +1194,7 @@ export class CatalogService {
 
     // Вычисляем метрики для каждого события
     const enriched = events.map((event) => {
-      const sessions: { startsAt: Date; availableTickets: number }[] = event.sessions || [];
+      const sessions: { startsAt: Date; availableTickets: number }[] = (event.sessions ?? []) as { startsAt: Date; availableTickets: number }[];
       const nextSessionAt = sessions.length > 0 ? sessions[0].startsAt : null;
       const now = new Date();
       const minutesUntilNext = nextSessionAt
@@ -1216,14 +1238,15 @@ export class CatalogService {
       const highlights: string[] = [];
       const venue = event.venue as { title?: string; shortTitle?: string } | null;
       const cityName = (event.city as { name?: string } | null)?.name;
-      const rawAddress = (event.address?.trim() || venue?.shortTitle || venue?.title) ?? '';
+      const rawAddress = (typeof event.address === 'string' ? event.address.trim() : null) || venue?.shortTitle || venue?.title || '';
       // Для точки отправления: только улица и номер дома
       const locStr = rawAddress ? shortenAddressToStreet(rawAddress) : '';
       if (locStr) highlights.push(locStr);
       const route = typeof templateData.route === 'string' ? templateData.route.trim() : null;
       if (route && !highlights.includes(route)) highlights.push(route);
-      const subs: EventSubcategory[] = event.subcategories || [];
-      const tagSlugsForFilter = (event.tags || []).map((t: any) => t?.tag?.slug).filter(Boolean);
+      const subs: EventSubcategory[] = (event.subcategories ?? []) as EventSubcategory[];
+      const tagsArr = Array.isArray(event.tags) ? event.tags : [];
+      const tagSlugsForFilter = (tagsArr as Array<{ tag?: { slug?: string } | null }>).map((t) => t?.tag?.slug).filter((s: string | undefined): s is string => !!s);
       const hasNightTag = tagSlugsForFilter.includes('night');
       const hasSaluteTag = tagSlugsForFilter.some((s: string) => s === 'salute' || s === 'salyut-s-vody');
       for (const sub of subs) {
@@ -1232,7 +1255,7 @@ export class CatalogService {
         const label = SUBCATEGORY_LABELS[sub as EventSubcategory];
         if (label && !highlights.includes(label)) highlights.push(label);
       }
-      const tags: { tag?: { slug?: string; name?: string } | null }[] = event.tags || [];
+      const tags: { tag?: { slug?: string; name?: string } | null }[] = (event.tags ?? []) as { tag?: { slug?: string; name?: string } | null }[];
       const tagLabelMap: Record<string, string> = {
         'with-guide': 'Экскурсия от гида',
         audioguide: 'Аудиогид',
@@ -1253,18 +1276,18 @@ export class CatalogService {
       const displayHighlights = highlights.slice(0, 3);
 
       // Primary offer — первый из отсортированных (isPrimary desc, priority desc)
-      const offers: any[] = event.offers || [];
+      const offers: Record<string, unknown>[] = (event.offers || []) as Record<string, unknown>[];
       const primaryOffer = offers.length > 0 ? offers[0] : null;
 
       // Извлекаем slug-и тегов для бейджей на фронтенде (защита от null tag)
       const tagSlugs: string[] = tags.map((t) => t?.tag?.slug).filter((s): s is string => !!s);
 
       // Рейтинг: до 10 отзывов — псевдослучайный. Салюты: 4.8–5, остальные: 4.5–5
-      const reviewCount = (event.reviewCount ?? 0) | 0;
+      const reviewCount = Number(event.reviewCount ?? 0) | 0;
       const rawRating = Number(event.rating) || 0;
       const hash = String(event.id || event.slug || '')
         .split('')
-        .reduce((a, c) => (a << 5) - a + c.charCodeAt(0), 0);
+        .reduce((a: number, c: string) => (a << 5) - a + c.charCodeAt(0), 0);
       const displayRating =
         reviewCount >= 10
           ? rawRating
@@ -1272,7 +1295,7 @@ export class CatalogService {
             ? 4.8 + (Math.abs(hash) % 21) / 100 // 4.80–5.00
             : 4.5 + (Math.abs(hash) % 51) / 100; // 4.50–5.00
 
-      const shortAddr = event.address ? shortenAddressToStreet(event.address) : '';
+      const shortAddr = event.address ? shortenAddressToStreet(String(event.address)) : '';
       return {
         ...event,
         rating: displayRating,
@@ -1294,7 +1317,7 @@ export class CatalogService {
     });
 
     // Нормализация для scoring
-    const prices = enriched.map((e) => e.priceFrom || 0).filter((p) => p > 0);
+    const prices = enriched.map((e) => Number((e as { priceFrom?: number }).priceFrom) || 0).filter((p) => p > 0);
     const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
     const maxPrice = prices.length > 0 ? Math.max(...prices) : 1;
     const priceRange = maxPrice - minPrice || 1;
@@ -1309,7 +1332,7 @@ export class CatalogService {
     for (let i = 0; i < enriched.length; i++) {
       const e = enriched[i];
       const rating = Number(e.rating) || 0;
-      const price = e.priceFrom || 0;
+      const price = Number((e as { priceFrom?: number }).priceFrom) || 0;
 
       const ratingScore = (rating / 5) * 0.4;
       const priceScore = price > 0 ? ((maxPrice - price) / priceRange) * 0.3 : 0;

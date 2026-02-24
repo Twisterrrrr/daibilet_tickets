@@ -37,7 +37,7 @@ export class RegionService {
   async getRegionPreviewByHubCity(cityId: string): Promise<{
     regionSlug: string;
     regionName: string;
-    events: any[];
+    events: Record<string, unknown>[];
   } | null> {
     const cacheKey = cacheKeys.regions.preview(cityId);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.CITY_DETAIL, async () => {

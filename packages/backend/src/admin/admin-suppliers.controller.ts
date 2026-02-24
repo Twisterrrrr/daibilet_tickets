@@ -20,7 +20,7 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { CreateApiKeyDto, UpdateSupplierDto, UpdateWebhookDto } from './dto/admin-supplier.dto';
+import { CreateApiKeyDto, UpdateSupplierDto, UpdateWebhookDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()

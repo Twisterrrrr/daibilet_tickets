@@ -427,8 +427,27 @@ export function EventEditPage() {
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Название</Label>
-                  <Input value={form.title ?? ''} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <Label>Название</Label>
+                    {event && (
+                      <span className="text-xs text-muted-foreground">
+                        <span title="Из источника (TC, TEPLOHOD и т.д.)">Оригинал:</span>{' '}
+                        <span className="font-medium">{event.title}</span>
+                        {(form.title ?? event.override?.title) && (form.title ?? event.override?.title) !== event.title && (
+                          <>
+                            {' · '}
+                            <span title="Показывается на сайте">Для Daibilet:</span>{' '}
+                            <span className="font-medium">{form.title ?? event.override?.title}</span>
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    value={form.title ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder={event?.title ? `Оригинал: ${event.title}` : undefined}
+                  />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">

@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { RedisCacheModule } from '../cache/cache.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { CheckoutModule } from '../checkout/checkout.module';
+import { VoucherModule } from '../voucher/voucher.module';
 import { ReviewService } from '../catalog/review.service';
 import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
 import { TagAssignmentService } from '../scheduler/tag-assignment.service';
@@ -23,6 +24,7 @@ import { AdminLandingsController } from './admin-landings.controller';
 import { AdminModerationController } from './admin-moderation.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminOrdersController } from './admin-orders.controller';
+import { AdminCacheController } from './admin-cache.controller';
 import { AdminReconciliationController } from './admin-reconciliation.controller';
 import { AdminReviewsController } from './admin-reviews.controller';
 import { AdminSettingsController } from './admin-settings.controller';
@@ -44,6 +46,7 @@ import { PaymentMetricsService } from '../checkout/payment-metrics.service';
     SupportModule,
     CheckoutModule,
     CatalogModule,
+    VoucherModule,
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_SYNC },
@@ -73,6 +76,7 @@ import { PaymentMetricsService } from '../checkout/payment-metrics.service';
     AdminSupportController,
     AdminOpsController,
     AdminReconciliationController,
+    AdminCacheController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })

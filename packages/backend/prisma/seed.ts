@@ -1,5 +1,8 @@
+import * as dotenv from 'dotenv';
 import { PrismaClient, TagCategory } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+
+dotenv.config({ path: '../../.env' });
 
 const prisma = new PrismaClient();
 
@@ -9,20 +12,106 @@ async function main() {
   // --- Admin User ---
   const adminEmail = process.env.ADMIN_INITIAL_EMAIL || 'admin@daibilet.ru';
   const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'changeme123';
-  const passwordHash = await bcrypt.hash(adminPassword, 10);
+  const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
 
   await prisma.adminUser.upsert({
     where: { email: adminEmail },
     update: { role: 'ADMIN' },
     create: {
       email: adminEmail,
-      passwordHash,
+      passwordHash: adminPasswordHash,
       name: 'Admin',
       role: 'ADMIN',
       isActive: true,
     },
   });
   console.log(`  ✓ Admin user: ${adminEmail} (role: ADMIN)`);
+
+  // --- Test Admin / Support accounts ---
+  const adminTestPassword = await bcrypt.hash('Admin123!', 10);
+  await prisma.adminUser.upsert({
+    where: { email: 'admin.test@daibilet.ru' },
+    update: {},
+    create: {
+      email: 'admin.test@daibilet.ru',
+      passwordHash: adminTestPassword,
+      name: 'Test Admin',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  });
+  await prisma.adminUser.upsert({
+    where: { email: 'support.test@daibilet.ru' },
+    update: {},
+    create: {
+      email: 'support.test@daibilet.ru',
+      passwordHash: adminTestPassword,
+      name: 'Test Support',
+      role: 'EDITOR',
+      isActive: true,
+    },
+  });
+  console.log('  ✓ Test admin/support accounts created');
+
+  // --- Test frontend Users (buyers) ---
+  const userPasswordHash = await bcrypt.hash('TestUser123!', 10);
+  const users = [
+    {
+      email: 'test.user@daibilet.ru',
+      name: 'Test User',
+    },
+    {
+      email: 'history.user@daibilet.ru',
+      name: 'History User',
+    },
+  ];
+
+  for (const u of users) {
+    await prisma.user.upsert({
+      where: { email: u.email },
+      update: {},
+      create: {
+        email: u.email,
+        name: u.name,
+        passwordHash: userPasswordHash,
+        isActive: true,
+      },
+    });
+  }
+  console.log('  ✓ Test buyer accounts created (test.user, history.user)');
+
+  // --- Test Supplier (partner) account ---
+  const supplierPasswordHash = await bcrypt.hash('Partner123!', 10);
+  const testOperator = await prisma.operator.upsert({
+    where: { slug: 'test-supplier' },
+    update: {},
+    create: {
+      slug: 'test-supplier',
+      name: 'Test Supplier',
+      isSupplier: true,
+      trustLevel: 1,
+      commissionRate: 0.25,
+      promoRate: 0.1,
+      companyName: 'ИП Тестовый Партнёр',
+      inn: '000000000000',
+      contactEmail: 'partner.test@daibilet.ru',
+      contactPhone: '+7 800 123-45-67',
+    },
+  });
+
+  await prisma.supplierUser.upsert({
+    where: { email: 'partner.test@daibilet.ru' },
+    update: {},
+    create: {
+      email: 'partner.test@daibilet.ru',
+      name: 'Partner Test',
+      passwordHash: supplierPasswordHash,
+      operatorId: testOperator.id,
+      role: 'OWNER',
+      isActive: true,
+    },
+  });
+  console.log('  ✓ Test supplier account created (partner.test@daibilet.ru)');
 
   // --- Города ---
 

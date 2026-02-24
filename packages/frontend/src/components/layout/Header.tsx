@@ -18,7 +18,6 @@ const navigation = [
   { name: 'Подборки', href: '/podborki' },
   { name: 'Города', href: '/cities' },
   { name: 'Блог', href: '/blog' },
-  { name: 'Стать партнёром', href: '/partner' },
 ];
 
 interface HeaderCity {
@@ -40,7 +39,7 @@ function HeaderCitySelect() {
         const data = await api.getCities();
         if (!cancelled) {
           setCities(
-            (data || []).map((c: any) => ({
+            (data || []).map((c) => ({
               slug: c.slug,
               name: c.name,
             })),
@@ -134,14 +133,18 @@ function HeaderCitySelect() {
 }
 
 export function Header() {
+  const searchParams = useSearchParams();
+  const cityFromUrl = searchParams.get('city') ?? undefined;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const auth = useUserAuthOptional();
+  const router = useRouter();
   const { slugs, mounted } = useFavorites();
   const favoritesCount = mounted ? slugs.length : 0;
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-      <nav className="container-page flex h-16 items-center justify-between gap-2">
+      <nav className="container-page flex h-16 min-w-0 items-center justify-between gap-2">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 flex-shrink-0">
           <Compass className="h-7 w-7 text-primary-600" />
@@ -166,7 +169,7 @@ export function Header() {
         {/* Right side: city selector (desktop) + search + help + mobile menu */}
         <div className="flex items-center gap-1 sm:gap-2">
           <HeaderCitySelect />
-          <SearchAutocomplete />
+          <SearchAutocomplete city={cityFromUrl} />
           <Link
             href="/favorites"
             className="relative flex items-center justify-center rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-rose-500 sm:inline-flex"
@@ -187,7 +190,33 @@ export function Header() {
             <HelpCircle className="h-5 w-5" />
           </Link>
           {auth?.isLoggedIn ? (
-            <span className="hidden text-sm text-slate-600 sm:inline">{auth.user?.name}</span>
+            <div className="relative hidden sm:block">
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen((v) => !v)}
+                className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800"
+              >
+                <span className="max-w-[140px] truncate">{auth.user?.name}</span>
+                <ChevronDown
+                  className={`h-3 w-3 text-slate-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {userMenuOpen && (
+                <div className="absolute right-0 z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white shadow-lg">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await auth.logout();
+                      setUserMenuOpen(false);
+                      router.push('/');
+                    }}
+                    className="block w-full px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
+                  >
+                    Выйти
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <Link
               href="/login"
@@ -238,7 +267,20 @@ export function Header() {
               Помощь
             </Link>
             {auth?.isLoggedIn ? (
-              <span className="block px-3 py-2.5 text-sm text-slate-500">{auth.user?.name}</span>
+              <div className="px-3 pt-2.5 pb-1">
+                <div className="text-sm text-slate-600">{auth.user?.name}</div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await auth.logout();
+                    setMobileMenuOpen(false);
+                    router.push('/');
+                  }}
+                  className="mt-2 inline-flex rounded-lg px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50"
+                >
+                  Выйти
+                </button>
+              </div>
             ) : (
               <Link
                 href="/login"

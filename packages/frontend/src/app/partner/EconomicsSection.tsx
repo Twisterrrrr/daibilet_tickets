@@ -107,8 +107,8 @@ export function EconomicsSection() {
             </div>
           </div>
           <p className="text-sm text-white/50 mt-4">
-            За 4 месяца промо-периода —{' '}
-            {formatNumber(4 * 500 * avgCheck * (standardRate - promoRate))} дополнительной прибыли.
+            За 3 месяца промо-периода —{' '}
+            {formatNumber(3 * 500 * avgCheck * (standardRate - promoRate))} дополнительной прибыли.
           </p>
         </div>
       </div>

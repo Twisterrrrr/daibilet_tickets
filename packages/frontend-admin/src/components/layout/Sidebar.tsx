@@ -23,7 +23,6 @@ import {
   Tag,
   Ticket,
   Users,
-  Window,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
@@ -32,6 +31,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { flags } from '@/config/flags';
 
 interface NavItem {
   to: string;
@@ -50,9 +50,13 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Основное',
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-      { to: '/events', label: 'События', icon: CalendarDays },
-      { to: '/events/merge', label: 'Merge дублей', icon: Merge },
-      { to: '/orders', label: 'Заказы', icon: ShoppingCart },
+      ...(flags.showEvents
+        ? [
+            { to: '/events', label: 'События', icon: CalendarDays },
+            { to: '/events/merge', label: 'Merge дублей', icon: Merge },
+          ]
+        : []),
+      ...(flags.showOrders ? [{ to: '/orders', label: 'Заказы', icon: ShoppingCart }] : []),
       { to: '/checkout', label: 'Заявки', icon: Inbox },
       { to: '/support', label: 'Поддержка', icon: HeadphonesIcon },
     ],
@@ -60,14 +64,18 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Контент',
     items: [
-      { to: '/cities', label: 'Города', icon: MapPin },
-      { to: '/venues', label: 'Места', icon: Landmark },
-      { to: '/tags', label: 'Теги', icon: Tag },
-      { to: '/collections', label: 'Подборки', icon: LayoutList },
-      { to: '/landings', label: 'Лендинги', icon: FileText },
-      { to: '/combos', label: 'Combo', icon: Layers },
-      { to: '/articles', label: 'Статьи', icon: BookOpen },
-      { to: '/widgets', label: 'Виджеты Teplohod', icon: Window },
+      ...(flags.showContent
+        ? [
+            { to: '/cities', label: 'Города', icon: MapPin },
+            { to: '/tags', label: 'Теги', icon: Tag },
+            { to: '/collections', label: 'Подборки', icon: LayoutList },
+            { to: '/landings', label: 'Лендинги', icon: FileText },
+            { to: '/combos', label: 'Combo', icon: Layers },
+            { to: '/articles', label: 'Статьи', icon: BookOpen },
+            { to: '/widgets', label: 'Виджеты Teplohod', icon: ExternalLink },
+          ]
+        : []),
+      ...(flags.showCatalog ? [{ to: '/venues', label: 'Места', icon: Landmark }] : []),
     ],
   },
   {
@@ -83,9 +91,13 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/reviews', label: 'Отзывы', icon: MessageSquare },
       { to: '/external-reviews', label: 'Внешние отзывы', icon: ExternalLink },
       { to: '/upsells', label: 'Upsells', icon: DollarSign },
-      { to: '/jobs/failed', label: 'Failed Jobs', icon: AlertCircle },
-      { to: '/reconciliation', label: 'Сверка', icon: Scale },
-      { to: '/audit', label: 'Аудит', icon: ClipboardList },
+      ...(flags.showOps
+        ? [
+            { to: '/jobs/failed', label: 'Failed Jobs', icon: AlertCircle },
+            { to: '/reconciliation', label: 'Сверка', icon: Scale },
+            { to: '/audit', label: 'Аудит', icon: ClipboardList },
+          ]
+        : []),
       { to: '/settings', label: 'Настройки', icon: Settings },
     ],
   },

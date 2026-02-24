@@ -70,12 +70,12 @@
 - **GiftCertificate** — подарочный сертификат (номинал, код GC-XXXX-XXXX, email получателя, сообщение). Создаётся при успешной оплате, статусы ISSUED/ACTIVATED/EXPIRED.
 - **OrderRequest** — заявка на подтверждение (SLA/TTL, expireReason, confirmedAt). Привязана к CheckoutSession.
 - **PaymentIntent** — платёжное намерение (PENDING/PROCESSING/PAID/FAILED/CANCELLED/REFUNDED). Привязка к CheckoutSession, idempotencyKey, provider (STUB/YOOKASSA). Split-поля для маркетплейса: supplierId, grossAmount, platformFee, supplierAmount, commissionRate.
-- **Operator** — юридическое лицо/правообладатель. Поля маркетплейса: isSupplier, trustLevel, commissionRate, status (ACTIVE/ARCHIVED/SUSPENDED). Подробно: `docs/SupplierArchitecture.md`.
+- **Operator** — юридическое лицо/правообладатель. Поля маркетплейса: isSupplier, trustLevel, commissionRate, status (ACTIVE/ARCHIVED/SUSPENDED). Подробно: § Архитектура Supplier ниже.
 - **SupplierUser** — аккаунт поставщика (Operator 1—N SupplierUser). Роли: OWNER, MANAGER, CONTENT, ACCOUNTANT.
 - **User** — пользователь сайта (регистрация/вход). Избранное в UserFavorite (eventSlug).
 - **ApiKey** — API-ключ для Partner B2B API: SHA-256 хеш (не храним оригинал), prefix (8 символов для UI), rateLimit, ipWhitelist, expiresAt.
 - **Venue** — место (музей, галерея, арт-пространство). VenueType enum (MUSEUM/GALLERY/ART_SPACE/EXHIBITION_HALL/THEATER/PALACE/PARK). Содержит: openingHours (JSON), priceFrom, rating, galleryUrls, address/metro/lat/lng, operatorId (партнёр). Soft delete, optimistic lock.
-- **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate. Шаблоны страниц по категориям — `docs/PageTemplateSpecs.md`.
+- **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate. Шаблоны страниц — `docs/Reference.md` § PageTemplateSpecs.
 - **EventOffer расширен**: venueId для прямых офферов к месту (без привязки к Event).
 - **Location** — причал, площадка, точка встречи (каркас, Фаза 2)
 - **Route** — маршрут с POI (каркас, Фаза 2)
@@ -87,7 +87,7 @@
 ## Соглашения
 
 - REST API: `/api/v1`
-- Observability: `docs/Observability.md` — requestId, PII masking, логирование
+- Observability: `docs/Reference.md` §2 — requestId, PII masking
 - Цены в копейках (целое число)
 - Даты — ISO 8601, UTC в БД, локальные при отображении
 - Slug — транслитерация кириллицы
@@ -370,6 +370,54 @@ Article
 
 ## План 26 PR: Инфра + типизация + UX + Checkout
 
-> Документ: `docs/InfraTypizationUXCheckoutPlan.md`
-
 26 задач (каждая = 1 PR): Nginx static, Feature Flags, Pino/Sentry, Redis cache, типизация (tc-sync, Proto, where builders), email order-confirmed/completed, каталог (view toggle, venue detail), Teplohod widgets, Supplier RBAC + drafts, Checkout (package flow, YooKassa, orders tracking, webhook idempotency). Миграции M1–M8.
+
+---
+
+## Partitioning Plan (EventSession)
+
+**Цель:** Партиционировать `event_sessions` по `startsAt` (месяц).
+
+### Шаги (без простоя)
+
+1. **Подготовка:** Создать `event_sessions_new` (PARTITION BY RANGE (startsAt)), партиции на N месяцев вперёд. Скрипт: `infra/migrations/create_event_sessions_partitions.sql`.
+2. **Миграция:** `INSERT INTO event_sessions_new SELECT * FROM event_sessions` (batch 10k).
+3. **Переключение:** RENAME event_sessions → event_sessions_old, event_sessions_new → event_sessions.
+4. **Cron:** Раз в месяц создавать партиции на следующие 3 месяца.
+
+**Rollback:** RENAME обратно, перезапуск приложения.
+
+---
+
+## Архитектура Supplier (Operator vs SupplierUser)
+
+| Сущность | Что это | Роль |
+|----------|---------|------|
+| **Operator** | Юрлицо / правообладатель | ООО/ИП, договор, комиссия |
+| **SupplierUser** | Аккаунт в ЛК | Логин, доступ, создаёт Event/Venue |
+| **Provider** | Источник инвентаря | TC, TEPLOHOD, MANUAL |
+| **Offer** | Предложение | EventOffer — цена, deeplink |
+
+**Operator (1) ← SupplierUser (N).** Контент привязан к Operator через `operatorId`. Operator с `isSupplier = true` → доступ в Supplier Portal.
+
+**Режимы:** A) Operator-модель — вы ведёте контент, Supplier не обязателен. B) Supplier-модель — Supplier создаёт DRAFT, модерация. C) Ручной — MANUAL, self-serve.
+
+**Модерация:** DRAFT → PENDING_REVIEW → APPROVED/REJECTED. AUTO_APPROVED при trustLevel 1–2.
+
+**Роли:** OWNER (всё), MANAGER (события/офферы), CONTENT (контент), ACCOUNTANT (отчёты).
+
+**Operator.status:** ACTIVE | ARCHIVED | SUSPENDED.
+
+**createdByType:** ADMIN | SUPPLIER | IMPORT — для Event/Venue.
+
+---
+
+## Политика фильтров (QF)
+
+**Query Filters:** type (excursion|venue|event), group, slug, title, isSeo, priority. 17 фильтров в seed.
+
+**Маппинг:** slug → EventSubcategory, VenueType, EventAudience, tag. См. `query-filter-map.ts`.
+
+**SEO URL:** `/{city}/{type}/`, `/{city}/{type}/{filter}/`. Индексируем 1–2 фильтра в path, остальное — query.
+
+**Модель:** QueryFilter (id, type, group, slug, title, isSeo, priority), @@unique([slug, type]).

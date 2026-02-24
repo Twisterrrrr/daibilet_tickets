@@ -403,7 +403,7 @@ export class ReviewService {
     ]);
 
     // Внешние отзывы (первая страница)
-    let externalReviews: any[] = [];
+    let externalReviews: Record<string, unknown>[] = [];
     if (page === 1) {
       externalReviews = await this.prisma.externalReview.findMany({
         where: { eventId: event.id },

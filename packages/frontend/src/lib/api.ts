@@ -136,7 +136,7 @@ export const api = {
 
   // Теги
   getTags: (category?: string) =>
-    fetchApi<TagItem[]>(`/tags${category ? `?category=${category}` : ''}`),
+    fetchApi<import('./api.types').TagWithCount[]>(`/tags${category ? `?category=${category}` : ''}`),
 
   getTagBySlug: (slug: string, city?: string, page?: number) => {
     const params = new URLSearchParams();
@@ -156,6 +156,17 @@ export const api = {
   // Planner
   calculatePlan: (data: PlanRequest) =>
     fetchApi<{ variants: PlanVariant[]; upsells: UpsellItem[]; meta: PlanCalculateMeta }>('/planner/calculate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  customizePlan: (data: {
+    variant: Record<string, unknown>;
+    dayNumber: number;
+    slotIndex: number;
+    newEventId: string;
+  }) =>
+    fetchApi<{ success: boolean; variant?: Record<string, unknown>; message?: string }>('/planner/customize', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -397,5 +408,17 @@ export const api = {
     fetchApi<{ slugs: string[] }>(`/user/favorites/${encodeURIComponent(slug)}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  userForgotPassword: (email: string) =>
+    fetchApi<{ ok: boolean }>('/user/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  userResetPassword: (data: { token: string; password: string }) =>
+    fetchApi<{ ok: boolean }>('/user/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 };

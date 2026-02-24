@@ -17,7 +17,7 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { CreateExternalWidgetDto, UpdateExternalWidgetDto } from './dto/admin-widget.dto';
+import { CreateExternalWidgetDto, UpdateExternalWidgetDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()

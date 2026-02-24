@@ -3,7 +3,7 @@ import { Search, ListChecks, ShoppingCart, TrendingUp, Tag, Globe } from 'lucide
 const features = [
   { icon: Globe, text: 'SEO-страницы по городам и тематикам' },
   { icon: Search, text: 'Продвижение в подборках каталога' },
-  { icon: ShoppingCart, text: 'Upsell и cross-sell' },
+  { icon: ShoppingCart, text: 'Допродажи и кросс-продажи' },
   { icon: ListChecks, text: 'Планировщик поездки' },
   { icon: Tag, text: 'Гибкая система тарифов' },
   { icon: TrendingUp, text: 'Автоматическая перелинковка' },

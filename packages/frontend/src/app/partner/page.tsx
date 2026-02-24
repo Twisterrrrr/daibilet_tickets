@@ -9,7 +9,7 @@ import { ReportingSection } from './ReportingSection';
 import { ContactSection } from './ContactSection';
 
 export const metadata: Metadata = {
-  title: 'Варианты сотрудничества с DAIBILET',
+  title: 'Варианты сотрудничества с Дайбилет',
   description: 'Выберите модель сотрудничества, подходящую вашему бизнесу',
 };
 
@@ -26,7 +26,7 @@ export default function PartnerPage() {
 
       <footer className="py-8 bg-primary-600 text-white/70 text-center text-sm">
         <div className="container-page">
-          © {new Date().getFullYear()} Daibilet.ru — агрегатор экскурсий, мероприятий и музеев
+          © {new Date().getFullYear()} Дайбилет — агрегатор экскурсий, мероприятий и музеев
         </div>
       </footer>
     </main>

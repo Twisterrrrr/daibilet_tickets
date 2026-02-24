@@ -17,11 +17,12 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
+import { toJsonValue } from '../common/typing';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
-import { CreateComboDto, UpdateComboDto } from './dto/admin-combo.dto';
+import { CreateComboDto, UpdateComboDto } from './dto/admin.dto';
 import { CuratedEventSchema, FaqSchema, FeatureSchema, IncludesSchema, validateJson } from './json-schemas';
 
 @ApiTags('admin')
@@ -42,7 +43,7 @@ export class AdminCombosController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const where: any = { isDeleted: false };
+    const where: Record<string, unknown> = { isDeleted: false };
     if (city) where.city = { slug: city };
 
     const pg = parsePagination({ cursor, page, limit });
@@ -69,16 +70,30 @@ export class AdminCombosController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateComboDto) {
-    this.validateJsonFields(data);
-    return this.prisma.comboPage.create({ data });
+    this.validateJsonFields(data as unknown as Record<string, unknown>);
+    const prismaData = {
+      ...data,
+      curatedEvents: data.curatedEvents ? toJsonValue(data.curatedEvents) : undefined,
+      faq: data.faq ? toJsonValue(data.faq) : undefined,
+      features: data.features ? toJsonValue(data.features) : undefined,
+      includes: data.includes ? toJsonValue(data.includes) : undefined,
+    };
+    return this.prisma.comboPage.create({ data: prismaData as Parameters<typeof this.prisma.comboPage.create>[0]['data'] });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: UpdateComboDto, @Request() req: any) {
-    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as any;
+  async update(@Param('id') id: string, @Body() data: UpdateComboDto, @Request() req: { user: { id: string } }) {
+    const { id: _, createdAt, updatedAt, city, version, ...rest } = data as Record<string, unknown>;
+    const clean = {
+      ...rest,
+      curatedEvents: rest.curatedEvents !== undefined ? toJsonValue(rest.curatedEvents) : undefined,
+      faq: rest.faq !== undefined ? toJsonValue(rest.faq) : undefined,
+      features: rest.features !== undefined ? toJsonValue(rest.features) : undefined,
+      includes: rest.includes !== undefined ? toJsonValue(rest.includes) : undefined,
+    };
 
-    this.validateJsonFields(clean);
+    this.validateJsonFields(rest);
 
     if (data.version !== undefined) {
       const before = await this.prisma.comboPage.findUnique({ where: { id } });
@@ -112,7 +127,7 @@ export class AdminCombosController {
     return { success: true };
   }
 
-  private validateJsonFields(data: any) {
+  private validateJsonFields(data: Record<string, unknown>) {
     try {
       if (data.faq !== undefined) validateJson(FaqSchema, data.faq, 'faq');
       if (data.features !== undefined) validateJson(FeatureSchema, data.features, 'features');

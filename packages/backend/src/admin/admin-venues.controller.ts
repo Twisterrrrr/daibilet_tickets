@@ -24,7 +24,7 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { CreateVenueDto, UpdateVenueDto } from './dto/admin-venue.dto';
+import { CreateVenueDto, UpdateVenueDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -46,7 +46,7 @@ export class AdminVenuesController {
   ) {
     const pg = parsePagination({ cursor, page, limit: limit || '20' });
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       isDeleted: false,
       ...(city && { city: { slug: city } }),
       ...(venueType && { venueType }),
@@ -260,7 +260,7 @@ export class AdminVenuesController {
           commissionRate: body.commissionRate ? Number(body.commissionRate) : null,
         }),
         version: { increment: 1 },
-      },
+      } as Parameters<typeof this.prisma.venue.updateMany>[0]['data'],
     });
 
     if (result.count === 0) {
@@ -289,7 +289,7 @@ export class AdminVenuesController {
    * Rule: venue cannot be active without these fields filled.
    * Required: title, address, imageUrl, priceFrom, description (at least short).
    */
-  private validateForPublish(data: any): void {
+  private validateForPublish(data: { title?: string; address?: string | null; imageUrl?: string | null; priceFrom?: number | null; description?: string | null; shortDescription?: string | null; galleryUrls?: unknown[] }): void {
     const errors: string[] = [];
 
     if (!data.title?.trim()) errors.push('Название (title)');
@@ -298,7 +298,6 @@ export class AdminVenuesController {
     if (!data.priceFrom || Number(data.priceFrom) <= 0) errors.push('Цена от (priceFrom)');
     if (!data.description?.trim() && !data.shortDescription?.trim()) errors.push('Описание (description)');
 
-    // Рекомендация: минимум 3 фото (image + 2 gallery), но не блокируем
     const galleryCount = (data.galleryUrls || []).length;
     const totalPhotos = (data.imageUrl ? 1 : 0) + galleryCount;
     if (totalPhotos < 3) {

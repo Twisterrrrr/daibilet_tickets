@@ -6,13 +6,9 @@ import { PassportModule } from '@nestjs/passport';
 import { OperatorScopeGuard } from '../common/guards/operator-scope.guard';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SupplierRolesGuard } from './supplier.guard';
-import { SupplierAuthController } from './supplier-auth.controller';
 import { SupplierAuthService } from './supplier-auth.service';
-import { SupplierDashboardController } from './supplier-dashboard.controller';
-import { SupplierEventsController } from './supplier-events.controller';
+import { SupplierController } from './supplier.controller';
 import { SupplierJwtStrategy } from './supplier-jwt.strategy';
-import { SupplierReportsController } from './supplier-reports.controller';
-import { SupplierSettingsController } from './supplier-settings.controller';
 
 @Module({
   imports: [
@@ -28,13 +24,7 @@ import { SupplierSettingsController } from './supplier-settings.controller';
     }),
   ],
   providers: [SupplierJwtStrategy, SupplierAuthService, SupplierRolesGuard, OperatorScopeGuard],
-  controllers: [
-    SupplierAuthController,
-    SupplierEventsController,
-    SupplierDashboardController,
-    SupplierReportsController,
-    SupplierSettingsController,
-  ],
+  controllers: [SupplierController],
   exports: [SupplierAuthService],
 })
 export class SupplierModule {}

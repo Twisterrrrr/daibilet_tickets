@@ -150,12 +150,12 @@ export class CreateVenueDto {
   @ApiPropertyOptional({ description: 'JSON array of highlight strings' })
   @IsOptional()
   @IsArray()
-  highlights?: any[];
+  highlights?: string[];
 
   @ApiPropertyOptional({ description: 'JSON array: [{q, a}]' })
   @IsOptional()
   @IsArray()
-  faq?: any[];
+  faq?: Record<string, unknown>[];
 
   @ApiPropertyOptional({ description: 'Feature flags array' })
   @IsOptional()

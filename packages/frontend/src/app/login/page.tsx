@@ -84,6 +84,13 @@ export default function LoginPage() {
               className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
             />
           </div>
+          {mode === 'login' && (
+            <div className="text-right">
+              <Link href="/forgot-password" className="text-xs text-primary-600 hover:text-primary-700">
+                Забыли пароль?
+              </Link>
+            </div>
+          )}
           <button
             type="submit"
             disabled={loading}

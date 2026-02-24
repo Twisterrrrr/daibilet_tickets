@@ -3,6 +3,8 @@
  * Shared types (CatalogItem, EventDetail, etc.) come from @daibilet/shared.
  */
 
+import type { TagItem } from '@daibilet/shared';
+
 /** SEO meta (GET /seo/:entityType/:entityId) */
 export interface SeoMetaResponse {
   entityType?: string;
@@ -185,6 +187,34 @@ export interface ExternalReviewItemDto {
   rating: number;
   text: string;
   publishedAt?: string;
+}
+
+/** Результат поиска (GET /search) */
+export interface SearchResult {
+  events: import('@daibilet/shared').EventListItem[];
+  cities: import('@daibilet/shared').CityListItem[];
+}
+
+/** Ответ статуса checkout (GET /checkout/:packageId/status) */
+export interface CheckoutStatusResponse {
+  status: string;
+  voucherUrl: string | null;
+  totalPrice?: number;
+  items?: unknown[];
+  code?: string;
+}
+
+/** Tag с счётчиком событий (API /tags) */
+export interface TagWithCount extends TagItem {
+  _count?: { events: number };
+}
+
+/** Combo detail — features, faq, days, upsells */
+export interface ComboDetailData {
+  features?: Array<{ icon?: string; title?: string; text?: string }>;
+  faq?: Array<{ question?: string; answer?: string }>;
+  days?: Array<{ dayNumber?: number; slots?: Array<{ slot?: string; event?: unknown; subtotal?: number }> }>;
+  upsells?: Array<{ id?: string; name?: string; priceKopecks?: number; icon?: string }>;
 }
 
 /** Review response (paginated) — совместим с ReviewSection */

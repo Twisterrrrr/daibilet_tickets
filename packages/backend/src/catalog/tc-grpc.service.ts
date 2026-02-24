@@ -104,7 +104,7 @@ export interface TcGrpcCategory {
 @Injectable()
 export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TcGrpcService.name);
-  private client: any;
+  private client: import('@grpc/grpc-js').Client | null = null;
   private readonly endpoint: string;
   private readonly apiKey: string;
 
@@ -178,13 +178,13 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
   /**
    * Обёртка: собирает все элементы из server-side streaming RPC в массив.
    */
-  private collectStream<T>(rpcMethod: string, request: any, timeoutMs = 30000): Promise<T[]> {
+  private collectStream<T>(rpcMethod: string, request: Record<string, unknown>, timeoutMs = 30000): Promise<T[]> {
     return new Promise((resolve, reject) => {
       if (!this.client) {
         return reject(new Error('gRPC-клиент не инициализирован'));
       }
 
-      const method = this.client[rpcMethod];
+      const method = (this.client as unknown as Record<string, unknown>)[rpcMethod];
       if (!method) {
         return reject(new Error(`gRPC-метод ${rpcMethod} не найден`));
       }
@@ -192,23 +192,24 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
       const items: T[] = [];
       const deadline = new Date(Date.now() + timeoutMs);
 
-      const stream = method.call(this.client, request, this.getMetadata(), { deadline });
+      const stream = (method as (req: unknown, md: unknown, opts: unknown) => { on: (ev: string, cb: (d?: unknown) => void) => unknown }).call(this.client, request, this.getMetadata(), { deadline }) as { on: (ev: string, cb: (d?: unknown) => void) => unknown };
 
-      stream.on('data', (item: T) => {
-        items.push(item);
+      stream.on('data', (item: unknown) => {
+        items.push(item as T);
       });
 
       stream.on('end', () => {
         resolve(items);
       });
 
-      stream.on('error', (err: any) => {
+      stream.on('error', (err: unknown) => {
         // CANCELLED после end — нормально
-        if (err.code === grpc.status.CANCELLED && items.length > 0) {
+        const e = err as { code?: number; message?: string };
+        if (e.code === grpc.status.CANCELLED && items.length > 0) {
           resolve(items);
           return;
         }
-        reject(new Error(`gRPC ${rpcMethod} error: ${err.message} (code=${err.code})`));
+        reject(new Error(`gRPC ${rpcMethod} error: ${e.message} (code=${e.code})`));
       });
     });
   }
@@ -222,16 +223,16 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
         return reject(new Error('gRPC-клиент не инициализирован'));
       }
 
-      const method = this.client[rpcMethod];
+      const method = (this.client as unknown as Record<string, unknown>)[rpcMethod];
       if (!method) {
         return reject(new Error(`gRPC-метод ${rpcMethod} не найден`));
       }
 
       const deadline = new Date(Date.now() + timeoutMs);
 
-      method.call(this.client, request, this.getMetadata(), { deadline }, (err: any, response: TRes) => {
+      (method as (req: unknown, md: unknown, opts: unknown, cb: (err: Error | null, res: unknown) => void) => void).call(this.client, request, this.getMetadata(), { deadline }, (err: Error | null, response: unknown) => {
         if (err) return reject(new Error(`gRPC ${rpcMethod}: ${err.message}`));
-        resolve(response);
+        resolve(response as TRes);
       });
     });
   }
@@ -269,7 +270,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
     without_meta?: boolean;
     org?: string;
   }): Promise<TcGrpcEvent[]> {
-    const request: any = {};
+    const request: Record<string, unknown> = {};
 
     if (filter?.status !== undefined) request.status = filter.status;
     if (filter?.ids?.length) request.ids = filter.ids;
@@ -293,7 +294,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
    * Получить группы повторяющихся мероприятий (MetaEvents).
    */
   async fetchMetaEvents(ids?: string[]): Promise<TcGrpcMetaEvent[]> {
-    const request: any = {};
+    const request: Record<string, unknown> = {};
     if (ids?.length) request.ids = ids;
 
     const metas = await this.collectStream<TcGrpcMetaEvent>('MetaEvents', request, 30000);
@@ -306,7 +307,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
    * Получить площадки.
    */
   async fetchVenues(ids?: string[]): Promise<TcGrpcVenue[]> {
-    const request: any = {};
+    const request: Record<string, unknown> = {};
     if (ids?.length) request.ids = ids;
 
     const venues = await this.collectStream<TcGrpcVenue>('Venues', request, 30000);
@@ -319,7 +320,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
    * Получить города из справочника TC.
    */
   async fetchCities(ids?: number[]): Promise<TcGrpcCity[]> {
-    const request: any = {};
+    const request: Record<string, unknown> = {};
     if (ids?.length) request.ids = ids;
 
     const cities = await this.collectStream<TcGrpcCity>('Cities', request, 15000);
@@ -332,7 +333,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
    * Получить теги (жанры).
    */
   async fetchTags(ids?: string[]): Promise<TcGrpcTag[]> {
-    const request: any = {};
+    const request: Record<string, unknown> = {};
     if (ids?.length) request.ids = ids;
 
     const tags = await this.collectStream<TcGrpcTag>('Tags', request, 15000);
@@ -344,7 +345,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
    * Получить категории мероприятий.
    */
   async fetchCategories(ids?: string[]): Promise<TcGrpcCategory[]> {
-    const request: any = {};
+    const request: Record<string, unknown> = {};
     if (ids?.length) request.ids = ids;
 
     const cats = await this.collectStream<TcGrpcCategory>('Categories', request, 15000);

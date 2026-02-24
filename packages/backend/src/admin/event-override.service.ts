@@ -18,7 +18,7 @@ export class EventOverrideService {
   /**
    * Создать или обновить override для события.
    */
-  async upsert(eventId: string, data: any, updatedBy: string) {
+  async upsert(eventId: string, data: Record<string, unknown>, updatedBy: string) {
     const { id: _, createdAt, updatedAt, event, ...clean } = data;
 
     return this.prisma.eventOverride.upsert({
@@ -52,7 +52,7 @@ export class EventOverrideService {
    * Применить overrides к массиву событий.
    * Возвращает события с мёрженными данными, фильтрует isHidden.
    */
-  async applyOverrides(events: any[]): Promise<any[]> {
+  async applyOverrides<T extends Record<string, unknown> & { id: string }>(events: T[]): Promise<T[]> {
     if (events.length === 0) return events;
 
     const eventIds = events.map((e) => e.id);
@@ -66,24 +66,48 @@ export class EventOverrideService {
 
     return events
       .map((event) => {
-        const override = overrideMap.get(event.id);
+        const override = overrideMap.get(event.id) as
+          | (Record<string, unknown> & {
+              editorStatus?: string;
+              subcategories?: unknown[];
+              subcategoriesMode?: string | null;
+              subcategoriesOverride?: unknown[];
+            })
+          | undefined;
         if (!override) return event;
-        if (override.isHidden) return null; // Фильтруем скрытые
+        if ((override as { isHidden?: boolean }).isHidden) return null;
+        // Очередь постредакции: не показывать, пока редактор не выставил PUBLISHED
+        const status = override.editorStatus;
+        if (status !== undefined && status !== 'PUBLISHED') return null;
+        const ev = event as Record<string, unknown>;
+
+        let subcategories: unknown[] = ev.subcategories as unknown[];
+        const mode = (override.subcategoriesMode || 'INHERIT').toUpperCase();
+        if (mode === 'CLEAR') {
+          subcategories = [];
+        } else if (mode === 'OVERRIDE') {
+          subcategories = override.subcategoriesOverride && override.subcategoriesOverride.length > 0
+            ? override.subcategoriesOverride
+            : [];
+        } else if (override.subcategories && override.subcategories.length > 0) {
+          // Для обратной совместимости, если subcategoriesMode не задан, но subcategories есть
+          subcategories = override.subcategories;
+        }
 
         return {
           ...event,
-          title: override.title ?? event.title,
-          description: override.description ?? event.description,
-          imageUrl: override.imageUrl ?? event.imageUrl,
-          category: override.category ?? event.category,
-          audience: override.audience ?? event.audience,
-          subcategories: override.subcategories?.length ? override.subcategories : event.subcategories,
-          minAge: override.minAge ?? event.minAge,
-          rating: override.manualRating ?? event.rating,
+          title: override.title ?? ev.title,
+          description: override.description ?? ev.description,
+          imageUrl: override.imageUrl ?? ev.imageUrl,
+          category: override.category ?? ev.category,
+          audience: override.audience ?? ev.audience,
+          subcategories,
+          minAge: override.minAge ?? ev.minAge,
+          rating: override.manualRating ?? ev.rating,
           templateData: (override as { templateData?: unknown }).templateData ?? null,
           _hasOverride: true,
-        };
+        } as T;
       })
-      .filter(Boolean);
+      .filter((x): x is T => x != null);
   }
 }

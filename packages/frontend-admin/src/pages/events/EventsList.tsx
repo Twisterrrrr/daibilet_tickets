@@ -37,8 +37,10 @@ interface EventItem {
 interface EventsResponse {
   items: EventItem[];
   total: number;
-  page: number;
-  pages: number;
+  page?: number;
+  pages?: number;
+  nextCursor?: string | null;
+  hasMore?: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -50,6 +52,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 const SOURCE_LABELS: Record<string, string> = {
   TC: 'TicketsCloud',
   TEPLOHOD: 'Теплоход',
+  MANUAL: 'Ручной ввод',
 };
 
 // ─── Columns ─────────────────────────────────────────────────────────────────
@@ -276,6 +279,7 @@ export function EventsListPage() {
                 <SelectItem value="__all__">Все источники</SelectItem>
                 <SelectItem value="TC">TicketsCloud</SelectItem>
                 <SelectItem value="TEPLOHOD">Теплоход</SelectItem>
+                <SelectItem value="MANUAL">Ручной ввод</SelectItem>
               </SelectContent>
             </Select>
             <Select
@@ -305,7 +309,7 @@ export function EventsListPage() {
       />
 
       {/* Server pagination */}
-      {data && data.pages > 1 && (
+      {data && (data.pages ?? Math.ceil(data.total / filters.limit)) > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             Показано {data.items.length} из {data.total}
@@ -320,13 +324,13 @@ export function EventsListPage() {
               Назад
             </Button>
             <span className="text-sm tabular-nums text-muted-foreground">
-              {filters.page} / {data.pages}
+              {filters.page} / {data.pages ?? Math.ceil(data.total / filters.limit)}
             </span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
-              disabled={filters.page >= data.pages}
+              disabled={filters.page >= (data.pages ?? Math.ceil(data.total / filters.limit))}
             >
               Вперёд
             </Button>

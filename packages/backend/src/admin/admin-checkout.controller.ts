@@ -34,7 +34,7 @@ import {
   ExportRequestsCsvDto,
   ExportSessionsCsvDto,
   UpdateSessionStatusDto,
-} from './dto/admin-checkout.dto';
+} from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()

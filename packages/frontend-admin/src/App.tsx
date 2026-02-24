@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { Layout } from './components/layout/Layout';
+import { flags } from './config/flags';
 import { isAuthenticated } from './lib/auth';
 import { ArticleEditPage } from './pages/articles/ArticleEdit';
 import { ArticlesListPage } from './pages/articles/ArticlesList';
@@ -33,14 +34,22 @@ import { WidgetsListPage } from './pages/widgets/WidgetsList';
 import { SupplierDetailPage } from './pages/suppliers/SupplierDetail';
 import { SuppliersListPage } from './pages/suppliers/SuppliersList';
 import { SupportDetailPage } from './pages/support/SupportDetail';
-import ReconciliationPage from './pages/reconciliation/ReconciliationPage';
-import { isAuthenticated } from './lib/auth';
-
+import { VenuesListPage } from './pages/venues/VenuesList';
+import { VenueEditPage } from './pages/venues/VenueEdit';
+import { TagsListPage } from './pages/tags/TagsList';
+import { TagEditPage } from './pages/tags/TagEdit';
+import { UpsellsListPage } from './pages/upsells/UpsellsList';
+import { UpsellEditPage } from './pages/upsells/UpsellEdit';
+import { SupportListPage } from './pages/support/SupportList';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
+}
+
+function DisabledRoute() {
+  return <Navigate to="/" replace />;
 }
 
 export default function App() {
@@ -57,35 +66,33 @@ export default function App() {
           }
         >
           <Route index element={<DashboardPage />} />
-          <Route path="events" element={<EventsListPage />} />
-          <Route path="events/merge" element={<EventsMergePage />} />
-          <Route path="schedules" element={<EventStudioPage />} />
-          <Route path="schedules/:id" element={<ScheduleDetailPage />} />
-          <Route path="events/new" element={<EventCreatePage />} />
-          <Route path="events/:id" element={<EventEditPage />} />
-          <Route path="cities" element={<CitiesListPage />} />
-          <Route path="cities/:id" element={<CityEditPage />} />
-          <Route path="venues" element={<VenuesListPage />} />
+          <Route path="events" element={flags.showEvents ? <EventsListPage /> : <DisabledRoute />} />
+          <Route path="events/merge" element={flags.showEvents ? <EventsMergePage /> : <DisabledRoute />} />
+          <Route path="events/new" element={flags.showEvents ? <EventCreatePage /> : <DisabledRoute />} />
+          <Route path="events/:id" element={flags.showEvents ? <EventEditPage /> : <DisabledRoute />} />
+          <Route path="cities" element={flags.showContent ? <CitiesListPage /> : <DisabledRoute />} />
+          <Route path="cities/:id" element={flags.showContent ? <CityEditPage /> : <DisabledRoute />} />
+          <Route path="venues" element={flags.showCatalog ? <VenuesListPage /> : <DisabledRoute />} />
           <Route path="venues/new" element={<VenueEditPage />} />
           <Route path="venues/:id" element={<VenueEditPage />} />
-          <Route path="tags" element={<TagsListPage />} />
+          <Route path="tags" element={flags.showContent ? <TagsListPage /> : <DisabledRoute />} />
           <Route path="tags/new" element={<TagEditPage />} />
           <Route path="tags/:id" element={<TagEditPage />} />
-          <Route path="landings" element={<LandingsListPage />} />
+          <Route path="landings" element={flags.showContent ? <LandingsListPage /> : <DisabledRoute />} />
           <Route path="landings/new" element={<LandingEditPage />} />
           <Route path="landings/:id" element={<LandingEditPage />} />
-          <Route path="collections" element={<CollectionsListPage />} />
+          <Route path="collections" element={flags.showContent ? <CollectionsListPage /> : <DisabledRoute />} />
           <Route path="collections/new" element={<CollectionEditPage />} />
           <Route path="collections/:id" element={<CollectionEditPage />} />
-          <Route path="combos" element={<CombosListPage />} />
+          <Route path="combos" element={flags.showContent ? <CombosListPage /> : <DisabledRoute />} />
           <Route path="combos/new" element={<ComboEditPage />} />
           <Route path="combos/:id" element={<ComboEditPage />} />
-          <Route path="articles" element={<ArticlesListPage />} />
+          <Route path="articles" element={flags.showContent ? <ArticlesListPage /> : <DisabledRoute />} />
           <Route path="articles/new" element={<ArticleEditPage />} />
           <Route path="articles/:id" element={<ArticleEditPage />} />
           <Route path="reviews" element={<ReviewsListPage />} />
           <Route path="external-reviews" element={<ExternalReviewsListPage />} />
-          <Route path="orders" element={<OrdersListPage />} />
+          <Route path="orders" element={flags.showOrders ? <OrdersListPage /> : <DisabledRoute />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
           <Route path="checkout" element={<CheckoutSessionsListPage />} />
           <Route path="upsells" element={<UpsellsListPage />} />
@@ -96,9 +103,9 @@ export default function App() {
           <Route path="moderation" element={<ModerationQueuePage />} />
           <Route path="support" element={<SupportListPage />} />
           <Route path="support/:id" element={<SupportDetailPage />} />
-          <Route path="jobs/failed" element={<FailedJobsPage />} />
-          <Route path="reconciliation" element={<ReconciliationPage />} />
-          <Route path="audit" element={<AuditLogPage />} />
+          <Route path="jobs/failed" element={flags.showOps ? <FailedJobsPage /> : <DisabledRoute />} />
+          <Route path="reconciliation" element={flags.showOps ? <ReconciliationPage /> : <DisabledRoute />} />
+          <Route path="audit" element={flags.showOps ? <AuditLogPage /> : <DisabledRoute />} />
           <Route path="widgets" element={<WidgetsListPage />} />
           <Route path="widgets/new" element={<WidgetEditPage />} />
           <Route path="widgets/:id" element={<WidgetEditPage />} />

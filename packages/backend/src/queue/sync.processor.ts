@@ -1,8 +1,10 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { EventSource } from '@prisma/client';
 
 import { CacheService } from '../cache/cache.service';
+import { PostEditQueueService } from '../catalog/postedit-queue.service';
 import { TcSyncService } from '../catalog/tc-sync.service';
 import { TepSyncService } from '../catalog/tep-sync.service';
 import { ComboService } from '../combo/combo.service';
@@ -43,6 +45,7 @@ export class SyncProcessor extends WorkerHost {
     private readonly tepSync: TepSyncService,
     private readonly combo: ComboService,
     private readonly cache: CacheService,
+    private readonly postEditQueue: PostEditQueueService,
   ) {
     super();
   }
@@ -110,9 +113,11 @@ export class SyncProcessor extends WorkerHost {
   }
 
   /**
-   * Полная синхронизация: TC + TEP + retag + combo populate + cache invalidation.
+   * Полная синхронизация: TC + TEP + retag + combo populate + cache invalidation + очередь постредакции.
    */
   private async handleFullSync(signal?: AbortSignal) {
+    const runStartedAt = new Date();
+
     // 1. TC sync (retag встроен в конце syncAll)
     const tcResult = await this.tcSync.syncAll();
     this.logger.log(
@@ -122,6 +127,23 @@ export class SyncProcessor extends WorkerHost {
     // 2. Teplohod sync
     const tepResult = await this.tepSync.syncAll(signal);
     this.logger.log(`TEP sync: ${tepResult.eventsSynced} событий, статус: ${tepResult.status}`);
+
+    // 2.1 Очередь постредакции: ensure overrides для импортных событий (NEEDS_REVIEW в Directus)
+    try {
+      const queueTc = await this.postEditQueue.ensureOverridesForImportedEvents({
+        source: EventSource.TC,
+        since: runStartedAt,
+      });
+      const queueTep = await this.postEditQueue.ensureOverridesForImportedEvents({
+        source: EventSource.TEPLOHOD,
+        since: runStartedAt,
+      });
+      this.logger.log(
+        `Post-edit queue: TC created=${queueTc.created} updated=${queueTc.updated}, TEP created=${queueTep.created} updated=${queueTep.updated}`,
+      );
+    } catch (err: unknown) {
+      this.logger.warn(`Post-edit queue error: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     // 3. Финальный retag
     const retagResult = await this.tcSync.retagAll();
@@ -148,11 +170,22 @@ export class SyncProcessor extends WorkerHost {
   }
 
   /**
-   * Инкрементальная синхронизация: только TC + cache invalidation.
+   * Инкрементальная синхронизация: только TC + очередь постредакции + cache invalidation.
    */
   private async handleIncrementalSync(signal?: AbortSignal) {
+    const runStartedAt = new Date();
     const tcResult = await this.tcSync.syncAll();
     this.logger.log(`TC incremental: ${tcResult.uniqueEvents} событий, статус: ${tcResult.status}`);
+
+    try {
+      const queue = await this.postEditQueue.ensureOverridesForImportedEvents({
+        source: EventSource.TC,
+        since: runStartedAt,
+      });
+      this.logger.log(`Post-edit queue: TC created=${queue.created} updated=${queue.updated}`);
+    } catch (err: unknown) {
+      this.logger.warn(`Post-edit queue error: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     await this.cache.invalidateAfterSync();
 

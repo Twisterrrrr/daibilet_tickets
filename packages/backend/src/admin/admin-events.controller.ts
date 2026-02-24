@@ -46,8 +46,10 @@ import {
   PatchEventOfferDto,
   UpdateEventOfferDto,
   VenueSettingsDto,
-} from './dto/admin-event.dto';
+} from './dto/admin.dto';
 import { EventOverrideService } from './event-override.service';
+import { EventQualityService } from '../catalog/event-quality.service';
+import { AuditService } from './audit.service';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -61,6 +63,8 @@ export class AdminEventsController {
     private readonly reviewService: ReviewService,
     private readonly fuzzyDedupService: FuzzyDedupService,
     private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly eventQuality: EventQualityService,
+    private readonly audit: AuditService,
   ) {}
 
   @Get()
@@ -76,20 +80,30 @@ export class AdminEventsController {
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
-    const where: any = {};
-    if (city) where.city = { slug: city };
-    if (category) where.category = category;
-    if (source) where.source = source;
-    if (active !== undefined) where.isActive = active === 'true';
+    const andParts: Prisma.EventWhereInput[] = [{ isDeleted: false }];
+    if (city) andParts.push({ city: { slug: city } });
+    if (category) andParts.push({ category });
+    if (source) andParts.push({ source });
+    if (active !== undefined) andParts.push({ isActive: active === 'true' });
     if (search) {
       const trimmed = search.trim();
-      where.OR = [
-        { title: { contains: trimmed, mode: 'insensitive' } },
-        { slug: { contains: trimmed, mode: 'insensitive' } },
-        { tcEventId: trimmed },
-        { offers: { some: { externalEventId: trimmed } } },
-      ];
+      andParts.push({
+        OR: [
+          { title: { contains: trimmed, mode: 'insensitive' } },
+          { slug: { contains: trimmed, mode: 'insensitive' } },
+          { tcEventId: trimmed },
+          { offers: { some: { externalEventId: trimmed } } },
+        ],
+      });
     }
+    if (hidden === 'true') {
+      andParts.push({ override: { isHidden: true } });
+    } else if (hidden === 'false') {
+      andParts.push({
+        OR: [{ override: null }, { override: { isHidden: false } }],
+      });
+    }
+    const where: Prisma.EventWhereInput = andParts.length === 1 ? andParts[0]! : { AND: andParts };
 
     const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
@@ -105,15 +119,12 @@ export class AdminEventsController {
       this.prisma.event.count({ where }),
     ]);
 
-    // Опционально: фильтрация по isHidden через override
-    let filtered = rawItems;
-    if (hidden === 'true') {
-      filtered = rawItems.filter((e: any) => e.override?.isHidden === true);
-    } else if (hidden === 'false') {
-      filtered = rawItems.filter((e: any) => !e.override?.isHidden);
-    }
-
-    return buildPaginatedResult(filtered, total, pg.limit);
+    const result = buildPaginatedResult(rawItems, total, pg.limit);
+    return {
+      ...result,
+      page: pg.page,
+      pages: Math.ceil(total / pg.limit) || 1,
+    };
   }
 
   /**
@@ -126,19 +137,19 @@ export class AdminEventsController {
       res,
       filename: 'events',
       fields: [
-        { header: 'id', accessor: (e: any) => e.id },
-        { header: 'tcEventId', accessor: (e: any) => e.tcEventId },
-        { header: 'title', accessor: (e: any) => e.title },
-        { header: 'slug', accessor: (e: any) => e.slug },
-        { header: 'city', accessor: (e: any) => e.city?.name ?? '' },
-        { header: 'citySlug', accessor: (e: any) => e.city?.slug ?? '' },
-        { header: 'category', accessor: (e: any) => e.category },
-        { header: 'source', accessor: (e: any) => e.source },
-        { header: 'priceFrom', accessor: (e: any) => e.priceFrom },
-        { header: 'isActive', accessor: (e: any) => e.isActive },
-        { header: 'address', accessor: (e: any) => e.address ?? '' },
-        { header: 'lastSyncAt', accessor: (e: any) => e.lastSyncAt?.toISOString?.() ?? '' },
-        { header: 'createdAt', accessor: (e: any) => e.createdAt?.toISOString?.() ?? '' },
+        { header: 'id', accessor: (e) => String((e as Record<string, unknown>).id ?? '') },
+        { header: 'tcEventId', accessor: (e) => String((e as Record<string, unknown>).tcEventId ?? '') },
+        { header: 'title', accessor: (e) => String((e as Record<string, unknown>).title ?? '') },
+        { header: 'slug', accessor: (e) => String((e as Record<string, unknown>).slug ?? '') },
+        { header: 'city', accessor: (e) => String(((e as Record<string, unknown>).city as { name?: string })?.name ?? '') },
+        { header: 'citySlug', accessor: (e) => String(((e as Record<string, unknown>).city as { slug?: string })?.slug ?? '') },
+        { header: 'category', accessor: (e) => String((e as Record<string, unknown>).category ?? '') },
+        { header: 'source', accessor: (e) => String((e as Record<string, unknown>).source ?? '') },
+        { header: 'priceFrom', accessor: (e) => String((e as Record<string, unknown>).priceFrom ?? '') },
+        { header: 'isActive', accessor: (e) => String((e as Record<string, unknown>).isActive ?? '') },
+        { header: 'address', accessor: (e) => String((e as Record<string, unknown>).address ?? '') },
+        { header: 'lastSyncAt', accessor: (e) => ((e as Record<string, unknown>).lastSyncAt as Date)?.toISOString?.() ?? '' },
+        { header: 'createdAt', accessor: (e) => ((e as Record<string, unknown>).createdAt as Date)?.toISOString?.() ?? '' },
       ],
       fetchBatch: (cursor, take) =>
         this.prisma.event.findMany({
@@ -274,6 +285,49 @@ export class AdminEventsController {
     return result;
   }
 
+  /**
+   * Опубликовать событие (через quality gate).
+   *
+   * POST /admin/events/:id/publish
+   */
+  @Post(':id/publish')
+  @Roles('ADMIN')
+  async publishEvent(@Param('id') eventId: string, @Request() req: { user: { id: string } }) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
+    if (!event) {
+      throw new NotFoundException('Событие не найдено');
+    }
+
+    const quality = await this.eventQuality.checkAndPersist(eventId);
+    if (!quality.isReady) {
+      return {
+        ok: false,
+        issues: quality.issues,
+      };
+    }
+
+    await this.prisma.eventOverride.upsert({
+      where: { eventId },
+      create: {
+        eventId,
+        editorStatus: 'PUBLISHED',
+        updatedBy: req.user.id,
+        needsReviewAt: null,
+      },
+      update: {
+        editorStatus: 'PUBLISHED',
+        updatedBy: req.user.id,
+        needsReviewAt: null,
+      },
+    });
+
+    await this.audit.log(req.user.id, 'UPDATE', 'EventPublish', eventId, null, {
+      editorStatus: 'PUBLISHED',
+    });
+
+    return { ok: true, issues: [] };
+  }
+
   /** Транслитерация заголовка в slug */
   private transliterate(text: string): string {
     const map: Record<string, string> = {
@@ -348,8 +402,8 @@ export class AdminEventsController {
    */
   @Patch(':id/override')
   @Roles('ADMIN', 'EDITOR')
-  async upsertOverride(@Param('id') id: string, @Body() data: OverrideEventDto, @Request() req: any) {
-    const result = await this.overrideService.upsert(id, data, req.user.id);
+  async upsertOverride(@Param('id') id: string, @Body() data: OverrideEventDto, @Request() req: { user: { id: string } }) {
+    const result = await this.overrideService.upsert(id, data as unknown as Record<string, unknown>, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
   }
@@ -370,7 +424,7 @@ export class AdminEventsController {
    */
   @Patch(':id/hide')
   @Roles('ADMIN', 'EDITOR')
-  async toggleHide(@Param('id') id: string, @Body('isHidden') isHidden: boolean, @Request() req: any) {
+  async toggleHide(@Param('id') id: string, @Body('isHidden') isHidden: boolean, @Request() req: { user: { id: string } }) {
     const result = await this.overrideService.toggleHidden(id, isHidden, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;

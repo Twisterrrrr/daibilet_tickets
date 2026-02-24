@@ -163,9 +163,9 @@ export function EventCardHorizontal({
           )}
         </div>
 
-        {/* Top-right: избранное — inline-flex чтобы не растягивался flex-родителем */}
-        <div className="absolute right-2 top-2 flex shrink-0 items-center justify-center sm:right-3 sm:top-3">
-          <FavoriteButton slug={slug} size="sm" />
+        {/* Top-right: избранное — строго круг */}
+        <div className="absolute right-2 top-2 size-8 shrink-0 overflow-hidden rounded-full sm:right-3 sm:top-3 sm:size-9">
+          <FavoriteButton slug={slug} size="sm" className="h-full w-full" />
         </div>
 
         {/* Bottom-left: departing soon / open date */}
@@ -254,7 +254,7 @@ export function EventCardHorizontal({
                 key={time}
                 type="button"
                 onClick={(e) => handleSlotClick(e, time)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-normal text-slate-800 transition-colors hover:border-primary-400 hover:bg-primary-50"
+                className="inline-btn box-border inline-flex h-[30px] min-h-[30px] shrink-0 items-center justify-center self-start rounded-lg border border-slate-300 bg-white px-3 text-xs leading-none text-slate-800 transition-colors hover:border-primary-400 hover:bg-primary-50"
               >
                 {time}
               </button>

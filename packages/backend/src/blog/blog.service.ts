@@ -91,9 +91,9 @@ export class BlogService {
       const overviewExists = await this.prisma.article.findUnique({ where: { slug: overviewSlug } });
 
       if (!overviewExists) {
-        const excursions = city.events.filter((e: any) => e.category === 'EXCURSION');
-        const museums = city.events.filter((e: any) => e.category === 'MUSEUM');
-        const events = city.events.filter((e: any) => e.category === 'EVENT');
+        const excursions = city.events.filter((e: { category?: string }) => e.category === 'EXCURSION');
+        const museums = city.events.filter((e: { category?: string }) => e.category === 'MUSEUM');
+        const events = city.events.filter((e: { category?: string }) => e.category === 'EVENT');
 
         const content = this.buildCityOverviewContent(city, excursions, museums, events);
 
@@ -125,7 +125,7 @@ export class BlogService {
       }
 
       // --- Статья 2: Экскурсии ---
-      const excursions = city.events.filter((e: any) => e.category === 'EXCURSION');
+      const excursions = city.events.filter((e: { category?: string }) => e.category === 'EXCURSION');
       if (excursions.length >= 3) {
         const excSlug = `luchshie-ekskursii-${city.slug}`;
         const excExists = await this.prisma.article.findUnique({ where: { slug: excSlug } });
@@ -166,52 +166,66 @@ export class BlogService {
 
   // --- Content builders ---
 
-  private buildCityOverviewContent(city: any, excursions: any[], museums: any[], events: any[]): string {
-    let md = `# Что посмотреть в ${city.name}\n\n`;
-    md += `${city.name} — один из самых интересных городов для путешественников. `;
-    md += `В нашем каталоге **${city._count.events} событий** с возможностью онлайн-покупки билетов.\n\n`;
+  private buildCityOverviewContent(
+    city: Record<string, unknown>,
+    excursions: Record<string, unknown>[],
+    museums: Record<string, unknown>[],
+    events: Record<string, unknown>[],
+  ): string {
+    const name = String(city.name ?? '');
+    const slug = String(city.slug ?? '');
+    const eventCount = Number((city._count as { events?: number })?.events ?? 0);
+    let md = `# Что посмотреть в ${name}\n\n`;
+    md += `${name} — один из самых интересных городов для путешественников. `;
+    md += `В нашем каталоге **${eventCount} событий** с возможностью онлайн-покупки билетов.\n\n`;
 
     if (excursions.length > 0) {
       md += `## Экскурсии\n\n`;
-      md += `В ${city.name} доступно ${excursions.length} экскурсий — от классических обзорных до необычных авторских маршрутов.\n\n`;
+      md += `В ${name} доступно ${excursions.length} экскурсий — от классических обзорных до необычных авторских маршрутов.\n\n`;
       for (const e of excursions.slice(0, 5)) {
-        const price = e.priceFrom ? ` — от ${Math.round(e.priceFrom / 100)} ₽` : '';
-        md += `- **[${e.title}](/events/${e.slug})**${price}\n`;
+        const pf = Number((e as { priceFrom?: number }).priceFrom ?? 0);
+        const price = pf ? ` — от ${Math.round(pf / 100)} ₽` : '';
+        md += `- **[${(e as { title?: string }).title}](/events/${(e as { slug?: string }).slug})**${price}\n`;
       }
-      md += `\n[Все экскурсии в ${city.name} →](/events?city=${city.slug}&category=EXCURSION)\n\n`;
+      md += `\n[Все экскурсии в ${name} →](/events?city=${slug}&category=EXCURSION)\n\n`;
     }
 
     if (museums.length > 0) {
       md += `## Музеи\n\n`;
       for (const e of museums.slice(0, 5)) {
-        const price = e.priceFrom ? ` — от ${Math.round(e.priceFrom / 100)} ₽` : '';
-        md += `- **[${e.title}](/events/${e.slug})**${price}\n`;
+        const pf = Number((e as { priceFrom?: number }).priceFrom ?? 0);
+        const price = pf ? ` — от ${Math.round(pf / 100)} ₽` : '';
+        md += `- **[${(e as { title?: string }).title}](/events/${(e as { slug?: string }).slug})**${price}\n`;
       }
-      md += `\n[Все музеи в ${city.name} →](/events?city=${city.slug}&category=MUSEUM)\n\n`;
+      md += `\n[Все музеи в ${name} →](/events?city=${slug}&category=MUSEUM)\n\n`;
     }
 
     if (events.length > 0) {
       md += `## Мероприятия\n\n`;
       for (const e of events.slice(0, 5)) {
-        const price = e.priceFrom ? ` — от ${Math.round(e.priceFrom / 100)} ₽` : '';
-        md += `- **[${e.title}](/events/${e.slug})**${price}\n`;
+        const pf = Number((e as { priceFrom?: number }).priceFrom ?? 0);
+        const price = pf ? ` — от ${Math.round(pf / 100)} ₽` : '';
+        md += `- **[${(e as { title?: string }).title}](/events/${(e as { slug?: string }).slug})**${price}\n`;
       }
-      md += `\n[Все мероприятия в ${city.name} →](/events?city=${city.slug}&category=EVENT)\n\n`;
+      md += `\n[Все мероприятия в ${name} →](/events?city=${slug}&category=EVENT)\n\n`;
     }
 
     md += `---\n\n`;
-    md += `Покупайте билеты онлайн на [Дайбилет](/) и планируйте идеальную поездку в ${city.name}!\n`;
+    md += `Покупайте билеты онлайн на [Дайбилет](/) и планируйте идеальную поездку в ${name}!\n`;
 
     return md;
   }
 
-  private buildCategoryContent(city: any, categoryLabel: string, events: any[]): string {
-    let md = `# Лучшие ${categoryLabel} в ${city.name}\n\n`;
-    md += `Мы собрали **${events.length} ${categoryLabel}** в ${city.name} с рейтингами и онлайн-покупкой билетов.\n\n`;
+  private buildCategoryContent(city: Record<string, unknown>, categoryLabel: string, events: Record<string, unknown>[]): string {
+    const name = String(city.name ?? '');
+    const slug = String(city.slug ?? '');
+    let md = `# Лучшие ${categoryLabel} в ${name}\n\n`;
+    md += `Мы собрали **${events.length} ${categoryLabel}** в ${name} с рейтингами и онлайн-покупкой билетов.\n\n`;
 
     for (let i = 0; i < Math.min(events.length, 10); i++) {
-      const e = events[i];
-      const price = e.priceFrom ? `от ${Math.round(e.priceFrom / 100)} ₽` : 'уточняйте';
+      const e = events[i] as Record<string, unknown>;
+      const pf = Number(e.priceFrom ?? 0);
+      const price = pf ? `от ${Math.round(pf / 100)} ₽` : 'уточняйте';
       const rating = e.rating ? ` (рейтинг ${e.rating})` : '';
       md += `### ${i + 1}. ${e.title}\n\n`;
       md += `**Цена:** ${price}${rating}\n\n`;
@@ -220,13 +234,13 @@ export class BlogService {
     }
 
     md += `---\n\n`;
-    md += `[Все ${categoryLabel} в ${city.name} →](/events?city=${city.slug}&category=EXCURSION)\n`;
+    md += `[Все ${categoryLabel} в ${name} →](/events?city=${slug}&category=EXCURSION)\n`;
 
     return md;
   }
 
-  private minPrice(events: any[]): string {
-    const prices = events.map((e: any) => e.priceFrom).filter(Boolean);
+  private minPrice(events: Record<string, unknown>[]): string {
+    const prices = events.map((e) => Number((e as { priceFrom?: number }).priceFrom ?? 0)).filter((n) => n > 0);
     if (prices.length === 0) return '—';
     return String(Math.round(Math.min(...prices) / 100));
   }

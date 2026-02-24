@@ -45,7 +45,7 @@ export class CreateComboDto {
 
   @ApiProperty({ description: 'JSON: [{eventId, dayNumber, slot, time}]' })
   @IsArray()
-  curatedEvents!: any[];
+  curatedEvents!: Record<string, unknown>[];
 
   @ApiPropertyOptional({ description: 'Ориентировочная цена (копейки)' })
   @IsOptional()
@@ -56,17 +56,17 @@ export class CreateComboDto {
   @ApiPropertyOptional({ description: 'JSON: [{icon, title, text}]' })
   @IsOptional()
   @IsArray()
-  features?: any[];
+  features?: Record<string, unknown>[];
 
   @ApiPropertyOptional({ description: 'JSON: ["Билеты на 3 события", "Гид"]' })
   @IsOptional()
   @IsArray()
-  includes?: any[];
+  includes?: unknown[];
 
   @ApiPropertyOptional({ description: 'JSON: [{question, answer}]' })
   @IsOptional()
   @IsArray()
-  faq?: any[];
+  faq?: Record<string, unknown>[];
 
   @ApiPropertyOptional()
   @IsOptional()

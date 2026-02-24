@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
   DateMode,
+  EditorStatus,
   EventAudience,
   EventCategory,
   EventSubcategory,
@@ -308,6 +309,14 @@ export class OverrideEventDto {
   @IsOptional()
   @IsObject()
   templateData?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    enum: EditorStatus,
+    description: 'Очередь постредакции: NEEDS_REVIEW | IN_PROGRESS | PUBLISHED | REJECTED',
+  })
+  @IsOptional()
+  @IsEnum(EditorStatus)
+  editorStatus?: EditorStatus;
 }
 
 // ─── Venue Settings ────────────────────────────────────────────────

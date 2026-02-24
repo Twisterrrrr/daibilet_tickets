@@ -163,7 +163,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
           </h2>
 
           {events.length > 0 ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-6 grid-cols-1 min-[361px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
               {events.map((event: any) => (
                 <div key={event.id} className="relative">
                   {event.isPinned && (

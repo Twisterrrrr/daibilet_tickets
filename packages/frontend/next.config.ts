@@ -58,6 +58,10 @@ const nextConfig: NextConfig = {
         protocol: 'http',
         hostname: 'api.teplohod.info',
       },
+      {
+        protocol: 'https',
+        hostname: 'daibilet.ru',
+      },
     ],
   },
 };

@@ -144,7 +144,7 @@ export class PricingService {
   // ==========================================
 
   async getUpsells(citySlug?: string): Promise<UpsellItem[]> {
-    const where: any = { isActive: true };
+    const where: Record<string, unknown> = { isActive: true };
     if (citySlug) {
       where.OR = [{ citySlug: null }, { citySlug }];
     } else {

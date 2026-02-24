@@ -171,7 +171,7 @@ export class TcApiService {
    * Обновить заказ (добавить билеты, сменить статус).
    * PATCH /v2/resources/orders/:id
    */
-  async updateOrder(orderId: string, payload: any): Promise<any> {
+  async updateOrder(orderId: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
     const url = new URL(`/v2/resources/orders/${orderId}`, this.baseUrl);
 
     const res = await fetch(url.toString(), {
@@ -193,7 +193,7 @@ export class TcApiService {
       throw new Error(`TC update order failed ${res.status}: ${text.slice(0, 200)}`);
     }
 
-    return res.json();
+    return res.json() as Promise<Record<string, unknown>>;
   }
 
   /**
@@ -255,9 +255,9 @@ export class TcApiService {
 
       const sampleFields = events.length > 0 ? Object.keys(events[0]) : [];
       const cityIds = events
-        .map((e: any) => e?.venue?.city?.id)
-        .filter(Boolean)
-        .filter((v: number, i: number, a: number[]) => a.indexOf(v) === i);
+        .map((e: { venue?: { city?: { id?: number } } | null }) => e?.venue?.city?.id)
+        .filter((v): v is number => typeof v === 'number')
+        .filter((v, i, a) => a.indexOf(v) === i);
 
       return {
         apiReachable: true,

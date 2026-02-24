@@ -4,6 +4,76 @@
 
 ---
 
+## 24.02.2026 — Event Quality Gate и публикация через Nest
+
+### Наблюдения
+
+- Публикация событий сейчас зависит от ручной дисциплины: редактор может выставить PUBLISHED даже при отсутствующих полях (category, image, offers, location).
+- Directus не «понимает» бизнес-правила качества, поэтому нужен backend-gate перед публикацией.
+- Subcategories в EventOverride ранее не имели явной семантики override/clear/inherit, что мешает предсказуемой категоризации и фильтрам.
+
+### Решения
+
+- Добавлен `EventQualityService.validateForPublish(eventId)` в backend (Nest, catalog), который возвращает:
+  - `isReady: boolean`,
+  - `issues: { code, message, field? }[]` (MISSING_TITLE, MISSING_CITY, MISSING_CATEGORY, MISSING_DESCRIPTION, MISSING_IMAGE, MISSING_LOCATION, MISSING_ACTIVE_OFFER, NO_FUTURE_SESSIONS).
+- В `EventOverride` добавлены поля качества: `qualityStatus` (READY | BLOCKED), `qualityIssues` (Json-массив объектов issues), `qualityCheckedAt`; метод `checkAndPersist` сохраняет результат проверки.
+- Реализован endpoint `POST /admin/events/:id/publish` (ADMIN-only), который:
+  - вызывает `checkAndPersist`,
+  - при наличии issues возвращает `{ ok: false, issues }` и не ставит PUBLISHED,
+  - при успехе делает upsert EventOverride с `editorStatus=PUBLISHED`, снимает `needsReviewAt`, пишет запись в AuditLog (`EventPublish`).
+- Для подкатегорий в `EventOverride` введена явная семантика:
+  - `subcategoriesMode: INHERIT | OVERRIDE | CLEAR`,
+  - `subcategoriesOverride: EventSubcategory[]`;
+  - `applyOverrides` использует этот режим: INHERIT → оригинал, OVERRIDE → override-список, CLEAR → [] (плюс backward compatibility, если mode не задан, но subcategories есть).
+
+### Проблемы
+
+- Пока quality gate работает только при явной публикации через `/admin/events/:id/publish`; Directus нужно настроить так, чтобы редактор не редактировал `editorStatus` напрямую, а использовал этот endpoint (custom action/flow).
+
+---
+
+## 23.02.2026 — Очередь постредакции для Directus (EventOverride.editorStatus)
+
+### Наблюдения
+- План переезда на Directus как внутреннюю админку: контент/SEO/редактура событий; импорт TC и teplohod должен попадать в очередь постредакции без перетирания при sync.
+- Модель Event + EventOverride уже разделяет «оригинал из источника» и «правки для Daibilet»; sync не трогает override.
+
+### Решения
+- **EditorStatus** enum: NEEDS_REVIEW, IN_PROGRESS, PUBLISHED, REJECTED. Поля EventOverride: editorStatus (default NEEDS_REVIEW), needsReviewAt, lastImportedAt; updatedBy сделан nullable для авто-созданных override.
+- **PostEditQueueService** (catalog): ensureOverridesForImportedEvents(source?, since?) — после sync создаёт/обновляет override для импортных событий (TC/TEPLOHOD): новые → NEEDS_REVIEW; уже PUBLISHED — только lastImportedAt; остальные → NEEDS_REVIEW или сохраняем IN_PROGRESS.
+- **SyncProcessor**: после TC и TEP sync (full) и после TC (incremental) вызывается очередь с since = runStartedAt.
+- **applyOverrides**: не показывать события с override, у которых editorStatus !== PUBLISHED или isHidden.
+- **OverrideEventDto** + API: поле editorStatus для установки PUBLISHED из админки/Directus.
+- Миграция: существующие override с updated_by IS NOT NULL помечены PUBLISHED, чтобы не скрыть уже опубликованный контент.
+- Документ **DirectusPipeline.md** — фазы 0–4, чеклист задач, описание очереди.
+
+### Проблемы
+- Prisma generate на Windows может дать EPERM (файл занят) — перезапуск терминала/IDE или повторный запуск после закрытия процессов.
+
+---
+
+## 23.02.2026 — Ops Batch 4, типизация, UX, Planner «Заменить»
+
+### Наблюдения
+
+1. **Ops Batch 4** — Admin Operator Panel v2: resend-email, retry-fulfilment уже в спецификации; set-status (PATCH) уже был. Добавлены POST /admin/orders/:id/resend-email и POST /admin/orders/:id/retry-fulfilment. Для Package: retry-fulfilment создаёт voucher если отсутствует, отправляет письмо.
+2. **Типизация** — JwtPayload уже в jwt.strategy; добавлен auth.types.ts (AdminJwtUser, PartnerApiUser). Partner/Supplier контроллеры: req: any заменены на типы. admin-orders: where: any → Prisma.PackageWhereInput. ESLint no-explicit-any уже настроен.
+3. **Frontend/UX** — loading.tsx для /events (скелетон каталога); EventEdit: подсказки «Оригинал» / «Для Daibilet» у поля названия; SearchAutocomplete: city из URL для фильтрации событий.
+4. **Planner** — Кнопка «Заменить» на слоте: модалка с выбором другого события, вызов POST /planner/customize, обновление варианта.
+
+### Решения
+
+- Batch 4: OrderActionDto, OrderStatusDto (reason для аудита); VoucherModule в AdminModule; MailService.sendOrderCompleted для resend/retry.
+- auth.types.ts экспортирует AdminJwtUser, PartnerApiUser; supplier-settings использует CurrentSupplierUser; partner-events — PartnerApiUser, EventSource.
+- SearchAutocomplete принимает city prop из Header (searchParams).
+
+### Проблемы
+
+- Redis-кэш и автовыбор primary — оставлены на следующий этап (уже есть CacheService, логика primary — в admin/offers).
+
+---
+
 ## 23.02.2026 — Диагностика «сайт не открывается», staging/prod docs
 
 ### Наблюдения

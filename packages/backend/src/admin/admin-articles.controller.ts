@@ -21,7 +21,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { ExpressRequest } from '../common/http/express.types';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
-import { CreateArticleDto, UpdateArticleDto } from './dto/admin-article.dto';
+import { CreateArticleDto, UpdateArticleDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -44,7 +44,7 @@ export class AdminArticlesController {
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
-    const where: any = { isDeleted: false };
+    const where: Record<string, unknown> = { isDeleted: false };
     if (city) where.city = { slug: city };
     if (published !== undefined) where.isPublished = published === 'true';
     if (search) {
@@ -85,14 +85,14 @@ export class AdminArticlesController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateArticleDto) {
-    const { articleEvents, articleTags, ...articleData } = data as any;
+    const { articleEvents, articleTags, ...articleData } = data as CreateArticleDto & { articleEvents?: unknown; articleTags?: unknown };
     return this.prisma.article.create({ data: articleData });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateArticleDto, @Request() req: ExpressRequest) {
-    const { id: _, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data as any;
+    const { id: _id, createdAt, updatedAt, city, articleEvents, articleTags, _count, version, ...clean } = data as UpdateArticleDto & { id?: string; createdAt?: unknown; updatedAt?: unknown; city?: unknown; articleEvents?: unknown; articleTags?: unknown; _count?: unknown };
 
     if (data.version !== undefined) {
       const before = await this.prisma.article.findUnique({ where: { id } });

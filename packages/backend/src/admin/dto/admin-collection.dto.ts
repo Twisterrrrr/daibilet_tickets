@@ -69,7 +69,7 @@ export class CreateCollectionDto {
   @ApiPropertyOptional({ description: 'Дополнительные фильтры (JSON)' })
   @IsOptional()
   @IsObject()
-  additionalFilters?: Record<string, any>;
+  additionalFilters?: Record<string, unknown>;
 
   // --- Курация ---
 
@@ -102,12 +102,12 @@ export class CreateCollectionDto {
   @ApiPropertyOptional({ description: 'Информационные блоки [{title, text}]' })
   @IsOptional()
   @IsArray()
-  infoBlocks?: any[];
+  infoBlocks?: Record<string, unknown>[];
 
   @ApiPropertyOptional({ description: 'FAQ [{question, answer}]' })
   @IsOptional()
   @IsArray()
-  faq?: any[];
+  faq?: Record<string, unknown>[];
 
   // --- Состояние ---
 

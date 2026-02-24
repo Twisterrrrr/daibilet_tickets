@@ -6,7 +6,7 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { CreateUpsellDto, UpdateUpsellDto } from './dto/admin-upsell.dto';
+import { CreateUpsellDto, UpdateUpsellDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -24,7 +24,7 @@ export class AdminUpsellsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const where: any = {};
+    const where: Record<string, unknown> = {};
     if (citySlug) where.citySlug = citySlug;
     if (active !== undefined) where.isActive = active === 'true';
 
@@ -54,7 +54,7 @@ export class AdminUpsellsController {
   @Patch(':id')
   @Roles('ADMIN')
   async update(@Param('id') id: string, @Body() data: UpdateUpsellDto) {
-    const { id: _, createdAt, updatedAt, ...clean } = data as any;
+    const { id: _, createdAt, updatedAt, ...clean } = data as Record<string, unknown>;
     return this.prisma.upsellItem.update({ where: { id }, data: clean });
   }
 

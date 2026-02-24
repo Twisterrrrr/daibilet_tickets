@@ -1,6 +1,7 @@
 import { getPriceByTypeKopecks } from '@daibilet/shared';
 import { Injectable, Logger } from '@nestjs/common';
 
+import { toDateSafe } from '../common/typing';
 import { MarkupContext, PricingService } from '../pricing/pricing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CalculatePlanDto } from './dto/calculate-plan.dto';
@@ -16,8 +17,8 @@ import { CalculatePlanDto } from './dto/calculate-plan.dto';
 // ==========================================
 
 interface ScoredEvent {
-  event: any;
-  session: any;
+  event: Record<string, unknown>;
+  session: Record<string, unknown>;
   score: number;
   adultPrice: number;
   childPrice: number;
@@ -174,7 +175,7 @@ export class PlannerService {
   /**
    * Заменить событие в слоте.
    */
-  async customize(body: { variant: any; dayNumber: number; slotIndex: number; newEventId: string }) {
+  async customize(body: { variant: Record<string, unknown>; dayNumber: number; slotIndex: number; newEventId: string }) {
     const event = await this.prisma.event.findUnique({
       where: { id: body.newEventId },
       include: {
@@ -188,39 +189,42 @@ export class PlannerService {
     }
 
     // Найти день и слот
-    const day = body.variant.days?.find((d: any) => d.dayNumber === body.dayNumber);
+    const day = (body.variant.days as Array<{ dayNumber: number; slots: unknown[] }> | undefined)?.find((d) => d.dayNumber === body.dayNumber);
     if (!day || !day.slots[body.slotIndex]) {
       return { success: false, message: 'Слот не найден' };
     }
 
-    const slot = day.slots[body.slotIndex];
+    const slot = (day.slots as Array<{ slot?: string; event?: unknown; session?: unknown; tickets?: { adult?: { count?: number; unitPrice?: number; total?: number }; child?: { count?: number; unitPrice?: number; total?: number } }; subtotal?: number }>)[body.slotIndex];
     const session = event.sessions[0];
     const adultPrice = getPriceByTypeKopecks(session.prices, 'adult');
     const childPrice = getPriceByTypeKopecks(session.prices, 'child') || adultPrice;
 
     // Пересчитать
-    const adultTotal = adultPrice * (slot.tickets?.adult?.count || 1);
-    const childTotal = childPrice * (slot.tickets?.child?.count || 0);
+    const adultTotal = adultPrice * (slot?.tickets?.adult?.count ?? 1);
+    const childTotal = childPrice * (slot?.tickets?.child?.count ?? 0);
     const subtotal = adultTotal + childTotal;
 
     // Заменить
     slot.event = this.mapEventToListItem(event);
-    slot.session = this.mapSession(session);
+    slot.session = this.mapSession(session) as Record<string, unknown>;
+    const adultCount = slot?.tickets?.adult?.count ?? 1;
+    const childCount = slot?.tickets?.child?.count ?? 0;
     slot.tickets = {
-      adult: { count: slot.tickets?.adult?.count || 1, unitPrice: adultPrice, total: adultTotal },
-      child: { count: slot.tickets?.child?.count || 0, unitPrice: childPrice, total: childTotal },
+      adult: { count: adultCount, unitPrice: adultPrice, total: adultTotal },
+      child: { count: childCount, unitPrice: childPrice, total: childTotal },
     };
     slot.subtotal = subtotal;
 
     // Пересчитать итого
-    const totalPrice = body.variant.days.reduce(
-      (sum: number, d: any) => sum + d.slots.reduce((s: number, sl: any) => s + (sl.subtotal || 0), 0),
+    const daysArr = body.variant.days as Array<{ slots: Array<{ subtotal?: number }> }>;
+    const totalPrice = daysArr.reduce(
+      (sum, d) => sum + d.slots.reduce((s, sl) => s + (sl.subtotal || 0), 0),
       0,
     );
 
     const breakdown = await this.pricing.calculateBreakdown(
       totalPrice,
-      slot.tickets.adult.count + slot.tickets.child.count,
+      adultCount + childCount,
     );
 
     body.variant.totalPrice = breakdown.basePrice;
@@ -237,7 +241,7 @@ export class PlannerService {
 
   private async buildVariant(
     tier: VariantTier,
-    allEvents: any[],
+    allEvents: Record<string, unknown>[],
     startDate: Date,
     dayCount: number,
     intensityConfig: ReturnType<typeof this.getIntensityConfig>,
@@ -268,7 +272,7 @@ export class PlannerService {
 
         // Выбрать лучшее
         const best = scored[0];
-        usedEventIds.add(best.event.id);
+        usedEventIds.add(String(best.event.id ?? ''));
 
         const adultTotal = best.adultPrice * adults;
         const childTotal = best.childPrice * children;
@@ -283,7 +287,7 @@ export class PlannerService {
           tickets: {
             adult: { count: adults, unitPrice: best.adultPrice, total: adultTotal },
             child: { count: children, unitPrice: best.childPrice, total: childTotal },
-          },
+          } as { adult: { count?: number }; child: { count?: number } },
           subtotal,
         });
       }
@@ -327,7 +331,7 @@ export class PlannerService {
    * Возвращает отсортированный массив (лучшие первыми).
    */
   private scoreEventsForSlot(
-    events: any[],
+    events: Record<string, unknown>[],
     slotType: string,
     date: Date,
     variantConfig: (typeof VARIANT_CONFIG)[VariantTier],
@@ -339,20 +343,22 @@ export class PlannerService {
     if (!slotRange) return scored;
 
     // Ценовой диапазон для нормализации
-    const allPrices = events.map((e) => this.getAdultPrice(e.sessions)).filter((p) => p > 0);
+    const allPrices = events
+      .map((e) => this.getAdultPrice(Array.isArray(e.sessions) ? e.sessions : []))
+      .filter((p) => p > 0);
     const maxPrice = Math.max(...allPrices, 1);
     const minPrice = Math.min(...allPrices, 0);
     const priceRange = maxPrice - minPrice || 1;
 
     for (const event of events) {
-      if (usedEventIds.has(event.id)) continue;
+      if (usedEventIds.has(String(event.id ?? ''))) continue;
 
-      // Найти лучшую сессию для этого дня и слота
-      const session = this.findBestSession(event.sessions, date, slotRange);
+      const sessionsArr = Array.isArray(event.sessions) ? event.sessions : [];
+      const session = this.findBestSession(sessionsArr, date, slotRange);
       if (!session) continue;
 
-      // Проверить доступность
-      if (session.availableTickets < totalPersons) continue;
+      const availableTickets = session.availableTickets ?? 0;
+      if (availableTickets < totalPersons) continue;
 
       const adultPrice = getPriceByTypeKopecks(session.prices, 'adult');
       const childPrice = getPriceByTypeKopecks(session.prices, 'child') || adultPrice;
@@ -367,7 +373,7 @@ export class PlannerService {
       score += (rating / 5) * 25 * (1 + variantConfig.ratingWeight);
 
       // 2. Категория × слот (0-30 баллов)
-      const catFit = CATEGORY_SLOT_FIT[event.category]?.[slotType] || 15;
+      const catFit = CATEGORY_SLOT_FIT[String(event.category ?? '')]?.[slotType] || 15;
       score += catFit;
 
       // 3. Ценовой фактор (0-20 баллов)
@@ -376,15 +382,17 @@ export class PlannerService {
       score += (0.5 + variantConfig.priceWeight * (priceNorm - 0.5)) * 20;
 
       // 4. Популярность (0-10 баллов)
-      const popularity = Math.min(event.reviewCount / 50, 1); // normalize to 0-1
+      const reviewCount = Number(event.reviewCount ?? 0);
+      const popularity = Math.min(reviewCount / 50, 1);
       score += popularity * 10;
 
-      // 5. Длительность: штраф если событие длиннее слота (0-(-10) баллов)
-      if (event.durationMinutes) {
+      // 5. Длительность: штраф если событие длиннее слота
+      const durationMinutes = Number(event.durationMinutes ?? 0);
+      if (durationMinutes > 0) {
         const slotDuration = (slotRange.end - slotRange.start) * 60;
-        if (event.durationMinutes > slotDuration) {
+        if (durationMinutes > slotDuration) {
           score -= 5; // Штраф за перебор
-        } else if (event.durationMinutes < 30) {
+        } else if (durationMinutes < 30) {
           score -= 3; // Слишком короткое — не стоит целого слота
         }
       }
@@ -393,9 +401,10 @@ export class PlannerService {
       if (event.imageUrl) score += 2;
       if (event.description) score += 1;
 
-      // 7. Фактор новизны (0-8 баллов) — новые события не теряются в тени старых
-      if (event.createdAt) {
-        const ageDays = (Date.now() - new Date(event.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+      // 7. Фактор новизны (0-8 баллов)
+      const createdAt = toDateSafe(event.createdAt);
+      if (createdAt) {
+        const ageDays = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
         if (ageDays < 30) {
           score += 8 * (1 - ageDays / 30); // Max 8 баллов для совсем новых
         }
@@ -414,7 +423,11 @@ export class PlannerService {
   // Утилиты
   // ==========================================
 
-  private findBestSession(sessions: any[], targetDate: Date, slotRange: { start: number; end: number }) {
+  private findBestSession(
+    sessions: Array<{ startsAt: Date; availableTickets?: number; prices?: unknown }>,
+    targetDate: Date,
+    slotRange: { start: number; end: number },
+  ): { startsAt: Date; availableTickets: number; prices?: unknown } | null {
     const targetDay = targetDate.toISOString().split('T')[0];
 
     // Сессии на нужный день в нужном временном диапазоне
@@ -425,7 +438,10 @@ export class PlannerService {
       return sDay === targetDay && sHour >= slotRange.start && sHour < slotRange.end;
     });
 
-    if (candidates.length > 0) return candidates[0];
+    if (candidates.length > 0) {
+      const s = candidates[0];
+      return { ...s, availableTickets: s.availableTickets ?? 0 };
+    }
 
     // Фолбэк: любая сессия на этот день
     const sameDaySessions = sessions.filter((s) => {
@@ -433,10 +449,12 @@ export class PlannerService {
       return sDay === targetDay;
     });
 
-    return sameDaySessions[0] || null;
+    const fallback = sameDaySessions[0];
+    if (!fallback) return null;
+    return { ...fallback, availableTickets: fallback.availableTickets ?? 0 };
   }
 
-  private getAdultPrice(sessions: any[]): number {
+  private getAdultPrice(sessions: Array<{ prices: unknown }>): number {
     for (const s of sessions) {
       const price = getPriceByTypeKopecks(s.prices, 'adult');
       if (price > 0) return price;
@@ -455,7 +473,7 @@ export class PlannerService {
     }
   }
 
-  private mapEventToListItem(event: any) {
+  private mapEventToListItem(event: Record<string, unknown>) {
     return {
       id: event.id,
       slug: event.slug,
@@ -470,7 +488,7 @@ export class PlannerService {
     };
   }
 
-  private mapSession(session: any) {
+  private mapSession(session: Record<string, unknown>) {
     return {
       id: session.id,
       startsAt: session.startsAt,
@@ -483,11 +501,11 @@ export class PlannerService {
   /**
    * Убрать варианты-дубликаты (если мало событий, economy ≈ optimal).
    */
-  private deduplicateVariants(variants: any[]): any[] {
+  private deduplicateVariants(variants: Record<string, unknown>[]): Record<string, unknown>[] {
     const seen = new Set<string>();
     return variants.filter((v) => {
-      // Fingerprint: набор eventId в порядке слотов
-      const fp = v.days.flatMap((d: any) => d.slots.map((s: any) => s.event.id)).join(',');
+      const vv = v as { days?: Array<{ slots?: Array<{ event?: { id?: string } }> }> };
+      const fp = (vv.days ?? []).flatMap((d) => (d.slots ?? []).map((s) => s.event?.id ?? '')).join(',');
       if (seen.has(fp)) return false;
       seen.add(fp);
       return true;

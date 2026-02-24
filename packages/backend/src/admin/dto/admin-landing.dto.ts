@@ -35,37 +35,37 @@ export class CreateLandingDto {
   @ApiPropertyOptional({ description: 'JSON: [{title, text}]' })
   @IsOptional()
   @IsArray()
-  howToChoose?: any[];
+  howToChoose?: Record<string, unknown>[];
 
   @ApiPropertyOptional({ description: 'JSON: [{title, text}]' })
   @IsOptional()
   @IsArray()
-  infoBlocks?: any[];
+  infoBlocks?: Record<string, unknown>[];
 
   @ApiPropertyOptional({ description: 'JSON: [{question, answer}]' })
   @IsOptional()
   @IsArray()
-  faq?: any[];
+  faq?: Record<string, unknown>[];
 
   @ApiPropertyOptional({ description: 'JSON: [{text, author, rating}]' })
   @IsOptional()
   @IsArray()
-  reviews?: any[];
+  reviews?: Record<string, unknown>[];
 
   @ApiPropertyOptional({ description: 'JSON: {soldTickets, avgRating}' })
   @IsOptional()
   @IsObject()
-  stats?: Record<string, any>;
+  stats?: Record<string, unknown>;
 
   @ApiPropertyOptional({ description: 'JSON: [{title, href}]' })
   @IsOptional()
   @IsArray()
-  relatedLinks?: any[];
+  relatedLinks?: Record<string, unknown>[];
 
   @ApiPropertyOptional({ description: 'JSON: {category?, source?, ...}' })
   @IsOptional()
   @IsObject()
-  additionalFilters?: Record<string, any>;
+  additionalFilters?: Record<string, unknown>;
 
   @ApiPropertyOptional()
   @IsOptional()

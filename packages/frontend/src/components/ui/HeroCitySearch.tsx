@@ -78,7 +78,7 @@ export function HeroCitySearch({ cities, initialCitySlug }: HeroCitySearchProps)
 
   return (
     <div ref={containerRef} className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-w-0">
         <div className="flex items-center gap-3 rounded-xl bg-white px-4 py-3.5 shadow-lg sm:rounded-l-xl sm:rounded-r-none">
           <MapPin className="h-5 w-5 flex-shrink-0 text-primary-500" />
           <input

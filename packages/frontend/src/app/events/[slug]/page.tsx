@@ -504,7 +504,7 @@ export default async function EventPage({ params }: Props) {
         <section className="border-t border-slate-100 bg-slate-50 py-12">
           <div className="container-page">
             <h2 className="text-xl font-bold text-slate-900">Похожие события в {event.city?.name}</h2>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="mt-6 grid gap-4 grid-cols-1 min-[361px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
               {event.relatedEvents.map((related: any) => (
                 <EventCard
                   key={related.id}

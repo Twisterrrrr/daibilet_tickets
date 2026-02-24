@@ -34,7 +34,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   async refresh(
-    @Request() req: any,
+    @Request() req: { cookies?: Record<string, string> },
     @Body('refreshToken') bodyToken: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -59,7 +59,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(200)
-  async logout(@Request() req: any, @Res({ passthrough: true }) res: Response) {
+  async logout(@Request() req: { user: { id: string } }, @Res({ passthrough: true }) res: Response) {
     await this.auth.logout(req.user.id);
     res.clearCookie(REFRESH_COOKIE, { path: '/' });
     return { success: true };
@@ -68,7 +68,7 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async me(@Request() req: any) {
+  async me(@Request() req: { user: { id: string } }) {
     return this.auth.getProfile(req.user.id);
   }
 

@@ -12,6 +12,7 @@ import { TcApiService } from './tc-api.service';
 import { TcGrpcService } from './tc-grpc.service';
 import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
+import { PostEditQueueService } from './postedit-queue.service';
 import { TepSyncService } from './tep-sync.service';
 
 @Module({
@@ -28,6 +29,7 @@ import { TepSyncService } from './tep-sync.service';
     TepSyncService,
     FuzzyDedupService,
     EventOverrideService,
+    PostEditQueueService,
   ],
   exports: [
     CatalogService,
@@ -40,6 +42,7 @@ import { TepSyncService } from './tep-sync.service';
     TepSyncService,
     FuzzyDedupService,
     EventOverrideService,
+    PostEditQueueService,
   ],
 })
 export class CatalogModule {}

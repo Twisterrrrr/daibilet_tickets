@@ -3,36 +3,25 @@ import { Plug, Layout, MapPin, Check } from 'lucide-react';
 const formats = [
   {
     icon: Plug,
-    title: 'Operator',
-    subtitle: 'API / виджет провайдера',
-    target: 'Для компаний со своей билетной системой (TicketsCloud, teplohod.info и др.)',
-    commission: [
-      { label: 'Экскурсии', value: '15–25%' },
-      { label: 'Мероприятия', value: '10–20%' },
-      { label: 'Музеи', value: '10–14%' },
-    ],
+    title: 'Оператор',
+    subtitle: 'Внешний API / виджет провайдера',
+    target: 'Для компаний со своей билетной системой или сторонней — TicketsCloud, teplohod.info и др.',
     benefits: ['Минимальные технические доработки', 'Мы не вмешиваемся в вашу логику продаж', 'Быстрое подключение'],
     accent: false,
   },
   {
     icon: Layout,
-    title: 'Supplier',
-    subtitle: 'Личный кабинет на Daibilet',
-    target: 'Для гидов, локальных операторов, музеев, организаторов мероприятий',
-    commission: [
-      { label: 'Экскурсии', value: '20–30%' },
-      { label: 'Мероприятия', value: '15–25%' },
-      { label: 'Площадки', value: '12–18%' },
-    ],
+    title: 'Поставщик',
+    subtitle: 'Личный кабинет на Дайбилет',
+    target: 'Для частных гидов, небольших операторов, организаторов мероприятий',
     benefits: ['Полный контроль над расписанием', 'Автоматическая отчётность и акты', 'Не нужна своя билетная система'],
     accent: true,
   },
   {
     icon: MapPin,
-    title: 'Venue',
-    subtitle: 'Площадка / open-date',
+    title: 'Площадка',
+    subtitle: 'Билеты с открытой датой',
     target: 'Для музеев, выставочных пространств, культурных центров',
-    commission: [{ label: 'Базовая', value: '10–18%' }],
     benefits: ['Гибкая модель без расписания', 'QR-валидация на входе', 'Индивидуальные условия для госмузеев'],
     accent: false,
   },
@@ -79,24 +68,6 @@ export function FormatsSection() {
               <p className={`text-sm mb-4 ${f.accent ? 'text-white/70' : 'text-slate-600'}`}>{f.subtitle}</p>
 
               <p className={`text-sm mb-6 ${f.accent ? 'text-white/60' : 'text-slate-600'}`}>{f.target}</p>
-
-              <div className="mb-6">
-                <h4
-                  className={`text-xs font-semibold uppercase tracking-wider mb-3 ${
-                    f.accent ? 'text-white/50' : 'text-slate-500'
-                  }`}
-                >
-                  Комиссия
-                </h4>
-                <div className="space-y-2">
-                  {f.commission.map((c) => (
-                    <div key={c.label} className="flex items-center justify-between">
-                      <span className={`text-sm ${f.accent ? 'text-white/70' : 'text-slate-600'}`}>{c.label}</span>
-                      <span className="font-bold text-lg">{c.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
               <div className="space-y-2.5">
                 {f.benefits.map((b) => (

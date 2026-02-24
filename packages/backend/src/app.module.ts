@@ -17,6 +17,7 @@ import { LoggingInterceptor } from './common/logging.interceptor';
 import { RequestIdMiddleware } from './common/request-id.middleware';
 import { SentryContextMiddleware } from './common/sentry-context.middleware';
 import { getThrottlerOptions } from './common/throttle.util';
+import { IdempotencyModule } from './common/idempotency.module';
 import { HealthModule } from './health/health.module';
 import { PublicModule } from './public/public.module';
 import { LandingModule } from './landing/landing.module';
@@ -60,6 +61,7 @@ import { VoucherModule } from './voucher/voucher.module';
       limit: 30,   // 30 запросов в минуту (глобальный лимит)
     }]),
     PrismaModule,
+    IdempotencyModule,
     RedisCacheModule,
     MailModule,
     UploadModule,

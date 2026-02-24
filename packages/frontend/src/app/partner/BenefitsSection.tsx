@@ -40,7 +40,7 @@ export function BenefitsSection() {
       <div className="container-page">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
-            Почему выгодно работать с Daibilet
+            Почему выгодно работать с Дайбилет
           </h2>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
             Всё для увеличения продаж и снижения операционной нагрузки

@@ -72,7 +72,7 @@ export default function FavoritesPage() {
           </Link>
         </div>
       ) : loading ? (
-        <div className="mt-8 grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-4">
+        <div className="mt-8 grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="animate-pulse rounded-xl bg-slate-100 h-72" />
           ))}
@@ -85,7 +85,7 @@ export default function FavoritesPage() {
           </Link>
         </div>
       ) : (
-        <div className="mt-8 grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-4">
+        <div className="mt-8 grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
           {events.map((event: any) => (
             <EventCard
               key={event.id}

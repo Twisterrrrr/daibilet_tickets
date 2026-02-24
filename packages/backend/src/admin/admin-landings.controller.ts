@@ -17,11 +17,12 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
+import { toJsonValue } from '../common/typing';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
-import { CreateLandingDto, UpdateLandingDto } from './dto/admin-landing.dto';
+import { CreateLandingDto, UpdateLandingDto } from './dto/admin.dto';
 import {
   AdditionalFiltersSchema,
   FaqSchema,
@@ -51,7 +52,7 @@ export class AdminLandingsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const where: any = { isDeleted: false };
+    const where: Record<string, unknown> = { isDeleted: false };
     if (city) where.city = { slug: city };
 
     const pg = parsePagination({ cursor, page, limit });
@@ -78,14 +79,18 @@ export class AdminLandingsController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateLandingDto) {
-    this.validateJsonFields(data);
-    return this.prisma.landingPage.create({ data });
+    this.validateJsonFields(data as unknown as Record<string, unknown>);
+    const prismaData = {
+      ...data,
+      additionalFilters: data.additionalFilters ? toJsonValue(data.additionalFilters) : undefined,
+    };
+    return this.prisma.landingPage.create({ data: prismaData as Parameters<typeof this.prisma.landingPage.create>[0]['data'] });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
-  async update(@Param('id') id: string, @Body() data: UpdateLandingDto, @Request() req: any) {
-    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as any;
+  async update(@Param('id') id: string, @Body() data: UpdateLandingDto, @Request() req: { user: { id: string } }) {
+    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as Record<string, unknown>;
 
     this.validateJsonFields(clean);
 
@@ -121,7 +126,7 @@ export class AdminLandingsController {
     return { success: true };
   }
 
-  private validateJsonFields(data: any) {
+  private validateJsonFields(data: Record<string, unknown>) {
     try {
       if (data.faq !== undefined) validateJson(FaqSchema, data.faq, 'faq');
       if (data.reviews !== undefined) validateJson(ReviewSchema, data.reviews, 'reviews');

@@ -70,7 +70,7 @@ export class CollectionService {
       }
 
       // 1) Закреплённые события (pinned) — отдельный запрос
-      let pinnedEvents: any[] = [];
+      let pinnedEvents: Awaited<ReturnType<typeof this.prisma.event.findMany>> = [];
       if (collection.pinnedEventIds.length > 0) {
         pinnedEvents = await this.prisma.event.findMany({
           where: {
@@ -161,26 +161,26 @@ export class CollectionService {
 
       const total = filteredTotal + pinnedEvents.length;
 
-      // Обогащаем события (primary offer, tags)
       const enrichedEvents = events.map((event) => {
-        const offers = event.offers || [];
+        const ev = event as unknown as { id: string; offers?: unknown[]; sessions?: { startsAt: Date }[]; tags?: { tag: unknown }[]; city?: unknown; slug: string; title: string; imageUrl?: string | null; category: string; priceFrom?: number | null; rating?: number; reviewCount: number; durationMinutes?: number | null };
+        const offers = ev.offers ?? [];
         const primaryOffer = offers.length > 0 ? offers[0] : null;
-        const sessions = event.sessions || [];
+        const sessions = ev.sessions ?? [];
         const nextSessionAt = sessions.length > 0 ? sessions[0].startsAt : null;
-        const tags = (event.tags || []).map((t: any) => t.tag);
-        const isPinned = pinnedIds.has(event.id);
+        const tags = (ev.tags ?? []).map((t) => t.tag);
+        const isPinned = pinnedIds.has(ev.id);
 
         return {
-          id: event.id,
-          slug: event.slug,
-          title: event.title,
-          imageUrl: event.imageUrl,
-          category: event.category,
-          priceFrom: event.priceFrom,
-          rating: event.rating,
-          reviewCount: event.reviewCount,
-          durationMinutes: event.durationMinutes,
-          city: event.city,
+          id: ev.id,
+          slug: ev.slug,
+          title: ev.title,
+          imageUrl: ev.imageUrl,
+          category: ev.category,
+          priceFrom: ev.priceFrom,
+          rating: ev.rating,
+          reviewCount: ev.reviewCount,
+          durationMinutes: ev.durationMinutes,
+          city: ev.city,
           primaryOffer,
           nextSessionAt,
           tags,
@@ -238,7 +238,7 @@ export class CollectionService {
     filterSubcategory: string | null;
     filterAudience: string | null;
     excludedEventIds: string[];
-    additionalFilters: any;
+    additionalFilters: unknown;
   }): Prisma.EventWhereInput {
     // Базовый фильтр: активные, не удалённые, не дубли
     const where: Prisma.EventWhereInput = {

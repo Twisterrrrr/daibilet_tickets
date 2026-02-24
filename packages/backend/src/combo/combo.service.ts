@@ -45,7 +45,7 @@ export class ComboService {
   // ==========================================
 
   async getAll(citySlug?: string) {
-    const where: any = { isActive: true };
+    const where: { isActive: boolean; [key: string]: unknown } = { isActive: true };
     if (citySlug) where.city = { slug: citySlug };
 
     return this.prisma.comboPage.findMany({
@@ -79,7 +79,7 @@ export class ComboService {
       }
     }
 
-    return this.buildComboResponse(combo, curatedItems);
+    return this.buildComboResponse(combo, curatedItems as unknown as Record<string, unknown>[]);
   }
 
   /**
@@ -115,7 +115,7 @@ export class ComboService {
    * @param affectedCityIds — если передан, обрабатываются только combo этих городов
    */
   async populateAll(affectedCityIds?: string[]) {
-    const where: any = { isActive: true };
+    const where: { isActive: boolean; [key: string]: unknown } = { isActive: true };
     if (affectedCityIds && affectedCityIds.length > 0) {
       where.cityId = { in: affectedCityIds };
     }
@@ -181,7 +181,7 @@ export class ComboService {
   /**
    * Проверяет, сколько событий из curatedEvents всё ещё активны.
    */
-  private async validateCuratedEvents(curatedItems: any[]): Promise<{
+  private async validateCuratedEvents(curatedItems: CuratedEventSlot[]): Promise<{
     totalCount: number;
     validCount: number;
     invalidCount: number;
@@ -218,7 +218,7 @@ export class ComboService {
    * - Новизны (бонус для событий < 30 дней)
    * - Категории → слот
    */
-  private async autoFillCuratedEvents(cityId: string, dayCount: number, intensity: string): Promise<any[]> {
+  private async autoFillCuratedEvents(cityId: string, dayCount: number, intensity: string): Promise<CuratedEventSlot[]> {
     const slotsPerDay = intensity === 'RELAXED' ? 2 : intensity === 'ACTIVE' ? 4 : 3;
     const totalNeeded = dayCount * slotsPerDay;
 
@@ -278,7 +278,7 @@ export class ComboService {
     }
 
     const usedIds = new Set<string>();
-    const result: any[] = [];
+    const result: CuratedEventSlot[] = [];
 
     for (let d = 1; d <= dayCount; d++) {
       const slots =
@@ -322,8 +322,8 @@ export class ComboService {
   // Response builder
   // ==========================================
 
-  private async buildComboResponse(combo: any, curatedItems: any[]) {
-    const eventIds = curatedItems.map((c: any) => c.eventId).filter(Boolean);
+  private async buildComboResponse(combo: Record<string, unknown>, curatedItems: Record<string, unknown>[]) {
+    const eventIds = curatedItems.map((c) => c.eventId as string).filter(Boolean);
     const events =
       eventIds.length > 0
         ? await this.prisma.event.findMany({
@@ -340,13 +340,13 @@ export class ComboService {
         : [];
 
     const eventMap = new Map(events.map((e) => [e.id, e]));
-    const dayMap = new Map<number, any[]>();
+    const dayMap = new Map<number, Array<Record<string, unknown>>>();
 
     for (const item of curatedItems) {
-      const dayNum = item.dayNumber || 1;
+      const dayNum = Number(item.dayNumber ?? 1);
       if (!dayMap.has(dayNum)) dayMap.set(dayNum, []);
 
-      const event = eventMap.get(item.eventId);
+      const event = eventMap.get(String(item.eventId ?? ''));
       if (!event) continue;
 
       const session = event.sessions[0];
@@ -354,7 +354,7 @@ export class ComboService {
 
       dayMap.get(dayNum)!.push({
         slot: item.slot || 'MORNING',
-        time: item.time || SLOT_TIMES[item.slot] || '10:00',
+        time: item.time || SLOT_TIMES[String(item.slot ?? 'MORNING')] || '10:00',
         event: {
           id: event.id,
           slug: event.slug,
@@ -379,25 +379,27 @@ export class ComboService {
       });
     }
 
-    const days: any[] = [];
+    const days: Record<string, unknown>[] = [];
     for (const [dayNum, slots] of dayMap) {
       days.push({
         dayNumber: dayNum,
         slots: slots.sort((a, b) => {
           const order: Record<string, number> = { MORNING: 0, AFTERNOON: 1, EVENING: 2 };
-          return (order[a.slot] || 0) - (order[b.slot] || 0);
+          return (order[String((a as { slot?: string }).slot ?? '')] || 0) - (order[String((b as { slot?: string }).slot ?? '')] || 0);
         }),
       });
     }
-    days.sort((a, b) => a.dayNumber - b.dayNumber);
+    days.sort((a, b) => (a.dayNumber as number) - (b.dayNumber as number));
 
     const totalBase = days.reduce(
-      (sum, d) => sum + d.slots.reduce((s: number, sl: any) => s + (sl.adultPrice || 0), 0),
+      (sum, d) => sum + (d.slots as Array<{ adultPrice?: number }>).reduce((s, sl) => s + (sl.adultPrice || 0), 0),
       0,
     );
 
-    const breakdown = await this.pricing.calculateBreakdown(combo.suggestedPrice || totalBase * 2, 2);
-    const upsells = await this.pricing.getUpsells(combo.city.slug);
+    const citySlug = (combo.city as { slug?: string })?.slug ?? '';
+    const suggested = Number(combo.suggestedPrice ?? 0) || totalBase * 2;
+    const breakdown = await this.pricing.calculateBreakdown(suggested, 2);
+    const upsells = await this.pricing.getUpsells(citySlug || '');
 
     return {
       ...combo,

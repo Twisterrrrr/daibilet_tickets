@@ -24,7 +24,7 @@ export default function EventEdit() {
   });
 
   useEffect(() => {
-    api.get<any>('/catalog/cities').then((res) => setCities(res.items || res || []));
+    api.get<any>('/cities').then((res) => setCities(res.items || res || []));
     if (id) {
       api.get<any>(`/supplier/events/${id}`).then((event) => {
         setForm({

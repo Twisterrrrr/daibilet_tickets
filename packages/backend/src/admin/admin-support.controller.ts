@@ -16,7 +16,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { SupportService } from '../support/support.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { ReplyTicketDto, UpdateTicketDto } from './dto/admin-support.dto';
+import { ReplyTicketDto, UpdateTicketDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()

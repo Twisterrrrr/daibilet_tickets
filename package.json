@@ -6,7 +6,9 @@
   "scripts": {
     "dev:backend": "pnpm --filter @daibilet/backend dev",
     "dev:frontend": "pnpm --filter @daibilet/frontend dev",
-    "dev": "concurrently -n backend,frontend -c blue,green \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "dev:admin": "pnpm --filter @daibilet/frontend-admin dev",
+    "dev:supplier": "pnpm --filter @daibilet/frontend-supplier dev",
+    "dev": "concurrently -n backend,frontend,admin,supplier -c blue,green,magenta,cyan \"pnpm dev:backend\" \"pnpm dev:frontend\" \"pnpm dev:admin\" \"pnpm dev:supplier\"",
     "build": "pnpm --filter @daibilet/shared build && pnpm --filter @daibilet/backend build && pnpm --filter @daibilet/frontend build",
     "lint": "npx eslint packages/",
     "lint:fix": "npx eslint packages/ --fix",

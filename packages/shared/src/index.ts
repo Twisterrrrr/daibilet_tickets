@@ -27,6 +27,7 @@ export {
   RadarioWidgetPayloadSchema,
   type TCWidgetPayload,
   TCWidgetPayloadSchema,
+  type TepWidgetPayload,
   type TimepadWidgetPayload,
   TimepadWidgetPayloadSchema,
   validateWidgetPayload,
@@ -374,7 +375,9 @@ export interface CityListItem {
   slug: string;
   name: string;
   heroImage: string | null;
-  _count: { events: number };
+  _count: { events: number; venues?: number };
+  /** Дополнительное поле API getTopCities */
+  museumCount?: number;
 }
 
 export interface EventListItem {
@@ -390,6 +393,17 @@ export interface EventListItem {
   reviewCount: number;
   durationMinutes: number | null;
   city: { slug: string; name: string };
+  /** Дополнительные поля от catalog API */
+  priceOriginalKopecks?: number | null;
+  totalAvailableTickets?: number;
+  departingSoonMinutes?: number | null;
+  nextSessionAt?: string | null;
+  isOptimalChoice?: boolean;
+  dateMode?: string;
+  groupSize?: string | null;
+  templateData?: Record<string, unknown> | null;
+  sessionTimes?: string[];
+  highlights?: string[];
 }
 
 /** Единая карточка каталога: Event или Venue */
@@ -443,6 +457,8 @@ export interface EventDetail extends EventListItem {
   galleryUrls: string[];
   sessions: EventSession[];
   tags: { tag: TagItem }[];
+  offers?: EventOffer[] | null;
+  tcEventId?: string | null;
   relatedEvents: EventListItem[];
 }
 
@@ -452,6 +468,16 @@ export interface EventSession {
   endsAt: string | null;
   availableTickets: number;
   prices: TicketPrice[];
+  isActive?: boolean;
+}
+
+/** Оффер события (API EventDetail.offers) */
+export interface EventOffer {
+  id: string;
+  status: string;
+  purchaseType?: string;
+  priceFrom?: number | null;
+  [key: string]: unknown;
 }
 
 export interface TicketPrice {
@@ -464,6 +490,11 @@ export interface TagItem {
   slug: string;
   name: string;
   category: TagCategory;
+}
+
+/** Tag с счётчиком событий (API /tags) */
+export interface TagWithCount extends TagItem {
+  _count?: { events: number };
 }
 
 // --- Planner Types ---

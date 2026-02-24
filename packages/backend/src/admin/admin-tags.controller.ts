@@ -20,7 +20,7 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { CreateTagDto, UpdateTagDto } from './dto/admin-tag.dto';
+import { CreateTagDto, UpdateTagDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -38,7 +38,7 @@ export class AdminTagsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const where: any = { isDeleted: false };
+    const where: Record<string, unknown> = { isDeleted: false };
     if (category) where.category = category;
     if (search) {
       where.OR = [
@@ -91,7 +91,7 @@ export class AdminTagsController {
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateTagDto) {
-    const { id: _, createdAt, updatedAt, events, articleTags, _count, version, ...clean } = data as any;
+    const { id: _, createdAt, updatedAt, events, articleTags, _count, version, ...clean } = data as Record<string, unknown>;
 
     if (data.version !== undefined) {
       const result = await this.prisma.tag.updateMany({

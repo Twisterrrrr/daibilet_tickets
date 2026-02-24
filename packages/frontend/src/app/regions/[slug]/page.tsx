@@ -238,7 +238,7 @@ export default function RegionPage() {
 
         {/* Events grid */}
         {loading ? (
-          <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="card animate-pulse">
                 <div className="h-36 sm:h-48 bg-slate-200" />
@@ -251,7 +251,7 @@ export default function RegionPage() {
             ))}
           </div>
         ) : events.length > 0 ? (
-          <div className="grid gap-3 grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
             {events.map((event: any) => (
               <EventCard
                 key={event.id}

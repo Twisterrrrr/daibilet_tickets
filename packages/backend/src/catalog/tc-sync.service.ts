@@ -3,10 +3,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
 
+import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';
 import { classify } from './event-classifier';
 import { TcApiService } from './tc-api.service';
-import { type TcEvent } from './tc-api.types';
+import { type TcEvent, type TcTicketSet } from './tc-api.types';
 import {
   TcGrpcCity,
   TcGrpcEvent,
@@ -466,7 +467,8 @@ export class TcSyncService {
 
     const tcSessionId = `${ev.id}-main`;
     const availableTickets = ev.tickets_amount_vacant || 0;
-    const prices = this.extractPricesGrpc(ev.sets);
+    const pricesRaw = this.extractPricesGrpc(ev.sets);
+    const prices = toJsonValue(pricesRaw);
     const isActive = ev.status === 1 && availableTickets > 0; // PUBLIC + есть билеты
 
     await this.prisma.eventSession.upsert({
@@ -657,7 +659,7 @@ export class TcSyncService {
   }
 
   /** Цены из gRPC TicketSets → JSON для EventSession.prices */
-  private extractPricesGrpc(sets: TcGrpcTicketSet[]): any[] {
+  private extractPricesGrpc(sets: TcGrpcTicketSet[]): Record<string, unknown>[] {
     if (!sets?.length) return [];
     return sets
       .map((set) => {
@@ -1042,14 +1044,15 @@ export class TcSyncService {
   }
 
   /** REST v1: сессия */
-  private async syncSession(eventId: string, tc: any): Promise<boolean> {
+  private async syncSession(eventId: string, tc: TcEvent): Promise<boolean> {
     const tcId = String(tc.id);
-    const dates = this.parseVevent(tc.lifetime);
+    const dates = this.parseLifetimeRest(tc.lifetime);
     if (!dates.start) return false;
 
     const tcSessionId = `${tcId}-main`;
-    const availableTickets = tc.tickets_amount_vacant || 0;
-    const prices = this.extractPrices(tc.sets ?? []);
+    const availableTickets = Number(tc.tickets_amount_vacant) || 0;
+    const pricesRaw = this.extractPrices(tc.sets ?? []);
+    const prices = toJsonValue(pricesRaw);
     const isActive = tc.status === 'public' && availableTickets > 0;
 
     await this.prisma.eventSession.upsert({
@@ -1268,7 +1271,7 @@ export class TcSyncService {
   // REST v1 Города (legacy)
   // ============================================================
 
-  private async ensureCity(geoId: number, sampleEvent: any): Promise<string | null> {
+  private async ensureCity(geoId: number, sampleEvent: TcEvent): Promise<string | null> {
     if (this.cityCache.has(geoId)) return null;
 
     let slug = this.CITY_MAP[geoId] || null;
@@ -1338,8 +1341,8 @@ export class TcSyncService {
     return null;
   }
 
-  private extractDuration(tc: any): number | null {
-    const dates = this.parseVevent(tc.lifetime);
+  private extractDuration(tc: TcEvent): number | null {
+    const dates = this.parseLifetimeRest(tc.lifetime);
     if (dates.start && dates.finish) {
       const min = Math.round((dates.finish.getTime() - dates.start.getTime()) / 60000);
       return min > 0 && min < 2880 ? min : null;
@@ -1355,11 +1358,24 @@ export class TcSyncService {
     return current?.slug || base;
   }
 
+  /** REST API: lifetime = { start?: string; finish?: string } */
+  private parseLifetimeRest(lifetime: TcEvent['lifetime']): { start: Date | null; finish: Date | null } {
+    if (!lifetime) return { start: null, finish: null };
+    if (typeof lifetime === 'string') return this.parseVevent(lifetime);
+    const lo = lifetime as { start?: string; finish?: string };
+    const start = lo.start ? new Date(lo.start) : null;
+    const finish = lo.finish ? new Date(lo.finish) : null;
+    return {
+      start: start && !isNaN(start.getTime()) ? start : null,
+      finish: finish && !isNaN(finish.getTime()) ? finish : null,
+    };
+  }
+
   private parseVevent(vevent: string | null): { start: Date | null; finish: Date | null } {
     if (!vevent) return { start: null, finish: null };
     let start: Date | null = null;
     let finish: Date | null = null;
-    const startMatch = vevent.match(/DTSTART[^:]*:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?/);
+    const startMatch = String(vevent).match(/DTSTART[^:]*:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?/);
     if (startMatch) {
       start = new Date(
         `${startMatch[1]}-${startMatch[2]}-${startMatch[3]}T${startMatch[4]}:${startMatch[5]}:${startMatch[6]}Z`,
@@ -1372,25 +1388,27 @@ export class TcSyncService {
     return { start, finish };
   }
 
-  private classifyRest(tc: any) {
+  private classifyRest(tc: TcEvent) {
     const tags = (tc.tags || []).map((t: string) => t.toLowerCase());
     const title = String(tc.title?.text || '');
     const desc = String(tc.title?.desc || '');
     return classify(title, desc, tags);
   }
 
-  private extractMinPrice(sets: any[]): number | null {
+  private extractMinPrice(sets: TcTicketSet[]): number | null {
     if (!sets || !Array.isArray(sets)) return null;
     const prices: number[] = [];
     for (const set of sets) {
-      if (set.price) {
-        const p = Math.round(parseFloat(set.price) * 100);
+      if (set.price != null) {
+        const p = Math.round(parseFloat(String(set.price)) * 100);
         if (p > 0) prices.push(p);
       }
-      if (set.rules) {
-        for (const rule of set.rules) {
-          if (rule.current && rule.price) {
-            const p = Math.round(parseFloat(rule.price) * 100);
+      const rules = set.rules;
+      if (rules && Array.isArray(rules)) {
+        for (const rule of rules) {
+          const r = rule as { current?: boolean; price?: string | number };
+          if (r.current && r.price != null) {
+            const p = Math.round(parseFloat(String(r.price)) * 100);
             if (p > 0) prices.push(p);
           }
         }
@@ -1399,20 +1417,20 @@ export class TcSyncService {
     return prices.length > 0 ? Math.min(...prices) : null;
   }
 
-  private extractPrices(sets: any[]): any[] {
+  private extractPrices(sets: TcTicketSet[]): Record<string, unknown>[] {
     if (!sets || !Array.isArray(sets)) return [];
     return sets
-      .map((set: any) => {
+      .map((set: TcTicketSet & { rules?: Array<{ current?: boolean; price?: string; price_org?: string; price_extra?: string }> }) => {
         let priceCopecks = 0;
         let priceOrg = 0;
         let priceExtra = 0;
-        const currentRule = set.rules?.find((r: any) => r.current);
+        const currentRule = set.rules?.find((r) => r.current);
         if (currentRule) {
           priceCopecks = Math.round(parseFloat(currentRule.price || '0') * 100);
           priceOrg = Math.round(parseFloat(currentRule.price_org || '0') * 100);
           priceExtra = Math.round(parseFloat(currentRule.price_extra || '0') * 100);
-        } else if (set.price) {
-          priceCopecks = Math.round(parseFloat(set.price) * 100);
+        } else if (set.price != null) {
+          priceCopecks = Math.round(parseFloat(String(set.price)) * 100);
         }
         return {
           setId: set.id,
@@ -1425,10 +1443,10 @@ export class TcSyncService {
           withSeats: set.with_seats || false,
         };
       })
-      .filter((p: any) => p.price > 0);
+      .filter((p: { price: number }) => p.price > 0);
   }
 
-  private getCityName(tcCity: any): string {
+  private getCityName(tcCity: { name?: string | { ru?: string; default?: string; en?: string }; [key: string]: unknown } | null | undefined): string {
     if (!tcCity?.name) return 'unknown';
     if (typeof tcCity.name === 'string') return tcCity.name;
     return tcCity.name.ru || tcCity.name.default || tcCity.name.en || 'unknown';

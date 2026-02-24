@@ -14,7 +14,7 @@ interface Offer {
   badge?: string | null;
   availabilityMode?: string | null;
   widgetProvider?: string | null;
-  widgetPayload?: any;
+  widgetPayload?: Record<string, unknown>;
   externalEventId?: string | null;
 }
 

@@ -20,7 +20,7 @@ export function HeroSection() {
 
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-white leading-tight mb-6">
             Размещайте экскурсии и{' '}
-            <span className="text-gradient-gold">мероприятия</span> на Daibilet
+            <span className="text-gradient-gold">мероприятия</span> на Дайбилет
           </h1>
 
           <p className="text-lg sm:text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed">
@@ -48,7 +48,7 @@ export function HeroSection() {
             {[
               { icon: Ticket, label: 'Экскурсии', desc: 'API и виджеты' },
               { icon: Users, label: 'Мероприятия', desc: 'Личный кабинет' },
-              { icon: Building2, label: 'Музеи', desc: 'Open-date билеты' },
+              { icon: Building2, label: 'Музеи', desc: 'Билеты без даты' },
             ].map((item) => (
               <div
                 key={item.label}

@@ -26,11 +26,12 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
   }
 
-  /* Smooth scrolling */
-  html {
-    scroll-behavior: smooth;
+  body {
+    overflow-x: hidden;
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -1,6 +1,5 @@
-import { Building, FileText, Image, Scale, Check, ArrowRight } from 'lucide-react';
-
-const PARTNER_PORTAL_URL = 'https://daibilet-supplier.lovable.app/';
+import { Building, FileText, Image, Scale, Check } from 'lucide-react';
+import { PartnerApplicationForm } from './PartnerApplicationForm';
 
 const requirements = [
   { icon: Building, text: 'Юридическое лицо или ИП' },
@@ -23,10 +22,10 @@ export function ContactSection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
           <div>
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-              Начните продавать с Daibilet
+              Начните продавать с Дайбилет
             </h2>
             <p className="text-slate-600 mb-10 leading-relaxed">
-              Оставьте заявку через форму на партнёрском портале — мы подберём оптимальный формат
+              Оставьте заявку — мы подберём оптимальный формат
               сотрудничества для вашего бизнеса.
             </p>
 
@@ -62,26 +61,7 @@ export function ContactSection() {
           </div>
 
           <div>
-            <div className="bg-slate-50 rounded-2xl p-8 border border-slate-200">
-                <p className="text-slate-600 mb-6">
-                  Чтобы оставить заявку на партнёрство, перейдите на партнёрский портал Daibilet.
-                </p>
-                <a
-                  href={PARTNER_PORTAL_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 w-full px-6 py-4 rounded-lg gradient-gold text-slate-900 font-semibold text-lg shadow-gold hover:opacity-90 transition-opacity"
-                >
-                  Перейти на портал партнёров
-                  <ArrowRight className="w-5 h-5" />
-                </a>
-                <p className="mt-4 text-sm text-slate-500 text-center">
-                  Или{' '}
-                  <a href="mailto:partner@daibilet.ru" className="text-primary-600 hover:underline">
-                    напишите нам
-                  </a>
-                </p>
-              </div>
+            <PartnerApplicationForm />
           </div>
         </div>
       </div>

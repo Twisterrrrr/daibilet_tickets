@@ -94,8 +94,8 @@ export function CombosListPage() {
     if (cityFilter) params.set('city', cityFilter);
 
     adminApi
-      .get<ComboItem[]>(`/admin/combos${params.toString() ? `?${params}` : ''}`)
-      .then((res) => setData(Array.isArray(res) ? res : []))
+      .get<ComboItem[] | { items: ComboItem[] }>(`/admin/combos${params.toString() ? `?${params}` : ''}`)
+      .then((res) => setData(Array.isArray(res) ? res : (res?.items ?? [])))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   }, [cityFilter]);

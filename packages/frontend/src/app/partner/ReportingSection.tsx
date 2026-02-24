@@ -5,7 +5,7 @@ const reports = [
   { icon: Receipt, label: 'Реестр ваучеров', desc: 'все выданные билеты' },
   { icon: RefreshCw, label: 'Отчёт по возвратам', desc: 'полные и частичные' },
   { icon: FileText, label: 'Отчёт по комиссиям', desc: 'прозрачная экономика' },
-  { icon: QrCode, label: 'Usage Report', desc: 'валидация билетов' },
+  { icon: QrCode, label: 'Отчёт по использованию', desc: 'валидация билетов' },
   { icon: FileCheck, label: 'Акт выполненных работ', desc: 'ежемесячно' },
 ];
 

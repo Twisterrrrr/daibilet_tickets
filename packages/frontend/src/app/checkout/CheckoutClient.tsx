@@ -32,6 +32,7 @@ interface ContactForm {
   name: string;
   email: string;
   phone: string;
+  newsletterConsent?: boolean;
 }
 
 export function CheckoutClient() {
@@ -40,7 +41,12 @@ export function CheckoutClient() {
   const [validating, setValidating] = useState(false);
   const [validatedItems, setValidatedItems] = useState<ValidatedItem[] | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [contact, setContact] = useState<ContactForm>({ name: '', email: '', phone: '' });
+  const [contact, setContact] = useState<ContactForm>({
+    name: '',
+    email: '',
+    phone: '',
+    newsletterConsent: false,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     shortCode?: string;
@@ -433,6 +439,19 @@ export function CheckoutClient() {
                     className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
                   />
                 </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={contact.newsletterConsent ?? false}
+                    onChange={(e) =>
+                      setContact((f) => ({ ...f, newsletterConsent: e.target.checked }))
+                    }
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-slate-600">
+                    Я согласен получать новости и спецпредложения от Daibilet.ru
+                  </span>
+                </label>
               </div>
             </div>
 

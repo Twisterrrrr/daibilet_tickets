@@ -1,4 +1,4 @@
-import { getEffectiveCommission, VENUE_COMMISSION_DEFAULTS, VenueType } from '@daibilet/shared';
+type VenueType = 'MUSEUM' | 'GALLERY' | 'ART_SPACE' | 'EXHIBITION_HALL' | 'THEATER' | 'PALACE' | 'PARK';
 import { ArrowLeft, ExternalLink, Info, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -22,7 +22,57 @@ const VENUE_TYPES = [
   { value: 'THEATER', label: 'Театр' },
   { value: 'PALACE', label: 'Дворец' },
   { value: 'PARK', label: 'Парк' },
-];
+] as const;
+
+type VenueTypeValue = (typeof VENUE_TYPES)[number]['value'];
+
+const VENUE_COMMISSION_DEFAULTS: Record<
+  VenueTypeValue,
+  { defaultRate: number; promoRate: number; promoMonths: number; label: string }
+> = {
+  MUSEUM: {
+    defaultRate: 15,
+    promoRate: 10,
+    promoMonths: 3,
+    label: '15% базовая комиссия, 10% промо на 3 месяца',
+  },
+  GALLERY: {
+    defaultRate: 15,
+    promoRate: 10,
+    promoMonths: 3,
+    label: '15% базовая комиссия, 10% промо на 3 месяца',
+  },
+  ART_SPACE: {
+    defaultRate: 15,
+    promoRate: 10,
+    promoMonths: 3,
+    label: '15% базовая комиссия, 10% промо на 3 месяца',
+  },
+  EXHIBITION_HALL: {
+    defaultRate: 15,
+    promoRate: 10,
+    promoMonths: 3,
+    label: '15% базовая комиссия, 10% промо на 3 месяца',
+  },
+  THEATER: {
+    defaultRate: 15,
+    promoRate: 10,
+    promoMonths: 3,
+    label: '15% базовая комиссия, 10% промо на 3 месяца',
+  },
+  PALACE: {
+    defaultRate: 15,
+    promoRate: 10,
+    promoMonths: 3,
+    label: '15% базовая комиссия, 10% промо на 3 месяца',
+  },
+  PARK: {
+    defaultRate: 15,
+    promoRate: 10,
+    promoMonths: 3,
+    label: '15% базовая комиссия, 10% промо на 3 месяца',
+  },
+};
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS: Record<string, string> = {
@@ -214,7 +264,8 @@ export function VenueEditPage() {
       };
 
       if (isNew) {
-        const result = await adminApi.post<any>('/admin/venues', payload);
+        const { version: _omitVersion, ...createPayload } = payload;
+        const result = await adminApi.post<any>('/admin/venues', createPayload);
         navigate(`/venues/${result.id}`, { replace: true });
       } else {
         await adminApi.patch(`/admin/venues/${id}`, payload);

@@ -98,7 +98,7 @@ export class CheckoutService {
     // 3. Создать заказ в TC API
     this.logger.log(`Creating TC order: event=${event.tcEventId}, items=${JSON.stringify(random)}`);
 
-    let tcOrder: any;
+    let tcOrder: Record<string, unknown> | undefined;
     try {
       tcOrder = await this.tcApi.createOrder({
         event: event.tcEventId,
@@ -110,12 +110,14 @@ export class CheckoutService {
       throw new BadRequestException(`Не удалось создать заказ: ${msg}`);
     }
 
-    const orderData = tcOrder?.data || tcOrder;
+    const orderData = (tcOrder?.data ?? tcOrder) as Record<string, unknown>;
+    if (!orderData) throw new BadRequestException('Не удалось создать заказ');
 
     // 4. Обновить заказ с данными покупателя и включить отправку билетов
-    if (orderData.id) {
+    const orderId = String(orderData.id ?? '');
+    if (orderId) {
       try {
-        await this.tcApi.updateOrder(orderData.id, {
+        await this.tcApi.updateOrder(orderId, {
           settings: {
             send_tickets: true,
           },
@@ -125,7 +127,7 @@ export class CheckoutService {
             source: this.getSourceDomain(),
           },
         });
-        this.logger.log(`Updated TC order ${orderData.id} with customer data`);
+        this.logger.log(`Updated TC order ${orderId} with customer data`);
       } catch (err: unknown) {
         this.logger.warn(
           `Failed to update TC order with customer data: ${err instanceof Error ? err.message : String(err)}`,
@@ -134,40 +136,39 @@ export class CheckoutService {
     }
 
     // 5. Автоподтверждение заказа — TC отправит билеты покупателю
-    // Партнёр (мы) подтверждает заказ, TC обрабатывает доставку билетов.
-    // Оплата проходит через билетную систему (реквизиты партнёра прописаны в TC).
-    let confirmedOrder: any = null;
-    try {
-      confirmedOrder = await this.tcApi.finishOrder(orderData.id);
-      this.logger.log(`TC order ${orderData.id} confirmed (status: done). Tickets will be sent.`);
-    } catch (err: unknown) {
-      this.logger.error(`TC order confirmation failed: ${err instanceof Error ? err.message : String(err)}`);
-      // Заказ создан, но не подтверждён — билеты зарезервированы
+    let confirmedOrder: unknown = null;
+    if (orderId) {
+      try {
+        confirmedOrder = await this.tcApi.finishOrder(orderId);
+        this.logger.log(`TC order ${orderId} confirmed (status: done). Tickets will be sent.`);
+      } catch (err: unknown) {
+        this.logger.error(`TC order confirmation failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
-    const finalOrder = confirmedOrder?.data || orderData;
+    const finalOrder = ((confirmedOrder as { data?: unknown })?.data ?? orderData) as Record<string, unknown>;
 
     // 6. Рассчитать стоимость
-    const values = finalOrder.values || orderData.values || {};
-    const totalPrice = parseFloat(values.full || '0') * 100; // в копейках
+    const values = (finalOrder?.values ?? orderData.values ?? {}) as Record<string, unknown>;
+    const totalPrice = parseFloat(String(values.full ?? '0')) * 100;
 
     // 7. Сформировать ответ
     return {
       success: true,
       order: {
-        id: finalOrder.id || orderData.id,
-        number: finalOrder.number || orderData.number,
-        status: finalOrder.status || orderData.status,
+        id: finalOrder.id ?? orderData.id,
+        number: finalOrder.number ?? orderData.number,
+        status: finalOrder.status ?? orderData.status,
         expiresAt: orderData.expired_after,
-        tickets: (orderData.tickets || []).map((t: any) => ({
+        tickets: ((orderData.tickets as Array<Record<string, unknown>>) || []).map((t) => ({
           id: t.id,
           number: t.number,
           setId: t.set,
-          price: parseFloat(t.full || '0') * 100, // копейки
+          price: parseFloat(String(t.full ?? '0')) * 100,
           status: t.status,
         })),
         totalPrice, // копейки
-        totalPriceFormatted: `${(totalPrice / 100).toLocaleString('ru-RU')} ₽`,
+        totalPriceFormatted: `${Math.round(totalPrice / 100).toLocaleString('ru-RU')} ₽`,
       },
       event: {
         id: event.id,
@@ -192,7 +193,7 @@ export class CheckoutService {
       const result = await this.tcApi.finishOrder(tcOrderId);
       return {
         success: true,
-        order: (result as any)?.data || result,
+        order: (result as { data?: unknown })?.data ?? result,
         message: 'Заказ подтверждён. Билеты будут отправлены на email.',
       };
     } catch (err: unknown) {
@@ -311,11 +312,14 @@ export class CheckoutService {
     }
 
     const validated: Array<CartItemDto & { valid: boolean; currentPrice: number | null; reason?: string }> = [];
+    const now = new Date();
 
     for (const item of items) {
       const offer = await this.prisma.eventOffer.findFirst({
         where: { id: item.offerId, eventId: item.eventId, status: 'ACTIVE' },
-        include: { event: { select: { id: true, title: true, slug: true, imageUrl: true, isActive: true } } },
+        include: {
+          event: { select: { id: true, title: true, slug: true, imageUrl: true, isActive: true } },
+        },
       });
 
       if (!offer) {
@@ -334,10 +338,64 @@ export class CheckoutService {
         continue;
       }
 
+      // --- Price & validity rules ---
+      let currentPrice = offer.priceFrom ?? null;
+
+      // OPEN_PRICE: используем клиентскую цену из item.priceFrom, валидируем minAmount
+      if ((offer as any).priceMode === 'OPEN_PRICE') {
+        const clientPrice = item.priceFrom;
+        const minAmount = (offer as any).minAmount as number | null | undefined;
+        if (!clientPrice || clientPrice <= 0) {
+          validated.push({
+            ...item,
+            valid: false,
+            currentPrice: null,
+            reason: 'Укажите сумму для билета',
+          });
+          continue;
+        }
+        if (minAmount != null && clientPrice < minAmount) {
+          validated.push({
+            ...item,
+            valid: false,
+            currentPrice: clientPrice,
+            reason: 'Сумма меньше минимально допустимой',
+          });
+          continue;
+        }
+        currentPrice = clientPrice;
+      } else {
+        // FIXED_PRICE: защищаемся от расхождения — цена в корзине должна совпадать с актуальной
+        const dbPrice = offer.priceFrom ?? 0;
+        if (item.priceFrom !== dbPrice) {
+          validated.push({
+            ...item,
+            valid: false,
+            currentPrice: dbPrice,
+            reason: 'Цена изменилась, обновите страницу',
+          });
+          continue;
+        }
+        currentPrice = dbPrice;
+      }
+
+      // Validity window (UNTIL_DATE / DAYS_FROM_PURCHASE / NO_EXPIRY)
+      const validityMode = (offer as any).validityMode as string | undefined;
+      const validUntil = (offer as any).validUntil as Date | null | undefined;
+      if (validityMode === 'UNTIL_DATE' && validUntil && validUntil < now) {
+        validated.push({
+          ...item,
+          valid: false,
+          currentPrice,
+          reason: 'Срок действия билета истёк',
+        });
+        continue;
+      }
+
       validated.push({
         ...item,
         valid: true,
-        currentPrice: offer.priceFrom,
+        currentPrice,
         eventTitle: offer.event.title,
         eventSlug: offer.event.slug,
         imageUrl: offer.event.imageUrl || item.imageUrl,
@@ -437,8 +495,12 @@ export class CheckoutService {
         event: { select: { id: true, title: true, slug: true, imageUrl: true } },
         operator: {
           select: {
-            id: true, name: true, isSupplier: true,
-            commissionRate: true, promoRate: true, promoUntil: true,
+            id: true,
+            name: true,
+            isSupplier: true,
+            commissionRate: true,
+            promoRate: true,
+            promoUntil: true,
           },
         },
         venue: { select: { id: true, commissionRate: true } },
@@ -453,7 +515,11 @@ export class CheckoutService {
     const offersSnapshot = offersData.map((o, index) => {
       const cartItem = cartByOffer.get(o.id);
       const quantity = cartItem?.quantity || 1;
-      const unitPrice = o.priceFrom || 0;
+      // Цена единицы: для OPEN_PRICE берём цену из корзины, иначе актуальную priceFrom
+      let unitPrice = o.priceFrom || 0;
+      if ((o as any).priceMode === 'OPEN_PRICE' && cartItem) {
+        unitPrice = cartItem.priceFrom;
+      }
       const lineTotal = unitPrice * quantity;
       const purchaseFlow = resolvePaymentFlow(o.purchaseType);
 
@@ -825,7 +891,7 @@ export class CheckoutService {
     });
 
     if (!session) return null;
-    return this.formatTrackingResult(session as any);
+    return this.formatTrackingResult(session as Parameters<typeof this.formatTrackingResult>[0]);
   }
 
   // ============================
@@ -955,7 +1021,7 @@ export class CheckoutService {
     return { packageId: session.id, code: session.shortCode };
   }
 
-  async handleWebhook(body: any) {
+  async handleWebhook(body: Record<string, unknown>) {
     // TODO: Верификация IP + подпись, обработка payment.succeeded / payment.canceled
     return { status: 'ok' };
   }

@@ -21,3 +21,18 @@ export class UserLoginDto {
   @IsNotEmpty()
   password: string;
 }
+
+export class UserForgotPasswordDto {
+  @IsEmail()
+  email: string;
+}
+
+export class UserResetPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
+  @IsString()
+  @MinLength(6, { message: 'Пароль минимум 6 символов' })
+  password: string;
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import type { CityListItem, EventListItem } from '@daibilet/shared';
 import { formatPrice } from '@daibilet/shared';
 import { ArrowRight, Loader2, MapPin, Search, Ticket, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -8,11 +9,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 
 interface SearchResult {
-  events: any[];
-  cities: any[];
+  events: EventListItem[];
+  cities: CityListItem[];
 }
 
-export function SearchAutocomplete() {
+interface SearchAutocompleteProps {
+  /** Город из URL — для фильтрации событий (город + начало названия) */
+  city?: string;
+}
+
+export function SearchAutocomplete({ city }: SearchAutocompleteProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -23,21 +29,24 @@ export function SearchAutocomplete() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Debounced search
-  const doSearch = useCallback(async (q: string) => {
-    if (q.length < 2) {
-      setResults(null);
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await api.search(q);
-      setResults(res);
-    } catch {
-      setResults(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const doSearch = useCallback(
+    async (q: string) => {
+      if (q.length < 2) {
+        setResults(null);
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await api.search(q, city);
+        setResults(res);
+      } catch {
+        setResults(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [city],
+  );
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -118,7 +127,7 @@ export function SearchAutocomplete() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Город, событие, музей..."
+                placeholder={city ? `Событие в городе...` : 'Город, событие, музей...'}
                 className="flex-1 bg-transparent text-base text-slate-900 placeholder-slate-400 outline-none md:text-sm"
                 autoComplete="off"
               />
@@ -143,7 +152,7 @@ export function SearchAutocomplete() {
                 {results!.cities.length > 0 && (
                   <div className="px-3 py-2 md:px-4">
                     <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Города</p>
-                    {results!.cities.slice(0, 4).map((city: any) => (
+                    {results!.cities.slice(0, 4).map((city) => (
                       <button
                         key={city.slug}
                         onClick={() => navigate(`/cities/${city.slug}`)}
@@ -166,7 +175,7 @@ export function SearchAutocomplete() {
                 {results!.events.length > 0 && (
                   <div className="px-3 py-2 md:px-4">
                     <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">События</p>
-                    {results!.events.slice(0, 6).map((event: any) => (
+                    {results!.events.slice(0, 6).map((event) => (
                       <button
                         key={event.id || event.slug}
                         onClick={() => navigate(`/events/${event.slug}`)}
@@ -187,7 +196,7 @@ export function SearchAutocomplete() {
                           <p className="text-sm font-medium text-slate-900 truncate">{event.title}</p>
                           <div className="flex items-center gap-2 text-xs text-slate-400">
                             {event.city?.name && <span>{event.city.name}</span>}
-                            {event.priceFrom > 0 && (
+                            {event.priceFrom != null && event.priceFrom > 0 && (
                               <span className="font-medium text-slate-600">от {formatPrice(event.priceFrom)}</span>
                             )}
                           </div>

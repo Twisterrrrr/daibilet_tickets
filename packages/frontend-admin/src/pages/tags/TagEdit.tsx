@@ -94,11 +94,10 @@ export function TagEditPage() {
     try {
       if (isCreate) {
         await adminApi.post('/admin/tags', form);
-        navigate('/tags');
       } else {
-        await adminApi.put(`/admin/tags/${id}`, form);
-        navigate('/tags');
+        await adminApi.patch(`/admin/tags/${id}`, form);
       }
+      navigate('/tags');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Ошибка сохранения');
       setSaving(false);
