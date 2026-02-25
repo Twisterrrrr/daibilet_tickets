@@ -3,9 +3,9 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EmailProcessor } from './email.processor';
 import { ReviewTaskProcessor } from './review-task.processor';
+import { QUEUE_EMAILS, QUEUE_REVIEW_TASKS } from './queue.constants';
 
-export const QUEUE_EMAILS = 'emails';
-export const QUEUE_REVIEW_TASKS = 'review-tasks';
+export { QUEUE_EMAILS, QUEUE_REVIEW_TASKS };
 
 @Global()
 @Module({

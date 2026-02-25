@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
-import { QUEUE_REVIEW_TASKS } from './queue.module';
+import { QUEUE_REVIEW_TASKS } from './queue.constants';
 
 export type ReviewTaskData =
   | { type: 'cleanup-expired-tokens' }

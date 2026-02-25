@@ -30,7 +30,10 @@
       "prisma",
       "@nestjs/core",
       "sharp",
-      "msgpackr-extract"
+      "msgpackr-extract",
+      "bcrypt",
+      "esbuild",
+      "protobufjs"
     ]
   }
 }

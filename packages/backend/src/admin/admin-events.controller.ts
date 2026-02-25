@@ -130,7 +130,7 @@ export class AdminEventsController {
           description: data.description || null,
           shortDescription: data.shortDescription || null,
           category: data.category as any,
-          subcategories: data.subcategories || [],
+          subcategories: (data.subcategories || []) as any,
           audience: (data.audience as any) || 'ALL',
           minAge: data.minAge || 0,
           durationMinutes: data.durationMinutes || null,
