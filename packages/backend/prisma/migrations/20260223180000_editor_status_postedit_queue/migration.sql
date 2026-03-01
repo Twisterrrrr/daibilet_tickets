@@ -1,4 +1,4 @@
--- EditorStatus enum + EventOverride queue fields (очередь постредакции для Directus)
+-- EditorStatus enum + EventOverride queue fields (очередь постредакции для админки)
 -- Без изменения существующих данных: updatedBy делаем nullable для авто-созданных override из sync.
 
 DO $$ BEGIN

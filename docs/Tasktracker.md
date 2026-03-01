@@ -130,13 +130,11 @@
 - [ ] **Средний**: Лендинг `salyut` — unit-test getPrice + проверка edge-cases
 - [ ] **Средний**: SQL-отчёт по категоризации (аудит качества каталога)
 
-### Gate 2 — ежедневные ops без старой админки
+### Gate 2 — ежедневные ops в текущей админке
 
-- [ ] **Высокий**: Admin UI в Directus — поиск заказа (id/code/email/paymentId) + 2 действия: resend, retry fulfilment
-- [ ] **Высокий**: Directus ops-tools: UI для cache invalidate (scope + ids → /admin/cache/invalidate)
-- [ ] **Высокий**: UI кнопки resend/retry в существующей админке можно выключить после включения Directus
-- [ ] **Средний**: Support escalation checklist (runbook для саппорта) — `docs/SupportEscalation.md`
-- [ ] **Средний**: Directus roles/permissions: Admin/Ops/Support (кто может видеть ops-страницы и жать resend/retry/invalidate)
+- [x] **Высокий**: Admin UI — поиск заказа (id/code/email/paymentId) + resend, retry fulfilment (OrderDetail) ✅
+- [x] **Высокий**: Cache invalidate в Settings (scope + ids → /admin/cache/invalidate) ✅
+- [x] **Средний**: Support escalation checklist — `docs/SupportEscalation.md` ✅
 
 ### Gate 3 — контент/SEO минимум для индексации
 
@@ -223,11 +221,11 @@
 
 ### Batch 4 — Admin Operator Panel v2
 - [x] **Критический**: POST resend-email, retry-fulfilment, set-status (с reason, audit) ✅
-- [ ] **Высокий**: UI кнопки в админке для resend/retry
+- [x] **Высокий**: UI кнопки в админке для resend/retry (OrderDetail) ✅
 
 ### Batch 5 — Runbooks
 - [x] **Высокий**: ops/runbooks/*.md ✅
-- [ ] **Средний**: Support escalation checklist
+- [x] **Средний**: Support escalation checklist — docs/SupportEscalation.md ✅
 
 ### Batch 6 — Backups + DR
 - [x] **Критический**: scripts/backup.sh, restore-to-staging.sh ✅
@@ -397,7 +395,7 @@
 - [ ] **Высокий**: Email шаблоны order-confirmed, order-completed — вёрстка
 - [ ] **Высокий**: Мониторинг первых платежей через reconciliation
 - [ ] **Высокий**: Feature flags: отключение EXTERNAL по городам
-- [ ] **Высокий**: Supplier self-service: портал добавления событий
+- [x] **Высокий**: Supplier self-service: ЛК поставщика — создание событий как черновик, отправка на модерацию (редактор/админ) ✅
 - [ ] **Высокий**: Расширение географии: новые города по KPI
 - [ ] **Средний**: Проверка категоризации (стендапы, мастер-классы)
 - [ ] **Средний**: Сезонные лендинги, партнёрский контент

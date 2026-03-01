@@ -4,12 +4,75 @@
 
 ---
 
+## 01.03.2026 — Отказ от Directus, всё в текущей админке
+
+### Наблюдения
+
+- Ранее планировался переезд части админки на Directus; сейчас решено оставаться полностью на frontend-admin (React + Nest API).
+
+### Решения
+
+- **Удалено:** папка deploy/directus (docker-compose, extensions ops-tools, ops-orders), документ DirectusPipeline.md.
+- **Обновлено:** Tasktracker — Gate 2: «всё в текущей админке», задачи Directus отменены; AdminPipeline — убраны упоминания Directus; SupplierModel, SupplierArchitecture — «права админки» вместо Directus; комментарии в backend (admin-orders, admin-cache, postedit-queue, sync.processor, schema.prisma) — «админка» вместо «Directus».
+- **Результат:** единственная админка — frontend-admin. Ops-действия (resend, retry, cache invalidate) доступны в Settings и OrderDetail.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 01.03.2026 — SEO-аудит, Отчёты, Support escalation, Error Boundary
+
+### Наблюдения
+
+- Tasktracker содержал закрытые задачи без полной реализации (resend/retry UI, Support escalation, Error Boundary).
+- SEO-аудит и Отчёты были разбросаны (query-filters isSeo, dashboard stats) — требовались отдельные страницы.
+
+### Решения
+
+- **SEO-аудит:** GET /admin/seo/audit — сводка покрытия meta по типам (CITY, VENUE, EVENT, LANDING, ARTICLE, COMBO). Отдельная страница /seo-audit в админке.
+- **Отчёты:** Отдельная страница /reports — агрегация данных dashboard + ссылки на Сверку, Заказы.
+- **Support escalation:** docs/SupportEscalation.md — чеклист для саппорта (письмо не пришло, платёж не обновился, событие не показывается и др.).
+- **Error Boundary:** компонент ErrorBoundary в frontend-admin, оборачивает App в main.tsx.
+- **Sidebar:** новая секция «Аналитика» с SEO-аудит и Отчёты.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 01.03.2026 — ЛК поставщика: черновики и модерация
+
+### Наблюдения
+
+- Backend supplier API уже поддерживал: POST /supplier/events (DRAFT), PUT /supplier/events/:id, POST /supplier/events/:id/submit (DRAFT→PENDING_REVIEW).
+- Админка имеет ModerationQueue (approve/reject). Не хватало полноценного UI в frontend-supplier для цикла «создать черновик → отправить на модерацию».
+- Цены в БД — в копейках; UI должен показывать рубли.
+
+### Решения
+
+- **EventEdit (frontend-supplier):**
+  - Создание события — как черновик (moderationStatus: DRAFT), кнопка «Создать черновик».
+  - При редактировании: отображение moderationStatus и moderationNote (при REJECTED).
+  - Кнопка «Отправить на модерацию» (DRAFT/REJECTED → PENDING_REVIEW).
+  - Цена от: UI в рублях, API в копейках (×100).
+- **EventsList:** фильтр по статусу модерации (Все / Черновики / На модерации / Одобренные / Отклонённые).
+- **Cities:** используется публичный GET /cities (catalog), возвращает массив городов.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 24.02.2026 — Event Quality Gate и публикация через Nest
 
 ### Наблюдения
 
 - Публикация событий сейчас зависит от ручной дисциплины: редактор может выставить PUBLISHED даже при отсутствующих полях (category, image, offers, location).
-- Directus не «понимает» бизнес-правила качества, поэтому нужен backend-gate перед публикацией.
+- Backend-gate перед публикацией нужен, чтобы редактор не мог выставить PUBLISHED без проверки.
 - Subcategories в EventOverride ранее не имели явной семантики override/clear/inherit, что мешает предсказуемой категоризации и фильтрам.
 
 ### Решения
@@ -29,14 +92,14 @@
 
 ### Проблемы
 
-- Пока quality gate работает только при явной публикации через `/admin/events/:id/publish`; Directus нужно настроить так, чтобы редактор не редактировал `editorStatus` напрямую, а использовал этот endpoint (custom action/flow).
+- Quality gate работает при публикации через `/admin/events/:id/publish`; редактор в админке использует кнопку «Опубликовать», а не прямое редактирование editorStatus.
 
 ---
 
-## 23.02.2026 — Очередь постредакции для Directus (EventOverride.editorStatus)
+## 23.02.2026 — Очередь постредакции (EventOverride.editorStatus)
 
 ### Наблюдения
-- План переезда на Directus как внутреннюю админку: контент/SEO/редактура событий; импорт TC и teplohod должен попадать в очередь постредакции без перетирания при sync.
+- Контент/SEO/редактура событий — в админке (frontend-admin); импорт TC и teplohod попадает в очередь постредакции без перетирания при sync.
 - Модель Event + EventOverride уже разделяет «оригинал из источника» и «правки для Daibilet»; sync не трогает override.
 
 ### Решения
@@ -44,9 +107,9 @@
 - **PostEditQueueService** (catalog): ensureOverridesForImportedEvents(source?, since?) — после sync создаёт/обновляет override для импортных событий (TC/TEPLOHOD): новые → NEEDS_REVIEW; уже PUBLISHED — только lastImportedAt; остальные → NEEDS_REVIEW или сохраняем IN_PROGRESS.
 - **SyncProcessor**: после TC и TEP sync (full) и после TC (incremental) вызывается очередь с since = runStartedAt.
 - **applyOverrides**: не показывать события с override, у которых editorStatus !== PUBLISHED или isHidden.
-- **OverrideEventDto** + API: поле editorStatus для установки PUBLISHED из админки/Directus.
+- **OverrideEventDto** + API: поле editorStatus для установки PUBLISHED из админки.
 - Миграция: существующие override с updated_by IS NOT NULL помечены PUBLISHED, чтобы не скрыть уже опубликованный контент.
-- Документ **DirectusPipeline.md** — фазы 0–4, чеклист задач, описание очереди.
+- Документ **AdminPipeline.md** — фазы 0–4, чеклист задач, описание очереди.
 
 ### Проблемы
 - Prisma generate на Windows может дать EPERM (файл занят) — перезапуск терминала/IDE или повторный запуск после закрытия процессов.

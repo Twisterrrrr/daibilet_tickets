@@ -1,7 +1,9 @@
 # Архитектура Supplier vs Operator
 
-> Разделение ролей: Operator (юрлицо) vs Supplier (аккаунт в ЛК).  
-> Последнее обновление: 2026-02-21
+> Разделение ролей: Operator (юрлицо) vs Supplier (контрагент) vs SupplierUser (аккаунт в ЛК).  
+> Последнее обновление: 2026-03-01
+
+> **См. также:** `docs/SupplierModel.md` — нормализованная модель Supplier (type OPERATOR|VENUE, accessMode NONE|READONLY|LK).
 
 ---
 
