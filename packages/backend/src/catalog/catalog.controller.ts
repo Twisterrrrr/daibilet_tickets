@@ -113,6 +113,14 @@ export class CatalogController {
     return this.catalogService.getCatalog(query);
   }
 
+  // --- Multi-events (глобальные группы по groupingKey) ---
+
+  @Get('multi-events')
+  @ApiOperation({ summary: 'Глобальные группы событий (одно шоу в разных городах/датах)' })
+  getMultiEvents(@Query('sort') sort?: string, @Query('limit') limit?: number) {
+    return this.catalogService.getMultiEvents({ sort, limit: limit ? Number(limit) : 20 });
+  }
+
   // --- События ---
 
   @Get('events')

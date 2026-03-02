@@ -1,4 +1,5 @@
 import { normalizeEventTitle } from '@daibilet/shared';
+import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
@@ -357,12 +358,21 @@ export class TcSyncService {
       });
     }
 
+    // Группировка мульти-событий: одинаковое шоу в разных городах/датах
+    const normalizedTitle = title ? normalizeEventTitle(title).toLowerCase() : null;
+    const groupingKey =
+      normalizedTitle && category
+        ? `${category}::${normalizedTitle}::${durationMinutes ?? 'na'}::${minAge ?? 0}`
+        : null;
+
     if (event) {
       await this.prisma.event.update({
         where: { id: event.id },
         data: {
           tcEventId: tcId,
           tcMetaEventId,
+          normalizedTitle,
+          groupingKey,
           description: description || event.description,
           category,
           subcategories,
@@ -388,6 +398,8 @@ export class TcSyncService {
           tcMetaEventId,
           cityId,
           title,
+          normalizedTitle,
+          groupingKey,
           slug,
           description,
           category,

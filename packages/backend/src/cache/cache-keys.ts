@@ -41,6 +41,7 @@ export const cacheKeys = {
   /** T11: catalog list/detail keys */
   catalog: {
     list: (paramsHash: string) => `catalog:list:${paramsHash}`,
+    multiEvents: (key: string) => `catalog:multi:${key}`,
     detail: (type: string, id: string) => `catalog:detail:${type}:${id}`,
   },
   pricing: {

@@ -1,4 +1,5 @@
 import { normalizeEventTitle } from '@daibilet/shared';
+import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
 import { existsSync, readFileSync } from 'fs';
@@ -225,7 +226,7 @@ export class TepSyncService {
     if (!title) return -1;
 
     const description = this.cleanDescription(tep.description);
-    const { category, subcategories, audience } = this.classifyTep(tep);
+    const { category, subcategories, audience, minAge } = this.classifyTep(tep);
     const durationMinutes = tep.duration > 0 ? tep.duration : null;
 
     const slug = await this.generateUniqueSlug(title, sourceId);
@@ -249,12 +250,21 @@ export class TepSyncService {
       where: { tcEventId: sourceId },
     });
 
+    // Группировка мульти-событий: одинаковое шоу в разных городах/датах
+    const normalizedTitle = title ? normalizeEventTitle(title).toLowerCase() : null;
+    const groupingKey =
+      normalizedTitle && category
+        ? `${category}::${normalizedTitle}::${durationMinutes ?? 'na'}::${minAge ?? 0}`
+        : null;
+
     if (existing) {
       await this.prisma.event.update({
         where: { tcEventId: sourceId },
         data: {
           cityId,
           title,
+          normalizedTitle,
+          groupingKey,
           description,
           category,
           subcategories,
@@ -278,6 +288,8 @@ export class TepSyncService {
           tcEventId: sourceId,
           cityId,
           title,
+          normalizedTitle,
+          groupingKey,
           slug,
           description,
           category,
@@ -847,6 +859,7 @@ export class TepSyncService {
     category: EventCategory;
     subcategories: EventSubcategory[];
     audience: EventAudience;
+    minAge: number;
   } {
     const cat = (tep.category || '').toLowerCase();
     const title = (tep.title || '').toLowerCase();
@@ -865,7 +878,7 @@ export class TepSyncService {
 
     // Мероприятия — выпускной, последний звонок, дискотека (даже на теплоходе) — проверяем ДО водных
     if (this.hasTep(text, ['выпускной', 'последний звонок', 'дискотек', 'disco']))
-      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.PARTY], audience };
+      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.PARTY], audience, minAge: 18 };
 
     // Речная/водная экскурсия — только если в заголовке/описании есть «экскурсия»
     const isWater = this.hasTep(text, [
@@ -890,35 +903,51 @@ export class TepSyncService {
         this.hasTep(text, ['гастро', 'гастрономич', 'дегустац', 'culinary', 'food tour'])
       )
         subs.push(EventSubcategory.GASTRO);
-      return { category: EventCategory.EXCURSION, subcategories: subs, audience };
+      return { category: EventCategory.EXCURSION, subcategories: subs, audience, minAge: 0 };
     }
 
     // Музей и площадки (смотровая площадка = площадка, не мероприятие)
     if (cat.includes('музей') || title.includes('музей'))
-      return { category: EventCategory.MUSEUM, subcategories: [EventSubcategory.MUSEUM_CLASSIC], audience };
+      return {
+        category: EventCategory.MUSEUM,
+        subcategories: [EventSubcategory.MUSEUM_CLASSIC],
+        audience,
+        minAge: 0,
+      };
     if (cat.includes('выставк') || title.includes('выставк'))
-      return { category: EventCategory.MUSEUM, subcategories: [EventSubcategory.EXHIBITION], audience };
+      return {
+        category: EventCategory.MUSEUM,
+        subcategories: [EventSubcategory.EXHIBITION],
+        audience,
+        minAge: 0,
+      };
     if (this.hasTep(text, ['смотровая площадка', 'смотров', 'observation']))
-      return { category: EventCategory.MUSEUM, subcategories: [EventSubcategory.ART_SPACE], audience };
+      return {
+        category: EventCategory.MUSEUM,
+        subcategories: [EventSubcategory.ART_SPACE],
+        audience,
+        minAge: 0,
+      };
 
     // Мероприятия
     if (this.hasTep(text, ['стендап', 'stand-up', 'stand up', 'комедия', 'comedy', 'комик']))
-      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.STANDUP], audience };
+      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.STANDUP], audience, minAge: 18 };
     if (this.hasTep(text, ['концерт', 'concert']))
-      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.CONCERT], audience };
+      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.CONCERT], audience, minAge: 12 };
     if (this.hasTep(text, ['шоу', 'show', 'представлен']))
-      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.SHOW], audience };
-    if (this.hasTep(text, ['фестиваль', 'festival']))
-      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.FESTIVAL], audience };
+      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.SHOW], audience, minAge: 6 };
 
     // Экстрим — только наземные (танк, квадроцикл и т.п.). Речные прогулки никогда не экстрим.
+    if (this.hasTep(text, ['фестиваль', 'festival']))
+      return { category: EventCategory.EVENT, subcategories: [EventSubcategory.FESTIVAL], audience, minAge: 6 };
+
     if (this.hasTep(text, ['танк', 'танке', 'квадроцикл', 'стрельб', 'экстрим', 'броневик']))
-      return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.EXTREME], audience };
+      return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.EXTREME], audience, minAge: 16 };
     if (this.hasTep(text, ['автобус', 'bus', 'hop-on', 'hop on']) || (this.hasTep(text, ['обзорн']) && !isWater))
-      return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.BUS], audience };
+      return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.BUS], audience, minAge: 0 };
 
     // По умолчанию — EVENT. teplohod.info не только речные прогулки: музеи, площадки, мероприятия.
-    return { category: EventCategory.EVENT, subcategories: [], audience };
+    return { category: EventCategory.EVENT, subcategories: [], audience, minAge: 0 };
   }
 
   private hasTep(text: string, words: string[]): boolean {

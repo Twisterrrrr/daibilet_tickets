@@ -650,6 +650,47 @@ export class CatalogService {
     return this.fetchEvents(query);
   }
 
+  // Глобальные группы событий (одно шоу в разных городах/датах).
+  async getMultiEvents(params: { sort?: string; limit?: number }) {
+    const sort = params.sort === 'new' ? 'new' : 'popular';
+    const limit = params.limit && params.limit > 0 && params.limit <= 100 ? params.limit : 20;
+
+    const cacheKey = cacheKeys.catalog.multiEvents(`${sort}:${limit}`);
+
+    return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_LIST, async () => {
+      const rows =
+        await this.prisma.$queryRaw<{
+          groupingKey: string;
+          title: string;
+          coverUrl: string | null;
+          totalEvents: number;
+          totalCities: number;
+          minPrice: number | null;
+          maxRating: number | null;
+        }[]>`
+        SELECT
+          e."groupingKey"                       AS "groupingKey",
+          MIN(e."title")                        AS "title",
+          MIN(e."imageUrl")                     AS "coverUrl",
+          COUNT(*)                              AS "totalEvents",
+          COUNT(DISTINCT e."cityId")            AS "totalCities",
+          MIN(e."priceFrom")                    AS "minPrice",
+          MAX(e."rating")                       AS "maxRating"
+        FROM "events" e
+        WHERE e."isActive" = true
+          AND e."isDeleted" = false
+          AND e."groupingKey" IS NOT NULL
+        GROUP BY e."groupingKey"
+        ORDER BY
+          CASE WHEN ${sort} = 'popular' THEN MAX(e."reviewCount") END DESC,
+          CASE WHEN ${sort} = 'new' THEN MAX(e."createdAt") END DESC
+        LIMIT ${limit};
+      `;
+
+      return rows;
+    });
+  }
+
   private async fetchEvents(query: EventsQueryDto & { cityIds?: string[] }) {
     const {
       city,

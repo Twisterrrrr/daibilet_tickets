@@ -366,6 +366,8 @@ model Event {
   tcMetaEventId       String? // ID группы MetaEvent из TC (для повторяющихся)
   cityId              String             @db.Uuid
   title               String
+  normalizedTitle     String?
+  groupingKey         String?            @db.Text
   slug                String             @unique
   description         String?            @db.Text
   shortDescription    String?
@@ -441,6 +443,7 @@ model Event {
   orderRequests   OrderRequest[]
 
   @@index([cityId, category])
+  @@index([groupingKey])
   @@index([slug])
   @@index([tcMetaEventId])
   @@index([canonicalOfId])

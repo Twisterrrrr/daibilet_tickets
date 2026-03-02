@@ -248,6 +248,30 @@
 
 ---
 
+## 02.03.2026 — База для мульти-событий (глобальные группы по groupingKey)
+
+### Наблюдения
+
+- В глобальном каталоге `/events` начали появляться десятки одинаковых карточек одного и того же шоу («ЛЕДИ НАЙТ – только для женщин» в разных городах и датах).
+- Нужно техническое основание для мульти-событий (одно шоу → много городов/дат), не ломая текущую маршрутизацию и контракты `/events/{slug}`.
+
+### Решения
+
+- В Prisma-модели `Event` добавлены поля `normalizedTitle?: String` и `groupingKey?: String` + индекс `@@index([groupingKey])`.
+- Создана миграция `20260302140000_event_grouping_key` (ALTER TABLE events ADD normalizedTitle/groupingKey + индекс), применена вручную через `prisma db execute` без полного `migrate dev` (shadow DB ломался на старой миграции audience).
+- В sync-слое:
+  - `tc-sync.service`: при upsert Event для gRPC-группы рассчитывается `normalizedTitle = normalizeEventTitle(title).toLowerCase()` и `groupingKey = "{category}::{normalizedTitle}::{durationMinutes|na}::{minAge}"`.
+  - `tep-sync.service`: аналогично, с использованием классификатора для category/subcategories/audience/minAge.
+- Добавлен endpoint `GET /api/v1/multi-events?sort=popular|new&limit=N`:
+  - Использует `Prisma.$queryRaw` для агрегации по `groupingKey` (COUNT событий, COUNT DISTINCT городов, MIN(priceFrom), MAX(rating)).
+  - Кэшируется через `cacheKeys.catalog.multiEvents(sort:limit)` с TTL как у списков каталога.
+
+### Проблемы
+
+- Полноценная страница мульти-события (`/events/m/{slug}`) и интеграция в фронтовый глобальный каталог пока не реализованы; на backend подготовлен только слой данных и API для групп.
+
+---
+
 ## 22.02.2026 — Комиссии, партнёрская страница, Venue vs Operator
 
 ### Наблюдения

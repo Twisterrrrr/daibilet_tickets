@@ -118,6 +118,21 @@
 
 ---
 
+### Глобальные мульти-события (одно шоу в разных городах)
+
+- Для гастролей/серийных шоу (одинаковое событие в разных городах/датах) используется grouping на уровне `Event`:
+  - `normalizedTitle: String?` — нормализованный заголовок (для grouping, а не для UX).
+  - `groupingKey: String?` — ключ вида `"{category}::{normalizedTitle}::{durationMinutes|na}::{minAge}"`.
+  - Индекс `@@index([groupingKey])` для быстрых выборок.
+- Sync-слой (TC gRPC + teplohod.info) при upsert Event заполняет:
+  - `normalizedTitle` через `normalizeEventTitle` (из shared) → `.toLowerCase()`.
+  - `groupingKey` на основе `category`, `normalizedTitle`, `durationMinutes`, `minAge`.
+- API:
+  - `GET /api/v1/multi-events?sort=popular|new&limit=N` — агрегированные группы (по `groupingKey`) для глобального каталога.
+  - Детальный просмотр мульти-события `/events/m/{slug}` и таблица `EventGroup` — отдельный этап (см. Tasktracker, раздел «Каталог / Venues / Teplohod»).
+
+---
+
 ## Фаза 1 UX: Afisha-inspired улучшения
 
 > Добавлено: 2026-02-12. Источник: сравнительный анализ с Яндекс.Афишей.
