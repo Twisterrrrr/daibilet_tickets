@@ -128,12 +128,18 @@ enum ModerationStatus {
   AUTO_APPROVED // Автоодобрено (trust level 1-2)
 }
 
-/// Очередь постредакции (Directus): статус правок поверх импортного события
+/// Очередь постредакции: статус правок поверх импортного события (редактор в админке)
 enum EditorStatus {
   NEEDS_REVIEW // Импорт: нужна проверка редактором
   IN_PROGRESS  // Редактор в работе
   PUBLISHED    // Опубликовано (sync не сбрасывает)
   REJECTED     // Отклонено
+}
+
+enum SubcategoriesMode {
+  INHERIT
+  OVERRIDE
+  CLEAR
 }
 
 enum LocationType {
@@ -555,13 +561,13 @@ model EventOverride {
   qualityIssues   Json?     // массив объектов { code, message, field? }
   qualityCheckedAt DateTime?
   // --- Семантика подкатегорий (override / clear / inherit) ---
-  subcategoriesMode     String?             // INHERIT | OVERRIDE | CLEAR
-  subcategoriesOverride EventSubcategory[]  @default([])
+  subcategoriesMode     SubcategoriesMode   @default(INHERIT)
+  subcategoriesOverride EventSubcategory[]
   updatedBy     String?            @db.Uuid // null = создано sync (очередь постредакции)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
-  // --- Очередь постредакции (Directus) ---
+  // --- Очередь постредакции (админка) ---
   editorStatus   EditorStatus  @default(NEEDS_REVIEW)
   needsReviewAt  DateTime?     // сортировка очереди
   lastImportedAt DateTime?    // когда последний раз обновлялся импорт (Event.updatedAt)
@@ -1572,6 +1578,25 @@ model ExternalWidget {
   @@index([isActive])
   @@index([updatedAt])
   @@map("external_widgets")
+}
+
+// ========================
+// Query Filters (QF) — справочник быстрых фильтров
+// ========================
+
+model QueryFilter {
+  id       String  @id @default(cuid())
+  type     String  // excursion | venue | event
+  group    String
+  slug     String
+  title    String
+  isSeo    Boolean @default(false)
+  priority Int     @default(0)
+
+  @@unique([slug, type])
+  @@index([type])
+  @@index([type, group])
+  @@map("query_filters")
 }
 
 // ════════════════════════════════════════════

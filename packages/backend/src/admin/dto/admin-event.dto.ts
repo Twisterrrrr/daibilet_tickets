@@ -8,6 +8,7 @@ import {
   OfferSource,
   OfferStatus,
   PurchaseType,
+  SubcategoriesMode,
 } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
@@ -317,6 +318,20 @@ export class OverrideEventDto {
   @IsOptional()
   @IsEnum(EditorStatus)
   editorStatus?: EditorStatus;
+
+  @ApiPropertyOptional({
+    enum: SubcategoriesMode,
+    description: 'Режим подкатегорий: INHERIT=из sync, OVERRIDE=свой список, CLEAR=пусто',
+  })
+  @IsOptional()
+  @IsEnum(SubcategoriesMode)
+  subcategoriesMode?: SubcategoriesMode;
+
+  @ApiPropertyOptional({ enum: EventSubcategory, isArray: true, description: 'При subcategoriesMode=OVERRIDE' })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(EventSubcategory, { each: true })
+  subcategoriesOverride?: EventSubcategory[];
 }
 
 // ─── Venue Settings ────────────────────────────────────────────────

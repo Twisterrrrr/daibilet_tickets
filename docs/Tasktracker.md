@@ -158,7 +158,7 @@
 - [ ] **Средний**: Отображение «Музеи» (детальная страница venue) — режим работы, галерея, выставки (см. `docs/Reference.md` §1)
 - [ ] **Средний**: Аудит категоризации — SQL-отчёт уже из Gate 1 можно переиспользовать как инструмент SEO
 - [x] **Высокий**: Event Quality Gate — `EventQualityService.validateForPublish` + `/admin/events/:id/publish` ✅ (+ NO_VALID_PRICE для офферов без цены)
-- [ ] **Высокий**: EventOverride.subcategories — явная семантика INHERIT/OVERRIDE/CLEAR + subcategoriesOverride
+- [x] **Высокий**: EventOverride.subcategories — явная семантика INHERIT/OVERRIDE/CLEAR + subcategoriesOverride (SubcategoriesMode enum + Prisma migration)
 - [ ] **Средний**: Нормализация категорий/аудиторий после импорта (детерминированный маппинг TC/TEP → EventCategory/EventSubcategory)
 - [ ] **Средний**: Нормализация location/venue (venueId ИЛИ meetingPoint/address; MISSING_LOCATION блокирует publish)
 - [ ] **Средний**: Нормализация offers (ACTIVE только для продаваемых, наличие хотя бы одного ACTIVE offer как publish-gate)

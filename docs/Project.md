@@ -51,8 +51,15 @@
     - EVENT: `CONCERT`, `SHOW`, `STANDUP`, `THEATER`, `SPORT`, `FESTIVAL`, `MASTERCLASS`, `PARTY`
     - KIDS: `KIDS_SHOW`, `KIDS_EXCURSION`, `KIDS_MASTER`, `KIDS_MUSEUM`, `KIDS_QUEST`, `KIDS_AMUSEMENT`
   - `Event.subcategory` — `EventSubcategory?` (опционально).
-- **EventOverride** — правки админа поверх sync-данных (title, description, imageUrl, isHidden, manualRating, tagsAdd/Remove, **category**, **subcategory**).  
-  **Заголовок**: `Event.title` — оригинал из источника (TC, Teplohod), обновляется при каждом sync. `EventOverride.title` — кастомный заголовок для Daibilet. Для отображения используется override ?? event.title. Оригинал сохраняется в `Event.title` для импорта/экспорта и виджетов.
+- **EventOverride** — правки админа поверх sync-данных (title, description, imageUrl, isHidden, manualRating, tagsAdd/Remove, **category**, **subcategories**).  
+  **Заголовок**: `Event.title` — оригинал из источника (TC, Teplohod), обновляется при каждом sync. `EventOverride.title` — кастомный заголовок для Daibilet. Для отображения используется override ?? event.title. Оригинал сохраняется в `Event.title` для импорта/экспорта и виджетов.  
+  **Подкатегории**:  
+  - `subcategoriesMode: SubcategoriesMode` — enum `INHERIT | OVERRIDE | CLEAR` с default = `INHERIT`;  
+  - `subcategoriesOverride: EventSubcategory[]` — явный список подкатегорий для режима `OVERRIDE`;  
+  - итоговый список подкатегорий вычисляется в backend через `resolveSubcategories(event.subcategories, subcategoriesMode, subcategoriesOverride)` и всегда является **жёстким override без merge**:  
+    - INHERIT → берем подкатегории события (`Event.subcategories`),  
+    - OVERRIDE → используем только `subcategoriesOverride`,  
+    - CLEAR → пустой массив.
 - **EventOffer** — оффер из конкретного источника (TC/TEPLOHOD/RADARIO/TIMEPAD/MANUAL). Содержит: source, purchaseType (TC_WIDGET/REDIRECT/API_CHECKOUT), externalEventId, deeplink, priceFrom, commission, status (ACTIVE/HIDDEN/DISABLED), isPrimary.
 - **EventSession** — конкретный сеанс (дата, свободные места, цены). Привязан к Event и к EventOffer (offerId). Для teplohod.info — реальное расписание из `eventTimes` API (дата, время отправления, кол-во свободных мест).
 - **Tag** — теги для фильтрации и группировки (тема, аудитория, сезон)

@@ -4,6 +4,27 @@
 
 ---
 
+## 01.03.2026 — ESLint PR-only (Вариант A)
+
+### Наблюдения
+
+- Унаследованный проект: линтер «грязный», PR тонут в старых предупреждениях.
+- Правило: новые PR не ухудшают, но не обязаны чинить старое.
+
+### Решения
+
+- **CI:** ESLint только по изменённым файлам (`git diff base...head`, фильтр `*.ts`, `*.tsx`).
+- **PR:** `base` = merge base, `head` = PR head.
+- **Push:** `base` = before, `head` = sha (при before=0 — fallback HEAD~1).
+- Если нет изменённых *.ts/*.tsx — шаг пропускается (success).
+- **package.json:** `lint:all` — полный lint с --max-warnings=0 (локально при необходимости).
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 01.03.2026 — PR-1–PR-8: Cursor Master Pipeline (EventOverride, Cache, Offers, Checkout, Orders, JSON-LD, ESLint, tc-sync)
 
 ### Наблюдения
@@ -129,9 +150,9 @@
   - при наличии issues возвращает `{ ok: false, issues }` и не ставит PUBLISHED,
   - при успехе делает upsert EventOverride с `editorStatus=PUBLISHED`, снимает `needsReviewAt`, пишет запись в AuditLog (`EventPublish`).
 - Для подкатегорий в `EventOverride` введена явная семантика:
-  - `subcategoriesMode: INHERIT | OVERRIDE | CLEAR`,
-  - `subcategoriesOverride: EventSubcategory[]`;
-  - `applyOverrides` использует этот режим: INHERIT → оригинал, OVERRIDE → override-список, CLEAR → [] (плюс backward compatibility, если mode не задан, но subcategories есть).
+  - `subcategoriesMode: SubcategoriesMode` (Prisma enum `INHERIT | OVERRIDE | CLEAR`, default = `INHERIT`, NOT NULL),
+  - `subcategoriesOverride: EventSubcategory[]` (массив подкатегорий для режима OVERRIDE);
+  - `resolveSubcategories` в `EventOverrideService.applyOverrides` использует этот режим: INHERIT → оригинал, OVERRIDE → override-список, CLEAR → [] (плюс backward compatibility, если ранее mode был NULL или содержал мусор — миграция конвертирует в INHERIT).
 
 ### Проблемы
 
