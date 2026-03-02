@@ -1,6 +1,6 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-02-23. См. `docs/Reference.md`, `docs/Deploy.md`.
+> Последнее обновление: 2026-03-01. См. `docs/Reference.md`, `docs/Deploy.md`.
 > **Отложено 6+ мес** (Q3 2026+): Planner, Unified Checkout, ML-рекомендации, PWA, сложная дедупликация, gRPC-оптимизации, микрооптимизация Web Vitals, расширенная CI-инфра.
 > План 26 PR: `docs/InfraTypizationUXCheckoutPlan.md` (инфра, типизация, UX, Checkout + YooKassa).
 
@@ -17,6 +17,17 @@
 # Часть I — Закрытые задачи (Выполнено)
 
 > Сводка выполненных работ по темам. Детали — в секциях ниже и в `docs/Diary.md`.
+
+## Cursor Master Pipeline PR-1–PR-8 (01.03.2026) ✅
+
+- **PR-1 (A1)** EventOverride.subcategories: INHERIT/OVERRIDE/CLEAR (resolveSubcategories).
+- **PR-2 (A2)** Redis cache: TTL (cities 6h, events 2m/10m), инвалидация catalog при изменении события.
+- **PR-3 (A3)** Publish-gate: isSellable(), фильтр offers с priceFrom > 0, voucherUrl в tracking.
+- **PR-4 (C2)** Mobile checkout: прогресс-бар, fixed bottom bar ≤420px.
+- **PR-5 (C3)** /orders/[id]: таймлайн, операционная инфо, ваучер.
+- **PR-6 (B1+B2)** JSON-LD: buildArticleJsonLd(), Article schema на blog/[slug], FAQPage в FaqSection.
+- **PR-7 (D1)** ESLint no-explicit-any: уже включён (warn); overrides для DTO, тестов.
+- **PR-8 (D2)** Типизация tc-sync: TcVenueCity, TcTicketSetRule, TcOffer, isTcEvent, валидация.
 
 ## Инфра + типизация + UX + Checkout (26 PR) ✅
 
@@ -141,12 +152,12 @@
 - [ ] **Критический**: SEO-описания для всех городов (уникальные, не шаблонные)
 - [ ] **Критический**: SEO-описания для ТОП-10 площадок (venues)
 - [ ] **Высокий**: Тематические лендинги («Ночные экскурсии СПб», «Музеи Казани с детьми» и др.)
-- [ ] **Высокий**: Базовый JSON-LD и meta-теги на городах, venues, событиях, комбо
-- [ ] **Высокий**: Аудит PageTemplateSpecs — соответствие реализаций фронта/админки описанным шаблонам
+- [x] **Высокий**: Базовый JSON-LD и meta-теги на городах, venues, событиях, комбо ✅ (buildPageMetadata, og+twitter)
+- [x] **Высокий**: Аудит PageTemplateSpecs — соответствие реализаций фронта/админки описанным шаблонам ✅ (docs/PageTemplateSpecsAudit.md)
 - [ ] **Средний**: Контентный план — 30 статей (ArticlePlanner)
 - [ ] **Средний**: Отображение «Музеи» (детальная страница venue) — режим работы, галерея, выставки (см. `docs/Reference.md` §1)
 - [ ] **Средний**: Аудит категоризации — SQL-отчёт уже из Gate 1 можно переиспользовать как инструмент SEO
-- [ ] **Высокий**: Event Quality Gate — `EventQualityService.validateForPublish` + `/admin/events/:id/publish` (без PUBLISHED мимо валидации)
+- [x] **Высокий**: Event Quality Gate — `EventQualityService.validateForPublish` + `/admin/events/:id/publish` ✅ (+ NO_VALID_PRICE для офферов без цены)
 - [ ] **Высокий**: EventOverride.subcategories — явная семантика INHERIT/OVERRIDE/CLEAR + subcategoriesOverride
 - [ ] **Средний**: Нормализация категорий/аудиторий после импорта (детерминированный маппинг TC/TEP → EventCategory/EventSubcategory)
 - [ ] **Средний**: Нормализация location/venue (venueId ИЛИ meetingPoint/address; MISSING_LOCATION блокирует publish)

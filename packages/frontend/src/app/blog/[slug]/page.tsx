@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { EventCard } from '@/components/ui/EventCard';
 import { VenueCard } from '@/components/ui/VenueCard';
 import { api } from '@/lib/api';
-import { getSeoMeta } from '@/lib/seo/getSeoMeta';
+import { buildArticleJsonLd } from '@/lib/seo/buildArticleJsonLd';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -82,8 +82,15 @@ export default async function ArticlePage({ params }: Props) {
     // ignore
   }
 
+  const articleJsonLd = buildArticleJsonLd(article);
+
   return (
     <>
+      {/* PR-6 (B1): JSON-LD Article schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
       {/* Hero */}
       <section className="bg-gradient-to-br from-slate-800 to-slate-900 py-12">
         <div className="container-page max-w-3xl">

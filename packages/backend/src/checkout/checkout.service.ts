@@ -849,6 +849,12 @@ export class CheckoutService {
           event: { title: s.eventTitle, slug: s.eventSlug, imageUrl: s.eventImage || null },
           offerTitle: s.eventTitle,
         }));
+    const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
+    const voucherUrl =
+      session.status === 'COMPLETED'
+        ? `${appUrl}/orders/track?code=${session.shortCode}`
+        : null;
+
     return {
       id: session.shortCode,
       shortCode: session.shortCode,
@@ -861,6 +867,7 @@ export class CheckoutService {
       updatedAt: session.updatedAt,
       completedAt: session.completedAt,
       expiresAt: session.expiresAt,
+      voucherUrl,
       items,
     };
   }

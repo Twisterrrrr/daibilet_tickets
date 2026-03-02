@@ -7,7 +7,7 @@ import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';
 import { classify } from './event-classifier';
 import { TcApiService } from './tc-api.service';
-import { type TcEvent, type TcTicketSet } from './tc-api.types';
+import { type TcEvent, type TcTicketSet, type TcTicketSetRule, type TcVenueCity, isTcEvent } from './tc-api.types';
 import {
   TcGrpcCity,
   TcGrpcEvent,
@@ -732,7 +732,11 @@ export class TcSyncService {
 
     let allTcEvents: TcEvent[] = [];
     try {
-      allTcEvents = await this.tcApi.getEvents();
+      const raw = await this.tcApi.getEvents();
+      allTcEvents = raw.filter((v): v is TcEvent => isTcEvent(v));
+      if (allTcEvents.length < raw.length) {
+        this.logger.warn(`TC API: отфильтровано ${raw.length - allTcEvents.length} невалидных записей`);
+      }
       this.logger.log(`Получено ${allTcEvents.length} TC-записей`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1389,7 +1393,7 @@ export class TcSyncService {
   }
 
   private classifyRest(tc: TcEvent) {
-    const tags = (tc.tags || []).map((t: string) => t.toLowerCase());
+    const tags = (tc.tags || []).map((t) => t.toLowerCase());
     const title = String(tc.title?.text || '');
     const desc = String(tc.title?.desc || '');
     return classify(title, desc, tags);
@@ -1420,15 +1424,15 @@ export class TcSyncService {
   private extractPrices(sets: TcTicketSet[]): Record<string, unknown>[] {
     if (!sets || !Array.isArray(sets)) return [];
     return sets
-      .map((set: TcTicketSet & { rules?: Array<{ current?: boolean; price?: string; price_org?: string; price_extra?: string }> }) => {
+      .map((set: TcTicketSet) => {
         let priceCopecks = 0;
         let priceOrg = 0;
         let priceExtra = 0;
-        const currentRule = set.rules?.find((r) => r.current);
+        const currentRule = set.rules?.find((r: TcTicketSetRule) => r.current);
         if (currentRule) {
-          priceCopecks = Math.round(parseFloat(currentRule.price || '0') * 100);
-          priceOrg = Math.round(parseFloat(currentRule.price_org || '0') * 100);
-          priceExtra = Math.round(parseFloat(currentRule.price_extra || '0') * 100);
+          priceCopecks = Math.round(parseFloat(String(currentRule.price ?? '0')) * 100);
+          priceOrg = Math.round(parseFloat(String(currentRule.price_org ?? '0')) * 100);
+          priceExtra = Math.round(parseFloat(String(currentRule.price_extra ?? '0')) * 100);
         } else if (set.price != null) {
           priceCopecks = Math.round(parseFloat(String(set.price)) * 100);
         }
@@ -1443,10 +1447,10 @@ export class TcSyncService {
           withSeats: set.with_seats || false,
         };
       })
-      .filter((p: { price: number }) => p.price > 0);
+      .filter((p) => p.price > 0);
   }
 
-  private getCityName(tcCity: { name?: string | { ru?: string; default?: string; en?: string }; [key: string]: unknown } | null | undefined): string {
+  private getCityName(tcCity: TcVenueCity | null | undefined): string {
     if (!tcCity?.name) return 'unknown';
     if (typeof tcCity.name === 'string') return tcCity.name;
     return tcCity.name.ru || tcCity.name.default || tcCity.name.en || 'unknown';

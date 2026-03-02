@@ -18,6 +18,14 @@ import { useEffect, useState } from 'react';
 
 import { type CartItem, useCart } from '@/lib/cart';
 
+/** Прогресс: Корзина → Данные → Оплата → Завершение (PR-4) */
+const PROGRESS_STEPS = [
+  { key: 'review', label: 'Корзина' },
+  { key: 'contact', label: 'Данные' },
+  { key: 'payment', label: 'Оплата' },
+  { key: 'done', label: 'Готово' },
+] as const;
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 type CheckoutStep = 'review' | 'contact' | 'processing' | 'done';
@@ -169,8 +177,13 @@ export function CheckoutClient() {
     );
   }
 
+  const displayTotal = totalPrice - (giftCertValidation?.valid ? giftCertValidation.discountAmount ?? 0 : 0);
+  const showMobileBar = step === 'review' || step === 'contact';
+  const progressStepIndex =
+    step === 'done' ? 4 : step === 'processing' ? 3 : step === 'contact' ? 2 : step === 'review' ? 1 : 1;
+
   return (
-    <div className="container-page py-8">
+    <div className="container-page py-8 pb-24 min-[421px]:pb-8">
       <div className="mx-auto max-w-3xl">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -180,19 +193,16 @@ export function CheckoutClient() {
           <h1 className="text-2xl font-bold text-slate-900">Оформление заказа</h1>
         </div>
 
-        {/* Progress */}
+        {/* PR-4: Прогресс-бар — Корзина → Данные → Оплата → Завершение */}
         <div className="flex items-center gap-2 mb-8">
-          {['Проверка', 'Контакты', 'Готово'].map((label, idx) => {
-            const stepIdx = idx === 0 ? 'review' : idx === 1 ? 'contact' : 'done';
-            const isActive = step === stepIdx || step === 'processing';
-            const isDone =
-              (idx === 0 && (step === 'contact' || step === 'processing' || step === 'done')) ||
-              (idx === 1 && (step === 'processing' || step === 'done')) ||
-              (idx === 2 && step === 'done');
+          {PROGRESS_STEPS.map((s, idx) => {
+            const idx1 = idx + 1;
+            const isActive = progressStepIndex >= idx1;
+            const isDone = progressStepIndex > idx1;
             return (
-              <div key={label} className="flex items-center gap-2 flex-1">
+              <div key={s.key} className="flex items-center gap-2 flex-1 min-w-0">
                 <div
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                     isDone
                       ? 'bg-emerald-500 text-white'
                       : isActive
@@ -200,12 +210,12 @@ export function CheckoutClient() {
                         : 'bg-slate-200 text-slate-500'
                   }`}
                 >
-                  {isDone ? <CheckCircle className="h-4 w-4" /> : idx + 1}
+                  {isDone ? <CheckCircle className="h-4 w-4" /> : idx1}
                 </div>
-                <span className={`text-sm ${isActive || isDone ? 'font-medium text-slate-900' : 'text-slate-400'}`}>
-                  {label}
+                <span className={`text-sm truncate ${isActive || isDone ? 'font-medium text-slate-900' : 'text-slate-400'}`}>
+                  {s.label}
                 </span>
-                {idx < 2 && <div className="flex-1 h-px bg-slate-200" />}
+                {idx < 3 && <div className="flex-1 h-px bg-slate-200 min-w-2" />}
               </div>
             );
           })}
@@ -334,9 +344,7 @@ export function CheckoutClient() {
               )}
               <div className="flex items-center justify-between">
                 <span className="text-slate-600">Итого:</span>
-                <span className="text-xl font-bold text-slate-900">
-                  {formatPrice(totalPrice - (giftCertValidation?.valid ? (giftCertValidation.discountAmount ?? 0) : 0))}
-                </span>
+                <span className="text-xl font-bold text-slate-900">{formatPrice(displayTotal)}</span>
               </div>
               {redirectItems.length > 0 && requestItems.length > 0 && (
                 <p className="mt-2 text-xs text-slate-400">
@@ -348,7 +356,7 @@ export function CheckoutClient() {
             <button
               onClick={handleValidate}
               disabled={validating}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
+              className="hidden w-full min-[421px]:flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
             >
               {validating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Продолжить'}
             </button>
@@ -357,7 +365,7 @@ export function CheckoutClient() {
 
         {/* Step: Contact Info */}
         {step === 'contact' && (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form id="checkout-contact-form" onSubmit={handleSubmit} className="space-y-6">
             {validationError && (
               <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
                 <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
@@ -466,7 +474,7 @@ export function CheckoutClient() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-base font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
+                className="hidden min-[421px]:flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-base font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
               >
                 {submitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -541,6 +549,38 @@ export function CheckoutClient() {
           </div>
         )}
       </div>
+
+      {/* PR-4: Fixed bottom bar для мобильных (≤420px) */}
+      {showMobileBar && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-40 flex min-[421px]:hidden items-center justify-between gap-4 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]"
+          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
+        >
+          <div>
+            <span className="text-xs text-slate-500">Итого</span>
+            <p className="text-lg font-bold text-slate-900">{formatPrice(displayTotal)}</p>
+          </div>
+          {step === 'review' && (
+            <button
+              onClick={handleValidate}
+              disabled={validating}
+              className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-base font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
+            >
+              {validating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Продолжить'}
+            </button>
+          )}
+          {step === 'contact' && (
+            <button
+              type="submit"
+              form="checkout-contact-form"
+              disabled={submitting}
+              className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-base font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
+            >
+              {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Оформить'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

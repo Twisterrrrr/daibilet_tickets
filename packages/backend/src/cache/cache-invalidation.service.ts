@@ -30,11 +30,12 @@ export class CacheInvalidationService {
 
   /**
    * Инвалидировать кэш для конкретного события по slug.
-   * Удаляет events:detail:{slug} и search (поиск может включать это событие).
+   * Удаляет events:detail:{slug}, search, catalog:list (списки могут включать это событие).
    */
   async invalidateEvent(slug: string): Promise<void> {
     await this.cache.del(cacheKeys.events.detail(slug));
     await this.cache.delByPrefix('search:');
+    await this.cache.delByPrefix('catalog:');
     this.logger.debug(`Invalidated cache for event slug=${slug}`);
   }
 

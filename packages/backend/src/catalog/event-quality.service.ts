@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { DateMode, EventCategory } from '@prisma/client';
+import { DateMode, EventCategory, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { isSellable } from './sellable';
 
 export interface EventQualityIssue {
   code: string;
@@ -87,7 +88,8 @@ export class EventQualityService {
       });
     }
 
-    if (!event.venueId && !event.meetingPoint && !event.address) {
+    const hasLocation = event.venueId || event.address || event.offers.some((o) => o.meetingPoint);
+    if (!hasLocation) {
       issues.push({
         code: 'MISSING_LOCATION',
         message: 'Не указано место проведения (venue или адрес/точка встречи)',
@@ -95,24 +97,40 @@ export class EventQualityService {
       });
     }
 
-    const activeOffers = event.offers.filter((o) => !o.isDeleted && o.status === 'ACTIVE');
-    if (activeOffers.length === 0) {
-      issues.push({
-        code: 'MISSING_ACTIVE_OFFER',
-        message: 'Нет ни одного активного оффера с валидной ценой',
-        field: 'offers',
-      });
-    }
-
-    if (event.dateMode === DateMode.SCHEDULED) {
-      const now = new Date();
-      const hasFutureSession = event.sessions.some((s) => s.startsAt > now && s.isActive);
-      if (!hasFutureSession) {
+    const now = new Date();
+    const sellable = isSellable(event, event.offers, event.sessions, now);
+    if (!sellable) {
+      const activeOffers = event.offers.filter((o) => !o.isDeleted && o.status === 'ACTIVE');
+      const withPrice = activeOffers.filter((o) => o.priceFrom != null && o.priceFrom > 0);
+      if (activeOffers.length === 0) {
         issues.push({
-          code: 'NO_FUTURE_SESSIONS',
-          message: 'Нет будущих активных сеансов для расписания',
-          field: 'sessions',
+          code: 'MISSING_ACTIVE_OFFER',
+          message: 'Нет ни одного активного оффера с валидной ценой',
+          field: 'offers',
         });
+      } else if (withPrice.length === 0) {
+        issues.push({
+          code: 'NO_VALID_PRICE',
+          message: 'Активные офферы без указанной цены — укажите priceFrom',
+          field: 'offers',
+        });
+      } else if (event.dateMode === DateMode.SCHEDULED) {
+        const hasFutureSession = event.sessions.some((s) => s.startsAt > now && s.isActive);
+        if (!hasFutureSession) {
+          issues.push({
+            code: 'NO_FUTURE_SESSIONS',
+            message: 'Нет будущих активных сеансов для расписания',
+            field: 'sessions',
+          });
+        }
+      } else if (event.dateMode === DateMode.OPEN_DATE && event.endDate) {
+        if (new Date(event.endDate) < now) {
+          issues.push({
+            code: 'END_DATE_PASSED',
+            message: 'Дата окончания события истекла',
+            field: 'endDate',
+          });
+        }
       }
     }
 
@@ -131,7 +149,7 @@ export class EventQualityService {
         where: { eventId },
         data: {
           qualityStatus: result.isReady ? 'READY' : 'BLOCKED',
-          qualityIssues: result.issues,
+          qualityIssues: result.issues as unknown as Prisma.InputJsonValue,
           qualityCheckedAt: new Date(),
         },
       })

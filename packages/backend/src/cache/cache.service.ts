@@ -26,14 +26,14 @@ function parseTtlEnv(key: string, fallbackSec: number): number {
 }
 
 export const CACHE_TTL = {
-  CITIES: parseTtlEnv('CACHE_TTL_CITIES', 3600), // 1 час
-  CITY_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 3600), // detail 1–6h, default 1h
-  EVENT_LIST: parseTtlEnv('CACHE_TTL_LIST', 300), // list 5–10m, default 5m
-  EVENT_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 3600), // detail 1–6h
-  TAGS: parseTtlEnv('CACHE_TTL_TAGS', 3600), // 1 час
-  LANDINGS: parseTtlEnv('CACHE_TTL_LANDINGS', 1800), // 30 мин
-  COMBOS: parseTtlEnv('CACHE_TTL_COMBOS', 1800), // 30 мин
-  SEARCH: parseTtlEnv('CACHE_TTL_SEARCH', 300), // list 5–10m
+  CITIES: parseTtlEnv('CACHE_TTL_CITIES', 21600), // 6h (PR-2: cities:list 6–24h)
+  CITY_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 3600), // 1h (city detail)
+  EVENT_LIST: parseTtlEnv('CACHE_TTL_LIST', 120), // 2m (PR-2: events:list 60–180s)
+  EVENT_DETAIL: parseTtlEnv('CACHE_TTL_DETAIL', 600), // 10m (PR-2: events:slug 5–15m)
+  TAGS: parseTtlEnv('CACHE_TTL_TAGS', 3600), // 1h
+  LANDINGS: parseTtlEnv('CACHE_TTL_LANDINGS', 1800), // 30m
+  COMBOS: parseTtlEnv('CACHE_TTL_COMBOS', 1800), // 30m
+  SEARCH: parseTtlEnv('CACHE_TTL_SEARCH', 120), // 2m (60–180s)
 } as const;
 
 @Injectable()

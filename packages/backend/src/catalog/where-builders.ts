@@ -86,6 +86,8 @@ export function buildEventWhere(
     isActive: true,
     isDeleted: false,
     canonicalOfId: null,
+    // PR-3 publish-gate: только события с ACTIVE оффером и ценой
+    offers: { some: { status: 'ACTIVE', isDeleted: false, priceFrom: { gt: 0 } } },
     ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),
     city: {
       isActive: true,

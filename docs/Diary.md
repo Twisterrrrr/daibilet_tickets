@@ -4,6 +4,49 @@
 
 ---
 
+## 01.03.2026 — PR-1–PR-8: Cursor Master Pipeline (EventOverride, Cache, Offers, Checkout, Orders, JSON-LD, ESLint, tc-sync)
+
+### Наблюдения
+
+- Выполнена цепочка PR-1…PR-8 из спецификации Cursor Master Pipeline.
+- PR-1 (subcategories) уже был готов ранее; PR-2–PR-8 реализованы последовательно.
+
+### Решения
+
+- **PR-2 (A2) Redis cache:** TTL по спецификации (cities 6h, events list 2m, detail 10m, search 2m); инвалидация `catalog:` при изменении события.
+- **PR-3 (A3) Publish-gate:** `isSellable()` в `catalog/sellable.ts`; `buildEventWhere` фильтрует только события с ACTIVE оффером и `priceFrom > 0`; `voucherUrl` в `formatTrackingResult` при COMPLETED.
+- **PR-4 (C2) Mobile checkout:** Прогресс-бар «Корзина → Данные → Оплата → Завершение»; fixed bottom bar для ширины ≤420px с итогом и CTA.
+- **PR-5 (C3) /orders/[id]:** Таймлайн статуса, операционная информация (место встречи, телефон), блок «Открыть ваучер».
+- **PR-6 (B1+B2) JSON-LD:** `buildArticleJsonLd()` для статей; страница `blog/[slug]` рендерит Article schema; FaqSection уже использует FAQPage.
+- **PR-7 (D1) ESLint:** Правило `@typescript-eslint/no-explicit-any: warn` уже было включено; overrides для DTO и тестов.
+- **PR-8 (D2) Типизация tc-sync:** TcVenueCity, TcTicketSetRule, TcOffer; `isTcEvent` принимает id/_id; валидация в syncAllRest; `getCityName` типизирован.
+
+### Проблемы
+
+- ESLint по-прежнему выявляет pre-existing ошибки (unused vars, no-explicit-any warnings) — не связаны с текущими изменениями.
+
+---
+
+## 02.03.2026 — Gate 3: meta-теги, Event Quality Gate, PageTemplateSpecs аудит
+
+### Наблюдения
+
+- JSON-LD уже реализован на Event, City, Venue, Combo, Landings, Help. Meta og/twitter были частично — без единого helper.
+
+### Решения
+
+- **buildPageMetadata()** — lib/seo/buildPageMetadata.ts: единый helper для title, description, openGraph, twitter (card, title, description, images), canonical.
+- **Обновлены страницы:** events/[slug], cities/[slug], venues/[slug], combo/[slug], podborki/[slug] — используют buildPageMetadata с полным набором og + twitter.
+- **Layout:** добавлен twitter.card = summary_large_image по умолчанию.
+- **Event Quality Gate:** добавлена проверка NO_VALID_PRICE — активные офферы должны иметь priceFrom > 0.
+- **PageTemplateSpecs аудит:** docs/PageTemplateSpecsAudit.md — сверка реализации (Музеи, каталог, JSON-LD, meta) со спецификацией.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 01.03.2026 — Отказ от Directus, всё в текущей админке
 
 ### Наблюдения

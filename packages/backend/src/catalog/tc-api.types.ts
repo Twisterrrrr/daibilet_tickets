@@ -9,10 +9,20 @@
 // TC Event (из /v2/resources/events)
 // ============================================================
 
+/** Город из TC API (venue.city) */
+export interface TcVenueCity {
+  id?: number;
+  name?: string | { ru?: string; default?: string; en?: string };
+  timezone?: string;
+  [key: string]: unknown;
+}
+
 export interface TcEvent {
-  _id: string;
+  _id?: string;
+  id?: string | number; // REST API может возвращать id вместо _id
   title?: {
     text?: string;
+    desc?: string;
     [key: string]: unknown;
   };
   org?: {
@@ -26,12 +36,7 @@ export interface TcEvent {
     [key: string]: unknown;
   };
   venue?: {
-    city?: {
-      id?: number;
-      name?: string;
-      timezone?: string;
-      [key: string]: unknown;
-    };
+    city?: TcVenueCity;
     address?: string;
     title?: string;
     point?: { coordinates?: [number, number] | number[] };
@@ -58,9 +63,22 @@ export interface TcEvent {
   tags?: string[];
   settings?: Record<string, unknown>;
   status?: string;
+  tickets_amount_vacant?: number;
+  age_rating?: number;
   sets?: TcTicketSet[];
   [key: string]: unknown;
 }
+
+export interface TcTicketSetRule {
+  current?: boolean;
+  price?: string | number;
+  price_org?: string;
+  price_extra?: string;
+  [key: string]: unknown;
+}
+
+/** Offer = TicketSet в терминологии TC API */
+export type TcOffer = TcTicketSet;
 
 export interface TcTicketSet {
   _id?: string;
@@ -69,6 +87,10 @@ export interface TcTicketSet {
   price?: number;
   price_max?: number;
   status?: string;
+  amount?: number;
+  amount_vacant?: number;
+  with_seats?: boolean;
+  rules?: TcTicketSetRule[];
   [key: string]: unknown;
 }
 
@@ -132,7 +154,8 @@ export interface TcGrpcTicketSet {
 export function isTcEvent(value: unknown): value is TcEvent {
   if (!value || typeof value !== 'object') return false;
   const obj = value as Record<string, unknown>;
-  return typeof obj._id === 'string' && obj._id.length > 0;
+  const id = obj.id ?? obj._id;
+  return (typeof id === 'string' && id.length > 0) || (typeof id === 'number' && !isNaN(id));
 }
 
 export function isTcEventArray(value: unknown): value is TcEvent[] {
