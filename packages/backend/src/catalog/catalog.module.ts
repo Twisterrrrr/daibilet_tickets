@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 
 import { EventOverrideService } from '../admin/event-override.service';
+import { EventQualityService } from './event-quality.service';
 import { QUEUE_EMAILS } from '../queue/queue.constants';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
@@ -30,6 +31,7 @@ import { TepSyncService } from './tep-sync.service';
     FuzzyDedupService,
     EventOverrideService,
     PostEditQueueService,
+    EventQualityService,
   ],
   exports: [
     CatalogService,
@@ -43,6 +45,7 @@ import { TepSyncService } from './tep-sync.service';
     FuzzyDedupService,
     EventOverrideService,
     PostEditQueueService,
+    EventQualityService,
   ],
 })
 export class CatalogModule {}

@@ -113,7 +113,8 @@ export class AdminOrdersController {
 
     // Поисковый запрос по id/code/email/phone/paymentId
     where.OR = [
-      { id: { contains: trimmed, mode: 'insensitive' } },
+      // По id — только точное совпадение (UUID).
+      { id: trimmed },
       { code: { contains: trimmed, mode: 'insensitive' } },
       { email: { contains: trimmed, mode: 'insensitive' } },
       { phone: { contains: trimmed, mode: 'insensitive' } },

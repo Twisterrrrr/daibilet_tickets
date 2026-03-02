@@ -86,6 +86,33 @@
 
 ---
 
+## 02.03.2026 — Диетический режим листингов `/events`
+
+### Наблюдения
+
+- После импорта большого объёма событий (TC + teplohod) листинги (`/`, `/events`, лендинги) стали возвращать очень «жирный» JSON: полный `Event` с `tcData`, всеми офферами и сессиями.
+- Next.js dev + NestJS dev + тяжёлый payload давали заметное падение TTFB на первых запросах, особенно без прогретого Redis-кэша.
+
+### Решения
+
+- Введён параметр `fields` для `/api/v1/events`:
+  - `fields=card` — лёгкий режим для листингов; возвращается компактная DTO «карточка события» (id, slug, title, category, subcategories, audience, краткое описание, город/venue, imageUrl, priceFrom, рейтинг/отзывы, ближайшая сессия, базовые highlights/теги).
+  - `fields=full` (по умолчанию) — полный объект события для деталок и спец-сценариев.
+- В `CatalogService.fetchEvents` реализованы две Prisma-ветки:
+  - `card`: `select` только по нужным полям, без тяжёлых JSON; сессии ограничены `take: 20` ближайших, tags — только через `tags.tag`.
+  - `full`: прежний `include` с офферами/сессиями.
+- Для обоих режимов после выборки по-прежнему работают:
+  - `EventOverride.applyOverrides` (publish-gate, isHidden, editorStatus=PUBLISHED).
+  - `enrichWithBadges` (nextSessionAt, totalAvailableTickets, highlights, isOptimalChoice).
+- Добавлен лог таймингов в `fetchEvents`:
+  - метрики `dbMs`, `overrideMs`, `badgesMs`, `totalMs`, `fields`, `sort`, `total` логируются через `Logger(CatalogService)`, чтобы в dev/prod отслеживать реальную стоимость листингов.
+
+### Проблемы
+
+- Для упрощения count пока считается одинаково и для `card`, и для `full` (`prisma.event.count({ where })`); при необходимости можно вынести count в отдельный кэш-ключ и/или ослабить требования к точному total для дальних страниц (`page > 3`).
+
+---
+
 ## 01.03.2026 — SEO-аудит, Отчёты, Support escalation, Error Boundary
 
 ### Наблюдения

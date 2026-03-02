@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { EventAudience, EventCategory, EventSource } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min, IsIn } from 'class-validator';
 
 export class EventsQueryDto {
   @ApiPropertyOptional({ description: 'Slug города' })
@@ -131,4 +131,12 @@ export class EventsQueryDto {
   @IsOptional()
   @IsString()
   nocache?: string;
+
+  @ApiPropertyOptional({
+    description: 'Набор полей в ответе: card (лёгкая карточка) или full (полные данные)',
+    enum: ['card', 'full'],
+  })
+  @IsOptional()
+  @IsIn(['card', 'full'])
+  fields?: 'card' | 'full';
 }

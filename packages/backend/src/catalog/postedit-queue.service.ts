@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EditorStatus, EventSource, Prisma } from '@prisma/client';
+import { EditorStatus, Prisma } from '@prisma/client';
+import type { EventSource } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+
+const IMPORT_SOURCES: EventSource[] = ['TC', 'TEPLOHOD'];
 
 /**
  * Очередь постредакции: после sync TC/TEP создаём или обновляем EventOverride,
@@ -21,7 +24,7 @@ export class PostEditQueueService {
    * @param since — опционально: только события, обновлённые после этой даты (ускоряет после sync)
    */
   async ensureOverridesForImportedEvents(params?: {
-    source?: EventSource.TC | EventSource.TEPLOHOD;
+    source?: EventSource;
     since?: Date;
     batchSize?: number;
   }): Promise<{ created: number; updated: number }> {
@@ -30,7 +33,7 @@ export class PostEditQueueService {
     const batchSize = params?.batchSize ?? 500;
 
     const where: Prisma.EventWhereInput = {
-      source: source ?? { in: [EventSource.TC, EventSource.TEPLOHOD] },
+      source: source ?? { in: IMPORT_SOURCES },
       isDeleted: false,
       ...(since ? { updatedAt: { gte: since } } : {}),
     };
@@ -40,7 +43,7 @@ export class PostEditQueueService {
     let cursorId: string | null = null;
 
     while (true) {
-      const events = await this.prisma.event.findMany({
+      const events: { id: string; updatedAt: Date }[] = await this.prisma.event.findMany({
         where,
         select: { id: true, updatedAt: true },
         orderBy: { id: 'asc' },

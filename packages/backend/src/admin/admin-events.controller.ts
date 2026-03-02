@@ -82,8 +82,12 @@ export class AdminEventsController {
     const pg = parsePagination({ cursor, page, limit });
     const andParts: Prisma.EventWhereInput[] = [{ isDeleted: false }];
     if (city) andParts.push({ city: { slug: city } });
-    if (category) andParts.push({ category });
-    if (source) andParts.push({ source });
+    if (category) {
+      andParts.push({ category: category as EventCategory });
+    }
+    if (source) {
+      andParts.push({ source: source as any });
+    }
     if (active !== undefined) andParts.push({ isActive: active === 'true' });
     if (search) {
       const trimmed = search.trim();

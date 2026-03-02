@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { SUBCATEGORY_LABELS } from '@daibilet/shared';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DateMode, EventCategory, EventSubcategory, LocationType, Prisma, TagCategory } from '@prisma/client';
 
 import { asCatalogEntityLite, asCityLite, toDateSafe } from '../common/typing';
@@ -30,6 +30,8 @@ export class CatalogService {
     private readonly overrideService: EventOverrideService,
     private readonly regionService: RegionService,
   ) {}
+
+  private readonly logger = new Logger(CatalogService.name);
 
   // --- Города ---
 
@@ -642,11 +644,7 @@ export class CatalogService {
     const cacheKey = cacheKeys.catalog.list(`${query.city || 'all'}:${paramsHash}`);
 
     if (!nocache) {
-      const cached = await this.cache.getOrSet(
-        cacheKey,
-        CACHE_TTL.EVENT_LIST,
-        () => this.fetchEvents(query),
-      );
+      const cached = await this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_LIST, () => this.fetchEvents(query));
       return cached;
     }
     return this.fetchEvents(query);
@@ -827,46 +825,86 @@ export class CatalogService {
     const maxTake = isDepartingSoon ? 500 : limit;
     const skip = isDepartingSoon ? 0 : (page - 1) * limit;
 
-    const [rawItems, total] = await Promise.all([
-      this.prisma.event.findMany({
-        where,
-        orderBy,
-        skip,
-        take: maxTake,
-        include: {
-          city: { select: { slug: true, name: true } },
-          venue: { select: { title: true, shortTitle: true } },
-          tags: { include: { tag: true } },
-          offers: {
-            where: { status: 'ACTIVE', isDeleted: false },
-            orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
+    const fields = query.fields ?? 'full';
+
+    const t0 = Date.now();
+    const tDb0 = Date.now();
+
+    const findManyPromise =
+      fields === 'card'
+        ? this.prisma.event.findMany({
+            where,
+            orderBy,
+            skip,
+            take: maxTake,
             select: {
               id: true,
-              source: true,
-              purchaseType: true,
-              externalEventId: true,
-              metaEventId: true,
-              deeplink: true,
+              slug: true,
+              title: true,
+              shortDescription: true,
+              category: true,
+              subcategories: true,
+              audience: true,
+              imageUrl: true,
+              galleryUrls: true,
               priceFrom: true,
-              isPrimary: true,
+              rating: true,
+              reviewCount: true,
+              city: { select: { slug: true, name: true } },
+              venue: { select: { title: true, shortTitle: true } },
+              tags: { include: { tag: true } },
+              sessions: {
+                where: { isActive: true, startsAt: { gte: new Date() } },
+                orderBy: { startsAt: 'asc' },
+                take: 20,
+                select: { startsAt: true, availableTickets: true },
+              },
             },
-          },
-          sessions: {
-            where: { isActive: true, startsAt: { gte: new Date() } },
-            orderBy: { startsAt: 'asc' },
-            take: 20,
-            select: { startsAt: true, availableTickets: true },
-          },
-        },
-      }),
-      this.prisma.event.count({ where }),
-    ]);
+          })
+        : this.prisma.event.findMany({
+            where,
+            orderBy,
+            skip,
+            take: maxTake,
+            include: {
+              city: { select: { slug: true, name: true } },
+              venue: { select: { title: true, shortTitle: true } },
+              tags: { include: { tag: true } },
+              offers: {
+                where: { status: 'ACTIVE', isDeleted: false },
+                orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
+                select: {
+                  id: true,
+                  source: true,
+                  purchaseType: true,
+                  externalEventId: true,
+                  metaEventId: true,
+                  deeplink: true,
+                  priceFrom: true,
+                  isPrimary: true,
+                },
+              },
+              sessions: {
+                where: { isActive: true, startsAt: { gte: new Date() } },
+                orderBy: { startsAt: 'asc' },
+                take: 20,
+                select: { startsAt: true, availableTickets: true },
+              },
+            },
+          });
 
-    // Применяем overrides (мерж данных, фильтрация скрытых)
+    const [rawItems, total] = await Promise.all([findManyPromise, this.prisma.event.count({ where })]);
+
+    const dbMs = Date.now() - tDb0;
+
+    const tOv0 = Date.now();
     const overridden = await this.overrideService.applyOverrides(rawItems);
+    const overrideMs = Date.now() - tOv0;
 
+    const tBadges0 = Date.now();
     // Вычисляем смарт-бейджи: ближайший сеанс, свободные места, optimal score
     let items = this.enrichWithBadges(overridden);
+    const badgesMs = Date.now() - tBadges0;
 
     // События без фото — в конец каталога
     items = this.moveNoPhotoToEnd(items);
@@ -887,19 +925,75 @@ export class CatalogService {
 
       const paged = sorted.slice((page - 1) * limit, page * limit);
 
+      const payloadItems = fields === 'card' ? paged.map((e) => this.toEventCard(e)) : paged;
+
+      const totalMs = Date.now() - t0;
+      this.logger.log({
+        msg: 'fetchEvents timings',
+        fields,
+        sort,
+        dbMs,
+        overrideMs,
+        badgesMs,
+        totalMs,
+        total: departingTotal,
+      });
+
       return {
-        items: paged,
+        items: payloadItems,
         total: departingTotal,
         page,
         totalPages: Math.ceil(departingTotal / limit),
       };
     }
 
+    const payloadItems = fields === 'card' ? items.map((e) => this.toEventCard(e)) : items;
+
+    const totalMs = Date.now() - t0;
+    this.logger.log({
+      msg: 'fetchEvents timings',
+      fields,
+      sort,
+      dbMs,
+      overrideMs,
+      badgesMs,
+      totalMs,
+      total,
+    });
+
     return {
-      items,
+      items: payloadItems,
       total,
       page,
       totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Облегчённая DTO для листингов: только данные, нужные карточке события.
+   * Не включает tcData, сырые JSON из интеграций и тяжёлые поля.
+   */
+  private toEventCard(event: any) {
+    return {
+      id: event.id,
+      slug: event.slug,
+      title: event.title,
+      shortDescription: event.shortDescription ?? null,
+      category: event.category ?? null,
+      subcategories: event.subcategories ?? [],
+      audience: event.audience ?? null,
+      city: event.city ?? null,
+      venue: event.venue ?? null,
+      imageUrl: event.imageUrl ?? null,
+      galleryUrls: event.galleryUrls ?? [],
+      priceFrom: event.priceFrom ?? null,
+      rating: event.rating ?? null,
+      reviewCount: event.reviewCount ?? 0,
+      nextSessionAt: event.nextSessionAt ?? null,
+      totalAvailableTickets: event.totalAvailableTickets ?? null,
+      tagSlugs: event.tagSlugs ?? [],
+      highlights: event.highlights ?? [],
+      isOptimalChoice: event.isOptimalChoice ?? false,
     };
   }
 

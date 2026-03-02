@@ -37,6 +37,10 @@ const mockCache = {
   invalidateAfterSync: vi.fn().mockResolvedValue(undefined),
 };
 
+const mockPostEditQueue = {
+  ensureOverridesForImportedEvents: vi.fn().mockResolvedValue({ created: 0, updated: 0 }),
+};
+
 const makeJob = (name: string, attemptsMade = 0): Job<any, any, string> =>
   ({
     name,
@@ -53,7 +57,13 @@ describe('SyncProcessor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    processor = new SyncProcessor(mockTcSync as any, mockTepSync as any, mockCombo as any, mockCache as any);
+    processor = new SyncProcessor(
+      mockTcSync as any,
+      mockTepSync as any,
+      mockCombo as any,
+      mockCache as any,
+      mockPostEditQueue as any,
+    );
   });
 
   // =========================================
