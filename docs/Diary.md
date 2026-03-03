@@ -4,6 +4,27 @@
 
 ---
 
+## 01.03.2026 — ESLint: Next.js plugin + flat config
+
+### Наблюдения
+
+- При `next build` / `next lint` предупреждение: «The Next.js plugin was not detected in your ESLint configuration».
+- Корневой ESLint — flat config (eslint.config.mjs). Монорепо: frontend в `packages/frontend`.
+
+### Решения
+
+- **packages/frontend/eslint.config.mjs:** spread корневого конфига + `@next/eslint-plugin-next` с правилами recommended.
+- **files:** включён `.mjs` — иначе Next при `calculateConfigForFile(eslint.config.mjs)` не находит плагин (см. [vercel/next.js#73655](https://github.com/vercel/next.js/issues/73655)).
+- **settings.next.rootDir:** `.` (корень frontend-приложения).
+- **eslint-config-next** не используем — конфликт с корневым `@typescript-eslint`.
+
+### Проблемы
+
+- Предупреждение «plugin was not detected» сохраняется в Next 15 — баг детекции flat config. Правила работают (no-img-element, no-html-link-for-pages). Ожидается исправление в v16.
+- В Next 16 `next lint` убирают; рекомендован переход на `npx eslint .`.
+
+---
+
 ## 01.03.2026 — ESLint PR-only (Вариант A)
 
 ### Наблюдения

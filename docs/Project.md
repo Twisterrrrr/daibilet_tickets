@@ -116,6 +116,20 @@
 - Наблюдаемость:
   - `CatalogService.fetchEvents` логирует тайминги по этапам (`dbMs`, `overrideMs`, `badgesMs`, `totalMs`, `fields`, `sort`, `total`) для диагностики производительности в dev/prod.
 
+### Сборка frontend (Windows / CI)
+
+- **Windows**: `next build` с `output: 'standalone'` падает на EPERM (создание symlink). В `next.config.ts` standalone отключён на Windows: `output: isWindows ? undefined : 'standalone'`. Сборка проходит успешно без standalone. Альтернатива — включить Developer Mode в Windows (Settings → Privacy → For developers).
+- **CI / Linux**: standalone включён; Docker-образ frontend остаётся ~100 MB.
+- **Скрипты**:
+  - `pnpm -C packages/frontend build` — обычный build (standalone только на Linux/macOS)
+  - `pnpm -C packages/frontend build:standalone` — принудительный standalone (`NEXT_OUTPUT=standalone`, может упасть на Windows без Developer Mode)
+  - `pnpm -C packages/frontend start:standalone` — запуск standalone-сервера после `build:standalone` (или обычного build на Linux)
+
+### ESLint (flat config + Next.js)
+
+- Корень: `eslint.config.mjs` (TypeScript-ESLint, Prettier, общие правила).
+- Frontend: `packages/frontend/eslint.config.mjs` — spread корня + `@next/eslint-plugin-next` (recommended). `next lint` — правила применяются; предупреждение «plugin was not detected» в Next 15 — косметическое (vercel/next.js#73655). В v16 — переход на `npx eslint .`.
+
 ---
 
 ### Глобальные мульти-события (одно шоу в разных городах)
