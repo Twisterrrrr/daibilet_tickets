@@ -165,6 +165,21 @@
 
 ---
 
+## Админка: Teplohod-style расписание и готовность (6+ мес)
+
+> Спецификация: `docs/AdminScheduleSpec.md`. План PR: PR1 quality → PR2 расписание → PR3 мультисобытия → PR4 SEO-аудит.
+
+- [ ] **PR1** (⏸ 6+ мес): GET /admin/events/:id/quality (on-demand), UI «Причины неактивности» + подсветка вкладок, field→tabKey
+- [ ] **PR1** (⏸ 6+ мес): Статус: isHidden ≠ активность, одна строка «В каталоге / Скрыто вручную / Причины» (без forceActive на MVP)
+- [ ] **PR2** (⏸ 6+ мес): Миграции (порядок: 1) pre-unique-safety, 2) admin_schedule_capacity)
+- [ ] **PR2** (⏸ 6+ мес): Вкладка «Расписание» — таблица date×00–23, draft-create, модалка минут, POST sessions/batch-create
+- [ ] **PR2** (⏸ 6+ мес): Контекстное меню слота, Модель A при sold>0, PATCH capacity/delete/cancel
+- [ ] **PR2 checklist перед merge**: индексы package_items(sessionId[,status]) в БД; tcSessionId не пустой; нет дублей (eventId,startsAt)
+- [ ] **PR3** (⏸ 6+ мес): Events — колонка groupingKey + фильтр; раздел «Группы событий»
+- [ ] **PR4** (⏸ 6+ мес): /admin/seo-audit, GET /admin/seo/audit, seo_issues
+
+---
+
 ## После запуска / 6+ мес
 
 > Задачи, явно помеченные в трекере как (⏸ 6+ мес) или требующие объёмной доработки после стабилизации ядра.
