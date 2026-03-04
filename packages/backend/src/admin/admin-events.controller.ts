@@ -15,6 +15,7 @@ import {
   Res,
   UseGuards,
   UseInterceptors,
+  ConflictException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
@@ -39,8 +40,14 @@ import { buildPaginatedResult, paginationArgs, parsePagination } from '../common
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import {
+  AdminCreateSessionDto,
+  AdminEventSessionsRangeDto,
+  AdminStopSessionDto,
+  AdminUpdateSessionDto,
+  AdminCancelSessionDto,
   CreateEventDto,
   CreateEventOfferDto,
+  EventQualityDto,
   ExternalRatingDto,
   OverrideEventDto,
   PatchEventOfferDto,
@@ -48,7 +55,7 @@ import {
   VenueSettingsDto,
 } from './dto/admin.dto';
 import { EventOverrideService } from './event-override.service';
-import { EventQualityService } from '../catalog/event-quality.service';
+import { EventQualityIssue, EventQualityService } from '../catalog/event-quality.service';
 import { AuditService } from './audit.service';
 
 @ApiTags('admin')
@@ -290,6 +297,345 @@ export class AdminEventsController {
   }
 
   /**
+   * Оценка готовности события к публикации (on-demand).
+   *
+   * GET /admin/events/:id/quality
+   */
+  @Get(':id/quality')
+  @Roles('ADMIN', 'EDITOR')
+  async getQuality(@Param('id') eventId: string): Promise<EventQualityDto> {
+    const result = await this.eventQuality.validateForPublish(eventId);
+
+    const issues = result.issues.map((issue) => ({
+      code: issue.code,
+      field: issue.field,
+      message: issue.message,
+      severity: this.mapIssueSeverity(issue),
+      tabKey: this.mapIssueTabKey(issue),
+    }));
+
+    return {
+      isSellable: result.isReady,
+      issues,
+    };
+  }
+
+  /**
+   * Диапазон сеансов события для админки (с агрегированным soldCount).
+   *
+   * GET /admin/events/:id/sessions?from&to
+   */
+  @Get(':id/sessions')
+  @Roles('ADMIN', 'EDITOR')
+  async getSessionsRange(
+    @Param('id') eventId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('includeCancelled') includeCancelled?: string,
+  ): Promise<AdminEventSessionsRangeDto> {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, source: true, defaultCapacityTotal: true },
+    });
+    if (!event) {
+      throw new NotFoundException('Событие не найдено');
+    }
+
+    const now = new Date();
+    const fromDate = from ? new Date(from) : now;
+    if (Number.isNaN(fromDate.getTime())) {
+      throw new BadRequestException('Invalid "from" date');
+    }
+
+    let toDate = to ? new Date(to) : new Date(fromDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(toDate.getTime())) {
+      throw new BadRequestException('Invalid "to" date');
+    }
+
+    // Ограничиваем диапазон разумным максимумом (365 дней), чтобы избежать тяжёлых запросов.
+    const maxRangeMs = 365 * 24 * 60 * 60 * 1000;
+    if (toDate.getTime() - fromDate.getTime() > maxRangeMs) {
+      toDate = new Date(fromDate.getTime() + maxRangeMs);
+    }
+
+    const includeCancelledBool =
+      includeCancelled === '1' || includeCancelled === 'true' || includeCancelled === 'yes';
+
+    const cancelledCount = await this.prisma.eventSession.count({
+      where: {
+        eventId,
+        startsAt: {
+          gte: fromDate,
+          lte: toDate,
+        },
+        canceledAt: { not: null },
+      },
+    });
+
+    const sessions = await this.prisma.eventSession.findMany({
+      where: {
+        eventId,
+        startsAt: {
+          gte: fromDate,
+          lte: toDate,
+        },
+        ...(includeCancelledBool ? {} : { canceledAt: null }),
+      },
+      select: {
+        id: true,
+        startsAt: true,
+        endsAt: true,
+        capacityTotal: true,
+        offerId: true,
+        canceledAt: true,
+        cancelReason: true,
+      },
+      orderBy: { startsAt: 'asc' },
+    });
+
+    if (sessions.length === 0) {
+      return {
+        eventId,
+        from: fromDate.toISOString(),
+        to: toDate.toISOString(),
+        cancelledCount,
+        rows: [],
+      };
+    }
+
+    const sessionIds = sessions.map((s) => s.id);
+
+    const sold = await this.prisma.packageItem.groupBy({
+      by: ['sessionId'],
+      where: {
+        sessionId: { in: sessionIds },
+        status: { in: ['BOOKED', 'CONFIRMED'] },
+      },
+      _sum: {
+        adultTickets: true,
+        childTickets: true,
+      },
+    });
+
+    const soldBySessionId: Record<string, number> = {};
+    for (const row of sold) {
+      const total = (row._sum.adultTickets ?? 0) + (row._sum.childTickets ?? 0);
+      soldBySessionId[row.sessionId] = total;
+    }
+
+    const rows = sessions.map((s) => {
+      const soldCount = soldBySessionId[s.id] ?? 0;
+      let locked = false;
+      let lockReason: 'SOLD' | 'PAST' | 'IMPORTED' | 'OTHER' | undefined;
+
+      if (soldCount > 0) {
+        locked = true;
+        lockReason = 'SOLD';
+      }
+      if (s.startsAt < now) {
+        locked = true;
+        if (!lockReason) lockReason = 'PAST';
+      }
+      if (event.source !== 'MANUAL') {
+        locked = true;
+        if (!lockReason) lockReason = 'IMPORTED';
+      }
+
+      const capacity = s.capacityTotal ?? event.defaultCapacityTotal ?? null;
+
+      return {
+        id: s.id,
+        startsAt: s.startsAt.toISOString(),
+        endsAt: s.endsAt?.toISOString() ?? null,
+        capacity,
+        soldCount,
+        locked,
+        lockReason,
+      };
+    });
+
+    return {
+      eventId,
+      from: fromDate.toISOString(),
+      to: toDate.toISOString(),
+      cancelledCount,
+      rows,
+    };
+  }
+
+  @Post(':id/sessions')
+  @Roles('ADMIN', 'EDITOR')
+  async createSession(@Param('id') eventId: string, @Body() dto: AdminCreateSessionDto) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, source: true, defaultCapacityTotal: true },
+    });
+    if (!event) {
+      throw new NotFoundException('Событие не найдено');
+    }
+    if (event.source !== 'MANUAL') {
+      throw new SessionLockedException('IMPORTED', 'Импортное событие: создание сеансов запрещено.');
+    }
+
+    const startsAt = new Date(dto.startsAt);
+    if (Number.isNaN(startsAt.getTime())) {
+      throw new BadRequestException('Invalid startsAt');
+    }
+
+    const endsAt = dto.endsAt ? new Date(dto.endsAt) : null;
+    if (dto.endsAt && Number.isNaN(endsAt!.getTime())) {
+      throw new BadRequestException('Invalid endsAt');
+    }
+
+    const now = new Date();
+    if (startsAt < now) {
+      throw new SessionLockedException('PAST', 'Сеанс не может начинаться в прошлом.');
+    }
+
+    const capacity = dto.capacity ?? event.defaultCapacityTotal ?? null;
+
+    const session = await this.prisma.eventSession.create({
+      data: {
+        eventId,
+        startsAt,
+        endsAt,
+        capacityTotal: capacity,
+        isActive: true,
+        canceledAt: null,
+        cancelReason: null,
+        tcSessionId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      },
+    });
+
+    return this.buildAdminSessionRow(session, event, 0);
+  }
+
+  @Patch('/sessions/:sessionId')
+  @Roles('ADMIN', 'EDITOR')
+  async updateSession(@Param('sessionId') sessionId: string, @Body() dto: AdminUpdateSessionDto) {
+    const { session, event } = await this.getSessionWithEvent(sessionId);
+    const soldCount = await this.getSessionSoldCount(sessionId);
+    this.assertSessionMutable(session, event, soldCount);
+
+    const data: Prisma.EventSessionUpdateInput = {};
+
+    if (dto.startsAt) {
+      const startsAt = new Date(dto.startsAt);
+      if (Number.isNaN(startsAt.getTime())) {
+        throw new BadRequestException('Invalid startsAt');
+      }
+      data.startsAt = startsAt;
+    }
+
+    if (dto.endsAt !== undefined) {
+      if (dto.endsAt === null) {
+        data.endsAt = null;
+      } else {
+        const endsAt = new Date(dto.endsAt);
+        if (Number.isNaN(endsAt.getTime())) {
+          throw new BadRequestException('Invalid endsAt');
+        }
+        data.endsAt = endsAt;
+      }
+    }
+
+    if (dto.capacity !== undefined) {
+      if (dto.capacity !== null && dto.capacity < soldCount) {
+        throw new SessionLockedException('SOLD', 'Нельзя уменьшить вместимость ниже количества проданных билетов.');
+      }
+      data.capacityTotal = dto.capacity;
+    }
+
+    const updated = await this.prisma.eventSession.update({
+      where: { id: sessionId },
+      data,
+    });
+
+    return this.buildAdminSessionRow(updated, event, soldCount);
+  }
+
+  @Post('/sessions/:sessionId/stop')
+  @Roles('ADMIN', 'EDITOR')
+  async stopSession(@Param('sessionId') sessionId: string, @Body() dto: AdminStopSessionDto) {
+    const { session, event } = await this.getSessionWithEvent(sessionId);
+    const soldCount = await this.getSessionSoldCount(sessionId);
+    this.assertSessionMutable(session, event, soldCount);
+
+    const now = new Date();
+    const updated = await this.prisma.eventSession.update({
+      where: { id: sessionId },
+      data: {
+        isActive: false,
+        canceledAt: now,
+        cancelReason: dto.reason ?? null,
+      },
+    });
+
+    return this.buildAdminSessionRow(updated, event, soldCount);
+  }
+
+  @Post('/sessions/:sessionId/cancel')
+  @Roles('ADMIN', 'EDITOR')
+  async cancelSession(@Param('sessionId') sessionId: string, @Body() dto: AdminCancelSessionDto) {
+    const { session, event } = await this.getSessionWithEvent(sessionId);
+    const soldCount = await this.getSessionSoldCount(sessionId);
+    const now = new Date();
+
+    if (event.source !== 'MANUAL') {
+      throw new SessionLockedException('IMPORTED', 'Импортное событие: отмена сеансов запрещена.');
+    }
+
+    if (session.startsAt < now) {
+      throw new SessionLockedException('PAST', 'Сеанс уже прошёл: отменить нельзя.');
+    }
+
+    if (soldCount > 0) {
+      throw new SessionLockedException(
+        'SOLD',
+        'Есть продажи: отмена сеанса требует отдельной процедуры возвратов.',
+      );
+    }
+
+    if (session.canceledAt) {
+      // Идемпотентность: если уже отменён, просто возвращаем текущее состояние.
+      return this.buildAdminSessionRow(session, event, soldCount);
+    }
+
+    const reason = dto.reason?.trim() || null;
+
+    const result = await this.prisma.eventSession.updateMany({
+      where: { id: sessionId, canceledAt: null },
+      data: {
+        isActive: false,
+        canceledAt: now,
+        cancelReason: reason,
+      },
+    });
+
+    if (result.count === 0) {
+      // Кто-то уже успел отменить в параллельной транзакции.
+      return this.buildAdminSessionRow(session, event, soldCount);
+    }
+
+    const updated = await this.prisma.eventSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    return this.buildAdminSessionRow(updated, event, soldCount);
+  }
+
+  @Delete('/sessions/:sessionId')
+  @Roles('ADMIN', 'EDITOR')
+  async deleteSession(@Param('sessionId') sessionId: string) {
+    const { session, event } = await this.getSessionWithEvent(sessionId);
+    const soldCount = await this.getSessionSoldCount(sessionId);
+    this.assertSessionMutable(session, event, soldCount);
+
+    await this.prisma.eventSession.delete({ where: { id: sessionId } });
+    return { ok: true };
+  }
+
+  /**
    * Опубликовать событие (через quality gate).
    *
    * POST /admin/events/:id/publish
@@ -330,6 +676,145 @@ export class AdminEventsController {
     });
 
     return { ok: true, issues: [] };
+  }
+
+  private async getSessionWithEvent(sessionId: string) {
+    const session = await this.prisma.eventSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        event: { select: { id: true, source: true, defaultCapacityTotal: true } },
+      },
+    });
+    if (!session) {
+      throw new NotFoundException('Сеанс не найден');
+    }
+    return { session, event: session.event };
+  }
+
+  private async getSessionSoldCount(sessionId: string): Promise<number> {
+    const sold = await this.prisma.packageItem.groupBy({
+      by: ['sessionId'],
+      where: {
+        sessionId,
+        status: { in: ['BOOKED', 'CONFIRMED'] },
+      },
+      _sum: {
+        adultTickets: true,
+        childTickets: true,
+      },
+    });
+    if (!sold.length) return 0;
+    const row = sold[0]!;
+    return (row._sum.adultTickets ?? 0) + (row._sum.childTickets ?? 0);
+  }
+
+  private assertSessionMutable(
+    session: { startsAt: Date; canceledAt: Date | null },
+    event: { source: string },
+    soldCount: number,
+  ) {
+    const now = new Date();
+
+    if (event.source !== 'MANUAL') {
+      throw new SessionLockedException('IMPORTED', 'Импортное событие: изменения расписания запрещены.');
+    }
+
+    if (session.canceledAt) {
+      throw new SessionLockedException('OTHER', 'Сеанс уже отменён.');
+    }
+
+    if (session.startsAt < now) {
+      throw new SessionLockedException('PAST', 'Сеанс уже прошёл: изменить или удалить нельзя.');
+    }
+
+    if (soldCount > 0) {
+      throw new SessionLockedException('SOLD', 'Есть продажи: изменить или удалить сеанс нельзя.');
+    }
+  }
+
+  private buildAdminSessionRow(
+    session: {
+      id: string;
+      startsAt: Date;
+      endsAt: Date | null;
+      capacityTotal: number | null;
+      canceledAt?: Date | null;
+      cancelReason?: string | null;
+    },
+    event: { source: string; defaultCapacityTotal: number | null },
+    soldCount: number,
+  ) {
+    const now = new Date();
+    let locked = false;
+    let lockReason: 'SOLD' | 'PAST' | 'IMPORTED' | 'OTHER' | undefined;
+
+    if (soldCount > 0) {
+      locked = true;
+      lockReason = 'SOLD';
+    }
+    if (session.startsAt < now) {
+      locked = true;
+      if (!lockReason) lockReason = 'PAST';
+    }
+    if (event.source !== 'MANUAL') {
+      locked = true;
+      if (!lockReason) lockReason = 'IMPORTED';
+    }
+
+    const capacity = session.capacityTotal ?? event.defaultCapacityTotal ?? null;
+    const isCancelled = !!session.canceledAt;
+    const canceledAt: Date | null = session.canceledAt ?? null;
+    const cancelReason: string | null = session.cancelReason ?? null;
+
+    return {
+      id: session.id,
+      startsAt: session.startsAt.toISOString(),
+      endsAt: session.endsAt?.toISOString() ?? null,
+      capacity,
+      soldCount,
+      locked,
+      lockReason,
+      isCancelled,
+      canceledAt: canceledAt ? canceledAt.toISOString() : null,
+      cancelReason,
+    };
+  }
+
+  /** Транслитерация заголовка в slug */
+  private mapIssueSeverity(_issue: EventQualityIssue): 'BLOCKING' | 'WARNING' {
+    // Текущее качество возвращает только блокирующие проблемы; предупреждения можно добавить позже.
+    return 'BLOCKING';
+  }
+
+  private mapIssueTabKey(issue: EventQualityIssue): 'main' | 'location' | 'offers' | 'schedule' {
+    const { code, field } = issue;
+
+    // Явное маппинг по коду (важные кейсы)
+    if (code === 'NO_FUTURE_SESSIONS' || code === 'END_DATE_PASSED') {
+      return 'schedule';
+    }
+    if (code === 'MISSING_ACTIVE_OFFER' || code === 'NO_VALID_PRICE') {
+      return 'offers';
+    }
+
+    // Маппинг по полю
+    switch (field) {
+      case 'title':
+      case 'description':
+      case 'imageUrl':
+      case 'category':
+        return 'main';
+      case 'cityId':
+      case 'location':
+        return 'location';
+      case 'offers':
+        return 'offers';
+      case 'sessions':
+      case 'endDate':
+        return 'schedule';
+      default:
+        return 'main';
+    }
   }
 
   /** Транслитерация заголовка в slug */
@@ -809,5 +1294,18 @@ export class AdminEventsController {
     }
 
     return { message: 'Оффер перенесён', targetEventId, remainingOffers };
+  }
+}
+
+class SessionLockedException extends ConflictException {
+  constructor(
+    public readonly reason: 'SOLD' | 'PAST' | 'IMPORTED' | 'OTHER',
+    message: string,
+  ) {
+    super({
+      code: 'SESSION_LOCKED',
+      reason,
+      message,
+    });
   }
 }

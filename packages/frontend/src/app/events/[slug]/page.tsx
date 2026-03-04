@@ -1,4 +1,8 @@
-import { CATEGORY_LABELS, type EventSubcategory, formatPrice, SUBCATEGORY_LABELS } from '@daibilet/shared';
+import { CATEGORY_LABELS, type EventSubcategory, formatPrice, SUBCATEGORY_LABELS, type EventListItem, type EventOffer } from '@daibilet/shared';
+import type { EventDetailFrontend } from '@/lib/api.types';
+
+type EventDetail = EventDetailFrontend;
+type EventOfferLite = EventOffer | null;
 import { Building2, Calendar, ChevronRight, Clock, MapPin, Shield, Users } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
@@ -22,7 +26,7 @@ export async function generateStaticParams() {
   try {
     // Берём первые 200 самых популярных событий для статической генерации
     const res = await api.getEvents({ sort: 'popular', limit: 200 });
-    return res.items.map((e: any) => ({ slug: e.slug }));
+    return res.items.map((e: EventListItem) => ({ slug: e.slug }));
   } catch {
     return [];
   }
@@ -226,10 +230,10 @@ function getVenueName(tcData: unknown): string | null {
 
 export default async function EventPage({ params }: Props) {
   const { slug } = await params;
-  let event: any = null;
+  let event: EventDetail;
   try {
     event = await api.getEventBySlug(slug);
-  } catch (e) {
+  } catch {
     // Если slug — это venue (музей/площадка), перенаправляем
     try {
       await api.getVenueBySlug(slug);
@@ -249,17 +253,18 @@ export default async function EventPage({ params }: Props) {
     );
   }
 
-  const tags = event.tags?.map((t: any) => t.tag).filter(Boolean) || [];
+  const tags = (event.tags ?? []).map((t) => t.tag).filter(Boolean);
   const venueName = getVenueName(event.tcData);
 
   // Offer-based: primaryOffer из API или fallback на event.source/tcEventId
-  const primaryOffer = event.primaryOffer || (event.offers && event.offers.length > 0 ? event.offers[0] : null);
+  const primaryOffer: EventOfferLite =
+    event.primaryOffer || ((event.offers ?? [])[0] ?? null);
   const buyUrl = primaryOffer?.externalEventId
-    ? getTcBuyUrl(primaryOffer.metaEventId || primaryOffer.externalEventId)
+    ? getTcBuyUrl(String(primaryOffer.metaEventId || primaryOffer.externalEventId || ''))
     : event.tcEventId
       ? getTcBuyUrl(event.tcMetaEventId || event.tcEventId)
       : null;
-  const hasActiveSessions = event.sessions?.some((s: any) => s.isActive && s.availableTickets > 0) ?? false;
+  const hasActiveSessions = event.sessions?.some((s) => s.isActive && s.availableTickets > 0) ?? false;
 
   const seo = await getSeoMeta('EVENT', event.id);
   const categoryLabel = CATEGORY_LABELS[event.category as keyof typeof CATEGORY_LABELS] || 'Событие';
@@ -268,7 +273,7 @@ export default async function EventPage({ params }: Props) {
     .filter(Boolean);
 
   // Ближайший сеанс
-  const nextSession = event.sessions?.find((s: any) => {
+  const nextSession = event.sessions?.find((s) => {
     const d = new Date(s.startsAt);
     return d > new Date() && s.isActive;
   });
@@ -371,10 +376,10 @@ export default async function EventPage({ params }: Props) {
             </div>
 
             {/* Price badge on hero (desktop) */}
-            {event.priceFrom > 0 && (
+            {(event.priceFrom ?? 0) > 0 && (
               <div className="hidden rounded-xl bg-white/15 px-5 py-3 text-right backdrop-blur-sm sm:block">
                 <p className="text-xs text-white/70">от</p>
-                <p className="text-2xl font-bold text-white">{formatPrice(event.priceFrom)}</p>
+                <p className="text-2xl font-bold text-white">{formatPrice(event.priceFrom ?? 0)}</p>
               </div>
             )}
           </div>
@@ -405,7 +410,7 @@ export default async function EventPage({ params }: Props) {
                   <Building2 className="h-5 w-5 text-primary-500" />
                   <p className="mt-1.5 text-xs text-slate-500">Место</p>
                   <p className="text-sm font-medium text-primary-600 hover:underline line-clamp-2">
-                    {event.venue.shortTitle || event.venue.title}
+                    {event.venue.shortTitle ?? event.venue.title ?? event.venue.name}
                   </p>
                 </Link>
               ) : venueName ? (
@@ -434,7 +439,7 @@ export default async function EventPage({ params }: Props) {
             {/* Tags */}
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {tags.map((tag: any) => (
+                {tags.map((tag) => (
                   <Link
                     key={tag.id}
                     href={`/tags/${tag.slug}`}
@@ -469,7 +474,7 @@ export default async function EventPage({ params }: Props) {
             />
 
             {/* Mobile buy button */}
-            {(primaryOffer || event.tcEventId || event.offers?.some((o: any) => o.status === 'ACTIVE')) && (
+            {(primaryOffer || event.tcEventId || event.offers?.some((o) => o.status === 'ACTIVE')) && (
               <div className="lg:hidden">
                 <BuyCard
                   event={event}
@@ -505,7 +510,7 @@ export default async function EventPage({ params }: Props) {
           <div className="container-page">
             <h2 className="text-xl font-bold text-slate-900">Похожие события в {event.city?.name}</h2>
             <div className="mt-6 grid gap-4 grid-cols-1 min-[361px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-              {event.relatedEvents.map((related: any) => (
+              {event.relatedEvents.map((related) => (
                 <EventCard
                   key={related.id}
                   slug={related.slug}
@@ -636,18 +641,18 @@ function OfferBadge({ badge }: { badge?: string | null }) {
 /** Карточка покупки (sidebar + mobile) — offer-based */
 function BuyCard({
   event,
-  buyUrl,
-  hasActiveSessions,
-  categoryLabel,
+  buyUrl: _buyUrl,
+  hasActiveSessions: _hasActiveSessions,
+  categoryLabel: _categoryLabel,
   venueName,
   primaryOffer,
 }: {
-  event: any;
+  event: EventDetail;
   buyUrl: string | null;
   hasActiveSessions: boolean;
   categoryLabel: string;
   venueName: string | null;
-  primaryOffer?: any;
+  primaryOffer?: EventOfferLite;
 }) {
   // Определяем тип покупки из primaryOffer или fallback на source
   const purchaseType = primaryOffer?.purchaseType || (event.source === 'TEPLOHOD' ? 'REDIRECT' : 'WIDGET');
@@ -657,20 +662,30 @@ function BuyCard({
   // WIDGET contract: рендерим виджет по widgetProvider, не угадываем
   const widgetProvider = primaryOffer?.widgetProvider || primaryOffer?.source || event.source;
   const isTepWidget = widgetProvider === 'TEPLOHOD' || event.source === 'TEPLOHOD';
-  const widgetPayload = primaryOffer?.widgetPayload || {};
-  const offerEventId = widgetPayload?.externalEventId || primaryOffer?.externalEventId || event.tcEventId;
-  const offerMetaId = widgetPayload?.metaEventId || primaryOffer?.metaEventId || event.tcMetaEventId;
+  const widgetPayload: Record<string, unknown> = (primaryOffer?.widgetPayload as Record<string, unknown>) ?? {};
+  const offerEventId =
+    (typeof widgetPayload.externalEventId === 'string' ? widgetPayload.externalEventId : null) ||
+    primaryOffer?.externalEventId ||
+    event.tcEventId;
+  const offerMetaId =
+    (typeof widgetPayload.metaEventId === 'string' ? widgetPayload.metaEventId : null) ||
+    primaryOffer?.metaEventId ||
+    event.tcMetaEventId;
   const offerDeeplink = primaryOffer?.deeplink;
   const offerSource = primaryOffer?.source || event.source;
 
   // Teplohod: tepWidgetId (виджет из админки) приоритетнее tepEventId (ID события из API)
-  const tepWidgetId = widgetPayload?.tepWidgetId ?? null;
+  const tepWidgetId = (typeof widgetPayload.tepWidgetId === 'string' ? widgetPayload.tepWidgetId : null) ?? null;
   const tepEventId =
-    widgetPayload?.tepEventId ?? primaryOffer?.externalEventId?.match?.(/^tep-(\d+)$/)?.[1] ?? event.tcData?.id ?? null;
+    (typeof widgetPayload.tepEventId === 'string' ? widgetPayload.tepEventId : null) ??
+    primaryOffer?.externalEventId?.match?.(/^tep-(\d+)$/)?.[1] ??
+    (typeof event.tcData === 'object' && event.tcData != null && 'id' in event.tcData
+      ? String((event.tcData as { id?: unknown }).id ?? '')
+      : null);
   const offerBadge = primaryOffer?.badge;
 
   // All active offers for multi-offer display
-  const allOffers = (event.offers || []).filter((o: any) => o.status === 'ACTIVE');
+  const allOffers = (event.offers ?? []).filter((o) => o.status === 'ACTIVE');
 
   // Показывать «от» только если в виджете есть варианты дороже
   const allPrices = new Set<number>();
@@ -688,10 +703,12 @@ function BuyCard({
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/50">
       {/* Price */}
-      {event.priceFrom > 0 ? (
+      {(event.priceFrom ?? 0) > 0 ? (
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-bold text-slate-900">
-            {showFromPrefix ? `от ${formatPrice(event.priceFrom)}` : formatPrice(event.priceFrom)}
+            {showFromPrefix
+              ? `от ${formatPrice(event.priceFrom ?? 0)}`
+              : formatPrice(event.priceFrom ?? 0)}
           </span>
           <span className="text-sm text-slate-400">/ чел.</span>
         </div>
@@ -710,11 +727,13 @@ function BuyCard({
       {allOffers.length > 1 && (
         <div className="mt-4 space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Варианты покупки</h3>
-          {allOffers.map((offer: any) => (
+          {allOffers.map((offer) => (
             <div
               key={offer.id}
               className={`flex items-center justify-between rounded-lg border px-3 py-2.5 transition ${
-                offer.isPrimary ? 'border-primary-300 bg-primary-50' : 'border-slate-200 bg-slate-50'
+                (offer as EventOffer & { isPrimary?: boolean }).isPrimary
+                  ? 'border-primary-300 bg-primary-50'
+                  : 'border-slate-200 bg-slate-50'
               }`}
             >
               <div className="flex flex-col gap-0.5">
@@ -729,7 +748,7 @@ function BuyCard({
                     ? 'TicketsCloud'
                     : offer.source === 'TEPLOHOD'
                       ? 'Теплоход'
-                      : offer.operator?.name || 'Дайбилет'}
+                      : (offer as EventOffer & { operator?: { name?: string } }).operator?.name ?? 'Дайбилет'}
                 </span>
               </div>
               {offer.source === 'TEPLOHOD' && offer.deeplink ? (
@@ -777,9 +796,9 @@ function BuyCard({
           {isWidget && !isTepWidget && <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс для покупки</p>}
           <div className="mt-2.5 space-y-1.5">
             {event.sessions
-              .filter((s: any) => s.isActive)
+              .filter((s) => s.isActive)
               .slice(0, 5)
-              .map((session: any) =>
+              .map((session) =>
                 isWidget && !isTepWidget ? (
                   <TcSessionSlot key={session.id} session={session} />
                 ) : (
@@ -792,8 +811,7 @@ function BuyCard({
 
       {/* Buy button — per offer purchaseType */}
       {isRequest ? (
-        /* REQUEST: форма заявки */
-        <RequestOfferForm event={event} offer={primaryOffer} />
+        primaryOffer ? <RequestOfferForm event={event} offer={primaryOffer} /> : null
       ) : isTepWidget && (tepWidgetId || tepEventId || primaryOffer?.externalEventId) ? (
         /* TEPLOHOD: embed-виджет покупки (data-id = tepWidgetId или tepEventId) */
         <TepWidgetEmbed
@@ -821,11 +839,20 @@ function BuyCard({
               eventTitle={event.title}
               eventImage={event.imageUrl}
               tcEventId={offerEventId}
-              source={offerSource}
-              sessions={event.sessions || []}
-              address={event.address}
-              venueName={venueName}
-              priceFrom={event.priceFrom}
+              source={offerSource === 'TEPLOHOD' ? 'TEPLOHOD' : 'TC'}
+              sessions={(event.sessions || []).map((s) => ({
+                ...s,
+                prices: (s.prices || []).map((p: { type?: string; price?: number }) => ({
+                  name: p.type ?? 'Стандарт',
+                  price: p.price ?? 0,
+                  setId: s.id,
+                  amount: 1,
+                  amountVacant: s.availableTickets ?? 0,
+                })),
+              }))}
+              address={event.address ?? undefined}
+              venueName={venueName ?? undefined}
+              priceFrom={event.priceFrom ?? 0}
             />
           )}
         </div>
@@ -861,12 +888,12 @@ function BuyCard({
               offerId={primaryOffer.id}
               eventTitle={event.title}
               eventSlug={event.slug}
-              imageUrl={event.imageUrl}
-              priceFrom={primaryOffer.priceFrom || event.priceFrom || 0}
-              purchaseType={purchaseType}
-              source={offerSource}
-              deeplink={offerDeeplink}
-              badge={offerBadge}
+              imageUrl={event.imageUrl ?? undefined}
+              priceFrom={primaryOffer.priceFrom ?? event.priceFrom ?? 0}
+              purchaseType={purchaseType ?? 'WIDGET'}
+              source={offerSource ?? 'TC'}
+              deeplink={typeof offerDeeplink === 'string' ? offerDeeplink : undefined}
+              badge={typeof offerBadge === 'string' ? offerBadge : undefined}
             />
           </div>
         )}
@@ -885,7 +912,7 @@ function BuyCard({
 }
 
 /** Форма заявки для REQUEST офферов */
-function RequestOfferForm({ event, offer }: { event: any; offer: any }) {
+function RequestOfferForm({ event, offer }: { event: EventDetail; offer: EventOfferLite }) {
   return (
     <div id="request-form" className="mt-5 space-y-3">
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -969,7 +996,7 @@ function RequestOfferForm({ event, offer }: { event: any; offer: any }) {
 }
 
 /** Статичная строка сеанса (для не-TC событий, без виджета) */
-function StaticSessionRow({ session }: { session: any }) {
+function StaticSessionRow({ session }: { session: EventDetail['sessions'][number] }) {
   const fmt = formatSessionDate(session.startsAt);
   return (
     <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5">

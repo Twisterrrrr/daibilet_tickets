@@ -32,6 +32,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { SeoModule } from './seo/seo.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { SupportModule } from './support/support.module';
+import { WidgetsModule } from './widgets/widgets.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
 import { VenueModule } from './venue/venue.module';
@@ -81,6 +82,7 @@ import { VoucherModule } from './voucher/voucher.module';
     AuthModule,
     AdminModule,
     SupplierModule,
+    WidgetsModule,
     PartnerModule,
     VenueModule,
     CollectionModule,

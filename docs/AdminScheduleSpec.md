@@ -346,6 +346,8 @@ PR1 и PR2 не конфликтуют, если: **PR1 не пишет в БД*
 
 ## 6. План PR (без философии)
 
+> **Cursor Auto Pipeline:** `docs/AdminSchedulePipeline.md` — разбивка PR1→PR4 на подзадачи с AC, UX и no-regress правилами.
+
 **PR2 архитектурно безопасен:** нет новых enum-статусов, триггеров, materialized aggregates, сложных миграций, переименований колонок. Drag/brush/ластик не трогаем в PR2 — low risk.
 
 | PR | Scope |

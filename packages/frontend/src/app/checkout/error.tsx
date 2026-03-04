@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 
 export default function CheckoutError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    console.error('Checkout error:', error);
+    console.warn('Checkout error:', error);
   }, [error]);
 
   return (

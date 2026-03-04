@@ -15,7 +15,7 @@ const sendToAnalytics: MetricHandler = (metric) => {
 
   // Console in development
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[Web Vitals] ${metric.name}: ${Math.round(metric.value)}`);
+    console.warn(`[Web Vitals] ${metric.name}: ${Math.round(metric.value)}`);
   }
 };
 

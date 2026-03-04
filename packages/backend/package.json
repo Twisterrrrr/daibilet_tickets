@@ -19,6 +19,8 @@
     "db:seed:qf": "npx tsx prisma/seed-query-filters.ts",
     "db:seed:seo": "npx tsx prisma/seed-seo-templates.ts",
     "sync:tep": "npx tsx scripts/sync-teplohod.ts",
+    "backfill:grouping": "npx tsx scripts/backfill-event-grouping.ts",
+    "event-groups:create": "npx tsx scripts/auto-create-event-groups.ts",
     "reclassify:dry": "npx tsx prisma/reclassify-events.ts",
     "reclassify:apply": "npx tsx prisma/reclassify-events.ts --apply",
     "check:categorization": "npx tsx prisma/check-categorization.ts",

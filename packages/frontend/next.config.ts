@@ -1,11 +1,18 @@
+import os from 'node:os';
 import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 
 const isDev = process.env.NODE_ENV !== 'production';
+// На Windows standalone ломается из‑за EPERM при symlink (нужен Developer Mode или админ).
+// CI/прод на Linux используют standalone.
+// NEXT_OUTPUT=standalone принудительно включает standalone (для build:standalone).
+const isWindows = os.platform() === 'win32';
+const forceStandalone = process.env.NEXT_OUTPUT === 'standalone';
+const useStandalone = forceStandalone || !isWindows;
 
 const nextConfig: NextConfig = {
   // Standalone output — минимальный образ для Docker (~100 MB вместо ~500 MB)
-  output: 'standalone',
+  output: useStandalone ? ('standalone' as const) : undefined,
 
   // Проксирование API запросов — только в dev-режиме.
   // В production Nginx проксирует /api/* напрямую на backend.

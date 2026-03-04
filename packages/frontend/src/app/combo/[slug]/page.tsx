@@ -1,18 +1,19 @@
 import { formatPrice } from '@daibilet/shared';
-import { Calendar, CheckCircle, ChevronRight, Clock, MapPin, Star, Users } from 'lucide-react';
+import { Calendar, CheckCircle, ChevronRight, Clock, MapPin, Star } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { FaqSection } from '@/components/landing/FaqSection';
 import { api } from '@/lib/api';
+import { toComboDetailVM } from '../_comboVm';
 
 export const revalidate = 21600;
 
 export async function generateStaticParams() {
   try {
     const combos = await api.getCombos();
-    return combos.map((c: any) => ({ slug: c.slug }));
+    return combos.map((c) => ({ slug: c.slug }));
   } catch {
     return [];
   }
@@ -55,18 +56,19 @@ const SLOT_COLORS: Record<string, string> = {
 export default async function ComboDetailPage({ params }: Props) {
   const { slug } = await params;
 
-  let data: any;
+  let raw: Awaited<ReturnType<typeof api.getComboBySlug>>;
   try {
-    data = await api.getComboBySlug(slug);
+    raw = await api.getComboBySlug(slug);
   } catch {
     notFound();
   }
 
-  const features = (data.features || []) as any[];
-  const includes = (data.includes || []) as string[];
-  const faq = (data.faq || []) as any[];
-  const days = (data.days || []) as any[];
-  const upsells = (data.upsells || []) as any[];
+  const data = toComboDetailVM(raw);
+  const features = data.features;
+  const includes = data.includes;
+  const faq = data.faq;
+  const days = data.days;
+  const upsells = data.upsells;
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -132,7 +134,7 @@ export default async function ComboDetailPage({ params }: Props) {
       {features.length > 0 && (
         <section className="container mx-auto px-4 py-12">
           <div className="grid md:grid-cols-3 gap-6">
-            {features.map((f: any, i: number) => (
+            {features.map((f, i) => (
               <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 text-center">
                 <span className="text-4xl mb-3 block">{f.icon}</span>
                 <h3 className="font-bold text-gray-900 mb-1">{f.title}</h3>
@@ -149,7 +151,7 @@ export default async function ComboDetailPage({ params }: Props) {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Что включено</h2>
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
             <div className="grid md:grid-cols-2 gap-3">
-              {includes.map((item: string, i: number) => (
+              {includes.map((item, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                   <span className="text-gray-700">{item}</span>
@@ -166,11 +168,11 @@ export default async function ComboDetailPage({ params }: Props) {
 
         {days.length > 0 ? (
           <div className="space-y-8">
-            {days.map((day: any) => (
+            {days.map((day) => (
               <div key={day.dayNumber}>
                 <h3 className="text-lg font-bold text-gray-800 mb-4">День {day.dayNumber}</h3>
                 <div className="space-y-4">
-                  {day.slots.map((slot: any, si: number) => (
+                  {day.slots.map((slot, si) => (
                     <div
                       key={si}
                       className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-start gap-4"
@@ -178,57 +180,62 @@ export default async function ComboDetailPage({ params }: Props) {
                       {/* Time badge */}
                       <div className="flex md:flex-col items-center md:items-start gap-3 md:gap-1 flex-shrink-0 md:w-20">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold border ${SLOT_COLORS[slot.slot] || 'bg-gray-50'}`}
+                          className={`px-3 py-1 rounded-full text-xs font-bold border ${SLOT_COLORS[slot.slot ?? ''] || 'bg-gray-50'}`}
                         >
-                          {SLOT_LABELS[slot.slot] || slot.slot}
+                          {SLOT_LABELS[slot.slot ?? ''] ?? slot.slot ?? ''}
                         </span>
                         <span className="text-sm text-gray-500 flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5" />
-                          {slot.time}
+                          {slot.time ?? '—'}
                         </span>
                       </div>
 
                       {/* Event image + info */}
-                      <div className="flex gap-3 flex-1 min-w-0">
-                        {slot.event.imageUrl && (
-                          <img
-                            src={slot.event.imageUrl}
-                            alt={slot.event.title}
-                            className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <Link
-                            href={`/events/${slot.event.slug}`}
-                            className="font-semibold text-gray-900 hover:text-indigo-600 transition-colors line-clamp-2"
-                          >
-                            {slot.event.title}
-                          </Link>
-                          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mt-1">
-                            {slot.event.durationMinutes && (
-                              <span className="flex items-center gap-0.5">
-                                <Clock className="w-3 h-3" /> {slot.event.durationMinutes} мин
-                              </span>
-                            )}
-                            {slot.event.rating > 0 && (
-                              <span className="flex items-center gap-0.5">
-                                <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                                {Number(slot.event.rating).toFixed(1)}
-                              </span>
-                            )}
-                            {slot.session?.availableTickets > 0 && slot.session.availableTickets < 20 && (
-                              <span className="text-red-500 text-xs font-medium">
-                                Осталось {slot.session.availableTickets} мест
-                              </span>
-                            )}
+                      {slot.event && (
+                        <div className="flex gap-3 flex-1 min-w-0">
+                          {slot.event.imageUrl && (
+                            <img
+                              src={slot.event.imageUrl}
+                              alt={slot.event.title}
+                              className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <Link
+                              href={`/events/${slot.event.slug}`}
+                              className="font-semibold text-gray-900 hover:text-indigo-600 transition-colors line-clamp-2"
+                            >
+                              {slot.event.title}
+                            </Link>
+                            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mt-1">
+                              {(slot.event.durationMinutes ?? 0) > 0 && (
+                                <span className="flex items-center gap-0.5">
+                                  <Clock className="w-3 h-3" /> {slot.event.durationMinutes} мин
+                                </span>
+                              )}
+                              {(slot.event.rating ?? 0) > 0 && (
+                                <span className="flex items-center gap-0.5">
+                                  <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                                  {Number(slot.event.rating).toFixed(1)}
+                                </span>
+                              )}
+                              {((slot.session?.availableTickets ?? 0) > 0 &&
+                                (slot.session?.availableTickets ?? 0) < 20) && (
+                                <span className="text-red-500 text-xs font-medium">
+                                  Осталось {slot.session?.availableTickets} мест
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Price */}
-                      {slot.adultPrice > 0 && (
+                      {((slot.adultPrice ?? slot.subtotal ?? 0) as number) > 0 && (
                         <div className="text-right flex-shrink-0">
-                          <span className="text-lg font-bold text-indigo-700">{formatPrice(slot.adultPrice)}</span>
+                          <span className="text-lg font-bold text-indigo-700">
+                            {formatPrice(slot.adultPrice ?? slot.subtotal ?? 0)}
+                          </span>
                           <span className="text-xs text-gray-400 block">/ чел.</span>
                         </div>
                       )}
@@ -305,7 +312,7 @@ export default async function ComboDetailPage({ params }: Props) {
         <section className="container mx-auto px-4 pb-12">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Дополнительные услуги</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {upsells.slice(0, 6).map((upsell: any) => (
+            {upsells.slice(0, 6).map((upsell) => (
               <div
                 key={upsell.id}
                 className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-start gap-4"
@@ -313,8 +320,12 @@ export default async function ComboDetailPage({ params }: Props) {
                 <span className="text-3xl">{upsell.icon}</span>
                 <div className="flex-1">
                   <h4 className="font-semibold text-gray-900">{upsell.name}</h4>
-                  <p className="text-sm text-gray-600 mt-0.5">{upsell.description}</p>
-                  <span className="text-indigo-700 font-bold mt-2 block">+{formatPrice(upsell.priceKopecks)}</span>
+                  {upsell.description && (
+                    <p className="text-sm text-gray-600 mt-0.5">{upsell.description}</p>
+                  )}
+                  <span className="text-indigo-700 font-bold mt-2 block">
+                    +{formatPrice(upsell.priceKopecks ?? 0)}
+                  </span>
                 </div>
               </div>
             ))}
@@ -347,10 +358,10 @@ export default async function ComboDetailPage({ params }: Props) {
             '@type': 'Product',
             name: data.title,
             description: data.subtitle || data.description,
-            offers: data.suggestedPrice
+            offers: (data.suggestedPrice ?? 0) > 0
               ? {
                   '@type': 'Offer',
-                  price: (data.suggestedPrice / 100).toFixed(0),
+                  price: ((data.suggestedPrice ?? 0) / 100).toFixed(0),
                   priceCurrency: 'RUB',
                   availability: 'https://schema.org/InStock',
                 }

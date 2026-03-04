@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
+import type { PaginatedResponse, ArticleListItem } from '@/lib/api.types';
 
 export const metadata: Metadata = {
   title: 'Блог — статьи о путешествиях по России | Дайбилет',
@@ -20,7 +21,7 @@ function formatDate(dateStr: string | null) {
 }
 
 export default async function BlogPage() {
-  let articles: any = { items: [], total: 0 };
+  let articles: PaginatedResponse<ArticleListItem> = { items: [], total: 0, page: 1, totalPages: 0 };
   try {
     articles = await api.getArticles();
   } catch {
@@ -50,7 +51,7 @@ export default async function BlogPage() {
       <section className="container-page py-12">
         {articles.items.length > 0 ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {articles.items.map((article: any) => (
+            {articles.items.map((article) => (
               <Link
                 key={article.id}
                 href={`/blog/${article.slug}`}
@@ -98,9 +99,9 @@ export default async function BlogPage() {
                   )}
 
                   {/* Tags */}
-                  {article.articleTags?.length > 0 && (
+                  {article.articleTags && (article.articleTags as unknown[]).length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {article.articleTags.slice(0, 3).map((at: any) => (
+                      {(article.articleTags as { tag: { slug: string; name: string } }[]).slice(0, 3).map((at) => (
                         <span
                           key={at.tag.slug}
                           className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600"

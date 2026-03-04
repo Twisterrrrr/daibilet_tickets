@@ -1,26 +1,5 @@
-import { formatPrice, VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
-import {
-  Accessibility,
-  Baby,
-  Calendar,
-  CheckCircle,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Globe,
-  Headphones,
-  ImageIcon,
-  Mail,
-  MapPin,
-  Navigation,
-  Phone,
-  ShieldCheck,
-  Star,
-  Ticket,
-  Train,
-  Users,
-  Zap,
-} from 'lucide-react';
+import { formatPrice, VENUE_TYPE_LABELS, type VenueType, type VenueListItem, type VenueDetail } from '@daibilet/shared';
+import { Accessibility, Baby, Calendar, CheckCircle, ChevronDown, ChevronRight, Clock, Globe, Headphones, MapPin, Navigation, Phone, Star, Train, Users, Zap } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -37,7 +16,7 @@ export const revalidate = 3600;
 export async function generateStaticParams() {
   try {
     const res = await api.getVenues({ limit: 200 });
-    return res.items.map((v: any) => ({ slug: v.slug }));
+    return res.items.map((v: VenueListItem) => ({ slug: v.slug }));
   } catch {
     return [];
   }
@@ -103,15 +82,6 @@ const DAY_NAMES: Record<string, string> = {
   sat: 'Сб',
   sun: 'Вс',
 };
-const DAY_NAMES_FULL: Record<string, string> = {
-  mon: 'Понедельник',
-  tue: 'Вторник',
-  wed: 'Среда',
-  thu: 'Четверг',
-  fri: 'Пятница',
-  sat: 'Суббота',
-  sun: 'Воскресенье',
-};
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const SCHEMA_DAY: Record<string, string> = {
   mon: 'Monday',
@@ -134,12 +104,12 @@ const FEATURE_LABELS: Record<string, { label: string; icon: string }> = {
   gift_shop: { label: 'Сувенирный магазин', icon: 'check' },
 };
 
-function normalizeHours(raw: Record<string, string> | null | undefined): Record<string, string> {
+function normalizeHours(raw: Record<string, string | null> | null | undefined): Record<string, string> {
   if (!raw) return {};
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw)) {
     const normalized = DAY_MAP_RU[key] || key.toLowerCase();
-    result[normalized] = value;
+    result[normalized] = value ?? '';
   }
   return result;
 }
@@ -153,7 +123,7 @@ function isOpenNow(hours: Record<string, string>): boolean {
   const todayKey = getTodayKey();
   const todayHours = hours[todayKey];
   if (!todayHours || todayHours.toLowerCase().includes('выходной')) return false;
-  const parts = todayHours.split(/[–\-]/);
+  const parts = todayHours.split(/[–-]/);
   if (parts.length < 2) return false;
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -186,7 +156,7 @@ function FeatureIcon({ name }: { name: string }) {
 export default async function VenuePage({ params }: Props) {
   const { slug } = await params;
 
-  let venue: any;
+  let venue: VenueDetail;
   try {
     venue = await api.getVenueBySlug(slug);
   } catch {
@@ -209,8 +179,8 @@ export default async function VenuePage({ params }: Props) {
   const openNow = isOpenNow(hours);
   const hasNoQueue = (venue.features || []).includes('no_queue');
 
-  const permanentExhibitions = venue.exhibitions?.filter((e: any) => e.isPermanent) || [];
-  const temporaryExhibitions = venue.exhibitions?.filter((e: any) => !e.isPermanent) || [];
+  const permanentExhibitions = (venue.exhibitions ?? []).filter((e) => e.isPermanent);
+  const temporaryExhibitions = (venue.exhibitions ?? []).filter((e) => !e.isPermanent);
   const highlights: string[] = venue.highlights || [];
   const faq: { q: string; a: string }[] = venue.faq || [];
   const features: string[] = venue.features || [];
@@ -225,9 +195,9 @@ export default async function VenuePage({ params }: Props) {
   const displayFacts = quickFacts.slice(0, 3);
 
   // JSON-LD
-  const offersJsonLd = (venue.offers || [])
-    .filter((o: any) => o.priceFrom)
-    .map((o: any) => ({
+  const offersJsonLd = (venue.offers ?? [])
+    .filter((o) => o.priceFrom)
+    .map((o) => ({
       '@type': 'Offer',
       price: (o.priceFrom / 100).toFixed(0),
       priceCurrency: 'RUB',
@@ -269,7 +239,7 @@ export default async function VenuePage({ params }: Props) {
     ...(Object.keys(hours).length > 0 && {
       openingHoursSpecification: DAY_ORDER.filter((d) => hours[d] && !hours[d].toLowerCase().includes('выходной')).map(
         (d) => {
-          const parts = hours[d].split(/[–\-]/);
+          const parts = hours[d].split(/[–-]/);
           return {
             '@type': 'OpeningHoursSpecification',
             dayOfWeek: SCHEMA_DAY[d],
@@ -304,7 +274,7 @@ export default async function VenuePage({ params }: Props) {
   const stickyIsExternal = primaryOffer?.purchaseType === 'REDIRECT' && !!primaryOffer?.deeplink;
 
   // Check if venue events are OPEN_DATE
-  const isOpenDate = venue.exhibitions?.some((e: any) => e.dateMode === 'OPEN_DATE') || false;
+  const isOpenDate = (venue.exhibitions ?? []).some((e) => e.dateMode === 'OPEN_DATE') || false;
 
   return (
     <>
@@ -381,8 +351,8 @@ export default async function VenuePage({ params }: Props) {
                   >
                     {venue.reviewCount} отзывов
                   </a>
-                  {venue.recommendPercent > 0 && (
-                    <span className="text-emerald-400 text-sm font-medium">{venue.recommendPercent}% рекомендуют</span>
+                  {(venue.recommendPercent ?? 0) > 0 && (
+                    <span className="text-emerald-400 text-sm font-medium">{venue.recommendPercent ?? 0}% рекомендуют</span>
                   )}
                 </div>
               )}
@@ -444,7 +414,7 @@ export default async function VenuePage({ params }: Props) {
 
       {/* ═══ 1. STICKY BOTTOM BAR (mobile — appears on scroll) ═══ */}
       <MobileStickyBar
-        priceFrom={venue.priceFrom}
+        priceFrom={venue.priceFrom ?? null}
         ctaHref={stickyCtaHref}
         ctaText="Купить билет"
         isExternal={stickyIsExternal}
@@ -466,8 +436,8 @@ export default async function VenuePage({ params }: Props) {
               <VenueReviewsBlock
                 venueId={venue.id}
                 venueSlug={venue.slug}
-                externalRating={venue.externalRating}
-                externalSource={venue.externalSource}
+                externalRating={venue.externalRating ?? null}
+                externalSource={venue.externalSource ?? null}
               />
             </section>
 
@@ -600,7 +570,7 @@ export default async function VenuePage({ params }: Props) {
               <section>
                 <h2 className="text-xl font-bold mb-4">Выставки и события</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[...temporaryExhibitions, ...permanentExhibitions].map((e: any) => (
+                  {[...temporaryExhibitions, ...permanentExhibitions].map((e) => (
                     <Link
                       key={e.id}
                       href={`/events/${e.slug}`}
@@ -660,11 +630,11 @@ export default async function VenuePage({ params }: Props) {
             )}
 
             {/* Похожие места */}
-            {venue.relatedVenues && venue.relatedVenues.length > 0 && (
+            {((venue as VenueDetail & { relatedVenues?: VenueListItem[] }).relatedVenues ?? []).length > 0 && (
               <section>
                 <h2 className="text-xl font-bold mb-4">Похожие места</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {venue.relatedVenues.map((v: any) => (
+                  {(venue as VenueDetail & { relatedVenues?: VenueListItem[] }).relatedVenues!.map((v) => (
                     <VenueCard
                       key={v.id}
                       slug={v.slug}
@@ -688,7 +658,7 @@ export default async function VenuePage({ params }: Props) {
               <section>
                 <h2 className="text-xl font-bold mb-4">Читайте также</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {venue.relatedArticles.map((article: any) => (
+                  {venue.relatedArticles.map((article) => (
                     <Link
                       key={article.slug}
                       href={`/blog/${article.slug}`}
@@ -749,7 +719,7 @@ export default async function VenuePage({ params }: Props) {
                   {openNow && todayHours && (
                     <div className="flex items-center gap-2 text-sm text-emerald-700">
                       <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                      Открыто сегодня до {todayHours.split(/[–\-]/)[1]?.trim()}
+                      Открыто сегодня до {todayHours.split(/[–-]/)[1]?.trim()}
                     </div>
                   )}
                   {!openNow && todayHours && (

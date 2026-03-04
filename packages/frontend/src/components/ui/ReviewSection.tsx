@@ -1,17 +1,6 @@
 'use client';
 
-import {
-  AlertCircle,
-  Camera,
-  CheckCircle,
-  ChevronDown,
-  ExternalLink,
-  Image as ImageIcon,
-  Send,
-  Star,
-  ThumbsUp,
-  X,
-} from 'lucide-react';
+import { AlertCircle, Camera, CheckCircle, ChevronDown, ExternalLink, Send, Star, ThumbsUp, X } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api';

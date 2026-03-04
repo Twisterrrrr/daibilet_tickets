@@ -8,6 +8,7 @@ import { EventCard } from '@/components/ui/EventCard';
 import { HeroCitySearch } from '@/components/ui/HeroCitySearch';
 import { PromoBlock } from '@/components/ui/PromoBlock';
 import { api } from '@/lib/api';
+import { devWarn } from '@/lib/devlog';
 
 // ISR: обновлять каждый час
 export const revalidate = 3600;
@@ -39,7 +40,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   try {
     cities = await api.getCities();
   } catch (e) {
-    if (process.env.NODE_ENV === 'development') console.error('[HomePage] getCities failed:', e);
+    if (process.env.NODE_ENV === 'development') devWarn('[HomePage] getCities failed:', e);
     cities = [];
   }
 
@@ -53,7 +54,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     });
     popularEvents = res.items || [];
   } catch (e) {
-    if (process.env.NODE_ENV === 'development') console.error('[HomePage] getEvents (popular) failed:', e);
+    if (process.env.NODE_ENV === 'development') devWarn('[HomePage] getEvents (popular) failed:', e);
     popularEvents = [];
   }
 
@@ -99,7 +100,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     });
     nearestEvents = nearestRes.items || [];
   } catch (e) {
-    if (process.env.NODE_ENV === 'development') console.error('[HomePage] getEvents (nearest) failed:', e);
+    if (process.env.NODE_ENV === 'development') devWarn('[HomePage] getEvents (nearest) failed:', e);
     nearestEvents = [];
   }
 
@@ -251,7 +252,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   priceFrom={event.priceFrom ?? null}
                   priceOriginalKopecks={event.priceOriginalKopecks ?? null}
                   rating={Number(event.rating) || 0}
-                  reviewCount={Number(event.reviewCount) ?? 0}
+                  reviewCount={Number(event.reviewCount ?? 0)}
                   durationMinutes={event.durationMinutes ?? null}
                   city={event.city ?? undefined}
                   totalAvailableTickets={event.totalAvailableTickets}
@@ -259,7 +260,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   nextSessionAt={typeof event.nextSessionAt === 'string' ? event.nextSessionAt : undefined}
                   isOptimalChoice={event.isOptimalChoice}
                   dateMode={event.dateMode}
-                  groupSize={typeof event.groupSize === 'string' ? event.groupSize : (typeof (event.templateData as Record<string, unknown> | null)?.groupSize === 'string' ? (event.templateData as Record<string, unknown>).groupSize as string : undefined) ?? undefined}
+                  groupSize={
+                    typeof event.groupSize === 'string'
+                      ? event.groupSize
+                      : ((): string | undefined => {
+                          const g = (event.templateData as Record<string, unknown> | null)?.groupSize;
+                          return typeof g === 'string' ? g : undefined;
+                        })()
+                  }
                   sessionTimes={event.sessionTimes ?? []}
                   highlights={event.highlights ?? []}
                   compact
@@ -351,7 +359,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       priceFrom={event.priceFrom ?? null}
                       priceOriginalKopecks={event.priceOriginalKopecks ?? null}
                       rating={Number(event.rating) || 0}
-                      reviewCount={Number(event.reviewCount) ?? 0}
+                      reviewCount={Number(event.reviewCount ?? 0)}
                       durationMinutes={event.durationMinutes ?? null}
                       city={event.city ?? undefined}
                       totalAvailableTickets={event.totalAvailableTickets}
@@ -359,7 +367,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       nextSessionAt={typeof event.nextSessionAt === 'string' ? event.nextSessionAt : undefined}
                       isOptimalChoice={event.isOptimalChoice}
                       dateMode={event.dateMode}
-                      groupSize={typeof event.groupSize === 'string' ? event.groupSize : (typeof (event.templateData as Record<string, unknown> | null)?.groupSize === 'string' ? (event.templateData as Record<string, unknown>).groupSize as string : undefined) ?? undefined}
+                      groupSize={
+                        typeof event.groupSize === 'string'
+                          ? event.groupSize
+                          : ((): string | undefined => {
+                              const g = (event.templateData as Record<string, unknown> | null)?.groupSize;
+                              return typeof g === 'string' ? g : undefined;
+                            })()
+                      }
                       sessionTimes={event.sessionTimes ?? []}
                       highlights={event.highlights ?? []}
                       compact

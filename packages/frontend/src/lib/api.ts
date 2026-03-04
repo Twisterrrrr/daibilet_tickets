@@ -3,12 +3,10 @@ import type {
   CheckoutRequest,
   CheckoutResponse,
   CityListItem,
-  EventDetail,
   EventListItem,
   PaginatedResponse,
   PlanRequest,
   PlanVariant,
-  TagItem,
   UpsellItem,
   VenueDetail,
   VenueListItem,
@@ -29,6 +27,10 @@ import type {
   SeoMetaResponse,
   TagDetailPage,
   ValidateGiftCertificateResponse,
+  MultiEventCityDatesDto,
+  MultiEventDetailDto,
+  MultiEventListItemDto,
+  MultiEventSort,
 } from './api.types';
 
 /**
@@ -54,7 +56,11 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   });
   } catch (e) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('[fetchApi] fetch failed', { url, err: String(e), cause: (e as Error & { cause?: unknown })?.cause });
+      console.warn('[fetchApi] fetch failed', {
+        url,
+        err: String(e),
+        cause: (e as Error & { cause?: unknown })?.cause,
+      });
     }
     throw e;
   }
@@ -79,6 +85,38 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(`Ответ не JSON: ${text.slice(0, 80)}... [${path}]`);
   }
 }
+
+type MultiEventListItemRaw = {
+  groupingKey: string;
+  slug: string | null;
+  title: string;
+  coverUrl: string | null;
+
+  totalEvents: number;
+  totalCities: number;
+
+  minPrice: number | null;
+  maxRating: number | null;
+
+  citiesPreview: { slug: string; name: string }[] | null;
+  nextDate: string | null;
+};
+
+type MultiEventDetailRaw = {
+  slug: string;
+  groupingKey: string;
+  title: string;
+  coverUrl: string | null;
+
+  totalEvents: number;
+  totalCities: number;
+
+  minPrice: number | null;
+  maxRating: number | null;
+
+  cities: { slug: string; name: string }[] | null;
+  nextDate: string | null;
+};
 
 // --- Каталог ---
 
@@ -132,7 +170,66 @@ export const api = {
   },
 
   getEventBySlug: (slug: string) =>
-    fetchApi<EventDetail>(`/events/${slug}`),
+    fetchApi<import('./api.types').EventDetailFrontend>(`/events/${slug}`),
+
+  // Multi-events (глобальные группы событий)
+  getMultiEvents: (params?: { sort?: MultiEventSort; limit?: number }) => {
+    const sort: MultiEventSort = params?.sort === 'new' ? 'new' : 'popular';
+    const limit = params?.limit && params.limit > 0 && params.limit <= 100 ? params.limit : 20;
+    const qs = `?sort=${encodeURIComponent(sort)}&limit=${encodeURIComponent(String(limit))}`;
+
+    return fetchApi<MultiEventListItemRaw[]>(`/multi-events${qs}`).then((rows) =>
+      rows.map<MultiEventListItemDto>((r) => {
+        const citiesPreview = Array.isArray(r.citiesPreview) ? r.citiesPreview : [];
+        const remainingCities = Math.max(0, (r.totalCities ?? 0) - citiesPreview.length);
+
+        return {
+          slug: r.slug || r.groupingKey,
+          groupingKey: r.groupingKey,
+          title: r.title,
+          coverUrl: r.coverUrl,
+
+          totalEvents: r.totalEvents,
+          totalCities: r.totalCities,
+
+          citiesPreview,
+          remainingCities,
+
+          minPrice: r.minPrice,
+          rating: r.maxRating,
+          nextDate: r.nextDate,
+        };
+      }),
+    );
+  },
+
+  getMultiEventBySlug: (slug: string) =>
+    fetchApi<MultiEventDetailRaw>(`/multi-events/${encodeURIComponent(slug)}`).then<MultiEventDetailDto>((r) => ({
+      group: {
+        slug: r.slug,
+        groupingKey: r.groupingKey,
+        title: r.title,
+        coverUrl: r.coverUrl,
+        totalEvents: r.totalEvents,
+        totalCities: r.totalCities,
+        minPrice: r.minPrice,
+        rating: r.maxRating,
+        nextDate: r.nextDate,
+      },
+      cities: Array.isArray(r.cities)
+        ? r.cities.map((c) => ({
+            slug: c.slug,
+            name: c.name,
+          }))
+        : [],
+    })),
+
+  getMultiEventDates: (groupSlug: string, citySlug: string, limit?: number) => {
+    const params = new URLSearchParams({ citySlug });
+    if (limit && limit > 0) params.set('limit', String(limit));
+    const query = params.toString() ? `?${params}` : '';
+    return fetchApi<MultiEventCityDatesDto>(`/multi-events/${encodeURIComponent(groupSlug)}/dates${query}`);
+  },
 
   // Теги
   getTags: (category?: string) =>
@@ -321,8 +418,7 @@ export const api = {
     const url = `${API_BASE}/reviews/${reviewId}/photos`;
     const res = await fetch(url, { method: 'POST', body: formData });
     if (!res.ok) {
-      const err = (await res.json().catch((e) => {
-        console.error('API error:', e);
+      const err = (await res.json().catch(() => {
         return { message: 'Ошибка загрузки фото' };
       })) as { message?: string };
       throw new Error(err.message || `HTTP ${res.status}`);

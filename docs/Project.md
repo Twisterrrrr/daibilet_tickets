@@ -132,6 +132,31 @@
 
 ---
 
+### Структура монорепозитория (папки packages/*)
+
+- **`packages/backend`** — NestJS backend:
+  - REST API (`/api/v1/*`, `/admin/*`, `/supplier/*`), очереди BullMQ, интеграции (Ticketscloud, YooKassa).
+  - Prisma схема + миграции (`packages/backend/prisma`), скрипты синхронизации (`prisma/*.ts`, `src/catalog/*`).
+- **`packages/frontend`** — публичный сайт (Next.js App Router):
+  - `/` (главная, города, подборки, события, билеты, блог, checkout).
+  - SSR/SSG для SEO, TailwindCSS, React Query.
+- **`packages/frontend-admin`** — админка Daibilet (React + Vite):
+  - Страницы: `src/pages/events/*` (EventsList, EventEdit, EventCreate, EventsMerge), `cities/*`, `venues/*`, `landings/*`, `collections/*`, `combos/*`, `upsells/*`, `widgets/*`, `articles/*`, `reviews/*`, `support/*`, `orders/*`, `audit/*`, `moderation/*`, `reconciliation/*`, `settings/*`, `Dashboard`, `Login`.
+  - Общий layout (`components/layout/*`), UI‑компоненты (`components/ui/*`), SeoMetaEditor.
+  - Использует `@tanstack/react-query`, `@tanstack/react-table`, Radix UI.
+- **`packages/frontend-supplier`** — портал поставщика (упрощённый кабинет):
+  - Страницы: `src/pages/events/*` (EventsList, EventEdit), `Dashboard`, `Reports`, `Settings`, `Login`, `Register`.
+  - Tailwind + Radix UI, React Router.
+- **`packages/shared`** — общий пакет `@daibilet/shared`:
+  - Утилиты: `normalize-title`, `price-normalizer`, `seo-utils`, `widget-payload`, `address-utils`, `city-declension`.
+  - Используется backend’ом и всеми фронтами.
+
+---
+
+### Админка: готовность, расписание, мультисобытия, SEO-аудит
+
+- **Спецификация:** `docs/AdminScheduleSpec.md` — готовность события (blocking/warnings), ручной publish + admin override, мультисобытия как отдельный уровень, SEO-аудит как список задач, Teplohod-style расписание (вкладка «Расписание»: сетка дата×час, drag/ctrl-brush, минуты, вместимость, Модель A при продажах). Scope: только события из админки/ЛК (импортируемые передаются как есть). **Pipeline:** `docs/AdminSchedulePipeline.md` — PR1→PR4 с подзадачами, AC и UX для Cursor.
+
 ### Глобальные мульти-события (одно шоу в разных городах)
 
 - Для гастролей/серийных шоу (одинаковое событие в разных городах/датах) используется grouping на уровне `Event`:

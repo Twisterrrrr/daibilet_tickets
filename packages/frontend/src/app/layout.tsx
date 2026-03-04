@@ -2,6 +2,7 @@ import './globals.css';
 
 import type { Metadata } from 'next';
 import Script from 'next/script';
+import { Suspense } from 'react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Footer } from '@/components/layout/Footer';
@@ -36,7 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <WebVitalsReporter />
         <CartProvider>
           <UserAuthProvider>
-            <Header />
+            <Suspense fallback={<header className="sticky top-0 z-50 h-16 border-b border-slate-200 bg-white" />}>
+              <Header />
+            </Suspense>
             <main className="min-w-0 flex-1">
               <ErrorBoundary>{children}</ErrorBoundary>
             </main>

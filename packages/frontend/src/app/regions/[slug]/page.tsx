@@ -1,13 +1,14 @@
 'use client';
 
-import { CATEGORY_LABELS, EventCategory } from '@daibilet/shared';
-import { ArrowRight, MapPin, TrendingUp } from 'lucide-react';
+import { CATEGORY_LABELS, EventCategory, type EventListItem } from '@daibilet/shared';
+import { MapPin, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { EventCard } from '@/components/ui/EventCard';
 import { api } from '@/lib/api';
+import type { RegionDetail } from '@/lib/api.types';
 
 const categories = [
   { value: '', label: 'Все' },
@@ -35,9 +36,9 @@ export default function RegionPage() {
   const params = useParams();
   const slug = params.slug as string;
 
-  const [region, setRegion] = useState<any>(null);
-  const [events, setEvents] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
+  const [region, setRegion] = useState<RegionDetail | null>(null);
+  const [events, setEvents] = useState<EventListItem[]>([]);
+  const [_total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -53,7 +54,7 @@ export default function RegionPage() {
       .getRegionBySlug(slug)
       .then(setRegion)
       .catch((e) => {
-        console.error('Region page error:', e);
+        console.warn('Region page error:', e);
         setError(true);
       });
   }, [slug]);
@@ -77,7 +78,7 @@ export default function RegionPage() {
         setTotalPages(res.totalPages);
       })
       .catch((e) => {
-        console.error('Region page error:', e);
+        console.warn('Region page error:', e);
         setEvents([]);
         setTotal(0);
         setTotalPages(0);
@@ -97,7 +98,8 @@ export default function RegionPage() {
     );
   }
 
-  const stats = region?.stats || {};
+  const stats = region?.stats ?? {};
+  const totalCount = stats.totalCount ?? (stats.excursionCount ?? 0) + (stats.museumCount ?? 0) + (stats.eventCount ?? 0);
   const regionCategories = [
     { category: EventCategory.EXCURSION, emoji: '🚶', count: stats.excursionCount || 0 },
     { category: EventCategory.MUSEUM, emoji: '🏛️', count: stats.museumCount || 0 },
@@ -121,10 +123,10 @@ export default function RegionPage() {
               Главная
             </Link>
             <span>/</span>
-            {region?.hubCity && (
+            {region?.hubCity != null && (
               <>
-                <Link href={`/cities/${region.hubCity.slug}`} className="hover:text-white">
-                  {region.hubCity.name}
+                <Link href={`/cities/${region.hubCity!.slug}`} className="hover:text-white">
+                  {region.hubCity!.name}
                 </Link>
                 <span>/</span>
               </>
@@ -135,11 +137,11 @@ export default function RegionPage() {
           {region?.description && <p className="mt-4 max-w-2xl text-base text-primary-100">{region.description}</p>}
 
           {/* Stats badges */}
-          {stats.totalCount > 0 && (
+          {totalCount > 0 && (
             <div className="mt-6 flex flex-wrap gap-3">
               <div className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
                 <TrendingUp className="h-4 w-4 text-emerald-300" />
-                {pluralEvents(stats.totalCount)} в регионе
+                {pluralEvents(totalCount)} в регионе
               </div>
               {regionCategories
                 .filter((c) => c.count > 0)
@@ -176,11 +178,11 @@ export default function RegionPage() {
               >
                 <MapPin className="h-3.5 w-3.5" />
                 Все города
-                {stats.totalCount > 0 && <span className="text-xs opacity-70">({stats.totalCount})</span>}
+                {totalCount > 0 && <span className="text-xs opacity-70">({totalCount})</span>}
               </button>
-              {region.cities.map((c: any) => (
+              {(region.cities ?? []).map((c) => (
                 <button
-                  key={c.id}
+                  key={c.id ?? c.slug}
                   onClick={() => {
                     setSelectedCity(c.slug);
                     setPage(1);
@@ -192,7 +194,7 @@ export default function RegionPage() {
                   }`}
                 >
                   {c.name}
-                  {c.eventCount > 0 && <span className="text-xs opacity-70">({c.eventCount})</span>}
+                  {(c.eventCount ?? 0) > 0 && <span className="text-xs opacity-70">({c.eventCount ?? 0})</span>}
                 </button>
               ))}
             </div>
@@ -252,7 +254,7 @@ export default function RegionPage() {
           </div>
         ) : events.length > 0 ? (
           <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-            {events.map((event: any) => (
+            {events.map((event) => (
               <EventCard
                 key={event.id}
                 slug={event.slug}
@@ -311,7 +313,7 @@ export default function RegionPage() {
               '@type': 'Place',
               name: region.name,
               description: region.description || `Экскурсии и мероприятия в ${region.name}`,
-              url: `https://daibilet.ru/regions/${region.slug}`,
+              url: `https://daibilet.ru/regions/${region.slug ?? slug}`,
             }),
           }}
         />

@@ -5,34 +5,10 @@ import { useMemo, useState } from 'react';
 import { ComparisonTable } from '@/components/landing/ComparisonTable';
 import { FilterBar, type FilterState } from '@/components/landing/FilterBar';
 import { VariantCards } from '@/components/landing/VariantCard';
+import type { LandingFilters, LandingVariant } from '../../_landingVm';
 
-interface Variant {
-  sessionId: string;
-  startsAt: string;
-  endsAt?: string;
-  availableTickets: number;
-  prices: Array<{ type: string; amount?: number; price?: number }>;
-  event: {
-    id: string;
-    title: string;
-    slug: string;
-    address?: string;
-    durationMinutes?: number;
-    imageUrl?: string;
-    tcEventId: string;
-    source: string;
-    rating: number;
-    reviewCount: number;
-    priceFrom?: number;
-  };
-}
-
-interface Filters {
-  piers: string[];
-  priceRange: [number, number];
-  dateRange: string[];
-  dates: string[];
-}
+type Variant = LandingVariant;
+type Filters = LandingFilters;
 
 function getPrice(v: Variant): number {
   const p = v.prices?.[0];

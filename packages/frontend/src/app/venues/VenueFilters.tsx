@@ -1,6 +1,6 @@
 'use client';
 
-import { VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
+import { VENUE_TYPE_LABELS } from '@daibilet/shared';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 interface VenueFiltersProps {

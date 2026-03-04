@@ -4,6 +4,24 @@
 
 ---
 
+## 01.03.2026 — Спецификация админки: Teplohod-style расписание, готовность, мультисобытия
+
+### Наблюдения
+
+- Обсуждение UX админки: причины неактивности, ручной publish, мультисобытия, SEO-аудит, расписание повторяющихся событий. Референс — Teplohod.info.
+
+### Решения
+
+- **docs/AdminScheduleSpec.md:** финальная спецификация: (1) computeEventReadiness + blocking/warnings, checklist в EventEdit; (2) manual publish + admin override; (3) мультисобытия как отдельный уровень; (4) SEO-аудит как список задач; (5) вкладка «Расписание» — сетка дата×час (00–23), час→минуты→сохранение, drag/ctrl-brush, RMB ластик, Модель A при sold>0. Scope: только MANUAL события.
+- **Project.md:** ссылка на AdminScheduleSpec.
+- **Tasktracker:** блок «Админка: Teplohod-style расписание» с задачами (6+ мес).
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 01.03.2026 — ESLint: Next.js plugin + flat config
 
 ### Наблюдения

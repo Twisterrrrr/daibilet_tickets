@@ -38,10 +38,11 @@ export const cacheKeys = {
     query: (q: string, city?: string) => (city ? `search:${q}:${city}` : `search:${q}`),
     pattern: () => 'search:*',
   },
-  /** T11: catalog list/detail keys */
+  /** T11: catalog list/detail keys. v2 = DoD PR2 (EventGroup, citiesPreview, nextDate) */
   catalog: {
     list: (paramsHash: string) => `catalog:list:${paramsHash}`,
-    multiEvents: (key: string) => `catalog:multi:${key}`,
+    multiEvents: (key: string) => `catalog:multi:v2:${key}`,
+    multiEventBySlug: (slug: string) => `catalog:multi:v2:slug:${slug}`,
     detail: (type: string, id: string) => `catalog:detail:${type}:${id}`,
   },
   pricing: {

@@ -1,5 +1,5 @@
-import { CATEGORY_LABELS, EventCategory, formatPrice } from '@daibilet/shared';
-import { ArrowRight, Clock, Star, Tag, Ticket, TrendingUp, Users } from 'lucide-react';
+import { CATEGORY_LABELS, EventCategory, type VenueListItem, type EventListItem } from '@daibilet/shared';
+import { ArrowRight, Tag, Ticket, TrendingUp } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { EventCard } from '@/components/ui/EventCard';
 import { VenueCard } from '@/components/ui/VenueCard';
 import { api } from '@/lib/api';
+import type { CityDetail } from '@/lib/api.types';
 import { getSeoMeta } from '@/lib/seo/getSeoMeta';
 
 // ISR: обновлять каждые 6 часов
@@ -16,7 +17,7 @@ export const revalidate = 21600;
 export async function generateStaticParams() {
   try {
     const cities = await api.getCities(true);
-    return cities.map((c: any) => ({ slug: c.slug }));
+    return cities.map((c) => ({ slug: c.slug }));
   } catch {
     return [];
   }
@@ -191,7 +192,7 @@ const CITY_INFO: Record<string, { brief: string; mustSee: Array<{ name: string; 
 
 export default async function CityPage({ params }: Props) {
   const { slug } = await params;
-  let city: any = null;
+  let city: CityDetail | null = null;
   try {
     city = await api.getCityBySlug(slug);
   } catch {
@@ -207,15 +208,17 @@ export default async function CityPage({ params }: Props) {
   }
 
   // Загрузить venues для города
-  let venues: any[] = [];
+  let venues: VenueListItem[] = [];
   try {
     const venuesRes = await api.getVenues({ city: slug, limit: 6 });
-    venues = venuesRes.items || [];
-  } catch {}
+    venues = (venuesRes.items as VenueListItem[]) || [];
+  } catch {
+    /* noop */
+  }
 
   const info = CITY_INFO[slug];
-  const stats = city.stats || {};
-  const popularTags = city.popularTags || [];
+  const stats = city.stats ?? {};
+  const popularTags = city.popularTags ?? [];
 
   const categories = [
     { category: EventCategory.EXCURSION, emoji: '🚶', count: stats.excursionCount || 0 },
@@ -224,7 +227,7 @@ export default async function CityPage({ params }: Props) {
   ];
 
   // Разделяем события: топ-6 рекомендуемых + остальные
-  const allEvents = city.events || [];
+  const allEvents: EventListItem[] = city.events ?? [];
   const topEvents = allEvents.slice(0, 6);
   const moreEvents = allEvents.slice(6);
 
@@ -249,11 +252,11 @@ export default async function CityPage({ params }: Props) {
           </p>
 
           {/* Stats badges */}
-          {stats.totalCount > 0 && (
+          {(stats.totalCount ?? 0) > 0 && (
             <div className="mt-6 flex flex-wrap gap-3">
               <div className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
                 <TrendingUp className="h-4 w-4 text-emerald-300" />
-                {pluralEvents(stats.totalCount)} в каталоге
+                {pluralEvents(stats.totalCount ?? 0)} в каталоге
               </div>
               {categories
                 .filter((c) => c.count > 0)
@@ -284,7 +287,7 @@ export default async function CityPage({ params }: Props) {
           <div className="container-page">
             <h2 className="text-lg font-bold text-slate-900">Популярные направления</h2>
             <div className="mt-3 flex flex-wrap gap-2">
-              {city.landingPages.map((lp: any) => (
+              {city.landingPages.map((lp) => (
                 <Link
                   key={lp.slug}
                   href={`/cities/${slug}/${lp.slug}`}
@@ -366,7 +369,7 @@ export default async function CityPage({ params }: Props) {
             </Link>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {venues.map((venue: any) => (
+            {venues.map((venue) => (
               <VenueCard key={venue.id} {...venue} />
             ))}
           </div>
@@ -378,7 +381,7 @@ export default async function CityPage({ params }: Props) {
         <section className="container-page py-10">
           <h3 className="text-lg font-semibold text-slate-900">Популярные теги</h3>
           <div className="mt-3 flex flex-wrap gap-2">
-            {popularTags.map((t: any) => (
+            {popularTags.map((t) => (
               <Link
                 key={t.id}
                 href={`/tags/${t.slug}?city=${slug}`}
@@ -386,7 +389,9 @@ export default async function CityPage({ params }: Props) {
               >
                 <Tag className="h-3.5 w-3.5" />
                 {t.name}
-                {t._count?.events > 0 && <span className="text-xs text-slate-400">({t._count.events})</span>}
+                {(t._count?.events ?? 0) > 0 && (
+                <span className="text-xs text-slate-400">({t._count?.events ?? 0})</span>
+              )}
               </Link>
             ))}
           </div>
@@ -409,7 +414,7 @@ export default async function CityPage({ params }: Props) {
             </Link>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {topEvents.map((event: any) => (
+            {topEvents.map((event) => (
               <EventCard
                 key={event.id}
                 slug={event.slug}
@@ -421,7 +426,6 @@ export default async function CityPage({ params }: Props) {
                 reviewCount={event.reviewCount}
                 durationMinutes={event.durationMinutes}
                 city={{ slug: city.slug, name: city.name }}
-                address={event.address}
               />
             ))}
           </div>
@@ -433,7 +437,7 @@ export default async function CityPage({ params }: Props) {
         <section className="container-page pb-16">
           <h2 className="text-xl font-bold text-slate-900">Ещё события</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {moreEvents.map((event: any) => (
+            {moreEvents.map((event) => (
               <EventCard
                 key={event.id}
                 slug={event.slug}
@@ -477,7 +481,7 @@ export default async function CityPage({ params }: Props) {
             </div>
             <div className="mt-6 -mx-4 px-4 sm:mx-0 sm:px-0">
               <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0">
-                {city.regionPreview.events.map((event: any) => (
+                {city.regionPreview.events.map((event) => (
                   <div key={event.id} className="min-w-[260px] flex-shrink-0 sm:min-w-0">
                     <EventCard
                       slug={event.slug}
@@ -489,7 +493,6 @@ export default async function CityPage({ params }: Props) {
                       reviewCount={event.reviewCount}
                       durationMinutes={event.durationMinutes}
                       city={event.city}
-                      address={event.address}
                       dateMode={event.dateMode}
                     />
                   </div>
@@ -531,14 +534,15 @@ export default async function CityPage({ params }: Props) {
             '@type': 'Place',
             name: city.name,
             description: city.description || city.metaDescription || `Экскурсии и мероприятия в городе ${city.name}`,
-            ...(city.lat &&
-              city.lng && {
-                geo: {
-                  '@type': 'GeoCoordinates',
-                  latitude: Number(city.lat),
-                  longitude: Number(city.lng),
-                },
-              }),
+            ...(typeof city.lat === 'number' && typeof city.lng === 'number'
+              ? {
+                  geo: {
+                    '@type': 'GeoCoordinates',
+                    latitude: city.lat,
+                    longitude: city.lng,
+                  },
+                }
+              : {}),
             url: `https://daibilet.ru/cities/${city.slug}`,
             image: city.heroImage || undefined,
           }),

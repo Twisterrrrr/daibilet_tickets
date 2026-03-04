@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
+import type { LandingItem } from '@/lib/api.types';
 
 export const revalidate = 21600;
 
@@ -13,8 +14,15 @@ export const metadata: Metadata = {
     'Тематические подборки экскурсий, музеев и мероприятий: ночные прогулки, детские программы, романтические вечера и многое другое.',
 };
 
+type CollectionCardVM = LandingItem & {
+  heroImage?: string | null;
+  subtitle?: string | null;
+  city?: { name: string; slug: string } | null;
+  eventCount?: number;
+};
+
 export default async function CollectionsListPage() {
-  let collections: any[] = [];
+  let collections: CollectionCardVM[] = [];
   try {
     collections = await api.getCollections();
   } catch {
@@ -23,7 +31,7 @@ export default async function CollectionsListPage() {
 
   // Группировка: кросс-городские (cityId=null) + по городам
   const crossCity = collections.filter((c) => !c.city);
-  const byCity = new Map<string, { cityName: string; citySlug: string; items: any[] }>();
+  const byCity = new Map<string, { cityName: string; citySlug: string; items: CollectionCardVM[] }>();
 
   for (const c of collections) {
     if (!c.city) continue;
@@ -86,7 +94,7 @@ export default async function CollectionsListPage() {
             </Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((c: any) => (
+            {items.map((c) => (
               <CollectionCard key={c.slug} collection={c} />
             ))}
           </div>
@@ -96,7 +104,7 @@ export default async function CollectionsListPage() {
   );
 }
 
-function CollectionCard({ collection }: { collection: any }) {
+function CollectionCard({ collection }: { collection: CollectionCardVM }) {
   return (
     <Link
       href={`/podborki/${collection.slug}`}
@@ -121,7 +129,7 @@ function CollectionCard({ collection }: { collection: any }) {
               {collection.city.name}
             </span>
           )}
-          {collection.eventCount > 0 && <span>{collection.eventCount} событий</span>}
+          {(collection.eventCount ?? 0) > 0 && <span>{collection.eventCount ?? 0} событий</span>}
         </div>
       </div>
     </Link>

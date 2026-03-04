@@ -14,7 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { type CartItem, useCart } from '@/lib/cart';
 
@@ -44,7 +44,7 @@ interface ContactForm {
 }
 
 export function CheckoutClient() {
-  const { items, itemCount, totalPrice, removeItem, updateQuantity, clearCart } = useCart();
+  const { items, totalPrice, removeItem, updateQuantity, clearCart } = useCart();
   const [step, setStep] = useState<CheckoutStep>('review');
   const [validating, setValidating] = useState(false);
   const [validatedItems, setValidatedItems] = useState<ValidatedItem[] | null>(null);
@@ -74,7 +74,6 @@ export function CheckoutClient() {
   // Separate items by type (3 типа: WIDGET, REDIRECT, REQUEST)
   const redirectItems = items.filter((i) => i.purchaseType === 'REDIRECT');
   const requestItems = items.filter((i) => i.purchaseType === 'REQUEST');
-  const widgetItems = items.filter((i) => i.purchaseType === 'WIDGET');
 
   // Validate cart
   const handleValidate = async () => {
@@ -96,7 +95,7 @@ export function CheckoutClient() {
         setStep('contact');
       }
     } catch (e: unknown) {
-      console.error('Checkout error:', e);
+      console.warn('Checkout error:', e);
       setValidationError((e as Error).message);
     } finally {
       setValidating(false);
@@ -119,7 +118,7 @@ export function CheckoutClient() {
       });
       const data = await res.json();
       setGiftCertValidation(data);
-    } catch (e) {
+    } catch {
       setGiftCertValidation({ valid: false, message: 'Ошибка проверки кода' });
     } finally {
       setValidatingCert(false);
@@ -153,7 +152,7 @@ export function CheckoutClient() {
       setStep('done');
       clearCart();
     } catch (e: unknown) {
-      console.error('Checkout error:', e);
+      console.warn('Checkout error:', e);
       setValidationError((e as Error).message);
     } finally {
       setSubmitting(false);
@@ -509,7 +508,7 @@ export function CheckoutClient() {
                   <ExternalLink className="h-4 w-4" />
                   Оплатите на сайте партнёра
                 </h3>
-                {result.redirectItems.map((item: any) => (
+                {result.redirectItems.map((item) => (
                   <a
                     key={item.offerId}
                     href={item.deeplink}

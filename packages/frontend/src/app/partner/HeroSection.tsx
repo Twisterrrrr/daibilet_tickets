@@ -1,5 +1,4 @@
 import { ArrowRight, Ticket, Building2, Users } from 'lucide-react';
-import Link from 'next/link';
 
 export function HeroSection() {
   return (

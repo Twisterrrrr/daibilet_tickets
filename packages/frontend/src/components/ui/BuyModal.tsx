@@ -34,9 +34,9 @@ interface PriceItem {
 interface Session {
   id: string;
   startsAt: string;
-  endsAt?: string;
+  endsAt?: string | null;
   availableTickets: number;
-  isActive: boolean;
+  isActive?: boolean;
   prices: PriceItem[];
 }
 
@@ -54,7 +54,7 @@ interface BuyModalProps {
   sessions: Session[];
   address?: string | null;
   venueName?: string | null;
-  priceFrom: number | null;
+  priceFrom: number | null | undefined;
 }
 
 // ========================
@@ -98,7 +98,7 @@ export function BuyModal({
   sessions,
   address,
   venueName,
-  priceFrom,
+  priceFrom: _priceFrom,
 }: BuyModalProps) {
   // Фильтруем только активные будущие сеансы
   const activeSessions = sessions.filter((s) => {
@@ -110,7 +110,7 @@ export function BuyModal({
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [sessionDropdownOpen, setSessionDropdownOpen] = useState(false);
   const [checkoutState, setCheckoutState] = useState<CheckoutState>('select');
-  const [orderResult, setOrderResult] = useState<any>(null);
+  const [orderResult, setOrderResult] = useState<unknown>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
@@ -204,6 +204,25 @@ export function BuyModal({
 
   if (!isOpen) return null;
 
+  type OrderTicket = { id: string; number: string; price: number };
+  type OrderResultVM = {
+    order: {
+      number: string;
+      totalPriceFormatted: string;
+      tickets?: OrderTicket[];
+    };
+    confirmed?: boolean;
+    event?: { title?: string };
+  };
+
+  function isOrderResultVM(x: unknown): x is OrderResultVM {
+    if (!x || typeof x !== 'object') return false;
+    const o = x as { order?: unknown };
+    if (!o.order || typeof o.order !== 'object') return false;
+    const ord = o.order as { number?: unknown; totalPriceFormatted?: unknown };
+    return typeof ord.number === 'string' && typeof ord.totalPriceFormatted === 'string';
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       {/* Backdrop */}
@@ -245,7 +264,7 @@ export function BuyModal({
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {/* ===== Экран успеха ===== */}
-          {checkoutState === 'success' && orderResult && (
+          {checkoutState === 'success' && isOrderResultVM(orderResult) && (
             <div className="py-6 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
                 <CheckCircle className="h-8 w-8 text-emerald-600" />
@@ -256,14 +275,17 @@ export function BuyModal({
               <p className="mt-2 text-sm text-slate-500">Заказ #{orderResult.order.number}</p>
 
               <div className="mt-4 rounded-xl bg-slate-50 p-4 text-left">
-                <p className="text-sm font-medium text-slate-700">{orderResult.event.title}</p>
+                <p className="text-sm font-medium text-slate-700">
+                  {typeof orderResult.event?.title === 'string' ? orderResult.event.title : eventTitle}
+                </p>
                 <div className="mt-2 space-y-1">
-                  {orderResult.order.tickets.map((t: any) => (
-                    <div key={t.id} className="flex justify-between text-sm">
-                      <span className="text-slate-500">Билет #{t.number}</span>
-                      <span className="font-medium text-slate-700">{formatPrice(t.price)}</span>
-                    </div>
-                  ))}
+                  {Array.isArray(orderResult.order.tickets) &&
+                    orderResult.order.tickets.map((t) => (
+                      <div key={t.id} className="flex justify-between text-sm">
+                        <span className="text-slate-500">Билет #{t.number}</span>
+                        <span className="font-medium text-slate-700">{formatPrice(t.price)}</span>
+                      </div>
+                    ))}
                   <div className="mt-2 border-t border-slate-200 pt-2 flex justify-between">
                     <span className="text-sm font-semibold text-slate-700">Итого</span>
                     <span className="text-sm font-bold text-slate-900">{orderResult.order.totalPriceFormatted}</span>
@@ -550,7 +572,7 @@ interface BuyButtonProps {
   sessions: Session[];
   address?: string | null;
   venueName?: string | null;
-  priceFrom: number | null;
+  priceFrom: number | null | undefined;
   className?: string;
 }
 
@@ -583,7 +605,7 @@ export function BuyButton({
         eventTitle={eventTitle}
         eventImage={eventImage}
         tcEventId={tcEventId}
-        source={source}
+        source={source === 'TEPLOHOD' ? 'TEPLOHOD' : 'TC'}
         sessions={sessions}
         address={address}
         venueName={venueName}

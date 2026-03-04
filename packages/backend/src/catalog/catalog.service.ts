@@ -659,7 +659,85 @@ export class CatalogService {
 
     return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_LIST, async () => {
       const rows =
-        await this.prisma.$queryRaw<{
+        await this.prisma.$queryRaw<
+          {
+            groupingKey: string;
+            slug: string | null;
+            title: string;
+            coverUrl: string | null;
+            totalEvents: number;
+            totalCities: number;
+            minPrice: number | null;
+            maxRating: number | null;
+            citiesPreview: Array<{ slug: string; name: string }> | null;
+            remainingCities: number;
+            nextDate: Date | null;
+          }[]
+        >`
+        SELECT
+          e."groupingKey" AS "groupingKey",
+          g.slug AS "slug",
+          COALESCE(g.title, MIN(e."title")) AS "title",
+          COALESCE(g."coverUrl", MIN(e."imageUrl")) AS "coverUrl",
+          COUNT(*)::int AS "totalEvents",
+          COUNT(DISTINCT e."cityId")::int AS "totalCities",
+          MIN(e."priceFrom") AS "minPrice",
+          MAX(e."rating") AS "maxRating",
+          (
+            SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json)
+            FROM (
+              SELECT DISTINCT ON (c.id) c.slug, c.name
+              FROM "events" e2
+              JOIN "cities" c ON e2."cityId" = c.id
+              WHERE e2."groupingKey" = e."groupingKey"
+                AND e2."isActive" = true
+                AND e2."isDeleted" = false
+              ORDER BY c.id
+              LIMIT 3
+            ) t
+          ) AS "citiesPreview",
+          GREATEST(0, COUNT(DISTINCT e."cityId")::int - 3) AS "remainingCities",
+          (
+            SELECT MIN(s."startsAt")
+            FROM "event_sessions" s
+            JOIN "events" e2 ON s."eventId" = e2.id
+            WHERE e2."groupingKey" = e."groupingKey"
+              AND e2."isActive" = true
+              AND e2."isDeleted" = false
+              AND s."isActive" = true
+              AND s."startsAt" >= NOW()
+          ) AS "nextDate"
+        FROM "events" e
+        LEFT JOIN "event_groups" g ON g."groupingKey" = e."groupingKey"
+        WHERE e."isActive" = true
+          AND e."isDeleted" = false
+          AND e."groupingKey" IS NOT NULL
+        GROUP BY e."groupingKey", g.id, g.slug, g.title, g."coverUrl"
+        ORDER BY
+          CASE WHEN ${sort} = 'popular' THEN MAX(e."reviewCount") END DESC,
+          CASE WHEN ${sort} = 'new' THEN MAX(e."createdAt") END DESC
+        LIMIT ${limit};
+      `;
+
+      return rows.map((r) => ({
+        ...r,
+        citiesPreview: Array.isArray(r.citiesPreview) ? r.citiesPreview : r.citiesPreview ? [r.citiesPreview] : [],
+      }));
+    });
+  }
+
+  async getMultiEventBySlug(slug: string) {
+    const group = await this.prisma.eventGroup.findUnique({
+      where: { slug },
+    });
+    if (!group) {
+      throw new NotFoundException(`EventGroup with slug "${slug}" not found`);
+    }
+
+    const cacheKey = cacheKeys.catalog.multiEventBySlug(slug);
+    return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_LIST, async () => {
+      const rows = await this.prisma.$queryRaw<
+        {
           groupingKey: string;
           title: string;
           coverUrl: string | null;
@@ -667,28 +745,132 @@ export class CatalogService {
           totalCities: number;
           minPrice: number | null;
           maxRating: number | null;
-        }[]>`
+          cities: Array<{ slug: string; name: string }> | null;
+          nextDate: Date | null;
+        }[]
+      >`
         SELECT
-          e."groupingKey"                       AS "groupingKey",
-          MIN(e."title")                        AS "title",
-          MIN(e."imageUrl")                     AS "coverUrl",
-          COUNT(*)                              AS "totalEvents",
-          COUNT(DISTINCT e."cityId")            AS "totalCities",
-          MIN(e."priceFrom")                    AS "minPrice",
-          MAX(e."rating")                       AS "maxRating"
+          e."groupingKey" AS "groupingKey",
+          COALESCE(g.title, MIN(e."title")) AS "title",
+          COALESCE(g."coverUrl", MIN(e."imageUrl")) AS "coverUrl",
+          COUNT(*)::int AS "totalEvents",
+          COUNT(DISTINCT e."cityId")::int AS "totalCities",
+          MIN(e."priceFrom") AS "minPrice",
+          MAX(e."rating") AS "maxRating",
+          (
+            SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json)
+            FROM (
+              SELECT DISTINCT ON (c.id) c.slug, c.name
+              FROM "events" e2
+              JOIN "cities" c ON e2."cityId" = c.id
+              WHERE e2."groupingKey" = e."groupingKey"
+                AND e2."isActive" = true
+                AND e2."isDeleted" = false
+              ORDER BY c.id
+            ) t
+          ) AS "cities",
+          (
+            SELECT MIN(s."startsAt")
+            FROM "event_sessions" s
+            JOIN "events" e2 ON s."eventId" = e2.id
+            WHERE e2."groupingKey" = e."groupingKey"
+              AND e2."isActive" = true
+              AND e2."isDeleted" = false
+              AND s."isActive" = true
+              AND s."startsAt" >= NOW()
+          ) AS "nextDate"
         FROM "events" e
-        WHERE e."isActive" = true
+        LEFT JOIN "event_groups" g ON g."groupingKey" = e."groupingKey"
+        WHERE e."groupingKey" = ${group.groupingKey}
+          AND e."isActive" = true
           AND e."isDeleted" = false
-          AND e."groupingKey" IS NOT NULL
-        GROUP BY e."groupingKey"
-        ORDER BY
-          CASE WHEN ${sort} = 'popular' THEN MAX(e."reviewCount") END DESC,
-          CASE WHEN ${sort} = 'new' THEN MAX(e."createdAt") END DESC
-        LIMIT ${limit};
+        GROUP BY e."groupingKey", g.id, g.title, g."coverUrl";
       `;
 
-      return rows;
+      const r = rows[0];
+      if (!r) {
+        throw new NotFoundException(`EventGroup "${slug}" has no events`);
+      }
+      return {
+        slug: group.slug,
+        groupingKey: r.groupingKey,
+        title: r.title,
+        coverUrl: r.coverUrl,
+        totalEvents: r.totalEvents,
+        totalCities: r.totalCities,
+        minPrice: r.minPrice,
+        maxRating: r.maxRating,
+        cities: Array.isArray(r.cities) ? r.cities : r.cities ? [r.cities] : [],
+        nextDate: r.nextDate,
+      };
     });
+  }
+
+  // Даты по группе событий и городу (для /events/m/[slug]).
+  async getMultiEventDates(slug: string, citySlug: string, limit?: number) {
+    const group = await this.prisma.eventGroup.findUnique({
+      where: { slug },
+    });
+    if (!group) {
+      throw new NotFoundException(`EventGroup with slug "${slug}" not found`);
+    }
+
+    const safeLimit = limit && limit > 0 && limit <= 200 ? limit : 60;
+
+    const rows = await this.prisma.$queryRaw<
+      {
+        citySlug: string;
+        eventSlug: string;
+        eventId: string;
+        startAt: Date;
+        priceFrom: number | null;
+        availableTickets: number | null;
+      }[]
+    >`
+      WITH grp AS (
+        SELECT "groupingKey"
+        FROM "event_groups"
+        WHERE slug = ${slug}
+      ),
+      ct AS (
+        SELECT id AS "cityId", slug AS "citySlug"
+        FROM "cities"
+        WHERE slug = ${citySlug}
+      ),
+      ev AS (
+        SELECT e.id AS "eventId", e.slug AS "eventSlug", e."priceFrom" AS "priceFrom"
+        FROM "events" e
+        JOIN grp ON grp."groupingKey" = e."groupingKey"
+        JOIN ct  ON ct."cityId" = e."cityId"
+        WHERE e."isActive" = true
+          AND e."isDeleted" = false
+      )
+      SELECT
+        ct."citySlug"        AS "citySlug",
+        ev."eventSlug"       AS "eventSlug",
+        ev."eventId"         AS "eventId",
+        s."startsAt"         AS "startAt",
+        ev."priceFrom"       AS "priceFrom",
+        s."availableTickets" AS "availableTickets"
+      FROM ev
+      JOIN ct ON TRUE
+      JOIN "event_sessions" s ON s."eventId" = ev."eventId"
+      WHERE s."startsAt" >= NOW()
+        AND s."isActive" = true
+      ORDER BY s."startsAt" ASC
+      LIMIT ${safeLimit};
+    `;
+
+    return {
+      citySlug,
+      items: rows.map((r) => ({
+        eventSlug: r.eventSlug,
+        eventId: r.eventId,
+        startAt: r.startAt,
+        priceFrom: r.priceFrom,
+        availableTickets: r.availableTickets,
+      })),
+    };
   }
 
   private async fetchEvents(query: EventsQueryDto & { cityIds?: string[] }) {

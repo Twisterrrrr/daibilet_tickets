@@ -4,11 +4,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { X, LayoutGrid, List as ListIcon } from 'lucide-react';
 import { api } from '@/lib/api';
+import type { MultiEventListItemDto } from '@/lib/api.types';
+import type { CityListItem, EventListItem, CatalogItem } from '@daibilet/shared';
 import { EventCard } from '@/components/ui/EventCard';
 import { EventCardHorizontal } from '@/components/ui/EventCardHorizontal';
 import { CatalogCard } from '@/components/ui/CatalogCard';
 import { DateRibbon } from '@/components/ui/DateRibbon';
 import { PromoBlock } from '@/components/ui/PromoBlock';
+import { MultiEventCard } from '@/components/ui/MultiEventCard';
 import {
   AUDIENCE_LABELS,
   CATEGORY_LABELS,
@@ -78,12 +81,13 @@ export default function EventsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [events, setEvents] = useState<any[]>([]);
-  const [catalogItems, setCatalogItems] = useState<any[]>([]);
+  const [events, setEvents] = useState<EventListItem[]>([]);
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
+  const [multiEvents, setMultiEvents] = useState<MultiEventListItemDto[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [cities, setCities] = useState<any[]>([]);
-  const [piers, setPiers] = useState<any[]>([]);
+  const [cities, setCities] = useState<CityListItem[]>([]);
+  const [piers, setPiers] = useState<{ id: string; slug?: string; title: string; shortTitle?: string | null }[]>([]);
   const [viewMode, setViewModeState] = useState<'grid' | 'list'>('grid');
 
   // T15: persist view mode to localStorage
@@ -168,15 +172,13 @@ export default function EventsPage() {
 
   // «Скоро» = departing_soon sort
   const isSoonMode = timeOfDay === 'soon';
-  const effectiveSort = isSoonMode ? 'departing_soon' : sort;
-  const effectiveTimeOfDay = isSoonMode ? '' : timeOfDay;
 
   useEffect(() => {
     api
       .getCities()
       .then(setCities)
       .catch((e) => {
-        console.error('Events page error:', e);
+        console.warn('Events page error:', e);
       });
   }, []);
 
@@ -186,7 +188,7 @@ export default function EventsPage() {
         .getLocations(city, 'PIER')
         .then(setPiers)
         .catch((e) => {
-          console.error('Events page error:', e);
+          console.warn('Events page error:', e);
           setPiers([]);
         });
     } else {
@@ -212,6 +214,14 @@ export default function EventsPage() {
     const pageFromUrl = f.page;
     const limitFromUrl = f.limit;
     const isMuseumFromUrl = categoryFromUrl === 'MUSEUM';
+    const hasExtraFilters =
+      !!audienceFromUrl ||
+      !!urlTagFromUrl ||
+      !!selectedDateFromUrl ||
+      !!f.pier ||
+      !!f.priceMax ||
+      Object.keys(quickFilterParams).length > 0;
+    const isGlobalMultiMode = !isMuseumFromUrl && !cityFromUrl && !hasExtraFilters;
 
     if (isMuseumFromUrl) {
       // Музеи → единый каталог (Venue)
@@ -219,8 +229,40 @@ export default function EventsPage() {
       if (cityFromUrl) params.city = cityFromUrl;
       api
         .getCatalog(params)
-        .then((res) => { setCatalogItems(res.items); setEvents([]); setTotal(res.total); })
-        .catch((e) => { console.error('Catalog error:', e); setCatalogItems([]); setEvents([]); setTotal(0); })
+        .then((res) => {
+          setCatalogItems(res.items);
+          setEvents([]);
+          setMultiEvents([]);
+          setTotal(res.total);
+        })
+        .catch((e) => {
+          console.warn('Catalog error:', e);
+          setCatalogItems([]);
+          setEvents([]);
+          setMultiEvents([]);
+          setTotal(0);
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    if (isGlobalMultiMode) {
+      const multiSort: 'popular' | 'new' = sortFromUrl === 'new' ? 'new' : 'popular';
+      api
+        .getMultiEvents({ sort: multiSort, limit: limitFromUrl })
+        .then((items) => {
+          setMultiEvents(items);
+          setEvents([]);
+          setCatalogItems([]);
+          setTotal(items.length);
+        })
+        .catch((e) => {
+          console.warn('Multi-events error:', e);
+          setMultiEvents([]);
+          setEvents([]);
+          setCatalogItems([]);
+          setTotal(0);
+        })
         .finally(() => setLoading(false));
       return;
     }
@@ -256,12 +298,14 @@ export default function EventsPage() {
       .then((res) => {
         setEvents(res.items);
         setCatalogItems([]);
+        setMultiEvents([]);
         setTotal(res.total);
       })
       .catch((e) => {
-        console.error('Events page error:', e);
+        console.warn('Events page error:', e);
         setEvents([]);
         setCatalogItems([]);
+        setMultiEvents([]);
         setTotal(0);
       })
       .finally(() => setLoading(false));
@@ -317,8 +361,8 @@ export default function EventsPage() {
   // Города для дропдауна: в режиме "Начнутся скоро" — только города с событиями в текущей выдаче
   const dropdownCities = useMemo(() => {
     if (!isSoonMode) return cities;
-    const slugsWithSoon = new Set(events.filter((e: any) => e.city).map((e: any) => e.city.slug));
-    return cities.filter((c: any) => slugsWithSoon.has(c.slug));
+    const slugsWithSoon = new Set(events.filter((e) => e.city).map((e) => e.city.slug));
+    return cities.filter((c) => slugsWithSoon.has(c.slug));
   }, [isSoonMode, cities, events]);
 
   return (
@@ -504,7 +548,7 @@ export default function EventsPage() {
             className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           >
             <option value="">Все города</option>
-            {dropdownCities.map((c: any) => (
+            {dropdownCities.map((c) => (
               <option key={c.slug} value={c.slug}>
                 {c.name}
               </option>
@@ -518,7 +562,7 @@ export default function EventsPage() {
               className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               <option value="">Все причалы</option>
-              {piers.map((p: any) => (
+              {piers.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.shortTitle || p.title}
                 </option>
@@ -577,14 +621,20 @@ export default function EventsPage() {
         </div>
       ) : isMuseumCategory && catalogItems.length > 0 ? (
         <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-          {catalogItems.map((item: any) => (
+          {catalogItems.map((item) => (
             <CatalogCard key={item.id} item={item} />
+          ))}
+        </div>
+      ) : multiEvents.length > 0 ? (
+        <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+          {multiEvents.map((item) => (
+            <MultiEventCard key={item.slug} item={item} />
           ))}
         </div>
       ) : events.length > 0 ? (
         viewMode === 'grid' ? (
           <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-            {events.map((event: any) => (
+            {events.map((event) => (
               <EventCard
                 key={event.id}
                 slug={event.slug}
@@ -594,39 +644,39 @@ export default function EventsPage() {
                 audience={event.audience}
                 tagSlugs={event.tagSlugs}
                 imageUrl={event.imageUrl}
-                priceFrom={event.priceFrom}
+                priceFrom={event.priceFrom ?? null}
                 rating={event.rating}
                 reviewCount={event.reviewCount}
-                durationMinutes={event.durationMinutes}
+                durationMinutes={event.durationMinutes ?? null}
                 city={event.city}
-                address={event.address}
+                address={event.address as string | null | undefined}
                 totalAvailableTickets={event.totalAvailableTickets}
                 departingSoonMinutes={event.departingSoonMinutes}
                 nextSessionAt={event.nextSessionAt}
                 isOptimalChoice={event.isOptimalChoice}
-                dateMode={event.dateMode}
+                dateMode={event.dateMode ?? undefined}
               />
             ))}
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4">
-            {events.map((event: any) => (
+            {events.map((event) => (
               <EventCardHorizontal
                 key={event.id}
                 slug={event.slug}
                 title={event.title}
                 category={event.category}
-                imageUrl={event.imageUrl}
-                priceFrom={event.priceFrom}
+                imageUrl={event.imageUrl ?? null}
+                priceFrom={event.priceFrom ?? null}
                 rating={event.rating}
                 reviewCount={event.reviewCount}
-                durationMinutes={event.durationMinutes}
+                durationMinutes={event.durationMinutes ?? null}
                 city={event.city}
-                totalAvailableTickets={event.totalAvailableTickets}
-                departingSoonMinutes={event.departingSoonMinutes}
-                nextSessionAt={event.nextSessionAt}
+                totalAvailableTickets={event.totalAvailableTickets ?? undefined}
+                departingSoonMinutes={event.departingSoonMinutes ?? undefined}
+                nextSessionAt={event.nextSessionAt ?? undefined}
                 isOptimalChoice={event.isOptimalChoice}
-                dateMode={event.dateMode}
+                dateMode={event.dateMode ?? undefined}
                 priceOriginalKopecks={event.priceOriginalKopecks}
               />
             ))}

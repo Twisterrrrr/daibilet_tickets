@@ -2,6 +2,9 @@
 
 import { Component, ErrorInfo, ReactNode } from 'react';
 
+import { devWarn } from '@/lib/devlog';
+import { noop } from '@/lib/noop';
+
 interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
@@ -23,14 +26,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo);
+    devWarn('ErrorBoundary caught:', error, errorInfo);
     // Sentry integration
     if (typeof window !== 'undefined') {
       import('@sentry/nextjs')
         .then((Sentry) => {
           Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
         })
-        .catch(() => {});
+        .catch(noop);
     }
   }
 
@@ -71,3 +74,4 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return this.props.children;
   }
 }
+

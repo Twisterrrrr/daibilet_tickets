@@ -2,6 +2,9 @@
 
 import { Component, ErrorInfo, ReactNode } from 'react';
 
+import { devWarn } from '@/lib/devlog';
+import { noop } from '@/lib/noop';
+
 interface Props {
   children: ReactNode;
   /** T7: packageId/sessionId для Sentry tags */
@@ -24,7 +27,7 @@ export class CheckoutErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Checkout error:', error, errorInfo);
+    devWarn('Checkout error:', error, errorInfo);
     if (typeof window !== 'undefined') {
       import('@sentry/nextjs')
         .then((Sentry) => {
@@ -36,7 +39,7 @@ export class CheckoutErrorBoundary extends Component<Props, State> {
             extra: { componentStack: errorInfo.componentStack },
           });
         })
-        .catch(() => {});
+        .catch(noop);
     }
   }
 
@@ -65,3 +68,4 @@ export class CheckoutErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+

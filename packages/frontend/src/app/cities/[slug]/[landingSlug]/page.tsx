@@ -13,6 +13,7 @@ import {
 } from '@/components/landing/ContentSections';
 import { FaqSection } from '@/components/landing/FaqSection';
 import { api } from '@/lib/api';
+import { getLandingCitySlug, toLandingVM } from '../../_landingVm';
 
 import { LandingClient } from './LandingClient';
 
@@ -23,10 +24,12 @@ export const revalidate = 21600;
 export async function generateStaticParams() {
   try {
     const landings = await api.getLandings();
-    return landings.map((lp: any) => ({
-      slug: lp.city.slug,
-      landingSlug: lp.slug,
-    }));
+    return landings
+      .map((lp) => {
+        const citySlug = getLandingCitySlug(lp);
+        return citySlug ? { slug: citySlug, landingSlug: lp.slug } : null;
+      })
+      .filter((p): p is { slug: string; landingSlug: string } => p != null);
   } catch {
     return [];
   }
@@ -64,18 +67,19 @@ function pluralReis(n: number): string {
 export default async function LandingPage({ params }: Props) {
   const { slug: citySlug, landingSlug } = await params;
 
-  let data: any;
+  let data;
   try {
     data = await api.getLandingBySlug(landingSlug);
   } catch {
     notFound();
   }
 
-  if (data.landing.city.slug !== citySlug) {
+  const { vm, total } = toLandingVM(data);
+  const { city, ...landing } = vm;
+
+  if (!city || city.slug !== citySlug) {
     notFound();
   }
-
-  const { landing, variants, filters, total } = data;
 
   return (
     <>
@@ -90,7 +94,7 @@ export default async function LandingPage({ params }: Props) {
             </Link>
             <ChevronRight className="h-3.5 w-3.5" />
             <Link href={`/cities/${citySlug}`} className="hover:text-white transition-colors">
-              {landing.city.name}
+              {city.name}
             </Link>
             <ChevronRight className="h-3.5 w-3.5" />
             <span className="text-primary-200">{landing.title.split('—')[0].trim()}</span>
@@ -135,19 +139,19 @@ export default async function LandingPage({ params }: Props) {
                     {total > 0 ? `${pluralReis(total)} доступно` : 'Рейсы появятся ближе к сезону'}
                   </span>
                 </div>
-                {landing.stats?.totalSold && (
+                {(vm.stats?.totalSold ?? 0) > 0 && (
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-amber-400 flex-shrink-0" />
                     <span className="text-sm text-primary-100">
-                      Более {Number(landing.stats.totalSold).toLocaleString('ru-RU')} проданных билетов
+                      Более {Number(vm.stats?.totalSold ?? 0).toLocaleString('ru-RU')} проданных билетов
                     </span>
                   </div>
                 )}
-                {landing.stats?.avgRating && (
+                {(vm.stats?.avgRating ?? 0) > 0 && (
                   <div className="flex items-center gap-2">
                     <Star className="h-4 w-4 fill-amber-400 text-amber-400 flex-shrink-0" />
                     <span className="text-sm font-semibold text-emerald-300">
-                      {landing.stats.avgRating} / 5 — средняя оценка
+                      {vm.stats?.avgRating} / 5 — средняя оценка
                     </span>
                   </div>
                 )}
@@ -165,33 +169,33 @@ export default async function LandingPage({ params }: Props) {
         {/* Filters + Table/Cards */}
         <div id="variants">
           <h2 className="mb-4 text-xl font-bold text-slate-900 sm:text-2xl">Расписание рейсов</h2>
-          <LandingClient variants={variants} filters={filters} />
+          <LandingClient variants={vm.variants} filters={vm.filters} />
         </div>
 
         {/* Stats Badge */}
-        {landing.stats && (
+        {vm.stats && (
           <div className="mt-10">
-            <StatsBadge stats={landing.stats} />
+            <StatsBadge stats={vm.stats} />
           </div>
         )}
 
         {/* How to Choose */}
-        <HowToChoose items={landing.howToChoose} />
+        <HowToChoose items={vm.howToChoose} />
 
         {/* Info Blocks (bridge schedule etc.) */}
-        <InfoBlocks items={landing.infoBlocks} />
+        <InfoBlocks items={vm.blocks} />
 
         {/* FAQ */}
-        <FaqSection items={landing.faq} />
+        <FaqSection items={vm.faq} />
 
         {/* Reviews */}
-        <ReviewsSection items={landing.reviews} />
+        <ReviewsSection items={vm.reviews} />
 
         {/* Related Links */}
-        <RelatedLinks items={landing.relatedLinks} />
+        <RelatedLinks items={vm.relatedLinks} />
 
         {/* Legal */}
-        <LegalDisclaimer text={landing.legalText} />
+        <LegalDisclaimer text={vm.legalText ?? undefined} />
       </div>
     </>
   );

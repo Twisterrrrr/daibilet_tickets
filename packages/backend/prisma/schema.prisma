@@ -414,6 +414,9 @@ model Event {
   isPermanent Boolean   @default(false) // Постоянная экспозиция
   endDate     DateTime? // Дата окончания для временных выставок
 
+  /// Default capacity for MANUAL sessions created in admin (Teplohod-style schedule).
+  defaultCapacityTotal Int?
+
   // Дедупликация: если canonicalOfId задан — это дубль, скрывается из каталога
   canonicalOfId String? @db.Uuid
   canonicalOf   Event?  @relation("EventDuplicates", fields: [canonicalOfId], references: [id])
@@ -444,6 +447,7 @@ model Event {
 
   @@index([cityId, category])
   @@index([groupingKey])
+  @@index([groupingKey, cityId])
   @@index([slug])
   @@index([tcMetaEventId])
   @@index([canonicalOfId])
@@ -456,16 +460,35 @@ model Event {
   @@map("events")
 }
 
+// Группа мульти-событий (одно шоу в разных городах/датах). Связь через groupingKey.
+model EventGroup {
+  id          String   @id @default(uuid()) @db.Uuid
+  groupingKey String   @unique @db.Text
+  slug        String   @unique
+  title       String
+  coverUrl    String?
+  auto        Boolean  @default(true) // true = создано скриптом, false = вручную
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+  @@map("event_groups")
+}
+
 model EventSession {
   id               String    @id @default(uuid()) @db.Uuid
   eventId          String    @db.Uuid
   offerId          String?   @db.Uuid // FK к EventOffer (nullable на переходном этапе)
-  tcSessionId      String    @unique
+  tcSessionId      String    @unique // Для MANUAL batch-create: "manual-{uuid}"
   startsAt         DateTime
   endsAt           DateTime?
   availableTickets Int       @default(0)
+  /// Snapshot capacity per slot; if NULL, use Event.defaultCapacityTotal as default.
+  capacityTotal    Int?
   prices           Json // [{type: "adult", price: 150000}, ...]
-  isActive         Boolean   @default(true)
+  isActive         Boolean   @default(true) // Пауза = false
+  canceledAt       DateTime? // CANCELED = IS NOT NULL
+  cancelReason     String?   @db.Text
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -473,8 +496,11 @@ model EventSession {
   offer        EventOffer?   @relation(fields: [offerId], references: [id], onDelete: SetNull)
   packageItems PackageItem[]
 
+  @@unique([eventId, startsAt])
   @@index([startsAt])
   @@index([eventId])
+  @@index([eventId, startsAt])
+   @@index([eventId, canceledAt])
   @@index([offerId])
   @@index([offerId, startsAt])
   @@map("event_sessions")

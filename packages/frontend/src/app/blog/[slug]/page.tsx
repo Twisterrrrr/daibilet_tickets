@@ -6,6 +6,8 @@ import { EventCard } from '@/components/ui/EventCard';
 import { VenueCard } from '@/components/ui/VenueCard';
 import { api } from '@/lib/api';
 import { buildArticleJsonLd } from '@/lib/seo/buildArticleJsonLd';
+import type { ArticleDetail } from '@/lib/api.types';
+import type { EventListItem, VenueListItem } from '@daibilet/shared';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -54,7 +56,7 @@ function renderMarkdown(md: string): string {
 
 export default async function ArticlePage({ params }: Props) {
   const { slug } = await params;
-  let article: any = null;
+  let article: ArticleDetail | null = null;
   try {
     article = await api.getArticleBySlug(slug);
   } catch {
@@ -68,15 +70,39 @@ export default async function ArticlePage({ params }: Props) {
     );
   }
 
-  const linkedEvents = article.articleEvents?.map((ae: any) => ae.event).filter(Boolean) || [];
-  const tags = article.articleTags?.map((at: any) => at.tag).filter(Boolean) || [];
+  // articleEvents / articleTags приходят из CMS как произвольные структуры.
+  // Аккуратно сузим их до нужных для UI полей без использования any.
+  type ArticleEventRecord = { event?: EventListItem | null };
+  type ArticleTagRecord = { tag?: { slug: string; name: string } | null };
+
+  const rawArticleEvents = (article as Record<string, unknown>).articleEvents;
+  const linkedEvents: EventListItem[] = Array.isArray(rawArticleEvents)
+    ? rawArticleEvents
+        .map((ae) => {
+          if (!ae || typeof ae !== 'object') return null;
+          const rec = ae as ArticleEventRecord;
+          return rec.event ?? null;
+        })
+        .filter((ev): ev is EventListItem => !!ev)
+    : [];
+
+  const rawArticleTags = (article as Record<string, unknown>).articleTags;
+  const tags: { slug: string; name: string }[] = Array.isArray(rawArticleTags)
+    ? rawArticleTags
+        .map((at) => {
+          if (!at || typeof at !== 'object') return null;
+          const rec = at as ArticleTagRecord;
+          return rec.tag ?? null;
+        })
+        .filter((t): t is { slug: string; name: string } => !!t)
+    : [];
 
   // Подгружаем venue-карточки по городу статьи (для перелинковки)
-  let relatedVenues: any[] = [];
+  let relatedVenues: VenueListItem[] = [];
   try {
     if (article.city?.slug) {
       const venuesRes = await api.getVenues({ city: article.city.slug, limit: 4, sort: 'rating' });
-      relatedVenues = venuesRes.items || [];
+      relatedVenues = (venuesRes.items as VenueListItem[]) || [];
     }
   } catch {
     // ignore
@@ -118,7 +144,7 @@ export default async function ArticlePage({ params }: Props) {
 
           {tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
-              {tags.map((t: any) => (
+              {tags.map((t) => (
                 <Link
                   key={t.slug}
                   href={`/tags/${t.slug}`}
@@ -153,7 +179,7 @@ export default async function ArticlePage({ params }: Props) {
         <section className="container-page max-w-3xl pb-10">
           <h2 className="text-xl font-bold text-slate-900">Упомянутые события</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {linkedEvents.map((event: any) => (
+            {linkedEvents.map((event) => (
               <EventCard
                 key={event.id}
                 slug={event.slug}
@@ -178,7 +204,7 @@ export default async function ArticlePage({ params }: Props) {
             Музеи и арт-пространства{article.city ? ` — ${article.city.name}` : ''}
           </h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {relatedVenues.map((venue: any) => (
+            {relatedVenues.map((venue) => (
               <VenueCard
                 key={venue.id}
                 slug={venue.slug}

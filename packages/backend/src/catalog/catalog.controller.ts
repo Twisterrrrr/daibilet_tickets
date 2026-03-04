@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, Post, Query, Req, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
@@ -119,6 +131,25 @@ export class CatalogController {
   @ApiOperation({ summary: 'Глобальные группы событий (одно шоу в разных городах/датах)' })
   getMultiEvents(@Query('sort') sort?: string, @Query('limit') limit?: number) {
     return this.catalogService.getMultiEvents({ sort, limit: limit ? Number(limit) : 20 });
+  }
+
+  @Get('multi-events/:slug')
+  @ApiOperation({ summary: 'Карточка группы событий (по slug)' })
+  getMultiEventBySlug(@Param('slug') slug: string) {
+    return this.catalogService.getMultiEventBySlug(slug);
+  }
+
+  @Get('multi-events/:slug/dates')
+  @ApiOperation({ summary: 'Даты группы событий по городу' })
+  getMultiEventDates(
+    @Param('slug') slug: string,
+    @Query('citySlug') citySlug?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!citySlug) {
+      throw new BadRequestException('citySlug is required');
+    }
+    return this.catalogService.getMultiEventDates(slug, citySlug, limit ? Number(limit) : undefined);
   }
 
   // --- События ---

@@ -11,7 +11,6 @@ import {
   HelpCircle,
   Loader2,
   MapPin,
-  Package,
   Phone,
   XCircle,
 } from 'lucide-react';

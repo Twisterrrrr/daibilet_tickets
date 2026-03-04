@@ -4,6 +4,10 @@ import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { adminApi } from '@/api/client';
+import { getEventQuality, type EventQuality, type EventQualityIssue, type QualityTabKey } from '@/api/adminEventsQuality';
+import { EventStatusLine } from '@/components/events/EventStatusLine';
+import { ScheduleTab } from '@/components/events/ScheduleTab';
+import { QualityBanner } from '@/components/events/QualityBanner';
 import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -170,6 +174,8 @@ interface EventDetail {
   override?: EventOverride | null;
 }
 
+type UiTab = 'general' | 'seo' | 'offers' | 'sessions' | 'rating';
+
 const SOURCE_LABELS: Record<string, string> = {
   TC: 'TicketsCloud',
   TEPLOHOD: 'Теплоход',
@@ -194,6 +200,11 @@ export function EventEditPage() {
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<UiTab>('general');
+
+  const [quality, setQuality] = useState<EventQuality | null>(null);
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [qualityError, setQualityError] = useState<string | null>(null);
 
   const [form, setForm] = useState<{
     title?: string;
@@ -227,10 +238,28 @@ export function EventEditPage() {
       .catch(() => setVenues([]));
   }, []);
 
+  const refreshQuality = useCallback(
+    async (eventId: string) => {
+      setQualityLoading(true);
+      setQualityError(null);
+      try {
+        const q = await getEventQuality(eventId);
+        setQuality(q);
+      } catch (e) {
+        setQuality(null);
+        setQualityError(e instanceof Error ? e.message : 'Ошибка загрузки качества');
+      } finally {
+        setQualityLoading(false);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     setError(null);
+    refreshQuality(id);
     adminApi
       .get<EventDetail>(`/admin/events/${id}`)
       .then((data) => {
@@ -255,7 +284,7 @@ export function EventEditPage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, refreshQuality]);
 
   const handleSave = async () => {
     if (!id) return;
@@ -289,6 +318,7 @@ export function EventEditPage() {
       }
 
       toast.success('Сохранено');
+      await refreshQuality(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
@@ -324,6 +354,7 @@ export function EventEditPage() {
           templateData: (ov as EventOverride)?.templateData ?? {},
         });
         toast.success('Override сброшен');
+        refreshQuality(id);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
       .finally(() => setSaving(false));
@@ -342,6 +373,26 @@ export function EventEditPage() {
   };
 
   const isHidden = event?.override?.isHidden ?? false;
+
+  const handleIssueClick = (tabKey: QualityTabKey, issue: EventQualityIssue) => {
+    const uiTab: UiTab =
+      tabKey === 'offers' ? 'offers' : tabKey === 'schedule' ? 'sessions' : tabKey === 'location' ? 'general' : 'general';
+    setActiveTab(uiTab);
+
+    requestAnimationFrame(() => {
+      const byField = issue.field ? document.querySelector<HTMLElement>(`[data-quality-field="${issue.field}"]`) : null;
+      if (byField) {
+        byField.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      const anchor = document.querySelector<HTMLElement>(`[data-quality-anchor="${tabKey}"]`);
+      if (anchor) {
+        anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  };
 
   if (loading) {
     return (
@@ -407,8 +458,23 @@ export function EventEditPage() {
         </Card>
       )}
 
+      <QualityBanner
+        quality={quality}
+        loading={qualityLoading}
+        error={qualityError}
+        isImported={event.source !== 'MANUAL'}
+        onIssueClick={handleIssueClick}
+      />
+
+      <EventStatusLine
+        isActive={event.isActive}
+        isHidden={isHidden}
+        issuesCount={quality?.issues?.length ?? 0}
+        quality={quality}
+      />
+
       {/* Tabs */}
-      <Tabs defaultValue="general" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as UiTab)} className="space-y-4">
         <TabsList>
           <TabsTrigger value="general">Основное</TabsTrigger>
           <TabsTrigger value="seo">SEO</TabsTrigger>
@@ -419,6 +485,7 @@ export function EventEditPage() {
 
         {/* ── General Tab ── */}
         <TabsContent value="general">
+          <div data-quality-anchor="main" />
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Данные события</CardTitle>
@@ -682,57 +749,14 @@ export function EventEditPage() {
 
         {/* ── Offers Tab ── */}
         <TabsContent value="offers">
+          <div data-quality-anchor="offers" />
           <OffersSection eventId={event.id} offers={event.offers || []} />
         </TabsContent>
 
         {/* ── Sessions Tab ── */}
         <TabsContent value="sessions">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Сеансы</CardTitle>
-              <CardDescription>Ближайшие даты проведения</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {event.sessions && event.sessions.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Дата / время</TableHead>
-                      <TableHead>Доступно билетов</TableHead>
-                      <TableHead>Цены</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {event.sessions.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-medium">
-                          {new Date(s.startsAt).toLocaleString('ru-RU', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </TableCell>
-                        <TableCell>{s.availableTickets}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {(() => {
-                            const p = s.prices;
-                            if (!p) return '—';
-                            if (Array.isArray(p)) return p.join(', ');
-                            if (typeof p === 'object' && p.min != null) return `${p.min}–${p.max ?? p.min}`;
-                            return String(p);
-                          })()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-center py-8 text-sm text-muted-foreground">Нет сеансов</p>
-              )}
-            </CardContent>
-          </Card>
+          <div data-quality-anchor="schedule" />
+          <ScheduleTab eventId={event.id} eventSource={event.source} />
         </TabsContent>
 
         {/* ── Rating Tab ── */}

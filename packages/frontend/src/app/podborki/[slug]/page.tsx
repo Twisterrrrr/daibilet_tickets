@@ -1,10 +1,12 @@
-import { ArrowRight, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import { ChevronDown, MapPin } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 
 import { EventCard } from '@/components/ui/EventCard';
 import { api } from '@/lib/api';
+import type { CollectionDetailResponse } from '@/lib/api.types';
+import type { EventListItem } from '@daibilet/shared';
 
 // ISR: обновлять каждые 6 часов
 export const revalidate = 21600;
@@ -47,7 +49,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
 
-  let data: any;
+  let data: CollectionDetailResponse;
   try {
     data = await api.getCollectionBySlug(slug, page);
   } catch {
@@ -65,7 +67,10 @@ export default async function CollectionPage({ params, searchParams }: Props) {
     );
   }
 
-  const { collection, events, total, totalPages, relatedCollections } = data;
+  const { collection, events = [], total = 0, totalPages = 1, relatedCollections = [] } = data as CollectionDetailResponse & {
+    events?: EventListItem[];
+    relatedCollections?: Array<{ slug: string; title: string; heroImage?: string | null; subtitle?: string | null }>;
+  };
   const infoBlocks: { title: string; text: string }[] = Array.isArray(collection.infoBlocks)
     ? collection.infoBlocks
     : [];
@@ -164,9 +169,9 @@ export default async function CollectionPage({ params, searchParams }: Props) {
 
           {events.length > 0 ? (
             <div className="grid gap-6 grid-cols-1 min-[361px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-              {events.map((event: any) => (
+              {events.map((event) => (
                 <div key={event.id} className="relative">
-                  {event.isPinned && (
+                  {(event as EventListItem & { isPinned?: boolean }).isPinned && (
                     <div className="absolute -top-2 left-3 z-10 rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-medium text-white shadow-sm">
                       Рекомендуем
                     </div>
@@ -272,7 +277,7 @@ export default async function CollectionPage({ params, searchParams }: Props) {
           <section className="mt-14">
             <h2 className="mb-6 text-2xl font-bold text-slate-900">Другие подборки</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {relatedCollections.map((rc: any) => (
+              {(relatedCollections as Array<{ slug: string; title: string; heroImage?: string | null; subtitle?: string | null }>).map((rc) => (
                 <Link
                   key={rc.slug}
                   href={`/podborki/${rc.slug}`}

@@ -46,6 +46,16 @@ export {
   getFirstPriceKopecks,
 } from './price-normalizer';
 
+export {
+  TeplohodWidgetQueryDto,
+  TeplohodWidgetEventDto,
+  TeplohodWidgetCheckoutReqDto,
+  TeplohodWidgetCheckoutResDto,
+  TeplohodWidgetLang,
+  TeplohodWidgetTheme,
+  TeplohodWidgetLayout,
+} from './dto/widgets/teplohod.dto';
+
 // --- Enums (дублируем из Prisma для использования на фронте) ---
 
 export enum EventCategory {
@@ -404,6 +414,10 @@ export interface EventListItem {
   templateData?: Record<string, unknown> | null;
   sessionTimes?: string[];
   highlights?: string[];
+  /** Address / location for display */
+  address?: string | null;
+  tagSlugs?: string[];
+  shortTitle?: string;
 }
 
 /** Единая карточка каталога: Event или Venue */
@@ -459,16 +473,29 @@ export interface EventDetail extends EventListItem {
   tags: { tag: TagItem }[];
   offers?: EventOffer[] | null;
   tcEventId?: string | null;
+  tcMetaEventId?: string | null;
   relatedEvents: EventListItem[];
+  /** TC widget data (Ticketscloud) */
+  tcData?: unknown;
+  /** Primary offer from API */
+  primaryOffer?: EventOffer | null;
+  /** Venue when event is at a venue */
+  venue?: { id: string; slug: string; name: string; shortTitle?: string; title?: string } | null;
+  /** External rating (e.g. TripAdvisor) */
+  externalRating?: number | null;
+  externalSource?: string | null;
+  source?: string;
 }
 
 export interface EventSession {
   id: string;
   startsAt: string;
-  endsAt: string | null;
+  endsAt?: string | null;
   availableTickets: number;
   prices: TicketPrice[];
   isActive?: boolean;
+  /** TC session ID (format: "{tcEventId}-{setName}") for widget */
+  tcSessionId?: string;
 }
 
 /** Оффер события (API EventDetail.offers) */
@@ -477,6 +504,13 @@ export interface EventOffer {
   status: string;
   purchaseType?: string;
   priceFrom?: number | null;
+  externalEventId?: string;
+  metaEventId?: string;
+  widgetProvider?: string;
+  widgetPayload?: Record<string, unknown>;
+  deeplink?: string;
+  source?: string;
+  badge?: string;
   [key: string]: unknown;
 }
 
@@ -830,6 +864,7 @@ export interface VenueDetail extends VenueListItem {
   metaTitle?: string | null;
   metaDescription?: string | null;
   relatedArticles?: any[];
+  relatedVenues?: VenueListItem[];
 }
 
 /** Интенсивность → описание */

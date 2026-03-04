@@ -22,9 +22,11 @@
     "docker:down": "docker compose down",
     "audit:debt": "bash scripts/tech-debt-audit.sh",
     "audit:debt:ci": "bash scripts/tech-debt-audit.sh --ci",
-    "typecheck": "pnpm --filter @daibilet/backend exec tsc --noEmit && pnpm --filter @daibilet/frontend exec tsc --noEmit"
+    "typecheck": "pnpm --filter @daibilet/backend exec tsc --noEmit && pnpm --filter @daibilet/frontend exec tsc --noEmit",
+    "prepare": "husky install"
   },
   "devDependencies": {
+    "@next/eslint-plugin-next": "^15.1.0",
     "@eslint/js": "^9.39.2",
     "concurrently": "^9.1.0",
     "eslint": "^9.39.2",
@@ -32,8 +34,13 @@
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.3.0",
     "prettier": "^3.8.1",
     "typescript-eslint": "^8.55.0"
+  },
+  "lint-staged": {
+    "packages/frontend/src/**/*.{ts,tsx,js,jsx}": "npx eslint --max-warnings=0"
   },
   "engines": {
     "node": ">=20.0.0",

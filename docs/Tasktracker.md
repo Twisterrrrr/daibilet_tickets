@@ -147,7 +147,23 @@
 - [x] **Высокий**: Cache invalidate в Settings (scope + ids → /admin/cache/invalidate) ✅
 - [x] **Средний**: Support escalation checklist — `docs/SupportEscalation.md` ✅
 
-### Gate 3 — контент/SEO минимум для индексации
+### Gate 2.5 — админка событий (готовность, расписание, поставщики)
+
+> Спецификация: `docs/AdminScheduleSpec.md`, pipeline: `docs/AdminSchedulePipeline.md`. Поставщики: см. раздел ниже.
+
+- [ ] **Высокий**: PR1 — GET /admin/events/:id/quality (on-demand), UI «Причины неактивности» + подсветка вкладок, field→tabKey
+- [ ] **Высокий**: PR1 — Статус: isHidden ≠ активность, одна строка «В каталоге / Скрыто вручную / Причины» (без forceActive на MVP)
+- [ ] **Высокий**: PR2 — Миграции (порядок: 1) pre-unique-safety, 2) admin_schedule_capacity)
+- [ ] **Высокий**: PR2 — Вкладка «Расписание» — таблица date×00–23, draft-create, модалка минут, POST sessions/batch-create
+- [ ] **Высокий**: PR2 — Контекстное меню слота, Модель A при sold>0, PATCH capacity/delete/cancel
+- [ ] **Высокий**: PR2 checklist перед merge: индексы package_items(sessionId[,status]) в БД; tcSessionId не пустой; нет дублей (eventId,startsAt)
+- [ ] **Высокий**: PR3 — Events — колонка groupingKey + фильтр; раздел «Группы событий»
+- [ ] **Высокий**: PR4 — /admin/seo-audit, GET /admin/seo/audit, seo_issues
+- [ ] **Высокий**: PR‑S1 — Admin SuppliersList v1 (реестр поставщиков: имя, тип, статус, события, площадки, комиссия, последняя активность; фильтры; быстрые действия)
+- [ ] **Высокий**: PR‑S2 — Admin SupplierDetail v1 (Профиль/События/Площадки/Финансы/Доступ; смена статуса ACTIVE/FROZEN; изменение комиссии)
+- [ ] **Средний**: PR‑S3 — Supplier EventsList/EventEdit v1.5 (упрощённый UX: базовые поля, подсказки качества, без перегруза override/SEO)
+
+### Gate 3 — контент/SEO минимум для индексации (3+ мес)
 
 - [ ] **Критический**: SEO-описания для всех городов (уникальные, не шаблонные)
 - [ ] **Критический**: SEO-описания для ТОП-10 площадок (venues)
@@ -155,30 +171,13 @@
 - [x] **Высокий**: Базовый JSON-LD и meta-теги на городах, venues, событиях, комбо ✅ (buildPageMetadata, og+twitter)
 - [x] **Высокий**: Аудит PageTemplateSpecs — соответствие реализаций фронта/админки описанным шаблонам ✅ (docs/PageTemplateSpecsAudit.md)
 - [ ] **Средний**: Контентный план — 30 статей (ArticlePlanner)
-- [ ] **Средний**: Отображение «Музеи» (детальная страница venue) — режим работы, галерея, выставки (см. `docs/Reference.md` §1)
+- [ ] **Средний** (3+ мес): Отображение «Музеи» (детальная страница venue) — режим работы, галерея, выставки (см. `docs/Reference.md` §1)
 - [ ] **Средний**: Аудит категоризации — SQL-отчёт уже из Gate 1 можно переиспользовать как инструмент SEO
 - [x] **Высокий**: Event Quality Gate — `EventQualityService.validateForPublish` + `/admin/events/:id/publish` ✅ (+ NO_VALID_PRICE для офферов без цены)
 - [x] **Высокий**: EventOverride.subcategories — явная семантика INHERIT/OVERRIDE/CLEAR + subcategoriesOverride (SubcategoriesMode enum + Prisma migration)
 - [ ] **Средний**: Нормализация категорий/аудиторий после импорта (детерминированный маппинг TC/TEP → EventCategory/EventSubcategory)
 - [ ] **Средний**: Нормализация location/venue (venueId ИЛИ meetingPoint/address; MISSING_LOCATION блокирует publish)
 - [ ] **Средний**: Нормализация offers (ACTIVE только для продаваемых, наличие хотя бы одного ACTIVE offer как publish-gate)
-
----
-
-## Админка: Teplohod-style расписание и готовность (6+ мес)
-
-> Спецификация: `docs/AdminScheduleSpec.md`. План PR: PR1 quality → PR2 расписание → PR3 мультисобытия → PR4 SEO-аудит.
-
-- [ ] **PR1** (⏸ 6+ мес): GET /admin/events/:id/quality (on-demand), UI «Причины неактивности» + подсветка вкладок, field→tabKey
-- [ ] **PR1** (⏸ 6+ мес): Статус: isHidden ≠ активность, одна строка «В каталоге / Скрыто вручную / Причины» (без forceActive на MVP)
-- [ ] **PR2** (⏸ 6+ мес): Миграции (порядок: 1) pre-unique-safety, 2) admin_schedule_capacity)
-- [ ] **PR2** (⏸ 6+ мес): Вкладка «Расписание» — таблица date×00–23, draft-create, модалка минут, POST sessions/batch-create
-- [ ] **PR2** (⏸ 6+ мес): Контекстное меню слота, Модель A при sold>0, PATCH capacity/delete/cancel
-- [ ] **PR2 checklist перед merge**: индексы package_items(sessionId[,status]) в БД; tcSessionId не пустой; нет дублей (eventId,startsAt)
-- [ ] **PR3** (⏸ 6+ мес): Events — колонка groupingKey + фильтр; раздел «Группы событий»
-- [ ] **PR4** (⏸ 6+ мес): /admin/seo-audit, GET /admin/seo/audit, seo_issues
-
----
 
 ## После запуска / 6+ мес
 

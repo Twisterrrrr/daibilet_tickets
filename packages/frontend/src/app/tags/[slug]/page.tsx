@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { EventCard } from '@/components/ui/EventCard';
 import { api } from '@/lib/api';
+import type { TagDetailPage } from '@/lib/api.types';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TagPage({ params }: Props) {
   const { slug } = await params;
-  let data: any = null;
+  let data: TagDetailPage | null = null;
   try {
     data = await api.getTagBySlug(slug);
   } catch {
@@ -37,7 +38,7 @@ export default async function TagPage({ params }: Props) {
     );
   }
 
-  const { tag, events, total } = data;
+  const { tag, events = [], total = 0 } = data;
 
   return (
     <div className="container-page py-10">
@@ -58,7 +59,7 @@ export default async function TagPage({ params }: Props) {
       {/* Events */}
       {events.length > 0 ? (
         <div className="grid gap-4 grid-cols-1 min-[361px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-          {events.map((event: any) => (
+          {events.map((event) => (
             <EventCard
               key={event.id}
               slug={event.slug}

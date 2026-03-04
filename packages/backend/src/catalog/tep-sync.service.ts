@@ -254,7 +254,7 @@ export class TepSyncService {
     const normalizedTitle = title ? normalizeEventTitle(title).toLowerCase() : null;
     const groupingKey =
       normalizedTitle && category
-        ? `${category}::${normalizedTitle}::${durationMinutes ?? 'na'}::${minAge ?? 0}`
+        ? `v1::${category}::${normalizedTitle}::${durationMinutes ?? 'na'}::${minAge ?? 0}`
         : null;
 
     if (existing) {

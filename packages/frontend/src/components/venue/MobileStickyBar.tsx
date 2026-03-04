@@ -1,7 +1,7 @@
 'use client';
 
 import { formatPrice } from '@daibilet/shared';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface MobileStickyBarProps {
   priceFrom: number | null;

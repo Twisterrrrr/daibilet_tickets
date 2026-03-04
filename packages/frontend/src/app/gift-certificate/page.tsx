@@ -10,7 +10,12 @@ export const metadata: Metadata = {
 };
 
 export default async function GiftCertificatePage() {
-  const { denominations } = await api.getGiftCertificateDenominations();
-
+  let denominations: number[] = [];
+  try {
+    const res = await api.getGiftCertificateDenominations();
+    denominations = res?.denominations ?? [];
+  } catch {
+    // Backend may be unavailable during build
+  }
   return <GiftCertificateClient denominations={denominations} />;
 }

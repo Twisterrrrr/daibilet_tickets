@@ -7,10 +7,11 @@ import { useEffect, useState } from 'react';
 import { EventCard } from '@/components/ui/EventCard';
 import { useFavorites } from '@/hooks/useFavorites';
 import { api } from '@/lib/api';
+import type { EventListItem } from '@daibilet/shared';
 
 export default function FavoritesPage() {
   const { slugs, mounted } = useFavorites();
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<EventListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function FavoritesPage() {
         </div>
       ) : (
         <div className="mt-8 grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {events.map((event: any) => (
+          {events.map((event) => (
             <EventCard
               key={event.id}
               slug={event.slug}

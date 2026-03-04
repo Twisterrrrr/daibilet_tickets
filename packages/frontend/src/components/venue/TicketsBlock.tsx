@@ -283,7 +283,7 @@ function OfferCard({
 }
 
 // ─── Main Component ───────────────────────────────
-export function TicketsBlock({ offers, isOpenDate = false, venueName, website }: TicketsBlockProps) {
+export function TicketsBlock({ offers, isOpenDate = false, venueName: _venueName, website }: TicketsBlockProps) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [quantity, setQuantity] = useState(1);
 

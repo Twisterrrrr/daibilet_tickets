@@ -1,16 +1,20 @@
 'use client';
 
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
 import { ReviewSection } from '@/components/ui/ReviewSection';
-import { api } from '@/lib/api';
 
 function ReviewWriteContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
-  const [eventData, setEventData] = useState<any>(null);
+  const [eventData, setEventData] = useState<{
+    eventId: string;
+    eventSlug: string;
+    eventTitle: string;
+    email: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 

@@ -1,3 +1,4 @@
+import type { CityListItem } from '@daibilet/shared';
 import type { Metadata } from 'next';
 
 import { CityCard } from '@/components/ui/CityCard';
@@ -9,8 +10,31 @@ export const metadata: Metadata = {
     'Выберите город для посещения. Билеты на экскурсии, музеи и мероприятия в Москве, Петербурге, Казани, Владимире, Ярославле и других городах.',
 };
 
+type CityCardVM = {
+  id: string;
+  slug: string;
+  name: string;
+  heroImage: string | null;
+  eventCount: number;
+  venueCount: number;
+  description?: string | null;
+};
+
+function toCityCardVM(c: CityListItem): CityCardVM {
+  const count = c._count ?? { events: 0 };
+  const ext = c as CityListItem & { museumCount?: number; _count?: { venues?: number } };
+  return {
+    id: c.id,
+    slug: c.slug,
+    name: c.name,
+    heroImage: c.heroImage,
+    eventCount: count.events ?? 0,
+    venueCount: ext.museumCount ?? ext._count?.venues ?? 0,
+  };
+}
+
 export default async function CitiesPage() {
-  let cities: any[] = [];
+  let cities: CityListItem[] = [];
   try {
     cities = await api.getCities();
   } catch {
@@ -28,19 +52,20 @@ export default async function CitiesPage() {
       {/* Cities grid */}
       {cities.length > 0 ? (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {cities.map((city: any) => (
-            <CityCard
-              key={city.id}
-              slug={city.slug}
-              name={city.name}
-              heroImage={city.heroImage}
-              eventCount={city._count?.events ?? 0}
-              venueCount={city.museumCount ?? city._count?.venues ?? 0}
-              description={city.description}
-              region={city.region ?? null}
-              large
-            />
-          ))}
+          {cities.map((city) => {
+            const vm = toCityCardVM(city);
+            return (
+              <CityCard
+                key={vm.id}
+                slug={vm.slug}
+                name={vm.name}
+                heroImage={vm.heroImage}
+                eventCount={vm.eventCount}
+                venueCount={vm.venueCount}
+                large
+              />
+            );
+          })}
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-slate-300 py-20 text-center">

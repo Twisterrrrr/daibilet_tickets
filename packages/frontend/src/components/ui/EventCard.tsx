@@ -1,6 +1,11 @@
 'use client';
 
-import { type EventCategory, type EventSubcategory, formatPrice } from '@daibilet/shared';
+import {
+  formatPrice,
+  type EventAudience,
+  type EventCategory,
+  type EventSubcategory,
+} from '@daibilet/shared';
 import { Award, Clock, Flame, MapPin, Star, Ticket } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -8,40 +13,36 @@ import { useRouter } from 'next/navigation';
 
 import { FavoriteButton } from './FavoriteButton';
 
-interface EventCardProps {
+export type EventCardVM = {
+  id?: string;
   slug: string;
   title: string;
-  category: EventCategory;
+  category?: EventCategory | string | null;
   subcategories?: EventSubcategory[];
-  audience?: string;
+  audience?: EventAudience | null;
   tagSlugs?: string[];
-  imageUrl: string | null;
-  priceFrom: number | null;
+  imageUrl?: string | null;
+  priceFrom?: number | null;
+  rating?: number | null;
+  reviewCount?: number;
+  durationMinutes?: number | null;
+  city?: { slug: string; name: string } | null;
+  address?: string | null;
+  totalAvailableTickets?: number;
+  departingSoonMinutes?: number | null;
+  nextSessionAt?: string | null;
+  isOptimalChoice?: boolean;
+  dateMode?: string | null;
+  groupSize?: string | null;
+  sessionTimes?: string[];
+  highlights?: string[];
+};
+
+type EventCardProps = EventCardVM & {
   /** Старая цена в копейках — для бейджа скидки и зачёркнутой цены */
   priceOriginalKopecks?: number | null;
-  rating: number;
-  reviewCount: number;
-  durationMinutes: number | null;
-  city?: { slug: string; name: string };
-  address?: string | null;
   compact?: boolean;
-  /** Сумма свободных мест по ближайшим сеансам */
-  totalAvailableTickets?: number;
-  /** Минут до ближайшего сеанса (1–120) — показываем бейдж «Начнётся скоро» */
-  departingSoonMinutes?: number;
-  /** Дата ближайшего сеанса (ISO) */
-  nextSessionAt?: string;
-  /** Лучшее событие по scoring-алгоритму */
-  isOptimalChoice?: boolean;
-  /** Режим даты: SCHEDULED (обычный) или OPEN_DATE (музеи) */
-  dateMode?: string;
-  /** Размер группы: "1–8 чел." */
-  groupSize?: string | null;
-  /** Слоты времени на сегодня: ["12:30", "13:30", ...] */
-  sessionTimes?: string[];
-  /** 3 highlights: локация, маршрут, экскурсия от гида и т.п. */
-  highlights?: string[];
-}
+};
 
 /** Порог: при скольких оставшихся местах показывать "Осталось N мест" */
 const LOW_TICKETS_THRESHOLD = 20;
@@ -67,16 +68,16 @@ export function EventCard({
   slug,
   title,
   category,
-  subcategories = [],
-  audience,
-  tagSlugs = [],
+  subcategories: _subcategories = [],
+  audience: _audience,
+  tagSlugs: _tagSlugs = [],
   imageUrl,
   priceFrom,
   rating,
   reviewCount,
   durationMinutes,
   city,
-  address,
+  address: _address,
   compact = false,
   totalAvailableTickets,
   departingSoonMinutes,
@@ -89,9 +90,10 @@ export function EventCard({
   highlights = [],
 }: EventCardProps) {
   const router = useRouter();
+  const safeReviewCount = reviewCount ?? 0;
   const showLowTickets =
     totalAvailableTickets !== undefined && totalAvailableTickets > 0 && totalAvailableTickets <= LOW_TICKETS_THRESHOLD;
-  const showPopular = reviewCount >= 100;
+  const showPopular = safeReviewCount >= 100;
   const hasDiscount =
     priceOriginalKopecks != null &&
     priceOriginalKopecks > 0 &&
@@ -178,7 +180,7 @@ export function EventCard({
         </div>
 
         {/* Bottom-right фото: цена — синий pill */}
-        {priceFrom !== null && priceFrom > 0 && (
+        {priceFrom != null && priceFrom > 0 && (
           <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5 sm:bottom-3 sm:right-3">
             {hasDiscount && priceOriginalKopecks && (
               <span className="text-[10px] font-medium text-white/90 line-through drop-shadow-md sm:text-xs">
@@ -215,7 +217,7 @@ export function EventCard({
             {Number(rating) > 0 ? (
               <>
                 <span className="font-medium text-slate-700">{Number(rating).toFixed(1)}</span>
-                {reviewCount > 0 && <span className="text-slate-400">({reviewCount})</span>}
+                {safeReviewCount > 0 && <span className="text-slate-400">({safeReviewCount})</span>}
               </>
             ) : (
               <span className="font-medium text-slate-400">Новое</span>

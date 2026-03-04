@@ -1,34 +1,15 @@
-import { formatPrice, VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
+import { formatPrice, VENUE_TYPE_LABELS, type VenueType, type VenueListItem } from '@daibilet/shared';
 import { MapPin, Star, Train } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-interface VenueCardProps {
-  slug: string;
-  title: string;
-  shortTitle?: string | null;
-  venueType: string;
-  imageUrl?: string | null;
-  address?: string | null;
-  metro?: string | null;
-  priceFrom?: number | null;
-  rating: number;
-  reviewCount: number;
-  city?: { name: string; slug: string } | null;
-}
+type VenueCardProps = Omit<VenueListItem, 'id'> & {
+  /** id для совместимости, но не обязателен для отображения */
+  id?: string;
+  className?: string;
+};
 
-export function VenueCard({
-  slug,
-  title,
-  venueType,
-  imageUrl,
-  address,
-  metro,
-  priceFrom,
-  rating,
-  reviewCount,
-  city,
-}: VenueCardProps) {
+export function VenueCard({ slug, title, venueType, imageUrl, address, metro, priceFrom, rating, reviewCount }: VenueCardProps) {
   const typeLabel = VENUE_TYPE_LABELS[venueType as VenueType] || venueType;
 
   return (

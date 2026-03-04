@@ -14,7 +14,7 @@
 
 declare global {
   interface Window {
-    ym?: (id: number, action: string, target: string, params?: Record<string, any>) => void;
+    ym?: (id: number, action: string, target: string, params?: Record<string, unknown>) => void;
   }
 }
 
@@ -23,7 +23,7 @@ const YM_ID = typeof window !== 'undefined' ? Number(process.env.NEXT_PUBLIC_YM_
 /**
  * Отправить цель в Яндекс Метрику.
  */
-export function reachGoal(target: string, params?: Record<string, any>) {
+export function reachGoal(target: string, params?: Record<string, unknown>) {
   if (typeof window === 'undefined' || !YM_ID || !window.ym) return;
   try {
     window.ym(YM_ID, 'reachGoal', target, params);

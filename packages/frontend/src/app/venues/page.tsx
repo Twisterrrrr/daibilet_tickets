@@ -1,4 +1,4 @@
-import { VENUE_TYPE_LABELS, type VenueType } from '@daibilet/shared';
+import type { VenueListItem } from '@daibilet/shared';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -27,7 +27,7 @@ interface Props {
 export default async function VenuesPage({ searchParams }: Props) {
   const { city, venueType, sort, page } = await searchParams;
 
-  let venues: any;
+  let venues: { items: VenueListItem[]; total: number; page: number; totalPages: number };
   try {
     venues = await api.getVenues({
       ...(city && { city }),
@@ -41,7 +41,7 @@ export default async function VenuesPage({ searchParams }: Props) {
   }
 
   // Fetch cities for filter
-  let cities: any[] = [];
+  let cities: { slug: string; name: string }[] = [];
   try {
     cities = await api.getCities(true);
   } catch {
@@ -85,7 +85,7 @@ export default async function VenuesPage({ searchParams }: Props) {
         {/* Grid */}
         {venues.items.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mt-6">
-            {venues.items.map((v: any) => (
+            {venues.items.map((v) => (
               <VenueCard key={v.id} {...v} />
             ))}
           </div>

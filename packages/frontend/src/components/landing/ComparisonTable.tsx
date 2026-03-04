@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, ExternalLink, MapPin, Ship, Star, Users } from 'lucide-react';
+import { Clock, ExternalLink, Ship, Star, Users } from 'lucide-react';
 
 import { TcWidgetButton } from '@/components/ui/TcWidget';
 

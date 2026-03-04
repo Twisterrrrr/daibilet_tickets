@@ -29,7 +29,162 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+// ─── Event Quality (readiness) ──────────────────────────────────────
+
+export class EventQualityIssueDto {
+  @ApiProperty()
+  @IsString()
+  code!: string;
+
+  @ApiProperty()
+  @IsString()
+  message!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  field?: string;
+
+  @ApiProperty({ enum: ['BLOCKING', 'WARNING'] })
+  @IsString()
+  severity!: 'BLOCKING' | 'WARNING';
+
+  @ApiProperty({ enum: ['main', 'location', 'offers', 'schedule'] })
+  @IsString()
+  tabKey!: 'main' | 'location' | 'offers' | 'schedule';
+}
+
+export class EventQualityDto {
+  @ApiProperty()
+  @IsBoolean()
+  isSellable!: boolean;
+
+  @ApiProperty({ type: [EventQualityIssueDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EventQualityIssueDto)
+  issues!: EventQualityIssueDto[];
+}
+
 // ─── Nested: Create Event Offer ────────────────────────────────────
+
+export class AdminEventSessionRowDto {
+  @ApiProperty()
+  @IsString()
+  id!: string;
+
+  @ApiProperty()
+  @IsString()
+  startsAt!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  endsAt?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  capacity?: number | null;
+
+  @ApiProperty()
+  @IsInt()
+  soldCount!: number;
+
+  @ApiProperty()
+  @IsBoolean()
+  locked!: boolean;
+
+  @ApiPropertyOptional({ enum: ['SOLD', 'PAST', 'IMPORTED', 'OTHER'] })
+  @IsOptional()
+  @IsString()
+  lockReason?: 'SOLD' | 'PAST' | 'IMPORTED' | 'OTHER';
+
+  @ApiProperty()
+  @IsBoolean()
+  isCancelled!: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  canceledAt?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  cancelReason?: string | null;
+}
+
+export class AdminEventSessionsRangeDto {
+  @ApiProperty()
+  @IsString()
+  eventId!: string;
+
+  @ApiProperty()
+  @IsString()
+  from!: string;
+
+  @ApiProperty()
+  @IsString()
+  to!: string;
+
+  @ApiProperty({ description: 'Количество отменённых сеансов в выбранном диапазоне' })
+  @IsInt()
+  cancelledCount!: number;
+
+  @ApiProperty({ type: [AdminEventSessionRowDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdminEventSessionRowDto)
+  rows!: AdminEventSessionRowDto[];
+}
+
+export class AdminCreateSessionDto {
+  @ApiProperty({ description: 'Дата/время начала сеанса (ISO 8601)' })
+  @IsISO8601()
+  startsAt!: string;
+
+  @ApiPropertyOptional({ description: 'Дата/время окончания сеанса (ISO 8601)' })
+  @IsOptional()
+  @IsISO8601()
+  endsAt?: string | null;
+
+  @ApiPropertyOptional({ description: 'Вместимость слота; если не задана, используется Event.defaultCapacityTotal' })
+  @IsOptional()
+  @IsInt()
+  capacity?: number | null;
+}
+
+export class AdminUpdateSessionDto {
+  @ApiPropertyOptional({ description: 'Новая дата/время начала (ISO 8601)' })
+  @IsOptional()
+  @IsISO8601()
+  startsAt?: string;
+
+  @ApiPropertyOptional({ description: 'Новая дата/время окончания (ISO 8601)' })
+  @IsOptional()
+  @IsISO8601()
+  endsAt?: string | null;
+
+  @ApiPropertyOptional({ description: 'Новая вместимость слота' })
+  @IsOptional()
+  @IsInt()
+  capacity?: number | null;
+}
+
+export class AdminStopSessionDto {
+  @ApiPropertyOptional({ description: 'Причина остановки/отмены сеанса (для аудита)' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class AdminCancelSessionDto {
+  @ApiPropertyOptional({ description: 'Причина отмены сеанса (для аудита)' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
 
 export class CreateEventOfferDto {
   @ApiProperty({ enum: OfferSource })

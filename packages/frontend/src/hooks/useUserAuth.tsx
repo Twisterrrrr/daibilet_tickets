@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 import { api } from '@/lib/api';
+import { noop } from '@/lib/noop';
 import { clearStoredToken, getStoredToken, setStoredToken } from '@/lib/user-auth';
 
 interface User {
@@ -54,7 +55,7 @@ export function UserAuthProvider({ children }: { children: React.ReactNode }) {
             return validateToken(res.accessToken);
           }
         })
-        .catch(() => {})
+        .catch(noop)
         .finally(() => setIsLoading(false));
       return;
     }

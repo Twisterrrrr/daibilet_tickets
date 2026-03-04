@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
+import { toComboListVM, type ComboListVM } from './_comboVm';
 
 export const revalidate = 21600;
 
@@ -14,19 +15,22 @@ export const metadata: Metadata = {
 };
 
 export default async function CombosListPage() {
-  let combos: any[] = [];
+  let rawCombos: Awaited<ReturnType<typeof api.getCombos>> = [];
   try {
-    combos = await api.getCombos();
+    rawCombos = await api.getCombos();
   } catch {
     // API недоступен
   }
 
+  const combos = rawCombos.map(toComboListVM).filter((c) => c.city != null);
+
   // Группировка по городам
-  const byCity = new Map<string, { city: any; combos: any[] }>();
+  const byCity = new Map<string, { city: { slug: string; name: string }; combos: ComboListVM[] }>();
   for (const combo of combos) {
-    const citySlug = combo.city.slug;
+    const city = combo.city!;
+    const citySlug = city.slug;
     if (!byCity.has(citySlug)) {
-      byCity.set(citySlug, { city: combo.city, combos: [] });
+      byCity.set(citySlug, { city, combos: [] });
     }
     byCity.get(citySlug)!.combos.push(combo);
   }
@@ -60,7 +64,7 @@ export default async function CombosListPage() {
                 <h2 className="text-2xl font-bold text-gray-900">{city.name}</h2>
               </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {cityCombos.map((combo: any) => (
+                {cityCombos.map((combo) => (
                   <Link
                     key={combo.slug}
                     href={`/combo/${combo.slug}`}
@@ -79,7 +83,12 @@ export default async function CombosListPage() {
                       <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          {combo.dayCount} {combo.dayCount === 1 ? 'день' : combo.dayCount < 5 ? 'дня' : 'дней'}
+                          {(combo.dayCount ?? 0)}{' '}
+                          {(combo.dayCount ?? 0) === 1
+                            ? 'день'
+                            : (combo.dayCount ?? 0) < 5
+                              ? 'дня'
+                              : 'дней'}
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
@@ -95,10 +104,10 @@ export default async function CombosListPage() {
                       {/* Features */}
                       {combo.features && (
                         <div className="space-y-2 mb-4">
-                          {(combo.features as any[]).slice(0, 3).map((f: any, i: number) => (
+                          {(combo.features ?? []).slice(0, 3).map((f, i) => (
                             <div key={i} className="flex items-center gap-2 text-sm">
-                              <span>{f.icon}</span>
-                              <span className="text-gray-700">{f.title}</span>
+                              <span>{f.icon ?? ''}</span>
+                              <span className="text-gray-700">{f.title ?? ''}</span>
                             </div>
                           ))}
                         </div>
@@ -106,11 +115,11 @@ export default async function CombosListPage() {
 
                       {/* Price + CTA */}
                       <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                        {combo.suggestedPrice ? (
+                        {(combo.suggestedPrice ?? 0) > 0 ? (
                           <div>
                             <span className="text-sm text-gray-500">от </span>
                             <span className="text-xl font-bold text-indigo-700">
-                              {formatPrice(combo.suggestedPrice)}
+                              {formatPrice(combo.suggestedPrice ?? 0)}
                             </span>
                             <span className="text-sm text-gray-500"> / 2 чел.</span>
                           </div>

@@ -92,13 +92,13 @@ export function TcSessionSlot({
 }: {
   session: {
     id: string;
-    tcSessionId: string;
+    tcSessionId?: string;
     startsAt: string;
     availableTickets: number;
-    isActive: boolean;
+    isActive?: boolean;
   };
 }) {
-  const tcEventId = extractTcEventId(session.tcSessionId);
+  const tcEventId = extractTcEventId(session.tcSessionId ?? '');
 
   if (!tcEventId || !TC_TOKEN) {
     // Без токена или без ID — рендерим обычную (не кликабельную) строку
