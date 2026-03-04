@@ -1,21 +1,23 @@
 import type { EventQuality } from '@/api/adminEventsQuality';
-import { Badge } from '@/components/ui/badge';
+import { InCatalogBadge } from '@/components/InCatalogBadge';
 
 type Props = {
   isActive: boolean;
   isHidden: boolean;
   issuesCount: number;
   quality: EventQuality | null;
+  supplierIsActive?: boolean;
 };
 
-export function EventStatusLine({ isActive, isHidden, issuesCount, quality }: Props) {
-  const inCatalog = isActive && !isHidden;
+export function EventStatusLine({ isActive, isHidden, issuesCount, quality, supplierIsActive }: Props) {
+  const supplierActive = supplierIsActive ?? true;
+  const inCatalog = isActive && !isHidden && supplierActive;
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-md border bg-background p-2 text-xs">
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground">В каталоге:</span>
-        <Badge variant={inCatalog ? 'outline' : 'destructive'}>{inCatalog ? 'Да' : 'Нет'}</Badge>
+        <InCatalogBadge inCatalog={inCatalog} />
       </div>
 
       <div className="flex items-center gap-2">
@@ -36,7 +38,13 @@ export function EventStatusLine({ isActive, isHidden, issuesCount, quality }: Pr
           </Badge>
         </div>
       )}
+
+      {supplierActive === false && (
+        <div className="text-[11px] text-amber-700">
+          Поставщик заморожен — продажи отключены на уровне поставщика.
+        </div>
+      )}
     </div>
   );
 }
-*** End Patch ***!
+

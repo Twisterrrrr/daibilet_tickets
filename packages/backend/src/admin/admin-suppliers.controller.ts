@@ -102,6 +102,98 @@ export class AdminSuppliersController {
   }
 
   /**
+   * Список событий поставщика (по operatorId в офферах).
+   */
+  @Get(':id/events')
+  async listSupplierEvents(
+    @Param('id') id: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('sort') sort?: 'title' | 'createdAt' | 'nearestSession',
+    @Query('dir') dir?: 'asc' | 'desc',
+  ) {
+    const supplier = await this.prisma.operator.findUnique({ where: { id, isSupplier: true } });
+    if (!supplier) throw new NotFoundException('Поставщик не найден');
+
+    const where: any = {
+      isDeleted: false,
+      offers: { some: { operatorId: id } },
+    };
+
+    if (search) {
+      const trimmed = search.trim();
+      if (trimmed) {
+        where.OR = [
+          { title: { contains: trimmed, mode: 'insensitive' } },
+          { slug: { contains: trimmed, mode: 'insensitive' } },
+        ];
+      }
+    }
+
+    const now = new Date();
+
+    const pageNum = Math.max(1, Number(page) || 1);
+    const take = Math.min(100, Number(pageSize) || 20);
+    const skip = (pageNum - 1) * take;
+
+    const orderBy: Prisma.EventOrderByWithRelationInput =
+      sort === 'title'
+        ? { title: dir === 'asc' ? 'asc' : 'desc' }
+        : sort === 'createdAt'
+        ? { createdAt: dir === 'asc' ? 'asc' : 'desc' }
+        : { updatedAt: dir === 'asc' ? 'asc' : 'desc' };
+
+    const [events, total] = await Promise.all([
+      this.prisma.event.findMany({
+      where,
+        orderBy,
+        skip,
+        take,
+      include: {
+        city: { select: { name: true } },
+        sessions: {
+          where: { isActive: true, canceledAt: null, startsAt: { gt: now } },
+          orderBy: { startsAt: 'asc' },
+          take: 1,
+        },
+        offers: {
+          where: { operatorId: id },
+          orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
+          take: 1,
+          include: {
+            operator: { select: { id: true, isActive: true } },
+          },
+        },
+      }),
+      this.prisma.event.count({ where }),
+    ]);
+
+    const items = events.map((e) => {
+      const primaryOffer = e.offers[0];
+      const nearestSession = e.sessions[0];
+      const supplierIsActive = primaryOffer?.operator?.isActive ?? true;
+
+      return {
+        id: e.id,
+        title: e.title,
+        cityName: e.city?.name ?? null,
+        source: e.source,
+        isActive: e.isActive,
+        supplierIsActive,
+        nearestSession: nearestSession?.startsAt?.toISOString?.() ?? null,
+      };
+    });
+
+    return {
+      items,
+      total,
+      page: pageNum,
+      pageSize: take,
+    };
+  }
+
+  /**
    * Обновить поставщика (комиссия, trust level, промо).
    */
   @Patch(':id')
