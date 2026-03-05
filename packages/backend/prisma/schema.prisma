@@ -362,7 +362,7 @@ model RegionCity {
 model Event {
   id                  String             @id @default(uuid()) @db.Uuid
   source              EventSource        @default(TC)
-  tcEventId           String             @unique // TC: "6980...", Teplohod: "tep-282"
+  tcEventId           String?            @db.Text // TC: "6980...", Teplohod: "123"
   tcMetaEventId       String? // ID группы MetaEvent из TC (для повторяющихся)
   cityId              String             @db.Uuid
   title               String
@@ -445,6 +445,8 @@ model Event {
   reviewRequests  ReviewRequest[]
   orderRequests   OrderRequest[]
 
+  @@unique([source, tcEventId])
+  @@index([source, tcEventId])
   @@index([cityId, category])
   @@index([groupingKey])
   @@index([groupingKey, cityId])

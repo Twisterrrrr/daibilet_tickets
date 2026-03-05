@@ -23,8 +23,38 @@ export function SuppliersListPage() {
     const params = new URLSearchParams();
     if (s) params.set('search', s);
     adminApi.get(`/admin/suppliers?${params}`).then((res: any) => {
-      setSuppliers(res.items || []);
-      setTotal(res.total || 0);
+      const baseItems = res.items || [];
+      const eventCountsBySource = res.eventCountsBySource || {};
+      const tcEvents = Number(eventCountsBySource.TC || eventCountsBySource.Tc || 0);
+      const teplohodEvents = Number(eventCountsBySource.TEPLOHOD || eventCountsBySource.Teplohod || 0);
+
+      // Виртуальные агрегаторы (источники инвентаря), чтобы видеть их в списке поставщиков
+      const aggregators = [
+        {
+          id: 'agg:ticketscloud',
+          name: 'Ticketscloud',
+          companyName: 'Ticketscloud',
+          contactEmail: '',
+          trustLevel: 2,
+          commissionRate: 0,
+          promoRate: null,
+          _count: { events: tcEvents },
+          successfulSales: 0,
+        },
+        {
+          id: 'agg:teplohod',
+          name: 'Teplohod.info',
+          companyName: 'Teplohod.info',
+          contactEmail: '',
+          trustLevel: 1,
+          commissionRate: 0,
+          promoRate: null,
+          _count: { events: teplohodEvents },
+          successfulSales: 0,
+        },
+      ];
+      setSuppliers([...baseItems, ...aggregators]);
+      setTotal((res.total || 0) + aggregators.length);
     });
   };
 
@@ -60,14 +90,28 @@ export function SuppliersListPage() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {suppliers.map((s) => (
-              <tr key={s.id} className="hover:bg-muted/30">
-                <td className="px-4 py-3">
-                  <Link to={`/suppliers/${s.id}`} className="font-medium text-primary hover:underline">
-                    {s.companyName || s.name}
-                  </Link>
-                  {s.inn && <span className="text-xs text-muted-foreground ml-2">ИНН: {s.inn}</span>}
-                </td>
+            {suppliers.map((s) => {
+              const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
+              const name = s.companyName || s.name;
+              return (
+                <tr key={s.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-3">
+                    {isAggregator ? (
+                      <span className="font-medium text-muted-foreground">{name}</span>
+                    ) : (
+                      <Link to={`/suppliers/${s.id}`} className="font-medium text-primary hover:underline">
+                        {name}
+                      </Link>
+                    )}
+                    {s.inn && !isAggregator && (
+                      <span className="text-xs text-muted-foreground ml-2">ИНН: {s.inn}</span>
+                    )}
+                    {isAggregator && (
+                      <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
+                        агрегатор
+                      </span>
+                    )}
+                  </td>
                 <td className="px-4 py-3 text-muted-foreground">{s.contactEmail}</td>
                 <td className="px-4 py-3 text-center">
                   <span
@@ -77,8 +121,8 @@ export function SuppliersListPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  {(Number(s.commissionRate) * 100).toFixed(0)}%
-                  {s.promoRate && (
+                  {isAggregator ? '—' : `${(Number(s.commissionRate) * 100).toFixed(0)}%`}
+                  {!isAggregator && s.promoRate && (
                     <span className="text-green-600 text-xs ml-1">
                       ({(Number(s.promoRate) * 100).toFixed(0)}% промо)
                     </span>
@@ -87,7 +131,7 @@ export function SuppliersListPage() {
                 <td className="px-4 py-3 text-center">{s._count?.events || 0}</td>
                 <td className="px-4 py-3 text-center">{s.successfulSales || 0}</td>
               </tr>
-            ))}
+            );})}
             {suppliers.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">

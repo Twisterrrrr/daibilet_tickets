@@ -4,14 +4,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { X, LayoutGrid, List as ListIcon } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { MultiEventListItemDto } from '@/lib/api.types';
 import type { CityListItem, EventListItem, CatalogItem } from '@daibilet/shared';
 import { EventCard } from '@/components/ui/EventCard';
 import { EventCardHorizontal } from '@/components/ui/EventCardHorizontal';
 import { CatalogCard } from '@/components/ui/CatalogCard';
 import { DateRibbon } from '@/components/ui/DateRibbon';
 import { PromoBlock } from '@/components/ui/PromoBlock';
-import { MultiEventCard } from '@/components/ui/MultiEventCard';
 import {
   AUDIENCE_LABELS,
   CATEGORY_LABELS,
@@ -56,6 +54,14 @@ const PRICE_OPTIONS = [
 
 const LIMIT_OPTIONS = [20, 50, 100] as const;
 
+function pluralizeCity(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'город';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'города';
+  return 'городов';
+}
+
 function filtersFromParams(sp: URLSearchParams) {
   const sort = sp.get('sort') || 'popular';
   const isSoon = sort === 'departing_soon';
@@ -83,12 +89,12 @@ export default function EventsPage() {
 
   const [events, setEvents] = useState<EventListItem[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
-  const [multiEvents, setMultiEvents] = useState<MultiEventListItemDto[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [cities, setCities] = useState<CityListItem[]>([]);
   const [piers, setPiers] = useState<{ id: string; slug?: string; title: string; shortTitle?: string | null }[]>([]);
   const [viewMode, setViewModeState] = useState<'grid' | 'list'>('grid');
+  const [multiSlugByGroupingKey, setMultiSlugByGroupingKey] = useState<Record<string, string>>({});
 
   // T15: persist view mode to localStorage
   const setViewMode = useCallback((mode: 'grid' | 'list') => {
@@ -112,6 +118,7 @@ export default function EventsPage() {
     }
   }, []);
 
+  // Предзагружаем карту groupSlug по groupingKey для мульти-событий (нужна только в общей выдаче "Мероприятия").
   // Фильтры — единый источник: URL
   const [city, setCity] = useState('');
   const [category, setCategory] = useState('');
@@ -125,6 +132,36 @@ export default function EventsPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [activeQuickFilter, setActiveQuickFilter] = useState<string>('');
+
+  // Предзагружаем карту groupSlug по groupingKey для мульти-событий (нужна только без выбранного города).
+  useEffect(() => {
+    if (city) {
+      setMultiSlugByGroupingKey({});
+      return;
+    }
+
+    let cancelled = false;
+
+    api
+      .getMultiEvents({ sort: 'popular', limit: 200 })
+      .then((groups) => {
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        for (const g of groups) {
+          if (g.groupingKey && g.slug) {
+            map[g.groupingKey] = g.slug;
+          }
+        }
+        setMultiSlugByGroupingKey(map);
+      })
+      .catch((e) => {
+        console.warn('Events page: getMultiEvents error', e);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [city]);
 
   // Синхронизация URL → состояние (при загрузке и навигации)
   useEffect(() => {
@@ -163,6 +200,28 @@ export default function EventsPage() {
   // Текущие быстрые фильтры для витрины
   const quickFilters = useMemo<QuickFilter[]>(() => (vitrineKey ? QUICK_FILTERS[vitrineKey] || [] : []), [vitrineKey]);
 
+  // Практический подход: для вкладки "Мероприятия" скрывать быстрые фильтры,
+  // под которыми в текущей выборке вообще нет событий (по подкатегории/тегу/аудитории).
+  const visibleQuickFilters = useMemo<QuickFilter[]>(() => {
+    if (!quickFilters.length) return quickFilters;
+    if (vitrineKey !== EventCategory.EVENT) return quickFilters;
+
+    return quickFilters.filter((qf) => {
+      const params = qf.params || {};
+      // Если фильтр не завязан на содержимое event'а — оставляем как есть.
+      const { subcategory, tag, audience: aud, dateMode: dm } = params as Record<string, string | undefined>;
+
+      return events.some((e) => {
+        const subs = e.subcategories || [];
+        if (subcategory && !subs.includes(subcategory as (typeof subs)[number])) return false;
+        if (tag && !(e.tagSlugs || []).includes(tag)) return false;
+        if (aud && e.audience !== aud) return false;
+        if (dm && e.dateMode !== dm) return false;
+        return true;
+      });
+    });
+  }, [quickFilters, vitrineKey, events]);
+
   // Параметры от активного quick filter
   const quickFilterParams = useMemo(() => {
     if (!activeQuickFilter) return {};
@@ -197,7 +256,7 @@ export default function EventsPage() {
     }
   }, [city]);
 
-  const isMuseumCategory = category === 'MUSEUM';
+    const isMuseumCategory = category === 'MUSEUM';
 
   useEffect(() => {
     setLoading(true);
@@ -214,14 +273,6 @@ export default function EventsPage() {
     const pageFromUrl = f.page;
     const limitFromUrl = f.limit;
     const isMuseumFromUrl = categoryFromUrl === 'MUSEUM';
-    const hasExtraFilters =
-      !!audienceFromUrl ||
-      !!urlTagFromUrl ||
-      !!selectedDateFromUrl ||
-      !!f.pier ||
-      !!f.priceMax ||
-      Object.keys(quickFilterParams).length > 0;
-    const isGlobalMultiMode = !isMuseumFromUrl && !cityFromUrl && !hasExtraFilters;
 
     if (isMuseumFromUrl) {
       // Музеи → единый каталог (Venue)
@@ -232,35 +283,12 @@ export default function EventsPage() {
         .then((res) => {
           setCatalogItems(res.items);
           setEvents([]);
-          setMultiEvents([]);
           setTotal(res.total);
         })
         .catch((e) => {
           console.warn('Catalog error:', e);
           setCatalogItems([]);
           setEvents([]);
-          setMultiEvents([]);
-          setTotal(0);
-        })
-        .finally(() => setLoading(false));
-      return;
-    }
-
-    if (isGlobalMultiMode) {
-      const multiSort: 'popular' | 'new' = sortFromUrl === 'new' ? 'new' : 'popular';
-      api
-        .getMultiEvents({ sort: multiSort, limit: limitFromUrl })
-        .then((items) => {
-          setMultiEvents(items);
-          setEvents([]);
-          setCatalogItems([]);
-          setTotal(items.length);
-        })
-        .catch((e) => {
-          console.warn('Multi-events error:', e);
-          setMultiEvents([]);
-          setEvents([]);
-          setCatalogItems([]);
           setTotal(0);
         })
         .finally(() => setLoading(false));
@@ -298,14 +326,12 @@ export default function EventsPage() {
       .then((res) => {
         setEvents(res.items);
         setCatalogItems([]);
-        setMultiEvents([]);
         setTotal(res.total);
       })
       .catch((e) => {
         console.warn('Events page error:', e);
         setEvents([]);
         setCatalogItems([]);
-        setMultiEvents([]);
         setTotal(0);
       })
       .finally(() => setLoading(false));
@@ -364,6 +390,181 @@ export default function EventsPage() {
     const slugsWithSoon = new Set(events.filter((e) => e.city).map((e) => e.city.slug));
     return cities.filter((c) => slugsWithSoon.has(c.slug));
   }, [isSoonMode, cities, events]);
+
+  // Группировка мульти-событий в общей выдаче: одинаковое название + разные города → 1 карточка.
+  // Работает только без выбранного города (общая витрина); группируем только события категории EVENT.
+  type DisplayEvent = {
+    event: EventListItem;
+    cityLabelOverride?: string;
+    hrefOverride?: string;
+    groupingKey?: string | null;
+  };
+
+  type EventWithGroupingKey = EventListItem & { groupingKey?: string | null };
+
+  // Небольшое выравнивание: не ставить рядом карточки с одинаковой картинкой
+  // (используется только в общей выдаче без фильтра города).
+  function separateSameImageNeighbors(items: DisplayEvent[]): DisplayEvent[] {
+    const result = [...items];
+    for (let i = 1; i < result.length; i++) {
+      const prev = result[i - 1]?.event;
+      const curr = result[i]?.event;
+      const prevImg = (prev?.imageUrl || '').trim();
+      const currImg = (curr?.imageUrl || '').trim();
+      if (!prevImg || !currImg || prevImg !== currImg) continue;
+
+      // Ищем дальше по списку первую карточку с другим изображением и меняем местами
+      for (let j = i + 1; j < result.length; j++) {
+        const img = (result[j]?.event.imageUrl || '').trim();
+        if (!img || img !== prevImg) {
+          const tmp = result[i];
+          result[i] = result[j];
+          result[j] = tmp;
+          break;
+        }
+      }
+    }
+    return result;
+  }
+
+  const displayEvents: DisplayEvent[] = useMemo(() => {
+    if (!events.length) return [];
+
+    // С выбранным городом — ничего не группируем, возвращаем как есть.
+    if (city) {
+      return events.map((e) => ({ event: e }));
+    }
+
+    type Group = {
+      events: EventListItem[];
+      hasMultipleCities: boolean;
+      cityNames: string[];
+      groupingKey?: string | null;
+    };
+
+    const groups = new Map<string, Group>();
+
+    // Собираем события по ключу группы:
+    // 1) если есть groupingKey — по нему;
+    // 2) иначе по нормализованному заголовку;
+    // 3) если нет ни заголовка, ни groupingKey — не группируем (уникальный ключ по id).
+    const getGroupKey = (e: EventWithGroupingKey): string | null => {
+      const rawTitle = (e.title || '').trim();
+      const groupingKey = e.groupingKey;
+      const normalizedGroupingKey = groupingKey?.trim() || null;
+
+      if (!rawTitle && !normalizedGroupingKey) return null;
+      if (normalizedGroupingKey) return `g:${normalizedGroupingKey}`;
+      return rawTitle.toLowerCase();
+    };
+
+    for (const eBase of events) {
+      const e = eBase as EventWithGroupingKey;
+      // Группируем только события категории EVENT; остальные не попадают в группы.
+      if (e.category !== EventCategory.EVENT) {
+        continue;
+      }
+
+      const key = getGroupKey(e);
+      if (!key) {
+        // Без ключа группы — кладём под собственный id, не группируем с другими
+        const fallbackKey = `__id__${e.id}`;
+        const group = groups.get(fallbackKey) ?? {
+          events: [],
+          hasMultipleCities: false,
+          cityNames: [],
+          groupingKey: null,
+        };
+        group.events.push(e);
+        groups.set(fallbackKey, group);
+        continue;
+      }
+
+      const groupingKey = e.groupingKey;
+      const group = groups.get(key) ?? {
+        events: [],
+        hasMultipleCities: false,
+        cityNames: [],
+        groupingKey: groupingKey ?? null,
+      };
+      group.events.push(e);
+      groups.set(key, group);
+    }
+
+    // Определяем, какие группы действительно мульти (есть разные города) и считаем города
+    for (const [key, group] of groups) {
+      const cityMap = new Map<string, string>();
+      for (const e of group.events) {
+        if (e.city) {
+          cityMap.set(e.city.slug, e.city.name);
+        }
+      }
+      const cityNames = Array.from(cityMap.values());
+      group.cityNames = cityNames;
+      group.hasMultipleCities = cityNames.length > 1;
+      groups.set(key, group);
+    }
+
+    const seen = new Set<string>();
+    const result: DisplayEvent[] = [];
+
+    // Идём в исходном порядке событий, чтобы не ломать сортировку;
+    // для мульти-группы добавляем только первого представителя + собираем человекочитаемый список городов.
+    for (const e of events) {
+      // Не EVENT — не участвует в группировке, просто добавляем.
+      if (e.category !== EventCategory.EVENT) {
+        result.push({ event: e });
+        continue;
+      }
+
+      const key = getGroupKey(e);
+      if (!key) {
+        result.push({ event: e });
+        continue;
+      }
+
+      const group = groups.get(key);
+      if (!group || !group.hasMultipleCities) {
+        result.push({ event: e });
+        continue;
+      }
+
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const representative = group.events[0] ?? e;
+      const totalCities = group.cityNames.length;
+      const previewCities = group.cityNames.slice(0, 2);
+      const remaining = totalCities - previewCities.length;
+
+      let cityLabelOverride: string | undefined;
+      if (totalCities > 0) {
+        if (remaining > 0) {
+          const head = previewCities.join(' • ');
+          cityLabelOverride = `${head} • +${remaining} ${pluralizeCity(remaining)}`;
+        } else {
+          cityLabelOverride = previewCities.join(' • ');
+        }
+      }
+
+      let hrefOverride: string | undefined;
+      if (group.groupingKey && group.hasMultipleCities) {
+        const slug = multiSlugByGroupingKey[group.groupingKey] ?? group.groupingKey;
+        hrefOverride = `/events/m/${slug}`;
+      }
+
+      result.push({
+        event: representative,
+        cityLabelOverride,
+        hrefOverride,
+        groupingKey: group.groupingKey ?? null,
+      });
+    }
+
+    // В общей выдаче без города слегка "расслаиваем" одинаковые картинки,
+    // чтобы они не стояли вплотную.
+    return city ? result : separateSameImageNeighbors(result);
+  }, [events, category, city, multiSlugByGroupingKey]);
 
   return (
     <div className="container-page py-6 sm:py-10">
@@ -466,7 +667,7 @@ export default function EventsPage() {
       </div>
 
       {/* Quick Filters — контекстные чипы витрины */}
-      {quickFilters.length > 0 && (
+      {visibleQuickFilters.length > 0 && (
         <div className="-mx-4 mb-4 px-4 sm:mx-0 sm:px-0">
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
             <button
@@ -479,7 +680,7 @@ export default function EventsPage() {
             >
               Все
             </button>
-            {quickFilters.map((qf) => (
+            {visibleQuickFilters.map((qf) => (
               <button
                 key={qf.id}
                 onClick={() => handleQuickFilter(qf.id)}
@@ -625,16 +826,10 @@ export default function EventsPage() {
             <CatalogCard key={item.id} item={item} />
           ))}
         </div>
-      ) : multiEvents.length > 0 ? (
-        <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-          {multiEvents.map((item) => (
-            <MultiEventCard key={item.slug} item={item} />
-          ))}
-        </div>
       ) : events.length > 0 ? (
         viewMode === 'grid' ? (
           <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-            {events.map((event) => (
+            {displayEvents.map(({ event, cityLabelOverride, hrefOverride }) => (
               <EventCard
                 key={event.id}
                 slug={event.slug}
@@ -655,12 +850,21 @@ export default function EventsPage() {
                 nextSessionAt={event.nextSessionAt}
                 isOptimalChoice={event.isOptimalChoice}
                 dateMode={event.dateMode ?? undefined}
+                cityLabelOverride={cityLabelOverride}
+                hrefOverride={hrefOverride}
               />
             ))}
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4">
-            {events.map((event) => (
+          {displayEvents.map(({ event, cityLabelOverride, hrefOverride }) => {
+            const evWithDescription = event as typeof event & {
+              description?: string | null;
+              shortDescription?: string | null;
+            };
+            const description = evWithDescription.description ?? evWithDescription.shortDescription ?? null;
+
+            return (
               <EventCardHorizontal
                 key={event.id}
                 slug={event.slug}
@@ -678,8 +882,12 @@ export default function EventsPage() {
                 isOptimalChoice={event.isOptimalChoice}
                 dateMode={event.dateMode ?? undefined}
                 priceOriginalKopecks={event.priceOriginalKopecks}
+                cityLabelOverride={cityLabelOverride}
+                hrefOverride={hrefOverride}
+                description={description}
               />
-            ))}
+            );
+          })}
           </div>
         )
       ) : (

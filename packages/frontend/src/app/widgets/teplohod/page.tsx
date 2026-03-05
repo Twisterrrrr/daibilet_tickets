@@ -24,7 +24,7 @@ async function fetchEventData<T = unknown>(searchParams: SearchParams): Promise<
   if (searchParams.theme) params.set('theme', searchParams.theme);
   if (searchParams.layout) params.set('layout', searchParams.layout);
 
-  const url = `/api/widgets/teplohod/event?${params.toString()}`;
+  const url = `/api/v1/widgets/teplohod/event?${params.toString()}`;
 
   try {
     const res = await fetch(url, { cache: 'no-store' });

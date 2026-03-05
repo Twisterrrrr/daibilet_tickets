@@ -48,4 +48,4 @@ export function getSessionLockedMessage(err: unknown) {
 
   return anyErr?.message ?? 'Ошибка операции.';
 }
-*** End Patch
+

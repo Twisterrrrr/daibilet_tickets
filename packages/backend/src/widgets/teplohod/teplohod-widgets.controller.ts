@@ -21,12 +21,12 @@ export class TeplohodWidgetsController {
     return res.send(html);
   }
 
-  @Get('/api/widgets/teplohod/event')
+  @Get('/widgets/teplohod/event')
   async getTeplohodEvent(@Query() q: TeplohodWidgetQueryDto): Promise<TeplohodWidgetEventDto> {
     return this.svc.getEventDto(q);
   }
 
-  @Post('/api/widgets/teplohod/checkout')
+  @Post('/widgets/teplohod/checkout')
   async createCheckout(
     @Body() body: TeplohodWidgetCheckoutReqDto,
   ): Promise<TeplohodWidgetCheckoutResDto> {

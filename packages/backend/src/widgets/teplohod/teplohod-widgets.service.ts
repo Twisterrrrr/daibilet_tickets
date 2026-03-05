@@ -13,15 +13,11 @@ function looksLikeUuid(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
 
-function normalizeTeplohodExternalId(raw: string): string {
-  const value = raw.trim();
-  const match = value.match(/(\d{3,})/);
-
-  if (value.toUpperCase().startsWith('TEP_')) return value.toUpperCase();
-  if (value.toLowerCase().startsWith('tep:') && match) return `TEP_${match[1]}`;
-  if (/^\d{3,}$/.test(value)) return `TEP_${value}`;
-
-  return value;
+export function normalizeTeplohodExternalId(input: string | number): string {
+  const s = String(input).trim();
+  const m = s.match(/(\d+)/);
+  if (!m) return s;
+  return m[1];
 }
 
 function escapeHtml(str: string): string {
@@ -139,9 +135,11 @@ export class TeplohodWidgetsService {
   }
 
   private async findEvent(eventId: string) {
-    if (looksLikeUuid(eventId)) {
+    const raw = eventId.trim();
+
+    if (looksLikeUuid(raw)) {
       return this.prisma.event.findFirst({
-        where: { id: eventId, isActive: true, isDeleted: false },
+        where: { id: raw, isActive: true, isDeleted: false },
         include: {
           city: true,
           sessions: {
@@ -152,14 +150,19 @@ export class TeplohodWidgetsService {
       });
     }
 
-    const externalId = normalizeTeplohodExternalId(eventId);
+    const externalId = normalizeTeplohodExternalId(raw);
 
     return this.prisma.event.findFirst({
       where: {
-        tcEventId: externalId,
         source: 'TEPLOHOD',
         isActive: true,
         isDeleted: false,
+        OR: [
+          // Современный формат: голое число из Teplohod API (tcEventId = "<id>")
+          { tcEventId: externalId },
+          // Исторические записи с префиксом в tcEventId (tep-123, TEP_123 и т.п.)
+          { tcEventId: `tep-${externalId}` },
+        ],
       },
       include: {
         city: true,

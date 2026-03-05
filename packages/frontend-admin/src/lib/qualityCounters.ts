@@ -16,4 +16,4 @@ export function buildTabCounters(quality: EventQuality | null | undefined): Reco
 
   return base;
 }
-*** End Patch ***!
+

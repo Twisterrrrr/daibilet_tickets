@@ -19,4 +19,4 @@ export type EventQuality = {
 export async function getEventQuality(eventId: string): Promise<EventQuality> {
   return adminApi.get<EventQuality>(`/admin/events/${eventId}/quality`);
 }
-*** End Patch ***!
+

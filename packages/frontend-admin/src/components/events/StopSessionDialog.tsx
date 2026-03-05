@@ -84,4 +84,4 @@ export function CancelSessionDialog({ open, onOpenChange, eventId, session }: Pr
     </Dialog>
   );
 }
-*** End Patch
+

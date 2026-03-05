@@ -42,6 +42,10 @@ type EventCardProps = EventCardVM & {
   /** Старая цена в копейках — для бейджа скидки и зачёркнутой цены */
   priceOriginalKopecks?: number | null;
   compact?: boolean;
+  /** Переопределение ссылки по клику (для мульти-событий) */
+  hrefOverride?: string;
+  /** Переопределение отображаемого города/списка городов */
+  cityLabelOverride?: string;
 };
 
 /** Порог: при скольких оставшихся местах показывать "Осталось N мест" */
@@ -88,6 +92,8 @@ export function EventCard({
   groupSize,
   sessionTimes = [],
   highlights = [],
+  hrefOverride,
+  cityLabelOverride,
 }: EventCardProps) {
   const router = useRouter();
   const safeReviewCount = reviewCount ?? 0;
@@ -124,7 +130,7 @@ export function EventCard({
 
   return (
     <Link
-      href={`/events/${slug}`}
+      href={hrefOverride ?? `/events/${slug}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-slate-200/60 hover:-translate-y-0.5"
     >
       {/* Image */}
@@ -223,10 +229,10 @@ export function EventCard({
               <span className="font-medium text-slate-400">Новое</span>
             )}
           </span>
-          {city && (
+          {(city || cityLabelOverride) && (
             <span className="flex items-center gap-0.5 text-slate-500 truncate">
               <MapPin className="h-3 w-3 shrink-0" />
-              <span className="truncate">{city.name}</span>
+              <span className="truncate">{cityLabelOverride ?? city?.name}</span>
             </span>
           )}
         </div>

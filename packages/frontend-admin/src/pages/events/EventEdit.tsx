@@ -96,7 +96,7 @@ interface EventOffer {
   availabilityMode: string | null;
   badge: string | null;
   operatorId: string | null;
-  operator?: { id: string; name: string; slug: string } | null;
+  operator?: { id: string; name: string; slug: string; isActive?: boolean } | null;
   _count?: { sessions?: number };
 }
 
@@ -374,6 +374,12 @@ export function EventEditPage() {
 
   const isHidden = event?.override?.isHidden ?? false;
 
+  const supplierIsActive =
+    event.offers && event.offers.length > 0
+      ? !event.offers.some((o) => o.operator && o.operator.isActive === false) ||
+        event.offers.some((o) => o.operator && o.operator.isActive === true)
+      : undefined;
+
   const handleIssueClick = (tabKey: QualityTabKey, issue: EventQualityIssue) => {
     const uiTab: UiTab =
       tabKey === 'offers' ? 'offers' : tabKey === 'schedule' ? 'sessions' : tabKey === 'location' ? 'general' : 'general';
@@ -471,6 +477,7 @@ export function EventEditPage() {
         isHidden={isHidden}
         issuesCount={quality?.issues?.length ?? 0}
         quality={quality}
+        supplierIsActive={supplierIsActive}
       />
 
       {/* Tabs */}

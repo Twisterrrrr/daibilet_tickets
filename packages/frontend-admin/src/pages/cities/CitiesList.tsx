@@ -16,8 +16,8 @@ interface CityItem {
   isActive: boolean;
   _count?: {
     events?: number;
-    landings?: number;
-    combos?: number;
+    landingPages?: number;
+    comboPages?: number;
   };
 }
 
@@ -50,18 +50,19 @@ const columns: ColumnDef<CityItem>[] = [
   },
   {
     id: 'eventsCount',
-    header: 'Событий',
+    accessorFn: (row) => row._count?.events ?? 0,
+    header: ({ column }) => <SortableHeader column={column}>Событий</SortableHeader>,
     cell: ({ row }) => <span className="tabular-nums">{row.original._count?.events ?? 0}</span>,
   },
   {
     id: 'landingsCount',
     header: 'Лендингов',
-    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.landings ?? 0}</span>,
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.landingPages ?? 0}</span>,
   },
   {
     id: 'combosCount',
     header: 'Combo',
-    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.combos ?? 0}</span>,
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.comboPages ?? 0}</span>,
   },
 ];
 
@@ -70,13 +71,21 @@ export function CitiesListPage() {
   const [items, setItems] = useState<CityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState({
+    search: '',
+    hasEvents: false,
+    hasLandings: false,
+    hasCombos: false,
+  });
 
   useEffect(() => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
-    if (search) params.set('search', search);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.hasEvents) params.set('hasEvents', 'true');
+    if (filters.hasLandings) params.set('hasLandings', 'true');
+    if (filters.hasCombos) params.set('hasCombos', 'true');
 
     const query = params.toString();
     const path = query ? `/admin/cities?${query}` : '/admin/cities';
@@ -89,7 +98,7 @@ export function CitiesListPage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, [search]);
+  }, [filters]);
 
   const handleRowClick = (item: CityItem) => {
     navigate(`/cities/${item.id}`);
@@ -113,16 +122,47 @@ export function CitiesListPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Фильтры</CardTitle>
-          <CardDescription>Поиск по названию или slug</CardDescription>
+          <CardDescription>Поиск по названию или slug и по наличию сущностей</CardDescription>
         </CardHeader>
         <CardContent>
-          <Input
-            type="text"
-            placeholder="Поиск..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Input
+              type="text"
+              placeholder="Поиск..."
+              value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              className="max-w-sm"
+            />
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border border-gray-300"
+                  checked={filters.hasEvents}
+                  onChange={(e) => setFilters((f) => ({ ...f, hasEvents: e.target.checked }))}
+                />
+                <span>Есть события</span>
+              </label>
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border border-gray-300"
+                  checked={filters.hasLandings}
+                  onChange={(e) => setFilters((f) => ({ ...f, hasLandings: e.target.checked }))}
+                />
+                <span>Есть лендинги</span>
+              </label>
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border border-gray-300"
+                  checked={filters.hasCombos}
+                  onChange={(e) => setFilters((f) => ({ ...f, hasCombos: e.target.checked }))}
+                />
+                <span>Есть combo</span>
+              </label>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

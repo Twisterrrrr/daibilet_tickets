@@ -147,6 +147,8 @@ export function EventsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [cities, setCities] = useState<Array<{ slug: string; name: string }>>([]);
+  const [citiesLoaded, setCitiesLoaded] = useState(false);
 
   const [filters, setFilters] = useState({
     city: '',
@@ -182,6 +184,31 @@ export function EventsListPage() {
   useEffect(() => {
     fetchEvents();
   }, [filters]);
+
+  // Загрузить все города для фильтра (админский список, не витрина)
+  useEffect(() => {
+    let cancelled = false;
+    adminApi
+      .get<{ items: Array<{ slug: string; name: string }>; total: number }>('/admin/cities?limit=1000')
+      .then((res) => {
+        if (cancelled) return;
+        const items = Array.isArray(res.items) ? res.items : [];
+        setCities(
+          items
+            .filter((c) => typeof c.slug === 'string' && typeof c.name === 'string')
+            .map((c) => ({ slug: c.slug, name: c.name })),
+        );
+      })
+      .catch(() => {
+        // fallback: оставим хардкоды, если админский endpoint недоступен
+      })
+      .finally(() => {
+        if (!cancelled) setCitiesLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -246,12 +273,21 @@ export function EventsListPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Все города</SelectItem>
-                <SelectItem value="moscow">Москва</SelectItem>
-                <SelectItem value="spb">Санкт-Петербург</SelectItem>
-                <SelectItem value="kazan">Казань</SelectItem>
-                <SelectItem value="kaliningrad">Калининград</SelectItem>
-                <SelectItem value="vladimir">Владимир</SelectItem>
-                <SelectItem value="yaroslavl">Ярославль</SelectItem>
+                {citiesLoaded && cities.length === 0 && (
+                  <>
+                    <SelectItem value="moscow">Москва</SelectItem>
+                    <SelectItem value="saint-petersburg">Санкт-Петербург</SelectItem>
+                    <SelectItem value="kazan">Казань</SelectItem>
+                    <SelectItem value="kaliningrad">Калининград</SelectItem>
+                    <SelectItem value="vladimir">Владимир</SelectItem>
+                    <SelectItem value="yaroslavl">Ярославль</SelectItem>
+                  </>
+                )}
+                {cities.map((city) => (
+                  <SelectItem key={city.slug} value={city.slug}>
+                    {city.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select

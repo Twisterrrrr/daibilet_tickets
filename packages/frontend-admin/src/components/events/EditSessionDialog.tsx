@@ -102,4 +102,4 @@ export function EditSessionDialog({ open, onOpenChange, eventId, session, defaul
     </Dialog>
   );
 }
-*** End Patch
+

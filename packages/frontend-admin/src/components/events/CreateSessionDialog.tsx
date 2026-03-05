@@ -82,4 +82,4 @@ export function CreateSessionDialog({ open, onOpenChange, eventId }: Props) {
     </Dialog>
   );
 }
-*** End Patch
+

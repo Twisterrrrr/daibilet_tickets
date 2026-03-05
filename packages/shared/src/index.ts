@@ -34,23 +34,16 @@ export {
   type WidgetPayloadValidationResult,
 } from './widget-payload';
 
-export { normalizeEventTitle } from './normalize-title';
-export { cityToPrepositional } from './city-declension';
-
-export {
-  type NormalizedPrice,
-  getPriceKopecks,
-  normalizeSessionPrices,
-  getMinPriceKopecks,
-  getPriceByTypeKopecks,
-  getFirstPriceKopecks,
-} from './price-normalizer';
+// (дополнительные re-export ниже удалены, чтобы избежать дублирования)
 
 export {
   TeplohodWidgetQueryDto,
   TeplohodWidgetEventDto,
+  TeplohodWidgetEventSessionDto,
   TeplohodWidgetCheckoutReqDto,
   TeplohodWidgetCheckoutResDto,
+} from './dto/widgets/teplohod.dto';
+export type {
   TeplohodWidgetLang,
   TeplohodWidgetTheme,
   TeplohodWidgetLayout,
@@ -411,6 +404,8 @@ export interface EventListItem {
   isOptimalChoice?: boolean;
   dateMode?: string;
   groupSize?: string | null;
+  /** Ключ группы мульти-события (если есть) */
+  groupingKey?: string | null;
   templateData?: Record<string, unknown> | null;
   sessionTimes?: string[];
   highlights?: string[];

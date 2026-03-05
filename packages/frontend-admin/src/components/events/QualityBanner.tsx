@@ -101,4 +101,4 @@ export function QualityBanner({ quality, loading, error, isImported, onIssueClic
     </div>
   );
 }
-*** End Patch ***!
+

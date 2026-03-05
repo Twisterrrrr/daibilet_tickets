@@ -6,7 +6,7 @@ export async function createTeplohodCheckout(input: {
   qty?: number;
   returnUrl?: string;
 }) {
-  const res = await fetch('/api/widgets/teplohod/checkout', {
+  const res = await fetch('/api/v1/widgets/teplohod/checkout', {
     method: 'POST',
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json' },

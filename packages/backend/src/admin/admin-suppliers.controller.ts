@@ -15,6 +15,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import * as crypto from 'crypto';
 
+import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
@@ -54,7 +55,7 @@ export class AdminSuppliersController {
     }
     if (trustLevel !== undefined) where.trustLevel = Number(trustLevel);
 
-    const [rawItems, total] = await Promise.all([
+    const [rawItems, total, eventsBySourceRaw] = await Promise.all([
       this.prisma.operator.findMany({
         where,
         include: {
@@ -64,9 +65,25 @@ export class AdminSuppliersController {
         ...paginationArgs(pg),
       }),
       this.prisma.operator.count({ where }),
+      this.prisma.event.groupBy({
+        by: ['source'],
+        where: { isDeleted: false },
+        _count: { id: true },
+      }),
     ]);
 
-    return buildPaginatedResult(rawItems, total, pg.limit);
+    const eventCountsBySource = eventsBySourceRaw.reduce(
+      (acc, row) => {
+        acc[row.source] = row._count.id;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    return {
+      ...buildPaginatedResult(rawItems, total, pg.limit),
+      eventCountsBySource,
+    };
   }
 
   /**
@@ -146,23 +163,24 @@ export class AdminSuppliersController {
 
     const [events, total] = await Promise.all([
       this.prisma.event.findMany({
-      where,
+        where,
         orderBy,
         skip,
         take,
-      include: {
-        city: { select: { name: true } },
-        sessions: {
-          where: { isActive: true, canceledAt: null, startsAt: { gt: now } },
-          orderBy: { startsAt: 'asc' },
-          take: 1,
-        },
-        offers: {
-          where: { operatorId: id },
-          orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
-          take: 1,
-          include: {
-            operator: { select: { id: true, isActive: true } },
+        include: {
+          city: { select: { name: true } },
+          sessions: {
+            where: { isActive: true, canceledAt: null, startsAt: { gt: now } },
+            orderBy: { startsAt: 'asc' },
+            take: 1,
+          },
+          offers: {
+            where: { operatorId: id },
+            orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
+            take: 1,
+            include: {
+              operator: { select: { id: true, isActive: true } },
+            },
           },
         },
       }),

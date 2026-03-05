@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 
-const ROOT = path.resolve(new URL('../', import.meta.url).pathname);
+const ROOT = process.cwd();
 const FRONTEND_PUBLIC = path.join(ROOT, 'packages', 'frontend', 'public');
 const IMAGES_JSON_PATH = path.join(FRONTEND_PUBLIC, 'assets', 'images', 'images.json');
 const REPORT_PATH = path.join(ROOT, 'docs', 'image-assets-report.md');

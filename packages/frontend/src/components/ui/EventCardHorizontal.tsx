@@ -57,6 +57,10 @@ interface EventCardHorizontalProps {
   highlights?: string[];
   /** Описание для 3 строк под длительностью/датой */
   description?: string | null;
+  /** Переопределение ссылки по клику (для мульти-событий) */
+  hrefOverride?: string;
+  /** Переопределение отображаемого города/списка городов */
+  cityLabelOverride?: string;
 }
 
 export function EventCardHorizontal({
@@ -79,6 +83,8 @@ export function EventCardHorizontal({
   highlights = [],
   description,
   totalAvailableTickets,
+  hrefOverride,
+  cityLabelOverride,
 }: EventCardHorizontalProps) {
   const router = useRouter();
 
@@ -118,7 +124,7 @@ export function EventCardHorizontal({
 
   return (
     <Link
-      href={`/events/${slug}`}
+      href={hrefOverride ?? `/events/${slug}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-slate-200/60 hover:-translate-y-0.5 sm:flex-row"
     >
       {/* Image — 16:9 слева */}
@@ -183,10 +189,23 @@ export function EventCardHorizontal({
         )}
       </div>
 
-      {/* Content — справа, отступ от фото 20px */}
-      <div className="flex flex-1 flex-col justify-between p-3 sm:pl-5 sm:pr-4 sm:pt-4 sm:pb-4">
-        {/* Между фото и названием: Рейтинг слева, Город прижат вправо */}
+      {/* Content — справа, с увеличенным отступом слева */}
+      <div className="ml-2.5 flex flex-1 flex-col justify-between p-3 pl-5 sm:pl-7 sm:pr-4 sm:pt-4 sm:pb-4">
+        {/* Первая строка: слева — заголовок, справа — локация */}
         <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500 sm:text-xs">
+          <h3 className="flex-1 truncate text-base font-semibold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-lg">
+            {title}
+          </h3>
+          {(city || cityLabelOverride) && (
+            <span className="flex items-center gap-0.5 text-slate-500 truncate">
+              <MapPin className="h-3 w-3 shrink-0" />
+              <span className="truncate">{cityLabelOverride ?? city?.name}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Длительность, рейтинг, размер группы, ближайшая дата */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-slate-500 sm:text-xs">
           <span className="flex items-center gap-0.5 shrink-0">
             <Star
               className={
@@ -202,20 +221,6 @@ export function EventCardHorizontal({
               <span className="font-medium text-slate-400">Новое</span>
             )}
           </span>
-          {city && (
-            <span className="flex items-center gap-0.5 text-slate-500 truncate">
-              <MapPin className="h-3 w-3 shrink-0" />
-              <span className="truncate">{city.name}</span>
-            </span>
-          )}
-        </div>
-
-        <h3 className="mt-2 line-clamp-2 text-base font-semibold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-lg">
-          {title}
-        </h3>
-
-        {/* Длительность, размер группы, ближайшая дата */}
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-slate-500 sm:text-xs">
           {durationMinutes && (
             <span className="flex items-center gap-0.5">
               <Clock className="h-3 w-3" />

@@ -425,33 +425,21 @@ export class AdminEventsController {
 
     const rows = sessions.map((s) => {
       const soldCount = soldBySessionId[s.id] ?? 0;
-      let locked = false;
-      let lockReason: 'SOLD' | 'PAST' | 'IMPORTED' | 'OTHER' | undefined;
-
-      if (soldCount > 0) {
-        locked = true;
-        lockReason = 'SOLD';
-      }
-      if (s.startsAt < now) {
-        locked = true;
-        if (!lockReason) lockReason = 'PAST';
-      }
-      if (event.source !== 'MANUAL') {
-        locked = true;
-        if (!lockReason) lockReason = 'IMPORTED';
-      }
-
-      const capacity = s.capacityTotal ?? event.defaultCapacityTotal ?? null;
-
-      return {
-        id: s.id,
-        startsAt: s.startsAt.toISOString(),
-        endsAt: s.endsAt?.toISOString() ?? null,
-        capacity,
+      return this.buildAdminSessionRow(
+        {
+          id: s.id,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt ?? null,
+          capacityTotal: s.capacityTotal ?? null,
+          canceledAt: s.canceledAt,
+          cancelReason: s.cancelReason,
+        },
+        {
+          source: event.source,
+          defaultCapacityTotal: event.defaultCapacityTotal ?? null,
+        },
         soldCount,
-        locked,
-        lockReason,
-      };
+      );
     });
 
     return {
@@ -504,6 +492,7 @@ export class AdminEventsController {
         canceledAt: null,
         cancelReason: null,
         tcSessionId: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        prices: [],
       },
     });
 
@@ -876,7 +865,7 @@ export class AdminEventsController {
           orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
           include: {
             _count: { select: { sessions: true } },
-            operator: { select: { id: true, name: true, slug: true } },
+            operator: { select: { id: true, name: true, slug: true, isActive: true } },
           },
         },
         override: true,
@@ -997,7 +986,7 @@ export class AdminEventsController {
       orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
       include: {
         _count: { select: { sessions: true } },
-        operator: { select: { id: true, name: true, slug: true } },
+        operator: { select: { id: true, name: true, slug: true, isActive: true } },
       },
     });
   }

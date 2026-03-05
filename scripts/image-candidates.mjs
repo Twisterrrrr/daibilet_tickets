@@ -1,7 +1,32 @@
 import fs from 'fs';
 import path from 'path';
 
-const ROOT = path.resolve(new URL('../', import.meta.url).pathname);
+const ROOT = process.cwd();
+
+function loadDotEnv() {
+  const envPath = path.join(ROOT, '.env');
+  if (!fs.existsSync(envPath)) return;
+  const raw = fs.readFileSync(envPath, 'utf8');
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadDotEnv();
 const ASSETS_SRC_ROOT = path.join(ROOT, 'packages', 'frontend', 'assets-src');
 const FRONTEND_PUBLIC = path.join(ROOT, 'packages', 'frontend', 'public');
 const IMAGES_JSON_PATH = path.join(FRONTEND_PUBLIC, 'assets', 'images', 'images.json');
@@ -54,14 +79,32 @@ function extractCitiesFromCityInfo() {
   const cityInfoPath = path.join(ROOT, 'packages', 'frontend', 'src', 'lib', 'cityInfo.ts');
   if (!fs.existsSync(cityInfoPath)) return null;
   const src = fs.readFileSync(cityInfoPath, 'utf8');
-  const matchSection = src.split('export const CITY_INFO')[1];
-  if (!matchSection) return null;
-  const re = /'([^']+)':\s*{/g;
-  const slugs = [];
+  const marker = 'export const CITY_INFO';
+  const idx = src.indexOf(marker);
+  if (idx === -1) return null;
+  const braceStart = src.indexOf('{', idx);
+  if (braceStart === -1) return null;
+  const braceEnd = src.indexOf('};', braceStart);
+  const body = braceEnd === -1 ? src.slice(braceStart) : src.slice(braceStart, braceEnd);
+
+  const slugsSet = new Set();
+
+  // Ключи в кавычках: 'saint-petersburg': { ... }
+  const reQuoted = /^[ \t]*'([^']+)'[ \t]*:\s*{/gm;
   let m;
-  while ((m = re.exec(matchSection)) !== null) {
-    slugs.push(m[1]);
+  while ((m = reQuoted.exec(body)) !== null) {
+    slugsSet.add(m[1]);
   }
+
+  // Ключи без кавычек: moscow: { ... }
+  const reBare = /^[ \t]*([a-z0-9-]+)[ \t]*:\s*{/gm;
+  while ((m = reBare.exec(body)) !== null) {
+    const key = m[1];
+    if (key === 'brief' || key === 'mustSee') continue;
+    slugsSet.add(key);
+  }
+
+  const slugs = Array.from(slugsSet);
   if (!slugs.length) return null;
   return slugs.map((slug) => ({ slug, name: slugToDisplayName(slug) }));
 }
@@ -83,9 +126,19 @@ async function fetchCitiesFromApi() {
 
 async function getCities(limitCities) {
   let cities = extractCitiesFromCityInfo();
-  if (!cities) {
-    console.log('[image-candidates] CITY_INFO not parsed, falling back to /cities API');
-    cities = await fetchCitiesFromApi();
+  if (!cities || !cities.length) {
+    console.warn(
+      '[image-candidates] failed to parse CITY_INFO (packages/frontend/src/lib/cityInfo.ts), using fallback slug list',
+    );
+    const fallbackSlugs = [
+      'saint-petersburg',
+      'moscow',
+      'kazan',
+      'kaliningrad',
+      'vladimir',
+      'yaroslavl',
+    ];
+    cities = fallbackSlugs.map((slug) => ({ slug, name: slugToDisplayName(slug) }));
   }
   if (limitCities && cities.length > limitCities) {
     return cities.slice(0, limitCities);

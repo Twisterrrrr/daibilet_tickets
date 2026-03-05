@@ -30,6 +30,9 @@ export class AdminCitiesController {
   @Get()
   async list(
     @Query('search') search?: string,
+    @Query('hasEvents') hasEvents?: string,
+    @Query('hasLandings') hasLandings?: string,
+    @Query('hasCombos') hasCombos?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -40,6 +43,15 @@ export class AdminCitiesController {
         { name: { contains: search, mode: 'insensitive' } },
         { slug: { contains: search, mode: 'insensitive' } },
       ];
+    }
+    if (hasEvents === 'true') {
+      where.events = { some: {} };
+    }
+    if (hasLandings === 'true') {
+      where.landingPages = { some: {} };
+    }
+    if (hasCombos === 'true') {
+      where.comboPages = { some: {} };
     }
 
     const pg = parsePagination({ cursor, page, limit });

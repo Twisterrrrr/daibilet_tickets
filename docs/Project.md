@@ -509,6 +509,35 @@ Article
 
 ---
 
+## Teplohod Widget / PartnerEventId инвариант
+
+- **Источник данных**: `https://api.teplohod.info/v1/events` (или `/v1/events?compact`) — поле `id` Teplohod является **внешним идентификатором события**.
+- **Хранение в БД**:
+  - Для событий из Teplohod: `Event.source = 'TEPLOHOD'`, `Event.tcEventId = String(id)` (строка числа без префиксов).
+  - Глобальный ключ: `@@unique([source, tcEventId])` + `@@index([source, tcEventId])` в Prisma-модели `Event`.
+- **Инвариант партнёрского идентификатора**:
+  - `PartnerEventId = (source === 'TEPLOHOD' ? tcEventId : id)`.
+  - Реализация на фронтенде: `getPartnerEventId(event)` в `packages/frontend/src/lib/partnerIds.ts`:
+    - для Teplohod-событий всегда возвращает `tcEventId` (голое число из Teplohod API),
+    - для всех остальных — внутренний `Event.id` (UUID).
+- **Виджет и embed**:
+  - Партнёрский скрипт `public/teplohod.js` ищет `.db-teplohod-widget` и создаёт iframe на `/widgets/teplohod?eventId=...`, где:
+    - для Teplohod: `data-event-id="<id из /v1/events>"`,
+    - для ручных/внутренних событий допустим UUID (локальное тестирование).
+  - Бэкенд-виджет (`TeplohodWidgetsService`) при `GET /api/widgets/teplohod/event?eventId=...`:
+    - если параметр похож на UUID → ищет по `Event.id` (наш внутренний ключ),
+    - иначе нормализует Teplohod id (`normalizeTeplohodExternalId`) и ищет по
+      `source = 'TEPLOHOD'` + `tcEventId = "<id>"` (с fallback на устаревшие значения вида `tep-<id>`).
+- **Миграция старых данных**:
+  - Одноразовая SQL-миграция в `packages/backend/prisma/migrations/*_teplohod_tcEventId_normalize` нормализует все старые `tcEventId` Teplohod к чистым числам (`tep-123` → `"123"`), чтобы исключить расхождения между БД и внешним API.
+- **Тесты**:
+  - Vitest-тесты в `packages/backend/test/teplohod-contract.spec.ts` фиксируют:
+    - нормализацию внешнего Teplohod id (`normalizeTeplohodExternalId`),
+    - стратегию поиска события в `TeplohodWidgetsService.findEvent`,
+    - инвариант `getPartnerEventId` (Teplohod → `tcEventId`, остальные → `id`).
+
+---
+
 ## Политика фильтров (QF)
 
 **Query Filters:** type (excursion|venue|event), group, slug, title, isSeo, priority. 17 фильтров в seed.

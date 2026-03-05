@@ -16,8 +16,10 @@ import { RetentionService } from './retention.service';
  * queue.add() вернёт существующий job, а не создаст дубликат.
  * Completed / failed НЕ блокируют — новый job создастся.
  */
-const SYNC_FULL_JOB_ID = 'singleton:sync-full';
-const SYNC_INCREMENTAL_JOB_ID = 'singleton:sync-incremental';
+// BullMQ v5+: jobId (custom id) не может содержать двоеточие.
+// Используем безопасный формат с подчёркиваниями для overlap protection.
+const SYNC_FULL_JOB_ID = 'singleton_sync_full';
+const SYNC_INCREMENTAL_JOB_ID = 'singleton_sync_incremental';
 
 /**
  * Scheduler Service — автоматическая синхронизация данных.

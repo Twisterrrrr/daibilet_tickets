@@ -36,7 +36,8 @@ export class CatalogService {
   // --- Города ---
 
   async getCities(featured?: boolean) {
-    const cacheKey = cacheKeys.cities.list(featured ?? 'all');
+    // v2: включает регионы/хабы для списка городов; версию кодируем в строке ключа
+    const cacheKey = `${cacheKeys.cities.list(featured ?? 'all')}:v2`;
 
     return this.cache.getOrSet(cacheKey, CACHE_TTL.CITIES, async () => {
       // ID городов, которые являются не-хабовыми членами регионов
