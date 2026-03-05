@@ -113,6 +113,20 @@
 
 ---
 
+## Merge checklist (гейты перед merge в main)
+
+Перед merge ветки в `main` обязательно пройти:
+
+| Гейт | Команда | Ожидание |
+|------|--------|----------|
+| TypeScript | `cd packages/backend && npx tsc --noEmit` | PASS (0 ошибок) |
+| Lint | `cd packages/backend && npm run lint` | PASS (0 errors; warnings по any допустимы) |
+| Тесты | `pnpm --filter @daibilet/backend test` | PASS или NOT RUN (если в CI тесты не настроены — зафиксировать) |
+
+Рекомендуемый порядок коммитов: один коммит только с правками под tsc (`fix(backend): make tsc pass`), затем merge без смешивания с массовой чисткой линта в том же коммите.
+
+---
+
 ## Gates (минимальный путь к запуску)
 
 ### Gate 0 — проект доступен по доменам + есть бэкап
@@ -272,6 +286,7 @@
 - [ ] **Высокий**: Redis-кэш: списки событий (TTL 10 мин), детали (5 мин), сессии (3 мин)
 - [x] **Средний**: Диетический режим листингов `/events` — `fields=card`/`full`, Prisma `select` для card, тайминги `fetchEvents` (dbMs/overrideMs/badgesMs/totalMs)
 - [~] **Средний**: Глобальные мульти-события (одно шоу в разных городах) — `normalizedTitle`/`groupingKey`, `GET /api/v1/multi-events` (backend готов, подключение фронта и `/events/m/{slug}` — отдельный PR)
+- [x] **Средний**: FULL SYNC (dev) — CLI `FULL_SYNC=1 pnpm full:sync` (Ticketscloud + Teplohod + retag + cache invalidate)
 - [ ] **Средний** (⏸ 6+ мес): gRPC: фильтровать Cities/Venues по нужным ID
 - [ ] **Низкий** (⏸ 6+ мес): gRPC Seats — наличие конкретных мест
 

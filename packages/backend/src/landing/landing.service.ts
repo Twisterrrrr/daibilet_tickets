@@ -107,7 +107,7 @@ export class LandingService {
         imageUrl: string | null;
         tcEventId: string;
         source: string;
-        rating: any;
+        rating: unknown;
         reviewCount: number;
         priceFrom: number | null;
       };
@@ -131,7 +131,7 @@ export class LandingService {
               address: event.address,
               durationMinutes: event.durationMinutes,
               imageUrl: event.imageUrl,
-              tcEventId: event.tcEventId,
+              tcEventId: event.tcEventId ?? '',
               source: event.source,
               rating: event.rating,
               reviewCount: event.reviewCount,
@@ -154,7 +154,7 @@ export class LandingService {
           address: event.address,
           durationMinutes: event.durationMinutes,
           imageUrl: event.imageUrl,
-          tcEventId: event.tcEventId,
+          tcEventId: event.tcEventId ?? '',
           source: event.source,
           rating: event.rating,
           reviewCount: event.reviewCount,
