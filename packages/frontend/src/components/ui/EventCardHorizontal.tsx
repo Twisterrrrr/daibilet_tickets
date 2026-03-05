@@ -191,13 +191,13 @@ export function EventCardHorizontal({
 
       {/* Content — справа, с увеличенным отступом слева */}
       <div className="ml-2.5 flex flex-1 flex-col justify-between p-3 pl-5 sm:pl-7 sm:pr-4 sm:pt-4 sm:pb-4">
-        {/* Первая строка: слева — заголовок, справа — локация */}
-        <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500 sm:text-xs">
-          <h3 className="flex-1 truncate text-base font-semibold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-lg">
+        {/* Первая строка: слева заголовок, справа — город */}
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="flex-1 text-sm font-semibold leading-snug text-slate-900 transition-colors group-hover:text-primary-600 sm:text-lg line-clamp-2">
             {title}
           </h3>
           {(city || cityLabelOverride) && (
-            <span className="flex items-center gap-0.5 text-slate-500 truncate">
+            <span className="ml-2 flex items-center gap-0.5 text-[10px] text-slate-500 sm:text-xs">
               <MapPin className="h-3 w-3 shrink-0" />
               <span className="truncate">{cityLabelOverride ?? city?.name}</span>
             </span>
@@ -238,6 +238,13 @@ export function EventCardHorizontal({
           )}
         </div>
 
+        {/* Highlights: компактная строка через • под строкой с рейтингом */}
+        {displayHighlights.length > 0 && (
+          <p className="mt-1 line-clamp-1 text-[10px] text-slate-600 sm:text-xs">
+            {displayHighlights.join(' • ')}
+          </p>
+        )}
+
         {/* 3 строки описания, половина последней — в градиенте */}
         {stripDescription(description) && (
           <div className="relative mt-2 overflow-hidden">
@@ -265,18 +272,6 @@ export function EventCardHorizontal({
               </button>
             ))}
           </div>
-        )}
-
-        {/* 3 highlights */}
-        {displayHighlights.length > 0 && (
-          <ul className="mt-2 space-y-0.5 text-[10px] text-slate-600 sm:text-xs">
-            {displayHighlights.map((h, i) => (
-              <li key={i} className="flex gap-1.5">
-                <span className="text-primary-500">•</span>
-                <span className="line-clamp-1">{h}</span>
-              </li>
-            ))}
-          </ul>
         )}
 
         {/* Footer: Подробнее слева, цена справа внизу карточки */}

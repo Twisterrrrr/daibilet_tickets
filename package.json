@@ -25,7 +25,8 @@
     "typecheck": "pnpm --filter @daibilet/backend exec tsc --noEmit && pnpm --filter @daibilet/frontend exec tsc --noEmit",
     "prepare": "husky install",
     "images:candidates": "node scripts/image-candidates.mjs",
-    "images:build": "node scripts/image-assets.mjs"
+    "images:build": "node scripts/image-assets.mjs",
+    "full:sync": "pnpm --filter @daibilet/backend full:sync"
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "^15.1.0",

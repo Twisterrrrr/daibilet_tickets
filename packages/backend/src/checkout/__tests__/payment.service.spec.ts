@@ -472,7 +472,7 @@ describe('PaymentService', () => {
         completedAt: new Date(),
       });
 
-      const result = await service.markPaid(intentId);
+      const _result = await service.markPaid(intentId);
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
       expect(mockPrisma.paymentIntent.update).toHaveBeenCalledWith({

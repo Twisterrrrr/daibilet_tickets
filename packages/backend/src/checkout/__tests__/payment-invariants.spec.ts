@@ -7,7 +7,7 @@
  */
 
 import { ConflictException } from '@nestjs/common';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { partitionCart, PaymentFlowType, SnapshotLineItem } from '../cart-partitioning';
 import { PaymentService } from '../payment.service';

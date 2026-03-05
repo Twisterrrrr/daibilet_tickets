@@ -157,6 +157,37 @@ export class RetentionService {
       this.logger.log(`AuditLog: would delete ${auditCount} (dry-run)`);
     }
 
+    // Auto-hide events без активных сеансов в горизонте 1 года вперёд.
+    const now = new Date();
+    const horizon = new Date(now);
+    horizon.setFullYear(horizon.getFullYear() + 1);
+
+    const autoHideWhere = {
+      isActive: true,
+      isDeleted: false,
+      sessions: {
+        none: {
+          isActive: true,
+          canceledAt: null,
+          startsAt: {
+            gte: now,
+            lte: horizon,
+          },
+        },
+      },
+    } as const;
+
+    const autoHideCount = await this.prisma.event.count({ where: autoHideWhere });
+    if (!dryRun && autoHideCount > 0) {
+      await this.prisma.event.updateMany({
+        where: autoHideWhere,
+        data: { isActive: false },
+      });
+      this.logger.log(`Events: auto-hidden ${autoHideCount} events without sessions in next 365 days`);
+    } else if (dryRun && autoHideCount > 0) {
+      this.logger.log(`Events: would auto-hide ${autoHideCount} events without sessions in next 365 days (dry-run)`);
+    }
+
     return report;
   }
 }

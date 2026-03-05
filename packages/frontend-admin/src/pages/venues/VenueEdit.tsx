@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ImageUploadInput } from '@/components/ui/ImageUploadInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -360,7 +361,7 @@ export function VenueEditPage() {
           <TabsTrigger value="conversion">Конверсия</TabsTrigger>
           <TabsTrigger value="seo">SEO</TabsTrigger>
           {!isNew && <TabsTrigger value="events">Выставки ({events.length})</TabsTrigger>}
-          {!isNew && <TabsTrigger value="offers">Офферы ({offers.length})</TabsTrigger>}
+          {!isNew && <TabsTrigger value="offers">Способы покупки ({offers.length})</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -447,14 +448,12 @@ export function VenueEditPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>URL обложки</Label>
-                  <Input
-                    value={form.imageUrl}
-                    onChange={(e) => updateField('imageUrl', e.target.value)}
-                    placeholder="https://..."
-                  />
-                </div>
+                <ImageUploadInput
+                  label="URL обложки"
+                  value={form.imageUrl}
+                  onChange={(v) => updateField('imageUrl', v)}
+                  placeholder="https://..."
+                />
                 <div className="space-y-2">
                   <Label>Цена от (копейки)</Label>
                   <Input

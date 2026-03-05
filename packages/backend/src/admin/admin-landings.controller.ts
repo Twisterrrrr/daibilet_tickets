@@ -90,7 +90,7 @@ export class AdminLandingsController {
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateLandingDto, @Request() req: { user: { id: string } }) {
-    const { id: _, createdAt, updatedAt, city, version, ...clean } = data as Record<string, unknown>;
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, city: _city, version: _version, ...clean } = data as Record<string, unknown>;
 
     this.validateJsonFields(clean);
 

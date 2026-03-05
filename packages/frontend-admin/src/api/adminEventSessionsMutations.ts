@@ -33,3 +33,25 @@ export async function deleteSession(sessionId: string) {
   return adminApi.delete<{ ok: true }>(`/admin/sessions/${sessionId}`);
 }
 
+export type BatchCreateSessionSlot = {
+  startsAt: string;
+  capacityTotal?: number | null;
+  isActive?: boolean;
+};
+
+export type BatchCreateSessionsResponse = {
+  requested: number;
+  created: AdminEventSessionRow[];
+  skipped: { startsAt: string; reason: string }[];
+};
+
+export async function batchCreateSessions(
+  eventId: string,
+  slots: BatchCreateSessionSlot[],
+) {
+  return adminApi.post<BatchCreateSessionsResponse>(
+    `/admin/events/${eventId}/sessions/batch-create`,
+    { slots },
+  );
+}
+

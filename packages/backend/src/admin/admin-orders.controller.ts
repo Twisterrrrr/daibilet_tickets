@@ -178,7 +178,7 @@ export class AdminOrdersController {
   @Roles('ADMIN', 'EDITOR')
   @ApiOperation({ summary: 'Изменить статус заказа (с reason для аудита)' })
   async updateStatus(@Param('id') id: string, @Body() body: OrderStatusDto) {
-    const { status, reason } = body;
+    const { status, reason: _reason } = body;
     const safe: Record<string, string[]> = {
       DRAFT: ['PENDING_PAYMENT'],
       PENDING_PAYMENT: ['PAID', 'FAILED'],
@@ -203,7 +203,7 @@ export class AdminOrdersController {
   @Post(':id/resend-email')
   @Roles('ADMIN', 'EDITOR')
   @ApiOperation({ summary: 'Повторная отправка письма с ваучером' })
-  async resendEmail(@Param('id') id: string, @Body() body: OrderActionDto) {
+  async resendEmail(@Param('id') id: string, @Body() _body: OrderActionDto) {
     const pkg = await this.prisma.package.findUniqueOrThrow({
       where: { id },
       include: {
@@ -289,7 +289,7 @@ export class AdminOrdersController {
   @Post(':id/retry-fulfilment')
   @Roles('ADMIN', 'EDITOR')
   @ApiOperation({ summary: 'Retry fulfilment: создать ваучер если отсутствует, отправить письмо' })
-  async retryFulfilment(@Param('id') id: string, @Body() body: OrderActionDto) {
+  async retryFulfilment(@Param('id') id: string, @Body() _body: OrderActionDto) {
     const pkg = await this.prisma.package.findUniqueOrThrow({
       where: { id },
       include: {

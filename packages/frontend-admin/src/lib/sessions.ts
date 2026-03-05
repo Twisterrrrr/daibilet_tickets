@@ -6,7 +6,8 @@ export function pad2(n: number) {
 
 export function formatDateRu(iso: string) {
   const d = new Date(iso);
-  return `${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}-${d.getFullYear()}`;
+  // Админка: даты во всех списках показываем как DD/MM/YYYY
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
 export function formatTimeRu(iso: string) {

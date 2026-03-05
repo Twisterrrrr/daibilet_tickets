@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
-import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
+import { parsePagination } from '../common/pagination';
 import { AuditService } from './audit.service';
 
 @ApiTags('admin')

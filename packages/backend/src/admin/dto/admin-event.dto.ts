@@ -155,6 +155,34 @@ export class AdminCreateSessionDto {
   capacity?: number | null;
 }
 
+// ─── Batch Create Sessions ────────────────────────────────────────────
+
+export class BatchCreateSessionSlotDto {
+  @ApiProperty({ description: 'Дата/время начала сеанса (ISO 8601)' })
+  @IsISO8601()
+  startsAt!: string;
+
+  @ApiPropertyOptional({
+    description: 'Вместимость слота; если не задана, используется Event.defaultCapacityTotal',
+  })
+  @IsOptional()
+  @IsInt()
+  capacityTotal?: number | null;
+
+  @ApiPropertyOptional({ description: 'Флаг активности; по умолчанию true' })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class BatchCreateEventSessionsDto {
+  @ApiProperty({ type: [BatchCreateSessionSlotDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BatchCreateSessionSlotDto)
+  slots!: BatchCreateSessionSlotDto[];
+}
+
 export class AdminUpdateSessionDto {
   @ApiPropertyOptional({ description: 'Новая дата/время начала (ISO 8601)' })
   @IsOptional()
@@ -497,6 +525,11 @@ export class VenueSettingsDto {
   @IsUUID()
   venueId?: string | null;
 
+  @ApiPropertyOptional({ description: 'Адрес / место проведения (строка), опционально' })
+  @IsOptional()
+  @IsString()
+  address?: string | null;
+
   @ApiPropertyOptional({ enum: DateMode })
   @IsOptional()
   @IsEnum(DateMode)
@@ -511,6 +544,14 @@ export class VenueSettingsDto {
   @IsOptional()
   @IsISO8601()
   endDate?: string | null;
+}
+
+// ─── Event Activation ────────────────────────────────────────────────
+
+export class EventActivationDto {
+  @ApiProperty()
+  @IsBoolean()
+  isActive!: boolean;
 }
 
 // ─── External Rating ───────────────────────────────────────────────

@@ -121,6 +121,7 @@ export class VenueService {
     let reviews: any[] = [];
     let recommendPercent = 0;
 
+    // eslint-disable-next-line no-constant-condition -- always load reviews for venue stats
     if (eventIds.length > 0 || true) {
       reviews = await this.prisma.review.findMany({
         where: reviewWhere,

@@ -45,8 +45,10 @@ import {
   AdminStopSessionDto,
   AdminUpdateSessionDto,
   AdminCancelSessionDto,
+  BatchCreateEventSessionsDto,
   CreateEventDto,
   CreateEventOfferDto,
+  EventActivationDto,
   EventQualityDto,
   ExternalRatingDto,
   OverrideEventDto,
@@ -57,6 +59,7 @@ import {
 import { EventOverrideService } from './event-override.service';
 import { EventQualityIssue, EventQualityService } from '../catalog/event-quality.service';
 import { AuditService } from './audit.service';
+import { toJsonValue } from '../common/typing';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -196,6 +199,39 @@ export class AdminEventsController {
   }
 
   /**
+   * Поиск событий для связи в группы (admin UI).
+   */
+  @Get('search')
+  @Roles('ADMIN', 'EDITOR')
+  async searchEvents(@Query('query') query?: string) {
+    const trimmed = query?.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const items = await this.prisma.event.findMany({
+      where: {
+        isDeleted: false,
+        OR: [
+          { title: { contains: trimmed, mode: 'insensitive' } },
+          { slug: { contains: trimmed, mode: 'insensitive' } },
+        ],
+      },
+      include: {
+        city: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    return items.map((e) => ({
+      id: e.id,
+      title: e.title,
+      cityName: e.city?.name ?? '',
+    }));
+  }
+
+  /**
    * Пометить событие как дубль другого (canonicalOfId).
    */
   @Patch(':id/mark-duplicate')
@@ -215,6 +251,168 @@ export class AdminEventsController {
       data: { canonicalOfId },
     });
     return { message: 'Событие помечено как дубль', canonicalOfId };
+  }
+
+  /**
+   * Группа событий по groupingKey: детали для админки.
+   */
+  @Get(':id/group')
+  @Roles('ADMIN', 'EDITOR')
+  async getEventGroup(@Param('id') eventId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        city: { select: { name: true } },
+        override: { select: { isHidden: true } },
+      },
+    });
+    if (!event || event.isDeleted) {
+      throw new NotFoundException('Событие не найдено');
+    }
+
+    if (!event.groupingKey) {
+      return {
+        groupingKey: null as string | null,
+        isCanonical: false,
+        canonicalEventId: null as string | null,
+        items: [] as {
+          id: string;
+          title: string;
+          cityName: string;
+          source: string;
+          isActive: boolean;
+          isHidden: boolean;
+        }[],
+      };
+    }
+
+    const groupEvents = await this.prisma.event.findMany({
+      where: {
+        groupingKey: event.groupingKey,
+        isDeleted: false,
+      },
+      include: {
+        city: { select: { name: true } },
+        override: { select: { isHidden: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!groupEvents.length) {
+      return {
+        groupingKey: event.groupingKey,
+        isCanonical: true,
+        canonicalEventId: event.id,
+        items: [],
+      };
+    }
+
+    // Каноническое событие внутри группы: сначала ищем без canonicalOfId, иначе берём самое раннее по createdAt.
+    const canonical =
+      groupEvents.find((e) => !e.canonicalOfId) ??
+      groupEvents.reduce((acc, cur) => (cur.createdAt < acc.createdAt ? cur : acc), groupEvents[0]!);
+
+    const canonicalEventId = canonical.id;
+
+    return {
+      groupingKey: event.groupingKey,
+      isCanonical: event.id === canonicalEventId,
+      canonicalEventId,
+      items: groupEvents.map((e) => ({
+        id: e.id,
+        title: e.title,
+        cityName: e.city?.name ?? '',
+        source: e.source,
+        isActive: e.isActive,
+        isHidden: e.override?.isHidden ?? false,
+      })),
+    };
+  }
+
+  /**
+   * Обновить groupingKey события (вступить/создать группу).
+   */
+  @Patch(':id/group')
+  @Roles('ADMIN', 'EDITOR')
+  async updateEventGrouping(
+    @Param('id') eventId: string,
+    @Body('groupingKey') groupingKey: string,
+  ) {
+    const trimmed = groupingKey?.trim();
+    if (!trimmed) {
+      throw new BadRequestException('groupingKey обязателен');
+    }
+
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event || event.isDeleted) {
+      throw new NotFoundException('Событие не найдено');
+    }
+
+    const shouldResetCanonical = event.groupingKey !== trimmed;
+
+    await this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        groupingKey: trimmed,
+        ...(shouldResetCanonical ? { canonicalOfId: null } : {}),
+      },
+    });
+
+    return { groupingKey: trimmed };
+  }
+
+  /**
+   * Удалить событие из группы (groupingKey = null).
+   */
+  @Delete(':id/group')
+  @Roles('ADMIN', 'EDITOR')
+  async clearEventGrouping(@Param('id') eventId: string) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event || event.isDeleted) {
+      throw new NotFoundException('Событие не найдено');
+    }
+
+    await this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        groupingKey: null,
+        canonicalOfId: null,
+      },
+    });
+
+    return { groupingKey: null as string | null, canonicalEventId: null as string | null };
+  }
+
+  /**
+   * Сделать событие каноническим внутри группы (через canonicalOfId).
+   */
+  @Post(':id/group/make-canonical')
+  @Roles('ADMIN', 'EDITOR')
+  async makeEventCanonical(@Param('id') eventId: string) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event || event.isDeleted) {
+      throw new NotFoundException('Событие не найдено');
+    }
+    if (!event.groupingKey) {
+      throw new BadRequestException('Событие не входит ни в одну группу');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.event.updateMany({
+        where: {
+          groupingKey: event.groupingKey,
+          id: { not: event.id },
+        },
+        data: { canonicalOfId: event.id },
+      });
+
+      await tx.event.update({
+        where: { id: event.id },
+        data: { canonicalOfId: null },
+      });
+    });
+
+    return { canonicalEventId: event.id };
   }
 
   /**
@@ -285,9 +483,22 @@ export class AdminEventsController {
           });
       }
 
-      // Create override with templateData if provided
+      // Create override with templateData if provided.
+      // Важно использовать тот же транзакционный клиент (tx), иначе FK на eventId
+      // может сработать до коммита события и дать ошибку `event_overrides_eventId_fkey`.
       if (data.templateData && Object.keys(data.templateData).length > 0) {
-        await this.overrideService.upsert(event.id, { templateData: data.templateData }, req.user.id);
+        await tx.eventOverride.upsert({
+          where: { eventId: event.id },
+          create: {
+            eventId: event.id,
+            templateData: toJsonValue(data.templateData),
+            updatedBy: req.user.id,
+          },
+          update: {
+            templateData: toJsonValue(data.templateData),
+            updatedBy: req.user.id,
+          },
+        });
       }
 
       return { event, offer };
@@ -873,6 +1084,174 @@ export class AdminEventsController {
     });
   }
 
+  /**
+   * Батч-создание сеансов для события.
+   *
+   * POST /admin/events/:id/sessions/batch-create
+   */
+  @Post(':id/sessions/batch-create')
+  @Roles('ADMIN', 'EDITOR')
+  async batchCreateSessions(
+    @Param('id') eventId: string,
+    @Body() dto: BatchCreateEventSessionsDto,
+  ) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, source: true, defaultCapacityTotal: true },
+    });
+    if (!event) {
+      throw new NotFoundException('Событие не найдено');
+    }
+    if (event.source !== 'MANUAL') {
+      throw new SessionLockedException(
+        'IMPORTED',
+        'Импортное событие: батч-создание сеансов запрещено.',
+      );
+    }
+
+    const slots = dto.slots ?? [];
+    if (!slots.length) {
+      throw new BadRequestException('Список слотов пуст');
+    }
+    if (slots.length > 200) {
+      throw new BadRequestException('Нельзя создать более 200 слотов за один запрос');
+    }
+
+    const now = new Date();
+    const normalized: {
+      startsAt: Date;
+      capacityTotal: number | null;
+      isActive: boolean;
+      startsAtIso: string;
+    }[] = [];
+    const skipped: { startsAt: string; reason: 'PAST' | 'INVALID' }[] = [];
+
+    for (const slot of slots) {
+      let startsAt: Date;
+      try {
+        startsAt = new Date(slot.startsAt);
+        if (Number.isNaN(startsAt.getTime())) {
+          throw new Error('invalid');
+        }
+      } catch {
+        skipped.push({ startsAt: slot.startsAt, reason: 'INVALID' });
+        continue;
+      }
+
+      if (startsAt < now) {
+        skipped.push({ startsAt: startsAt.toISOString(), reason: 'PAST' });
+        continue;
+      }
+
+      const capacityTotal =
+        slot.capacityTotal != null
+          ? slot.capacityTotal
+          : event.defaultCapacityTotal != null
+            ? event.defaultCapacityTotal
+            : null;
+      const isActive = slot.isActive ?? true;
+
+      normalized.push({
+        startsAt,
+        capacityTotal,
+        isActive,
+        startsAtIso: startsAt.toISOString(),
+      });
+    }
+
+    if (!normalized.length) {
+      return {
+        requested: slots.length,
+        created: [] as ReturnType<typeof this.buildAdminSessionRow>[],
+        skipped,
+      };
+    }
+
+    // Проверяем существующие сеансы с теми же startsAt
+    const existing = await this.prisma.eventSession.findMany({
+      where: {
+        eventId,
+        startsAt: {
+          in: normalized.map((n) => n.startsAt),
+        },
+      },
+      select: { startsAt: true },
+    });
+    const existingSet = new Set(existing.map((s) => s.startsAt.toISOString()));
+
+    const toCreate = normalized.filter((n) => !existingSet.has(n.startsAtIso));
+
+    const duplicateSkipped = normalized
+      .filter((n) => existingSet.has(n.startsAtIso))
+      .map((n) => ({
+        startsAt: n.startsAtIso,
+        reason: 'DUPLICATE' as const,
+      }));
+
+    const createdSessions = await this.prisma.$transaction(async (tx) => {
+      const created: {
+        id: string;
+        startsAt: Date;
+        endsAt: Date | null;
+        capacityTotal: number | null;
+        canceledAt: Date | null;
+        cancelReason: string | null;
+      }[] = [];
+
+      for (const n of toCreate) {
+        const session = await tx.eventSession.create({
+          data: {
+            eventId,
+            startsAt: n.startsAt,
+            endsAt: null,
+            capacityTotal: n.capacityTotal,
+            isActive: n.isActive,
+            canceledAt: null,
+            cancelReason: null,
+            tcSessionId: `manual-${Date.now()}-${Math.random()
+              .toString(36)
+              .slice(2, 8)}`,
+            prices: [],
+          },
+          select: {
+            id: true,
+            startsAt: true,
+            endsAt: true,
+            capacityTotal: true,
+            canceledAt: true,
+            cancelReason: true,
+          },
+        });
+        created.push(session);
+      }
+
+      return created;
+    });
+
+    const createdRows = createdSessions.map((s) =>
+      this.buildAdminSessionRow(
+        {
+          id: s.id,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt,
+          capacityTotal: s.capacityTotal,
+          canceledAt: s.canceledAt,
+          cancelReason: s.cancelReason,
+        },
+        {
+          source: event.source,
+          defaultCapacityTotal: event.defaultCapacityTotal ?? null,
+        },
+        0,
+      ),
+    );
+
+    return {
+      requested: slots.length,
+      created: createdRows,
+      skipped: [...skipped, ...duplicateSkipped],
+    };
+  }
   // --- Override endpoints ---
 
   /**
@@ -908,6 +1287,30 @@ export class AdminEventsController {
     return result;
   }
 
+  /**
+   * Быстрое включение/выключение события в каталоге.
+   *
+   * PATCH /admin/events/:id/activation
+   */
+  @Patch(':id/activation')
+  @Roles('ADMIN', 'EDITOR')
+  async updateActivation(@Param('id') id: string, @Body() body: EventActivationDto) {
+    const event = await this.prisma.event.findUnique({ where: { id } });
+    if (!event) {
+      throw new NotFoundException('Событие не найдено');
+    }
+
+    const updated = await this.prisma.event.update({
+      where: { id },
+      data: { isActive: body.isActive },
+      select: { id: true, isActive: true },
+    });
+
+    await this.cacheInvalidation.invalidateEventById(id);
+
+    return updated;
+  }
+
   // --- Venue & dateMode (прямое обновление Event) ---
 
   @Patch(':id/venue-settings')
@@ -926,6 +1329,7 @@ export class AdminEventsController {
       where: { id },
       data: {
         ...(data.venueId !== undefined && { venueId: data.venueId || null }),
+        ...(data.address !== undefined && { address: data.address || null }),
         ...(data.dateMode && { dateMode: data.dateMode as DateMode }),
         ...(data.isPermanent !== undefined && { isPermanent: data.isPermanent }),
         ...(data.endDate !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
@@ -933,6 +1337,7 @@ export class AdminEventsController {
       select: {
         id: true,
         venueId: true,
+        address: true,
         dateMode: true,
         isPermanent: true,
         endDate: true,

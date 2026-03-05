@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from 'react';
 import { ArrowRight, Landmark, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
@@ -46,17 +49,37 @@ export function CityCard({
   large = false,
   region,
 }: CityCardProps) {
+  const [hasImage, setHasImage] = useState(false);
+
+  useEffect(() => {
+    if (!heroImage) {
+      setHasImage(false);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) setHasImage(true);
+    };
+    img.onerror = () => {
+      if (!cancelled) setHasImage(false);
+    };
+    img.src = heroImage;
+    return () => {
+      cancelled = true;
+    };
+  }, [heroImage]);
+
   return (
     <div className="flex flex-col">
       <Link href={`/cities/${slug}`} className={`card group relative overflow-hidden ${large ? 'h-64' : 'h-48'}`}>
-        {heroImage ? (
+        <div className="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-900" />
+        {hasImage && (
           <img
             src={heroImage}
             alt={name}
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-900" />
         )}
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />

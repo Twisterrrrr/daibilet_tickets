@@ -20,7 +20,7 @@ import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QUEUE_EMAILS } from '../queue/queue.constants';
 import { BOOKING_PROVIDER_TOKEN, BookingProvider, BookingProviderRegistry } from './booking-provider.interface';
-import { isSessionFullyFulfilled, PaymentFlowType, SnapshotLineItem } from './cart-partitioning';
+import { isSessionFullyFulfilled, SnapshotLineItem } from './cart-partitioning';
 import { tryTransitionCheckout } from './checkout-state-machine';
 
 /** Max retry attempts per fulfillment item */

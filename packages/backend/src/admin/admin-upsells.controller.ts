@@ -54,7 +54,7 @@ export class AdminUpsellsController {
   @Patch(':id')
   @Roles('ADMIN')
   async update(@Param('id') id: string, @Body() data: UpdateUpsellDto) {
-    const { id: _, createdAt, updatedAt, ...clean } = data as Record<string, unknown>;
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...clean } = data as Record<string, unknown>;
     return this.prisma.upsellItem.update({ where: { id }, data: clean });
   }
 

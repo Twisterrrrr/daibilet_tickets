@@ -172,7 +172,7 @@ export class SyncProcessor extends WorkerHost {
   /**
    * Инкрементальная синхронизация: только TC + очередь постредакции + cache invalidation.
    */
-  private async handleIncrementalSync(signal?: AbortSignal) {
+  private async handleIncrementalSync(_signal?: AbortSignal) {
     const runStartedAt = new Date();
     const tcResult = await this.tcSync.syncAll();
     this.logger.log(`TC incremental: ${tcResult.uniqueEvents} событий, статус: ${tcResult.status}`);

@@ -57,9 +57,9 @@ export function QualityBanner({ quality, loading, error, isImported, onIssueClic
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>Причины: {issues.length}</span>
               {warningCount > 0 && <Badge variant="secondary">Warning: {warningCount}</Badge>}
-              <Badge variant={quality.isSellable ? 'outline' : 'destructive'}>
-                Sellable: {quality.isSellable ? 'Да' : 'Нет'}
-              </Badge>
+            <Badge variant={quality.isSellable ? 'outline' : 'destructive'}>
+              Готово к продаже: {quality.isSellable ? 'Да' : 'Нет'}
+            </Badge>
             </div>
 
             {isImported && hasScheduleIssues && (

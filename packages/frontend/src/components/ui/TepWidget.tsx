@@ -1,3 +1,5 @@
+ "use client";
+
 /**
  * Виджет покупки билетов через teplohod.info.
  *
@@ -5,7 +7,8 @@
  * Он ищет элементы с классом "teplohod-info-wrapper" и рендерит
  * встроенный виджет покупки билетов внутри них.
  *
- * data-id — числовой ID события в системе teplohod.info
+ * data-id — числовой ID виджета агента на teplohod.info
+ * data-event-id — числовой ID события (из events?compact)
  * data-lang — локаль (ru-RU)
  *
  * Поскольку скрипт инициализируется при загрузке и может не найти
@@ -13,7 +16,6 @@
  * при монтировании компонента. MutationObserver скрывает виджет,
  * если teplohod вернул «нет расписания» (deleted-block / closed).
  */
-'use client';
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -61,6 +63,12 @@ const TEP_BUTTON_CSS = `
 `;
 
 /**
+ * Глобальный ID виджета агента на teplohod.info.
+ * Используется как data-id для всех событий.
+ */
+const GLOBAL_TEP_WIDGET_ID = '14208';
+
+/**
  * Извлечь числовой ID teplohod-события из externalEventId.
  * Формат: "tep-{id}", напр. "tep-1291" → "1291"
  */
@@ -85,17 +93,16 @@ export function TepWidgetEmbed({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hidden, setHidden] = useState(false);
-
-  const widgetId = tepWidgetId
-    ? String(tepWidgetId)
-    : tepEventId
+  // Числовой ID события Teplohod (из compact JSON / tcEventId)
+  const eventId =
+    tepEventId != null
       ? String(tepEventId)
       : externalEventId
         ? extractTepId(externalEventId)
         : null;
 
   useEffect(() => {
-    if (!widgetId || !containerRef.current) return;
+    if (!eventId || !containerRef.current) return;
 
     const container = containerRef.current;
 
@@ -124,14 +131,20 @@ export function TepWidgetEmbed({
       clearTimeout(timer);
       observer.disconnect();
     };
-  }, [widgetId]);
+  }, [eventId]);
 
-  if (!widgetId || hidden) return null;
+  if (!eventId || hidden) return null;
 
   return (
     <div className="mt-4">
       <style dangerouslySetInnerHTML={{ __html: TEP_BUTTON_CSS }} />
-      <div ref={containerRef} data-lang="ru-RU" data-id={widgetId} className="teplohod-info-wrapper" />
+      <div
+        ref={containerRef}
+        data-lang="ru-RU"
+        data-id={tepWidgetId ? String(tepWidgetId) : GLOBAL_TEP_WIDGET_ID}
+        data-event-id={eventId}
+        className="teplohod-info-wrapper"
+      />
     </div>
   );
 }

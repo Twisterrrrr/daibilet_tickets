@@ -882,6 +882,9 @@ export default function EventsPage() {
                 isOptimalChoice={event.isOptimalChoice}
                 dateMode={event.dateMode ?? undefined}
                 priceOriginalKopecks={event.priceOriginalKopecks}
+                groupSize={event.groupSize ?? undefined}
+                sessionTimes={event.sessionTimes ?? []}
+                highlights={event.highlights ?? []}
                 cityLabelOverride={cityLabelOverride}
                 hrefOverride={hrefOverride}
                 description={description}

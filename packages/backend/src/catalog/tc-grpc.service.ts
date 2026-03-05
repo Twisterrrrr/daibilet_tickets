@@ -178,7 +178,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
   /**
    * Обёртка: собирает все элементы из server-side streaming RPC в массив.
    */
-  private collectStream<T>(rpcMethod: string, request: Record<string, unknown>, timeoutMs = 30000): Promise<T[]> {
+  private collectStream<T>(rpcMethod: string, request: Record<string, unknown>, timeoutMs = 120000): Promise<T[]> {
     return new Promise((resolve, reject) => {
       if (!this.client) {
         return reject(new Error('gRPC-клиент не инициализирован'));
@@ -280,11 +280,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.debug(`gRPC Events request: ${JSON.stringify(request)}`);
 
-    const events = await this.collectStream<TcGrpcEvent>(
-      'Events',
-      request,
-      60000, // 60s — может быть много данных
-    );
+    const events = await this.collectStream<TcGrpcEvent>('Events', request, 180000);
 
     this.logger.log(`gRPC Events: получено ${events.length} мероприятий`);
     return events;

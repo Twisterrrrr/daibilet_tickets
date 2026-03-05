@@ -5,7 +5,7 @@ import { maskAuthorization, maskEmail, maskPhone, maskPii, maskPiiInString, mask
 describe('pii-mask.util', () => {
   describe('maskEmail', () => {
     it('masks email keeping structure', () => {
-      expect(maskEmail('user@example.com')).toMatch(/^.+\@.+\..+$/);
+      expect(maskEmail('user@example.com')).toMatch(/^.+.+@.+\..+$/);
       expect(maskEmail('a@b.co')).not.toBe('a@b.co');
     });
     it('returns empty for null/undefined', () => {

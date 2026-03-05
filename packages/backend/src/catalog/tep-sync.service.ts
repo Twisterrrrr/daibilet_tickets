@@ -1,5 +1,4 @@
 import { normalizeEventTitle } from '@daibilet/shared';
-import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
 import { existsSync, readFileSync } from 'fs';
@@ -257,8 +256,8 @@ export class TepSyncService {
     const prices = this.extractPrices(tep.eventTickets);
 
     // Upsert события
-    const existing = await this.prisma.event.findUnique({
-      where: { source_tcEventId: { source: 'TEPLOHOD', tcEventId } },
+    const existing = await this.prisma.event.findFirst({
+      where: { source: 'TEPLOHOD', tcEventId },
     });
 
     // Группировка мульти-событий: одинаковое шоу в разных городах/датах
@@ -269,8 +268,8 @@ export class TepSyncService {
         : null;
 
     if (existing) {
-      await this.prisma.event.update({
-        where: { source_tcEventId: { source: 'TEPLOHOD', tcEventId } },
+      await this.prisma.event.updateMany({
+        where: { source: 'TEPLOHOD', tcEventId },
         data: {
           cityId,
           title,
@@ -327,8 +326,8 @@ export class TepSyncService {
     // Если embed не работает, событие будет скрыто (DISABLED) проверкой ниже.
     const eventRecord = existing
       ? existing
-      : await this.prisma.event.findUnique({
-          where: { source_tcEventId: { source: 'TEPLOHOD', tcEventId } },
+      : await this.prisma.event.findFirst({
+          where: { source: 'TEPLOHOD', tcEventId },
           select: { id: true },
         });
     if (eventRecord) {
@@ -380,73 +379,13 @@ export class TepSyncService {
     const sessionCount = await this.syncSession(sourceId, tep, prices);
     this.logger.debug(`tep-${tep.id}: ${sessionCount} sessions (real=${hasRealSchedule})`);
 
-    // Проверка виджета teplohod.info по tepWidgetId (account.teplohod.info/widget/embed/{tepWidgetId}).
-    // tepWidgetId — из widgetPayload (seed-teplohod-widgets) или teplohod-widgets.json.
-    if (eventRecord) {
-      const offerAfter = await this.prisma.eventOffer.findUnique({
-        where: { source_externalEventId: { source: 'TEPLOHOD', externalEventId: sourceId } },
-        select: { widgetPayload: true },
-      });
-      const payload = (offerAfter?.widgetPayload as Record<string, unknown>) || {};
-      const tepWidgetId =
-        (payload.tepWidgetId as number | string | null | undefined) ?? this.getTeplohodWidgetsMapping()[sourceId];
-
-      let offerStatus: 'ACTIVE' | 'DISABLED' = 'ACTIVE';
-      let eventIsActive = true;
-
-      if (tepWidgetId != null) {
-        try {
-          const widgetStatus = await this.tepApi.checkWidgetStatusByTepWidgetId(tepWidgetId);
-          if (widgetStatus === 'working') {
-            offerStatus = 'ACTIVE';
-            eventIsActive = true;
-          } else {
-            offerStatus = 'DISABLED';
-            eventIsActive = false;
-            this.logger.debug(`tep-${tep.id}: виджет ${tepWidgetId} → ${widgetStatus}, скрываем`);
-          }
-        } catch (err) {
-          this.logger.warn(
-            `tep-${tep.id}: ошибка проверки виджета ${tepWidgetId}: ${err instanceof Error ? err.message : String(err)}`,
-          );
-          // При ошибке сети оставляем ACTIVE — не скрываем из-за временных сбоев
-        }
-      }
-
-      await this.prisma.eventOffer.updateMany({
-        where: { source: 'TEPLOHOD', externalEventId: sourceId },
-        data: { purchaseType: 'WIDGET', status: offerStatus },
-      });
-
-      const ev = await this.prisma.event.findUnique({
-        where: { source_tcEventId: { source: 'TEPLOHOD', tcEventId } },
-        select: { isActive: true },
-      });
-      if (ev) {
-        const needReactivate = !ev.isActive && eventIsActive;
-        const needDeactivate = ev.isActive && !eventIsActive;
-        if (needReactivate) {
-          this.logger.log(`tep-${tep.id}: реактивируем`);
-          await this.prisma.event.update({
-            where: { source_tcEventId: { source: 'TEPLOHOD', tcEventId } },
-            data: { isActive: true },
-          });
-          await this.prisma.eventSession.updateMany({
-            where: { eventId: eventRecord.id, tcSessionId: { startsWith: sourceId } },
-            data: { isActive: true },
-          });
-        } else if (needDeactivate) {
-          await this.prisma.event.update({
-            where: { source_tcEventId: { source: 'TEPLOHOD', tcEventId } },
-            data: { isActive: false },
-          });
-          await this.prisma.eventSession.updateMany({
-            where: { eventId: eventRecord.id, tcSessionId: { startsWith: sourceId } },
-            data: { isActive: false },
-          });
-        }
-      }
-    }
+    // Ранее здесь была проверка статуса виджета Teplohod по tepWidgetId
+    // с автоматическим выключением оффера и события (isActive=false),
+    // если виджет возвращал неуспешный статус.
+    // Сейчас контракт с Teplohod основан на внешнем eventId (tcEventId),
+    // а не на нашем embed-виджете, поэтому не трогаем isActive и статус оффера
+    // по сетевым/виджетным ошибкам, чтобы события всегда оставались видимыми
+    // в каталоге при наличии данных и расписания.
 
     // Теги из фич
     await this.syncFeatureTags(sourceId, tep.eventFeatures || []);
@@ -464,8 +403,8 @@ export class TepSyncService {
    * Используем batch INSERT ... ON CONFLICT для производительности.
    */
   private async syncSession(sourceId: string, tep: TepEvent, prices: Record<string, unknown>[]): Promise<number> {
-    const event = await this.prisma.event.findUnique({
-      where: { source_tcEventId: { source: 'TEPLOHOD', tcEventId: normalizeTeplohodExternalId(tep.id) } },
+    const event = await this.prisma.event.findFirst({
+      where: { source: 'TEPLOHOD', tcEventId: normalizeTeplohodExternalId(tep.id) },
       select: { id: true },
     });
     if (!event) return 0;
@@ -654,8 +593,8 @@ export class TepSyncService {
    * Связать фичи teplohod.info (Кафе-бар, WC, Дискотека) с тегами.
    */
   private async syncFeatureTags(sourceId: string, features: { id: number; title: string }[]): Promise<void> {
-    const event = await this.prisma.event.findUnique({
-      where: { tcEventId: sourceId },
+    const event = await this.prisma.event.findFirst({
+      where: { source: 'TEPLOHOD', tcEventId: normalizeTeplohodExternalId(sourceId) },
       select: { id: true },
     });
     if (!event) return;
@@ -701,8 +640,8 @@ export class TepSyncService {
    * Auto-assign tags by keyword matching in title+description.
    */
   private async syncKeywordTags(sourceId: string, title: string, description: string): Promise<void> {
-    const event = await this.prisma.event.findUnique({
-      where: { tcEventId: sourceId },
+    const event = await this.prisma.event.findFirst({
+      where: { source: 'TEPLOHOD', tcEventId: normalizeTeplohodExternalId(sourceId) },
       select: { id: true },
     });
     if (!event) return;

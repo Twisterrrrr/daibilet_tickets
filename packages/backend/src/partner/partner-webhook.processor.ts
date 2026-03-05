@@ -18,7 +18,7 @@ export class PartnerWebhookProcessor extends WorkerHost {
   private readonly logger = new Logger(PartnerWebhookProcessor.name);
 
   async process(job: Job<WebhookJobData>): Promise<any> {
-    const { operatorId, operatorName, webhookUrl, webhookSecret, payload } = job.data;
+    const { operatorId: _operatorId, operatorName, webhookUrl, webhookSecret, payload } = job.data;
 
     const bodyStr = JSON.stringify(payload);
     const signature = webhookSecret ? PartnerWebhookService.sign(bodyStr, webhookSecret) : '';

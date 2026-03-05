@@ -9,7 +9,6 @@ import {
   Patch,
   Post,
   Query,
-  Request,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -91,7 +90,7 @@ export class AdminTagsController {
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateTagDto) {
-    const { id: _, createdAt, updatedAt, events, articleTags, _count, version, ...clean } = data as Record<string, unknown>;
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, events: _events, articleTags: _articleTags, _count, version: _version, ...clean } = data as Record<string, unknown>;
 
     if (data.version !== undefined) {
       const result = await this.prisma.tag.updateMany({

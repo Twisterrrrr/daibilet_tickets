@@ -1555,7 +1555,7 @@ export class CatalogService {
       // highlights: 1) локация (очищенная), 2) маршрут, 3) подкатегории/теги
       const highlights: string[] = [];
       const venue = event.venue as { title?: string; shortTitle?: string } | null;
-      const cityName = (event.city as { name?: string } | null)?.name;
+      const _cityName = (event.city as { name?: string } | null)?.name;
       const rawAddress = (typeof event.address === 'string' ? event.address.trim() : null) || venue?.shortTitle || venue?.title || '';
       // Для точки отправления: только улица и номер дома
       const locStr = rawAddress ? shortenAddressToStreet(rawAddress) : '';

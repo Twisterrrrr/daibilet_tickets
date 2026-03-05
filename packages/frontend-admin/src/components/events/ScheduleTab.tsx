@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Calendar, Lock, Pencil, Plus, RefreshCcw, Trash2, XCircle } from 'lucide-react';
+import { Calendar, LayoutGrid, List, Lock, Pencil, Plus, RefreshCcw, Trash2, XCircle } from 'lucide-react';
 
 import { adminApi } from '@/api/client';
 import { CreateSessionDialog } from '@/components/events/CreateSessionDialog';
@@ -15,7 +15,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { formatDateRu, formatTimeRu, LockReason } from '@/lib/sessions';
+import { formatDateRu, formatTimeRu, isoToDateInput, LockReason, pad2 } from '@/lib/sessions';
+import { ScheduleGridDay, type ScheduleGridSelection } from '@/components/events/ScheduleGridDay';
+import { ScheduleGridRange, type ScheduleGridRangeSelection } from '@/components/events/ScheduleGridRange';
+import { ScheduleBatchCreateDialog } from '@/components/events/ScheduleBatchCreateDialog';
+import { ScheduleBatchCreateRangeDialog } from '@/components/events/ScheduleBatchCreateRangeDialog';
+import { batchCreateSessions } from '@/api/adminEventSessionsMutations';
+import { toast } from 'sonner';
 
 export type AdminEventSessionRow = {
   id: string;
@@ -46,6 +52,14 @@ function addDaysIso(isoDate: string, days: number) {
   const d = new Date(`${isoDate}T00:00:00`);
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function buildIsoFromLocalDateKey(dateKey: string, hour: number, minute: number) {
+  const local = new Date(`${dateKey}T${pad2(hour)}:${pad2(minute)}:00`);
+  if (Number.isNaN(local.getTime())) {
+    throw new Error(`Некорректная дата/время: ${dateKey} ${pad2(hour)}:${pad2(minute)}`);
+  }
+  return local.toISOString();
 }
 
 function lockLabel(reason?: LockReason) {
@@ -107,6 +121,19 @@ export function ScheduleTab({
   const [stopping, setStopping] = useState<AdminEventSessionRow | null>(null);
   const [creating, setCreating] = useState(false);
   const [includeCancelled, setIncludeCancelled] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [gridDetailMode, setGridDetailMode] = useState<'range' | 'day'>('range');
+  const [rangeDays, setRangeDays] = useState<7 | 14 | 30>(14);
+  const [selectionDay, setSelectionDay] = useState<ScheduleGridSelection>(new Set());
+  const [selectionRange, setSelectionRange] = useState<ScheduleGridRangeSelection>(new Set());
+  const [batchOpenDay, setBatchOpenDay] = useState(false);
+  const [batchOpenRange, setBatchOpenRange] = useState(false);
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
+  const [fromFocused, setFromFocused] = useState(false);
+  const [toFocused, setToFocused] = useState(false);
+  const fromDateInputRef = useRef<HTMLInputElement | null>(null);
+  const toDateInputRef = useRef<HTMLInputElement | null>(null);
 
   const query = useQuery({
     queryKey: ['admin', 'eventSessionsRange', eventId, from, to, includeCancelled],
@@ -118,6 +145,17 @@ export function ScheduleTab({
   const rows = useMemo(() => query.data?.rows ?? [], [query.data]);
   const cancelledCount = query.data?.cancelledCount ?? 0;
   const isImported = eventSource && eventSource !== 'MANUAL';
+
+  // Есть ли сеансы выбранного дня вне диапазона сетки (00:00–08:00 или ≥23:00)
+  const hasOutOfRangeForSelectedDay = useMemo(() => {
+    const dayRows = rows.filter((r) => isoToDateInput(r.startsAt) === from);
+    return dayRows.some((r) => {
+      const d = new Date(r.startsAt);
+      const h = d.getHours();
+      // Сетка покрывает 10:00–23:45 для выбранного дня; всё что до 10:00 или после 23:59 считаем вне диапазона.
+      return h < 10 || h >= 24;
+    });
+  }, [rows, from]);
 
   const gridConfig = useMemo(
     () => ({
@@ -192,6 +230,106 @@ export function ScheduleTab({
     setTo(addDaysIso(f, days));
   };
 
+  // При смене дня сбрасываем выбор слотов в режиме Day, чтобы не создать слоты "невидимого" дня.
+  useEffect(() => {
+    setSelectionDay(new Set());
+  }, [from]);
+
+  // И в режиме Диапазон сбрасываем выбор часов при смене from,
+  // чтобы не создать слоты "старого" диапазона.
+  useEffect(() => {
+    setSelectionRange(new Set());
+  }, [from, rangeDays]);
+
+  const selectedDate = from;
+
+  const handleToggleSlotDay = (startsAtIso: string) => {
+    setSelectionDay((prev) => {
+      const next = new Set(prev);
+      if (next.has(startsAtIso)) {
+        next.delete(startsAtIso);
+      } else {
+        next.add(startsAtIso);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleCellRange = (key: string) => {
+    setSelectionRange((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const handleBatchConfirmDay = async (params: { capacityTotal?: number | null; isActive: boolean }) => {
+    if (!selectionDay.size) {
+      setBatchOpenDay(false);
+      return;
+    }
+    setBatchSubmitting(true);
+    setBatchError(null);
+    try {
+      const slots = Array.from(selectionDay).map((startsAt) => ({
+        startsAt,
+        capacityTotal: params.capacityTotal,
+        isActive: params.isActive,
+      }));
+      const res = await batchCreateSessions(eventId, slots);
+      toast.success(`Создано слотов: ${res.created.length}, пропущено: ${res.skipped.length}.`);
+      setSelectionDay(new Set());
+      setBatchOpenDay(false);
+      await query.refetch();
+    } catch (e) {
+      setBatchError(e instanceof Error ? e.message : 'Не удалось создать слоты');
+    } finally {
+      setBatchSubmitting(false);
+    }
+  };
+
+  const handleBatchConfirmRange = async (params: {
+    capacityTotal?: number | null;
+    isActive: boolean;
+    minutesByKey: Record<string, number[]>;
+  }) => {
+    const selectionArray = Array.from(selectionRange);
+    if (!selectionArray.length) {
+      setBatchOpenRange(false);
+      return;
+    }
+    setBatchSubmitting(true);
+    setBatchError(null);
+    try {
+      const slots = selectionArray.flatMap((key) => {
+        const [dateKey, hourStr] = key.split('|');
+        const hour = Number.parseInt(hourStr, 10);
+        const minutes =
+          params.minutesByKey[key] && params.minutesByKey[key].length > 0
+            ? params.minutesByKey[key]
+            : [0];
+        return minutes.map((m) => ({
+          startsAt: buildIsoFromLocalDateKey(dateKey, hour, m),
+          capacityTotal: params.capacityTotal,
+          isActive: params.isActive,
+        }));
+      });
+      const res = await batchCreateSessions(eventId, slots);
+      toast.success(`Создано слотов: ${res.created.length}, пропущено: ${res.skipped.length}.`);
+      setSelectionRange(new Set());
+      setBatchOpenRange(false);
+      await query.refetch();
+    } catch (e) {
+      setBatchError(e instanceof Error ? e.message : 'Не удалось создать слоты');
+    } finally {
+      setBatchSubmitting(false);
+    }
+  };
+
   return (
     <TooltipProvider>
       <Card>
@@ -203,6 +341,65 @@ export function ScheduleTab({
             </CardTitle>
 
             <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1 py-0.5 text-[10px] text-slate-600">
+                <button
+                  type="button"
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${viewMode === 'grid' ? 'bg-white text-slate-900 shadow-sm' : ''}`}
+                  onClick={() => setViewMode('grid')}
+                >
+                  <LayoutGrid className="h-3 w-3" />
+                  Сетка
+                </button>
+                <button
+                  type="button"
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${viewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : ''}`}
+                  onClick={() => setViewMode('table')}
+                >
+                  <List className="h-3 w-3" />
+                  Таблица
+                </button>
+              </div>
+
+              {viewMode === 'grid' && (
+                <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1 py-0.5 text-[10px] text-slate-600">
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${gridDetailMode === 'range' ? 'bg-white text-slate-900 shadow-sm' : ''}`}
+                    onClick={() => {
+                      setGridDetailMode('range');
+                      setSelectionDay(new Set());
+                    }}
+                  >
+                    Диапазон
+                  </button>
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${gridDetailMode === 'day' ? 'bg-white text-slate-900 shadow-sm' : ''}`}
+                    onClick={() => {
+                      setGridDetailMode('day');
+                      setSelectionRange(new Set());
+                    }}
+                  >
+                    День
+                  </button>
+                </div>
+              )}
+
+              {viewMode === 'grid' && gridDetailMode === 'range' && (
+                <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1 py-0.5 text-[10px] text-slate-600">
+                  {[7, 14, 30].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${rangeDays === d ? 'bg-white text-slate-900 shadow-sm' : ''}`}
+                      onClick={() => setRangeDays(d as 7 | 14 | 30)}
+                    >
+                      {d} дн.
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <Button variant="outline" size="sm" onClick={() => preset(30)}>
                 30 дней
               </Button>
@@ -234,11 +431,83 @@ export function ScheduleTab({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-3 text-sm">
               <span className="text-muted-foreground">Период:</span>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-[150px]" />
+              <div className="flex items-center gap-1">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={
+                    fromFocused || !from
+                      ? from
+                      : !Number.isNaN(Date.parse(from))
+                        ? new Date(from).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })
+                        : from
+                  }
+                  onChange={(e) => setFrom(e.target.value)}
+                  onFocus={() => setFromFocused(true)}
+                  onBlur={() => setFromFocused(false)}
+                  className="w-[170px] text-xs"
+                  placeholder="ГГГГ-ММ-ДД"
+                />
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-muted-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => fromDateInputRef.current?.showPicker?.()}
+                >
+                  <Calendar className="h-4 w-4" />
+                </button>
+                <input
+                  ref={fromDateInputRef}
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="sr-only"
+                  tabIndex={-1}
+                />
+              </div>
               <span className="text-muted-foreground">—</span>
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-[150px]" />
+              <div className="flex items-center gap-1">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={
+                    toFocused || !to
+                      ? to
+                      : !Number.isNaN(Date.parse(to))
+                        ? new Date(to).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })
+                        : to
+                  }
+                  onChange={(e) => setTo(e.target.value)}
+                  onFocus={() => setToFocused(true)}
+                  onBlur={() => setToFocused(false)}
+                  className="w-[170px] text-xs"
+                  placeholder="ГГГГ-ММ-ДД"
+                />
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input bg-background text-muted-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => toDateInputRef.current?.showPicker?.()}
+                >
+                  <Calendar className="h-4 w-4" />
+                </button>
+                <input
+                  ref={toDateInputRef}
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="sr-only"
+                  tabIndex={-1}
+                />
+              </div>
             </div>
 
             <label className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -271,7 +540,95 @@ export function ScheduleTab({
             <div className="text-sm text-muted-foreground">В выбранном диапазоне сеансов нет.</div>
           )}
 
-          {!query.isLoading && !query.isError && rows.length > 0 && (
+          {!query.isLoading && !query.isError && viewMode === 'grid' && (
+            <>
+              {gridDetailMode === 'day' && (
+                <>
+                  {hasOutOfRangeForSelectedDay && (
+                    <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      Для выбранного дня есть сеансы вне диапазона сетки (00:00–08:00 или 23:00–24:00).
+                      Переключитесь в режим «Таблица», чтобы увидеть их все.
+                    </div>
+                  )}
+                  <ScheduleGridDay
+                    date={selectedDate}
+                    sessions={rows}
+                    selection={selectionDay}
+                    onToggleSlot={handleToggleSlotDay}
+                    onEditSession={(s) => setEditing(s)}
+                  />
+                  {!isImported && selectionDay.size > 0 && (
+                    <div className="mt-3 flex items-center justify-between gap-2 text-xs text-slate-600">
+                      <div>
+                        Выбрано слотов: <span className="font-medium">{selectionDay.size}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectionDay(new Set())}
+                        >
+                          Очистить выбор
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => setBatchOpenDay(true)}
+                          disabled={batchSubmitting}
+                        >
+                          Добавить
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {gridDetailMode === 'range' && (
+                <>
+                  <ScheduleGridRange
+                    fromDateKey={from}
+                    days={rangeDays}
+                    hoursStart={10}
+                    hoursEnd={1}
+                    sessions={rows}
+                    selection={selectionRange}
+                    onToggleCell={handleToggleCellRange}
+                    onOpenSession={(sessionId) => {
+                      const s = rows.find((r) => r.id === sessionId);
+                      if (s) setEditing(s);
+                    }}
+                  />
+                  {!isImported && selectionRange.size > 0 && (
+                    <div className="mt-3 flex items-center justify-between gap-2 text-xs text-slate-600">
+                      <div>
+                        Выбрано часов: <span className="font-medium">{selectionRange.size}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectionRange(new Set())}
+                        >
+                          Очистить выбор
+                        </Button>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => setBatchOpenRange(true)}
+                            disabled={batchSubmitting}
+                          >
+                            Добавить
+                          </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {!query.isLoading && !query.isError && viewMode === 'table' && rows.length > 0 && (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -437,6 +794,42 @@ export function ScheduleTab({
           )}
         </CardContent>
       </Card>
+
+      {batchOpenDay && !isImported && (
+        <ScheduleBatchCreateDialog
+          open={batchOpenDay}
+          onOpenChange={(open) => {
+            setBatchOpenDay(open);
+            if (!open) {
+              setBatchError(null);
+            }
+          }}
+          dateLabel={formatDateRu(`${selectedDate}T00:00:00Z`)}
+          slots={Array.from(selectionDay).map((startsAt) => ({ startsAt }))}
+          onConfirm={handleBatchConfirmDay}
+          isSubmitting={batchSubmitting}
+          errorMessage={batchError}
+        />
+      )}
+
+      {batchOpenRange && !isImported && (
+        <ScheduleBatchCreateRangeDialog
+          open={batchOpenRange}
+          onOpenChange={(open) => {
+            setBatchOpenRange(open);
+            if (!open) {
+              setBatchError(null);
+            }
+          }}
+          selection={Array.from(selectionRange).map((key) => {
+            const [dateKey, hourStr] = key.split('|');
+            return { dateKey, hour: Number.parseInt(hourStr, 10) };
+          })}
+          onConfirm={handleBatchConfirmRange}
+          isSubmitting={batchSubmitting}
+          errorMessage={batchError}
+        />
+      )}
 
       <EditSessionDialog
         open={!!editing}

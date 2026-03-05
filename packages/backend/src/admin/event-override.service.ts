@@ -19,7 +19,7 @@ export class EventOverrideService {
    * Создать или обновить override для события.
    */
   async upsert(eventId: string, data: Record<string, unknown>, updatedBy: string) {
-    const { id: _, createdAt, updatedAt, event, ...clean } = data;
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, event: _event, ...clean } = data;
 
     return this.prisma.eventOverride.upsert({
       where: { eventId },

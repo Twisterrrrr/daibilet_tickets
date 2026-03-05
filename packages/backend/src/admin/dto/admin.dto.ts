@@ -5,17 +5,12 @@ import {
   IsBoolean,
   IsEnum,
   IsISO8601,
-  IsInt,
   IsNotEmpty,
   IsNumber,
-  IsObject,
   IsOptional,
   IsString,
-  IsUrl,
-  IsUUID,
   Max,
   Min,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { TagCategory } from '@prisma/client';

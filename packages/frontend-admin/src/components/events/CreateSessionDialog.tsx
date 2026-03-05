@@ -53,11 +53,23 @@ export function CreateSessionDialog({ open, onOpenChange, eventId }: Props) {
         <div className="grid gap-4">
           <div className="grid gap-2">
             <Label>Дата</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              title="Формат: DD/MM/YYYY в интерфейсе, ISO в значении"
+            />
           </div>
           <div className="grid gap-2">
             <Label>Время</Label>
-            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            <Input
+              type="text"
+              inputMode="numeric"
+              pattern="^\\d{2}:\\d{2}$"
+              placeholder="HH:MM"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+            />
           </div>
           <div className="grid gap-2">
             <Label>Вместимость (опционально)</Label>

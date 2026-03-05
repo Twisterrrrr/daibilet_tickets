@@ -277,7 +277,7 @@ export class YookassaWebhookDto {
   event?: string;
 
   @IsOptional()
-  object?: Record<string, any>;
+  object?: Record<string, unknown>;
 }
 
 // ============================================================

@@ -6,7 +6,6 @@ import {
   Param,
   Patch,
   Query,
-  Request,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -79,16 +78,16 @@ export class AdminCitiesController {
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateCityDto) {
     const {
-      id: _,
-      createdAt,
-      updatedAt,
+      id: _id,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
       _count,
-      events,
-      packages,
-      articles,
-      landingPages,
-      comboPages,
-      version,
+      events: _events,
+      packages: _packages,
+      articles: _articles,
+      landingPages: _landingPages,
+      comboPages: _comboPages,
+      version: _version,
       ...clean
     } = data as any;
 

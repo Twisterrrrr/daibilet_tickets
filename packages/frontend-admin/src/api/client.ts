@@ -58,7 +58,12 @@ export async function api<T = any>(path: string, options: RequestInit = {}): Pro
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || `HTTP ${res.status}`);
+    let message: string = err.message || `HTTP ${res.status}`;
+    // Локализация типичных сообщений валидации
+    if (typeof message === 'string' && message.includes('property shortDescription should not exist')) {
+      message = 'Поле shortDescription не поддерживается этим запросом. Уберите его из данных.';
+    }
+    throw new Error(message);
   }
 
   return res.json();

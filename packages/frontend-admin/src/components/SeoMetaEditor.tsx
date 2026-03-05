@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ImageUploadInput } from '@/components/ui/ImageUploadInput';
 import { generateSeo, getSeo, SeoEntityType, SeoMetaResponse, upsertSeo } from '@/lib/api/seo';
 
 type Props = {
@@ -214,10 +215,12 @@ export function SeoMetaEditor({ entityType, entityId, defaultTitle }: Props) {
             <Input value={form.ogDescription} onChange={onChange('ogDescription')} />
           </div>
         </div>
-        <div>
-          <Label>OG image URL</Label>
-          <Input value={form.ogImage} onChange={onChange('ogImage')} placeholder="https://..." />
-        </div>
+        <ImageUploadInput
+          label="OG image URL"
+          value={form.ogImage}
+          onChange={(v) => setForm((p) => ({ ...p, ogImage: v }))}
+          placeholder="https://..."
+        />
         <div>
           <Label>JSON-LD (опционально)</Label>
           <Textarea

@@ -14,7 +14,7 @@
  *   [7] Multi-item partial failure — partial refund
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { isSessionFullyFulfilled, partitionCart, PaymentFlowType, SnapshotLineItem } from '../cart-partitioning';
 import { tryTransitionCheckout, tryTransitionOrderRequest, tryTransitionPayment } from '../checkout-state-machine';

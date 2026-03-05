@@ -177,7 +177,7 @@ export class CreateSupplierOfferDto {
   @ApiPropertyOptional({ type: Object })
   @IsOptional()
   @IsObject()
-  widgetPayload?: Record<string, any>;
+  widgetPayload?: Record<string, unknown>;
 }
 
 export class UpdateSupplierOfferDto {
@@ -223,5 +223,5 @@ export class UpdateSupplierOfferDto {
   @ApiPropertyOptional({ type: Object })
   @IsOptional()
   @IsObject()
-  widgetPayload?: Record<string, any>;
+  widgetPayload?: Record<string, unknown>;
 }

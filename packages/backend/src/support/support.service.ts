@@ -67,7 +67,7 @@ export class SupportService {
     const slaDeadline = new Date();
     slaDeadline.setHours(slaDeadline.getHours() + slaHours);
 
-    const ticket = await this.prisma.supportTicket.create({
+    const _ticket = await this.prisma.supportTicket.create({
       data: {
         shortCode,
         name: data.name,

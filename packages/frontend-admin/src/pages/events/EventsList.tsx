@@ -130,11 +130,13 @@ const columns: ColumnDef<EventItem>[] = [
     header: ({ column }) => <SortableHeader column={column}>Обновлено</SortableHeader>,
     cell: ({ row }) =>
       row.original.updatedAt
-        ? new Date(row.original.updatedAt).toLocaleDateString('ru-RU', {
-            day: '2-digit',
-            month: '2-digit',
-            year: '2-digit',
-          })
+        ? (() => {
+            const d = new Date(row.original.updatedAt);
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+          })()
         : '—',
   },
 ];
@@ -229,9 +231,9 @@ export function EventsListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">События</h1>
-          <p className="text-muted-foreground">
+          <div className="text-muted-foreground">
             {data ? `${data.total} событий в базе` : <Skeleton className="h-4 w-32 inline-block" />}
-          </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button asChild>

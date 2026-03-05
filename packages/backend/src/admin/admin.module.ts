@@ -19,7 +19,6 @@ import { AdminCombosController } from './admin-combos.controller';
 import { AdminDashboardController } from './admin-dashboard.controller';
 import { AdminEventsController } from './admin-events.controller';
 import { AdminExternalReviewsController } from './admin-external-reviews.controller';
-import { AdminJobsController } from './admin-jobs.controller';
 import { AdminLandingsController } from './admin-landings.controller';
 import { AdminModerationController } from './admin-moderation.controller';
 import { AdminOpsController } from './admin-ops.controller';
@@ -34,6 +33,7 @@ import { AdminTagsController } from './admin-tags.controller';
 import { AdminUpsellsController } from './admin-upsells.controller';
 import { AdminVenuesController } from './admin-venues.controller';
 import { AdminWidgetsController } from './admin-widgets.controller';
+import { AdminUploadController } from './admin-upload.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
 import { AuditService } from './audit.service';
 import { EventOverrideService } from './event-override.service';
@@ -77,6 +77,7 @@ import { PaymentMetricsService } from '../checkout/payment-metrics.service';
     AdminOpsController,
     AdminReconciliationController,
     AdminCacheController,
+    AdminUploadController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })

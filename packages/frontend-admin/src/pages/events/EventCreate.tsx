@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ImageUploadInput } from '@/components/ui/ImageUploadInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -270,10 +271,12 @@ export function EventCreatePage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>URL изображения</Label>
-                <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
-              </div>
+              <ImageUploadInput
+                label="Изображение"
+                value={imageUrl}
+                onChange={setImageUrl}
+                placeholder="https://..."
+              />
               <div className="space-y-2">
                 <Label>Мин. возраст</Label>
                 <Input type="number" value={minAge} onChange={(e) => setMinAge(e.target.value)} placeholder="0" />

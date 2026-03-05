@@ -120,7 +120,7 @@ export class IdempotencyService {
             } as Prisma.InputJsonValue,
           },
         })
-        .catch(() => {});
+        .catch(() => { /* noop: log already recorded */ });
 
       throw error;
     }

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -38,12 +37,13 @@ export class AdminSuppliersController {
   async list(
     @Query('search') search?: string,
     @Query('trustLevel') trustLevel?: string,
+    @Query('isActive') isActive?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
-    const where: any = { isSupplier: true };
+    const where: Prisma.OperatorWhereInput = { isSupplier: true };
 
     if (search) {
       where.OR = [
@@ -53,7 +53,17 @@ export class AdminSuppliersController {
         { inn: { contains: search } },
       ];
     }
-    if (trustLevel !== undefined) where.trustLevel = Number(trustLevel);
+    if (trustLevel !== undefined) {
+      const tl = Number(trustLevel);
+      if (!Number.isNaN(tl)) {
+        where.trustLevel = tl;
+      }
+    }
+    if (isActive === 'true') {
+      where.isActive = true;
+    } else if (isActive === 'false') {
+      where.isActive = false;
+    }
 
     const [rawItems, total, eventsBySourceRaw] = await Promise.all([
       this.prisma.operator.findMany({
@@ -194,11 +204,14 @@ export class AdminSuppliersController {
 
       return {
         id: e.id,
+        slug: e.slug,
         title: e.title,
         cityName: e.city?.name ?? null,
         source: e.source,
         isActive: e.isActive,
         supplierIsActive,
+        sessionsCount: e.sessions.length,
+        updatedAt: e.updatedAt,
         nearestSession: nearestSession?.startsAt?.toISOString?.() ?? null,
       };
     });

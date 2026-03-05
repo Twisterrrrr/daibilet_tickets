@@ -87,7 +87,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   try {
     const res = await api.getEvents({
       sort: 'popular',
-      limit: 8,
+      // Берём с запасом, чтобы после uniqueByImage осталось 8 карточек
+      limit: 32,
       hasPhoto: 1,
       ...(citySlug ? { city: citySlug } : {}),
     });
@@ -102,7 +103,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     try {
       const res = await api.getEvents({
         sort: 'rating',
-        limit: 8,
+        limit: 32,
         hasPhoto: 1,
         ...(citySlug ? { city: citySlug } : {}),
       });
@@ -117,7 +118,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     try {
       const res = await api.getEvents({
         sort: 'popular',
-        limit: 8 - popularEvents.length,
+        limit: 32,
         hasPhoto: 1,
       });
       const ids = new Set(popularEvents.map((e) => e.id));

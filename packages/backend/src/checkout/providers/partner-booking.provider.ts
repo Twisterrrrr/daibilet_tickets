@@ -65,7 +65,7 @@ export class PartnerBookingProvider implements BookingProvider {
     return { success: true };
   }
 
-  async getStatus(request: StatusRequest): Promise<StatusResult> {
+  async getStatus(_request: StatusRequest): Promise<StatusResult> {
     // Partner status is tracked via OrderRequest and partner webhooks
     return { status: 'pending' };
   }

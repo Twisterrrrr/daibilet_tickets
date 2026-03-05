@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { adminApi } from '@/api/client';
 import { InCatalogBadge } from '@/components/InCatalogBadge';
 import { computeInCatalog } from '@/lib/catalog';
 import { formatDateRu, formatTimeRu } from '@/lib/sessions';
+import { toast } from 'sonner';
 
 type SupplierEventRow = {
   id: string;
+  slug: string;
   title: string;
   cityName: string | null;
   source: string;
   isActive: boolean;
   supplierIsActive: boolean;
+  sessionsCount?: number;
+  updatedAt?: string | null;
   nearestSession?: string | null;
 };
 
@@ -24,6 +28,7 @@ export function SupplierEventsTab({ supplierId }: Props) {
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const search = searchParams.get('search') || '';
   const page = Number(searchParams.get('page') || '1');
@@ -50,6 +55,21 @@ export function SupplierEventsTab({ supplierId }: Props) {
     }
   }, [supplierId, search, page, pageSize]);
 
+  const toggleActivation = async (row: SupplierEventRow, nextValue: boolean) => {
+    try {
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, isActive: nextValue } : r)),
+      );
+      await adminApi.patch(`/admin/events/${row.id}/activation`, { isActive: nextValue });
+      toast.success(`Событие "${row.title}" ${nextValue ? 'включено' : 'выключено'} в каталоге.`);
+    } catch (e: unknown) {
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, isActive: row.isActive } : r)),
+      );
+      toast.error(e instanceof Error ? e.message : 'Не удалось изменить активность события');
+    }
+  };
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -71,7 +91,7 @@ export function SupplierEventsTab({ supplierId }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold">События поставщика ({rows.length})</h2>
+        <h2 className="font-semibold">События поставщика ({total})</h2>
         <div className="flex items-center gap-2">
           <input
             value={search}
@@ -102,8 +122,9 @@ export function SupplierEventsTab({ supplierId }: Props) {
               <th className="px-4 py-2 text-left">Город</th>
               <th className="px-4 py-2 text-left">Источник</th>
               <th className="px-4 py-2 text-center">Ближайший сеанс</th>
+              <th className="px-4 py-2 text-center">Сеансы</th>
               <th className="px-4 py-2 text-center">В каталоге</th>
-              <th className="px-4 py-2 text-right" />
+              <th className="px-4 py-2 text-right">Действия</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -121,17 +142,47 @@ export function SupplierEventsTab({ supplierId }: Props) {
                     <Link to={`/events/${e.id}`} className="text-primary hover:underline">
                       {e.title}
                     </Link>
+                    {e.updatedAt && (
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        Обновлено: {new Date(e.updatedAt).toLocaleString('ru-RU')}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-2">{e.cityName || '—'}</td>
                   <td className="px-4 py-2 text-xs text-muted-foreground">{e.source}</td>
                   <td className="px-4 py-2 text-center">{nearest}</td>
+                  <td className="px-4 py-2 text-center">{e.sessionsCount ?? '—'}</td>
                   <td className="px-4 py-2 text-center">
                     <InCatalogBadge inCatalog={inCatalog} />
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <Link to={`/events/${e.id}`} className="text-xs text-primary hover:underline">
-                      Открыть
-                    </Link>
+                    <div className="inline-flex items-center gap-2 text-xs">
+                      <label className="inline-flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={e.isActive}
+                          disabled={!supplierActive}
+                          onChange={(ev) => void toggleActivation(e, ev.target.checked)}
+                        />
+                        <span className={supplierActive ? '' : 'text-muted-foreground'}>
+                          Активно
+                        </span>
+                      </label>
+                      <button
+                        type="button"
+                        className="text-primary hover:underline"
+                        onClick={() => navigate(`/events/${e.id}`)}
+                      >
+                        Редактировать
+                      </button>
+                      <button
+                        type="button"
+                        className="text-primary hover:underline"
+                        onClick={() => navigate(`/events/${e.id}?tab=sessions`)}
+                      >
+                        Расписание
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

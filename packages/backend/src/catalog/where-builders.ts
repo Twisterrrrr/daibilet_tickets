@@ -32,7 +32,7 @@ export interface VenueWhereDto {
 }
 
 /** Базовый фильтр сессий: SCHEDULED с будущими сеансами ИЛИ OPEN_DATE. */
-function sessionFilter(isOpenDateOnly?: boolean): Prisma.EventWhereInput {
+function _sessionFilter(isOpenDateOnly?: boolean): Prisma.EventWhereInput {
   const now = new Date();
   if (isOpenDateOnly) {
     return {
@@ -57,7 +57,7 @@ function sessionFilter(isOpenDateOnly?: boolean): Prisma.EventWhereInput {
 /** T10: Собрать EventWhereInput из DTO. sessionFilterOverride — для date-aware фильтров (dateFrom, dateTo, departing_soon). */
 export function buildEventWhere(
   dto: EventWhereDto,
-  sessionFilterOverride?: Prisma.EventWhereInput,
+  _sessionFilterOverride?: Prisma.EventWhereInput,
 ): Prisma.EventWhereInput {
   const {
     city,
@@ -75,25 +75,22 @@ export function buildEventWhere(
     priceMax,
     hasPhoto,
     slugs,
-    timeOfDay,
+    timeOfDay: _timeOfDay,
     dateMode,
-    isOpenDateOnly,
+    isOpenDateOnly: _isOpenDateOnly,
   } = dto;
-
-  const sessionFilterClause = sessionFilterOverride ?? sessionFilter(isOpenDateOnly);
 
   const where: Prisma.EventWhereInput = {
     isActive: true,
     isDeleted: false,
     canonicalOfId: null,
-    // PR-3 publish-gate: только события с ACTIVE оффером и ценой
-    offers: { some: { status: 'ACTIVE', isDeleted: false, priceFrom: { gt: 0 } } },
+    // Витрина теперь показывает все события, которые isActive в админке,
+    // без дополнительного фильтра по офферам/цене.
     ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),
     city: {
       isActive: true,
       ...(city && !cityIds?.length && { slug: city }),
     },
-    ...sessionFilterClause,
     ...(category && { category: category as Prisma.EnumEventCategoryFilter }),
     ...(subcategory &&
       (subcategory === 'RIVER'

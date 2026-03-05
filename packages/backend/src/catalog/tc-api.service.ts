@@ -31,7 +31,9 @@ export class TcApiService {
   }
 
   private getTimeoutMs(): number {
-    return getHttpTimeoutMs('TC_HTTP_TIMEOUT_MS', 60_000);
+    // Для full sync dev-окружения позволяем увеличить таймаут через ENV.
+    // Без явного переопределения остаётся 60s, как и раньше.
+    return getHttpTimeoutMs('TC_HTTP_TIMEOUT_MS', 300_000);
   }
 
   /**

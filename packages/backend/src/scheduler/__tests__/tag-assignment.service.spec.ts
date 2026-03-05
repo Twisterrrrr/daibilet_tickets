@@ -325,9 +325,9 @@ describe('TagAssignmentService', () => {
     });
 
     it('should call assign methods in parallel', async () => {
-      const startTime = Date.now();
+      const _startTime = Date.now();
       await service.runManually();
-      const endTime = Date.now();
+      const _endTime = Date.now();
 
       // All three $queryRaw calls should have been made
       expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(3);

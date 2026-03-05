@@ -41,7 +41,7 @@ export class AuditInterceptor implements NestInterceptor {
     const body = req.body;
 
     return next.handle().pipe(
-      tap((result) => {
+      tap((_result) => {
         // Записываем в аудит после успешного выполнения
         this.audit
           .log(userId, action, entity, entityId, before, body)

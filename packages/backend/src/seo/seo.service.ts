@@ -4,15 +4,15 @@ import type { UpsertSeoMetaDto } from './dto/upsert-seo-meta.dto';
 
 @Injectable()
 export class SeoService {
-  async getSeoMeta(entityType: SeoEntityType, entityId: string): Promise<Record<string, unknown> | null> {
+  async getSeoMeta(_entityType: SeoEntityType, _entityId: string): Promise<Record<string, unknown> | null> {
     return null;
   }
 
-  async upsertSeoMeta(entityType: SeoEntityType, entityId: string, data: UpsertSeoMetaDto): Promise<Record<string, unknown>> {
+  async upsertSeoMeta(_entityType: SeoEntityType, _entityId: string, data: UpsertSeoMetaDto): Promise<Record<string, unknown>> {
     return data as unknown as Record<string, unknown>;
   }
 
-  async generateSeoMeta(entityType: SeoEntityType, entityId: string): Promise<Record<string, unknown> | null> {
+  async generateSeoMeta(_entityType: SeoEntityType, _entityId: string): Promise<Record<string, unknown> | null> {
     return null;
   }
 }

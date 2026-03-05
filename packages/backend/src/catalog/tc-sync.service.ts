@@ -1,8 +1,7 @@
 import { normalizeEventTitle } from '@daibilet/shared';
-import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';
@@ -1343,8 +1342,7 @@ export class TcSyncService {
 
   private normalizeTitle(title: string): string {
     return title
-      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
-      .replace(/[🔞🌐🎭🎪🎉🎊🎶🎵🎤🎬🎨🎭🏛️🚶]/g, '')
+      .replace(/\p{Extended_Pictographic}/gu, '')
       .trim()
       .toLowerCase();
   }

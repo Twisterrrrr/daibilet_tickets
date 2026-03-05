@@ -30,6 +30,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
 import { EventTemplateFields } from './EventTemplateFields';
+import { ImageUploadInput } from '@/components/ui/ImageUploadInput';
+import { EventGroupTab } from './EventGroupTab';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -174,7 +176,7 @@ interface EventDetail {
   override?: EventOverride | null;
 }
 
-type UiTab = 'general' | 'seo' | 'offers' | 'sessions' | 'rating';
+type UiTab = 'general' | 'seo' | 'offers' | 'sessions' | 'rating' | 'group';
 
 const SOURCE_LABELS: Record<string, string> = {
   TC: 'TicketsCloud',
@@ -212,11 +214,13 @@ export function EventEditPage() {
     audience?: string | null;
     subcategories?: EventSubcategory[];
     imageUrl?: string;
+    shortDescription?: string;
     manualRating?: number | null;
     minAge?: number | null;
     description?: string;
     shortDescription?: string;
     venueId?: string | null;
+    address?: string | null;
     dateMode?: string;
     isPermanent?: boolean;
     endDate?: string | null;
@@ -276,6 +280,7 @@ export function EventEditPage() {
           description: ov?.description ?? data.description ?? '',
           shortDescription: data.shortDescription ?? '',
           venueId: data.venueId ?? null,
+          address: data.address ?? null,
           dateMode: data.dateMode ?? 'SCHEDULED',
           isPermanent: data.isPermanent ?? false,
           endDate: data.endDate ? data.endDate.slice(0, 10) : null,
@@ -301,15 +306,15 @@ export function EventEditPage() {
         manualRating: form.manualRating,
         minAge: form.minAge,
         description: form.description,
-        shortDescription: form.shortDescription,
         templateData: form.templateData ?? {},
       });
       setEvent((prev) => (prev ? { ...prev, override: ov } : null));
 
-      // Save venue-specific fields (direct on Event, not override)
-      if (form.category === 'MUSEUM' || form.venueId || form.dateMode === 'OPEN_DATE') {
+      // Save venue/location-specific fields (прямо на Event, не в override)
+      if (form.category === 'MUSEUM' || form.venueId || form.dateMode === 'OPEN_DATE' || form.address !== undefined) {
         const venueData = await adminApi.patch(`/admin/events/${id}/venue-settings`, {
           venueId: form.venueId,
+          address: form.address,
           dateMode: form.dateMode || 'SCHEDULED',
           isPermanent: form.isPermanent ?? false,
           endDate: form.isPermanent ? null : form.endDate || null,
@@ -348,6 +353,7 @@ export function EventEditPage() {
           description: ov?.description ?? data.description ?? '',
           shortDescription: data.shortDescription ?? '',
           venueId: data.venueId ?? null,
+          address: data.address ?? null,
           dateMode: data.dateMode ?? 'SCHEDULED',
           isPermanent: data.isPermanent ?? false,
           endDate: data.endDate ? data.endDate.slice(0, 10) : null,
@@ -374,10 +380,11 @@ export function EventEditPage() {
 
   const isHidden = event?.override?.isHidden ?? false;
 
+  const offers = event?.offers;
   const supplierIsActive =
-    event.offers && event.offers.length > 0
-      ? !event.offers.some((o) => o.operator && o.operator.isActive === false) ||
-        event.offers.some((o) => o.operator && o.operator.isActive === true)
+    offers && offers.length > 0
+      ? !offers.some((o) => o.operator && o.operator.isActive === false) ||
+        offers.some((o) => o.operator && o.operator.isActive === true)
       : undefined;
 
   const handleIssueClick = (tabKey: QualityTabKey, issue: EventQualityIssue) => {
@@ -485,9 +492,10 @@ export function EventEditPage() {
         <TabsList>
           <TabsTrigger value="general">Основное</TabsTrigger>
           <TabsTrigger value="seo">SEO</TabsTrigger>
-          <TabsTrigger value="offers">Офферы ({event.offers?.length || 0})</TabsTrigger>
-          <TabsTrigger value="sessions">Сеансы ({event.sessions?.length || 0})</TabsTrigger>
+          <TabsTrigger value="offers">Способы покупки ({event.offers?.length || 0})</TabsTrigger>
+          <TabsTrigger value="sessions">Расписание ({event.sessions?.length || 0})</TabsTrigger>
           <TabsTrigger value="rating">Рейтинг</TabsTrigger>
+          <TabsTrigger value="group">Группа</TabsTrigger>
         </TabsList>
 
         {/* ── General Tab ── */}
@@ -632,11 +640,9 @@ export function EventEditPage() {
                     )}
                   </div>
                 </div>
-                {/* Venue & Date Mode — показываем для MUSEUM */}
-                {form.category === 'MUSEUM' && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Место (Venue)</Label>
+                {/* Venue & Date Mode — показываем для всех категорий (quality: MISSING_LOCATION) */}
+                    <div className="space-y-2" data-quality-field="location">
+                      <Label>Карточка места (Venue, опционально)</Label>
                       <Select
                         value={form.venueId || '__none__'}
                         onValueChange={(v) => setForm((f) => ({ ...f, venueId: v === '__none__' ? null : v }))}
@@ -695,15 +701,20 @@ export function EventEditPage() {
                         )}
                       </>
                     )}
-                  </>
-                )}
-                <div className="space-y-2">
-                  <Label>URL изображения</Label>
-                  <Input
-                    value={form.imageUrl ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label>Адрес / место проведения</Label>
+                      <Input
+                        type="text"
+                        value={form.address ?? ''}
+                        onChange={(e) => setForm((f) => ({ ...f, address: e.target.value || null }))}
+                        placeholder="Адрес или точка встречи (если нет Venue)"
+                      />
+                    </div>
+                <ImageUploadInput
+                  label="Изображение"
+                  value={form.imageUrl ?? ''}
+                  onChange={(v) => setForm((f) => ({ ...f, imageUrl: v }))}
+                />
                 <div className="space-y-2">
                   <Label>Мин. возраст</Label>
                   <Input
@@ -718,6 +729,14 @@ export function EventEditPage() {
                     rows={5}
                     value={form.description ?? ''}
                     onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  />
+                </div>
+                <div className="sm:col-span-2 space-y-2 mt-3">
+                  <Label>Краткое описание</Label>
+                  <Input
+                    value={form.shortDescription ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, shortDescription: e.target.value }))}
+                    placeholder="Для каталога / SEO description"
                   />
                 </div>
               </div>
@@ -802,6 +821,10 @@ export function EventEditPage() {
             {/* External rating */}
             <ExternalRatingSection eventId={event.id} event={event} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="group">
+          {id && <EventGroupTab eventId={id} />}
         </TabsContent>
       </Tabs>
     </div>
@@ -1110,8 +1133,8 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-base">Офферы / Источники продажи</CardTitle>
-            <CardDescription>Управление предложениями из разных систем</CardDescription>
+            <CardTitle className="text-base">Способы покупки / источники продажи</CardTitle>
+            <CardDescription>Управление вариантами покупки из разных систем</CardDescription>
           </div>
           <Button size="sm" onClick={openCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />
@@ -1143,7 +1166,7 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                         <span className="font-medium">{SOURCE_LABELS[offer.source] || offer.source}</span>
                         {offer.isPrimary && (
                           <Badge variant="default" className="text-[10px]">
-                            Primary
+                            Основной
                           </Badge>
                         )}
                       </div>
@@ -1184,9 +1207,9 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                           size="sm"
                           onClick={() => handleSetPrimary(offer.id)}
                           disabled={busy === offer.id}
-                          title="Сделать основным"
+                          title="Сделать основным оффером"
                         >
-                          Primary
+                          Основной
                         </Button>
                       )}
                       <Button
@@ -1490,7 +1513,7 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                 className="h-4 w-4 rounded border-gray-300"
               />
               <Label htmlFor="isPrimary" className="cursor-pointer">
-                Основной оффер (Primary)
+                Основной оффер
               </Label>
             </div>
           </div>

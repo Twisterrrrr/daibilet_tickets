@@ -447,7 +447,7 @@ export class SupplierController {
     if (data.badge !== undefined) updateData.badge = data.badge;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.widgetProvider !== undefined) updateData.widgetProvider = data.widgetProvider;
-    if (data.widgetPayload !== undefined) updateData.widgetPayload = data.widgetPayload;
+    if (data.widgetPayload !== undefined) updateData.widgetPayload = data.widgetPayload as Prisma.InputJsonValue;
     return this.prisma.eventOffer.update({ where: { id: offerId }, data: updateData });
   }
 

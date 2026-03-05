@@ -104,7 +104,7 @@ export class InternalBookingProvider implements BookingProvider {
     }
   }
 
-  async getStatus(request: StatusRequest): Promise<StatusResult> {
+  async getStatus(_request: StatusRequest): Promise<StatusResult> {
     // Internal orders are tracked via FulfillmentItem directly
     return { status: 'confirmed' };
   }

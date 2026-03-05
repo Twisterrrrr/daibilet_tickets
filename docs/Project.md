@@ -122,6 +122,28 @@
 - UUID v4 для всех первичных ключей
 - Коммиты: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`
 
+## FULL SYNC (dev) — полный ресинк каталога
+
+- **Назначение**: принудительно пересинхронизировать все внешние источники каталога (Ticketscloud + teplohod.info), пересчитать теги и сбросить кэш, чтобы витрина и админка видели актуальные данные.
+- **Entry point**: CLI в backend.
+  - Скрипт: `packages/backend/scripts/full-sync.ts`
+  - Команда из корня монорепо:
+    - `FULL_SYNC=1 pnpm full:sync`
+- **Требования и защита**:
+  - Backend dev-сервер должен быть запущен (`pnpm dev:backend`, по умолчанию слушает `http://127.0.0.1:4000`).
+  - Обязателен флаг окружения `FULL_SYNC=1` — без него скрипт немедленно завершится с ошибкой (защита от случайного запуска).
+- **Что делает FULL SYNC**:
+  - Делает HTTP‑запрос `POST /api/v1/catalog/sync/all` к backend API.
+  - Внутри backend запускается комбинированная синхронизация:
+    - Полный sync Ticketscloud (`TcSyncService.syncAll`): города, площадки, события, офферы, сеансы, retag.
+    - Полный sync teplohod.info (`TepSyncService.syncAll`): города, события, офферы, реальное расписание сеансов или виртуальные fallback‑сессии.
+    - Дополнительный `retagAll` для унификации тегов по обоим источникам.
+    - Инвалидация кэша каталога (`CacheService.invalidateAfterSync`).
+  - В stdout выводится JSON‑summary по источникам (кол-во событий/сеансов, новые города, ошибки).
+- **Идемпотентность**:
+  - Все sync‑слои используют upsert по стабильным ключам (`source + tcEventId / externalEventId`, `tcSessionId` и др.), поэтому повторный FULL SYNC не плодит дубли и только актуализирует данные.
+  - Soft‑delete и publish‑gate‑состояния (`isActive`/`isDeleted`, `EventOverride`, `offers.status`) при этом не ломаются — синк следует существующей бизнес‑логике.
+
 ### Каталог событий — режимы ответа и производительность
 
 - `/api/v1/events` — основной endpoint каталога событий.
@@ -160,6 +182,7 @@
   - Prisma схема + миграции (`packages/backend/prisma`), скрипты синхронизации (`prisma/*.ts`, `src/catalog/*`).
 - **`packages/frontend`** — публичный сайт (Next.js App Router):
   - `/` (главная, города, подборки, события, билеты, блог, checkout).
+  - Виджет выбора сеанса и checkout: `docs/PR-C.md` (PR-C1…C5, архитектура CheckoutSession → PaymentIntent → Package).
   - SSR/SSG для SEO, TailwindCSS, React Query.
 - **`packages/frontend-admin`** — админка Daibilet (React + Vite):
   - Страницы: `src/pages/events/*` (EventsList, EventEdit, EventCreate, EventsMerge), `cities/*`, `venues/*`, `landings/*`, `collections/*`, `combos/*`, `upsells/*`, `widgets/*`, `articles/*`, `reviews/*`, `support/*`, `orders/*`, `audit/*`, `moderation/*`, `reconciliation/*`, `settings/*`, `Dashboard`, `Login`.

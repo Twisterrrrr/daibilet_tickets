@@ -17,7 +17,6 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import cookieParser from 'cookie-parser';
-import helmet from 'helmet';
 
 import { Prisma } from '@prisma/client';
 

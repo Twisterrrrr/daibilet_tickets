@@ -1,5 +1,6 @@
 import type { EventQuality } from '@/api/adminEventsQuality';
 import { InCatalogBadge } from '@/components/InCatalogBadge';
+import { Badge } from '@/components/ui/badge';
 
 type Props = {
   isActive: boolean;
@@ -32,7 +33,7 @@ export function EventStatusLine({ isActive, isHidden, issuesCount, quality, supp
 
       {quality && (
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">Sellable:</span>
+          <span className="text-muted-foreground">Готово к продаже:</span>
           <Badge variant={quality.isSellable ? 'outline' : 'destructive'}>
             {quality.isSellable ? 'Да' : 'Нет'}
           </Badge>

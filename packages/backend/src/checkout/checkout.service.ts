@@ -1,4 +1,4 @@
-import { ensurePayloadVersion, resolvePurchaseType, validateWidgetPayload } from '@daibilet/shared';
+import { resolvePurchaseType } from '@daibilet/shared';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
@@ -13,12 +13,7 @@ import {
   DEFAULT_REQUEST_SLA_MINUTES,
   QUICK_REQUEST_TTL_MINUTES,
 } from './checkout-state-machine';
-import {
-  CartItemDto,
-  CreateGiftCertificateCheckoutDto,
-  CreatePackageDto,
-  CreateTripPlanCheckoutDto,
-} from './dto/checkout.dto';
+import { CartItemDto, CreatePackageDto, CreateTripPlanCheckoutDto } from './dto/checkout.dto';
 
 /**
  * Checkout Service — покупка билетов + корзина + заявки.
@@ -210,7 +205,7 @@ export class CheckoutService {
     this.logger.log(`Cancelling TC order: ${tcOrderId}`);
 
     try {
-      const result = await this.tcApi.updateOrder(tcOrderId, {
+      await this.tcApi.updateOrder(tcOrderId, {
         status: 'cancelled',
       });
       return {
@@ -923,7 +918,7 @@ export class CheckoutService {
   // Trip Planner (legacy)
   // ============================
 
-  async create(body: CreateTripPlanCheckoutDto) {
+  async create(_body: CreateTripPlanCheckoutDto) {
     // TODO: Реализовать создание Package + платёж YooKassa (Trip Planner)
     return {
       message: 'Checkout create — в разработке. Требуется подключение YooKassa.',
@@ -1028,7 +1023,7 @@ export class CheckoutService {
     return { packageId: session.id, code: session.shortCode };
   }
 
-  async handleWebhook(body: Record<string, unknown>) {
+  async handleWebhook(_body: Record<string, unknown>) {
     // TODO: Верификация IP + подпись, обработка payment.succeeded / payment.canceled
     return { status: 'ok' };
   }

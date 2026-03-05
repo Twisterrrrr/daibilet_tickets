@@ -15,12 +15,12 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import * as Sentry from '@sentry/nestjs';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
-import { createHmac, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { partitionCart, SnapshotLineItem } from './cart-partitioning';
-import { PaymentIntentStatus, tryTransitionCheckout, tryTransitionPayment } from './checkout-state-machine';
+import { tryTransitionCheckout, tryTransitionPayment } from './checkout-state-machine';
 import { isYkPayment, YkPayment, YkRefund } from './yookassa.types';
 
 @Injectable()

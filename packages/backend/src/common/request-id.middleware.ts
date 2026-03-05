@@ -11,6 +11,7 @@ import { randomUUID } from 'crypto';
 import { NextFunction, Request, Response } from 'express';
 
 // Extend Express Request type
+/* eslint-disable @typescript-eslint/no-namespace */
 declare global {
   namespace Express {
     interface Request {

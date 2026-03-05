@@ -5,7 +5,7 @@
  * Полноценные E2E (с БД + Redis) — в отдельном test:e2e задании.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   isSessionFullyFulfilled,

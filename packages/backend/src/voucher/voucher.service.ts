@@ -32,7 +32,7 @@ export class VoucherService {
     const page = pdfDoc.addPage([400, 500]);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const { width, height } = page.getSize();
+    const { width: _width, height } = page.getSize();
 
     page.drawText('Ваучер Дайбилет', {
       x: 50,
