@@ -3,11 +3,19 @@ import type { Metadata } from 'next';
 
 import { CityCard } from '@/components/ui/CityCard';
 import { api } from '@/lib/api';
+import { CITY_INFO } from '@/lib/cityInfo';
+import { CITY_IMAGES } from '@/lib/cityImages';
 
 export const metadata: Metadata = {
   title: 'Города России — экскурсии, музеи и мероприятия',
   description:
     'Выберите город для посещения. Билеты на экскурсии, музеи и мероприятия в Москве, Петербурге, Казани, Владимире, Ярославле и других городах.',
+};
+
+type RegionVM = {
+  slug: string;
+  name: string;
+  eventCount: number;
 };
 
 type CityCardVM = {
@@ -18,18 +26,33 @@ type CityCardVM = {
   eventCount: number;
   venueCount: number;
   description?: string | null;
+  region?: RegionVM | null;
 };
 
-function toCityCardVM(c: CityListItem): CityCardVM {
-  const count = c._count ?? { events: 0 };
-  const ext = c as CityListItem & { museumCount?: number; _count?: { venues?: number } };
+type ExtendedCity = CityListItem & {
+  description?: string | null;
+  museumCount?: number;
+  _count?: { venues?: number; events?: number };
+  region?: { slug: string; name: string; eventCount: number } | null;
+};
+
+function toCityCardVM(c: ExtendedCity): CityCardVM {
+  const count = c._count ?? { events: 0, venues: 0 };
+  const fallbackInfo = CITY_INFO[c.slug];
+  const imageConfig = CITY_IMAGES[c.slug];
   return {
     id: c.id,
     slug: c.slug,
     name: c.name,
-    heroImage: c.heroImage,
+    // Приоритет: статичная оптимизированная картинка из CITY_IMAGES → heroImage из БД.
+    heroImage: imageConfig?.card ?? c.heroImage,
     eventCount: count.events ?? 0,
-    venueCount: ext.museumCount ?? ext._count?.venues ?? 0,
+    // museumCount на бэке уже считает venues + events-at-venues; fallback — просто количество venues.
+    venueCount: c.museumCount ?? count.venues ?? 0,
+    // Приоритет как на странице города: сначала маркетинговый brief из CITY_INFO,
+    // затем описание из БД (city.description), затем ничего.
+    description: fallbackInfo?.brief ?? c.description ?? null,
+    region: c.region ?? null,
   };
 }
 
@@ -53,7 +76,7 @@ export default async function CitiesPage() {
       {cities.length > 0 ? (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {cities.map((city) => {
-            const vm = toCityCardVM(city);
+            const vm = toCityCardVM(city as ExtendedCity);
             return (
               <CityCard
                 key={vm.id}
@@ -62,6 +85,8 @@ export default async function CitiesPage() {
                 heroImage={vm.heroImage}
                 eventCount={vm.eventCount}
                 venueCount={vm.venueCount}
+                description={vm.description}
+                region={vm.region ?? undefined}
                 large
               />
             );

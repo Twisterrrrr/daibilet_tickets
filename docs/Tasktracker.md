@@ -151,13 +151,13 @@
 
 > Спецификация: `docs/AdminScheduleSpec.md`, pipeline: `docs/AdminSchedulePipeline.md`. Поставщики: см. раздел ниже.
 
-- [ ] **Высокий**: PR1 — GET /admin/events/:id/quality (on-demand), UI «Причины неактивности» + подсветка вкладок, field→tabKey
-- [ ] **Высокий**: PR1 — Статус: isHidden ≠ активность, одна строка «В каталоге / Скрыто вручную / Причины» (без forceActive на MVP)
-- [ ] **Высокий**: PR2 — Миграции (порядок: 1) pre-unique-safety, 2) admin_schedule_capacity)
-- [ ] **Высокий**: PR2 — Вкладка «Расписание» — таблица date×00–23, draft-create, модалка минут, POST sessions/batch-create
-- [ ] **Высокий**: PR2 — Контекстное меню слота, Модель A при sold>0, PATCH capacity/delete/cancel
-- [ ] **Высокий**: PR2 checklist перед merge: индексы package_items(sessionId[,status]) в БД; tcSessionId не пустой; нет дублей (eventId,startsAt)
-- [ ] **Высокий**: PR3 — Events — колонка groupingKey + фильтр; раздел «Группы событий»
+- [x] **Высокий**: PR1 — GET /admin/events/:id/quality (on-demand), UI «Причины неактивности» + подсветка вкладок, field→tabKey (**v1 реализован**: endpoint + `EventQualityService` + `QualityBanner`)
+- [x] **Высокий**: PR1 — Статус: isHidden ≠ активность, одна строка «В каталоге / Скрыто вручную / Причины» (без forceActive на MVP) (**v1 реализован**: `EventStatusLine` с inCatalog/isHidden/quality)
+- [x] **Высокий**: PR2 — Миграции (порядок: 1) pre-unique-safety, 2) admin_schedule_capacity) (**реализовано**: pre-unique-safety миграция + индексы, см. `schema.prisma` и миграции 20260301*)
+- [x] **Высокий**: PR2 — Вкладка «Расписание» — v1: список сеансов + create/edit/cancel/delete, Model A-блокировки; Teplohod-style grid/brush/ластик → отдельный PR v2
+- [x] **Высокий**: PR2 — Контекстное меню слота, Модель A при sold>0, PATCH capacity/delete/cancel (**реализовано**: диалоги Edit/Delete/Cancel + `SessionLockedException`)
+- [x] **Высокий**: PR2 checklist перед merge: индексы package_items(sessionId[,status]) в БД; tcSessionId не пустой; нет дублей (eventId,startsAt) (**выполнено** в pre-unique-safety миграции)
+- [~] **Высокий**: PR3 — Events — колонка groupingKey + фильтр; раздел «Группы событий» (**backend grouping API готов**, UI/раздел «Группы событий» — TODO)
 - [ ] **Высокий**: PR4 — /admin/seo-audit, GET /admin/seo/audit, seo_issues
 - [ ] **Высокий**: PR‑S1 — Admin SuppliersList v1 (реестр поставщиков: имя, тип, статус, события, площадки, комиссия, последняя активность; фильтры; быстрые действия)
 - [x] **Высокий**: PR‑S2 — Admin SupplierDetail v1 (Профиль/События/Площадки/Финансы/Доступ; смена статуса ACTIVE/FROZEN; изменение комиссии) — **S1.1–S1.2**: вкладки Профиль/События/API, список событий поставщика `/admin/suppliers/:id/events` с пагинацией и учётом `supplierIsActive` в статусе «В каталоге»
@@ -282,6 +282,7 @@
 ### Hero и визуал
 - [ ] **Критический**: Hero с фотографией — полноэкранное фото города (карусель 3–4 города)
 - [ ] **Критический**: Качество фото каталога — галереи ТОП-20 с настоящими фото
+  - [ ] **Высокий**: Пайплайн статичных изображений городов и главного hero (`CITY_IMAGES`, `public/assets/images`, `scripts/image-assets.mjs`, `docs/image-assets-report.md`)
 
 ### Приоритетные
 - [ ] **Высокий**: Карусель отзывов на главной (5–6 лучших отзывов)

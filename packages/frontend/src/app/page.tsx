@@ -9,6 +9,7 @@ import { HeroCitySearch } from '@/components/ui/HeroCitySearch';
 import { PromoBlock } from '@/components/ui/PromoBlock';
 import { api } from '@/lib/api';
 import { devWarn } from '@/lib/devlog';
+import { CITY_IMAGES } from '@/lib/cityImages';
 
 // ISR: обновлять каждый час
 export const revalidate = 3600;
@@ -32,9 +33,47 @@ interface HomePageProps {
   searchParams?: Promise<{ city?: string }>;
 }
 
+/** Убрать максимально похожие карточки для витрин на главной.
+ *  Ключ — нормализованный title (основной) + fallback по imageUrl.
+ *  Так в "Популярных" и "Ближайших" показываем по одному событию на шоу.
+ */
+function uniqueByImage(events: EventListItem[], max: number): EventListItem[] {
+  const seenTitles = new Set<string>();
+  const seenImages = new Set<string>();
+  const result: EventListItem[] = [];
+  for (const e of events) {
+    const titleKey = (e.title || '').trim().toLowerCase();
+    const imageKey = (e.imageUrl || '').trim();
+    // Сначала пытаемся не повторять шоу по названию
+    if (titleKey && seenTitles.has(titleKey)) continue;
+    // Если названия нет, страхуемся по картинке
+    if (!titleKey && imageKey && seenImages.has(imageKey)) continue;
+
+    if (titleKey) seenTitles.add(titleKey);
+    if (imageKey) seenImages.add(imageKey);
+    result.push(e);
+    if (result.length >= max) break;
+  }
+  return result;
+}
+
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
   const citySlug = params?.city || '';
+
+  // Для согласованного числа событий: берём total из /events с теми же базовыми фильтрами,
+  // что использует каталог (город + sort=popular). Если не получилось — используем fallback.
+  let heroEventsTotal: number | null = null;
+  try {
+    const totalRes = await api.getEvents({
+      sort: 'popular',
+      limit: 1,
+      ...(citySlug ? { city: citySlug } : {}),
+    });
+    heroEventsTotal = totalRes.total ?? null;
+  } catch {
+    heroEventsTotal = null;
+  }
 
   let cities: CityListItem[] = [];
   try {
@@ -104,6 +143,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     nearestEvents = [];
   }
 
+  // Главная страница: не показывать повторяющиеся карточки с одинаковым изображением
+  // (как в общем режиме, так и при выбранном городе).
+  if (popularEvents.length > 0) {
+    popularEvents = uniqueByImage(popularEvents, 8);
+  }
+  if (nearestEvents.length > 0) {
+    nearestEvents = uniqueByImage(nearestEvents, 8);
+  }
+
   let popularTags: TagWithCount[] = [];
   try {
     const allTags = await api.getTags();
@@ -117,7 +165,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     popularTags = [];
   }
 
-  // Счётчики Hero: по городам, которые реально отображаются
+  // Счётчики Hero: если есть heroEventsTotal из /events, используем его (он совпадает с каталогом);
+  // иначе считаем по городам, которые реально отображаются.
   const totalEvents = cities.reduce((sum, c) => sum + (c._count?.events ?? 0), 0);
   const totalVenues = cities.reduce((sum, c) => sum + (c._count?.venues ?? 0), 0);
   const totalEventsAndVenues = totalEvents + totalVenues;
@@ -146,8 +195,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <span className="block text-primary-300">и мероприятия</span>
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-slate-300">
-              {totalEventsAndVenues > 0 ? `${totalEventsAndVenues}+ событий и мест` : 'Сотни событий и мест'} в{' '}
-              {totalCities > 0 ? `${totalCities} городах` : 'городах'} России. Экскурсии, музеи, концерты, шоу —
+              {heroEventsTotal != null && heroEventsTotal > 0
+                ? `${pluralEvents(heroEventsTotal)}`
+                : totalEventsAndVenues > 0
+                  ? `${totalEventsAndVenues}+ событий и мест`
+                  : 'Сотни событий и мест'}{' '}
+              в {totalCities > 0 ? `${totalCities} городах` : 'городах'} России. Экскурсии, музеи, концерты, шоу —
               выбирайте и покупайте онлайн.
             </p>
 
@@ -443,13 +496,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 href={`/cities/${city.slug}`}
                 className="card group relative flex h-48 flex-col justify-end overflow-hidden bg-gradient-to-br from-primary-800 to-primary-950 transition-transform hover:scale-[1.02]"
               >
-                {city.heroImage && (
+                {(() => {
+                  const imageConfig = CITY_IMAGES[city.slug];
+                  const cardImage = imageConfig?.card ?? city.heroImage;
+                  if (!cardImage) return null;
+                  return (
                   <img
-                    src={city.heroImage}
+                    src={cardImage}
                     alt={city.name}
                     className="absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
-                )}
+                  );
+                })()}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                 <div className="relative p-5">
                   <h3 className="text-xl font-bold text-white">{city.name}</h3>

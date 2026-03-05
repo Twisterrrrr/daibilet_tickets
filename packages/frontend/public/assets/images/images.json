@@ -1,0 +1,34 @@
+{
+  "__homepage__": {
+    "hero": "/assets/images/hero/hero-main.webp",
+    "source": "",
+    "author": "",
+    "license": "free commercial use",
+    "blurDataUrl": ""
+  },
+  "saint-petersburg": {
+    "hero": "/assets/images/cities/saint-petersburg/hero.webp",
+    "card": "/assets/images/cities/saint-petersburg/card.webp",
+    "source": "",
+    "author": "",
+    "license": "free commercial use",
+    "blurDataUrl": ""
+  },
+  "moscow": {
+    "hero": "/assets/images/cities/moscow/hero.webp",
+    "card": "/assets/images/cities/moscow/card.webp",
+    "source": "",
+    "author": "",
+    "license": "free commercial use",
+    "blurDataUrl": ""
+  },
+  "kazan": {
+    "hero": "/assets/images/cities/kazan/hero.webp",
+    "card": "/assets/images/cities/kazan/card.webp",
+    "source": "",
+    "author": "",
+    "license": "free commercial use",
+    "blurDataUrl": ""
+  }
+}
+

@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-03-02
+> Последнее обновление: 2026-03-05
 
 ## Миссия
 
@@ -39,6 +39,20 @@
 - **YooKassa** — оплата бандлов/программ + Split Payment для маркетплейса (запланировано)
 - **SMTP** — транзакционные email (@nestjs-modules/mailer + Handlebars)
 - **Partner B2B API** — machine-to-machine API для внешних поставщиков (API-ключи, webhook-уведомления)
+
+## Статические изображения и витрины городов
+
+- **Статичные картинки городов**: единый конфиг `CITY_IMAGES` (`packages/frontend/src/lib/cityImages.ts`) описывает hero- и card-картинки для каждого города (slug → пути в `public/assets/images/...` + источник, автор, лицензия, blur placeholder).
+- **Хранение файлов**: все оптимизированные изображения лежат в `packages/frontend/public/assets/images`, структура:
+  - `/assets/images/hero/hero-main.webp` — главный hero для `/` (3200×1800, ≤400 KB).
+  - `/assets/images/cities/{slug}/hero.webp` — фон hero-блока страницы города (3000×1700, ≤350 KB).
+  - `/assets/images/cities/{slug}/card.webp` — картинка карточки города на `/cities` и в блоке «Города» на главной (1600×900, ≤200 KB).
+- **Метаданные и отчёт**:
+  - `/assets/images/images.json` — технический JSON для пайплайна (пути, источник, автор, лицензия, локальные пути исходников, blurDataUrl).
+  - `docs/image-assets-report.md` — авто‑отчёт по фактическим размерам и весу файлов (генерируется скриптом).
+- **Пайплайн оптимизации**:
+  - Скрипт `scripts/image-assets.mjs` (Node + ImageMagick `magick`) читает `images.json`, ресайзит исходники в WEBP под целевые размеры, генерирует blur placeholders и валидирует веса, после чего обновляет JSON и отчёт.
+  - Фронтенд использует только статичные пути (`CITY_IMAGES`), контракты API не меняются (backend продолжает отдавать `city.heroImage`, но фронт приоритетно берёт оптимизированные локальные файлы).
 
 ## Модель данных (ключевые сущности)
 
