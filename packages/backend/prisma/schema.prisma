@@ -1324,6 +1324,7 @@ model CheckoutSession {
 
   @@index([status])
   @@index([customerEmail])
+  @@index([status, expiresAt])
   @@map("checkout_sessions")
 }
 

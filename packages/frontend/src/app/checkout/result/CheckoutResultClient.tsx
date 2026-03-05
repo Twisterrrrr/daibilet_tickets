@@ -9,7 +9,7 @@ export function CheckoutResultClient() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const sessionId = searchParams.get('session');
+    const sessionId = searchParams.get('session') || searchParams.get('sessionId');
     if (!sessionId) {
       window.location.href = '/events';
       return;

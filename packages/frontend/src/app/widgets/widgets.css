@@ -1,0 +1,13 @@
+/* Скрываем основной header/footer и фон для widget-роутов, чтобы в iframe был только виджет. */
+header {
+  display: none !important;
+}
+
+footer {
+  display: none !important;
+}
+
+body {
+  background: transparent !important;
+}
+

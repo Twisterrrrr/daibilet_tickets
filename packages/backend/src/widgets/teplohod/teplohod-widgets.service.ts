@@ -71,7 +71,7 @@ export class TeplohodWidgetsService {
       provider: 'TEPLOHOD',
       event: {
         id: event.id,
-        externalId: event.tcEventId,
+        externalId: event.tcEventId ?? undefined,
         title: event.title,
         city: event.city?.name ?? undefined,
         imageUrl: event.imageUrl ?? undefined,
