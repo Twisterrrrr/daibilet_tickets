@@ -48,11 +48,18 @@
   - `/assets/images/cities/{slug}/hero.webp` — фон hero-блока страницы города (3000×1700, ≤350 KB).
   - `/assets/images/cities/{slug}/card.webp` — картинка карточки города на `/cities` и в блоке «Города» на главной (1600×900, ≤200 KB).
 - **Метаданные и отчёт**:
-  - `/assets/images/images.json` — технический JSON для пайплайна (пути, источник, автор, лицензия, локальные пути исходников, blurDataUrl).
+  - `/assets/images/images.json` — технический JSON для пайплайна (пути, источник, автор, лицензия, URL страницы/скачивания, локальные пути исходников, blurDataUrl).
   - `docs/image-assets-report.md` — авто‑отчёт по фактическим размерам и весу файлов (генерируется скриптом).
-- **Пайплайн оптимизации**:
-  - Скрипт `scripts/image-assets.mjs` (Node + ImageMagick `magick`) читает `images.json`, ресайзит исходники в WEBP под целевые размеры, генерирует blur placeholders и валидирует веса, после чего обновляет JSON и отчёт.
+- **Пайплайн кандидатов и оптимизации**:
+  - Скрипт `scripts/image-candidates.mjs` (Node 20+ fetch, без npm-зависимостей) собирает стоковые кандидаты по городам из Pexels/Unsplash/Pixabay, сохраняет их в `packages/frontend/assets-src/**/candidates` и пишет `candidates.json` с метаданными (source, author, license, pageUrl, downloadUrl, width, height, query).
+  - Хелпер `scripts/select-image.mjs` копирует выбранные кандидаты в `.../selected/hero-original.jpg` / `card-original.jpg` и автоматически обновляет `images.json` (localHeroSourcePath/localCardSourcePath + метаданные).
+  - Скрипт `scripts/image-assets.mjs` (Node + ImageMagick `magick`) читает `images.json`, ресайзит исходники из `assets-src` в WEBP под целевые размеры слотов (homepage hero, city hero, city card, og), генерирует blur placeholders и валидирует веса, после чего обновляет JSON и отчёт.
   - Фронтенд использует только статичные пути (`CITY_IMAGES`), контракты API не меняются (backend продолжает отдавать `city.heroImage`, но фронт приоритетно берёт оптимизированные локальные файлы).
+- **Процесс для контент-редакторов**:
+  1. `pnpm images:candidates` — собрать кандидатов по всем городам (исходники не попадают в прод, лежат в `packages/frontend/assets-src` и не коммитятся).
+  2. Вручную просмотреть `.../candidates` и выбрать лучшие файлы (по hero/card) либо вызвать `node scripts/select-image.mjs --city=slug --hero=01__...jpg --card=02__...jpg` (для главной: `--homepageHero=...`).
+  3. Убедиться, что `public/assets/images/images.json` содержит корректные пути/метаданные.
+  4. Запустить `pnpm images:build` (ImageMagick `magick` должен быть в PATH) — будут сгенерированы/обновлены WEBP-файлы, blur placeholders и `docs/image-assets-report.md`.
 
 ## Модель данных (ключевые сущности)
 

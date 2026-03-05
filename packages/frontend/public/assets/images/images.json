@@ -4,6 +4,10 @@
     "source": "",
     "author": "",
     "license": "free commercial use",
+    "licenseUrl": "",
+    "pageUrl": "",
+    "downloadUrl": "",
+    "localSourcePath": "",
     "blurDataUrl": ""
   },
   "saint-petersburg": {
@@ -12,6 +16,11 @@
     "source": "",
     "author": "",
     "license": "free commercial use",
+    "licenseUrl": "",
+    "pageUrl": "",
+    "downloadUrl": "",
+    "localHeroSourcePath": "",
+    "localCardSourcePath": "",
     "blurDataUrl": ""
   },
   "moscow": {
@@ -20,6 +29,11 @@
     "source": "",
     "author": "",
     "license": "free commercial use",
+    "licenseUrl": "",
+    "pageUrl": "",
+    "downloadUrl": "",
+    "localHeroSourcePath": "",
+    "localCardSourcePath": "",
     "blurDataUrl": ""
   },
   "kazan": {
@@ -28,7 +42,11 @@
     "source": "",
     "author": "",
     "license": "free commercial use",
+    "licenseUrl": "",
+    "pageUrl": "",
+    "downloadUrl": "",
+    "localHeroSourcePath": "",
+    "localCardSourcePath": "",
     "blurDataUrl": ""
   }
 }
-
