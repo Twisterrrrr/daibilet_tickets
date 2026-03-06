@@ -33,7 +33,7 @@ COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_module
 COPY --from=deps /app/packages/frontend/node_modules ./packages/frontend/node_modules
 
 # Копируем workspace конфиги
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 
 # Копируем исходники
 COPY packages/shared/ ./packages/shared/
