@@ -5,6 +5,8 @@ PROJECT_DIR="/opt/daibilet"
 
 cd "${PROJECT_DIR}"
 
+[ -x scripts/prepare-ports-staging.sh ] && bash scripts/prepare-ports-staging.sh || true
+
 echo "==> Pulling latest code..."
 git pull || true
 
