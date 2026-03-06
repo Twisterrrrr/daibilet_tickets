@@ -54,7 +54,7 @@ export function ScheduleGridDay({
         .padStart(2, '0')}`;
       if (map.has(key)) {
         // Исторические дубли: показываем первый, но подсвечиваем в консоли (dev).
-        if (process.env.NODE_ENV !== 'production') {
+        if (!import.meta.env.PROD) {
           // eslint-disable-next-line no-console
           console.warn('Duplicate sessions for the same startsAt in grid', {
             date,

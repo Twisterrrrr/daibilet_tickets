@@ -217,12 +217,11 @@ export function EventEditPage() {
     category?: EventCategory;
     audience?: string | null;
     subcategories?: EventSubcategory[];
-    imageUrl?: string;
+    imageUrl?: string | null;
     shortDescription?: string;
     manualRating?: number | null;
     minAge?: number | null;
     description?: string;
-    shortDescription?: string;
     venueId?: string | null;
     address?: string | null;
     dateMode?: string;

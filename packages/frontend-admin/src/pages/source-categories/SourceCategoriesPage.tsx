@@ -263,7 +263,7 @@ export function SourceCategoriesPage() {
                             </td>
                             <td className="py-1.5 pr-0 align-top text-right">
                               <Button
-                                size="xs"
+                                size="sm"
                                 variant="outline"
                                 onClick={() => handleUseUnknown(u)}
                               >
