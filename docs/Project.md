@@ -40,6 +40,34 @@
 - **SMTP** — транзакционные email (@nestjs-modules/mailer + Handlebars)
 - **Partner B2B API** — machine-to-machine API для внешних поставщиков (API-ключи, webhook-уведомления)
 
+## Preview-ссылки (черновики событий и площадок)
+
+- **Цель**: дать редакторам и поставщикам безопасный предпросмотр страниц события/площадки с реальным UI, без публикации в каталоге и индексации.
+- **Backend**:
+  - HMAC-токены предпросмотра (`PreviewService`): тип (`EVENT`/`VENUE`), `id`, `iat`, `exp` (TTL по умолчанию 30 минут).
+  - Эндпоинты:
+    - `GET /api/v1/preview/events/:id?token=...` — возвращает `EventDetailFrontend` для черновика события.
+    - `GET /api/v1/preview/venues/:id?token=...` — возвращает `VenueDetail` для черновика площадки.
+  - Защита: токен подписан HMAC, проверяется тип и `id`, истечение по времени, `Cache-Control: no-store`.
+- **Frontend (Next.js)**:
+  - Публичные страницы используют shared view-компоненты:
+    - `app/events/[slug]/page.tsx` → `EventPageView` (`components/events/EventPageView.tsx`).
+    - `app/venues/[slug]/page.tsx` → `VenuePageView` (`components/venue/VenuePageView.tsx`).
+  - Preview-страницы повторно используют тот же UI:
+    - `app/preview/events/[id]/page.tsx`:
+      - читает `id` и `token` из URL;
+      - грузит `api.getEventPreview(id, token)` (через backend `/preview/events/:id`);
+      - рендерит `<EventPageView event={event} mode="preview" />`.
+    - `app/preview/venues/[id]/page.tsx`:
+      - грузит `api.getVenuePreview(id, token)`;
+      - рендерит `<VenuePageView venue={venue} mode="preview" />`.
+  - **PreviewBanner**:
+    - Компонент `components/preview/PreviewBanner.tsx` рендерится поверх страницы:
+      - текст по умолчанию: «Черновик · предпросмотр · Ссылка действует 30 минут»;
+      - если передан `publicUrl`, показывает кнопку «Открыть публичную», ведущую на `/events/{slug}` или `/venues/{slug}` (если объект уже опубликован).
+  - SEO: метаданные preview-страниц устанавливают `robots: { index: false, follow: false }`, чтобы ссылки не индексировались.
+
+
 ## Статические изображения и витрины городов
 
 - **Статичные картинки городов**: единый конфиг `CITY_IMAGES` (`packages/frontend/src/lib/cityImages.ts`) описывает hero- и card-картинки для каждого города (slug → пути в `public/assets/images/...` + источник, автор, лицензия, blur placeholder).
