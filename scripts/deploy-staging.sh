@@ -5,7 +5,8 @@ PROJECT_DIR="/opt/daibilet"
 
 cd "${PROJECT_DIR}"
 
-[ -x scripts/prepare-ports-staging.sh ] && bash scripts/prepare-ports-staging.sh || true
+echo "==> Освобождаем порты 80/443..."
+bash scripts/prepare-ports-staging.sh
 
 echo "==> Pulling latest code..."
 git pull || true
