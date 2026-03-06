@@ -28,6 +28,9 @@ COPY packages/backend/ ./packages/backend/
 # Генерируем Prisma Client
 RUN pnpm --filter @daibilet/backend db:generate
 
+# Собираем shared (backend зависит от него)
+RUN pnpm --filter @daibilet/shared build
+
 # Собираем backend
 RUN pnpm --filter @daibilet/backend build
 
