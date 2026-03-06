@@ -12,7 +12,7 @@ RUN apk add --no-cache openssl
 WORKDIR /app
 
 # Копируем конфиги workspace
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 
 # Копируем package.json всех пакетов (для правильного install)
 COPY packages/shared/package.json ./packages/shared/
