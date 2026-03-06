@@ -1,5 +1,6 @@
 import { ArrowRight, BookOpen, Calendar, MapPin } from 'lucide-react';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
@@ -60,10 +61,12 @@ export default async function BlogPage() {
                 {/* Cover image */}
                 <div className="relative h-48 overflow-hidden bg-gradient-to-br from-primary-100 to-primary-200">
                   {article.coverImage ? (
-                    <img
+                    <Image
                       src={article.coverImage}
                       alt={article.title}
+                      fill
                       className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                      sizes="(min-width: 1024px) 25vw, 50vw"
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center">

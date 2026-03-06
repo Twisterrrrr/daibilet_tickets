@@ -14,6 +14,7 @@ import {
   Phone,
   XCircle,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -224,9 +225,11 @@ export default function OrderPage() {
                 <li key={item.id} className="p-4">
                   <div className="flex gap-4">
                     {item.event?.imageUrl ? (
-                      <img
+                      <Image
                         src={item.event.imageUrl}
-                        alt=""
+                        alt={item.event.title ?? ''}
+                        width={56}
+                        height={56}
                         className="h-14 w-14 rounded-lg object-cover flex-shrink-0"
                       />
                     ) : (

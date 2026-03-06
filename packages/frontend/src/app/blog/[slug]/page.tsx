@@ -1,5 +1,6 @@
 import { ArrowLeft, Calendar, MapPin, Tag } from 'lucide-react';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { EventCard } from '@/components/ui/EventCard';
@@ -162,7 +163,13 @@ export default async function ArticlePage({ params }: Props) {
       {/* Cover image */}
       {article.coverImage && (
         <div className="container-page max-w-3xl -mt-2">
-          <img src={article.coverImage} alt={article.title} className="w-full rounded-2xl shadow-lg" />
+          <Image
+            src={article.coverImage}
+            alt={article.title}
+            width={1200}
+            height={630}
+            className="w-full rounded-2xl shadow-lg"
+          />
         </div>
       )}
 

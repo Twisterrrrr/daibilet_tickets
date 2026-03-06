@@ -43,8 +43,10 @@ const mockPostEditQueue = {
 
 const makeJob = (name: string, attemptsMade = 0): Job<any, any, string> =>
   ({
+    id: 'job-1',
     name,
     attemptsMade,
+    opts: { attempts: 3 },
     data: {},
   }) as any;
 

@@ -5,6 +5,7 @@ import { MapPin, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 import { EventCard } from '@/components/ui/EventCard';
 import { api } from '@/lib/api';
@@ -111,10 +112,12 @@ export default function RegionPage() {
       {/* Hero */}
       <section className="relative bg-gradient-to-br from-primary-700 to-primary-900 py-14 sm:py-18">
         {region?.heroImage && (
-          <img
+          <Image
             src={region.heroImage}
             alt={region?.name || ''}
+            fill
             className="absolute inset-0 h-full w-full object-cover opacity-20"
+            sizes="100vw"
           />
         )}
         <div className="container-page relative">

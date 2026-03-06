@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   Trash2,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -238,7 +239,13 @@ export function CheckoutClient() {
                 return (
                   <div key={item.offerId} className="flex gap-4 p-4">
                     {item.imageUrl ? (
-                      <img src={item.imageUrl} alt="" className="h-16 w-16 rounded-lg object-cover flex-shrink-0" />
+                      <Image
+                        src={item.imageUrl}
+                        alt={item.eventTitle || ''}
+                        width={64}
+                        height={64}
+                        className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
+                      />
                     ) : (
                       <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-100 flex-shrink-0">
                         <span className="text-2xl opacity-40">🎫</span>

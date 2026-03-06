@@ -136,7 +136,14 @@ describe('PaymentService', () => {
 
       const result = await service.createPaymentIntent(checkoutSessionId, idempotencyKey);
 
-      expect(result).toEqual(existingIntent);
+      expect(result).toEqual({
+        paymentIntentId: existingIntent.id,
+        paymentUrl: existingIntent.paymentUrl,
+        amount: (existingIntent as any).amount,
+        currency: (existingIntent as any).currency,
+        provider: (existingIntent as any).provider,
+        status: existingIntent.status,
+      });
       expect(mockPrisma.paymentIntent.findUnique).toHaveBeenCalledWith({
         where: { idempotencyKey },
       });

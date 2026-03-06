@@ -21,6 +21,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -651,9 +652,11 @@ export default function PlannerPage() {
                                     {/* Event image + info */}
                                     <div className="flex-1 min-w-0 flex gap-3">
                                       {slot.event.imageUrl && (
-                                        <img
+                                        <Image
                                           src={slot.event.imageUrl}
-                                          alt=""
+                                          alt={slot.event.title}
+                                          width={56}
+                                          height={56}
                                           className="h-14 w-14 rounded-lg object-cover flex-shrink-0"
                                         />
                                       )}
@@ -860,7 +863,7 @@ export default function PlannerPage() {
                           </div>
                         ) : (
                           <div className="space-y-2">
-                            {replaceEvents
+                                    {(replaceEvents ?? [])
                               .filter((e) => e.id !== replaceModal.slot.event?.id)
                               .slice(0, 15)
                               .map((e) => (
@@ -871,9 +874,11 @@ export default function PlannerPage() {
                                   className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50"
                                 >
                                   {e.imageUrl && (
-                                    <img
+                                    <Image
                                       src={e.imageUrl}
-                                      alt=""
+                                      alt={e.title}
+                                      width={48}
+                                      height={48}
                                       className="h-12 w-12 rounded-lg object-cover"
                                     />
                                   )}

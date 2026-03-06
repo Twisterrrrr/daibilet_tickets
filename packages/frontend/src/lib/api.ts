@@ -360,6 +360,13 @@ export const api = {
 
   getVenueBySlug: (slug: string) => fetchApi<VenueDetail>(`/venues/${slug}`),
 
+  // Preview (unpublished entities)
+  getEventPreview: (id: string, token: string) =>
+    fetchApi<import('./api.types').EventDetailFrontend>(`/preview/events/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`),
+
+  getVenuePreview: (id: string, token: string) =>
+    fetchApi<VenueDetail>(`/preview/venues/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`),
+
   // Лендинги (посадочные страницы)
   getLandings: (city?: string) => fetchApi<LandingItem[]>(city ? `/landings?city=${city}` : '/landings'),
 

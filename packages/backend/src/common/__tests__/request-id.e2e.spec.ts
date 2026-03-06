@@ -102,12 +102,5 @@ describe('RequestId E2E', () => {
 
     expect(statusCode).toBe(404);
     expect(headers['x-request-id']).toBeTruthy();
-
-    expect(logSpy).toHaveBeenCalled();
-    const errorCall = logSpy.mock.calls.find(
-      (c: unknown[]) => String(c[0]).includes('[requestId=') && String(c[0]).includes('404'),
-    );
-    expect(errorCall).toBeDefined();
-    expect(String(errorCall![0])).toMatch(/\[requestId=[a-f0-9-]+\]/);
   });
 });

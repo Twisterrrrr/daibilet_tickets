@@ -1,0 +1,255 @@
+# CURSOR AUTO — PR4.3 SEO Auto-Generator (Titles, Meta, JSON-LD)
+
+Контекст проекта:
+- Monorepo: NestJS backend + Prisma + Next.js (App Router) + admin panel.
+- Уже реализовано:
+  - PR4+ SEO Audit (данные)
+  - PR4.1 Live Page Probe
+  - PR4.2 SEO Opportunity Finder
+- В системе есть сущности: Event, City, Category (или тип события), Sessions.
+- Нужно добавить **SEO Auto-Generator**, который автоматически создаёт:
+  - title
+  - meta description
+  - og tags
+  - JSON-LD schema.org/Event
+для страниц событий и landing-страниц.
+
+Ограничения:
+- НЕ добавлять ML или внешние API.
+- Генерация должна быть детерминированной (template-based).
+- Если у события уже есть metaTitle/metaDescription — **не перезаписывать** без флага force.
+- TS strict, без новых зависимостей.
+
+Цель:
+- Endpoint генерации SEO
+- Endpoint preview
+- UI в админке
+- JSON-LD генератор для фронта
+- Коммиты: PR4.3
+
+---
+
+# BACKEND
+
+Создать сервис:
+
+src/admin/seo/seo-auto-generator.service.ts
+
+---
+
+# Templates
+
+Определить шаблоны.
+
+## Title templates
+
+Examples:
+
+1)
+"{category} в {city} — цены, расписание, билеты"
+
+2)
+"{title} — билеты и расписание | {city}"
+
+3)
+"{category} {city} — купить билет онлайн"
+
+Алгоритм:
+
+Если event.title содержит город → использовать шаблон 2.
+
+Иначе:
+
+шаблон 1.
+
+Макс длина 65 символов.
+
+Если длиннее → обрезать по словам.
+
+---
+
+## Description templates
+
+Пример:
+
+"Купите билеты на {title} в {city}. 
+Расписание, цены, отзывы. 
+Бронирование онлайн на Daibilet."
+
+Fallback:
+
+"{category} в {city}. Билеты онлайн, актуальное расписание и лучшие предложения."
+
+Минимум 120 символов.
+
+---
+
+## OG tags
+
+og:title → metaTitle  
+og:description → metaDescription  
+og:image → imageUrl  
+
+---
+
+# JSON-LD
+
+Функция:
+
+generateEventSchema(event, session)
+
+Schema:
+
+{
+ "@context": "https://schema.org",
+ "@type": "Event",
+ "name": event.title,
+ "startDate": session.startsAt,
+ "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+ "eventStatus": "https://schema.org/EventScheduled",
+ "location": {
+   "@type": "Place",
+   "name": event.locationName || city.name,
+   "address": city.name
+ },
+ "image": event.imageUrl,
+ "offers": {
+   "@type": "Offer",
+   "price": event.priceFrom,
+   "priceCurrency": "RUB",
+   "availability": "https://schema.org/InStock"
+ }
+}
+
+---
+
+# ENDPOINTS
+
+## Preview
+
+GET /admin/seo-generator/event/:id/preview
+
+Response:
+
+{
+  title,
+  description,
+  og: {
+    title,
+    description,
+    image
+  },
+  jsonLd
+}
+
+---
+
+## Apply
+
+POST /admin/seo-generator/event/:id/apply
+
+Body:
+
+{
+  force?: boolean
+}
+
+Логика:
+
+если metaTitle/metaDescription пусты  
+или force=true
+
+→ сохранить в event.
+
+---
+
+## Landing generator
+
+POST /admin/seo-generator/landing
+
+Body:
+
+{
+ city,
+ category,
+ intent?
+}
+
+Создаёт:
+
+slug
+
+title
+
+description
+
+canonical
+
+---
+
+# FRONTEND ADMIN
+
+Добавить кнопку в EventEdit (SEO вкладка):
+
+"Generate SEO"
+
+---
+
+## Modal
+
+Preview:
+
+Title
+
+Description
+
+JSON-LD preview
+
+---
+
+## Buttons
+
+Apply  
+Copy  
+Cancel
+
+---
+
+# FRONTEND (CATALOG)
+
+В странице события:
+
+generateMetadata()
+
+если metaTitle/metaDescription пусты
+
+→ использовать SeoAutoGeneratorService.
+
+---
+
+## JSON-LD injection
+
+Добавить:
+
+<script type="application/ld+json">
+
+с результатом generateEventSchema.
+
+---
+
+# Acceptance
+
+1) открыть событие в админке  
+2) нажать Generate SEO  
+3) увидеть preview  
+4) нажать Apply  
+5) metaTitle/metaDescription сохранены  
+
+6) открыть страницу события  
+7) увидеть JSON-LD schema
+
+---
+
+# Commit
+
+PR4.3: feat(admin-seo): SEO auto generator for titles, meta descriptions and event schema

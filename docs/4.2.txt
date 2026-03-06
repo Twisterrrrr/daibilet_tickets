@@ -1,0 +1,225 @@
+# PR4.2 — SEO Opportunity Finder
+
+Контекст:
+В PR4+ есть SEO аудит существующих страниц.
+Теперь нужно находить SEO-страницы, которые могут существовать, но ещё не созданы.
+
+Пример:
+
+"экскурсии в Казани вечером"
+"прогулки на теплоходе Москва"
+"музеи СПб для детей"
+
+Это комбинации:
+
+City × Category × Intent.
+
+Система должна:
+- генерировать потенциальные страницы
+- проверять, есть ли они
+- показывать SEO opportunity score
+
+---
+
+# Backend
+
+Создать сервис:
+
+SeoOpportunityService
+
+Файл:
+
+src/admin/seo/seo-opportunity.service.ts
+
+---
+
+# Endpoint
+
+GET /admin/seo-opportunities
+
+Query:
+
+cityId?
+category?
+intent?
+limit?
+
+Response:
+
+{
+  items: [
+    {
+      city: "Санкт-Петербург",
+      category: "экскурсии",
+      intent: "вечерние",
+      slug: "vechernie-ekskursii-sankt-peterburg",
+
+      existingEvents: 12,
+      hasLandingPage: false,
+
+      score: 78,
+
+      reason: [
+        "есть события",
+        "нет SEO страницы"
+      ]
+    }
+  ]
+}
+
+---
+
+# Data sources
+
+Использовать:
+
+cities table
+events table
+categories
+tags (если есть)
+
+---
+
+# Генерация комбинаций
+
+City × Category × Intent
+
+Intent examples:
+
+["вечерние","ночные","для детей","зимой","летом","на выходные"]
+
+---
+
+# Проверка существующей страницы
+
+Slug patterns:
+
+/cities/{city}/events
+/{category}-{city}
+/{intent}-{category}-{city}
+
+Если slug существует → hasLandingPage = true
+
+---
+
+# Score calculation
+
+score =
+
+eventDensityScore +
+missingLandingScore +
+categoryDemandScore
+
+---
+
+# eventDensityScore
+
+events count in city/category
+
+0 → 0
+1–5 → 10
+6–20 → 30
+>20 → 50
+
+---
+
+# missingLandingScore
+
+если landing page отсутствует
+
++30
+
+---
+
+# categoryDemandScore
+
+если category популярная
+
+экскурсии → +20
+музеи → +15
+прогулки → +10
+
+---
+
+# Filters
+
+city
+category
+score > X
+
+---
+
+# Frontend admin
+
+Новая страница:
+
+/admin/seo-opportunities
+
+---
+
+# UI
+
+Table:
+
+| City | Category | Intent | Events | Landing | Score | Actions |
+
+Landing:
+
+YES / NO
+
+Score:
+
+цветная шкала
+
+---
+
+# Actions
+
+Create landing page
+
+→ opens landing generator
+
+---
+
+# Landing generator
+
+POST /admin/seo-opportunities/create
+
+Body:
+
+{
+ city
+ category
+ intent
+}
+
+Создаёт страницу:
+
+slug
+title
+meta
+template
+
+---
+
+# UX
+
+Сортировка по score desc.
+
+---
+
+# Acceptance
+
+Admin открывает SEO Opportunities
+
+видит список потенциальных страниц
+
+нажимает Create landing page
+
+страница создаётся
+
+---
+
+# Commit
+
+PR4.2: feat(admin-seo): SEO opportunity finder for landing pages

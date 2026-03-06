@@ -447,6 +447,29 @@ export function EventEditPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!id || saving}
+            onClick={async () => {
+              if (!id) return;
+              if (Object.keys(form).length > 0 && !saving) {
+                const proceed = window.confirm('Предпросмотр показывает последнюю сохранённую версию. Продолжить?');
+                if (!proceed) return;
+              }
+              try {
+                const res = await adminApi.post<{ previewUrl: string }>(`/admin/previews/events/${id}`);
+                if (res.previewUrl) {
+                  window.open(res.previewUrl, '_blank', 'noopener,noreferrer');
+                }
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Не удалось открыть предпросмотр');
+              }
+            }}
+            title={id ? 'Открыть предпросмотр события' : 'Сначала сохраните событие'}
+          >
+            Предпросмотр
+          </Button>
           <Button variant={isHidden ? 'default' : 'outline'} size="sm" onClick={handleToggleHidden} disabled={toggling}>
             {isHidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
             {isHidden ? 'Показать' : 'Скрыть'}

@@ -111,8 +111,127 @@ export class VenueService {
 
     if (!venue) throw new NotFoundException('Venue not found');
 
+    return this.buildVenuePublicDto(venue, true);
+  }
+
+  /** Preview: детальная страница venue по ID, допускает неактивные (isActive=false) сущности. */
+  async getVenueByIdForPreview(id: string) {
+    const venue = await this.prisma.venue.findFirst({
+      where: { id, isDeleted: false },
+      include: {
+        city: { select: { name: true, slug: true } },
+        operator: { select: { id: true, name: true, slug: true, logo: true } },
+        offers: {
+          where: { status: 'ACTIVE' },
+          orderBy: { priority: 'desc' },
+          select: {
+            id: true,
+            source: true,
+            purchaseType: true,
+            deeplink: true,
+            priceFrom: true,
+            badge: true,
+            availabilityMode: true,
+            widgetProvider: true,
+            widgetPayload: true,
+            externalEventId: true,
+          },
+        },
+        events: {
+          where: { isActive: true, moderationStatus: 'APPROVED' },
+          orderBy: [{ isPermanent: 'desc' }, { createdAt: 'desc' }],
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            imageUrl: true,
+            category: true,
+            priceFrom: true,
+            rating: true,
+            reviewCount: true,
+            dateMode: true,
+            isPermanent: true,
+            endDate: true,
+            shortDescription: true,
+            durationMinutes: true,
+          },
+        },
+      },
+    });
+
+    if (!venue) throw new NotFoundException('Venue not found');
+
+    return this.buildVenuePublicDto(venue, false);
+  }
+
+  private async buildVenuePublicDto(
+    venue: {
+      id: string;
+      cityId: string | null;
+      slug: string;
+      title: string;
+      shortTitle: string | null;
+      venueType: VenueType;
+      description: string | null;
+      shortDescription: string | null;
+      imageUrl: string | null;
+      galleryUrls: string[] | null;
+      address: string | null;
+      lat: number | null;
+      lng: number | null;
+      metro: string | null;
+      district: string | null;
+      phone: string | null;
+      email: string | null;
+      website: string | null;
+      openingHours: Prisma.JsonValue | null;
+      priceFrom: number | null;
+      rating: Prisma.Decimal;
+      reviewCount: number;
+      recommendPercent?: number | null;
+      externalRating: Prisma.Decimal | null;
+      externalSource: string | null;
+      highlights: Prisma.JsonValue | null;
+      faq: Prisma.JsonValue | null;
+      features: Prisma.JsonValue | null;
+      isFeatured: boolean;
+      metaTitle: string | null;
+      metaDescription: string | null;
+      city: { name: string; slug: string } | null;
+      operator: { id: string; name: string; slug: string; logo: string | null } | null;
+      offers: {
+        id: string;
+        source: string;
+        purchaseType: string;
+        deeplink: string | null;
+        priceFrom: number | null;
+        badge: string | null;
+        availabilityMode: string | null;
+        widgetProvider: string | null;
+        widgetPayload: Prisma.JsonValue | null;
+        externalEventId: string | null;
+      }[];
+      events: {
+        id: string;
+        slug: string;
+        title: string;
+        imageUrl: string | null;
+        category: string;
+        priceFrom: number | null;
+        rating: Prisma.Decimal | null;
+        reviewCount: number;
+        dateMode: string;
+        isPermanent: boolean;
+        endDate: Date | null;
+        shortDescription: string | null;
+        durationMinutes: number | null;
+      }[];
+    },
+    requireActive: boolean,
+  ) {
+    const events = venue.events;
     // Загрузим последние отзывы: прямые venue-отзывы + по привязанным events
-    const eventIds = venue.events.map((e) => e.id);
+    const eventIds = events.map((e) => e.id);
     const reviewWhere = {
       status: 'APPROVED' as const,
       OR: [...(eventIds.length > 0 ? [{ eventId: { in: eventIds } }] : []), { venueId: venue.id }],
@@ -171,9 +290,9 @@ export class VenueService {
       recommendPercent,
       externalRating: venue.externalRating ? Number(venue.externalRating) : null,
       externalSource: venue.externalSource,
-      highlights: venue.highlights,
-      faq: venue.faq,
-      features: venue.features,
+      highlights: (venue.highlights as string[] | null) ?? null,
+      faq: (venue.faq as Array<{ q: string; a: string }> | null) ?? null,
+      features: (venue.features as string[] | null) ?? null,
       isFeatured: venue.isFeatured,
       metaTitle: venue.metaTitle,
       metaDescription: venue.metaDescription,

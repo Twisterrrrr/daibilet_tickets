@@ -8,7 +8,7 @@ import { CatalogService } from '../catalog.service';
 
 const mockPrisma = {
   city: { findMany: vi.fn(), findUnique: vi.fn() },
-  event: { findMany: vi.fn(), count: vi.fn() },
+  event: { findMany: vi.fn(), count: vi.fn(), groupBy: vi.fn().mockResolvedValue([]) },
   tag: { findMany: vi.fn(), findUnique: vi.fn() },
   $queryRaw: vi.fn(),
 };
@@ -51,9 +51,30 @@ describe('CatalogService', () => {
       // Both $queryRaw calls return empty arrays (no hidden cities, no region stats)
       mockPrisma.$queryRaw.mockResolvedValue([]);
       mockPrisma.city.findMany.mockResolvedValue([
-        { id: '1', name: 'Москва', slug: 'moscow', _count: { events: 10, venues: 5 }, landingPages: [] },
-        { id: '2', name: 'Empty', slug: 'empty', _count: { events: 0, venues: 0 }, landingPages: [] },
-        { id: '3', name: 'OneEvent', slug: 'one-event', _count: { events: 1, venues: 0 }, landingPages: [] },
+        {
+          id: '1',
+          name: 'Москва',
+          slug: 'moscow',
+          description: 'Test city description',
+          _count: { events: 10, venues: 5 },
+          landingPages: [],
+        },
+        {
+          id: '2',
+          name: 'Empty',
+          slug: 'empty',
+          description: null,
+          _count: { events: 0, venues: 0 },
+          landingPages: [],
+        },
+        {
+          id: '3',
+          name: 'OneEvent',
+          slug: 'one-event',
+          description: null,
+          _count: { events: 1, venues: 0 },
+          landingPages: [],
+        },
       ]);
 
       const result = await service.getCities();
@@ -67,8 +88,22 @@ describe('CatalogService', () => {
         .mockResolvedValueOnce([{ cityId: 'hidden-1' }]) // hiddenCityIds
         .mockResolvedValueOnce([]); // regionStats
       mockPrisma.city.findMany.mockResolvedValue([
-        { id: '1', name: 'Москва', slug: 'moscow', _count: { events: 10, venues: 5 }, landingPages: [] },
-        { id: 'hidden-1', name: 'Раменское', slug: 'ramenskoe', _count: { events: 3, venues: 0 }, landingPages: [] },
+        {
+          id: '1',
+          name: 'Москва',
+          slug: 'moscow',
+          description: 'Test city description',
+          _count: { events: 10, venues: 5 },
+          landingPages: [],
+        },
+        {
+          id: 'hidden-1',
+          name: 'Раменское',
+          slug: 'ramenskoe',
+          description: 'Hidden city description',
+          _count: { events: 3, venues: 0 },
+          landingPages: [],
+        },
       ]);
 
       const result = await service.getCities();
@@ -80,8 +115,22 @@ describe('CatalogService', () => {
     it('should sort cities by event count descending', async () => {
       mockPrisma.$queryRaw.mockResolvedValue([]);
       mockPrisma.city.findMany.mockResolvedValue([
-        { id: '1', name: 'Small', slug: 'small', _count: { events: 5, venues: 1 }, landingPages: [] },
-        { id: '2', name: 'Big', slug: 'big', _count: { events: 50, venues: 10 }, landingPages: [] },
+        {
+          id: '1',
+          name: 'Small',
+          slug: 'small',
+          description: 'Small city',
+          _count: { events: 5, venues: 1 },
+          landingPages: [],
+        },
+        {
+          id: '2',
+          name: 'Big',
+          slug: 'big',
+          description: 'Big city',
+          _count: { events: 50, venues: 10 },
+          landingPages: [],
+        },
       ]);
 
       const result = await service.getCities();
@@ -102,7 +151,14 @@ describe('CatalogService', () => {
           },
         ]);
       mockPrisma.city.findMany.mockResolvedValue([
-        { id: '1', name: 'Москва', slug: 'moscow', _count: { events: 50, venues: 10 }, landingPages: [] },
+        {
+          id: '1',
+          name: 'Москва',
+          slug: 'moscow',
+          description: 'Test city description',
+          _count: { events: 50, venues: 10 },
+          landingPages: [],
+        },
       ]);
 
       const result = await service.getCities();
@@ -117,7 +173,14 @@ describe('CatalogService', () => {
     it('should return null region for non-hub cities', async () => {
       mockPrisma.$queryRaw.mockResolvedValue([]);
       mockPrisma.city.findMany.mockResolvedValue([
-        { id: '99', name: 'Казань', slug: 'kazan', _count: { events: 20, venues: 3 }, landingPages: [] },
+        {
+          id: '99',
+          name: 'Казань',
+          slug: 'kazan',
+          description: 'Test city description',
+          _count: { events: 20, venues: 3 },
+          landingPages: [],
+        },
       ]);
 
       const result = await service.getCities();

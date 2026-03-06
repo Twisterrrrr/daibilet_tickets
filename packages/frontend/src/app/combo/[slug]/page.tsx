@@ -1,6 +1,7 @@
 import { formatPrice } from '@daibilet/shared';
 import { Calendar, CheckCircle, ChevronRight, Clock, MapPin, Star } from 'lucide-react';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -194,9 +195,11 @@ export default async function ComboDetailPage({ params }: Props) {
                       {slot.event && (
                         <div className="flex gap-3 flex-1 min-w-0">
                           {slot.event.imageUrl && (
-                            <img
+                            <Image
                               src={slot.event.imageUrl}
                               alt={slot.event.title}
+                              width={64}
+                              height={64}
                               className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                             />
                           )}

@@ -499,12 +499,12 @@ Article
 
 ### Зависимости
 
-- [x] PaymentIntent layer (stub) — готов
+- [x] PaymentIntent layer (STUB + YooKassa API v3) — готов
 - [x] State Machine (CheckoutSession/OrderRequest/PaymentIntent) — готов
 - [x] offersSnapshot immutable — готов
-- [ ] YooKassa SDK подключение
-- [ ] Sandbox-тесты
-- [ ] Webhook верификация (IP whitelist + HMAC)
+- [x] YooKassa API v3 подключение (через fetch, без SDK)
+- [ ] Sandbox-тесты (3 сценария: PLATFORM, EXTERNAL, mixed)
+- [x] Webhook верификация (IP whitelist + PaymentEventLog + WebhookIdempotency + очередь fulfillment)
 
 ### Преимущества Daibilet перед Афишей (killer features)
 

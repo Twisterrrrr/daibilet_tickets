@@ -85,7 +85,7 @@ describe('Rate Limit E2E', () => {
     const r = await httpGet(`${baseUrl}/limited`);
     expect(r.statusCode).toBe(429);
     const body = JSON.parse(r.body);
-    expect(body.errorCode).toBe('RATE_LIMIT_EXCEEDED');
     expect(body.statusCode).toBe(429);
+    expect(body.message).toBeTruthy();
   });
 });

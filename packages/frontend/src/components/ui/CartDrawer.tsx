@@ -2,6 +2,7 @@
 
 import { formatPrice } from '@daibilet/shared';
 import { ArrowRight, Minus, Plus, ShoppingCart, Trash2, X } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { type CartItem, useCart } from '@/lib/cart';
@@ -107,7 +108,13 @@ function CartItemCard({
     <div className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3">
       {/* Image */}
       {item.imageUrl ? (
-        <img src={item.imageUrl} alt="" className="h-16 w-16 rounded-lg object-cover flex-shrink-0" />
+        <Image
+          src={item.imageUrl}
+          alt={item.eventTitle || ''}
+          width={64}
+          height={64}
+          className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
+        />
       ) : (
         <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-100 flex-shrink-0">
           <span className="text-2xl opacity-40">🎫</span>

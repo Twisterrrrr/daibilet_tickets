@@ -15,6 +15,7 @@ import {
   Search,
   XCircle,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -320,13 +321,15 @@ export function OrdersTrackClient() {
                       <div key={item.id}>
                         <div className="p-4 flex items-center gap-4">
                           {/* Image */}
-                          {item.event?.imageUrl ? (
-                            <img
-                              src={item.event.imageUrl}
-                              alt={item.event.title}
-                              className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
-                            />
-                          ) : (
+                            {item.event?.imageUrl ? (
+                              <Image
+                                src={item.event.imageUrl}
+                                alt={item.event.title}
+                                width={56}
+                                height={56}
+                                className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+                              />
+                            ) : (
                             <div className="w-14 h-14 bg-slate-100 rounded-lg flex-shrink-0 flex items-center justify-center">
                               <CalendarCheck className="h-6 w-6 text-slate-400" />
                             </div>

@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
 
 import { shortenAddressToStreet } from '@/lib/address';
 
@@ -233,8 +234,14 @@ export function BuyModal({
         {/* Header */}
         <div className="relative flex-shrink-0">
           {eventImage && (
-            <div className="h-32 overflow-hidden sm:h-40">
-              <img src={eventImage} alt={eventTitle} className="h-full w-full object-cover" />
+            <div className="relative h-32 overflow-hidden sm:h-40">
+              <Image
+                src={eventImage}
+                alt={eventTitle}
+                fill
+                className="h-full w-full object-cover"
+                sizes="(min-width: 640px) 640px, 100vw"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
             </div>
           )}

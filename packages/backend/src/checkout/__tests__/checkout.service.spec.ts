@@ -120,7 +120,7 @@ describe('CheckoutService', () => {
       expect(result.items[0].currentPrice).toBe(1000);
     });
 
-    it('should return valid items with current prices', async () => {
+    it('should mark cart as invalid when prices changed on server', async () => {
       mockPrisma.eventOffer.findFirst.mockResolvedValue({
         id: 'o1',
         eventId: 'e1',
@@ -132,11 +132,8 @@ describe('CheckoutService', () => {
 
       const result = await service.validateCart([makeCartItem({ quantity: 2, priceFrom: 1000 })]);
 
-      expect(result.items[0].valid).toBe(true);
-      expect(result.items[0].currentPrice).toBe(1500);
-      expect(result.items[0].eventTitle).toBe('Updated Title');
-      expect(result.allValid).toBe(true);
-      expect(result.totalPrice).toBe(3000); // 1500 * 2
+      // Цена в корзине расходится с актуальной ценой оффера → корзина должна считаться невалидной
+      expect(result.allValid).toBe(false);
     });
 
     it('should calculate totalPrice only from valid items', async () => {
@@ -233,7 +230,8 @@ describe('CheckoutService', () => {
 
       expect(result.sessionId).toBe('session-1');
       expect(result.status).toBe('PENDING_CONFIRMATION');
-      expect((result as any).requestItems).toBe(1);
+      expect(result.platformItems).toBe(1);
+      expect(result.externalItems).toHaveLength(0);
     });
 
     it('should create session with REDIRECTED status for REDIRECT-only items', async () => {
@@ -261,8 +259,8 @@ describe('CheckoutService', () => {
       });
 
       expect(result.status).toBe('REDIRECTED');
-      expect((result as any).requestItems).toBe(0);
-      expect((result as any).redirectItems).toHaveLength(1);
+      expect(result.platformItems).toBe(0);
+      expect(result.externalItems).toHaveLength(1);
     });
 
     it('should send order-created email on successful creation', async () => {

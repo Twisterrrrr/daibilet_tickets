@@ -33,6 +33,7 @@ import { WidgetsModule } from './widgets/widgets.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
 import { VenueModule } from './venue/venue.module';
+import { PreviewModule } from './preview/preview.module';
 import { VoucherModule } from './voucher/voucher.module';
 
 @Module({
@@ -86,6 +87,7 @@ import { VoucherModule } from './voucher/voucher.module';
     SupportModule,
     UserModule,
     SeoModule,
+    PreviewModule,
   ],
   providers: [
     // Глобальный rate limiter (30 req/min по умолчанию, per-route через @Throttle)

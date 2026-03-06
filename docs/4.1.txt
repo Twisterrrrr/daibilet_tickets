@@ -1,0 +1,298 @@
+# PR4.1 — Live SEO Page Probe
+
+Контекст:
+
+В PR4+ уже есть SEO аудит на основе данных базы (title, description, slug, image, sessions).
+
+Теперь нужно добавить проверку **реально сгенерированной страницы**.
+
+Это выявляет проблемы:
+
+- неправильный <title>
+- отсутствующий canonical
+- robots=noindex
+- отсутствующий JSON-LD
+- отсутствующий og:image
+- SSR ошибки
+
+Важно:
+НЕ делать тяжёлый crawler.
+
+Мы проверяем только **текущую страницу события** через HTTP fetch.
+
+---
+
+# Backend
+
+Создать сервис:
+
+SeoPageProbeService
+
+Файл:
+
+src/admin/seo/seo-page-probe.service.ts
+
+---
+
+# Endpoint
+
+GET /admin/seo-audit/events/:id/page
+
+Response:
+
+{
+  url: string,
+  status: number,
+  checks: [
+    {
+      code: string,
+      severity: 'ERROR' | 'WARN' | 'INFO',
+      message: string
+    }
+  ],
+  meta: {
+    title: string | null,
+    description: string | null,
+    canonical: string | null,
+    robots: string | null,
+    ogImage: string | null
+  }
+}
+
+---
+
+# Алгоритм
+
+1) Получить slug события из БД
+
+2) Собрать URL:
+
+BASE_URL + /events/{slug}
+
+BASE_URL берётся из config:
+
+SEO_AUDIT_BASE_URL
+
+пример:
+
+https://daibilet.com
+
+---
+
+# Fetch
+
+Использовать fetch с:
+
+timeout 5s
+
+headers:
+
+User-Agent: "DaibiletSEOAuditBot/1.0"
+
+redirect: follow
+
+---
+
+# Если fetch ошибка
+
+issue:
+
+PAGE_UNREACHABLE
+
+severity ERROR
+
+---
+
+# Если status >= 500
+
+issue:
+
+PAGE_SERVER_ERROR
+
+severity ERROR
+
+---
+
+# Парсинг HTML
+
+Без зависимостей.
+
+Использовать простые regex.
+
+Извлечь:
+
+<title>
+
+<meta name="description">
+
+<link rel="canonical">
+
+<meta name="robots">
+
+<meta property="og:image">
+
+<script type="application/ld+json">
+
+---
+
+# SEO проверки
+
+## TITLE
+
+если отсутствует:
+
+TITLE_MISSING (ERROR)
+
+если длина < 25
+
+TITLE_TOO_SHORT (WARN)
+
+если > 70
+
+TITLE_TOO_LONG (WARN)
+
+---
+
+## DESCRIPTION
+
+если отсутствует
+
+DESCRIPTION_MISSING (ERROR)
+
+если < 90
+
+DESCRIPTION_TOO_SHORT (WARN)
+
+если > 160
+
+DESCRIPTION_TOO_LONG (WARN)
+
+---
+
+## CANONICAL
+
+если отсутствует
+
+CANONICAL_MISSING (ERROR)
+
+если canonical != текущий URL
+
+CANONICAL_MISMATCH (WARN)
+
+---
+
+## ROBOTS
+
+если содержит noindex
+
+PAGE_NOINDEX (ERROR)
+
+---
+
+## OG IMAGE
+
+если отсутствует
+
+OG_IMAGE_MISSING (WARN)
+
+если не https
+
+OG_IMAGE_NOT_HTTPS (WARN)
+
+---
+
+## STRUCTURED DATA
+
+если JSON-LD отсутствует
+
+STRUCTURED_DATA_MISSING (WARN)
+
+если присутствует
+
+INFO STRUCTURED_DATA_PRESENT
+
+---
+
+# Additional checks
+
+## Multiple H1
+
+regex check <h1>
+
+если >1
+
+MULTIPLE_H1 (WARN)
+
+---
+
+## HTML size
+
+если < 5kb
+
+PAGE_TOO_SMALL (INFO)
+
+---
+
+# Frontend admin
+
+В SeoAuditPage добавить кнопку:
+
+"Проверить страницу"
+
+Для каждой строки.
+
+---
+
+# UI
+
+Открывается Drawer / Modal.
+
+Показывает:
+
+URL
+
+HTTP status
+
+таблица проверок:
+
+Severity | Issue | Message
+
+---
+
+# Colors
+
+ERROR → red
+
+WARN → yellow
+
+INFO → gray
+
+---
+
+# Extra
+
+Кнопка:
+
+"Открыть страницу"
+
+target=_blank
+
+---
+
+# Acceptance
+
+1) открыть SEO audit
+
+2) нажать "Проверить страницу"
+
+3) backend fetch HTML
+
+4) UI показывает проверки
+
+5) ошибки понятные
+
+---
+
+# Commit
+
+PR4.1: feat(admin-seo): live page SEO probe for events

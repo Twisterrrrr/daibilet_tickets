@@ -52,8 +52,13 @@ export class EventOverrideService {
    * Применить overrides к массиву событий.
    * Возвращает события с мёрженными данными, фильтрует isHidden.
    */
-  async applyOverrides<T extends Record<string, unknown> & { id: string }>(events: T[]): Promise<T[]> {
+  async applyOverrides<T extends Record<string, unknown> & { id: string }>(
+    events: T[],
+    options?: { preview?: boolean },
+  ): Promise<T[]> {
     if (events.length === 0) return events;
+
+    const preview = options?.preview ?? false;
 
     const eventIds = events.map((e) => e.id);
     const overrides = await this.prisma.eventOverride.findMany({
@@ -75,10 +80,10 @@ export class EventOverrideService {
             })
           | undefined;
         if (!override) return event;
-        if ((override as { isHidden?: boolean }).isHidden) return null;
+        if (!preview && (override as { isHidden?: boolean }).isHidden) return null;
         // Очередь постредакции: не показывать, пока редактор не выставил PUBLISHED
         const status = override.editorStatus;
-        if (status !== undefined && status !== 'PUBLISHED') return null;
+        if (!preview && status !== undefined && status !== 'PUBLISHED') return null;
         const ev = event as Record<string, unknown>;
 
         let subcategories: unknown[] = ev.subcategories as unknown[];

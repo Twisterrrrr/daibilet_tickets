@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { MultiEventListItemDto } from '@/lib/api.types';
 import { formatPrice } from '@daibilet/shared';
 
@@ -22,10 +23,12 @@ export function MultiEventCard({ item, className = '' }: MultiEventCardProps) {
     >
       {item.coverUrl ? (
         <div className="relative aspect-[4/3] overflow-hidden bg-slate-200">
-          <img
+          <Image
             src={item.coverUrl}
             alt={item.title}
+            fill
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            sizes="(min-width: 1024px) 25vw, 50vw"
           />
         </div>
       ) : null}

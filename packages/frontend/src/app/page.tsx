@@ -2,6 +2,7 @@ import type { CityListItem, EventListItem } from '@daibilet/shared';
 import { CATEGORY_LABELS, cityToPrepositional, EventCategory } from '@daibilet/shared';
 import type { TagWithCount } from '@/lib/api.types';
 import { ArrowRight, Headphones, Landmark, MapPin, Star, Ticket, TrendingUp, X } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { EventCard } from '@/components/ui/EventCard';
@@ -502,11 +503,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   const cardImage = imageConfig?.card ?? city.heroImage;
                   if (!cardImage) return null;
                   return (
-                  <img
-                    src={cardImage}
-                    alt={city.name}
-                    className="absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105"
-                  />
+                    <Image
+                      src={cardImage}
+                      alt={city.name}
+                      fill
+                      className="absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105"
+                      sizes="(min-width: 1024px) 25vw, 50vw"
+                    />
                   );
                 })()}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />

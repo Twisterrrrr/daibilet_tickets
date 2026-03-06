@@ -10,6 +10,7 @@ import { ReviewService } from '../catalog/review.service';
 import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
 import { TagAssignmentService } from '../scheduler/tag-assignment.service';
 import { SupportModule } from '../support/support.module';
+import { PreviewModule } from '../preview/preview.module';
 
 import { AdminArticlesController } from './admin-articles.controller';
 import { AdminAuditController } from './admin-audit.controller';
@@ -36,6 +37,7 @@ import { AdminWidgetsController } from './admin-widgets.controller';
 import { AdminUploadController } from './admin-upload.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
 import { AdminSeoAuditController } from './admin-seo-audit.controller';
+import { AdminPreviewsController } from './admin-previews.controller';
 import { AuditService } from './audit.service';
 import { EventOverrideService } from './event-override.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
@@ -49,6 +51,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     CheckoutModule,
     CatalogModule,
     VoucherModule,
+    PreviewModule,
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_SYNC },
@@ -81,6 +84,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminCacheController,
     AdminUploadController,
     AdminSeoAuditController,
+    AdminPreviewsController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowRight, Landmark, MapPin } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 interface CityCardRegion {
@@ -57,7 +58,7 @@ export function CityCard({
       return;
     }
     let cancelled = false;
-    const img = new Image();
+    const img = new window.Image();
     img.onload = () => {
       if (!cancelled) setHasImage(true);
     };
@@ -74,11 +75,13 @@ export function CityCard({
     <div className="flex flex-col">
       <Link href={`/cities/${slug}`} className={`card group relative overflow-hidden ${large ? 'h-64' : 'h-48'}`}>
         <div className="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-900" />
-        {hasImage && (
-          <img
-            src={heroImage || ''}
+        {hasImage && heroImage && (
+          <Image
+            src={heroImage}
             alt={name}
+            fill
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            sizes="(min-width: 1024px) 25vw, 50vw"
           />
         )}
 

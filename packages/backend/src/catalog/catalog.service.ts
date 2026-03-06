@@ -1222,14 +1222,25 @@ export class CatalogService {
   }
 
   async getEventBySlug(slug: string, nocache = false) {
-    if (nocache) return this.fetchEventBySlug(slug);
+    if (nocache) return this.fetchEvent({ slug }, { preview: false });
     const cacheKey = cacheKeys.events.detail(slug);
-    return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_DETAIL, () => this.fetchEventBySlug(slug));
+    return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_DETAIL, () => this.fetchEvent({ slug }, { preview: false }));
   }
 
-  private async fetchEventBySlug(slug: string) {
+  /**
+   * Публичное представление события по ID для preview (может быть неактивным / неопубликованным).
+   */
+  async getEventByIdForPreview(id: string) {
+    return this.fetchEvent({ id }, { preview: true });
+  }
+
+  private async fetchEvent(
+    whereUnique: { slug: string } | { id: string },
+    options: { preview: boolean },
+  ) {
+    const { preview } = options;
     const event = await this.prisma.event.findFirst({
-      where: { slug, isDeleted: false },
+      where: { ...whereUnique, isDeleted: false },
       include: {
         city: true,
         venue: { select: { id: true, slug: true, title: true, shortTitle: true, venueType: true } },
@@ -1253,17 +1264,29 @@ export class CatalogService {
       },
     });
 
-    if (!event) throw new NotFoundException(`Событие "${slug}" не найдено`);
+    if (!event) {
+      const key = 'slug' in whereUnique ? whereUnique.slug : whereUnique.id;
+      throw new NotFoundException(`Событие "${key}" не найдено`);
+    }
 
-    // Применяем override (мерж title, description, templateData и т.д., фильтр isHidden)
-    const [overridden] = await this.overrideService.applyOverrides([event]);
-    if (!overridden) throw new NotFoundException(`Событие "${slug}" не найдено`);
+    // Применяем override (мерж title, description, templateData и т.д., фильтр isHidden/UNPUBLISHED только вне preview)
+    const [overridden] = await this.overrideService.applyOverrides([event], { preview });
+    if (!overridden) {
+      const key = 'slug' in whereUnique ? whereUnique.slug : whereUnique.id;
+      throw new NotFoundException(`Событие "${key}" не найдено`);
+    }
 
     // SCHEDULED без активных слотов — показываем страницу (с пустыми сеансами), не 404.
     // В каталоге такие события не выводятся; но по прямой ссылке — даём контекст («нет сеансов на данный момент»).
-    // OPEN_DATE с истёкшей endDate — не показывать
-    if (overridden.dateMode === 'OPEN_DATE' && overridden.endDate && new Date(overridden.endDate) < new Date()) {
-      throw new NotFoundException(`Событие "${slug}" не найдено`);
+    // OPEN_DATE с истёкшей endDate — не показывать на публичной странице, но разрешать в preview
+    if (
+      !preview &&
+      overridden.dateMode === 'OPEN_DATE' &&
+      overridden.endDate &&
+      new Date(overridden.endDate) < new Date()
+    ) {
+      const key = 'slug' in whereUnique ? whereUnique.slug : whereUnique.id;
+      throw new NotFoundException(`Событие "${key}" не найдено`);
     }
 
     // Primary offer для удобства фронтенда

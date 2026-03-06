@@ -334,6 +334,33 @@ export function VenueEditPage() {
         </div>
         <div className="flex gap-2">
           {!isNew && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={saving}
+              onClick={async () => {
+                if (!id) return;
+                if (Object.keys(form).length > 0 && !saving) {
+                  const proceed = window.confirm(
+                    'Предпросмотр показывает последнюю сохранённую версию площадки. Продолжить?',
+                  );
+                  if (!proceed) return;
+                }
+                try {
+                  const res = await adminApi.post<{ previewUrl: string }>(`/admin/previews/venues/${id}`);
+                  if (res.previewUrl) {
+                    window.open(res.previewUrl, '_blank', 'noopener,noreferrer');
+                  }
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : 'Не удалось открыть предпросмотр');
+                }
+              }}
+              title="Открыть предпросмотр площадки"
+            >
+              Предпросмотр
+            </Button>
+          )}
+          {!isNew && (
             <Button variant="destructive" size="sm" onClick={handleDelete}>
               <Trash2 className="h-4 w-4 mr-1" />
               Удалить

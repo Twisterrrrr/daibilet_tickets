@@ -2,6 +2,7 @@
 
 import { formatPrice } from '@daibilet/shared';
 import { AlertCircle, ArrowLeft, CheckCircle, CreditCard, Loader2, User, XCircle } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -251,9 +252,11 @@ export function CheckoutPackageClient({ packageId }: Props) {
               {data.items.map((item) => (
                 <li key={item.id} className="flex gap-4 p-4">
                   {item.event.imageUrl ? (
-                    <img
+                    <Image
                       src={item.event.imageUrl}
-                      alt=""
+                      alt={item.event.title}
+                      width={64}
+                      height={64}
                       className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
                     />
                   ) : (

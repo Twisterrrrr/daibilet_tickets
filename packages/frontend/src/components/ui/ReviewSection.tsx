@@ -2,6 +2,7 @@
 
 import { AlertCircle, Camera, CheckCircle, ChevronDown, ExternalLink, Send, Star, ThumbsUp, X } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 
 import { api } from '@/lib/api';
 
@@ -169,7 +170,14 @@ function PhotoGallery({ photos }: { photos: ReviewPhoto[] }) {
             onClick={() => setSelected(p.url)}
             className="flex-shrink-0 overflow-hidden rounded-lg border border-slate-100 hover:border-primary-300 transition"
           >
-            <img src={p.thumbUrl} alt="Фото отзыва" className="h-20 w-20 object-cover" loading="lazy" />
+            <Image
+              src={p.thumbUrl}
+              alt="Фото отзыва"
+              width={80}
+              height={80}
+              className="h-20 w-20 object-cover"
+              loading="lazy"
+            />
           </button>
         ))}
       </div>
@@ -186,9 +194,11 @@ function PhotoGallery({ photos }: { photos: ReviewPhoto[] }) {
           >
             <X className="h-6 w-6" />
           </button>
-          <img
+          <Image
             src={selected}
             alt="Фото отзыва"
+            width={1600}
+            height={900}
             className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
             onClick={(e) => e.stopPropagation()}
           />
@@ -495,7 +505,7 @@ function ReviewForm({
         <div className="flex flex-wrap gap-2">
           {previews.map((src, i) => (
             <div key={i} className="relative h-20 w-20 overflow-hidden rounded-lg border border-slate-200">
-              <img src={src} alt="" className="h-full w-full object-cover" />
+              <Image src={src} alt="" width={80} height={80} className="h-full w-full object-cover" />
               <button
                 type="button"
                 onClick={() => removePhoto(i)}

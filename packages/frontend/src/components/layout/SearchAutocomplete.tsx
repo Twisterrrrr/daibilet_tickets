@@ -5,6 +5,7 @@ import { formatPrice } from '@daibilet/shared';
 import { ArrowRight, Loader2, MapPin, Search, Ticket, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 
 import { api } from '@/lib/api';
 
@@ -182,9 +183,11 @@ export function SearchAutocomplete({ city }: SearchAutocompleteProps) {
                         className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-slate-50"
                       >
                         {event.imageUrl ? (
-                          <img
+                          <Image
                             src={event.imageUrl}
-                            alt=""
+                            alt={event.title}
+                            width={40}
+                            height={40}
                             className="h-10 w-10 rounded-lg object-cover flex-shrink-0"
                           />
                         ) : (

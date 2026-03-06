@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import type { MultiEventDetailDto } from '@/lib/api.types';
 import { formatPrice } from '@daibilet/shared';
 
@@ -27,8 +28,14 @@ export function MultiEventPageClient({ detail }: MultiEventPageClientProps) {
           )}
         </div>
         {group.coverUrl && (
-          <div className="mt-6 aspect-video overflow-hidden rounded-xl bg-slate-200">
-            <img src={group.coverUrl} alt={group.title} className="h-full w-full object-cover" />
+          <div className="mt-6 relative aspect-video overflow-hidden rounded-xl bg-slate-200">
+            <Image
+              src={group.coverUrl}
+              alt={group.title}
+              fill
+              className="h-full w-full object-cover"
+              sizes="(min-width: 768px) 768px, 100vw"
+            />
           </div>
         )}
       </div>
