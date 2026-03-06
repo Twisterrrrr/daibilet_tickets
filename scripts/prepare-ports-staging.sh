@@ -4,6 +4,16 @@
 
 set -euo pipefail
 
+cd /opt/daibilet 2>/dev/null || true
+
+echo "==> Кто занимает 80/443?"
+ss -tlnp 2>/dev/null | grep -E ':80 |:443 ' || echo "  (ничего)"
+
+echo "==> Останавливаем staging nginx (Docker)..."
+docker compose -f deploy/staging/docker-compose.yml -p daibilet-staging stop nginx 2>/dev/null || true
+docker stop daibilet-staging-nginx 2>/dev/null || true
+sleep 2
+
 echo "==> Останавливаем системный nginx/apache..."
 systemctl stop nginx 2>/dev/null || true
 systemctl stop apache2 2>/dev/null || true
