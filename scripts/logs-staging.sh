@@ -5,5 +5,5 @@ PROJECT_DIR="/opt/daibilet"
 
 cd "${PROJECT_DIR}"
 
-docker compose -f deploy/staging/docker-compose.yml -p daibilet-staging logs -f
+docker compose -f deploy/staging/docker-compose.yml --env-file .env -p daibilet-staging logs -f
 
