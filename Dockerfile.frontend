@@ -43,6 +43,9 @@ COPY packages/frontend/ ./packages/frontend/
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Собираем shared (frontend зависит от него)
+RUN pnpm --filter @daibilet/shared build
+
 # Собираем Next.js (standalone output)
 RUN pnpm --filter @daibilet/frontend build
 
