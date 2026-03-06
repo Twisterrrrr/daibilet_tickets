@@ -45,11 +45,11 @@ echo "==> [5/7] Создание каталогов certbot..."
 mkdir -p deploy/nginx/certbot/{www,conf}
 
 echo "==> [6/7] Сборка и запуск Docker..."
-docker compose -f deploy/staging/docker-compose.yml -p daibilet-staging up -d --build
+docker compose -f deploy/staging/docker-compose.yml --env-file .env -p daibilet-staging up -d --build
 
 echo "==> [7/7] Миграции Prisma..."
 sleep 15
-docker compose -f deploy/staging/docker-compose.yml -p daibilet-staging exec -T backend npx prisma migrate deploy || true
+docker compose -f deploy/staging/docker-compose.yml --env-file .env -p daibilet-staging exec -T backend npx prisma migrate deploy || true
 
 echo ""
 echo "============================================"
