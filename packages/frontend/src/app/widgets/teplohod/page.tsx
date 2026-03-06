@@ -1,4 +1,4 @@
-import TeplohodWidgetClient from './TeplohodWidgetClient';
+import TeplohodWidgetClient, { type WidgetData } from './TeplohodWidgetClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +37,7 @@ async function fetchEventData<T = unknown>(searchParams: SearchParams): Promise<
 }
 
 export default async function TeplohodPage({ searchParams }: { searchParams: SearchParams }) {
-  const { error, data } = await fetchEventData(searchParams);
+  const { error, data } = await fetchEventData<WidgetData>(searchParams);
 
   return (
     <TeplohodWidgetClient

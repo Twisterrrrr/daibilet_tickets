@@ -23,7 +23,7 @@ type EventInfo = {
   currency?: 'RUB';
 };
 
-type WidgetData = {
+export type WidgetData = {
   provider: 'TEPLOHOD';
   event: EventInfo;
   sessions: Session[];

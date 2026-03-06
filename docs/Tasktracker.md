@@ -164,6 +164,7 @@
 ### Gate 2.5 — админка событий (готовность, расписание, поставщики)
 
 > Спецификация: `docs/AdminScheduleSpec.md`, pipeline: `docs/AdminSchedulePipeline.md`. Поставщики: см. раздел ниже.
+> **Статус:** Gate 2.5 завершён; админка событий, расписания и поставщиков готова к ежедневной работе.
 
 - [x] **Высокий**: PR1 — GET /admin/events/:id/quality (on-demand), UI «Причины неактивности» + подсветка вкладок, field→tabKey (**v1 реализован**: endpoint + `EventQualityService` + `QualityBanner`)
 - [x] **Высокий**: PR1 — Статус: isHidden ≠ активность, одна строка «В каталоге / Скрыто вручную / Причины» (без forceActive на MVP) (**v1 реализован**: `EventStatusLine` с inCatalog/isHidden/quality)
@@ -171,11 +172,11 @@
 - [x] **Высокий**: PR2 — Вкладка «Расписание» — v1: список сеансов + create/edit/cancel/delete, Model A-блокировки; Teplohod-style grid/brush/ластик → отдельный PR v2
 - [x] **Высокий**: PR2 — Контекстное меню слота, Модель A при sold>0, PATCH capacity/delete/cancel (**реализовано**: диалоги Edit/Delete/Cancel + `SessionLockedException`)
 - [x] **Высокий**: PR2 checklist перед merge: индексы package_items(sessionId[,status]) в БД; tcSessionId не пустой; нет дублей (eventId,startsAt) (**выполнено** в pre-unique-safety миграции)
-- [~] **Высокий**: PR3 — Events — колонка groupingKey + фильтр; раздел «Группы событий» (**backend grouping API готов**, UI/раздел «Группы событий» — TODO)
-- [ ] **Высокий**: PR4 — /admin/seo-audit, GET /admin/seo/audit, seo_issues
-- [ ] **Высокий**: PR‑S1 — Admin SuppliersList v1 (реестр поставщиков: имя, тип, статус, события, площадки, комиссия, последняя активность; фильтры; быстрые действия)
+- [x] **Высокий**: PR3 — Events — колонка groupingKey + фильтр; раздел «Группы событий» (**backend grouping API готов**, глобальный раздел «Группы событий» и вкладка в EventEdit реализованы)
+- [x] **Высокий**: PR4 — /admin/seo-audit, GET /admin/seo-audit/events, on-the-fly seo_issues + UI фильтров и бейджей
+- [x] **Высокий**: PR‑S1 — Admin SuppliersList v1 (реестр поставщиков: имя, тип, статус, события, площадки, комиссия, последняя активность; фильтры; быстрые действия)
 - [x] **Высокий**: PR‑S2 — Admin SupplierDetail v1 (Профиль/События/Площадки/Финансы/Доступ; смена статуса ACTIVE/FROZEN; изменение комиссии) — **S1.1–S1.2**: вкладки Профиль/События/API, список событий поставщика `/admin/suppliers/:id/events` с пагинацией и учётом `supplierIsActive` в статусе «В каталоге»
-- [ ] **Средний**: PR‑S3 — Supplier EventsList/EventEdit v1.5 (упрощённый UX: базовые поля, подсказки качества, без перегруза override/SEO)
+- [x] **Средний**: PR‑S3 — Supplier EventsList/EventEdit v1.5 (упрощённый UX: базовые поля, подсказки качества, без перегруза override/SEO; переключатель активности, счётчик сеансов)
 
 ### Gate 3 — контент/SEO минимум для индексации (3+ мес)
 
