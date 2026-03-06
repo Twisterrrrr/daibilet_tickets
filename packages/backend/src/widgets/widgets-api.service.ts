@@ -124,7 +124,7 @@ export class WidgetsApiService {
     const raw = (email ?? '').trim().toLowerCase();
     if (!raw) return null;
     if (!('lastCustomerSnapshot' in this.prisma)) return null;
-    const row = await (this.prisma as { lastCustomerSnapshot: { findUnique: (args: { where: { email: string }; select: { name: true; email: true; phone: true } }) => Promise<{ name: string | null; email: string; phone: string | null } | null> } })
+    const row = await (this.prisma as unknown as { lastCustomerSnapshot: { findUnique: (args: { where: { email: string }; select: { name: true; email: true; phone: true } }) => Promise<{ name: string | null; email: string; phone: string | null } | null> } })
       .lastCustomerSnapshot.findUnique({
         where: { email: raw },
         select: { name: true, email: true, phone: true },
