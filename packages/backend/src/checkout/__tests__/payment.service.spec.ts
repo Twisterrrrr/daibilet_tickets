@@ -594,6 +594,39 @@ describe('PaymentService', () => {
 
       expect(mockPrisma.operator.update).not.toHaveBeenCalled();
     });
+
+    it('should set intent to PAID but not update session when session is EXPIRED (late payment after expiry)', async () => {
+      const intent = {
+        id: intentId,
+        status: 'PENDING',
+        checkoutSessionId: 'session-1',
+        checkoutSession: {
+          id: 'session-1',
+          status: 'EXPIRED',
+        },
+        supplierId: null,
+        provider: 'STUB',
+      };
+
+      mockPrisma.paymentIntent.findUnique.mockResolvedValue(intent);
+      mockPrisma.paymentIntent.update.mockResolvedValue({
+        ...intent,
+        status: 'PAID',
+        paidAt: new Date(),
+      });
+
+      await service.markPaid(intentId);
+
+      expect(mockPrisma.paymentIntent.update).toHaveBeenCalledWith({
+        where: { id: intentId },
+        data: expect.objectContaining({
+          status: 'PAID',
+          paidAt: expect.any(Date),
+        }),
+      });
+      // Session stays EXPIRED (state machine: no transition from EXPIRED to COMPLETED)
+      expect(mockPrisma.checkoutSession.update).not.toHaveBeenCalled();
+    });
   });
 
   // =========================================

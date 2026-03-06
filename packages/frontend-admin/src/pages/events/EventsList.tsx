@@ -1,4 +1,4 @@
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { Eye, EyeOff, MoreHorizontal, Plus, RefreshCw, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -18,6 +18,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+
+import { EventQuickViewDrawer } from './EventQuickViewDrawer';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -55,92 +57,6 @@ const SOURCE_LABELS: Record<string, string> = {
   MANUAL: 'Ручной ввод',
 };
 
-// ─── Columns ─────────────────────────────────────────────────────────────────
-
-const columns: ColumnDef<EventItem>[] = [
-  {
-    accessorKey: 'title',
-    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
-    cell: ({ row }) => (
-      <div className="max-w-[300px]">
-        <p className="font-medium truncate">{row.original.title}</p>
-        <p className="text-xs text-muted-foreground">{row.original.city?.name ?? '—'}</p>
-      </div>
-    ),
-  },
-  {
-    accessorKey: 'category',
-    header: 'Категория',
-    cell: ({ row }) => (
-      <Badge variant="secondary">{CATEGORY_LABELS[row.original.category] || row.original.category}</Badge>
-    ),
-    filterFn: 'equals',
-  },
-  {
-    accessorKey: 'source',
-    header: 'Источник',
-    cell: ({ row }) => <Badge variant="outline">{SOURCE_LABELS[row.original.source] || row.original.source}</Badge>,
-  },
-  {
-    accessorKey: 'rating',
-    header: ({ column }) => <SortableHeader column={column}>Рейтинг</SortableHeader>,
-    cell: ({ row }) => {
-      const r = row.original.rating;
-      if (r != null && Number(r) > 0) {
-        return (
-          <div className="flex items-center gap-1">
-            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-            <span className="text-sm font-medium">{Number(r).toFixed(1)}</span>
-          </div>
-        );
-      }
-      return <span className="text-xs text-muted-foreground">—</span>;
-    },
-  },
-  {
-    id: 'status',
-    header: 'Статус',
-    cell: ({ row }) => {
-      const isHidden = row.original.override?.isHidden ?? false;
-      if (isHidden) {
-        return (
-          <Badge variant="destructive">
-            <EyeOff className="mr-1 h-3 w-3" />
-            Скрыт
-          </Badge>
-        );
-      }
-      return row.original.isActive ? (
-        <Badge variant="success">
-          <Eye className="mr-1 h-3 w-3" />
-          Активен
-        </Badge>
-      ) : (
-        <Badge variant="secondary">Неактивен</Badge>
-      );
-    },
-  },
-  {
-    id: 'sessions',
-    header: 'Сеансы',
-    cell: ({ row }) => <span className="text-sm tabular-nums">{row.original._count?.sessions ?? 0}</span>,
-  },
-  {
-    accessorKey: 'updatedAt',
-    header: ({ column }) => <SortableHeader column={column}>Обновлено</SortableHeader>,
-    cell: ({ row }) =>
-      row.original.updatedAt
-        ? (() => {
-            const d = new Date(row.original.updatedAt);
-            const dd = String(d.getDate()).padStart(2, '0');
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const yyyy = d.getFullYear();
-            return `${dd}/${mm}/${yyyy}`;
-          })()
-        : '—',
-  },
-];
-
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export function EventsListPage() {
@@ -149,6 +65,10 @@ export function EventsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [quickViewOpen, setQuickViewOpen] = useState(false);
+  const [quickViewEventId, setQuickViewEventId] = useState<string | null>(null);
   const [cities, setCities] = useState<Array<{ slug: string; name: string }>>([]);
   const [citiesLoaded, setCitiesLoaded] = useState(false);
 
@@ -181,6 +101,26 @@ export function EventsListPage() {
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
+  };
+
+  const handleDuplicate = async (eventId: string) => {
+    setDuplicatingId(eventId);
+    try {
+      const res = await adminApi.post<{ id: string; slug: string; title: string }>(
+        `/admin/events/${eventId}/duplicate`,
+      );
+      const newId = res.id;
+      if (newId) {
+        navigate(`/events/${newId}`);
+      } else {
+        fetchEvents();
+      }
+    } catch (e) {
+      console.error('Duplicate event failed:', e);
+      // оставляем пользователя на списке, данные не меняем
+    } finally {
+      setDuplicatingId(null);
+    }
   };
 
   useEffect(() => {
@@ -224,6 +164,190 @@ export function EventsListPage() {
       setSyncing(false);
     }
   };
+
+  const selectedItems: EventItem[] =
+    data?.items.filter((item) => {
+      return rowSelection[item.id];
+    }) ?? [];
+
+  const selectedIds = selectedItems.map((item) => item.id);
+
+  const hasSelection = selectedIds.length > 0;
+
+  const resetSelection = () => setRowSelection({});
+
+  const callBulkUpdate = async (payload: { ids: string[]; category?: string; isActive?: boolean; softDelete?: boolean }) => {
+    if (!payload.ids.length) return;
+    try {
+      await adminApi.patch('/admin/events/bulk-update', payload);
+      resetSelection();
+      fetchEvents();
+    } catch (e) {
+      console.error('Bulk update failed', e);
+    }
+  };
+
+  const columns: ColumnDef<EventItem>[] = [
+    {
+      id: 'select',
+      header: () => null,
+      cell: ({ row }) => {
+        const event = row.original;
+        const rowId = event.id;
+        const checked = !!rowSelection[rowId];
+        return (
+          <input
+            type="checkbox"
+            aria-label="Выбрать событие"
+            checked={checked}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) =>
+              setRowSelection((prev) => ({
+                ...prev,
+                [rowId]: e.target.checked,
+              }))
+            }
+          />
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'title',
+      header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
+      cell: ({ row }) => (
+        <div className="max-w-[300px]">
+          <p className="font-medium truncate">{row.original.title}</p>
+          <p className="text-xs text-muted-foreground">{row.original.city?.name ?? '—'}</p>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'category',
+      header: 'Категория',
+      cell: ({ row }) => (
+        <Badge variant="secondary">{CATEGORY_LABELS[row.original.category] || row.original.category}</Badge>
+      ),
+      filterFn: 'equals',
+    },
+    {
+      accessorKey: 'source',
+      header: 'Источник',
+      cell: ({ row }) => <Badge variant="outline">{SOURCE_LABELS[row.original.source] || row.original.source}</Badge>,
+    },
+    {
+      accessorKey: 'rating',
+      header: ({ column }) => <SortableHeader column={column}>Рейтинг</SortableHeader>,
+      cell: ({ row }) => {
+        const r = row.original.rating;
+        if (r != null && Number(r) > 0) {
+          return (
+            <div className="flex items-center gap-1">
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <span className="text-sm font-medium">{Number(r).toFixed(1)}</span>
+            </div>
+          );
+        }
+        return <span className="text-xs text-muted-foreground">—</span>;
+      },
+    },
+    {
+      id: 'status',
+      header: 'Статус',
+      cell: ({ row }) => {
+        const isHidden = row.original.override?.isHidden ?? false;
+        if (isHidden) {
+          return (
+            <Badge variant="destructive">
+              <EyeOff className="mr-1 h-3 w-3" />
+              Скрыт
+            </Badge>
+          );
+        }
+        return row.original.isActive ? (
+          <Badge variant="success">
+            <Eye className="mr-1 h-3 w-3" />
+            Активен
+          </Badge>
+        ) : (
+          <Badge variant="secondary">Неактивен</Badge>
+        );
+      },
+    },
+    {
+      id: 'sessions',
+      header: 'Сеансы',
+      cell: ({ row }) => <span className="text-sm tabular-nums">{row.original._count?.sessions ?? 0}</span>,
+    },
+    {
+      accessorKey: 'updatedAt',
+      header: ({ column }) => <SortableHeader column={column}>Обновлено</SortableHeader>,
+      cell: ({ row }) =>
+        row.original.updatedAt
+          ? (() => {
+              const d = new Date(row.original.updatedAt);
+              const dd = String(d.getDate()).padStart(2, '0');
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              const yyyy = d.getFullYear();
+              return `${dd}/${mm}/${yyyy}`;
+            })()
+          : '—',
+    },
+    {
+      id: 'actions',
+      header: '',
+      enableHiding: false,
+      cell: ({ row }) => {
+        const event = row.original;
+        const isDuplicating = duplicatingId === event.id;
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isDuplicating}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => navigate(`/events/${event.id}`)}>
+                Открыть
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setQuickViewEventId(event.id);
+                  setQuickViewOpen(true);
+                }}
+              >
+                Быстрый просмотр
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  const isHidden = !(event.override?.isHidden ?? false);
+                  try {
+                    await adminApi.patch(`/admin/events/${event.id}/hide`, { isHidden });
+                    fetchEvents();
+                  } catch (e) {
+                    console.error('Toggle hide failed', e);
+                  }
+                }}
+              >
+                {event.override?.isHidden ? 'Показать в каталоге' : 'Скрыть в каталоге'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleDuplicate(event.id)}
+                disabled={isDuplicating}
+                className="text-primary"
+              >
+                {isDuplicating ? 'Клонирование...' : 'Дублировать'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -344,6 +468,50 @@ export function EventsListPage() {
         loading={loading}
         emptyText="Нет событий, соответствующих фильтрам"
         onRowClick={(item) => navigate(`/events/${item.id}`)}
+        toolbar={
+          hasSelection && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => callBulkUpdate({ ids: selectedIds, isActive: true })}
+              >
+                Опубликовать
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => callBulkUpdate({ ids: selectedIds, isActive: false })}
+              >
+                Снять с публикации
+              </Button>
+              <Select
+                onValueChange={(value) => {
+                  if (value === '__none__') return;
+                  void callBulkUpdate({ ids: selectedIds, category: value });
+                }}
+              >
+                <SelectTrigger className="h-8 w-[180px]">
+                  <SelectValue placeholder="Сменить категорию" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Не изменять</SelectItem>
+                  <SelectItem value="EXCURSION">Экскурсии</SelectItem>
+                  <SelectItem value="MUSEUM">Музеи</SelectItem>
+                  <SelectItem value="EVENT">Мероприятия</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => callBulkUpdate({ ids: selectedIds, softDelete: true })}
+              >
+                Удалить (soft-delete)
+              </Button>
+            </div>
+          )
+        }
       />
 
       {/* Server pagination */}
@@ -375,6 +543,12 @@ export function EventsListPage() {
           </div>
         </div>
       )}
+
+      <EventQuickViewDrawer
+        eventId={quickViewEventId}
+        open={quickViewOpen}
+        onOpenChange={setQuickViewOpen}
+      />
     </div>
   );
 }

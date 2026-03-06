@@ -9,6 +9,8 @@ export type EventQualityIssue = {
   field?: string;
   severity: QualitySeverity;
   tabKey: QualityTabKey;
+  /** Источник поля: source = импорт, local = редакция (override). */
+  ownership?: 'source' | 'local';
 };
 
 export type EventQuality = {

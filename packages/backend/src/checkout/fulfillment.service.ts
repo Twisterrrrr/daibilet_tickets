@@ -108,9 +108,8 @@ export class FulfillmentService {
     });
 
     this.logger.log(
-      `[session=${checkoutSessionId}] Created ${items.length} fulfillment items for ${session.shortCode}: ` +
-        `${items.filter((i) => i.purchaseFlow === 'PLATFORM').length} PLATFORM, ` +
-        `${items.filter((i) => i.purchaseFlow === 'EXTERNAL').length} EXTERNAL`,
+      `fulfillment_started sessionId=${checkoutSessionId} shortCode=${session.shortCode} itemsCount=${items.length} ` +
+        `platform=${items.filter((i) => i.purchaseFlow === 'PLATFORM').length} external=${items.filter((i) => i.purchaseFlow === 'EXTERNAL').length}`,
     );
   }
 

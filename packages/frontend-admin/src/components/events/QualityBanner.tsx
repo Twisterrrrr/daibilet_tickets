@@ -92,6 +92,14 @@ export function QualityBanner({ quality, loading, error, isImported, onIssueClic
                   >
                     {issue.message}
                   </Button>
+                  {issue.ownership && (
+                    <span
+                      className="mt-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded border border-border bg-muted px-1 text-[9px] font-medium text-muted-foreground"
+                      title={issue.ownership === 'local' ? 'Редакция' : 'Источник'}
+                    >
+                      {issue.ownership === 'local' ? 'L' : 'S'}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

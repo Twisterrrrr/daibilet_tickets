@@ -15,6 +15,10 @@ export type WidgetSessionDto = {
   lockReason?: 'SOLD' | 'PAST' | 'IMPORTED' | 'STOPPED';
   scarcityLevel: WidgetSessionScarcity;
   tags: Array<'SOONEST' | 'BEST_PRICE' | 'POPULAR'>;
+  /** Precomputed: купили за последние 24ч (C6). */
+  soldLast24h?: number;
+  /** Рекомендуемый вариант (один на событие). */
+  bestOption?: boolean;
 };
 
 export type WidgetEventResponse = {
@@ -45,7 +49,7 @@ export class WidgetsApiService {
     const now = new Date();
     const sessions = await this.prisma.checkoutSession.findMany({
       where: {
-        status: { in: ['STARTED', 'VALIDATED', 'REDIRECTED'] },
+        status: { in: ['STARTED', 'VALIDATED', 'REDIRECTED', 'AWAITING_PAYMENT'] },
         expiresAt: { not: null, gt: now },
       },
       select: { cartSnapshot: true },
@@ -69,23 +73,68 @@ export class WidgetsApiService {
   }
 
   /**
-   * Paid count per sessionId (PackageItem where Package.status = PAID).
+   * Paid count per sessionId: PackageItem (Trip Planner) + FulfillmentItem CONFIRMED (widget checkout).
    */
   private async getPaidBySessionId(sessionIds: string[]): Promise<Map<string, number>> {
     if (sessionIds.length === 0) return new Map();
-    const items = await this.prisma.packageItem.findMany({
+    const sessionIdSet = new Set(sessionIds);
+    const map = new Map<string, number>();
+
+    // 1) PackageItem (Trip Planner)
+    const pkgItems = await this.prisma.packageItem.findMany({
       where: {
         sessionId: { in: sessionIds },
         package: { status: 'PAID' },
       },
       select: { sessionId: true, adultTickets: true, childTickets: true },
     });
-    const map = new Map<string, number>();
-    for (const item of items) {
+    for (const item of pkgItems) {
       const qty = (item.adultTickets ?? 0) + (item.childTickets ?? 0);
       map.set(item.sessionId, (map.get(item.sessionId) ?? 0) + qty);
     }
+
+    // 2) FulfillmentItem CONFIRMED (widget: CheckoutSession → PaymentIntent PAID → FulfillmentItem)
+    const fulfilled = await this.prisma.fulfillmentItem.findMany({
+      where: { status: 'CONFIRMED' },
+      select: { lineItemIndex: true, checkoutSessionId: true },
+    });
+    if (fulfilled.length > 0) {
+      const sessionIdsToLoad = [...new Set(fulfilled.map((f) => f.checkoutSessionId))];
+      const sessions = await this.prisma.checkoutSession.findMany({
+        where: { id: { in: sessionIdsToLoad } },
+        select: { id: true, offersSnapshot: true },
+      });
+      const snapshotBySession = new Map(sessions.map((s) => [s.id, s.offersSnapshot]));
+      for (const item of fulfilled) {
+        const snapshot = snapshotBySession.get(item.checkoutSessionId) as Array<{ sessionId?: string | null; quantity?: number }> | null;
+        if (!Array.isArray(snapshot)) continue;
+        const line = snapshot[item.lineItemIndex];
+        const sid = line?.sessionId ?? null;
+        const qty = Math.max(0, Math.floor(Number(line?.quantity ?? 0)));
+        if (sid && sessionIdSet.has(sid) && qty > 0) {
+          map.set(sid, (map.get(sid) ?? 0) + qty);
+        }
+      }
+    }
     return map;
+  }
+
+  /** C7: последние контакты по email для префолла формы (instant checkout). */
+  async getLastCustomerByEmail(email: string | null | undefined): Promise<{ name: string; email: string; phone: string } | null> {
+    const raw = (email ?? '').trim().toLowerCase();
+    if (!raw) return null;
+    if (!('lastCustomerSnapshot' in this.prisma)) return null;
+    const row = await (this.prisma as { lastCustomerSnapshot: { findUnique: (args: { where: { email: string }; select: { name: true; email: true; phone: true } }) => Promise<{ name: string | null; email: string; phone: string | null } | null> } })
+      .lastCustomerSnapshot.findUnique({
+        where: { email: raw },
+        select: { name: true, email: true, phone: true },
+      });
+    if (!row) return null;
+    return {
+      name: row.name ?? '',
+      email: row.email,
+      phone: row.phone ?? '',
+    };
   }
 
   async getEventWithSessions(eventId?: string | null): Promise<WidgetEventResponse> {
@@ -111,6 +160,7 @@ export class WidgetsApiService {
           },
           orderBy: { startsAt: 'asc' },
           take: 30,
+          include: { stats: true },
         },
       },
     });
@@ -148,6 +198,7 @@ export class WidgetsApiService {
         }
       }
       const finalPrice = price ?? event.priceFrom ?? null;
+      const soldLast24h = s.stats?.soldLast24h ?? undefined;
 
       return {
         id: s.id,
@@ -159,6 +210,7 @@ export class WidgetsApiService {
         isLocked: false,
         scarcityLevel,
         tags: [],
+        soldLast24h,
       };
     });
 
@@ -173,13 +225,13 @@ export class WidgetsApiService {
       return ap - bp;
     });
 
-    // C2: Tags — SOONEST (first by startsAt among available), BEST_PRICE (min price), POPULAR (available < capacity*0.3)
+    // C2: Tags + bestOption. Правило bestOption: ровно один сеанс на событие — ближайший по startsAt среди доступных (не sold out).
     const byStartsAt = [...sessions].sort((a, b) => {
       const aStart = event.sessions.find((x) => x.id === a.id)?.startsAt?.getTime() ?? 0;
       const bStart = event.sessions.find((x) => x.id === b.id)?.startsAt?.getTime() ?? 0;
       return aStart - bStart;
     });
-    const soonestId = byStartsAt.find((x) => !x.isSoldOut)?.id;
+    const soonestId = byStartsAt.find((x) => !x.isSoldOut)?.id ?? null;
     const minPrice = Math.min(
       ...sessions.filter((x) => !x.isSoldOut && x.price != null).map((x) => x.price as number),
       Infinity,
@@ -190,6 +242,7 @@ export class WidgetsApiService {
       const tags: Array<'SOONEST' | 'BEST_PRICE' | 'POPULAR'> = [];
       if (soonestId && s.id === soonestId) tags.push('SOONEST');
       if (hasMinPrice && s.price === minPrice && !s.isSoldOut) tags.push('BEST_PRICE');
+      const hasRealPopular = typeof s.soldLast24h === 'number' && s.soldLast24h > 0;
       const capacityForSession = (() => {
         const sess = event.sessions.find((x) => x.id === s.id);
         if (!sess) return 0;
@@ -199,10 +252,12 @@ export class WidgetsApiService {
             : Number(sess.capacityTotal ?? defaultCap);
         return Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
       })();
-      if (capacityForSession > 0 && s.available < capacityForSession * 0.3 && !s.isSoldOut) {
-        tags.push('POPULAR');
-      }
-      return { ...s, tags };
+      const heuristicPopular =
+        capacityForSession > 0 && s.available < capacityForSession * 0.3 && !s.isSoldOut;
+      if ((hasRealPopular || heuristicPopular) && !s.isSoldOut) tags.push('POPULAR');
+      // bestOption: один на событие — сеанс с минимальным startsAt среди доступных (тот же, что SOONEST).
+      const bestOption = Boolean(soonestId && s.id === soonestId && !s.isSoldOut);
+      return { ...s, tags, bestOption };
     });
 
     return {

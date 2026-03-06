@@ -9,6 +9,7 @@ import { OrderExpiryService } from './order-expiry.service';
 import { RetentionService } from './retention.service';
 import { ReviewSchedulerService } from './review-scheduler.service';
 import { SchedulerService } from './scheduler.service';
+import { SessionStatsService } from './session-stats.service';
 import { TagAssignmentService } from './tag-assignment.service';
 
 @Module({
@@ -29,6 +30,7 @@ import { TagAssignmentService } from './tag-assignment.service';
     OrderExpiryService,
     TagAssignmentService,
     FulfillmentSchedulerService,
+    SessionStatsService,
   ],
   exports: [TagAssignmentService],
 })

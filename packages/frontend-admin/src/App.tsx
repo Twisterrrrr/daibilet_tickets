@@ -35,6 +35,7 @@ import { WidgetsListPage } from './pages/widgets/WidgetsList';
 import { SupplierDetailPage } from './pages/suppliers/SupplierDetail';
 import { SuppliersListPage } from './pages/suppliers/SuppliersList';
 import { SupportDetailPage } from './pages/support/SupportDetail';
+import { SourceCategoriesPage } from './pages/source-categories/SourceCategoriesPage';
 import { VenuesListPage } from './pages/venues/VenuesList';
 import { VenueEditPage } from './pages/venues/VenueEdit';
 import { TagsListPage } from './pages/tags/TagsList';
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="reconciliation" element={flags.showOps ? <ReconciliationPage /> : <DisabledRoute />} />
           <Route path="audit" element={flags.showOps ? <AuditLogPage /> : <DisabledRoute />} />
           <Route path="seo-audit" element={flags.showContent ? <SeoAuditPage /> : <DisabledRoute />} />
+          <Route path="source-categories" element={flags.showContent ? <SourceCategoriesPage /> : <DisabledRoute />} />
           <Route path="widgets" element={<WidgetsListPage />} />
           <Route path="widgets/new" element={<WidgetEditPage />} />
           <Route path="widgets/:id" element={<WidgetEditPage />} />

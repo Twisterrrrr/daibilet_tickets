@@ -103,6 +103,7 @@ export class WidgetCheckoutService {
 
     const { packageId, code } = await this.checkoutService.createPackage({
       items: [cartItem],
+      forcePlatformPayment: true, // Виджет на нашей странице: оплата через YooKassa (PLATFORM)
     });
 
     await this.checkoutService.updatePackageContacts(packageId, {

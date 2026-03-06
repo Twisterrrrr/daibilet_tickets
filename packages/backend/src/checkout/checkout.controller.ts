@@ -149,6 +149,9 @@ export class CheckoutController {
       return eventType === 'payment.succeeded' ? 'QUEUED_PAID' : 'QUEUED_' + eventType.toUpperCase();
     });
 
+    if (!result.processed) {
+      this.logger.debug(`webhook_duplicate_ignored providerEventId=${providerEventId} result=${result.result}`);
+    }
     return { status: 'ok', processed: result.processed, result: result.result };
   }
 

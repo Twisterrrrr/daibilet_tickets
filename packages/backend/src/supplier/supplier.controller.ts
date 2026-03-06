@@ -15,7 +15,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ModerationStatus, OfferSource, Prisma } from '@prisma/client';
+import { ModerationStatus, OfferSource, Prisma, SupplierRole } from '@prisma/client';
 import { Request, Response } from 'express';
 
 import { CurrentSupplierUser } from '../common/decorators/current-supplier-user.decorator';
@@ -33,6 +33,7 @@ import {
   UpdateSupplierOfferDto,
   UpdateSupplierSettingsDto,
 } from './dto/supplier.dto';
+import { SupplierRbacService } from './supplier-rbac.service';
 import { SupplierJwtGuard, SupplierRoles, SupplierRolesGuard } from './supplier.guard';
 import { SupplierAuthService } from './supplier-auth.service';
 
@@ -42,6 +43,7 @@ export class SupplierController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authService: SupplierAuthService,
+    private readonly rbac: SupplierRbacService,
   ) {}
 
   // ─── Auth (public / refresh / guarded) ─────────────────────────────────────
@@ -253,6 +255,8 @@ export class SupplierController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Обновить настройки' })
   async updateSettings(@CurrentSupplierUser() user: SupplierAuthUser, @Body() data: UpdateSupplierSettingsDto) {
+    // Дополнительная проверка RBAC на уровне membership (OWNER-only).
+    await this.rbac.requireSupplierRole(user.id, user.operatorId, [SupplierRole.OWNER]);
     return this.prisma.operator.update({
       where: { id: user.operatorId },
       data: { name: data.name, logo: data.logo, website: data.website, companyName: data.companyName, inn: data.inn, contactEmail: data.contactEmail, contactPhone: data.contactPhone },
@@ -306,6 +310,11 @@ export class SupplierController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Создать событие (черновик)' })
   async createEvent(@Req() req: { user: SupplierAuthUser }, @Body() data: CreateSupplierEventDto) {
+    await this.rbac.requireSupplierRole(req.user.id, req.user.operatorId, [
+      SupplierRole.OWNER,
+      SupplierRole.MANAGER,
+      SupplierRole.CONTENT,
+    ]);
     const slug =
       (data.title || 'event')
         .toLowerCase()
@@ -347,6 +356,11 @@ export class SupplierController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Обновить событие' })
   async updateEvent(@Req() req: { user: SupplierAuthUser }, @Param('id') id: string, @Body() data: UpdateSupplierEventDto) {
+    await this.rbac.requireSupplierRole(req.user.id, req.user.operatorId, [
+      SupplierRole.OWNER,
+      SupplierRole.MANAGER,
+      SupplierRole.CONTENT,
+    ]);
     const event = await this.prisma.event.findFirst({ where: { id, operatorId: req.user.operatorId } });
     if (!event) throw new NotFoundException('Событие не найдено');
     return this.prisma.event.update({
@@ -373,6 +387,10 @@ export class SupplierController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Отправить на модерацию' })
   async submitEvent(@Req() req: { user: SupplierAuthUser }, @Param('id') id: string) {
+    await this.rbac.requireSupplierRole(req.user.id, req.user.operatorId, [
+      SupplierRole.OWNER,
+      SupplierRole.MANAGER,
+    ]);
     const event = await this.prisma.event.findFirst({ where: { id, operatorId: req.user.operatorId } });
     if (!event) throw new NotFoundException('Событие не найдено');
     if (!['DRAFT', 'REJECTED'].includes(event.moderationStatus)) {
@@ -399,6 +417,10 @@ export class SupplierController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Добавить оффер' })
   async createOffer(@Req() req: { user: SupplierAuthUser }, @Param('eventId') eventId: string, @Body() data: CreateSupplierOfferDto) {
+    await this.rbac.requireSupplierRole(req.user.id, req.user.operatorId, [
+      SupplierRole.OWNER,
+      SupplierRole.MANAGER,
+    ]);
     const event = await this.prisma.event.findFirst({ where: { id: eventId, operatorId: req.user.operatorId } });
     if (!event) throw new NotFoundException('Событие не найдено');
     let widgetProvider = data.widgetProvider || null;
@@ -435,6 +457,10 @@ export class SupplierController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Обновить оффер' })
   async updateOffer(@Req() req: { user: SupplierAuthUser }, @Param('eventId') eventId: string, @Param('offerId') offerId: string, @Body() data: UpdateSupplierOfferDto) {
+    await this.rbac.requireSupplierRole(req.user.id, req.user.operatorId, [
+      SupplierRole.OWNER,
+      SupplierRole.MANAGER,
+    ]);
     const offer = await this.prisma.eventOffer.findFirst({
       where: { id: offerId, eventId, event: { operatorId: req.user.operatorId } },
     });
@@ -458,6 +484,7 @@ export class SupplierController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Удалить оффер' })
   async deleteOffer(@Req() req: { user: SupplierAuthUser }, @Param('eventId') eventId: string, @Param('offerId') offerId: string) {
+    await this.rbac.requireSupplierRole(req.user.id, req.user.operatorId, [SupplierRole.OWNER]);
     const offer = await this.prisma.eventOffer.findFirst({
       where: { id: offerId, eventId, event: { operatorId: req.user.operatorId } },
     });

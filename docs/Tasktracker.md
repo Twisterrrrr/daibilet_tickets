@@ -1,6 +1,6 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-03-01. См. `docs/Reference.md`, `docs/Deploy.md`.
+> Последнее обновление: 2026-03-06. См. `docs/Reference.md`, `docs/Deploy.md`.
 > **Отложено 6+ мес** (Q3 2026+): Planner, Unified Checkout, ML-рекомендации, PWA, сложная дедупликация, gRPC-оптимизации, микрооптимизация Web Vitals, расширенная CI-инфра.
 > План 26 PR: `docs/InfraTypizationUXCheckoutPlan.md` (инфра, типизация, UX, Checkout + YooKassa).
 
@@ -17,6 +17,12 @@
 # Часть I — Закрытые задачи (Выполнено)
 
 > Сводка выполненных работ по темам. Детали — в секциях ниже и в `docs/Diary.md`.
+
+## Checkout + Smart UX (C0–C7) — implemented (06.03.2026) ✅
+
+- **C0–C7 реализованы:** контракты ошибок, read API, smart sorting (bestOption зафиксирован), checkout + redirect, holds (в т.ч. AWAITING_PAYMENT), paid = PackageItem + FulfillmentItem, webhook, precomputed stats (soldLast24h), last-customer snapshot.
+- **Правило bestOption** нормализовано и документировано (один сеанс на событие = ближайший по startsAt среди доступных). См. `docs/PR-C0-C7-Final.md` §6.
+- **Следующий этап:** не разработка новых фич, а **E2E validation + edge-case hardening** (smoke path + 5 edge cases). Чеклист: `docs/PR-C0-C7-Final.md` §8.
 
 ## Cursor Master Pipeline PR-1–PR-8 (01.03.2026) ✅
 
@@ -192,9 +198,19 @@
 - [ ] **Средний**: Аудит категоризации — SQL-отчёт уже из Gate 1 можно переиспользовать как инструмент SEO
 - [x] **Высокий**: Event Quality Gate — `EventQualityService.validateForPublish` + `/admin/events/:id/publish` ✅ (+ NO_VALID_PRICE для офферов без цены)
 - [x] **Высокий**: EventOverride.subcategories — явная семантика INHERIT/OVERRIDE/CLEAR + subcategoriesOverride (SubcategoriesMode enum + Prisma migration)
-- [ ] **Средний**: Нормализация категорий/аудиторий после импорта (детерминированный маппинг TC/TEP → EventCategory/EventSubcategory)
+- [~] **Средний**: Нормализация категорий/аудиторий после импорта (детерминированный маппинг TC/TEP → EventCategory/EventSubcategory). **TEPLOHOD E2E готов:** mapping first → register unknown + classifier → EVENT; `findMappedCategory` + `registerUnknownCategory` в импортёре.
 - [ ] **Средний**: Нормализация location/venue (venueId ИЛИ meetingPoint/address; MISSING_LOCATION блокирует publish)
 - [ ] **Средний**: Нормализация offers (ACTIVE только для продаваемых, наличие хотя бы одного ACTIVE offer как publish-gate)
+
+### Контент-операции админки (FEATURE 7–10) ✅
+
+> Ownership полей и риски зафиксированы в `docs/PR-C0-C7-Final.md` §9. Реализовано 06.03.2026.
+
+- [x] **FEATURE 7** — Quick view: пометки ownership [S]/[L] в EventQuickViewDrawer (заголовок, категория, SEO-блок)
+- [x] **FEATURE 9** — Quality score: в issues добавлено поле ownership (source/local), отображается в QualityBanner
+- [x] **FEATURE 10** — Inline edit: переключатель «Скрыть/Показать в каталоге» в списке событий и в Quick view (PATCH /admin/events/:id/hide)
+- [x] **FEATURE 8** — Drag sorting: галерея в VenueEdit с перетаскиванием (HTML5 DnD), подсказка «local-owned»
+- [x] **Supplier RBAC Management** — PATCH `/admin/suppliers/:supplierId/users/:userId/role` + select в `SupplierDetailPage`, защита кода ошибки `LAST_OWNER_PROTECTION`
 
 ## После запуска / 6+ мес
 
@@ -393,6 +409,9 @@
 ---
 
 ## 9. Checkout / Orders / Voucher
+
+### Checkout + Smart UX pipeline (C0–C7)
+- [x] **Высокий**: Checkout + Smart UX (C0–C7) — **implemented**. Next: **E2E validation + edge-case hardening** (см. `docs/PR-C0-C7-Final.md` §8). Риск сейчас — не архитектура, а фактическое поведение на реальном потоке; новые фичи не добавлять до прогона smoke и 5 edge cases.
 
 ### YooKassa + Checkout (Фаза 4)
 - [ ] **Критический**: Модуль PaymentModule — YooKassa API v3, создание платежа, webhook handler

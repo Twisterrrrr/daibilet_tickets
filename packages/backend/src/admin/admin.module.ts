@@ -38,6 +38,7 @@ import { AdminUploadController } from './admin-upload.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
 import { AdminSeoAuditController } from './admin-seo-audit.controller';
 import { AdminPreviewsController } from './admin-previews.controller';
+import { AdminSourceCategoriesController } from './admin-source-categories.controller';
 import { AuditService } from './audit.service';
 import { EventOverrideService } from './event-override.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
@@ -85,6 +86,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminUploadController,
     AdminSeoAuditController,
     AdminPreviewsController,
+    AdminSourceCategoriesController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })

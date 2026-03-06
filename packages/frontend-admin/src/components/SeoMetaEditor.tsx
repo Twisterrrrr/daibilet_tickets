@@ -11,9 +11,14 @@ type Props = {
   entityType: SeoEntityType;
   entityId: string;
   defaultTitle?: string;
+  /**
+   * Относительный путь страницы (для превью URL), например `/events/slug`.
+   * Не влияет на canonicalUrl в БД, только на визуальный предпросмотр.
+   */
+  previewPath?: string;
 };
 
-export function SeoMetaEditor({ entityType, entityId, defaultTitle }: Props) {
+export function SeoMetaEditor({ entityType, entityId, defaultTitle, previewPath }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [data, setData] = useState<SeoMetaResponse | null>(null);
@@ -138,8 +143,40 @@ export function SeoMetaEditor({ entityType, entityId, defaultTitle }: Props) {
   }
 
   const seoStatus = data?.source === 'manual' ? 'MANUAL' : data?.source === 'auto' ? 'AUTO' : 'DEFAULT';
-  const titleOk = form.title.trim().length >= 10;
-  const descOk = form.description.trim().length >= 50;
+  const titleLen = form.title.trim().length;
+  const descLen = form.description.trim().length;
+  const titleOk = titleLen >= 10;
+  const descOk = descLen >= 50;
+
+  // Рекомендованные лимиты
+  const TITLE_SOFT_LIMIT = 60;
+  const TITLE_HARD_LIMIT = 70;
+  const DESC_SOFT_LIMIT = 160;
+  const DESC_HARD_LIMIT = 180;
+
+  const titleRatio = Math.min(1, titleLen / TITLE_SOFT_LIMIT);
+  const descRatio = Math.min(1, descLen / DESC_SOFT_LIMIT);
+
+  const titleColor =
+    titleLen === 0
+      ? 'bg-gray-200'
+      : titleLen <= TITLE_SOFT_LIMIT
+        ? 'bg-emerald-500'
+        : titleLen <= TITLE_HARD_LIMIT
+          ? 'bg-amber-500'
+          : 'bg-red-500';
+
+  const descColor =
+    descLen === 0
+      ? 'bg-gray-200'
+      : descLen <= DESC_SOFT_LIMIT
+        ? 'bg-emerald-500'
+        : descLen <= DESC_HARD_LIMIT
+          ? 'bg-amber-500'
+          : 'bg-red-500';
+
+  const displayHost = 'daibilet.ru';
+  const displayPath = previewPath || '/events/slug';
 
   return (
     <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
@@ -158,28 +195,47 @@ export function SeoMetaEditor({ entityType, entityId, defaultTitle }: Props) {
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs">
-        <div className="text-green-700">daibilet.ru</div>
-        <div className="mt-0.5 font-medium text-blue-700">{form.title || '—'}</div>
-        <div className="text-gray-600">{form.description || '—'}</div>
+      {/* Google-like preview */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4 text-xs shadow-sm">
+        <div className="mb-1 text-[11px] text-gray-500">
+          <span className="text-green-700">{displayHost}</span>
+          <span className="text-gray-400"> › </span>
+          <span className="text-gray-700">{displayPath}</span>
+        </div>
+        <div className="mt-0.5 text-sm font-medium text-blue-700">{form.title || 'Заголовок страницы'}</div>
+        <div className="mt-1 text-[13px] leading-snug text-gray-700">
+          {form.description || 'Краткое описание события для поисковой выдачи.'}
+        </div>
       </div>
 
       <div className="grid gap-3">
         <div>
-          <div className="mb-1 flex justify-between">
-            <Label>Meta title</Label>
-            <span className={`text-xs ${counters.title > 60 ? 'text-red-600' : 'text-gray-500'}`}>
-              {counters.title}/60
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Label>Meta title</Label>
+              <span className="text-[10px] text-gray-500">рекомендуется ≤ {TITLE_SOFT_LIMIT}</span>
+            </div>
+            <span className={`text-xs ${titleLen > TITLE_HARD_LIMIT ? 'text-red-600' : 'text-gray-500'}`}>
+              {titleLen}
             </span>
+          </div>
+          <div className="mb-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <div className={`h-full ${titleColor}`} style={{ width: `${titleRatio * 100}%` }} />
           </div>
           <Input value={form.title} onChange={onChange('title')} placeholder="До 60 символов" />
         </div>
         <div>
-          <div className="mb-1 flex justify-between">
-            <Label>Meta description</Label>
-            <span className={`text-xs ${counters.description > 160 ? 'text-red-600' : 'text-gray-500'}`}>
-              {counters.description}/160
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Label>Meta description</Label>
+              <span className="text-[10px] text-gray-500">рекомендуется ≤ {DESC_SOFT_LIMIT}</span>
+            </div>
+            <span className={`text-xs ${descLen > DESC_HARD_LIMIT ? 'text-red-600' : 'text-gray-500'}`}>
+              {descLen}
             </span>
+          </div>
+          <div className="mb-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <div className={`h-full ${descColor}`} style={{ width: `${descRatio * 100}%` }} />
           </div>
           <Textarea
             value={form.description}

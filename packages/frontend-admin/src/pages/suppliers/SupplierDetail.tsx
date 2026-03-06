@@ -17,6 +17,8 @@ export function SupplierDetailPage() {
   const [newKeyName, setNewKeyName] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
 
+  const SUPPLIER_ROLES = ['OWNER', 'MANAGER', 'CONTENT', 'ACCOUNTANT'] as const;
+
   const load = () => {
     adminApi.get(`/admin/suppliers/${id}`).then((data: any) => {
       setSupplier(data);
@@ -53,6 +55,17 @@ export function SupplierDetailPage() {
       load();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const updateUserRole = async (userId: string, role: string) => {
+    try {
+      await adminApi.patch(`/admin/suppliers/${id}/users/${userId}/role`, { role });
+      toast.success('Роль обновлена');
+      load();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(message);
     }
   };
 
@@ -200,7 +213,19 @@ export function SupplierDetailPage() {
                   <tr key={u.id}>
                     <td className="py-2">{u.name}</td>
                     <td className="py-2 text-muted-foreground">{u.email}</td>
-                    <td className="py-2 text-center">{u.role}</td>
+                    <td className="py-2 text-center">
+                      <select
+                        className="border rounded px-2 py-1 text-xs bg-background"
+                        value={u.role}
+                        onChange={(e) => updateUserRole(u.id, e.target.value)}
+                      >
+                        {SUPPLIER_ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="py-2 text-center">{u.isActive ? '✓' : '✗'}</td>
                   </tr>
                 ))}

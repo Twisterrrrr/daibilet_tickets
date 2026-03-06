@@ -926,7 +926,99 @@ export class CheckoutService {
   }
 
   /**
+   * C4: Holds по сессиям события (для проверки доступности при создании checkout).
+   * Key: "eventId:sessionId", value: sum of quantity.
+   */
+  private async getHoldsForEvent(eventId: string): Promise<Map<string, number>> {
+    const now = new Date();
+    const sessions = await this.prisma.checkoutSession.findMany({
+      where: {
+        status: { in: ['STARTED', 'VALIDATED', 'REDIRECTED', 'AWAITING_PAYMENT'] },
+        expiresAt: { not: null, gt: now },
+      },
+      select: { cartSnapshot: true },
+    });
+    const map = new Map<string, number>();
+    for (const row of sessions) {
+      const cart = (row.cartSnapshot as Array<{ eventId?: string; sessionId?: string; quantity?: number }> | null) ?? [];
+      for (const item of cart) {
+        const eid = item?.eventId ?? '';
+        const sid = item?.sessionId ?? '';
+        const qty = Math.max(0, Math.floor(Number(item?.quantity ?? 0)));
+        if (!eid || !sid || qty <= 0 || eid !== eventId) continue;
+        const key = `${eid}:${sid}`;
+        map.set(key, (map.get(key) ?? 0) + qty);
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Paid count per sessionId (PackageItem PAID + FulfillmentItem CONFIRMED по offersSnapshot).
+   */
+  private async getPaidBySessionId(sessionIds: string[]): Promise<Map<string, number>> {
+    if (sessionIds.length === 0) return new Map();
+    const set = new Set(sessionIds);
+    const map = new Map<string, number>();
+
+    const pkgItems = await this.prisma.packageItem.findMany({
+      where: { sessionId: { in: sessionIds }, package: { status: 'PAID' } },
+      select: { sessionId: true, adultTickets: true, childTickets: true },
+    });
+    for (const item of pkgItems) {
+      const qty = (item.adultTickets ?? 0) + (item.childTickets ?? 0);
+      map.set(item.sessionId, (map.get(item.sessionId) ?? 0) + qty);
+    }
+
+    const fulfilled = await this.prisma.fulfillmentItem.findMany({
+      where: { status: 'CONFIRMED' },
+      select: { lineItemIndex: true, checkoutSessionId: true },
+    });
+    if (fulfilled.length > 0) {
+      const csIds = [...new Set(fulfilled.map((f) => f.checkoutSessionId))];
+      const sessions = await this.prisma.checkoutSession.findMany({
+        where: { id: { in: csIds } },
+        select: { id: true, offersSnapshot: true },
+      });
+      const snap = new Map(sessions.map((s) => [s.id, s.offersSnapshot]));
+      for (const item of fulfilled) {
+        const snapshot = snap.get(item.checkoutSessionId) as Array<{ sessionId?: string | null; quantity?: number }> | null;
+        if (!Array.isArray(snapshot)) continue;
+        const line = snapshot[item.lineItemIndex];
+        const sid = line?.sessionId ?? null;
+        const qty = Math.max(0, Math.floor(Number(line?.quantity ?? 0)));
+        if (sid && set.has(sid) && qty > 0) map.set(sid, (map.get(sid) ?? 0) + qty);
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Effective available for session (capacity - paid - holds). Used for widget last-seats guard.
+   */
+  private async getEffectiveAvailableForSession(eventId: string, sessionId: string): Promise<number> {
+    const session = await this.prisma.eventSession.findUnique({
+      where: { id: sessionId, eventId },
+      select: { availableTickets: true, capacityTotal: true, event: { select: { defaultCapacityTotal: true } } },
+    });
+    if (!session) return 0;
+    const raw =
+      (session.availableTickets ?? undefined) != null
+        ? Number(session.availableTickets)
+        : Number(session.capacityTotal ?? session.event?.defaultCapacityTotal ?? 0);
+    const capacity = Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
+    const [holdsMap, paidMap] = await Promise.all([
+      this.getHoldsForEvent(eventId),
+      this.getPaidBySessionId([sessionId]),
+    ]);
+    const holds = holdsMap.get(`${eventId}:${sessionId}`) ?? 0;
+    const paid = paidMap.get(sessionId) ?? 0;
+    return Math.max(0, capacity - paid - holds);
+  }
+
+  /**
    * T21: Создать CheckoutSession из 1+ items (без customer) → редирект на /checkout/[id].
+   * При forcePlatformPayment (widget) проверяет доступность по сессиям (last-seats guard).
    */
   async createPackage(body: CreatePackageDto) {
     if (!body.items?.length) {
@@ -935,6 +1027,30 @@ export class CheckoutService {
     const validation = await this.validateCart(body.items);
     if (!validation.allValid) {
       throw new BadRequestException('Некоторые позиции недоступны');
+    }
+
+    // Last-seats guard: при виджетном checkout перепроверяем доступность по сессиям
+    if (Boolean(body.forcePlatformPayment)) {
+      const bySession = new Map<string, number>();
+      for (const item of body.items) {
+        if (!item.sessionId || !item.eventId) continue;
+        const key = `${item.eventId}:${item.sessionId}`;
+        bySession.set(key, (bySession.get(key) ?? 0) + (item.quantity ?? 1));
+      }
+      for (const [key, requestedQty] of bySession) {
+        const [eventId, sessionId] = key.split(':');
+        if (!eventId || !sessionId) continue;
+        const available = await this.getEffectiveAvailableForSession(eventId, sessionId);
+        if (requestedQty > available) {
+          this.logger.warn(
+            `createPackage: NOT_ENOUGH_AVAILABLE eventId=${eventId} sessionId=${sessionId} requested=${requestedQty} available=${available}`,
+          );
+          throw new BadRequestException({
+            code: 'NOT_ENOUGH_AVAILABLE',
+            message: `Недостаточно мест (доступно: ${available})`,
+          });
+        }
+      }
     }
     const shortCode = `CS-${Date.now().toString(36).toUpperCase()}`;
     const expiresAt = calculateExpiresAt(CHECKOUT_SESSION_TTL_MINUTES);
@@ -954,12 +1070,13 @@ export class CheckoutService {
     });
     const cartByOffer = new Map(body.items.map((i) => [i.offerId, i]));
     const now = new Date();
-    const offersSnapshot = offersData.map((o) => {
+    const forcePlatform = Boolean(body.forcePlatformPayment);
+    const offersSnapshot = offersData.map((o, idx) => {
       const cartItem = cartByOffer.get(o.id);
       const quantity = cartItem?.quantity || 1;
       const unitPrice = o.priceFrom || 0;
       const lineTotal = unitPrice * quantity;
-      const purchaseFlow = resolvePaymentFlow(o.purchaseType);
+      const purchaseFlow = forcePlatform ? PaymentFlowType.PLATFORM : resolvePaymentFlow(o.purchaseType);
       let commissionRateSnapshot: number | null = null;
       let platformFeeSnapshot: number | null = null;
       let supplierAmountSnapshot: number | null = null;
@@ -979,15 +1096,17 @@ export class CheckoutService {
         supplierAmountSnapshot = lineTotal - platformFeeSnapshot;
       }
       return {
-        lineItemIndex: 0,
+        lineItemIndex: idx,
         offerId: o.id,
         eventId: o.eventId,
+        sessionId: cartItem?.sessionId ?? null,
         source: o.source,
         purchaseType: o.purchaseType,
         purchaseFlow,
         eventTitle: o.event.title,
         eventSlug: o.event.slug,
         eventImage: o.event.imageUrl,
+        badge: o.badge ?? null,
         operatorName: o.operator?.name || null,
         unitPrice,
         quantity,
@@ -997,6 +1116,13 @@ export class CheckoutService {
         commissionRateSnapshot,
         platformFeeSnapshot,
         supplierAmountSnapshot,
+        deeplink: o.deeplink ?? null,
+        widgetProvider: o.widgetProvider ?? null,
+        widgetPayload: o.widgetPayload ?? null,
+        meetingPoint: o.meetingPoint ?? null,
+        meetingInstructions: o.meetingInstructions ?? null,
+        operationalPhone: o.operationalPhone ?? null,
+        operationalNote: o.operationalNote ?? null,
         snapshotAt: now.toISOString(),
       };
     });
@@ -1019,7 +1145,9 @@ export class CheckoutService {
         utmCampaign: body.utm?.campaign,
       },
     });
-    this.logger.log(`Created package session ${session.id} (${session.shortCode}), packageId=${session.id}`);
+    this.logger.log(
+      `checkout_created sessionId=${session.id} shortCode=${session.shortCode} forcePlatform=${forcePlatform}`,
+    );
     return { packageId: session.id, code: session.shortCode };
   }
 

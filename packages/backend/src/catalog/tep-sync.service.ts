@@ -6,6 +6,7 @@ import { join } from 'path';
 
 import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';
+import { CategoryMappingService } from './category-mapping.service';
 import { TepApiService, TepCity, TepEvent } from './tep-api.service';
 
 /**
@@ -68,6 +69,7 @@ export class TepSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tepApi: TepApiService,
+    private readonly categoryMapping: CategoryMappingService,
   ) {}
 
   /**
@@ -236,7 +238,21 @@ export class TepSyncService {
     if (!title) return -1;
 
     const description = this.cleanDescription(tep.description);
-    const { category, subcategories, audience, minAge } = this.classifyTep(tep);
+    const classifierResult = this.classifyTep(tep);
+    const externalRaw = (tep.category ?? '').trim();
+    let category: EventCategory;
+    if (externalRaw) {
+      const mapped = await this.categoryMapping.findMappedCategory('TEPLOHOD', externalRaw);
+      if (mapped) {
+        category = mapped;
+      } else {
+        await this.categoryMapping.registerUnknownCategory('TEPLOHOD', externalRaw);
+        category = classifierResult.category;
+      }
+    } else {
+      category = classifierResult.category;
+    }
+    const { subcategories, audience, minAge } = classifierResult;
     const durationMinutes = tep.duration > 0 ? tep.duration : null;
 
     const slug = await this.generateUniqueSlug(title, sourceId);

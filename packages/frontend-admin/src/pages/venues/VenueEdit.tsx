@@ -1,5 +1,5 @@
 type VenueType = 'MUSEUM' | 'GALLERY' | 'ART_SPACE' | 'EXHIBITION_HALL' | 'THEATER' | 'PALACE' | 'PARK';
-import { ArrowLeft, ExternalLink, Info, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, GripVertical, Info, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
@@ -298,6 +298,16 @@ export function VenueEditPage() {
 
   const removeGalleryUrl = (index: number) => {
     setForm((f) => ({ ...f, galleryUrls: f.galleryUrls.filter((_, i) => i !== index) }));
+  };
+
+  const moveGalleryUrl = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setForm((f) => {
+      const urls = [...f.galleryUrls];
+      const [removed] = urls.splice(fromIndex, 1);
+      urls.splice(toIndex, 0, removed);
+      return { ...f, galleryUrls: urls };
+    });
   };
 
   const updateField = (key: keyof VenueFormData, value: any) => {
@@ -677,17 +687,38 @@ export function VenueEditPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Перетащите строку за иконку для изменения порядка (local-owned).
+              </p>
               {form.galleryUrls.map((url, i) => (
-                <div key={i} className="flex items-center gap-2 p-2 border rounded-lg">
+                <div
+                  key={i}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', String(i));
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const from = Number(e.dataTransfer.getData('text/plain'));
+                    if (!Number.isNaN(from) && from !== i) moveGalleryUrl(from, i);
+                  }}
+                  className="flex items-center gap-2 p-2 border rounded-lg cursor-grab active:cursor-grabbing bg-card hover:bg-muted/50 transition-colors"
+                >
+                  <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <img
                     src={url}
                     alt=""
-                    className="h-12 w-16 object-cover rounded"
+                    className="h-12 w-16 object-cover rounded shrink-0"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
-                  <span className="text-sm truncate flex-1">{url}</span>
+                  <span className="text-sm truncate flex-1 min-w-0">{url}</span>
                   <Button variant="ghost" size="sm" onClick={() => removeGalleryUrl(i)}>
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
@@ -855,7 +886,14 @@ export function VenueEditPage() {
         </TabsContent>
 
         <TabsContent value="seo" className="space-y-4">
-          {!isNew && id && <SeoMetaEditor entityType="VENUE" entityId={id} defaultTitle={form.title} />}
+          {!isNew && id && (
+            <SeoMetaEditor
+              entityType="VENUE"
+              entityId={id}
+              defaultTitle={form.title}
+              previewPath={form.slug ? `/venues/${form.slug}` : '/venues/slug'}
+            />
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Legacy SEO (Venue)</CardTitle>

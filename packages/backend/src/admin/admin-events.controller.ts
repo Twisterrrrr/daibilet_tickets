@@ -49,12 +49,14 @@ import {
   CreateEventDto,
   CreateEventOfferDto,
   EventActivationDto,
+  UpdateEventSlugDto,
   EventQualityDto,
   ExternalRatingDto,
   OverrideEventDto,
   PatchEventOfferDto,
   UpdateEventOfferDto,
   VenueSettingsDto,
+  BulkUpdateEventsDto,
 } from './dto/admin.dto';
 import { EventOverrideService } from './event-override.service';
 import { EventQualityIssue, EventQualityService } from '../catalog/event-quality.service';
@@ -508,6 +510,166 @@ export class AdminEventsController {
   }
 
   /**
+   * Клонировать событие для быстрого создания похожего.
+   *
+   * POST /admin/events/:id/duplicate
+   *
+   * Копирует основные поля контента (title, description, imageUrl, galleryUrls,
+   * durationMinutes, minAge, address, priceFrom, groupingKey), но НЕ копирует
+   * сессии, заказы и рейтинги.
+   *
+   * Новый slug формируется на основе исходного (`{slug}-copy`, `...-copy-2` и т.д.),
+   * заголовок помечается префиксом `[COPY] `.
+   */
+  @Post(':id/duplicate')
+  @Roles('ADMIN', 'EDITOR')
+  async duplicateEvent(@Param('id') id: string, @Request() req: { user: { id: string } }) {
+    const original = await this.prisma.event.findUnique({
+      where: { id },
+      include: {
+        override: true,
+      },
+    });
+
+    if (!original || original.isDeleted) {
+      throw new NotFoundException('Событие не найдено');
+    }
+
+    // Базовый slug для копии
+    const baseSlug = `${original.slug}-copy`;
+    let slug = baseSlug;
+    let suffix = 1;
+
+    // Подбираем уникальный slug для нового события
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const existing = await this.prisma.event.findUnique({ where: { slug } });
+      if (!existing) {
+        break;
+      }
+      suffix += 1;
+      slug = `${baseSlug}-${suffix}`;
+    }
+
+    const title = `[COPY] ${original.title}`;
+
+    const duplicate = await this.prisma.$transaction(async (tx) => {
+      const event = await tx.event.create({
+        data: {
+          source: OfferSource.MANUAL,
+          tcEventId: `manual-copy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          cityId: original.cityId,
+          title: normalizeEventTitle(title),
+          normalizedTitle: original.normalizedTitle,
+          groupingKey: original.groupingKey,
+          slug,
+          description: original.description,
+          shortDescription: original.shortDescription,
+          category: original.category,
+          subcategories: original.subcategories,
+          audience: original.audience,
+          minAge: original.minAge,
+          durationMinutes: original.durationMinutes,
+          lat: original.lat,
+          lng: original.lng,
+          address: original.address,
+          indoor: original.indoor,
+          imageUrl: original.imageUrl,
+          galleryUrls: original.galleryUrls,
+          priceFrom: original.priceFrom,
+          isActive: false,
+          venueId: original.venueId,
+          dateMode: original.dateMode,
+          isPermanent: original.isPermanent,
+          endDate: original.endDate,
+          defaultCapacityTotal: original.defaultCapacityTotal,
+          startLocationId: original.startLocationId,
+          endLocationId: original.endLocationId,
+          operatorId: original.operatorId,
+          routeId: original.routeId,
+          supplierId: original.supplierId,
+          createdByType: 'ADMIN',
+          createdById: req.user.id,
+        },
+      });
+
+      // Скопировать Override, если он есть (контент, теги, templateData).
+      if (original.override) {
+        await tx.eventOverride.create({
+          data: {
+            eventId: event.id,
+            title: original.override.title,
+            description: original.override.description,
+            imageUrl: original.override.imageUrl,
+            category: original.override.category ?? null,
+            subcategories: original.override.subcategories,
+            audience: original.override.audience ?? null,
+            minAge: original.override.minAge ?? null,
+            manualRating: original.override.manualRating,
+            isHidden: original.override.isHidden,
+            tagsAdd: original.override.tagsAdd,
+            tagsRemove: original.override.tagsRemove,
+            templateData: original.override.templateData as Prisma.InputJsonValue,
+            subcategoriesMode: original.override.subcategoriesMode,
+            subcategoriesOverride: original.override.subcategoriesOverride,
+            updatedBy: req.user.id,
+          },
+        });
+      }
+
+      return event;
+    });
+
+    await this.cacheInvalidation.invalidateEventById(duplicate.id);
+
+    return {
+      id: duplicate.id,
+      slug: duplicate.slug,
+      title: duplicate.title,
+    };
+  }
+
+  /**
+   * Обновить slug события вручную.
+   *
+   * Правила:
+   * - slug нормализуется так же, как при создании (транслитерация + lower-case + `[^a-z0-9]` → `-`)
+   * - при конфликте добавляется суффикс -2, -3 и т.д.
+   */
+  @Patch(':id/slug')
+  @Roles('ADMIN', 'EDITOR')
+  async updateEventSlug(@Param('id') id: string, @Body() body: UpdateEventSlugDto) {
+    const base = this.transliterate(body.slug || '');
+    if (!base) {
+      throw new BadRequestException('Slug не может быть пустым');
+    }
+
+    let slug = base;
+    let suffix = 1;
+    // Ищем свободный slug с учётом текущего события
+    // (если slug уже принадлежит этому событию — обновляем без изменений).
+    // Поскольку это админский эндпоинт, несколько последовательных запросов допустимы.
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const existing = await this.prisma.event.findUnique({ where: { slug } });
+      if (!existing || existing.id === id) {
+        break;
+      }
+      suffix += 1;
+      slug = `${base}-${suffix}`;
+    }
+
+    const updated = await this.prisma.event.update({
+      where: { id },
+      data: { slug },
+    });
+
+    await this.cacheInvalidation.invalidateEventById(updated.id);
+
+    return { slug: updated.slug };
+  }
+
+  /**
    * Оценка готовности события к публикации (on-demand).
    *
    * GET /admin/events/:id/quality
@@ -523,6 +685,7 @@ export class AdminEventsController {
       message: issue.message,
       severity: this.mapIssueSeverity(issue),
       tabKey: this.mapIssueTabKey(issue),
+      ...(issue.ownership && { ownership: issue.ownership }),
     }));
 
     return {
@@ -1070,6 +1233,7 @@ export class AdminEventsController {
       where: { id },
       include: {
         city: { select: { slug: true, name: true } },
+        venue: { select: { id: true, title: true, slug: true } },
         sessions: { where: { isActive: true }, orderBy: { startsAt: 'asc' }, take: 20 },
         tags: { include: { tag: true } },
         offers: {
@@ -1309,6 +1473,53 @@ export class AdminEventsController {
     await this.cacheInvalidation.invalidateEventById(id);
 
     return updated;
+  }
+
+  /**
+   * Массовое обновление событий (статус, категория, soft-delete).
+   *
+   * PATCH /admin/events/bulk-update
+   */
+  @Patch('bulk-update')
+  @Roles('ADMIN', 'EDITOR')
+  async bulkUpdateEvents(@Body() body: BulkUpdateEventsDto) {
+    const { ids, category, isActive, softDelete } = body;
+
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('Список ids не может быть пустым');
+    }
+
+    const data: Prisma.EventUpdateManyMutationInput = {};
+
+    if (category !== undefined) {
+      data.category = category as EventCategory;
+    }
+
+    if (isActive !== undefined) {
+      data.isActive = isActive;
+    }
+
+    if (softDelete) {
+      data.isDeleted = true;
+      data.deletedAt = new Date();
+      data.isActive = false;
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('Нет полей для обновления');
+    }
+
+    await this.prisma.event.updateMany({
+      where: {
+        id: { in: ids },
+        isDeleted: false,
+      },
+      data,
+    });
+
+    await Promise.all(ids.map((id) => this.cacheInvalidation.invalidateEventById(id)));
+
+    return { ok: true };
   }
 
   // --- Venue & dateMode (прямое обновление Event) ---

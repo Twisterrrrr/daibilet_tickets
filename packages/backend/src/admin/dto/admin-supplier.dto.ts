@@ -1,6 +1,7 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { SupplierRole } from '@prisma/client';
 
 export class UpdateSupplierDto {
   @ApiPropertyOptional({ description: 'Trust level: 0, 1, 2' })
@@ -71,4 +72,10 @@ export class UpdateWebhookDto {
   @IsOptional()
   @IsBoolean()
   regenerateSecret?: boolean;
+}
+
+export class UpdateSupplierUserRoleDto {
+  @ApiProperty({ enum: SupplierRole })
+  @IsEnum(SupplierRole)
+  role!: SupplierRole;
 }

@@ -2,6 +2,9 @@
 // Дайбилет — Общие типы между backend и frontend
 // ==============================================
 
+export type { ApiErrorBody, CheckoutErrorCodeType } from './api-error';
+export { CheckoutErrorCode } from './api-error';
+
 /* eslint-disable no-var */
 declare var console: { warn: (...args: any[]) => void; log: (...args: any[]) => void; error: (...args: any[]) => void };
 

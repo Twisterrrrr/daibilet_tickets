@@ -152,6 +152,7 @@ interface VenueOption {
 interface EventDetail {
   id: string;
   title: string;
+  slug: string;
   category: EventCategory;
   source: string;
   isActive: boolean;
@@ -207,6 +208,9 @@ export function EventEditPage() {
   const [quality, setQuality] = useState<EventQuality | null>(null);
   const [qualityLoading, setQualityLoading] = useState(false);
   const [qualityError, setQualityError] = useState<string | null>(null);
+
+  const [slug, setSlug] = useState<string>('');
+  const [slugTouched, setSlugTouched] = useState(false);
 
   const [form, setForm] = useState<{
     title?: string;
@@ -268,6 +272,8 @@ export function EventEditPage() {
       .get<EventDetail>(`/admin/events/${id}`)
       .then((data) => {
         setEvent(data);
+        setSlug(data.slug);
+        setSlugTouched(false);
         const ov = data.override;
         setForm({
           title: ov?.title ?? data.title,
@@ -291,11 +297,63 @@ export function EventEditPage() {
       .finally(() => setLoading(false));
   }, [id, refreshQuality]);
 
+  const generateSlug = useCallback((value: string): string => {
+    const map: Record<string, string> = {
+      а: 'a',
+      б: 'b',
+      в: 'v',
+      г: 'g',
+      д: 'd',
+      е: 'e',
+      ё: 'yo',
+      ж: 'zh',
+      з: 'z',
+      и: 'i',
+      й: 'j',
+      к: 'k',
+      л: 'l',
+      м: 'm',
+      н: 'n',
+      о: 'o',
+      п: 'p',
+      р: 'r',
+      с: 's',
+      т: 't',
+      у: 'u',
+      ф: 'f',
+      х: 'kh',
+      ц: 'ts',
+      ч: 'ch',
+      ш: 'sh',
+      щ: 'shch',
+      ъ: '',
+      ы: 'y',
+      ь: '',
+      э: 'e',
+      ю: 'yu',
+      я: 'ya',
+    };
+    const base = value
+      .toLowerCase()
+      .split('')
+      .map((c) => map[c] ?? c)
+      .join('')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return base || '';
+  }, []);
+
   const handleSave = async () => {
     if (!id) return;
     setSaving(true);
     setError(null);
     try {
+      // Save slug (если он изменился)
+      if (event && slug && slug !== event.slug) {
+        const res = await adminApi.patch<{ slug: string }>(`/admin/events/${id}/slug`, { slug });
+        setEvent((prev) => (prev ? { ...prev, slug: res.slug } : prev));
+      }
+
       // Save override fields
       const ov = await adminApi.patch(`/admin/events/${id}/override`, {
         title: form.title,
@@ -550,7 +608,13 @@ export function EventEditPage() {
                   </div>
                   <Input
                     value={form.title ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm((f) => ({ ...f, title: value }));
+                      if (!slugTouched) {
+                        setSlug(generateSlug(value));
+                      }
+                    }}
                     placeholder={event?.title ? `Оригинал: ${event.title}` : undefined}
                   />
                 </div>
@@ -607,6 +671,36 @@ export function EventEditPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Slug</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground"
+                      disabled={saving}
+                      onClick={() => {
+                        const baseTitle = form.title || event?.title || '';
+                        const next = generateSlug(baseTitle);
+                        setSlug(next);
+                        // После ручного regenerate оставляем slugTouched = true, чтобы
+                        // дальнейшие изменения title не трогали slug автоматически.
+                        setSlugTouched(true);
+                      }}
+                    >
+                      Сгенерировать из названия
+                    </Button>
+                  </div>
+                  <Input
+                    value={slug}
+                    onChange={(e) => {
+                      setSlug(e.target.value);
+                      setSlugTouched(true);
+                    }}
+                    placeholder={event?.slug ? `Оригинал: ${event.slug}` : 'my-event-slug'}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Аудитория</Label>
@@ -794,7 +888,12 @@ export function EventEditPage() {
 
         {/* ── SEO Tab ── */}
         <TabsContent value="seo">
-          <SeoMetaEditor entityType="EVENT" entityId={event.id} defaultTitle={event.title} />
+          <SeoMetaEditor
+            entityType="EVENT"
+            entityId={event.id}
+            defaultTitle={event.title}
+            previewPath={`/events/${slug || event.slug}`}
+          />
         </TabsContent>
 
         {/* ── Offers Tab ── */}
@@ -806,7 +905,15 @@ export function EventEditPage() {
         {/* ── Sessions Tab ── */}
         <TabsContent value="sessions">
           <div data-quality-anchor="schedule" />
-          <ScheduleTab eventId={event.id} eventSource={event.source} />
+          {event.isPermanent ? (
+            <Card>
+              <CardContent className="text-sm text-muted-foreground">
+                Постоянное событие, расписание по сеансам не используется.
+              </CardContent>
+            </Card>
+          ) : (
+            <ScheduleTab eventId={event.id} eventSource={event.source} />
+          )}
         </TabsContent>
 
         {/* ── Rating Tab ── */}

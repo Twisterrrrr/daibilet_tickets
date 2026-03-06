@@ -8,6 +8,8 @@ export interface EventQualityIssue {
   code: string;
   message: string;
   field?: string;
+  /** Источник поля: source = из sync/импорта, local = из override (редакция). */
+  ownership?: 'source' | 'local';
 }
 
 export interface EventQualityResult {
@@ -50,6 +52,7 @@ export class EventQualityService {
         code: 'MISSING_TITLE',
         message: 'Не заполнен заголовок события',
         field: 'title',
+        ownership: event.override?.title !== undefined ? 'local' : 'source',
       });
     }
 
@@ -67,6 +70,7 @@ export class EventQualityService {
         code: 'MISSING_CATEGORY',
         message: 'Не указана категория события',
         field: 'category',
+        ownership: event.override?.category !== undefined ? 'local' : 'source',
       });
     }
 
@@ -76,6 +80,7 @@ export class EventQualityService {
         code: 'MISSING_DESCRIPTION',
         message: 'Описание события отсутствует или слишком короткое',
         field: 'description',
+        ownership: event.override?.description !== undefined ? 'local' : 'source',
       });
     }
 
@@ -85,6 +90,7 @@ export class EventQualityService {
         code: 'MISSING_IMAGE',
         message: 'Не задано основное изображение события',
         field: 'imageUrl',
+        ownership: event.override?.imageUrl !== undefined ? 'local' : 'source',
       });
     }
 
@@ -94,6 +100,7 @@ export class EventQualityService {
         code: 'MISSING_LOCATION',
         message: 'Не указано место проведения (venue или адрес/точка встречи)',
         field: 'location',
+        ownership: 'source',
       });
     }
 
@@ -107,12 +114,14 @@ export class EventQualityService {
           code: 'MISSING_ACTIVE_OFFER',
           message: 'Нет ни одного активного оффера с валидной ценой',
           field: 'offers',
+          ownership: 'source',
         });
       } else if (withPrice.length === 0) {
         issues.push({
           code: 'NO_VALID_PRICE',
           message: 'Активные офферы без указанной цены — укажите priceFrom',
           field: 'offers',
+          ownership: 'source',
         });
       } else if (event.dateMode === DateMode.SCHEDULED) {
         const hasFutureSession = event.sessions.some((s) => s.startsAt > now && s.isActive);
@@ -121,6 +130,7 @@ export class EventQualityService {
             code: 'NO_FUTURE_SESSIONS',
             message: 'Нет будущих активных сеансов для расписания',
             field: 'sessions',
+            ownership: 'source',
           });
         }
       } else if (event.dateMode === DateMode.OPEN_DATE && event.endDate) {
@@ -129,6 +139,7 @@ export class EventQualityService {
             code: 'END_DATE_PASSED',
             message: 'Дата окончания события истекла',
             field: 'endDate',
+            ownership: 'source',
           });
         }
       }

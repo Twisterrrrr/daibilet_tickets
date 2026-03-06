@@ -52,6 +52,11 @@ export class EventQualityIssueDto {
   @ApiProperty({ enum: ['main', 'location', 'offers', 'schedule'] })
   @IsString()
   tabKey!: 'main' | 'location' | 'offers' | 'schedule';
+
+  @ApiPropertyOptional({ enum: ['source', 'local'], description: 'Источник поля: source = импорт, local = редакция' })
+  @IsOptional()
+  @IsString()
+  ownership?: 'source' | 'local';
 }
 
 export class EventQualityDto {
@@ -424,6 +429,13 @@ export class CreateEventDto {
   templateData?: Record<string, unknown>;
 }
 
+export class UpdateEventSlugDto {
+  @ApiProperty({ description: 'Новый slug события (будет нормализован и уникализирован на бэкенде)' })
+  @IsString()
+  @IsNotEmpty()
+  slug!: string;
+}
+
 // ─── Override Event (all optional, merges onto sync data) ──────────
 
 export class OverrideEventDto {
@@ -552,6 +564,32 @@ export class EventActivationDto {
   @ApiProperty()
   @IsBoolean()
   isActive!: boolean;
+}
+
+// ─── Bulk Update Events ───────────────────────────────────────────────
+
+export class BulkUpdateEventsDto {
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  ids!: string[];
+
+  @ApiPropertyOptional({ enum: EventCategory })
+  @IsOptional()
+  @IsEnum(EventCategory)
+  category?: EventCategory;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Soft-delete событий. Если true — помечает как isDeleted с заполнением deletedAt.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  softDelete?: boolean;
 }
 
 // ─── External Rating ───────────────────────────────────────────────

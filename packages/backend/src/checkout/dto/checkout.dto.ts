@@ -136,6 +136,10 @@ export class CreatePackageDto {
   @Type(() => CartItemDto)
   items: CartItemDto[];
 
+  /** При true все позиции считаются PLATFORM (оплата на нашей стороне). Нужно для widget checkout (TEPLOHOD). */
+  @IsOptional()
+  forcePlatformPayment?: boolean;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => UtmDto)

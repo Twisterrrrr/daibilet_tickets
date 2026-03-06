@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -14,13 +15,13 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import * as crypto from 'crypto';
 
-import { Prisma } from '@prisma/client';
+import { Prisma, SupplierRole } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { CreateApiKeyDto, UpdateSupplierDto, UpdateWebhookDto } from './dto/admin.dto';
+import { CreateApiKeyDto, UpdateSupplierDto, UpdateWebhookDto, UpdateSupplierUserRoleDto } from './dto/admin.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -126,6 +127,74 @@ export class AdminSuppliersController {
         supplierRevenue: payments._sum.supplierAmount || 0,
       },
     };
+  }
+
+  /**
+   * Изменить роль пользователя поставщика.
+   *
+   * PATCH /admin/suppliers/:supplierId/users/:userId/role
+   */
+  @Patch(':supplierId/users/:userId/role')
+  @Roles('ADMIN')
+  async updateSupplierUserRole(
+    @Param('supplierId') supplierId: string,
+    @Param('userId') userId: string,
+    @Body() body: UpdateSupplierUserRoleDto,
+  ) {
+    const membership = await this.prisma.supplierUser.findFirst({
+      where: { id: userId, operatorId: supplierId },
+      select: { id: true, operatorId: true, role: true, isActive: true },
+    });
+    if (!membership) {
+      throw new NotFoundException('Пользователь поставщика не найден');
+    }
+
+    if (membership.role === body.role) {
+      // Ничего менять не нужно, но вернём актуальное состояние c дополнительными полями.
+      const current = await this.prisma.supplierUser.findUnique({
+        where: { id: membership.id },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          lastLoginAt: true,
+        },
+      });
+      return current;
+    }
+
+    // Защита: нельзя снять роль у последнего активного OWNER.
+    if (membership.role === SupplierRole.OWNER && body.role !== SupplierRole.OWNER) {
+      const activeOwners = await this.prisma.supplierUser.count({
+        where: {
+          operatorId: supplierId,
+          isActive: true,
+          role: SupplierRole.OWNER,
+        },
+      });
+      if (activeOwners <= 1) {
+        throw new BadRequestException({
+          code: 'LAST_OWNER_PROTECTION',
+          message: 'Нельзя снять роль у последнего активного OWNER',
+        });
+      }
+    }
+
+    const updated = await this.prisma.supplierUser.update({
+      where: { id: membership.id },
+      data: { role: body.role },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+      },
+    });
+    return updated;
   }
 
   /**

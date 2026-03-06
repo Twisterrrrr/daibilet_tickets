@@ -198,7 +198,12 @@ export function CityEditPage() {
         </CardContent>
       </Card>
 
-      <SeoMetaEditor entityType="CITY" entityId={id!} defaultTitle={form.name ?? undefined} />
+      <SeoMetaEditor
+        entityType="CITY"
+        entityId={id!}
+        defaultTitle={form.name ?? undefined}
+        previewPath={form.slug ? `/cities/${form.slug}` : '/cities/slug'}
+      />
 
       <Card>
         <CardHeader>

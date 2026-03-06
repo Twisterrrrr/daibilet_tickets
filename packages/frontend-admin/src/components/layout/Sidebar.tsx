@@ -99,6 +99,7 @@ const NAV_SECTIONS: NavSection[] = [
             { to: '/audit', label: 'Аудит', icon: ClipboardList },
           ]
         : []),
+      ...(flags.showContent ? [{ to: '/source-categories', label: 'Категории источников', icon: Layers }] : []),
       ...(flags.showContent ? [{ to: '/seo-audit', label: 'SEO Audit', icon: BarChart3 }] : []),
       { to: '/settings', label: 'Настройки', icon: Settings },
     ],

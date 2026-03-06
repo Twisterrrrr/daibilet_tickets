@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 
 import { OperatorScopeGuard } from '../common/guards/operator-scope.guard';
 import { PrismaModule } from '../prisma/prisma.module';
+import { SupplierRbacService } from './supplier-rbac.service';
 import { SupplierRolesGuard } from './supplier.guard';
 import { SupplierAuthService } from './supplier-auth.service';
 import { SupplierController } from './supplier.controller';
@@ -23,8 +24,8 @@ import { SupplierJwtStrategy } from './supplier-jwt.strategy';
       }),
     }),
   ],
-  providers: [SupplierJwtStrategy, SupplierAuthService, SupplierRolesGuard, OperatorScopeGuard],
+  providers: [SupplierJwtStrategy, SupplierAuthService, SupplierRolesGuard, OperatorScopeGuard, SupplierRbacService],
   controllers: [SupplierController],
-  exports: [SupplierAuthService],
+  exports: [SupplierAuthService, SupplierRbacService],
 })
 export class SupplierModule {}

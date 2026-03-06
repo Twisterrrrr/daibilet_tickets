@@ -6,6 +6,7 @@ import { EventQualityService } from './event-quality.service';
 import { QUEUE_EMAILS } from '../queue/queue.constants';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
+import { CategoryMappingService } from './category-mapping.service';
 import { FuzzyDedupService } from './fuzzy-dedup.service';
 import { RegionService } from './region.service';
 import { ReviewService } from './review.service';
@@ -28,6 +29,7 @@ import { TepSyncService } from './tep-sync.service';
     TcSyncService,
     TepApiService,
     TepSyncService,
+    CategoryMappingService,
     FuzzyDedupService,
     EventOverrideService,
     PostEditQueueService,

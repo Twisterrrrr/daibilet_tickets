@@ -27,5 +27,13 @@ export class WidgetsApiController {
   ): Promise<WidgetCheckoutResponseDto> {
     return this.widgetCheckout.createWidgetCheckout(provider, body);
   }
+
+  @Get(':provider/last-customer')
+  async getLastCustomer(
+    @Param('provider') _provider: string,
+    @Query('email') email?: string,
+  ): Promise<{ name: string; email: string; phone: string } | null> {
+    return this.widgetsApi.getLastCustomerByEmail(email);
+  }
 }
 

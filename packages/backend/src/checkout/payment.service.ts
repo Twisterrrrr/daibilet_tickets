@@ -243,8 +243,7 @@ export class PaymentService {
     });
 
     this.logger.log(
-      `[intent=${intent.id}] [provider=${this.provider}] [providerPmtId=${providerPaymentId}] ` +
-        `Created PaymentIntent for session ${checkoutSessionId}, amount=${grossAmount}, supplierId=${supplierId}`,
+      `payment_intent_created intentId=${intent.id} checkoutSessionId=${checkoutSessionId} amount=${grossAmount} provider=${this.provider}`,
     );
 
     return {
@@ -296,6 +295,13 @@ export class PaymentService {
     // State machine: CheckoutSession → COMPLETED
     const csResult = tryTransitionCheckout(intent.checkoutSession.status, 'COMPLETED', 'system');
 
+    if (intent.checkoutSession.status === 'EXPIRED') {
+      this.logger.warn(
+        `late_payment_after_expiry intentId=${intentId} checkoutSessionId=${intent.checkoutSessionId} ` +
+          `(session stays EXPIRED, intent→PAID, fulfillment will run)`,
+      );
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updatedIntent = await tx.paymentIntent.update({
         where: { id: intentId },
@@ -336,6 +342,7 @@ export class PaymentService {
         select: {
           customerEmail: true,
           customerName: true,
+          customerPhone: true,
           shortCode: true,
           offersSnapshot: true,
           giftCertificateSnapshot: true,
@@ -383,6 +390,27 @@ export class PaymentService {
               `[intent=${intentId}] Order-confirmed email failed: ${e instanceof Error ? e.message : String(e)}`,
             ),
           );
+        // C7: сохранить контакты для instant checkout (повторный покупатель)
+        if ('lastCustomerSnapshot' in this.prisma) {
+          (this.prisma as { lastCustomerSnapshot: { upsert: (args: unknown) => Promise<unknown> } })
+            .lastCustomerSnapshot.upsert({
+              where: { email: session.customerEmail },
+              create: {
+                email: session.customerEmail,
+                name: session.customerName ?? null,
+                phone: session.customerPhone ?? null,
+              },
+              update: {
+                name: session.customerName ?? undefined,
+                phone: session.customerPhone ?? undefined,
+              },
+            })
+            .catch((e: unknown) =>
+              this.logger.warn(
+                `[intent=${intentId}] LastCustomerSnapshot upsert failed: ${e instanceof Error ? e.message : String(e)}`,
+              ),
+            );
+        }
       }
       return updatedIntent;
     });

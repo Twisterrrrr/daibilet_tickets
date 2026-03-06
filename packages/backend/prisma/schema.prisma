@@ -497,6 +497,7 @@ model EventSession {
   event        Event         @relation(fields: [eventId], references: [id], onDelete: Restrict)
   offer        EventOffer?   @relation(fields: [offerId], references: [id], onDelete: SetNull)
   packageItems PackageItem[]
+  stats        EventSessionStats?
 
   @@unique([eventId, startsAt])
   @@index([startsAt])
@@ -506,6 +507,17 @@ model EventSession {
   @@index([offerId])
   @@index([offerId, startsAt])
   @@map("event_sessions")
+}
+
+/// Precomputed stats для read API: POPULAR / sold last 24h (C6). Обновляется cron.
+model EventSessionStats {
+  sessionId   String   @id @db.Uuid
+  soldLast24h Int      @default(0)
+  totalPaid   Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  session EventSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@map("event_session_stats")
 }
 
 // ========================
@@ -1328,6 +1340,17 @@ model CheckoutSession {
   @@map("checkout_sessions")
 }
 
+/// Последние контакты для instant checkout (C7). Обновляется при успешной оплате.
+model LastCustomerSnapshot {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  name      String?
+  phone     String?
+  updatedAt DateTime @updatedAt
+
+  @@map("last_customer_snapshots")
+}
+
 // ========================
 // Подарочные сертификаты
 // ========================
@@ -1699,4 +1722,35 @@ model TicketResponse {
 
   @@index([ticketId])
   @@map("ticket_responses")
+}
+
+// ========================
+// Source Category Mapping (Anti-corruption layer)
+// ========================
+
+model SourceCategoryMapping {
+  id                 String        @id @default(uuid()) @db.Uuid
+  source             String
+  externalCategoryNorm String
+  internalCategory   EventCategory
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@unique([source, externalCategoryNorm])
+  @@index([source])
+  @@map("source_category_mappings")
+}
+
+model SourceCategoryUnknown {
+  id                  String   @id @default(uuid()) @db.Uuid
+  source              String
+  externalCategoryRaw String
+  externalCategoryNorm String
+  firstSeenAt         DateTime @default(now())
+  lastSeenAt          DateTime @default(now())
+  hits                Int      @default(1)
+
+  @@unique([source, externalCategoryNorm])
+  @@index([source])
+  @@map("source_category_unknowns")
 }

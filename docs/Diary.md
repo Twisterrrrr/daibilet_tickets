@@ -4,6 +4,77 @@
 
 ---
 
+## 06.03.2026 — FEATURE 7–10: Quick view, Quality score, Inline edit, Drag sorting, Supplier RBAC Mgmt
+
+### Наблюдения
+
+- В админке уже были EventQuickViewDrawer, GET /admin/events/:id/quality, PATCH :id/hide, вкладка «Галерея» в VenueEdit и базовый Supplier RBAC (SupplierUser.role). Требовалось: добавить пометки ownership, расширить quality, дать быстрый inline edit, сортировку галереи и минимальное управление ролями поставщиков.
+
+### Решения
+
+- **FEATURE 7:** В EventQuickViewDrawer добавлены бейджи [S]/[L] (Источник/Редакция) у заголовка, категории и в блоке SEO (заголовок, описание, изображение). Тип QuickViewEvent расширен полями override.title, .description, .imageUrl, .category.
+- **FEATURE 9:** В EventQualityIssue (backend) и EventQualityIssueDto добавлено поле ownership: 'source' | 'local'. EventQualityService проставляет ownership при формировании issues (title, category, description, imageUrl, location, offers, sessions — source или local по наличию override). В QualityBanner отображается [S]/[L] рядом с каждым пунктом.
+- **FEATURE 10:** В списке событий в меню строки добавлен пункт «Скрыть в каталоге» / «Показать в каталоге» (PATCH /admin/events/:id/hide). В Quick view — кнопка «Скрыть/Показать в каталоге» с обновлением локального состояния после успешного PATCH.
+- **FEATURE 8:** В VenueEdit на вкладке «Галерея» строки списка сделаны draggable (HTML5 DnD), добавлена иконка GripVertical и функция moveGalleryUrl; подсказка «Перетащите строку за иконку для изменения порядка (local-owned)».
+- **Supplier RBAC Mgmt:** Добавлен PATCH `/admin/suppliers/:supplierId/users/:userId/role` (UpdateSupplierUserRoleDto, только ADMIN), защита LAST_OWNER_PROTECTION (нельзя снять роль у последнего активного OWNER), в `SupplierDetailPage` роль теперь меняется через select с вызовом этого endpoint.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 06.03.2026 — Архитектурные риски после C0–C7 (display vs transaction truth; admin as second source)
+
+### Наблюдения
+
+- После «работающего» checkout типично проявляются две ловушки: (1) разъезд «витринной правды» (текущий Event/Session) и «денежной правды» (snapshot в checkout/payment/fulfillment); (2) админка незаметно становится вторым каноническим источником рядом с импортом — конфликты sync vs manual edit.
+
+### Решения
+
+- **docs/PR-C0-C7-Final.md §9:** зафиксированы Known architectural risks: (A) продажи всегда на snapshot-правде, не на текущем editable Event; (B) поля разделены на source-owned, local-owned, override/derived; inline edit только для полей с ясным ownership.
+- Политика до FEATURE 7–10: изображения и SEO — local-owned; source categories raw — source-owned; mapped category — override/derived; массовый inline edit не открывать для source-owned полей.
+
+### Проблемы
+
+- Нет. При реализации Quick view / Inline edit / Quality score / Drag sorting придерживаться этой политики.
+
+---
+
+## 06.03.2026 — Checkout C0–C7: статус и следующий шаг
+
+### Наблюдения
+
+- Pipeline C0–C7 реализован и документирован; правило bestOption зафиксировано (один сеанс = ближайший по startsAt среди доступных). Главный риск — не архитектура, а фактическое поведение на реальном потоке.
+
+### Решения
+
+- В трекере зафиксирован статус: **Checkout + Smart UX (C0–C7) — implemented. Next: E2E validation + edge-case hardening.** Новые фичи не добавлять до прогона E2E smoke и 5 edge cases (чеклист в docs/PR-C0-C7-Final.md §8).
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 06.03.2026 — FEATURE 6 (Source category mapping): E2E на TEPLOHOD
+
+### Наблюдения
+
+- Маппинг внешних категорий был реализован на 70–80%: схема БД, сервис, админка, unknowns, но без встраивания в реальный import flow. Контракт приоритета: mapping first, затем classifier, затем EVENT (Variant B).
+
+### Решения
+
+- **CategoryMappingService:** разделён на два метода без оркестрации: `findMappedCategory(source, externalCategoryRaw)` → `EventCategory | null`; `registerUnknownCategory(source, externalCategoryRaw)` → `void`. Оркестрация выполняется в импортёре.
+- **TepSyncService:** в `syncEvent()` встроен flow для TEPLOHOD: при наличии `tep.category` — lookup mapping; при отсутствии маппинга — регистрация unknown и использование результата `classifyTep()`; при пустом внешнем категории — только classifier. Source в маппинге: `TEPLOHOD`.
+- **CatalogModule:** добавлен провайдер `CategoryMappingService`.
+
+### Проблемы
+
+- Нет. TC-импортёр пока не подключён к mapping (можно добавить по тому же контракту позже).
+
+---
+
 ## 01.03.2026 — Спецификация админки: Teplohod-style расписание, готовность, мультисобытия
 
 ### Наблюдения
