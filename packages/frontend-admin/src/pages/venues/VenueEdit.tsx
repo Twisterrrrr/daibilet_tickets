@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ImageUploadInput } from '@/components/ui/ImageUploadInput';
+import { ImageUploadField } from '@/components/forms/ImageUploadField';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -448,11 +448,11 @@ export function VenueEditPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <ImageUploadInput
+                <ImageUploadField
                   label="URL обложки"
-                  value={form.imageUrl}
-                  onChange={(v) => updateField('imageUrl', v)}
-                  placeholder="https://..."
+                  value={form.imageUrl || null}
+                  onChange={(v) => updateField('imageUrl', v ?? '')}
+                  disabled={saving}
                 />
                 <div className="space-y-2">
                   <Label>Цена от (копейки)</Label>

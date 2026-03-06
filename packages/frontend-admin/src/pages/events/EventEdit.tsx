@@ -30,7 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
 import { EventTemplateFields } from './EventTemplateFields';
-import { ImageUploadInput } from '@/components/ui/ImageUploadInput';
+import { ImageUploadField } from '@/components/forms/ImageUploadField';
 import { EventGroupTab } from './EventGroupTab';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -710,10 +710,11 @@ export function EventEditPage() {
                         placeholder="Адрес или точка встречи (если нет Venue)"
                       />
                     </div>
-                <ImageUploadInput
+                <ImageUploadField
                   label="Изображение"
-                  value={form.imageUrl ?? ''}
+                  value={form.imageUrl ?? null}
                   onChange={(v) => setForm((f) => ({ ...f, imageUrl: v }))}
+                  disabled={saving}
                 />
                 <div className="space-y-2">
                   <Label>Мин. возраст</Label>
