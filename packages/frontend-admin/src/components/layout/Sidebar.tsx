@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  BarChart3,
   BookOpen,
   CalendarDays,
   ChevronLeft,
@@ -98,6 +99,7 @@ const NAV_SECTIONS: NavSection[] = [
             { to: '/audit', label: 'Аудит', icon: ClipboardList },
           ]
         : []),
+      ...(flags.showContent ? [{ to: '/seo-audit', label: 'SEO Audit', icon: BarChart3 }] : []),
       { to: '/settings', label: 'Настройки', icon: Settings },
     ],
   },

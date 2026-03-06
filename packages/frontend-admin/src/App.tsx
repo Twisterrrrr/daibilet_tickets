@@ -28,6 +28,7 @@ import { OrdersListPage } from './pages/orders/OrdersList';
 import ReconciliationPage from './pages/reconciliation/ReconciliationPage';
 import { ExternalReviewsListPage } from './pages/reviews/ExternalReviewsList';
 import { ReviewsListPage } from './pages/reviews/ReviewsList';
+import { SeoAuditPage } from './pages/seo/SeoAuditPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { WidgetEditPage } from './pages/widgets/WidgetEdit';
 import { WidgetsListPage } from './pages/widgets/WidgetsList';
@@ -106,6 +107,7 @@ export default function App() {
           <Route path="jobs/failed" element={flags.showOps ? <FailedJobsPage /> : <DisabledRoute />} />
           <Route path="reconciliation" element={flags.showOps ? <ReconciliationPage /> : <DisabledRoute />} />
           <Route path="audit" element={flags.showOps ? <AuditLogPage /> : <DisabledRoute />} />
+          <Route path="seo-audit" element={flags.showContent ? <SeoAuditPage /> : <DisabledRoute />} />
           <Route path="widgets" element={<WidgetsListPage />} />
           <Route path="widgets/new" element={<WidgetEditPage />} />
           <Route path="widgets/:id" element={<WidgetEditPage />} />

@@ -34,6 +34,7 @@ const ROUTE_LABELS: Record<string, string> = {
   reviews: 'Отзывы',
   upsells: 'Upsells',
   audit: 'Аудит',
+  'seo-audit': 'SEO Audit',
   settings: 'Настройки',
   new: 'Создание',
 };

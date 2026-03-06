@@ -35,9 +35,11 @@ import { AdminVenuesController } from './admin-venues.controller';
 import { AdminWidgetsController } from './admin-widgets.controller';
 import { AdminUploadController } from './admin-upload.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
+import { AdminSeoAuditController } from './admin-seo-audit.controller';
 import { AuditService } from './audit.service';
 import { EventOverrideService } from './event-override.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
+import { SeoAuditService } from './seo-audit/seo-audit.service';
 
 @Module({
   imports: [
@@ -52,7 +54,7 @@ import { PaymentMetricsService } from '../checkout/payment-metrics.service';
       { name: QUEUE_SYNC },
     ),
   ],
-  providers: [AuditService, EventOverrideService, ReviewService, PaymentMetricsService, TagAssignmentService],
+  providers: [AuditService, EventOverrideService, ReviewService, PaymentMetricsService, TagAssignmentService, SeoAuditService],
   controllers: [
     AdminDashboardController,
     AdminCitiesController,
@@ -78,6 +80,7 @@ import { PaymentMetricsService } from '../checkout/payment-metrics.service';
     AdminReconciliationController,
     AdminCacheController,
     AdminUploadController,
+    AdminSeoAuditController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })
