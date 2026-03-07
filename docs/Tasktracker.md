@@ -139,14 +139,26 @@
 
 ### Gate 0 — проект доступен по доменам + есть бэкап
 
-- [ ] **Критический**: Создать VPS на Timeweb Cloud (Ubuntu 22.04/24.04, 2 CPU, 4 GB RAM, 50 GB NVMe)
-- [ ] **Критический**: Настроить DNS A-записи: daibilet.ru, www.daibilet.ru, admin.daibilet.ru → IP VPS
-- [ ] **Критический**: SSH на сервер, запустить `deploy.sh` (первый раз — создаст .env с паролями)
-- [ ] **Критический**: Заполнить TC_API_TOKEN, TC_WIDGET_TOKEN в .env на сервере
-- [ ] **Критический**: Deploy: Docker + CI/CD pipeline (первый ручной запуск `deploy.sh` до CI/CD)
-- [ ] **Высокий**: Проверить https://daibilet.ru, https://admin.daibilet.ru, https://daibilet.ru/api/v1/health
-- [ ] **Средний**: Проверить SSL-сертификат (SAN: 3 домена, auto-renewal cron)
-- [ ] **Средний**: Первый бэкап БД (pg_dump + фиксация шага в `Diary.md`)
+> **Двухэтапный подход:** сначала Gate 0a (staging), затем Gate 0b (prod). Gate 0 закрыт, когда оба этапа выполнены. Одна команда: `bash scripts/close-gate0.sh` (0a) и `bash scripts/close-gate0.sh --prod` (0b).
+
+#### Gate 0a — Staging
+
+- [ ] **Критический**: VPS на Timeweb Cloud (2 CPU, 4 GB RAM, 50 GB)
+- [ ] **Критический**: DNS A: staging.daibilet.ru, api-staging.daibilet.ru, admin-staging.daibilet.ru → IP VPS
+- [ ] **Критический**: SSH, `bash scripts/bootstrap-staging.sh` (или `close-gate0.sh` после первого bootstrap)
+- [ ] **Критический**: TC_API_TOKEN, TC_WIDGET_TOKEN в .env (1:1 из локального)
+- [ ] **Критический**: `bash scripts/close-gate0.sh` — deploy, migrate, backup, verify
+- [ ] **Высокий**: https://staging.daibilet.ru, https://admin-staging.daibilet.ru, https://api-staging.daibilet.ru/api/v1/health
+- [ ] **Средний**: SSL: `STAGING_ONLY=1 bash scripts/init-letsencrypt.sh` + `bash scripts/enable-ssl-staging.sh`
+- [ ] **Средний**: Бэкап: `bash scripts/backup-staging-db.sh` + запись в Diary.md
+
+#### Gate 0b — Production
+
+- [ ] **Критический**: DNS A: daibilet.ru, www.daibilet.ru, api.daibilet.ru, admin.daibilet.ru → IP prod
+- [ ] **Критический**: `bash scripts/close-gate0.sh --prod`
+- [ ] **Высокий**: https://daibilet.ru, https://admin.daibilet.ru, https://daibilet.ru/api/v1/health
+- [ ] **Средний**: SSL prod (Let's Encrypt, SAN 4 домена, cron renewal)
+- [ ] **Средний**: `bash scripts/backup-production-db.sh`
 
 ### Gate 1 — принимаем платежи end-to-end
 
@@ -201,6 +213,7 @@
 - [~] **Средний**: Нормализация категорий/аудиторий после импорта (детерминированный маппинг TC/TEP → EventCategory/EventSubcategory). **TEPLOHOD E2E готов:** mapping first → register unknown + classifier → EVENT; `findMappedCategory` + `registerUnknownCategory` в импортёре.
 - [ ] **Средний**: Нормализация location/venue (venueId ИЛИ meetingPoint/address; MISSING_LOCATION блокирует publish)
 - [ ] **Средний**: Нормализация offers (ACTIVE только для продаваемых, наличие хотя бы одного ACTIVE offer как publish-gate)
+- [ ] **Средний**: TEPLOHOD события с открытой датой (OPEN_DATE): в админке задавать диапазон дат для продажи билетов (startDate/endDate или только endDate), делать событие активным для каталога при наличии валидного диапазона.
 
 ### Контент-операции админки (FEATURE 7–10) ✅
 
@@ -211,6 +224,15 @@
 - [x] **FEATURE 10** — Inline edit: переключатель «Скрыть/Показать в каталоге» в списке событий и в Quick view (PATCH /admin/events/:id/hide)
 - [x] **FEATURE 8** — Drag sorting: галерея в VenueEdit с перетаскиванием (HTML5 DnD), подсказка «local-owned»
 - [x] **Supplier RBAC Management** — PATCH `/admin/suppliers/:supplierId/users/:userId/role` + select в `SupplierDetailPage`, защита кода ошибки `LAST_OWNER_PROTECTION`
+
+### Promo-блоки главной (админка)
+
+> Сейчас карточки «Масленица», «Зимний город», «Каникулы с детьми» и др. захардкожены в `packages/frontend/src/components/ui/PromoBlock.tsx`. Цель — вынести в админку.
+
+- [ ] **Средний**: Backend — модель `PromoBlock` (slug, title, description, href, icon, gradient, months[], sortOrder, isActive) + CRUD API `/admin/promo-blocks`
+- [ ] **Средний**: Публичный API `GET /api/v1/promo-blocks` — список активных блоков по текущему месяцу (или кэш)
+- [ ] **Средний**: Admin UI — раздел «Промо-блоки» (Sidebar), список блоков, создание/редактирование (title, description, href, иконка, градиент, месяцы показа)
+- [ ] **Низкий**: Frontend — заменить хардкод в `PromoBlock.tsx` на загрузку с API, fallback на статичный список при ошибке
 
 ## После запуска / 6+ мес
 

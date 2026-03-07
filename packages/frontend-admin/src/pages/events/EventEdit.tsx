@@ -131,6 +131,7 @@ const BADGE_OPTIONS = [
 interface EventOverride {
   id: string;
   isHidden: boolean;
+  editorStatus?: string | null;
   title?: string | null;
   description?: string | null;
   imageUrl?: string | null;
@@ -202,6 +203,7 @@ export function EventEditPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<UiTab>('general');
 
@@ -435,6 +437,32 @@ export function EventEditPage() {
       .finally(() => setToggling(false));
   };
 
+  const handlePublish = async () => {
+    if (!id) return;
+    setPublishing(true);
+    setError(null);
+    try {
+      const res = await adminApi.post<{ ok: boolean; issues?: { code: string; message: string }[] }>(
+        `/admin/events/${id}/publish`,
+      );
+      if (res.ok) {
+        const data = await adminApi.get<EventDetail>(`/admin/events/${id}`);
+        setEvent(data);
+        toast.success('Событие опубликовано — теперь оно видно в каталоге на сайте');
+        refreshQuality(id);
+      } else if (res.issues?.length) {
+        setError(res.issues.map((i) => i.message).join('. '));
+        toast.error('Исправьте проблемы перед публикацией');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Ошибка публикации';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const isHidden = event?.override?.isHidden ?? false;
 
   const offers = event?.offers;
@@ -565,6 +593,10 @@ export function EventEditPage() {
         issuesCount={quality?.issues?.length ?? 0}
         quality={quality}
         supplierIsActive={supplierIsActive}
+        editorStatus={event.override?.editorStatus}
+        hasOverride={!!event.override}
+        onPublish={handlePublish}
+        publishing={publishing}
       />
 
       {/* Tabs */}

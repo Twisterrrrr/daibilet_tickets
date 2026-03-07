@@ -84,8 +84,8 @@ export function buildEventWhere(
     isActive: true,
     isDeleted: false,
     canonicalOfId: null,
-    // Витрина теперь показывает все события, которые isActive в админке,
-    // без дополнительного фильтра по офферам/цене.
+    // В каталоге на сайте только опубликованные: без override или override.editorStatus = PUBLISHED
+    OR: [{ override: null }, { override: { editorStatus: 'PUBLISHED' } }],
     ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),
     city: {
       isActive: true,

@@ -4,6 +4,77 @@
 
 ---
 
+## 08.03.2026 — Publish-gate UI, каталог городов, кэш
+
+### Наблюдения
+
+- editorStatus (PUBLISHED/NEEDS_REVIEW) не был доступен в админке — событие помечалось «В каталоге: Да», но на сайте не показывалось из‑за applyOverrides.
+- Города в каталоге: нужно не менее 2 событий; областные города группировать под хабом (Казань → Татарстан), не выводить отдельно.
+- После изменений в коде каталог не обновлялся — данные брались из кэша (cities 6h, events 2m).
+
+### Решения
+
+- **Admin UI Publish:** Добавлены editorStatus и кнопка «Опубликовать» в EventStatusLine, EventEdit, EventQuickViewDrawer. Статус «В каталоге» учитывает published (override null или editorStatus=PUBLISHED).
+- **Каталог городов:** minEventsForCity = 2; non-hub города региона исключены (hiddenCityIds). Областные события с 1+ событием показываются под хабом в блоке «+ Регион».
+- **Кэш:** Обновление данных после изменений — через POST `/admin/settings/ops/cache/flush` (админка → Настройки → Flush Cache) или ожидание TTL.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 06.03.2026 — Каталог на сайте: только опубликованные события в подсчётах и выдаче
+
+### Наблюдения
+
+- В каталоге на сайте неопубликованные события (override с editorStatus !== PUBLISHED) не показываются (applyOverrides их отфильтровывает), но входили в подсчёты (excursionCount, eventCount, totalCount по городам/регионам). Это сбивало с толку: в админке «Экскурсии» показывали N событий, на сайте — меньше.
+- Требование: в каталоге, выводимом на сайте, неопубликованные не считать и не показывать.
+
+### Решения
+
+- **Подсчёты:** Во всех местах, где считаются события для каталога, добавлено условие «опубликован в каталоге»: нет override ИЛИ override.editorStatus = PUBLISHED.
+  - `catalog.service.ts`: raw SQL eventCountByCity и regionStats (NOT EXISTS по event_overrides с editor_status != 'PUBLISHED'); getCityBySlug — counts с publishedInCatalog; getCities — eventsAtVenues с publishedInCatalog.
+  - `region.service.ts`: activeEventFilter дополнен AND (override null OR override.editorStatus = PUBLISHED).
+- **Выдача:** В `where-builders.ts` (buildEventWhere) добавлен фильтр OR: [override: null, override: { editorStatus: 'PUBLISHED' }], чтобы список событий каталога не подтягивал неопубликованные из БД.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 06.03.2026 — Планирование: Promo-блоки главной в админке
+
+### Наблюдения
+
+- Карточки «Масленица», «Зимний город», «Каникулы с детьми» и др. захардкожены в `PromoBlock.tsx`; не редактируются из админки. Пользователь запросил вынести в админку.
+
+### Решения
+
+- Добавлен раздел «Promo-блоки главной (админка)» в `docs/Tasktracker.md`: Backend модель + CRUD API, публичный API, Admin UI, замена хардкода на фронте. Приоритет: Средний.
+- В `docs/Project.md` — упоминание PromoBlock (планируется) в модели данных.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 06.03.2026 — Gate 0: первый бэкап staging
+
+### Наблюдения
+- Скрипт `scripts/backup-staging-db.sh` создаёт дамп в `/opt/daibilet/backups/daibilet_staging_YYYYMMDD_HHMMSS.sql.gz`.
+- Retention: 14 дней.
+
+### Решения
+- Выполнено: `bash scripts/backup-staging-db.sh` (запускать после первого успешного deploy).
+
+### Проблемы
+- Нет.
+
+---
+
 ## 06.03.2026 — FEATURE 7–10: Quick view, Quality score, Inline edit, Drag sorting, Supplier RBAC Mgmt
 
 ### Наблюдения
@@ -2229,7 +2300,7 @@ Tripster — лидер рынка экскурсий в России. Прям�
 
 2. **Калининград — проверить покрытие TC**: Нужно убедиться, что в Ticketscloud достаточно событий по Калининграду. Если база слабая — заменить на Сочи или Нижний Новгород.
 
-3. **Домен daibilet.ru — проверить доступность и купить**: Нужно зарегистрировать домен до начала разработки. Также желательно зарегистрировать daibilet.com на всякий случай.
+3. **Домен daibilet.ru** — куплен до старта проекта.
 
 ---
 

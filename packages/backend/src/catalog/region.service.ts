@@ -11,19 +11,24 @@ export class RegionService {
     private readonly cache: CacheService,
   ) {}
 
-  /** Фильтр активных событий: SCHEDULED с будущими сеансами ИЛИ OPEN_DATE */
+  /** Фильтр активных событий для каталога: SCHEDULED с будущими сеансами ИЛИ OPEN_DATE, только опубликованные (без override или editorStatus = PUBLISHED). */
   private get activeEventFilter(): Prisma.EventWhereInput {
     return {
       isActive: true,
       canonicalOfId: null,
-      OR: [
+      AND: [
+        { OR: [{ override: null }, { override: { editorStatus: 'PUBLISHED' } }] },
         {
-          dateMode: DateMode.SCHEDULED,
-          sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
-        },
-        {
-          dateMode: DateMode.OPEN_DATE,
-          OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+          OR: [
+            {
+              dateMode: DateMode.SCHEDULED,
+              sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
+            },
+            {
+              dateMode: DateMode.OPEN_DATE,
+              OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+            },
+          ],
         },
       ],
     };

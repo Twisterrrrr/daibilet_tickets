@@ -48,15 +48,17 @@ describe('CatalogService', () => {
 
   describe('getCities', () => {
     it('should filter out cities with fewer than 2 events', async () => {
-      // Both $queryRaw calls return empty arrays (no hidden cities, no region stats)
-      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([]) // regionMembers (no hidden)
+        .mockResolvedValueOnce([{ cityId: '1', cnt: 10n }]) // eventCountByCity: только Москва >= 2
+        .mockResolvedValueOnce([]); // regionStats
       mockPrisma.city.findMany.mockResolvedValue([
         {
           id: '1',
           name: 'Москва',
           slug: 'moscow',
           description: 'Test city description',
-          _count: { events: 10, venues: 5 },
+          _count: { venues: 5 },
           landingPages: [],
         },
         {
@@ -64,7 +66,7 @@ describe('CatalogService', () => {
           name: 'Empty',
           slug: 'empty',
           description: null,
-          _count: { events: 0, venues: 0 },
+          _count: { venues: 0 },
           landingPages: [],
         },
         {
@@ -72,7 +74,7 @@ describe('CatalogService', () => {
           name: 'OneEvent',
           slug: 'one-event',
           description: null,
-          _count: { events: 1, venues: 0 },
+          _count: { venues: 0 },
           landingPages: [],
         },
       ]);
@@ -85,7 +87,8 @@ describe('CatalogService', () => {
 
     it('should hide non-hub regional cities', async () => {
       mockPrisma.$queryRaw
-        .mockResolvedValueOnce([{ cityId: 'hidden-1' }]) // hiddenCityIds
+        .mockResolvedValueOnce([{ cityId: 'hidden-1' }]) // regionMembers: Раменское — не хаб
+        .mockResolvedValueOnce([{ cityId: '1', cnt: 10n }]) // eventCountByCity: Москва >= 2
         .mockResolvedValueOnce([]); // regionStats
       mockPrisma.city.findMany.mockResolvedValue([
         {
@@ -93,7 +96,7 @@ describe('CatalogService', () => {
           name: 'Москва',
           slug: 'moscow',
           description: 'Test city description',
-          _count: { events: 10, venues: 5 },
+          _count: { venues: 5 },
           landingPages: [],
         },
         {
@@ -101,7 +104,7 @@ describe('CatalogService', () => {
           name: 'Раменское',
           slug: 'ramenskoe',
           description: 'Hidden city description',
-          _count: { events: 3, venues: 0 },
+          _count: { venues: 0 },
           landingPages: [],
         },
       ]);
@@ -113,14 +116,20 @@ describe('CatalogService', () => {
     });
 
     it('should sort cities by event count descending', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([]) // regionMembers
+        .mockResolvedValueOnce([
+          { cityId: '1', cnt: 5n },
+          { cityId: '2', cnt: 50n },
+        ]) // eventCountByCity
+        .mockResolvedValueOnce([]); // regionStats
       mockPrisma.city.findMany.mockResolvedValue([
         {
           id: '1',
           name: 'Small',
           slug: 'small',
           description: 'Small city',
-          _count: { events: 5, venues: 1 },
+          _count: { venues: 1 },
           landingPages: [],
         },
         {
@@ -128,7 +137,7 @@ describe('CatalogService', () => {
           name: 'Big',
           slug: 'big',
           description: 'Big city',
-          _count: { events: 50, venues: 10 },
+          _count: { venues: 10 },
           landingPages: [],
         },
       ]);
@@ -141,7 +150,8 @@ describe('CatalogService', () => {
 
     it('should attach region data to hub cities', async () => {
       mockPrisma.$queryRaw
-        .mockResolvedValueOnce([]) // no hidden cities
+        .mockResolvedValueOnce([]) // regionMembers
+        .mockResolvedValueOnce([{ cityId: '1', cnt: 50n }]) // eventCountByCity
         .mockResolvedValueOnce([
           {
             slug: 'moskovskaya-oblast',
@@ -149,14 +159,14 @@ describe('CatalogService', () => {
             hubCityId: '1',
             event_count: BigInt(10),
           },
-        ]);
+        ]); // regionStats
       mockPrisma.city.findMany.mockResolvedValue([
         {
           id: '1',
           name: 'Москва',
           slug: 'moscow',
           description: 'Test city description',
-          _count: { events: 50, venues: 10 },
+          _count: { venues: 10 },
           landingPages: [],
         },
       ]);
@@ -171,14 +181,17 @@ describe('CatalogService', () => {
     });
 
     it('should return null region for non-hub cities', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([]) // regionMembers
+        .mockResolvedValueOnce([{ cityId: '99', cnt: 20n }]) // eventCountByCity
+        .mockResolvedValueOnce([]); // regionStats (Казань не хаб — нет региона в ответе)
       mockPrisma.city.findMany.mockResolvedValue([
         {
           id: '99',
           name: 'Казань',
           slug: 'kazan',
           description: 'Test city description',
-          _count: { events: 20, venues: 3 },
+          _count: { venues: 3 },
           landingPages: [],
         },
       ]);

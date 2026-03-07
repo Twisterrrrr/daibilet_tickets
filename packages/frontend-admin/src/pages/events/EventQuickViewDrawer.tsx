@@ -1,8 +1,10 @@
 'use client';
 
-import { Calendar, Copy, ExternalLink, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Calendar, Copy, ExternalLink, Eye, EyeOff, Loader2, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { toast } from 'sonner';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +33,7 @@ interface QuickViewEvent {
   venue?: { id: string; title: string; slug: string } | null;
   override?: {
     isHidden?: boolean;
+    editorStatus?: string | null;
     title?: string | null;
     description?: string | null;
     imageUrl?: string | null;
@@ -63,6 +66,13 @@ const SOURCE_LABELS: Record<string, string> = {
   TC: 'TicketsCloud',
   TEPLOHOD: 'Теплоход',
   MANUAL: 'Ручной ввод',
+};
+
+const EDITOR_STATUS_LABELS: Record<string, string> = {
+  NEEDS_REVIEW: 'На проверке',
+  IN_PROGRESS: 'В работе',
+  PUBLISHED: 'Опубликовано',
+  REJECTED: 'Отклонено',
 };
 
 /** Пометка ownership: S = source, L = local (override), D = derived (mapping). */
@@ -110,6 +120,7 @@ export function EventQuickViewDrawer({
   const [error, setError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [hideLoading, setHideLoading] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
 
   useEffect(() => {
     if (!open || !eventId) {
@@ -207,8 +218,30 @@ export function EventQuickViewDrawer({
     }
   };
 
+  const handlePublish = async () => {
+    if (!eventId || !event) return;
+    setPublishLoading(true);
+    try {
+      const res = await adminApi.post<{ ok: boolean; issues?: { code: string; message: string }[] }>(
+        `/admin/events/${eventId}/publish`,
+      );
+      if (res.ok) {
+        const ev = await adminApi.get<QuickViewEvent>(`/admin/events/${eventId}`);
+        setEvent(ev);
+        toast.success('Событие опубликовано');
+      } else if (res.issues?.length) {
+        toast.error(res.issues.map((i) => i.message).join('. '));
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Ошибка публикации');
+    } finally {
+      setPublishLoading(false);
+    }
+  };
+
   const isHidden = event?.override?.isHidden ?? false;
-  const inCatalog = event != null && event.isActive && !isHidden;
+  const published = event?.override ? event.override.editorStatus === 'PUBLISHED' : true;
+  const inCatalog = event != null && event.isActive && !isHidden && published;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -278,6 +311,42 @@ export function EventQuickViewDrawer({
 
             {/* Status */}
             <div className="space-y-1 text-sm">
+              {event.override && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Статус редактора</span>
+                  <span className="flex items-center gap-1">
+                    <Badge
+                      variant={event.override.editorStatus === 'PUBLISHED' ? 'default' : 'secondary'}
+                    >
+                      {EDITOR_STATUS_LABELS[event.override.editorStatus ?? ''] ??
+                        event.override.editorStatus ??
+                        '—'}
+                    </Badge>
+                    {event.override.editorStatus !== 'PUBLISHED' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-xs"
+                        onClick={handlePublish}
+                        disabled={
+                          publishLoading || (quality != null && !quality.isSellable)
+                        }
+                        title={
+                          quality && !quality.isSellable
+                            ? 'Исправьте проблемы качества'
+                            : 'Опубликовать'
+                        }
+                      >
+                        {publishLoading ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Send className="h-3 w-3" />
+                        )}
+                      </Button>
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Статус</span>
                 <span>

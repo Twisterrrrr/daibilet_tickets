@@ -51,6 +51,26 @@ export class CatalogService {
       `;
       const hiddenCityIds = new Set(regionMembers.map((r) => r.cityId));
 
+      // Подсчёт событий с будущими сессиями (только опубликованные в каталоге: без override или override.editorStatus = PUBLISHED)
+      const eventCountByCity = await this.prisma.$queryRaw<{ cityId: string; cnt: bigint }[]>`
+        SELECT e."cityId", COUNT(DISTINCT e.id)::bigint as cnt
+        FROM events e
+        WHERE e."cityId" IS NOT NULL AND e."isActive" = true AND e."isDeleted" = false
+          AND NOT EXISTS (
+            SELECT 1 FROM event_overrides o
+            WHERE o."eventId" = e.id AND o."editor_status" != 'PUBLISHED'
+          )
+          AND (
+            (e."dateMode" = 'SCHEDULED' AND EXISTS(
+              SELECT 1 FROM event_sessions s
+              WHERE s."eventId" = e.id AND s."isActive" = true AND s."startsAt" > NOW()
+            ))
+            OR (e."dateMode" = 'OPEN_DATE' AND (e."endDate" IS NULL OR e."endDate" > NOW()))
+          )
+        GROUP BY e."cityId"
+      `;
+      const eventCountMap = new Map(eventCountByCity.map((r) => [r.cityId, Number(r.cnt)]));
+
       const cities = await this.prisma.city.findMany({
         where: {
           isActive: true,
@@ -59,19 +79,6 @@ export class CatalogService {
         include: {
           _count: {
             select: {
-              events: {
-                where: {
-                  isActive: true,
-                  isDeleted: false,
-                  OR: [
-                    {
-                      dateMode: DateMode.SCHEDULED,
-                      sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
-                    },
-                    { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: new Date() } }] },
-                  ],
-                },
-              },
               venues: {
                 where: { isActive: true },
               },
@@ -93,6 +100,10 @@ export class CatalogService {
         FROM regions r
         JOIN region_cities rc ON rc."regionId" = r.id AND rc."cityId" != r."hubCityId"
         JOIN events e ON e."cityId" = rc."cityId" AND e."isActive" = true
+          AND NOT EXISTS (
+            SELECT 1 FROM event_overrides o
+            WHERE o."eventId" = e.id AND o."editor_status" != 'PUBLISHED'
+          )
           AND (
             (e."dateMode" = 'SCHEDULED' AND EXISTS(
               SELECT 1 FROM event_sessions s
@@ -108,10 +119,11 @@ export class CatalogService {
         regionStats.map((r) => [r.hubCityId, { slug: r.slug, name: r.name, eventCount: Number(r.event_count) }]),
       );
 
-      // Отфильтрованные города, которые реально отображаются в каталоге
+      // Отфильтрованные города: не менее 2 событий; областные (не-хаб) не выводим — группируем под хабом (Казань → Татарстан ниже)
+      const minEventsForCity = 2;
+      const eventCount = (c: (typeof cities)[0]) => eventCountMap.get(c.id) ?? 0;
       const visibleCities = cities.filter(
-        (c) =>
-          !hiddenCityIds.has(c.id) && c._count.events >= 2 && c.description != null && c.description.trim().length > 0,
+        (c) => !hiddenCityIds.has(c.id) && eventCount(c) >= minEventsForCity,
       );
 
       // Счётчик «Музеи и арт» для списка городов:
@@ -132,6 +144,9 @@ export class CatalogService {
             },
           ],
         };
+        const publishedInCatalog: Prisma.EventWhereInput = {
+          OR: [{ override: null }, { override: { editorStatus: 'PUBLISHED' } }],
+        };
 
         const eventsAtVenues = await this.prisma.event.groupBy({
           by: ['cityId'],
@@ -141,6 +156,7 @@ export class CatalogService {
             isDeleted: false,
             venueId: { not: null },
             ...hasFutureSessions,
+            ...publishedInCatalog,
           },
           _count: { _all: true },
         });
@@ -154,7 +170,7 @@ export class CatalogService {
       }
 
       return visibleCities
-        .sort((a, b) => b._count.events - a._count.events)
+        .sort((a, b) => eventCount(b) - eventCount(a))
         .map((c) => {
           const eventsAtVenues = eventsAtVenuesByCity.get(c.id) ?? 0;
           const museumCount = (c._count.venues ?? 0) + eventsAtVenues;
@@ -278,23 +294,45 @@ export class CatalogService {
 
     if (!city) throw new NotFoundException(`Город "${slug}" не найден`);
 
-    // Статистика по категориям (с поддержкой OPEN_DATE).
-    // Музеи и арт = площадки (venues) + события в них (events с venueId).
+    // Статистика по категориям (с поддержкой OPEN_DATE). Только опубликованные в каталоге.
     const hasFutureSessions: Prisma.EventWhereInput = {
       OR: [
         { dateMode: DateMode.SCHEDULED, sessions: { some: { isActive: true, startsAt: { gte: new Date() } } } },
         { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: new Date() } }] },
       ],
     };
+    const publishedInCatalog: Prisma.EventWhereInput = {
+      OR: [{ override: null }, { override: { editorStatus: 'PUBLISHED' } }],
+    };
     const [excursionCount, eventCount, totalCount, venueCount, eventsAtVenuesCount] = await Promise.all([
       this.prisma.event.count({
-        where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EXCURSION', ...hasFutureSessions },
+        where: {
+          cityId: city.id,
+          isActive: true,
+          isDeleted: false,
+          category: 'EXCURSION',
+          ...hasFutureSessions,
+          ...publishedInCatalog,
+        },
       }),
       this.prisma.event.count({
-        where: { cityId: city.id, isActive: true, isDeleted: false, category: 'EVENT', ...hasFutureSessions },
+        where: {
+          cityId: city.id,
+          isActive: true,
+          isDeleted: false,
+          category: 'EVENT',
+          ...hasFutureSessions,
+          ...publishedInCatalog,
+        },
       }),
       this.prisma.event.count({
-        where: { cityId: city.id, isActive: true, isDeleted: false, ...hasFutureSessions },
+        where: {
+          cityId: city.id,
+          isActive: true,
+          isDeleted: false,
+          ...hasFutureSessions,
+          ...publishedInCatalog,
+        },
       }),
       this.prisma.venue.count({
         where: { cityId: city.id, isActive: true, isDeleted: false },
@@ -306,6 +344,7 @@ export class CatalogService {
           isDeleted: false,
           venueId: { not: null },
           ...hasFutureSessions,
+          ...publishedInCatalog,
         },
       }),
     ]);
@@ -894,11 +933,12 @@ export class CatalogService {
       venueId,
       priceMin,
       priceMax,
-      page = 1,
-      limit = 20,
       hasPhoto,
       slugs: slugsParam,
     } = query;
+
+    const pageNum = Math.max(1, Number(query.page) || 1);
+    const limitNum = Math.max(1, Math.min(200, Number(query.limit) || 20));
 
     // --- Фильтр сеансов: OPEN_DATE не требуют sessions ---
     // dateMode=OPEN_DATE → нет сеансов, показываем если isActive и не истёк endDate
@@ -1036,7 +1076,7 @@ export class CatalogService {
         if (ids.length > 0) {
           where.id = { in: ids };
         } else {
-          return { items: [], total: 0, page, totalPages: 0 };
+          return { items: [], total: 0, page: pageNum, totalPages: 0 };
         }
       }
     }
@@ -1046,8 +1086,8 @@ export class CatalogService {
 
     // Для departing_soon: Prisma не поддерживает orderBy по min(sessions.startsAt),
     // поэтому загружаем все подходящие (макс. 500), сортируем в памяти, затем пагинируем
-    const maxTake = isDepartingSoon ? 500 : limit;
-    const skip = isDepartingSoon ? 0 : (page - 1) * limit;
+    const maxTake = isDepartingSoon ? 500 : limitNum;
+    const skip = isDepartingSoon ? 0 : (pageNum - 1) * limitNum;
 
     const fields = query.fields ?? 'full';
 
@@ -1147,7 +1187,7 @@ export class CatalogService {
         }),
       );
 
-      const paged = sorted.slice((page - 1) * limit, page * limit);
+      const paged = sorted.slice((pageNum - 1) * limitNum, pageNum * limitNum);
 
       const payloadItems = fields === 'card' ? paged.map((e) => this.toEventCard(e)) : paged;
 
@@ -1166,8 +1206,8 @@ export class CatalogService {
       return {
         items: payloadItems,
         total: departingTotal,
-        page,
-        totalPages: Math.ceil(departingTotal / limit),
+        page: pageNum,
+        totalPages: Math.ceil(departingTotal / limitNum),
       };
     }
 
@@ -1188,8 +1228,8 @@ export class CatalogService {
     return {
       items: payloadItems,
       total,
-      page,
-      totalPages: Math.ceil(total / limit),
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
     };
   }
 
