@@ -18,7 +18,7 @@ type Props = {
   defaultStartIso?: string;
 };
 
-export function EditSessionDialog({ open, onOpenChange, eventId, session, defaultStartIso }: Props) {
+export function EditSessionDialog({ open, onOpenChange, eventId: _eventId, session, defaultStartIso }: Props) {
   const qc = useQueryClient();
 
   const [date, setDate] = useState('');

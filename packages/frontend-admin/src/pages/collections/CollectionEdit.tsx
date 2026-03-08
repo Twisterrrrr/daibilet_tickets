@@ -104,7 +104,7 @@ export function CollectionEditPage() {
       .then((data) => {
         setCities(data.items ?? []);
       })
-      .catch(() => {});
+      .catch(() => { /* noop */ });
   }, []);
 
   useEffect(() => {
@@ -148,7 +148,7 @@ export function CollectionEditPage() {
       adminApi
         .get<{ items: any[] }>(`/admin/events?search=${encodeURIComponent(eventSearch)}&limit=10`)
         .then((data) => setEventResults(data.items ?? []))
-        .catch(() => {});
+        .catch(() => { /* noop */ });
     }, 300);
     return () => clearTimeout(timer);
   }, [eventSearch]);

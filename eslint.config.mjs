@@ -60,11 +60,27 @@ export default tseslint.config(
     },
   },
 
-  // Seed/migration скрипты: разрешаем console (CLI output)
+  // CLI-скрипты (prisma, scripts): console и any — норма для миграций, JSON, сырых данных
   {
-    files: ['**/prisma/seed*.ts', '**/prisma/fix*.ts'],
+    files: [
+      '**/packages/backend/prisma/*.ts',
+      '**/packages/backend/scripts/**/*.ts',
+    ],
     rules: {
       'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+
+  // Админка: console для отладки, any — off (внутренний инструмент, типизация не приоритет)
+  {
+    files: [
+      '**/packages/frontend-admin/**/*.{ts,tsx}',
+      '**/packages/frontend-supplier/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 
@@ -79,6 +95,7 @@ export default tseslint.config(
       '**/*.mjs',
       '**/*.cjs',
       '**/prisma/migrations/**',
+      '**/next-env.d.ts',
     ],
   },
 );

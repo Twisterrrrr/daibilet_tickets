@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import {
   DropdownMenu,

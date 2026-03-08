@@ -40,7 +40,7 @@ export function ArticleEditPage() {
   const navigate = useNavigate();
   const isCreate = !id || id === 'new';
 
-  const [article, setArticle] = useState<ArticleDetail | null>(null);
+  const [_article, setArticle] = useState<ArticleDetail | null>(null);
   const [cities, setCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

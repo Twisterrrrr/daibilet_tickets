@@ -4,9 +4,7 @@ import { useMemo, useState } from 'react';
 import { CalendarClock, Plus } from 'lucide-react';
 
 import type { AdminEventSessionRow } from '@/components/events/ScheduleTab';
-import { formatDateRu, formatTimeRu, isoToDateInput } from '@/lib/sessions';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { formatTimeRu, isoToDateInput } from '@/lib/sessions';
 
 export type ScheduleGridSelection = Set<string>;
 
@@ -55,7 +53,7 @@ export function ScheduleGridDay({
       if (map.has(key)) {
         // Исторические дубли: показываем первый, но подсвечиваем в консоли (dev).
         if (!import.meta.env.PROD) {
-          // eslint-disable-next-line no-console
+           
           console.warn('Duplicate sessions for the same startsAt in grid', {
             date,
             key,

@@ -17,7 +17,7 @@ type Props = {
   session: AdminEventSessionRow | null;
 };
 
-export function CancelSessionDialog({ open, onOpenChange, eventId, session }: Props) {
+export function CancelSessionDialog({ open, onOpenChange, eventId: _eventId, session }: Props) {
   const qc = useQueryClient();
   const [reason, setReason] = useState('');
 

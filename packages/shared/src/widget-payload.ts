@@ -115,7 +115,9 @@ export function validateWidgetPayload(
   }
 
   // Zod v4 compatible error extraction
-  const errors = (result as any).error?.issues?.map?.((i: any) => `${i.path?.join?.('.') || ''}: ${i.message}`) || [
+  type ParseError = { error?: { issues?: Array<{ path?: unknown[]; message?: string }> } };
+  const err = result as unknown as ParseError;
+  const errors = err.error?.issues?.map?.((i) => `${(i as { path?: unknown[] }).path?.join?.('.') || ''}: ${(i as { message?: string }).message}`) || [
     'Невалидный widgetPayload',
   ];
 

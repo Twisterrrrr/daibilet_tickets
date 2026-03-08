@@ -87,7 +87,7 @@ export function SeoAuditPage() {
         const list = Array.isArray(data) ? data : data.items ?? [];
         setCities(list.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
       })
-      .catch(() => {});
+      .catch(() => { /* noop */ });
   }, []);
 
   const handleSearch = () => setSearch(searchInput);

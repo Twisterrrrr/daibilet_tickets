@@ -2,7 +2,6 @@ import {
   ArrowRight,
   CalendarDays,
   DollarSign,
-  ExternalLink,
   MessageSquare,
   Ticket,
   TrendingDown,

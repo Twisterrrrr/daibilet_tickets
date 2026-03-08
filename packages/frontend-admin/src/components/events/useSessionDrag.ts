@@ -96,7 +96,7 @@ export function useSessionDrag(args: UseSessionDragArgs): UseSessionDragResult {
 
       const d = new Date(session.startIso);
       const baseDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      const baseMs = baseDay.getTime();
+      const _baseMs = baseDay.getTime();
 
       const onMove = (ev: PointerEvent) => {
         setDrag((prev) => {
@@ -110,7 +110,7 @@ export function useSessionDrag(args: UseSessionDragArgs): UseSessionDragResult {
           const proposedStart = new Date(originDate.getTime() + deltaMinutes * 60_000);
 
           const hour = proposedStart.getHours();
-          const minute = proposedStart.getMinutes();
+          const _minute = proposedStart.getMinutes();
 
           let isValid = true;
           let invalidReason: DragInvalidReason | undefined;
@@ -158,7 +158,7 @@ export function useSessionDrag(args: UseSessionDragArgs): UseSessionDragResult {
         });
       };
 
-      const onUp = (ev: PointerEvent) => {
+      const onUp = (_ev: PointerEvent) => {
         setDrag((prev) => {
           if (prev.phase !== 'dragging' || prev.pointerId !== pointerId) return prev;
           if (prev.isValid) {

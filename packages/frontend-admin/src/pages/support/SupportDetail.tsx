@@ -4,9 +4,7 @@ import {
   Bot,
   CheckCircle,
   Clock,
-  Eye,
   EyeOff,
-  MessageSquare,
   Send,
   User,
 } from 'lucide-react';
@@ -49,7 +47,7 @@ interface Ticket {
   responses: Response[];
 }
 
-const STATUS_LABELS: Record<string, string> = {
+const _STATUS_LABELS: Record<string, string> = {
   OPEN: 'Открыт',
   IN_PROGRESS: 'В работе',
   WAITING_CUSTOMER: 'Ожидает клиента',

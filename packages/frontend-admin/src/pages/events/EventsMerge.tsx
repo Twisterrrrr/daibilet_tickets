@@ -101,7 +101,7 @@ export function EventsMergePage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {candidates.map((c, i) => (
+              {candidates.map((c, _i) => (
                 <div
                   key={`${c.eventA.id}-${c.eventB.id}`}
                   className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border bg-card"

@@ -74,7 +74,7 @@ const TRANSLIT: Record<string, string> = {
   я: 'ya',
 };
 
-function generateSlug(text: string): string {
+function _generateSlug(text: string): string {
   return text
     .toLowerCase()
     .split('')

@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, ExternalLink, Eye, EyeOff, Pencil, Plus, RotateCcw, Save, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, Eye, EyeOff, Pencil, Plus, RotateCcw, Save, Star, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -114,7 +114,7 @@ const PURCHASE_TYPE_LABELS: Record<string, string> = {
   REQUEST: 'Заявка',
 };
 
-const AVAILABILITY_LABELS: Record<string, string> = {
+const _AVAILABILITY_LABELS: Record<string, string> = {
   UNKNOWN: 'Неизвестно',
   LIMITED: 'Ограничено',
   SOLD_OUT: 'Распродано',

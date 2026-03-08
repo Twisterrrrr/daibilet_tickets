@@ -210,7 +210,6 @@ export function ImageUploadField({ label, value, onChange, disabled }: ImageUplo
         <div className="flex items-center gap-3">
           <div className="relative h-20 w-32 overflow-hidden rounded-md bg-slate-200">
             {hasPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={previewUrl ?? undefined} alt="" className="h-full w-full object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-[11px] text-slate-500">

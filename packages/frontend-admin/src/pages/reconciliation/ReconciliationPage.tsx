@@ -277,7 +277,6 @@ export default function ReconciliationPage() {
     if (tab === 'mismatches') loadMismatches();
     if (tab === 'webhooks') loadWebhooks();
     if (tab === 'metrics') loadMetrics();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   // ============================================================

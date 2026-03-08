@@ -111,8 +111,8 @@ export function ScheduleTab({
   eventId,
   eventSource,
   defaultDays = 30,
-  onEditSession,
-  onDeleteSession,
+  onEditSession: _onEditSession,
+  onDeleteSession: _onDeleteSession,
 }: Props) {
   const [from, setFrom] = useState<string>(() => isoToday());
   const [to, setTo] = useState<string>(() => addDaysIso(isoToday(), defaultDays));
@@ -185,7 +185,7 @@ export function ScheduleTab({
     });
   }, [rows, gridConfig.slotMinutes, todayDateStr]);
 
-  const { drag, onSessionPointerDown, cancelDrag } = useSessionDrag({
+  const { drag, onSessionPointerDown, cancelDrag: _cancelDrag } = useSessionDrag({
     config: gridConfig,
     intervalsForDay,
     canDragSession: (sessionId) => {
@@ -215,7 +215,7 @@ export function ScheduleTab({
         dayDate: isoToDateInput(s.startsAt),
       };
     },
-    onDropValid: (sessionId, prefillStartIso) => {
+    onDropValid: (sessionId, _prefillStartIso) => {
       const s = rows.find((r) => r.id === sessionId);
       if (!s) return;
       // Открываем диалог редактирования; PR2-9: пользователь подтверждает время руками.

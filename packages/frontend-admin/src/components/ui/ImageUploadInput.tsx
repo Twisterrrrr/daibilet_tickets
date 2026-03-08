@@ -42,7 +42,7 @@ export function ImageUploadInput({ label, value, onChange, placeholder, helperTe
         onChange(data.url);
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
+       
       console.error('Image upload failed', e);
     } finally {
       setUploading(false);

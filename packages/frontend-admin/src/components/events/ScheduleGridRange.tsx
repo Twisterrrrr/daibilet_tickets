@@ -117,8 +117,8 @@ export function ScheduleGridRange({
 
   const hasOutOfRange = useMemo(() => {
     if (!dateKeys.length || !hours.length) return false;
-    const minHour = Math.min(...hours);
-    const maxHour = Math.max(...hours);
+    const _minHour = Math.min(...hours);
+    const _maxHour = Math.max(...hours);
     return sessions.some((s) => {
       const d = new Date(s.startsAt);
       const dateKey = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;

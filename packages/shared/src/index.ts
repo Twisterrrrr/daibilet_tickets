@@ -4,9 +4,10 @@
 
 export type { ApiErrorBody, CheckoutErrorCodeType } from './api-error';
 export { CheckoutErrorCode } from './api-error';
+export { getScarcityState, type ScarcityLevel, type ScarcityState } from './session-ux';
 
 /* eslint-disable no-var */
-declare var console: { warn: (...args: any[]) => void; log: (...args: any[]) => void; error: (...args: any[]) => void };
+declare var console: { warn: (...args: unknown[]) => void; log: (...args: unknown[]) => void; error: (...args: unknown[]) => void };
 
 // --- Widget Payload Validation ---
 export { shortenAddressToStreet } from './address-utils';
@@ -850,9 +851,9 @@ export interface VenueDetail extends VenueListItem {
   lng?: number | null;
   district?: string | null;
   operator?: { id: string; name: string; slug: string; logo?: string | null } | null;
-  offers: any[];
-  exhibitions: any[];
-  reviews?: any[];
+  offers: unknown[];
+  exhibitions: unknown[];
+  reviews?: unknown[];
   recommendPercent?: number;
   highlights?: string[];
   faq?: { q: string; a: string }[];
@@ -861,7 +862,7 @@ export interface VenueDetail extends VenueListItem {
   externalSource?: string | null;
   metaTitle?: string | null;
   metaDescription?: string | null;
-  relatedArticles?: any[];
+  relatedArticles?: unknown[];
   relatedVenues?: VenueListItem[];
 }
 

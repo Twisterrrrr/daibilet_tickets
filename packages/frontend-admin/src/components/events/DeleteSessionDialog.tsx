@@ -14,7 +14,7 @@ type Props = {
   session: AdminEventSessionRow | null;
 };
 
-export function DeleteSessionDialog({ open, onOpenChange, eventId, session }: Props) {
+export function DeleteSessionDialog({ open, onOpenChange, eventId: _eventId, session }: Props) {
   const qc = useQueryClient();
 
   const mutation = useMutation({
