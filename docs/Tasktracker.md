@@ -1,6 +1,6 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-03-06. См. `docs/Reference.md`, `docs/Deploy.md`.
+> Последнее обновление: 2026-03-10. См. `docs/Reference.md`, `docs/Deploy.md`.
 > **Отложено 6+ мес** (Q3 2026+): Planner, Unified Checkout, ML-рекомендации, PWA, сложная дедупликация, gRPC-оптимизации, микрооптимизация Web Vitals, расширенная CI-инфра.
 > План 26 PR: `docs/InfraTypizationUXCheckoutPlan.md` (инфра, типизация, UX, Checkout + YooKassa).
 
@@ -18,11 +18,21 @@
 
 > Сводка выполненных работ по темам. Детали — в секциях ниже и в `docs/Diary.md`.
 
-## Checkout + Smart UX (C0–C7) — implemented (06.03.2026) ✅
+## Checkout + Smart UX (C0–C7) + E2E validation (06.03.2026) ✅
 
 - **C0–C7 реализованы:** контракты ошибок, read API, smart sorting (bestOption зафиксирован), checkout + redirect, holds (в т.ч. AWAITING_PAYMENT), paid = PackageItem + FulfillmentItem, webhook, precomputed stats (soldLast24h), last-customer snapshot.
 - **Правило bestOption** нормализовано и документировано (один сеанс на событие = ближайший по startsAt среди доступных). См. `docs/PR-C0-C7-Final.md` §6.
-- **Следующий этап:** не разработка новых фич, а **E2E validation + edge-case hardening** (smoke path + 5 edge cases). Чеклист: `docs/PR-C0-C7-Final.md` §8.
+- **E2E validation pass (06.03.2026)** выполнен: smoke path (Read API → Checkout → Payment → Webhook → Fulfillment → Stats → Last customer), 5 edge cases (last seats race, duplicate webhook, late payment after expiry, soldLast24h, last-customer). См. `docs/PR-C0-C7-Final.md` §8.
+
+## Gate 0a — Staging (03.2026) ✅
+
+- **Инфраструктура:** VPS Timeweb Cloud, DNS staging, SSH, bootstrap/close-gate0, deploy, migrate, SSL (Let's Encrypt), health OK (status, db, redis).
+- **Бэкапы:** `scripts/backup-staging-db.sh`, `scripts/backup-production-db.sh` — дамп в `/opt/daibilet/backups/`, retention 14 дней. Запуск: на VPS в `cd /opt/daibilet`.
+
+## Publish-gate UI + каталог городов (08.03.2026) ✅
+
+- **Publish-gate:** editorStatus в админке, кнопка «Опубликовать», POST /admin/events/:id/publish; каталог учитывает только override null или editorStatus=PUBLISHED.
+- **Правила городов:** minEventsForCity=2, областные города под хабом (hiddenCityIds). Кэш: cities 6h, events 2m; сброс через POST /admin/settings/ops/cache/flush.
 
 ## Cursor Master Pipeline PR-1–PR-8 (01.03.2026) ✅
 
@@ -99,7 +109,7 @@
 | # | Вопрос | Решение | Выполнено |
 |---|--------|---------|-----------|
 | 1 | Переклассификация событий | Скрипт reclassify-events.ts | ✅ |
-| 2 | EventOverride.subcategories | Жёсткий override: category, subcategory, clear | — |
+| 2 | EventOverride.subcategories | Жёсткий override: INHERIT/OVERRIDE/CLEAR + subcategoriesOverride | ✅ |
 | 3 | GiftCertificate — email | Шаблон, fulfillment, retry, лог admin | ✅ |
 | 4 | Скрыть корзину | Прямой checkout per-offer | ✅ |
 | 5 | Планировщик MVP | Отложить до базы 2000+ событий | — |
@@ -141,16 +151,16 @@
 
 > **Двухэтапный подход:** сначала Gate 0a (staging), затем Gate 0b (prod). Gate 0 закрыт, когда оба этапа выполнены. Одна команда: `bash scripts/close-gate0.sh` (0a) и `bash scripts/close-gate0.sh --prod` (0b).
 
-#### Gate 0a — Staging
+#### Gate 0a — Staging ✅
 
-- [ ] **Критический**: VPS на Timeweb Cloud (2 CPU, 4 GB RAM, 50 GB)
-- [ ] **Критический**: DNS A: staging.daibilet.ru, api-staging.daibilet.ru, admin-staging.daibilet.ru → IP VPS
-- [ ] **Критический**: SSH, `bash scripts/bootstrap-staging.sh` (или `close-gate0.sh` после первого bootstrap)
-- [ ] **Критический**: TC_API_TOKEN, TC_WIDGET_TOKEN в .env (1:1 из локального)
-- [ ] **Критический**: `bash scripts/close-gate0.sh` — deploy, migrate, backup, verify
-- [ ] **Высокий**: https://staging.daibilet.ru, https://admin-staging.daibilet.ru, https://api-staging.daibilet.ru/api/v1/health
-- [ ] **Средний**: SSL: `STAGING_ONLY=1 bash scripts/init-letsencrypt.sh` + `bash scripts/enable-ssl-staging.sh`
-- [ ] **Средний**: Бэкап: `bash scripts/backup-staging-db.sh` + запись в Diary.md
+- [x] **Критический**: VPS на Timeweb Cloud (2 CPU, 4 GB RAM, 50 GB) ✅
+- [x] **Критический**: DNS A: staging.daibilet.ru, api-staging.daibilet.ru, admin-staging.daibilet.ru → IP VPS ✅
+- [x] **Критический**: SSH, `bash scripts/bootstrap-staging.sh` (или `close-gate0.sh` после первого bootstrap) ✅
+- [x] **Критический**: TC_API_TOKEN, TC_WIDGET_TOKEN в .env (1:1 из локального) ✅
+- [x] **Критический**: `bash scripts/close-gate0.sh` — deploy, migrate, backup, verify ✅
+- [x] **Высокий**: https://staging.daibilet.ru, https://admin-staging.daibilet.ru, https://api-staging.daibilet.ru/api/v1/health ✅
+- [x] **Средний**: SSL: `STAGING_ONLY=1 bash scripts/init-letsencrypt.sh` + `bash scripts/enable-ssl-staging.sh` ✅
+- [x] **Средний**: Бэкап: `bash scripts/backup-staging-db.sh` ✅
 
 #### Gate 0b — Production
 
@@ -158,7 +168,7 @@
 - [ ] **Критический**: `bash scripts/close-gate0.sh --prod`
 - [ ] **Высокий**: https://daibilet.ru, https://admin.daibilet.ru, https://daibilet.ru/api/v1/health
 - [ ] **Средний**: SSL prod (Let's Encrypt, SAN 4 домена, cron renewal)
-- [ ] **Средний**: `bash scripts/backup-production-db.sh`
+- [ ] **Средний**: `bash scripts/backup-production-db.sh` (скрипт есть в `scripts/`; запускать на prod VPS)
 
 ### Gate 1 — принимаем платежи end-to-end
 
@@ -227,12 +237,23 @@
 
 ### Promo-блоки главной (админка)
 
-> Сейчас карточки «Масленица», «Зимний город», «Каникулы с детьми» и др. захардкожены в `packages/frontend/src/components/ui/PromoBlock.tsx`. Цель — вынести в админку.
+> Спецификация: `docs/PromoBlocksSpec.md`. v2: PromoCollection, PromoCollectionItem, PromoCollectionRule, resolver.
 
-- [ ] **Средний**: Backend — модель `PromoBlock` (slug, title, description, href, icon, gradient, months[], sortOrder, isActive) + CRUD API `/admin/promo-blocks`
-- [ ] **Средний**: Публичный API `GET /api/v1/promo-blocks` — список активных блоков по текущему месяцу (или кэш)
-- [ ] **Средний**: Admin UI — раздел «Промо-блоки» (Sidebar), список блоков, создание/редактирование (title, description, href, иконка, градиент, месяцы показа)
-- [ ] **Низкий**: Frontend — заменить хардкод в `PromoBlock.tsx` на загрузку с API, fallback на статичный список при ошибке
+- [x] **Средний**: Backend — модель `PromoBlock` + PromoBlockEvent, PromoBlockVenue + CRUD `/admin/promo-blocks` ✅
+- [x] **Средний**: Публичный API `GET /api/v1/promo-blocks` — активные по датам, сортировка priority/sortOrder ✅
+- [x] **Средний**: Admin UI — раздел «Промо-блоки», список, create/edit (периоды, иконка LIBRARY|SVG, фон SOLID|GRADIENT) ✅
+- [x] **Низкий**: Frontend — загрузка из API, fallback только при сетевой ошибке, SSR на главной ✅
+- [x] **Средний**: Promo Blocks v2 — PromoCollection, PromoCollectionItem, PromoCollectionRule, PromoCollectionResolverService ✅
+- [x] **Средний**: Admin CRUD `/admin/promo-collections`, items, rule, preview ✅
+- [x] **Средний**: Public `GET /api/v1/promo-blocks/:slug/items` ✅
+- [x] **Средний**: Admin UI — Promo Collections (список, create/edit), manual items (поиск+add/remove), auto rule форма, preview ✅
+- [x] **Средний**: PromoBlock form — contentMode (LINK_ONLY | COLLECTION), collectionId ✅
+- [x] **Средний**: Promo Blocks v2.5 — targetCitySlugs, city targeting (GET /api/v1/promo-blocks?city=), публичная страница /promo/:slug ✅
+- [x] **Средний**: Collection-based blocks href → /promo/{slug}, убран fallback /events ✅
+- [x] **Средний**: Admin UI — targetCitySlugs (comma-separated) в форме PromoBlock, колонка «Города» в списке ✅
+- [ ] **Отложено**: MANUAL EVENTS — ручная привязка событий (реализовано через PromoCollectionItem)
+- [ ] **Отложено**: MANUAL VENUES — ручная привязка мест (реализовано через PromoCollectionItem)
+- [ ] **Отложено**: AUTO — автоподбор по правилам (реализовано через PromoCollectionRule)
 
 ## После запуска / 6+ мес
 
@@ -297,7 +318,7 @@
 
 ### Batch 3 — Admin Operator Panel v1
 - [x] **Критический**: GET /admin/orders (list + search), GET /admin/orders/:id ✅
-- [ ] **Высокий**: Admin UI: Orders search, OrderDetails
+- [x] **Высокий**: Admin UI: Orders search, OrderDetail (resend, retry fulfilment) ✅
 
 ### Batch 4 — Admin Operator Panel v2
 - [x] **Критический**: POST resend-email, retry-fulfilment, set-status (с reason, audit) ✅
@@ -324,7 +345,7 @@
 - [ ] **Средний**: Импорт внешних рейтингов (Яндекс/2ГИС) для топ-venue
 - [x] **Низкий**: EventEdit — «Оригинал»/«Для Daibilet» рядом с названием ✅
 - [ ] **Низкий**: Геолокация «Ближайший причал» (Phase 2)
-- [ ] **Высокий**: Redis-кэш: списки событий (TTL 10 мин), детали (5 мин), сессии (3 мин)
+- [x] **Высокий**: Redis-кэш каталога (cities 6h, events 2m/10m; инвалидация при изменении события) ✅ (PR-2)
 - [x] **Средний**: Диетический режим листингов `/events` — `fields=card`/`full`, Prisma `select` для card, тайминги `fetchEvents` (dbMs/overrideMs/badgesMs/totalMs)
 - [~] **Средний**: Глобальные мульти-события (одно шоу в разных городах) — `normalizedTitle`/`groupingKey`, `GET /api/v1/multi-events` (backend готов, подключение фронта и `/events/m/{slug}` — отдельный PR)
 - [x] **Средний**: FULL SYNC (dev) — CLI `FULL_SYNC=1 pnpm full:sync` (Ticketscloud + Teplohod + retag + cache invalidate)
@@ -346,15 +367,15 @@
 - [x] **Высокий**: Autocomplete — город из URL для фильтрации ✅
 - [x] **Высокий**: Скелетон loading.tsx для /events ✅
 - [ ] **Высокий** (⏸ 6+ мес): Web Vitals: LCP < 2.5s, CLS < 0.1 — lazy images, font preload, critical CSS
-- [ ] **Высокий**: Мобильная корзина: UX на 375px, fixed bottom bar для «Оформить»
-- [ ] **Высокий**: Checkout UX: прогресс-бар (корзина → данные → оплата → готово)
-- [ ] **Высокий**: Страница /orders/[id] — трекинг заказа
+- [x] **Высокий**: Мобильная корзина: fixed bottom bar для «Оформить» (≤420px) ✅ (PR-4)
+- [x] **Высокий**: Checkout UX: прогресс-бар (корзина → данные → оплата → готово) ✅ (PR-4)
+- [x] **Высокий**: Страница /orders/[id] — таймлайн, операционная инфо, ваучер ✅ (PR-5)
 - [ ] **Высокий**: Push/email уведомления о смене статуса заказа
 
 ### Средний приоритет
 - [ ] **Средний**: Страница события: профиль оператора, маршрут на карте, фото
 - [ ] **Средний**: Живое социальное доказательство («Забронировано N раз сегодня»)
-- [ ] **Средний**: Мобильный UX: fixed bottom bar, bottom sheet для фильтров
+- [ ] **Средний**: Мобильный UX: bottom sheet для фильтров (fixed bottom bar checkout уже есть)
 - [ ] **Средний**: Scroll-progress indicator на мобиле
 - [ ] **Средний**: «Похожие места» блок на venue page (если ещё не везде)
 - [ ] **Средний**: «Недавно просмотренные» на главной
@@ -375,7 +396,7 @@
 - [ ] **Критический**: SEO-описания для всех городов (уникальные)
 - [ ] **Критический**: SEO-описания для ТОП-10 площадок
 - [ ] **Высокий**: Тематические лендинги («Ночные экскурсии СПб», «Музеи Казани с детьми»)
-- [ ] **Высокий**: JSON-LD и meta-теги на всех посадочных
+- [x] **Высокий**: JSON-LD и meta-теги на основных посадочных (города, venues, события, комбо, blog) ✅
 - [ ] **Высокий**: 5 SEO-статей для блога
 - [ ] **Высокий**: Описания ТОП-20 событий
 - [ ] **Высокий**: 5 SEO-подборок на город
@@ -389,15 +410,15 @@
 - [ ] **Средний**: FAQ-секции на площадках
 - [ ] **Средний**: Реализация ArticlePlanner + DataCollector + Renderer + Linker
 - [ ] **Средний**: OpenAI API для генерации контента
-- [ ] **Средний**: OpenGraph и Twitter Cards
+- [x] **Средний**: OpenGraph и Twitter Cards (buildPageMetadata на городах, venues, событиях, комбо) ✅
 - [ ] **Низкий**: Сезонные гиды (Белые ночи, Новый год, Майские)
 - [ ] **Низкий**: Admin UI для управления статьями (перегенерация, превью)
 
 ### Технический SEO
 - [ ] **Высокий** (⏸ 6+ мес): Core Web Vitals — микрооптимизация (LCP < 2.5s, FID < 100ms, CLS < 0.1)
 - [ ] **Высокий**: Яндекс.Вебмастер и Google Search Console
-- [ ] **Средний**: JSON-LD Article schema для статей
-- [ ] **Средний**: Микроразметка FAQPage
+- [x] **Средний**: JSON-LD Article schema для статей (buildArticleJsonLd на blog/[slug]) ✅
+- [x] **Средний**: Микроразметка FAQPage (FaqSection, combo, landings) ✅
 - [ ] **Низкий**: Alt-тексты для изображений
 
 ---
@@ -407,7 +428,7 @@
 - [ ] **Низкий**: Типизация `any` (backend ~31, frontend 100+), см. `docs/TechnicalDebt.md`
 - [ ] **Средний**: ESLint правило: запретить `any` в новых файлах (warning)
 - [ ] **Низкий**: Типизация `as any` в бэкенде (31 место) — type guards
-- [ ] **Высокий**: Типизация tc-sync.service.ts (TcEvent вместо any[])
+- [x] **Высокий**: Типизация tc-sync.service.ts (TcEvent, TcVenueCity, TcTicketSetRule, isTcEvent) ✅ (PR-8)
 - [ ] **Высокий** (⏸ 6+ мес): Proto-generated types для gRPC
 - [x] **Высокий**: JwtPayload, auth.types (AdminJwtUser, PartnerApiUser) ✅
 - [x] **Средний**: admin-orders where → Prisma.PackageWhereInput ✅
@@ -433,7 +454,8 @@
 ## 9. Checkout / Orders / Voucher
 
 ### Checkout + Smart UX pipeline (C0–C7)
-- [x] **Высокий**: Checkout + Smart UX (C0–C7) — **implemented**. Next: **E2E validation + edge-case hardening** (см. `docs/PR-C0-C7-Final.md` §8). Риск сейчас — не архитектура, а фактическое поведение на реальном потоке; новые фичи не добавлять до прогона smoke и 5 edge cases.
+- [x] **Высокий**: Checkout + Smart UX (C0–C7) — **implemented** ✅
+- [x] **Высокий**: E2E validation + edge-case hardening (smoke path + 5 edge cases) — **выполнен 06.03** (см. `docs/PR-C0-C7-Final.md` §8) ✅
 
 ### YooKassa + Checkout (Фаза 4)
 - [ ] **Критический**: Модуль PaymentModule — YooKassa API v3, создание платежа, webhook handler

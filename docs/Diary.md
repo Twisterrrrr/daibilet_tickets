@@ -4,6 +4,106 @@
 
 ---
 
+## 10.03.2026 — Promo Blocks v2.5: targetCitySlugs, public collection page /promo/:slug
+
+### Наблюдения
+
+- Collection-based promo blocks использовали fallback href=/events. Нужна собственная публичная страница подборки.
+- Не было таргетинга по городу — блоки показывались всем, включая пользователей из других городов.
+- Маршрут /collections/:slug занят podborki — выбран /promo/:slug.
+
+### Решения
+
+- **targetCitySlugs:** Поле PromoBlock.targetCitySlugs (String[]). Пустой массив = глобальный блок; непустой = только для указанных citySlug. Фильтрация на backend: `GET /api/v1/promo-blocks?city=saint-petersburg`.
+- **Public collection page:** `GET /api/v1/promo-collections/:slug` — title, description, resolved items. Страница `/promo/[slug]/page.tsx` — EventCard/VenueCard.
+- **href для COLLECTION:** `/promo/{collection.slug}` вместо /events. Fallback /events только при отсутствии коллекции.
+- **Admin UI:** targetCitySlugs — comma-separated input; в списке колонка «Города» (Глобальный / slugs).
+- **Frontend:** главная и /events передают citySlug в getPromoBlocks; PromoBlock получает citySlug для client-side fetch.
+
+### Проблемы
+
+- На /events была ссылка filters.city — исправлено на city (локальный state).
+
+---
+
+## 09.03.2026 — Promo Blocks v2: PromoCollection, items, rule, preview
+
+### Наблюдения
+
+- Требовалось эволюционно перейти от LINK_ONLY к архитектуре: PromoBlock (карточка) + PromoCollection (подборка) + PromoCollectionItem (ручное наполнение) + PromoCollectionRule (AUTO) + PromoCollectionResolverService (единая логика выдачи).
+- Существующие LINK_ONLY блоки должны продолжить работать. Миграция мягкая — contentMode, collectionId добавлены в PromoBlock, старые записи остаются валидными.
+
+### Решения
+
+- **Backend:** Admin CRUD для PromoCollection; items (GET/POST/PATCH/DELETE); rule (GET/PUT); preview (GET). Public endpoint `GET /api/v1/promo-blocks/:slug/items` возвращает resolved events/venues.
+- **PromoCollectionResolverService:** MANUAL — из PromoCollectionItem с order по sortOrder; AUTO — Prisma query по rule (citySlug, categorySlug, tagSlugs, isKids, isIndoor, sortMode, limit, onlyActive, onlyBookable).
+- **Admin UI:** PromoCollectionsListPage, PromoCollectionEditPage — форма коллекции, manual items (поиск events/venues, add/remove), auto rule форма, preview-блок.
+- **PromoBlock form:** contentMode (LINK_ONLY | COLLECTION), collectionId (при COLLECTION). При пустом href для collection-based блоков public API возвращает `/events` как fallback.
+
+### Проблемы
+
+- Нет. Не делались: drag-and-drop, mixed collections, CTR analytics, сложные rule groups.
+
+---
+
+## 08.03.2026 — Promo-блоки: расширенная спецификация
+
+### Наблюдения
+
+- Текущий хардкод в PromoBlock.tsx (months[]) не покрывает: плавающие даты (Масленица), новогодний период 15.12–14.01, короткие промо, полностью ручной режим.
+- По UX нужны: выбор иконки из каталога или вставка SVG; задание цвета/градиента; период показа (startsAt/endsAt); два режима — автоподбор по правилам или ручная привязка событий/мест.
+
+### Решения
+
+- **docs/PromoBlocksSpec.md:** модель PromoBlock с startsAt/endsAt, iconSource (LIBRARY|SVG), bgMode (SOLID|GRADIENT), selectionMode (MANUAL|AUTO), contentType (EVENTS|VENUES|LINK_ONLY); PromoBlockEvent, PromoBlockVenue для ручного наполнения; правила AUTO (citySlug, categorySlug, tagSlugs, isKids, isIndoor, autoSort, autoLimit).
+- **Tasktracker:** задачи Promo-блоков обновлены под расширенную спецификацию. MVP может стартовать с LINK_ONLY.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 08.03.2026 — Promo-блоки: hardening, SSR, статус MVP
+
+### Наблюдения
+
+- Реализован вертикальный срез LINK_ONLY. Схема готова под EVENTS/VENUES/AUTO, но UX и endpoints для них не сделаны.
+- Был дублирующий слой API (api.ts + api/promo-blocks.ts) — убран, один источник в api.ts.
+- PromoBlock на главной рендерился клиентским useEffect — layout shift, нет SSR.
+
+### Решения
+
+- **API:** единый источник `api.getPromoBlocks()` и `PromoBlockDto` в `lib/api.ts`. Файл `lib/api/promo-blocks.ts` удалён.
+- **SSR:** на главной (HomePage) блоки грузятся на сервере, передаются в `<PromoBlock initialBlocks={...} />`. Fallback при сетевой ошибке — через try/catch при fetch.
+- **Страница /events:** client component, PromoBlock без initialBlocks — клиентский fetch в useEffect (как раньше).
+- **Дефолтный градиент:** вынесен в `PROMO_DEFAULT_GRADIENT` в promo-blocks-fallback.ts.
+- **Tasktracker/Diary:** явно зафиксировано, что работает только LINK_ONLY; EVENTS/VENUES/AUTO — отложено.
+- **SVG sanitization:** regex-based, удаляет script, foreignObject, on*; помечено как временное решение. Для production рассмотреть DOMPurify+jsdom или ограничить MVP до LIBRARY.
+
+### Проблемы
+
+- SVG-санитайзер на regex не даёт полной гарантии XSS. Риск ниже при использовании только админом. Рекомендация: либо укрепить санитайзер, либо временно ограничить MVP до iconSource=LIBRARY.
+
+---
+
+## 08.03.2026 — Gate 0a: Staging поднят, health OK, бэкапы
+
+### Наблюдения
+
+- Staging развёрнут на VPS (Timeweb Cloud). DNS настроены, SSL (Let's Encrypt) активен. Health check: `{"status":"ok","db":true,"redis":true}`.
+
+### Решения
+
+- **Gate 0a закрыт** в Tasktracker: VPS, DNS, bootstrap, deploy, migrate, SSL, verify.
+- **Бэкапы:** `scripts/backup-staging-db.sh` и `scripts/backup-production-db.sh` — дамп PostgreSQL в `/opt/daibilet/backups/`, retention 14 дней. Запуск: на VPS `cd /opt/daibilet && bash scripts/backup-staging-db.sh` (staging) или `bash scripts/backup-production-db.sh` (prod).
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 08.03.2026 — Publish-gate UI, каталог городов, кэш
 
 ### Наблюдения

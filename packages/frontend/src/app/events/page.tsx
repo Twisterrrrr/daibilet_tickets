@@ -54,14 +54,6 @@ const PRICE_OPTIONS = [
 
 const LIMIT_OPTIONS = [20, 50, 100] as const;
 
-function pluralizeCity(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'город';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'города';
-  return 'городов';
-}
-
 function filtersFromParams(sp: URLSearchParams) {
   const sort = sp.get('sort') || 'popular';
   const isSoon = sort === 'departing_soon';
@@ -94,7 +86,6 @@ export default function EventsPage() {
   const [cities, setCities] = useState<CityListItem[]>([]);
   const [piers, setPiers] = useState<{ id: string; slug?: string; title: string; shortTitle?: string | null }[]>([]);
   const [viewMode, setViewModeState] = useState<'grid' | 'list'>('grid');
-  const [multiSlugByGroupingKey, setMultiSlugByGroupingKey] = useState<Record<string, string>>({});
 
   // T15: persist view mode to localStorage
   const setViewMode = useCallback((mode: 'grid' | 'list') => {
@@ -132,36 +123,6 @@ export default function EventsPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [activeQuickFilter, setActiveQuickFilter] = useState<string>('');
-
-  // Предзагружаем карту groupSlug по groupingKey для мульти-событий (нужна только без выбранного города).
-  useEffect(() => {
-    if (city) {
-      setMultiSlugByGroupingKey({});
-      return;
-    }
-
-    let cancelled = false;
-
-    api
-      .getMultiEvents({ sort: 'popular', limit: 200 })
-      .then((groups) => {
-        if (cancelled) return;
-        const map: Record<string, string> = {};
-        for (const g of groups) {
-          if (g.groupingKey && g.slug) {
-            map[g.groupingKey] = g.slug;
-          }
-        }
-        setMultiSlugByGroupingKey(map);
-      })
-      .catch((e) => {
-        console.warn('Events page: getMultiEvents error', e);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [city]);
 
   // Синхронизация URL → состояние (при загрузке и навигации)
   useEffect(() => {
@@ -391,8 +352,6 @@ export default function EventsPage() {
     return cities.filter((c) => slugsWithSoon.has(c.slug));
   }, [isSoonMode, cities, events]);
 
-  // Группировка мульти-событий в общей выдаче: одинаковое название + разные города → 1 карточка.
-  // Работает только без выбранного города (общая витрина); группируем только события категории EVENT.
   type DisplayEvent = {
     event: EventListItem;
     cityLabelOverride?: string;
@@ -400,171 +359,11 @@ export default function EventsPage() {
     groupingKey?: string | null;
   };
 
-  type EventWithGroupingKey = EventListItem & { groupingKey?: string | null };
-
-  // Небольшое выравнивание: не ставить рядом карточки с одинаковой картинкой
-  // (используется только в общей выдаче без фильтра города).
-  function separateSameImageNeighbors(items: DisplayEvent[]): DisplayEvent[] {
-    const result = [...items];
-    for (let i = 1; i < result.length; i++) {
-      const prev = result[i - 1]?.event;
-      const curr = result[i]?.event;
-      const prevImg = (prev?.imageUrl || '').trim();
-      const currImg = (curr?.imageUrl || '').trim();
-      if (!prevImg || !currImg || prevImg !== currImg) continue;
-
-      // Ищем дальше по списку первую карточку с другим изображением и меняем местами
-      for (let j = i + 1; j < result.length; j++) {
-        const img = (result[j]?.event.imageUrl || '').trim();
-        if (!img || img !== prevImg) {
-          const tmp = result[i];
-          result[i] = result[j];
-          result[j] = tmp;
-          break;
-        }
-      }
-    }
-    return result;
-  }
-
+  // Без группировки: каждое событие — отдельная карточка, как приходит с API.
   const displayEvents: DisplayEvent[] = useMemo(() => {
     if (!events.length) return [];
-
-    // С выбранным городом — ничего не группируем, возвращаем как есть.
-    if (city) {
-      return events.map((e) => ({ event: e }));
-    }
-
-    type Group = {
-      events: EventListItem[];
-      hasMultipleCities: boolean;
-      cityNames: string[];
-      groupingKey?: string | null;
-    };
-
-    const groups = new Map<string, Group>();
-
-    // Собираем события по ключу группы:
-    // 1) если есть groupingKey — по нему;
-    // 2) иначе по нормализованному заголовку;
-    // 3) если нет ни заголовка, ни groupingKey — не группируем (уникальный ключ по id).
-    const getGroupKey = (e: EventWithGroupingKey): string | null => {
-      const rawTitle = (e.title || '').trim();
-      const groupingKey = e.groupingKey;
-      const normalizedGroupingKey = groupingKey?.trim() || null;
-
-      if (!rawTitle && !normalizedGroupingKey) return null;
-      if (normalizedGroupingKey) return `g:${normalizedGroupingKey}`;
-      return rawTitle.toLowerCase();
-    };
-
-    for (const eBase of events) {
-      const e = eBase as EventWithGroupingKey;
-      // Группируем только события категории EVENT; остальные не попадают в группы.
-      if (e.category !== EventCategory.EVENT) {
-        continue;
-      }
-
-      const key = getGroupKey(e);
-      if (!key) {
-        // Без ключа группы — кладём под собственный id, не группируем с другими
-        const fallbackKey = `__id__${e.id}`;
-        const group = groups.get(fallbackKey) ?? {
-          events: [],
-          hasMultipleCities: false,
-          cityNames: [],
-          groupingKey: null,
-        };
-        group.events.push(e);
-        groups.set(fallbackKey, group);
-        continue;
-      }
-
-      const groupingKey = e.groupingKey;
-      const group = groups.get(key) ?? {
-        events: [],
-        hasMultipleCities: false,
-        cityNames: [],
-        groupingKey: groupingKey ?? null,
-      };
-      group.events.push(e);
-      groups.set(key, group);
-    }
-
-    // Определяем, какие группы действительно мульти (есть разные города) и считаем города
-    for (const [key, group] of groups) {
-      const cityMap = new Map<string, string>();
-      for (const e of group.events) {
-        if (e.city) {
-          cityMap.set(e.city.slug, e.city.name);
-        }
-      }
-      const cityNames = Array.from(cityMap.values());
-      group.cityNames = cityNames;
-      group.hasMultipleCities = cityNames.length > 1;
-      groups.set(key, group);
-    }
-
-    const seen = new Set<string>();
-    const result: DisplayEvent[] = [];
-
-    // Идём в исходном порядке событий, чтобы не ломать сортировку;
-    // для мульти-группы добавляем только первого представителя + собираем человекочитаемый список городов.
-    for (const e of events) {
-      // Не EVENT — не участвует в группировке, просто добавляем.
-      if (e.category !== EventCategory.EVENT) {
-        result.push({ event: e });
-        continue;
-      }
-
-      const key = getGroupKey(e);
-      if (!key) {
-        result.push({ event: e });
-        continue;
-      }
-
-      const group = groups.get(key);
-      if (!group || !group.hasMultipleCities) {
-        result.push({ event: e });
-        continue;
-      }
-
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      const representative = group.events[0] ?? e;
-      const totalCities = group.cityNames.length;
-      const previewCities = group.cityNames.slice(0, 2);
-      const remaining = totalCities - previewCities.length;
-
-      let cityLabelOverride: string | undefined;
-      if (totalCities > 0) {
-        if (remaining > 0) {
-          const head = previewCities.join(' • ');
-          cityLabelOverride = `${head} • +${remaining} ${pluralizeCity(remaining)}`;
-        } else {
-          cityLabelOverride = previewCities.join(' • ');
-        }
-      }
-
-      let hrefOverride: string | undefined;
-      if (group.groupingKey && group.hasMultipleCities) {
-        const slug = multiSlugByGroupingKey[group.groupingKey] ?? group.groupingKey;
-        hrefOverride = `/events/m/${slug}`;
-      }
-
-      result.push({
-        event: representative,
-        cityLabelOverride,
-        hrefOverride,
-        groupingKey: group.groupingKey ?? null,
-      });
-    }
-
-    // В общей выдаче без города слегка "расслаиваем" одинаковые картинки,
-    // чтобы они не стояли вплотную.
-    return city ? result : separateSameImageNeighbors(result);
-  }, [events, category, city, multiSlugByGroupingKey]);
+    return events.map((e) => ({ event: e }));
+  }, [events]);
 
   return (
     <div className="container-page py-6 sm:py-10">
@@ -701,7 +500,7 @@ export default function EventsPage() {
       {/* Promo block - only when no active filters */}
       {!category && !audience && !selectedDate && !urlTag && !activeQuickFilter && (
         <div className="mb-5 sm:mb-6">
-          <PromoBlock />
+          <PromoBlock citySlug={city || undefined} />
         </div>
       )}
 
