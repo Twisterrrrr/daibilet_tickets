@@ -4,6 +4,49 @@
 
 ---
 
+## 10.03.2026 — Promo Blocks hardening: runtime validation, нормализация дат
+
+### Наблюдения
+
+- Реализован hardening по трём рискам: валидные, но битые блоки; даты/таймзоны; city targeting (уже в v2.5).
+
+### Решения
+
+- **validatePromoBlockRuntime:** title, LINK_ONLY→href, COLLECTION→collection существует и активна, resolver ≥ 1 item. Invalid блоки не отдаются, логируются (promo.block.skipped, promo.collection.empty).
+- **normalizePromoPeriod:** startsAt→00:00:00 UTC, endsAt→23:59:59.999 UTC при вводе YYYY-MM-DD. Admin buildPayload.
+- **Frontend:** при пустом href и наличии slug — href = `/promo/{slug}` (не /events).
+- **Тесты:** promo-period.util.spec.ts, promo-blocks.service.spec.ts.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 10.03.2026 — Promo Blocks: три риска эксплуатационных багов (post-release)
+
+### Наблюдения
+
+Типичные баги Promo Blocks выявляются не сразу, а после 1–2 недель эксплуатации:
+
+1. **Тихая деградация «валидного, но плохого» блока** — API 200 OK, но: collectionId указывает на удалённую подборку; contentMode=COLLECTION, а href ведёт не туда; targetCitySlugs криво; AUTO даёт пустую подборку. Пользователь кликает — попадает в пустоту или общий каталог. Особенно вероятно при отвязке карточки от содержимого (COLLECTION, MANUAL, AUTO).
+
+2. **Плавающий баг дат/таймзон** — блок «должен показываться сегодня», но исчезает. Причины: дата в UTC vs локаль; endsAt=2026-03-10 без времени хранится как 00:00:00 UTC → блок исчезает в начале дня 10 марта, а не в конце.
+
+3. **Ложное «всё работает» без city targeting** — блоки без targetCitySlugs показываются всем. Редактор создаёт «Развод мостов» (СПб) — видит на главной Москвы. CTR падает, «сайт не про мой город». **Митигировано в v2.5** — targetCitySlugs реализован.
+
+### Решения (рекомендуемые)
+
+- **Runtime validation:** при contentMode=COLLECTION — collection должна существовать; preview и public items не должны расходиться; пустая collection при недопустимом сценарии → блок не публиковать в выдаче.
+- **Нормализация дат:** при вводе только даты без времени — startsAt → начало дня, endsAt → конец дня. Жёстко зафиксировать в PromoBlocksSpec.
+- **Post-release smoke:** коллекция с удалённой collection; блок с endsAt=сегодня; главная и /events в 2 разных городах.
+
+### Проблемы
+
+- Реализовано в hardening (запись выше).
+
+---
+
 ## 10.03.2026 — Promo Blocks v2.5: targetCitySlugs, public collection page /promo/:slug
 
 ### Наблюдения

@@ -1,6 +1,6 @@
 # Promo-блоки главной — спецификация
 
-> Последнее обновление: 2026-03-10. См. `docs/Tasktracker.md` — раздел «Promo-блоки главной».
+> Последнее обновление: 2026-03-11. См. `docs/Tasktracker.md` — раздел «Promo-блоки главной».
 
 ## Цель
 
@@ -194,7 +194,32 @@ enum PromoSortMode { POPULAR SOONEST RATING RANDOM }
 
 ---
 
-## 8. Что не делать на MVP
+## 8. Операционные риски и hardening (реализовано)
+
+### Даты (startsAt / endsAt)
+
+**Реализовано:** `normalizePromoPeriod` в admin buildPayload. При вводе только даты без времени backend нормализует:
+- `startsAt` → начало дня (00:00:00)
+- `endsAt` → конец дня (23:59:59.999)
+
+Иначе «заканчивается 10 марта» при хранении как `2026-03-10T00:00:00Z` приведёт к исчезновению блока в начале дня 10 марта. Timezone: использовать UTC или явную timezone проекта.
+
+### Runtime validation (COLLECTION)
+
+**Реализовано:** `validatePromoBlockRuntime` в PromoBlocksPublicService.
+- contentMode=COLLECTION → collection должна существовать и быть активной; иначе блок не отдавать.
+- preview и public items — одна бизнес-логика (resolver).
+- Пустая collection: допустимый сценарий (empty state) vs битый — определять политику.
+
+### Post-release smoke
+
+- Блок с collectionId на удалённую подборку.
+- Блок с endsAt = сегодня.
+- Главная и /events в двух разных городах (city targeting).
+
+---
+
+## 9. Что не делать на MVP
 
 - Drag-and-drop сортировка.
 - Отдельный media uploader.
@@ -204,7 +229,7 @@ enum PromoSortMode { POPULAR SOONEST RATING RANDOM }
 
 ---
 
-## 9. Acceptance criteria
+## 10. Acceptance criteria
 
 - [ ] В админке можно создавать, редактировать, удалять промо-блок.
 - [ ] Можно включать/выключать блок, задавать период показа.

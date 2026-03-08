@@ -1,6 +1,6 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-03-10. См. `docs/Reference.md`, `docs/Deploy.md`.
+> Последнее обновление: 2026-03-11. См. `docs/Reference.md`, `docs/Deploy.md`.
 > **Отложено 6+ мес** (Q3 2026+): Planner, Unified Checkout, ML-рекомендации, PWA, сложная дедупликация, gRPC-оптимизации, микрооптимизация Web Vitals, расширенная CI-инфра.
 > План 26 PR: `docs/InfraTypizationUXCheckoutPlan.md` (инфра, типизация, UX, Checkout + YooKassa).
 
@@ -251,6 +251,7 @@
 - [x] **Средний**: Promo Blocks v2.5 — targetCitySlugs, city targeting (GET /api/v1/promo-blocks?city=), публичная страница /promo/:slug ✅
 - [x] **Средний**: Collection-based blocks href → /promo/{slug}, убран fallback /events ✅
 - [x] **Средний**: Admin UI — targetCitySlugs (comma-separated) в форме PromoBlock, колонка «Города» в списке ✅
+- [x] **Высокий**: Promo Blocks hardening — runtime validation, пустые COLLECTION, normalizePromoPeriod (startsAt/endsAt) ✅
 - [ ] **Отложено**: MANUAL EVENTS — ручная привязка событий (реализовано через PromoCollectionItem)
 - [ ] **Отложено**: MANUAL VENUES — ручная привязка мест (реализовано через PromoCollectionItem)
 - [ ] **Отложено**: AUTO — автоподбор по правилам (реализовано через PromoCollectionRule)
