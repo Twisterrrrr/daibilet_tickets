@@ -22,6 +22,7 @@ import {
   DateMode,
   EventAudience,
   EventCategory,
+  EventSource,
   EventSubcategory,
   OfferSource,
   OfferStatus,
@@ -98,7 +99,7 @@ export class AdminEventsController {
       andParts.push({ category: category as EventCategory });
     }
     if (source) {
-      andParts.push({ source: source as any });
+      andParts.push({ source: source as EventSource });
     }
     if (active !== undefined) andParts.push({ isActive: active === 'true' });
     if (search) {
@@ -541,7 +542,7 @@ export class AdminEventsController {
     let suffix = 1;
 
     // Подбираем уникальный slug для нового события
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       const existing = await this.prisma.event.findUnique({ where: { slug } });
       if (!existing) {
@@ -649,7 +650,7 @@ export class AdminEventsController {
     // Ищем свободный slug с учётом текущего события
     // (если slug уже принадлежит этому событию — обновляем без изменений).
     // Поскольку это админский эндпоинт, несколько последовательных запросов допустимы.
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       const existing = await this.prisma.event.findUnique({ where: { slug } });
       if (!existing || existing.id === id) {
@@ -1034,7 +1035,7 @@ export class AdminEventsController {
       },
     });
 
-    await this.audit.log(req.user.id, 'UPDATE', 'EventPublish', eventId, null, {
+    await this.audit.log(req.user.id, 'UPDATE', 'EventPublish', eventId, undefined, {
       editorStatus: 'PUBLISHED',
     });
 

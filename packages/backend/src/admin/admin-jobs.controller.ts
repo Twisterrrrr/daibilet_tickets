@@ -27,7 +27,7 @@ export class AdminJobsController {
     const startNum = start ? parseInt(start, 10) : 0;
     const limitNum = limit ? Math.min(parseInt(limit, 10) || 50, 100) : 50;
 
-    const validQueue = queue && QUEUE_NAMES.includes(queue as any) ? queue : undefined;
+    const validQueue = queue && (QUEUE_NAMES as readonly string[]).includes(queue) ? queue : undefined;
     return this.failedJobs.getFailedJobs(validQueue, startNum, limitNum);
   }
 

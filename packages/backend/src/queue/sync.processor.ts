@@ -10,7 +10,32 @@ import { TepSyncService } from '../catalog/tep-sync.service';
 import { ComboService } from '../combo/combo.service';
 import { QUEUE_SYNC } from './queue.constants';
 
-export type SyncJobData = Record<string, never>;
+/** Данные задачи sync-full (пустой объект; в будущем: cityId?, source?) */
+export type SyncFullJobData = Record<string, never>;
+
+/** Данные задачи sync-incremental (пустой объект) */
+export type SyncIncrementalJobData = Record<string, never>;
+
+/** Объединение типов данных задач sync-очереди */
+export type SyncJobData = SyncFullJobData | SyncIncrementalJobData;
+
+/** Имена задач в sync-очереди */
+export type SyncJobName = 'sync-full' | 'sync-incremental';
+
+/** Результат full sync — сумма результатов TC, TEP, retag, combo */
+export interface SyncFullResult {
+  tc: Awaited<ReturnType<TcSyncService['syncAll']>>;
+  tep: Awaited<ReturnType<TepSyncService['syncAll']>>;
+  retag: Awaited<ReturnType<TcSyncService['retagAll']>>;
+  combo: Awaited<ReturnType<ComboService['populateAll']>>;
+}
+
+/** Результат incremental sync — только TC */
+export interface SyncIncrementalResult {
+  tc: Awaited<ReturnType<TcSyncService['syncAll']>>;
+}
+
+export type SyncJobResult = SyncFullResult | SyncIncrementalResult | null;
 
 /**
  * Hard timeout для sync-задач (защита от зависания).
@@ -50,7 +75,7 @@ export class SyncProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<SyncJobData, any, string>): Promise<any> {
+  async process(job: Job<SyncJobData, SyncJobResult, SyncJobName>): Promise<SyncJobResult> {
     const startMs = Date.now();
     this.logger.log(
       `[sync] Processing job: ${job.name} (id=${job.id}, attempt ${job.attemptsMade + 1}/${job.opts.attempts ?? '?'})`,
@@ -86,7 +111,11 @@ export class SyncProcessor extends WorkerHost {
    * 4. Если остались attempts — BullMQ retry с exponential backoff
    * 5. Если attempts исчерпаны — job в failed, следующий cron-тик создаст новый
    */
-  private withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>, timeoutMs: number, job: Job): Promise<T> {
+  private withTimeout<T>(
+    fn: (signal: AbortSignal) => Promise<T>,
+    timeoutMs: number,
+    job: Job<SyncJobData, SyncJobResult, SyncJobName>,
+  ): Promise<T> {
     const limitMin = Math.round(timeoutMs / 60_000);
     const ctrl = new AbortController();
 

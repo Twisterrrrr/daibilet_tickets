@@ -61,9 +61,9 @@ export class AdminCheckoutController {
   ) {
     const page = Number(pageRaw) || 1;
     const limit = Number(limitRaw) || 25;
-    const where: any = {};
+    const where: Prisma.CheckoutSessionWhereInput = {};
 
-    if (status) where.status = status;
+    if (status) where.status = status as CheckoutStatus;
     if (search) {
       where.OR = [
         { shortCode: { contains: search, mode: 'insensitive' } },
@@ -126,7 +126,7 @@ export class AdminCheckoutController {
       }
     }
 
-    const updateData: any = {};
+    const updateData: Prisma.CheckoutSessionUpdateInput = {};
     if (data.status) updateData.status = data.status as CheckoutStatus;
     // Фиксируем completedAt для корректной аналитики
     if (data.status === 'COMPLETED') updateData.completedAt = new Date();
@@ -146,7 +146,7 @@ export class AdminCheckoutController {
   ) {
     const page = Number(pageRaw) || 1;
     const limit = Number(limitRaw) || 25;
-    const where: any = {};
+    const where: Prisma.OrderRequestWhereInput = {};
 
     if (status) where.status = status;
     if (search) {
@@ -507,38 +507,41 @@ export class AdminCheckoutController {
       throw new BadRequestException('Максимальный период выгрузки: 93 дня');
     }
 
-    const where: Record<string, unknown> = {
+    const where: Prisma.OrderRequestWhereInput = {
       createdAt: { gte: dateFrom, lte: dateTo },
     };
-    if (query.status) (where as any).status = query.status;
+    if (query.status) where.status = query.status as Prisma.OrderRequestWhereInput['status'];
 
+    /* eslint-disable @typescript-eslint/no-explicit-any -- CSV accessors: row shape varies by Prisma model */
     await streamCsv({
       res,
       filename: 'order-requests',
       fields: [
-        { header: 'id', accessor: (r) => r.id },
-        { header: 'eventId', accessor: (r) => r.eventId },
-        { header: 'eventOfferId', accessor: (r) => r.eventOfferId },
-        { header: 'status', accessor: (r) => r.status },
-        { header: 'expireReason', accessor: (r) => r.expireReason },
-        { header: 'slaMinutes', accessor: (r) => r.slaMinutes },
-        { header: 'customerName', accessor: (r) => r.customerName },
-        { header: 'customerEmail', accessor: (r) => r.customerEmail },
-        { header: 'customerPhone', accessor: (r) => r.customerPhone },
-        { header: 'priceSnapshot', accessor: (r) => r.priceSnapshot },
-        { header: 'quantity', accessor: (r) => r.quantity },
-        { header: 'createdAt', accessor: (r) => r.createdAt.toISOString() },
-        { header: 'confirmedAt', accessor: (r) => r.confirmedAt?.toISOString() },
-        { header: 'expiresAt', accessor: (r) => r.expiresAt?.toISOString() },
+        { header: 'id', accessor: (r: any) => r.id },
+        { header: 'eventId', accessor: (r: any) => r.eventId },
+        { header: 'eventOfferId', accessor: (r: any) => r.eventOfferId },
+        { header: 'status', accessor: (r: any) => r.status },
+        { header: 'expireReason', accessor: (r: any) => r.expireReason },
+        { header: 'slaMinutes', accessor: (r: any) => r.slaMinutes },
+        { header: 'customerName', accessor: (r: any) => r.customerName },
+        { header: 'customerEmail', accessor: (r: any) => r.customerEmail },
+        { header: 'customerPhone', accessor: (r: any) => r.customerPhone },
+        { header: 'priceSnapshot', accessor: (r: any) => r.priceSnapshot },
+        { header: 'quantity', accessor: (r: any) => r.quantity },
+        { header: 'createdAt', accessor: (r: any) => (r.createdAt as Date).toISOString() },
+        { header: 'confirmedAt', accessor: (r: any) => (r.confirmedAt as Date | null)?.toISOString() },
+        { header: 'expiresAt', accessor: (r: any) => (r.expiresAt as Date | null)?.toISOString() },
       ],
       fetchBatch: (cursor, take) =>
         this.prisma.orderRequest.findMany({
-          where: where as any,
+          where,
           orderBy: { createdAt: 'desc' },
           take,
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         }),
     });
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
   }
 
   /**
@@ -555,36 +558,38 @@ export class AdminCheckoutController {
       throw new BadRequestException('Максимальный период выгрузки: 93 дня');
     }
 
-    const where: Record<string, unknown> = {
+    const where: Prisma.CheckoutSessionWhereInput = {
       createdAt: { gte: dateFrom, lte: dateTo },
     };
-    if (query.status) (where as any).status = query.status;
+    if (query.status) where.status = query.status as Prisma.CheckoutSessionWhereInput['status'];
 
+    /* eslint-disable @typescript-eslint/no-explicit-any -- CSV accessors: row shape varies by Prisma model */
     await streamCsv({
       res,
       filename: 'checkout-sessions',
       fields: [
-        { header: 'id', accessor: (s) => s.id },
-        { header: 'shortCode', accessor: (s) => s.shortCode },
-        { header: 'status', accessor: (s) => s.status },
-        { header: 'customerName', accessor: (s) => s.customerName },
-        { header: 'customerEmail', accessor: (s) => s.customerEmail },
-        { header: 'customerPhone', accessor: (s) => s.customerPhone },
-        { header: 'totalPrice', accessor: (s) => s.totalPrice },
-        { header: 'requestCount', accessor: (s) => (s as any)._count?.orderRequests ?? 0 },
-        { header: 'createdAt', accessor: (s) => s.createdAt.toISOString() },
-        { header: 'completedAt', accessor: (s) => s.completedAt?.toISOString() },
-        { header: 'expiresAt', accessor: (s) => s.expiresAt?.toISOString() },
+        { header: 'id', accessor: (s: any) => s.id },
+        { header: 'shortCode', accessor: (s: any) => s.shortCode },
+        { header: 'status', accessor: (s: any) => s.status },
+        { header: 'customerName', accessor: (s: any) => s.customerName },
+        { header: 'customerEmail', accessor: (s: any) => s.customerEmail },
+        { header: 'customerPhone', accessor: (s: any) => s.customerPhone },
+        { header: 'totalPrice', accessor: (s: any) => s.totalPrice },
+        { header: 'requestCount', accessor: (s: any) => s._count?.orderRequests ?? 0 },
+        { header: 'createdAt', accessor: (s: any) => (s.createdAt as Date).toISOString() },
+        { header: 'completedAt', accessor: (s: any) => (s.completedAt as Date | null)?.toISOString() },
+        { header: 'expiresAt', accessor: (s: any) => (s.expiresAt as Date | null)?.toISOString() },
       ],
       fetchBatch: (cursor, take) =>
         this.prisma.checkoutSession.findMany({
-          where: where as any,
+          where,
           orderBy: { createdAt: 'desc' },
           include: { _count: { select: { orderRequests: true } } },
           take,
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         }),
     });
+    /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 
   /**
