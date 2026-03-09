@@ -3,7 +3,8 @@
 // ==============================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["filteredRelationCount"]
 }
 
 datasource db {
@@ -444,6 +445,8 @@ model Event {
   externalReviews ExternalReview[]
   reviewRequests  ReviewRequest[]
   orderRequests   OrderRequest[]
+  promoBlockEvents     PromoBlockEvent[]
+  promoCollectionItems PromoCollectionItem[]
 
   @@unique([source, tcEventId])
   @@index([source, tcEventId])
@@ -611,9 +614,9 @@ model EventOverride {
   updatedAt     DateTime           @updatedAt
 
   // --- Очередь постредакции (админка) ---
-  editorStatus   EditorStatus  @default(NEEDS_REVIEW)
-  needsReviewAt  DateTime?     // сортировка очереди
-  lastImportedAt DateTime?    // когда последний раз обновлялся импорт (Event.updatedAt)
+  editorStatus   EditorStatus  @default(NEEDS_REVIEW) @map("editor_status")
+  needsReviewAt  DateTime?     @map("needs_review_at") // сортировка очереди
+  lastImportedAt DateTime?     @map("last_imported_at") // когда последний раз обновлялся импорт (Event.updatedAt)
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Restrict)
 
@@ -1021,12 +1024,198 @@ model Venue {
   events   Event[]      @relation("VenueEvents")
   offers   EventOffer[] @relation("VenueOffers")
   reviews  Review[]
+  promoBlockVenues     PromoBlockVenue[]
+  promoCollectionItems PromoCollectionItem[]
 
   @@index([cityId])
   @@index([venueType])
   @@index([slug])
   @@index([operatorId])
   @@map("venues")
+}
+
+// ========================
+// Promo Blocks (промо-карточки на главной)
+// ========================
+
+enum PromoSelectionMode {
+  MANUAL
+  AUTO
+}
+
+enum PromoContentType {
+  EVENTS
+  VENUES
+  LINK_ONLY
+}
+
+enum PromoContentMode {
+  LINK_ONLY
+  COLLECTION
+}
+
+enum PromoCollectionContentType {
+  EVENTS
+  VENUES
+}
+
+enum PromoCollectionItemType {
+  EVENT
+  VENUE
+}
+
+enum PromoIconSource {
+  LIBRARY
+  SVG
+}
+
+enum PromoBgMode {
+  SOLID
+  GRADIENT
+}
+
+enum PromoSortMode {
+  POPULAR
+  RATING
+  SOONEST
+  RANDOM
+}
+
+model PromoBlock {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  title         String
+  description   String
+  href          String?
+
+  contentMode   PromoContentMode @default(LINK_ONLY)
+  collectionId  String?
+  collection    PromoCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  selectionMode PromoSelectionMode @default(MANUAL)
+  contentType   PromoContentType   @default(LINK_ONLY)
+
+  citySlug      String?
+  categorySlug  String?
+  tagSlugs      String[]  @default([])
+
+  isKids        Boolean?
+  isIndoor      Boolean?
+
+  autoSort      PromoSortMode?
+  autoLimit     Int?
+
+  iconSource    PromoIconSource @default(LIBRARY)
+  iconKey       String?
+  iconSvg       String?         @db.Text
+
+  bgMode        PromoBgMode @default(GRADIENT)
+  bgColor       String?
+  gradientFrom  String?
+  gradientTo    String?
+
+  startsAt      DateTime?
+  endsAt        DateTime?
+
+  priority         Int      @default(0)
+  sortOrder        Int      @default(0)
+  isActive         Boolean  @default(true)
+  targetCitySlugs  String[] @default([])
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  events           PromoBlockEvent[]
+  venues           PromoBlockVenue[]
+
+  @@index([isActive, sortOrder])
+  @@index([collectionId])
+  @@map("promo_blocks")
+}
+
+model PromoCollection {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  description    String?  @db.Text
+  selectionMode  PromoSelectionMode
+  contentType    PromoCollectionContentType
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  blocks         PromoBlock[]
+  items          PromoCollectionItem[]
+  rule           PromoCollectionRule?
+
+  @@map("promo_collections")
+}
+
+model PromoCollectionItem {
+  id           String   @id @default(cuid())
+  collectionId String
+  itemType     PromoCollectionItemType
+  eventId      String?  @db.Uuid
+  venueId      String?  @db.Uuid
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  collection PromoCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  event      Event?          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venue      Venue?          @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, sortOrder])
+  @@index([collectionId, itemType])
+  @@map("promo_collection_items")
+}
+
+model PromoCollectionRule {
+  id           String   @id @default(cuid())
+  collectionId String   @unique
+  citySlug     String?
+  categorySlug String?
+  tagSlugs     String[] @default([])
+  isKids       Boolean?
+  isIndoor     Boolean?
+  sortMode     PromoSortMode @default(POPULAR)
+  limit        Int      @default(12)
+  onlyActive   Boolean  @default(true)
+  onlyBookable Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  collection PromoCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@map("promo_collection_rules")
+}
+
+model PromoBlockEvent {
+  id           String     @id @default(cuid())
+  promoBlockId String
+  eventId      String     @db.Uuid
+  sortOrder    Int        @default(0)
+
+  promoBlock   PromoBlock @relation(fields: [promoBlockId], references: [id], onDelete: Cascade)
+  event        Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([promoBlockId, eventId])
+  @@index([promoBlockId, sortOrder])
+  @@map("promo_block_events")
+}
+
+model PromoBlockVenue {
+  id           String     @id @default(cuid())
+  promoBlockId String
+  venueId      String     @db.Uuid
+  sortOrder    Int        @default(0)
+
+  promoBlock   PromoBlock @relation(fields: [promoBlockId], references: [id], onDelete: Cascade)
+  venue        Venue      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([promoBlockId, venueId])
+  @@index([promoBlockId, sortOrder])
+  @@map("promo_block_venues")
 }
 
 // ========================

@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
 # Переключить staging на HTTPS после успешного получения сертификатов.
-# Выполнять: bash scripts/init-letsencrypt.sh
+# Выполнять: STAGING_ONLY=1 bash scripts/init-letsencrypt.sh
 #            bash scripts/enable-ssl-staging.sh
 
 set -euo pipefail
 
-cd /opt/daibilet
+PROJECT_DIR="${PROJECT_DIR:-/opt/daibilet}"
+cd "${PROJECT_DIR}"
 
-if [ ! -f deploy/nginx/staging-https.conf ]; then
-  echo "Ошибка: deploy/nginx/staging-https.conf не найден (bootstrap ещё не запускали?)"
+ENV_FILE="deploy/staging/.env"
+[ -f "$ENV_FILE" ] || ENV_FILE=".env"
+
+if [ ! -d deploy/nginx/certbot/conf/live/staging.daibilet.ru ]; then
+  echo "Ошибка: сертификаты staging.daibilet.ru не найдены (запустите init-letsencrypt.sh)"
   exit 1
 fi
 
-echo "==> Переключение nginx на HTTPS config..."
-cp deploy/nginx/staging-https.conf deploy/nginx/staging.conf
-
-echo "==> Перезапуск nginx..."
-docker compose -f deploy/staging/docker-compose.yml --env-file .env -p daibilet-staging restart nginx
+echo "==> Подключение второго конфига (staging-ssl.conf)..."
+echo "==> Перезапуск nginx с SSL..."
+docker compose -f deploy/staging/docker-compose.yml -f deploy/staging/docker-compose.ssl.yml \
+  --env-file "$ENV_FILE" -p daibilet-staging up -d nginx
 
 echo "Staging доступен по HTTPS."

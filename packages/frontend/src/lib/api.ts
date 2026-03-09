@@ -34,13 +34,14 @@ import type {
 } from './api.types';
 
 /**
- * Единая схема: и SSR, и CSR идут через Next.js rewrites (/api/v1).
- * SSR запрашивает свой же origin (localhost:3000), Next проксирует на backend.
- * Это устраняет fetch failed при недоступности backend напрямую из Node.
+ * Единая схема: CSR — относительный /api/v1 (проксирует nginx на backend).
+ * SSR в production (Docker): INTERNAL_API_URL — прямой вызов backend (rewrites в prod отключены).
+ * SSR в dev: свой origin + rewrites Next → backend.
  */
 const isServer = typeof window === 'undefined';
 const API_BASE = isServer
-  ? (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000') + '/api/v1'
+  ? (process.env.INTERNAL_API_URL ||
+      (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000') + '/api/v1')
   : process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -524,4 +525,50 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  getPromoBlocks: (city?: string) =>
+    fetchApi<PromoBlockDto[]>(city ? `/promo-blocks?city=${encodeURIComponent(city)}` : '/promo-blocks'),
+
+  getPromoCollection: (slug: string) =>
+    fetchApi<PromoCollectionDto>(`/promo-collections/${encodeURIComponent(slug)}`),
+};
+
+export type PromoBlockDto = {
+  slug: string;
+  title: string;
+  description: string;
+  href: string;
+  iconSource: string;
+  iconKey: string | null;
+  iconSvg: string | null;
+  bgMode: string;
+  bgColor: string | null;
+  gradientFrom: string | null;
+  gradientTo: string | null;
+};
+
+export type PromoCollectionDto = {
+  slug: string;
+  title: string;
+  description: string | null;
+  contentType: 'EVENTS' | 'VENUES';
+  events?: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    category: string;
+    imageUrl: string | null;
+    priceFrom: number | null;
+    rating: number;
+    city?: { slug: string; name: string };
+  }>;
+  venues?: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    imageUrl: string | null;
+    priceFrom: number | null;
+    rating: number;
+    city?: { slug: string; name: string };
+  }>;
 };

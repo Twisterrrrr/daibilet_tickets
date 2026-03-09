@@ -11,6 +11,7 @@ import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
 import { TagAssignmentService } from '../scheduler/tag-assignment.service';
 import { SupportModule } from '../support/support.module';
 import { PreviewModule } from '../preview/preview.module';
+import { PromoModule } from '../promo/promo.module';
 
 import { AdminArticlesController } from './admin-articles.controller';
 import { AdminAuditController } from './admin-audit.controller';
@@ -38,6 +39,10 @@ import { AdminUploadController } from './admin-upload.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
 import { AdminSeoAuditController } from './admin-seo-audit.controller';
 import { AdminPreviewsController } from './admin-previews.controller';
+import { AdminPromoBlocksController } from './admin-promo-blocks.controller';
+import { AdminPromoBlocksService } from './admin-promo-blocks.service';
+import { AdminPromoCollectionsController } from './admin-promo-collections.controller';
+import { AdminPromoCollectionsService } from './admin-promo-collections.service';
 import { AdminSourceCategoriesController } from './admin-source-categories.controller';
 import { AuditService } from './audit.service';
 import { EventOverrideService } from './event-override.service';
@@ -53,12 +58,13 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     CatalogModule,
     VoucherModule,
     PreviewModule,
+    PromoModule,
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_SYNC },
     ),
   ],
-  providers: [AuditService, EventOverrideService, ReviewService, PaymentMetricsService, TagAssignmentService, SeoAuditService],
+  providers: [AuditService, EventOverrideService, ReviewService, PaymentMetricsService, TagAssignmentService, SeoAuditService, AdminPromoBlocksService, AdminPromoCollectionsService],
   controllers: [
     AdminDashboardController,
     AdminCitiesController,
@@ -86,6 +92,8 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminUploadController,
     AdminSeoAuditController,
     AdminPreviewsController,
+    AdminPromoBlocksController,
+    AdminPromoCollectionsController,
     AdminSourceCategoriesController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],

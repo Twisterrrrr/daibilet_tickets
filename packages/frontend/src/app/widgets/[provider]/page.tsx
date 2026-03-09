@@ -16,6 +16,7 @@ type WidgetSession = {
   isSoldOut: boolean;
   scarcityLevel: 'NONE' | 'LOW' | 'LAST';
   tags: Array<'SOONEST' | 'BEST_PRICE' | 'POPULAR'>;
+  soldLast24h?: number;
 };
 
 /** Event from API (backend returns eventSlug; we map to slug for UI). */

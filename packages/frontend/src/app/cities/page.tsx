@@ -1,7 +1,7 @@
 import type { CityListItem } from '@daibilet/shared';
 import type { Metadata } from 'next';
 
-import { CityCard } from '@/components/ui/CityCard';
+import { CitiesListClient } from './CitiesListClient';
 import { api } from '@/lib/api';
 import { CITY_INFO } from '@/lib/cityInfo';
 import { CITY_IMAGES } from '@/lib/cityImages';
@@ -31,6 +31,7 @@ type CityCardVM = {
 
 type ExtendedCity = CityListItem & {
   description?: string | null;
+  eventCount?: number;
   museumCount?: number;
   _count?: { venues?: number; events?: number };
   region?: { slug: string; name: string; eventCount: number } | null;
@@ -44,9 +45,9 @@ function toCityCardVM(c: ExtendedCity): CityCardVM {
     id: c.id,
     slug: c.slug,
     name: c.name,
-    // Приоритет: статичная оптимизированная картинка из CITY_IMAGES → heroImage из БД.
+    // Приоритет: eventCount из API → _count.events (для обратной совместимости)
     heroImage: imageConfig?.card ?? c.heroImage,
-    eventCount: count.events ?? 0,
+    eventCount: c.eventCount ?? count.events ?? 0,
     // museumCount на бэке уже считает venues + events-at-venues; fallback — просто количество venues.
     venueCount: c.museumCount ?? count.venues ?? 0,
     // Приоритет как на странице города: сначала маркетинговый brief из CITY_INFO,
@@ -64,39 +65,23 @@ export default async function CitiesPage() {
     // API недоступен — покажем пустое состояние
   }
 
+  const cityVMs = cities.map((c) => toCityCardVM(c as ExtendedCity));
+
   return (
     <div className="container-page py-10">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Города</h1>
-        <p className="mt-2 text-lg text-slate-500">Выберите город — найдём лучшие экскурсии, музеи и мероприятия</p>
-      </div>
-
-      {/* Cities grid */}
-      {cities.length > 0 ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {cities.map((city) => {
-            const vm = toCityCardVM(city as ExtendedCity);
-            return (
-              <CityCard
-                key={vm.id}
-                slug={vm.slug}
-                name={vm.name}
-                heroImage={vm.heroImage}
-                eventCount={vm.eventCount}
-                venueCount={vm.venueCount}
-                description={vm.description}
-                region={vm.region ?? undefined}
-                large
-              />
-            );
-          })}
-        </div>
+      {cityVMs.length > 0 ? (
+        <CitiesListClient cities={cityVMs} />
       ) : (
-        <div className="rounded-xl border border-dashed border-slate-300 py-20 text-center">
-          <p className="text-lg text-slate-400">Города загружаются...</p>
-          <p className="mt-1 text-sm text-slate-400">Убедитесь, что API запущен на порту 4000</p>
-        </div>
+        <>
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-slate-900">Города</h1>
+            <p className="mt-2 text-lg text-slate-500">Выберите город — найдём лучшие экскурсии, музеи и мероприятия</p>
+          </div>
+          <div className="rounded-xl border border-dashed border-slate-300 py-20 text-center">
+            <p className="text-lg text-slate-400">Города загружаются...</p>
+            <p className="mt-1 text-sm text-slate-400">Убедитесь, что API запущен на порту 4000</p>
+          </div>
+        </>
       )}
     </div>
   );

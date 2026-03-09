@@ -8,10 +8,8 @@
     "build": "tsc",
     "lint": "tsc --noEmit"
   },
-  "devDependencies": {
-    "typescript": "^5.7.0"
-  },
   "dependencies": {
+    "typescript": "^5.7.0",
     "zod": "^4.3.6"
   }
 }

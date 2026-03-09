@@ -13,6 +13,7 @@ type WidgetSession = {
   isSoldOut: boolean;
   scarcityLevel: ScarcityLevel;
   tags: Array<'SOONEST' | 'BEST_PRICE' | 'POPULAR'>;
+  soldLast24h?: number;
 };
 
 type WidgetEvent = {
@@ -67,6 +68,30 @@ export function SessionPickerClient({ provider, eventId, initialError, event, se
     }
   }, [sessions]);
 
+  // A8: Smart prefetch — подставить name/phone по email (без создания записей)
+  React.useEffect(() => {
+    const email = buyer.email.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length < 5) return;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/v1/widgets/${encodeURIComponent(provider)}/last-customer?email=${encodeURIComponent(email)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { name?: string; email?: string; phone?: string } | null;
+        if (!data || typeof data !== 'object') return;
+        setBuyer((prev) => ({
+          name: prev.name.trim() ? prev.name : (data.name ?? ''),
+          email: prev.email,
+          phone: prev.phone.trim() ? prev.phone : (data.phone ?? ''),
+        }));
+      } catch {
+        /* prefetch failed — ignore */
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [buyer.email, provider]);
+
   if (error && !event) {
     return (
       <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -87,6 +112,24 @@ export function SessionPickerClient({ provider, eventId, initialError, event, se
 
   const selectedSession = sessions?.find((s) => s.id === selectedSessionId) ?? null;
   const maxQty = selectedSession ? Math.max(1, Math.min(10, selectedSession.available || 1)) : 1;
+
+  const soldOutAlternatives =
+    selectedSession?.isSoldOut && sessions
+      ? sessions.filter((s) => !s.isSoldOut && s.available > 0).slice(0, 3)
+      : [];
+  const totalSold24h = sessions?.reduce((sum, s) => sum + (s.soldLast24h ?? 0), 0) ?? 0;
+  const cheaperSession =
+    selectedSession &&
+    !selectedSession.isSoldOut &&
+    sessions
+      ? sessions.find(
+          (s) =>
+            s.id !== selectedSession.id &&
+            !s.isSoldOut &&
+            (s.price ?? 0) > 0 &&
+            ((selectedSession.price ?? 0) - (s.price ?? 0)) >= 20000,
+        )
+      : null;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-900/5">
@@ -115,14 +158,18 @@ export function SessionPickerClient({ provider, eventId, initialError, event, se
 
                 let scarcityText: string | null = null;
                 if (!s.isSoldOut) {
-                  if (s.scarcityLevel === 'LAST') {
-                    scarcityText = `Последние места (${s.available})`;
-                  } else if (s.scarcityLevel === 'LOW') {
-                    scarcityText = `Осталось ${s.available}`;
-                  }
+                  if (s.scarcityLevel === 'LAST') scarcityText = `Последние места (${s.available})`;
+                  else if (s.scarcityLevel === 'LOW') scarcityText = `Осталось всего ${s.available} мест`;
                 } else {
                   scarcityText = 'Распродано';
                 }
+                const badgeLabels: string[] = [];
+                const d = new Date(s.startsAt);
+                const today = new Date();
+                const isToday = d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+                if (s.tags?.includes('SOONEST')) badgeLabels.push(isToday ? 'Сегодня' : 'Ближайший');
+                if (s.tags?.includes('BEST_PRICE')) badgeLabels.push('Лучшая цена');
+                if (s.tags?.includes('POPULAR')) badgeLabels.push('Самый популярный');
 
                 return (
                   <label
@@ -149,6 +196,15 @@ export function SessionPickerClient({ provider, eventId, initialError, event, se
                       className="h-3 w-3"
                     />
                     <span className="flex-1 truncate">{formatDateTime(s.startsAt)}</span>
+                    {badgeLabels.length > 0 && (
+                      <span className="ml-1 flex gap-1">
+                        {badgeLabels.map((l) => (
+                          <span key={l} className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                            {l}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                     {sessionPriceLabel && (
                       <span className="ml-2 whitespace-nowrap text-[11px] font-medium text-slate-900">
                         {sessionPriceLabel}
@@ -169,6 +225,44 @@ export function SessionPickerClient({ provider, eventId, initialError, event, se
                 );
               })}
             </div>
+
+            {selectedSession?.isSoldOut && soldOutAlternatives.length > 0 && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
+                <p className="mb-2 font-medium text-amber-900">Этот сеанс распродан</p>
+                <p className="mb-2 text-amber-800">Ближайшие доступные:</p>
+                <div className="flex flex-col gap-1">
+                  {soldOutAlternatives.map((alt) => (
+                    <button
+                      key={alt.id}
+                      type="button"
+                      onClick={() => setSelectedSessionId(alt.id)}
+                      className="flex items-center justify-between rounded border border-amber-200 bg-white px-2 py-1.5 text-left hover:bg-amber-50"
+                    >
+                      <span>{formatDateTime(alt.startsAt)}</span>
+                      {formatPriceRUB(alt.price) && (
+                        <span className="font-medium text-slate-900">{formatPriceRUB(alt.price)}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {totalSold24h > 0 && (
+              <p className="mb-2 text-[11px] text-slate-500">
+                За последние 24 часа купили {totalSold24h} {totalSold24h === 1 ? 'билет' : totalSold24h < 5 ? 'билета' : 'билетов'}
+              </p>
+            )}
+
+            {cheaperSession && selectedSession && (
+              <p className="mb-2 text-[11px] text-emerald-600">
+                Сэкономьте{' '}
+                {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(
+                  ((selectedSession.price ?? 0) - (cheaperSession.price ?? 0)) / 100,
+                )}{' '}
+                — выберите сеанс в {formatDateTime(cheaperSession.startsAt).split(' ')[1]}
+              </p>
+            )}
 
             {selectedSession && !selectedSession.isSoldOut && (
               <div className="mb-3 flex items-center justify-between gap-3 text-xs text-slate-600">

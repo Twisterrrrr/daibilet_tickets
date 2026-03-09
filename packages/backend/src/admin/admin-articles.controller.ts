@@ -109,7 +109,7 @@ export class AdminArticlesController {
       }
 
       const after = await this.prisma.article.findUnique({ where: { id } });
-      await this.audit.log(req.user!.id, 'UPDATE', 'Article', id, before, after);
+      await this.audit.log(req.user!.id, 'UPDATE', 'Article', id, before ?? undefined, after ?? undefined);
       return after;
     }
 

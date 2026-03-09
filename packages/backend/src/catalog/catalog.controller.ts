@@ -17,7 +17,10 @@ import { ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 
+import { EventSource } from '@prisma/client';
+
 import { CacheService } from '../cache/cache.service';
+import { PostEditQueueService } from './postedit-queue.service';
 import { CatalogService } from './catalog.service';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -31,6 +34,8 @@ import { TepSyncService } from './tep-sync.service';
 
 @ApiTags('catalog')
 @Controller()
+/** Публичный каталог: лимит 150 req/min (главная: getCities + getEvents x4 + Header/Footer). */
+@Throttle({ default: { ttl: 60_000, limit: 150 } })
 export class CatalogController {
   constructor(
     private readonly catalogService: CatalogService,
@@ -42,6 +47,7 @@ export class CatalogController {
     private readonly tepSync: TepSyncService,
     private readonly cache: CacheService,
     private readonly config: ConfigService,
+    private readonly postEditQueue: PostEditQueueService,
   ) {}
 
   // --- Города ---
@@ -306,8 +312,9 @@ export class CatalogController {
   // --- Синхронизация всех источников ---
 
   @Post('sync/all')
-  @ApiOperation({ summary: 'Синхронизация из всех источников (TC + Teplohod) + retag' })
+  @ApiOperation({ summary: 'Синхронизация из всех источников (TC + Teplohod) + retag + очередь постредакции' })
   async syncAllSources() {
+    const runStartedAt = new Date();
     // Параллельная синхронизация из обоих источников
     const [tc, tep] = await Promise.all([
       this.tcSync.syncAll(), // retag встроен в конец tcSync.syncAll()
@@ -315,7 +322,18 @@ export class CatalogController {
     ]);
     // Дополнительный retag для событий teplohod (если tep sync завершился после TC retag)
     const retag = await this.tcSync.retagAll();
+    // Очередь постредакции: импортные события → EventOverride с NEEDS_REVIEW (как в sync-очереди BullMQ)
+    let postEditQueue = { tc: { created: 0, updated: 0 }, tep: { created: 0, updated: 0 } };
+    try {
+      const [queueTc, queueTep] = await Promise.all([
+        this.postEditQueue.ensureOverridesForImportedEvents({ source: EventSource.TC, since: runStartedAt }),
+        this.postEditQueue.ensureOverridesForImportedEvents({ source: EventSource.TEPLOHOD, since: runStartedAt }),
+      ]);
+      postEditQueue = { tc: queueTc, tep: queueTep };
+    } catch (err) {
+      // Не ломаем sync при ошибке очереди (логируется внутри PostEditQueueService)
+    }
     await this.cache.invalidateAfterSync();
-    return { ticketscloud: tc, teplohod: tep, retag };
+    return { ticketscloud: tc, teplohod: tep, retag, postEditQueue };
   }
 }

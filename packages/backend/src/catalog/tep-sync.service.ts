@@ -211,6 +211,26 @@ export class TepSyncService {
       }
     }
 
+    // Самоисцеление: события с активными будущими сеансами должны быть isActive=true
+    const healed = await this.prisma.event.updateMany({
+      where: {
+        source: 'TEPLOHOD',
+        isActive: false,
+        isDeleted: false,
+        sessions: {
+          some: {
+            startsAt: { gt: new Date() },
+            canceledAt: null,
+            isActive: true,
+          },
+        },
+      },
+      data: { isActive: true },
+    });
+    if (healed.count > 0) {
+      this.logger.log(`TEP самоисцеление: ${healed.count} событий восстановлено (isActive=true)`);
+    }
+
     this.logger.log(`=== TEP синхронизация: ${totalSynced}/${allEvents.length} событий, ${totalSessions} сессий ===`);
 
     return {
@@ -448,12 +468,19 @@ export class TepSyncService {
         const startsAt = new Date(slot.datetime);
         if (startsAt <= now) continue;
 
+        const available = slot.available_tickets ?? 0;
+        const suspended =
+          slot.sale_suspended === true ||
+          slot.status === 'suspended' ||
+          slot.status === 'closed';
+        const isSellable = available > 0 && !suspended;
+
         rows.push({
           tcSessionId: `${sourceId}-${slot.id}`,
           startsAt,
           endsAt: new Date(startsAt.getTime() + durationMinutes * 60000),
-          availableTickets: slot.available_tickets || 0,
-          isActive: (slot.available_tickets || 0) > 0,
+          availableTickets: available,
+          isActive: isSellable,
         });
       }
 
@@ -756,7 +783,7 @@ export class TepSyncService {
       tep.place || '',
       tep.title || '',
       tep.description || '',
-      (tep as Record<string, any>).openDate?.description || '',
+      (tep as TepEvent & { openDate?: { description?: string } }).openDate?.description || '',
       tep.schedule_description || '',
     ];
     const text = parts.join(' ').toLowerCase();

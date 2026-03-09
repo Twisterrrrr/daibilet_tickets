@@ -11,10 +11,14 @@ interface MultiEventCardProps {
 }
 
 export function MultiEventCard({ item, className = '' }: MultiEventCardProps) {
+  // Список городов и дата ближайшего события
+  const cities = item.citiesPreview ?? [];
   const citiesLabel =
-    item.totalCities > 1
-      ? `${item.citiesPreview?.[0]?.name ?? ''} и ещё ${item.totalCities - 1}`
-      : item.citiesPreview?.[0]?.name ?? '';
+    cities.length === 0
+      ? ''
+      : item.remainingCities > 0
+        ? `${cities.map((c) => c.name).join(', ')} и ещё ${item.remainingCities}`
+        : cities.map((c) => c.name).join(', ');
 
   return (
     <Link
@@ -34,14 +38,14 @@ export function MultiEventCard({ item, className = '' }: MultiEventCardProps) {
       ) : null}
       <div className="p-3 sm:p-4">
         <h3 className="font-semibold text-slate-900 line-clamp-2 group-hover:text-primary-600">{item.title}</h3>
-        {citiesLabel ? <p className="mt-1 text-sm text-slate-500">{citiesLabel}</p> : null}
+        {citiesLabel ? <p className="mt-1 text-sm text-slate-500 line-clamp-2">{citiesLabel}</p> : null}
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
           {item.minPrice != null && item.minPrice > 0 ? (
             <span className="font-medium text-primary-600">от {formatPrice(item.minPrice)}</span>
           ) : null}
           {(item.rating ?? 0) > 0 ? <span className="text-slate-500">★ {item.rating?.toFixed(1)}</span> : null}
           {item.nextDate ? (
-            <span className="text-slate-500">
+            <span className="text-slate-500" title="Ближайшая дата">
               {new Date(item.nextDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
             </span>
           ) : null}

@@ -212,7 +212,7 @@ export class AdminSuppliersController {
     const supplier = await this.prisma.operator.findUnique({ where: { id, isSupplier: true } });
     if (!supplier) throw new NotFoundException('Поставщик не найден');
 
-    const where: any = {
+    const where: Prisma.EventWhereInput = {
       isDeleted: false,
       offers: { some: { operatorId: id } },
     };
@@ -302,7 +302,7 @@ export class AdminSuppliersController {
     const supplier = await this.prisma.operator.findUnique({ where: { id } });
     if (!supplier) throw new NotFoundException('Поставщик не найден');
 
-    const updateData: any = {};
+    const updateData: Prisma.OperatorUpdateInput = {};
     if (data.trustLevel !== undefined) updateData.trustLevel = Number(data.trustLevel);
     if (data.commissionRate !== undefined) updateData.commissionRate = Number(data.commissionRate);
     if (data.promoRate !== undefined) updateData.promoRate = data.promoRate ? Number(data.promoRate) : null;
@@ -409,7 +409,7 @@ export class AdminSuppliersController {
     const operator = await this.prisma.operator.findUnique({ where: { id } });
     if (!operator) throw new NotFoundException('Поставщик не найден');
 
-    const updateData: any = {};
+    const updateData: Prisma.OperatorUpdateInput = {};
     if (data.webhookUrl !== undefined) {
       updateData.webhookUrl = data.webhookUrl || null;
     }

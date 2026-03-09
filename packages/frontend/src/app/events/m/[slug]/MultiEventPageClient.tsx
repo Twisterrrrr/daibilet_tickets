@@ -26,6 +26,16 @@ export function MultiEventPageClient({ detail }: MultiEventPageClientProps) {
           {group.minPrice != null && group.minPrice > 0 && (
             <span>от {formatPrice(group.minPrice)}</span>
           )}
+          {group.nextDate && (
+            <span>
+              Ближайшая дата:{' '}
+              {new Date(group.nextDate).toLocaleDateString('ru-RU', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </span>
+          )}
         </div>
         {group.coverUrl && (
           <div className="mt-6 relative aspect-video overflow-hidden rounded-xl bg-slate-200">

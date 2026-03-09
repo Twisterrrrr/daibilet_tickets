@@ -36,12 +36,12 @@ export class AdminSourceCategoriesController {
       SELECT
         id,
         source,
-        external_category_norm AS "externalCategoryNorm",
-        internal_category      AS "internalCategory",
-        created_at             AS "createdAt",
-        updated_at             AS "updatedAt"
+        "externalCategoryNorm",
+        "internalCategory",
+        "createdAt",
+        "updatedAt"
       FROM source_category_mappings
-      ORDER BY created_at DESC
+      ORDER BY "createdAt" DESC
     `);
 
     return rows.map((r) => ({
@@ -72,13 +72,13 @@ export class AdminSourceCategoriesController {
       SELECT
         id,
         source,
-        external_category_raw  AS "externalCategoryRaw",
-        external_category_norm AS "externalCategoryNorm",
-        first_seen_at          AS "firstSeenAt",
-        last_seen_at           AS "lastSeenAt",
+        "externalCategoryRaw",
+        "externalCategoryNorm",
+        "firstSeenAt",
+        "lastSeenAt",
         hits
       FROM source_category_unknowns
-      ORDER BY hits DESC, last_seen_at DESC
+      ORDER BY hits DESC, "lastSeenAt" DESC
     `);
 
     return rows.map((r) => ({
@@ -109,26 +109,26 @@ export class AdminSourceCategoriesController {
         updatedAt: Date;
       }>
     >(Prisma.sql`
-      INSERT INTO source_category_mappings (id, source, external_category_norm, internal_category, created_at, updated_at)
+      INSERT INTO source_category_mappings (id, source, "externalCategoryNorm", "internalCategory", "createdAt", "updatedAt")
       VALUES (gen_random_uuid(), ${dto.source}, ${externalCategoryNorm}, ${dto.internalCategory}, NOW(), NOW())
-      ON CONFLICT (source, external_category_norm)
+      ON CONFLICT (source, "externalCategoryNorm")
       DO UPDATE SET
-        internal_category = EXCLUDED.internal_category,
-        updated_at        = NOW()
+        "internalCategory" = EXCLUDED."internalCategory",
+        "updatedAt"        = NOW()
       RETURNING
         id,
         source,
-        external_category_norm AS "externalCategoryNorm",
-        internal_category      AS "internalCategory",
-        created_at             AS "createdAt",
-        updated_at             AS "updatedAt"
+        "externalCategoryNorm",
+        "internalCategory",
+        "createdAt",
+        "updatedAt"
     `);
 
     // После создания правила можно удалить unknown-запись для этой пары.
     await this.prisma.$executeRaw(
       Prisma.sql`
         DELETE FROM source_category_unknowns
-        WHERE source = ${dto.source} AND external_category_norm = ${externalCategoryNorm}
+        WHERE source = ${dto.source} AND "externalCategoryNorm" = ${externalCategoryNorm}
       `,
     );
 

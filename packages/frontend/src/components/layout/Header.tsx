@@ -12,9 +12,9 @@ import { api } from '@/lib/api';
 import { SearchAutocomplete } from './SearchAutocomplete';
 
 const navigation = [
-  { name: 'Экскурсии', href: '/events?category=EXCURSION' },
-  { name: 'Музеи и Арт', href: '/events?category=MUSEUM' },
-  { name: 'Мероприятия', href: '/events?category=EVENT' },
+  { name: 'Экскурсии', href: '/events?category=EXCURSION&page=1' },
+  { name: 'Музеи и Арт', href: '/events?category=MUSEUM&page=1' },
+  { name: 'Мероприятия', href: '/events?category=EVENT&page=1' },
   { name: 'Подборки', href: '/podborki' },
   { name: 'Города', href: '/cities' },
   { name: 'Блог', href: '/blog' },

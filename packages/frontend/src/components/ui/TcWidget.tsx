@@ -1,11 +1,7 @@
 /**
  * Компоненты покупки билетов через Ticketscloud.
- * Скрипт tcwidget.js подключён глобально в layout.tsx.
- * По клику на элемент с data-tc-event скрипт открывает модалку TC.
- *
- * TcWidgetButton — основная кнопка «Купить билет»:
- *   - С tcMetaEventId → data-tc-meta="true", сначала выбор даты
- *   - Без meta → конкретный event, сразу выбор билетов
+ * TcWidgetButton — всегда прямая ссылка (GET). tcwidget.js при POST к view widget
+ * возвращает PredicateMismatch, поэтому используем href вместо data-tc-event.
  *
  * TcSessionSlot — кликабельная строка сеанса:
  *   - Извлекает TC event ID из tcSessionId (формат "{tcEventId}-{set}")
@@ -33,6 +29,12 @@ function extractTcEventId(tcSessionId: string): string | null {
 // TcWidgetButton — основная кнопка покупки
 // ────────────────────────────────────────────────────────────────
 
+function getTcWidgetUrl(widgetEventId: string, isMeta: boolean): string {
+  return isMeta
+    ? `https://ticketscloud.com/v1/services/widget/meta?meta_event=${widgetEventId}`
+    : `https://ticketscloud.com/v1/services/widget?event=${widgetEventId}`;
+}
+
 export function TcWidgetButton({
   tcEventId,
   tcMetaEventId,
@@ -45,7 +47,6 @@ export function TcWidgetButton({
   compact?: boolean;
 }) {
   const label = children ?? (compact ? 'Купить' : 'Купить билет');
-  // Если есть MetaEvent ID — виджет покажет выбор даты
   const widgetEventId = tcMetaEventId || tcEventId;
   const isMeta = !!tcMetaEventId;
 
@@ -55,31 +56,17 @@ export function TcWidgetButton({
     ? 'rounded-lg px-3.5 py-2 text-sm font-bold'
     : 'rounded-xl px-6 py-3 text-base font-semibold';
 
-  // Если токен не настроен — показываем fallback-ссылку
-  if (!TC_TOKEN) {
-    return (
-      <a
-        href={`https://ticketscloud.com/v1/services/widget?event=${widgetEventId}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`flex w-full items-center justify-center gap-1.5 bg-amber-400 text-slate-900 transition-colors hover:bg-amber-500 ${sizeClasses}`}
-      >
-        {label}
-      </a>
-    );
-  }
-
+  const href = getTcWidgetUrl(widgetEventId, isMeta);
   return (
-    <button
-      type="button"
-      data-tc-event={widgetEventId}
-      data-tc-token={TC_TOKEN}
-      {...(isMeta && { 'data-tc-meta': 'true' })}
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
       onClick={() => trackWidgetOpen(widgetEventId)}
-      className={`tc-buy-btn tc-background-yellow flex w-full items-center justify-center gap-1.5 ${sizeClasses}`}
+      className={`tc-buy-btn tc-background-yellow flex w-full items-center justify-center gap-1.5 bg-amber-400 text-slate-900 transition-colors hover:bg-amber-500 ${sizeClasses}`}
     >
       {label}
-    </button>
+    </a>
   );
 }
 

@@ -1,3 +1,19 @@
+// Preload .env из корня монорепо (до любых Nest/ConfigModule)
+// При cwd=packages/backend → ../../.env = корень монорепо
+import { config as dotenvConfig } from 'dotenv';
+import { existsSync } from 'fs';
+import { resolve } from 'path';
+const candidates = [
+  resolve(process.cwd(), '..', '..', '.env'),
+  resolve(process.cwd(), '.env'),
+];
+for (const p of candidates) {
+  if (existsSync(p)) {
+    dotenvConfig({ path: p });
+    break;
+  }
+}
+
 import * as Sentry from '@sentry/nestjs';
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
@@ -12,6 +28,7 @@ if (SENTRY_DSN) {
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as express from 'express';
+import { join } from 'path';
 import { setCompatDisabled, setCompatLogger } from '@daibilet/shared';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -41,8 +58,9 @@ async function bootstrap() {
   if (process.env.SENTRY_DSN) {
     try {
       const sentryNestjs = await import('@sentry/nestjs');
-      // SentryGlobalFilter may not exist in all @sentry/nestjs versions
-      const FilterClass = (sentryNestjs as any).SentryGlobalFilter;
+      // SentryGlobalFilter может отсутствовать в старых версиях @sentry/nestjs
+      type SentryModule = { SentryGlobalFilter?: new () => import('@nestjs/common').ExceptionFilter };
+      const FilterClass = (sentryNestjs as SentryModule).SentryGlobalFilter;
       if (FilterClass) {
         app.useGlobalFilters(new FilterClass());
       }
@@ -69,6 +87,10 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('api/v1');
+
+  // Раздача загруженных изображений (dev; в prod — Nginx)
+  const uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
+  app.use('/uploads', express.static(uploadDir));
 
   // JSON body parser с сохранением raw body (для webhook signature verification)
   app.use(

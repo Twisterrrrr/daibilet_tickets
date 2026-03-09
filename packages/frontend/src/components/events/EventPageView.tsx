@@ -1,4 +1,4 @@
-import { CATEGORY_LABELS, formatPrice, SUBCATEGORY_LABELS, type EventOffer, type EventSubcategory } from '@daibilet/shared';
+import { CATEGORY_LABELS, formatPrice, getScarcityState, SUBCATEGORY_LABELS, type EventOffer, type EventSubcategory } from '@daibilet/shared';
 import type { EventDetailFrontend } from '@/lib/api.types';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -823,6 +823,7 @@ function BuyCard({
 
 function StaticSessionRow({ session }: { session: EventDetail['sessions'][number] }) {
   const fmt = formatSessionDate(session.startsAt);
+  const scarcity = getScarcityState(session.availableTickets);
   return (
     <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5">
       <div className="flex items-center gap-3">
@@ -834,13 +835,23 @@ function StaticSessionRow({ session }: { session: EventDetail['sessions'][number
           <p className="text-xs text-slate-500">{fmt.time}</p>
         </div>
       </div>
-      {session.availableTickets > 0 ? (
+      {scarcity.label ? (
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+            scarcity.level === 'SOLD_OUT'
+              ? 'bg-red-50 text-red-600'
+              : scarcity.level === 'LAST'
+                ? 'bg-amber-50 text-amber-700'
+                : 'bg-emerald-50 text-emerald-600'
+          }`}
+        >
+          {scarcity.label}
+        </span>
+      ) : session.availableTickets > 0 ? (
         <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">
           {session.availableTickets} мест
         </span>
-      ) : (
-        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-500">Распродано</span>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { getFirstPriceKopecks } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, Prisma } from '@prisma/client';
+import { DateMode, EventCategory, EventSource, EventSubcategory, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -57,14 +57,19 @@ export class LandingService {
     // Получаем события с сессиями
     const now = new Date();
 
-    // Применяем additionalFilters из настроек лендинга
-    const af = (landing.additionalFilters ?? {}) as Record<string, any>;
-    const extraWhere: Record<string, any> = {};
-    if (af.category) extraWhere.category = af.category;
-    if (af.subcategories?.length) extraWhere.subcategories = { hasSome: af.subcategories };
-    if (af.source) extraWhere.source = af.source;
-    if (af.minDuration) extraWhere.durationMinutes = { ...(extraWhere.durationMinutes || {}), gte: af.minDuration };
-    if (af.maxDuration) extraWhere.durationMinutes = { ...(extraWhere.durationMinutes || {}), lte: af.maxDuration };
+    // Применяем additionalFilters из настроек лендинга (JSON из БД)
+    const af = (landing.additionalFilters ?? {}) as Record<string, unknown>;
+    const extraWhere: Prisma.EventWhereInput = {};
+    if (typeof af.category === 'string') extraWhere.category = af.category as EventCategory;
+    if (Array.isArray(af.subcategories) && af.subcategories.length > 0) {
+      extraWhere.subcategories = { hasSome: af.subcategories as EventSubcategory[] };
+    }
+    if (typeof af.source === 'string') extraWhere.source = af.source as EventSource;
+    const minD = typeof af.minDuration === 'number' ? af.minDuration : undefined;
+    const maxD = typeof af.maxDuration === 'number' ? af.maxDuration : undefined;
+    if (minD !== undefined || maxD !== undefined) {
+      extraWhere.durationMinutes = { ...(minD !== undefined && { gte: minD }), ...(maxD !== undefined && { lte: maxD }) };
+    }
 
     const events = tag
       ? await this.prisma.event.findMany({

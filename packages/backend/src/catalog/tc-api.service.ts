@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { type TcEvent, isTcEvent, isTcEventArray } from './tc-api.types';
+import { type TcEvent, type TcOrder, type TcTicket, isTcEvent, isTcEventArray } from './tc-api.types';
 import { runWithLimit, withRetry } from '../common/api-rate-limit.util';
 import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
 
@@ -41,7 +41,7 @@ export class TcApiService {
    * C3: concurrency limit + retry с backoff на 429/5xx.
    * @param signal — опционально, для отмены при job timeout
    */
-  private async request<T = any>(path: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T> {
+  private async request<T = unknown>(path: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T> {
     const doFetch = async (): Promise<T> => {
       const url = new URL(path, this.baseUrl);
       if (params) {
@@ -136,15 +136,21 @@ export class TcApiService {
    * Получить билеты с местами для конкретного события.
    * GET /v1/resources/events/:id/tickets
    */
-  async getEventTickets(eventId: string, status = 'vacant', signal?: AbortSignal): Promise<any[]> {
-    return this.request(`/v1/resources/events/${eventId}/tickets`, { status }, signal);
+  async getEventTickets(eventId: string, status = 'vacant', signal?: AbortSignal): Promise<TcTicket[]> {
+    const raw = await this.request<unknown>(`/v1/resources/events/${eventId}/tickets`, { status }, signal);
+    if (!Array.isArray(raw)) return [];
+    return raw as TcTicket[];
   }
 
   /**
    * Создать заказ.
    * POST /v2/resources/orders
    */
-  async createOrder(payload: { event?: string; random?: Record<string, number>; tickets?: string[] }): Promise<any> {
+  async createOrder(payload: {
+    event?: string;
+    random?: Record<string, number>;
+    tickets?: string[];
+  }): Promise<TcOrder | { data?: TcOrder }> {
     const url = new URL('/v2/resources/orders', this.baseUrl);
 
     const res = await fetch(url.toString(), {
@@ -166,7 +172,7 @@ export class TcApiService {
       throw new Error(`TC create order failed ${res.status}: ${text.slice(0, 200)}`);
     }
 
-    return res.json();
+    return res.json() as Promise<TcOrder | { data?: TcOrder }>;
   }
 
   /**

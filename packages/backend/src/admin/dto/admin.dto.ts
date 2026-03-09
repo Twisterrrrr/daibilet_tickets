@@ -235,3 +235,5 @@ export * from './admin-support.dto';
 export * from './admin-supplier.dto';
 export * from './admin-collection.dto';
 export * from './admin-checkout.dto';
+export * from './admin-promo-block.dto';
+export * from './admin-promo-collection.dto';

@@ -7,10 +7,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { QUEUE_PARTNER_WEBHOOKS } from '../queue/queue.constants';
 export { QUEUE_PARTNER_WEBHOOKS };
 
+/** JSON-сериализуемые данные для webhook. unknown — защита от undefined в логике партнёра. */
+export type WebhookData = Record<string, unknown>;
+
 export interface WebhookPayload {
   event: string;
   timestamp: string;
-  data: Record<string, any>;
+  data: WebhookData;
 }
 
 /**
@@ -35,8 +38,9 @@ export class PartnerWebhookService {
 
   /**
    * Ставит webhook-уведомление в очередь.
+   * @param data — JSON-сериализуемый объект (unknown защищает от undefined в полях)
    */
-  async enqueue(operatorId: string, eventType: string, data: Record<string, any>): Promise<void> {
+  async enqueue(operatorId: string, eventType: string, data: WebhookData): Promise<void> {
     const operator = await this.prisma.operator.findUnique({
       where: { id: operatorId },
       select: { webhookUrl: true, webhookSecret: true, name: true },

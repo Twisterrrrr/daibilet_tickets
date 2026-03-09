@@ -15,7 +15,7 @@
  * - ENV FULL_SYNC=1 обязательно, иначе скрипт завершится с ошибкой
  */
 
-const API_BASE = process.env.API_URL || 'http://127.0.0.1:4000';
+const API_BASE = process.env.API_URL || 'http://localhost:4000';
 
 async function runFullSync(): Promise<void> {
   if (process.env.FULL_SYNC !== '1') {
@@ -34,6 +34,7 @@ async function runFullSync(): Promise<void> {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(300_000), // 5 min
     });
 
     const elapsedSec = ((Date.now() - startedAt.getTime()) / 1000).toFixed(1);

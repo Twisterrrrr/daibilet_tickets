@@ -163,7 +163,7 @@ export function SearchAutocomplete({ city }: SearchAutocompleteProps) {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 truncate">{city.name}</p>
                           {city._count?.events > 0 && (
-                            <p className="text-xs text-slate-400">{city._count.events} событий</p>
+                            <p className="text-xs text-slate-400">{(city as { eventCount?: number }).eventCount ?? city._count?.events ?? 0} событий</p>
                           )}
                         </div>
                         <ArrowRight className="h-3.5 w-3.5 text-slate-300" />

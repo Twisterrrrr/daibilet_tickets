@@ -19,9 +19,9 @@ type FooterSection = 'Каталог' | 'Города' | 'Компания';
 
 const staticFooterLinks = {
   Каталог: [
-    { name: 'Экскурсии', href: '/events?category=EXCURSION' },
-    { name: 'Музеи', href: '/events?category=MUSEUM' },
-    { name: 'Мероприятия', href: '/events?category=EVENT' },
+    { name: 'Экскурсии', href: '/events?category=EXCURSION&page=1' },
+    { name: 'Музеи', href: '/events?category=MUSEUM&page=1' },
+    { name: 'Мероприятия', href: '/events?category=EVENT&page=1' },
   ],
   Компания: [
     { name: 'О сервисе', href: '/about' },

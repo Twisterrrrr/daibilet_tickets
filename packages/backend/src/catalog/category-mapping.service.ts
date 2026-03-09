@@ -31,9 +31,9 @@ export class CategoryMappingService {
     const mappings = await this.prisma.$queryRaw<
       Array<{ internalCategory: EventCategory }>
     >(Prisma.sql`
-      SELECT internal_category AS "internalCategory"
+      SELECT "internalCategory"
       FROM source_category_mappings
-      WHERE source = ${source} AND external_category_norm = ${externalCategoryNorm}
+      WHERE source = ${source} AND "externalCategoryNorm" = ${externalCategoryNorm}
       LIMIT 1
     `);
 
@@ -53,11 +53,11 @@ export class CategoryMappingService {
 
     await this.prisma.$executeRaw(
       Prisma.sql`
-        INSERT INTO source_category_unknowns (id, source, external_category_raw, external_category_norm, first_seen_at, last_seen_at, hits)
+        INSERT INTO source_category_unknowns (id, source, "externalCategoryRaw", "externalCategoryNorm", "firstSeenAt", "lastSeenAt", hits)
         VALUES (gen_random_uuid(), ${source}, ${externalCategoryRaw}, ${externalCategoryNorm}, NOW(), NOW(), 1)
-        ON CONFLICT (source, external_category_norm)
+        ON CONFLICT (source, "externalCategoryNorm")
         DO UPDATE SET
-          last_seen_at = NOW(),
+          "lastSeenAt" = NOW(),
           hits = source_category_unknowns.hits + 1
       `,
     );

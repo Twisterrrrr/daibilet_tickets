@@ -14,6 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Prisma } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -41,7 +42,7 @@ export class AdminCollectionsController {
   ) {
     const pg = parsePagination({ cursor, page, limit: limit || '20' });
 
-    const where: any = {
+    const where: Prisma.CollectionWhereInput = {
       isDeleted: false,
       ...(city && { city: { slug: city } }),
       ...(search && {
@@ -122,13 +123,13 @@ export class AdminCollectionsController {
         filterCategory: body.filterCategory || null,
         filterSubcategory: body.filterSubcategory || null,
         filterAudience: body.filterAudience || null,
-        additionalFilters: (body.additionalFilters as any) || undefined,
+        additionalFilters: (body.additionalFilters as Prisma.InputJsonValue) ?? undefined,
         pinnedEventIds: body.pinnedEventIds || [],
         excludedEventIds: body.excludedEventIds || [],
         metaTitle: body.metaTitle || null,
         metaDescription: body.metaDescription || null,
-        infoBlocks: (body.infoBlocks as any) || undefined,
-        faq: (body.faq as any) || undefined,
+        infoBlocks: (body.infoBlocks as Prisma.InputJsonValue) ?? undefined,
+        faq: (body.faq as Prisma.InputJsonValue) ?? undefined,
         isActive: body.isActive ?? true,
         sortOrder: body.sortOrder ?? 0,
       },
@@ -156,13 +157,15 @@ export class AdminCollectionsController {
         ...(body.filterCategory !== undefined && { filterCategory: body.filterCategory || null }),
         ...(body.filterSubcategory !== undefined && { filterSubcategory: body.filterSubcategory || null }),
         ...(body.filterAudience !== undefined && { filterAudience: body.filterAudience || null }),
-        ...(body.additionalFilters !== undefined && { additionalFilters: body.additionalFilters as any }),
+        ...(body.additionalFilters !== undefined && {
+          additionalFilters: body.additionalFilters as Prisma.InputJsonValue,
+        }),
         ...(body.pinnedEventIds !== undefined && { pinnedEventIds: body.pinnedEventIds }),
         ...(body.excludedEventIds !== undefined && { excludedEventIds: body.excludedEventIds }),
         ...(body.metaTitle !== undefined && { metaTitle: body.metaTitle || null }),
         ...(body.metaDescription !== undefined && { metaDescription: body.metaDescription || null }),
-        ...(body.infoBlocks !== undefined && { infoBlocks: body.infoBlocks as any }),
-        ...(body.faq !== undefined && { faq: body.faq as any }),
+        ...(body.infoBlocks !== undefined && { infoBlocks: body.infoBlocks as Prisma.InputJsonValue }),
+        ...(body.faq !== undefined && { faq: body.faq as Prisma.InputJsonValue }),
         ...(body.isActive !== undefined && { isActive: body.isActive }),
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
         version: { increment: 1 },

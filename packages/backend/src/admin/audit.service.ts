@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -17,8 +18,8 @@ export class AuditService {
     action: 'CREATE' | 'UPDATE' | 'DELETE',
     entity: string,
     entityId: string,
-    before?: any,
-    after?: any,
+    before?: Prisma.InputJsonValue | null,
+    after?: Prisma.InputJsonValue | null,
   ) {
     try {
       await this.prisma.auditLog.create({
@@ -27,8 +28,8 @@ export class AuditService {
           action,
           entity,
           entityId,
-          before: before ?? undefined,
-          after: after ?? undefined,
+          before: before != null ? before : undefined,
+          after: after != null ? after : undefined,
         },
       });
     } catch (err: unknown) {
@@ -50,7 +51,7 @@ export class AuditService {
   }) {
     const { entity, entityId, userId, action, page = 1, limit = 50 } = filters;
 
-    const where: any = {};
+    const where: Prisma.AuditLogWhereInput = {};
     if (entity) where.entity = entity;
     if (entityId) where.entityId = entityId;
     if (userId) where.userId = userId;

@@ -13,10 +13,10 @@ ALTER TABLE "event_overrides"
   ADD COLUMN IF NOT EXISTS "last_imported_at" TIMESTAMPTZ;
 
 -- Существующие override считаем уже опубликованными (не скрываем с сайта)
-UPDATE "event_overrides" SET "editor_status" = 'PUBLISHED' WHERE "editor_status" = 'NEEDS_REVIEW' AND "updated_by" IS NOT NULL;
+UPDATE "event_overrides" SET "editor_status" = 'PUBLISHED' WHERE "editor_status" = 'NEEDS_REVIEW' AND "updatedBy" IS NOT NULL;
 
 ALTER TABLE "event_overrides"
-  ALTER COLUMN "updated_by" DROP NOT NULL;
+  ALTER COLUMN "updatedBy" DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS "event_overrides_editor_status_needs_review_at_idx"
   ON "event_overrides" ("editor_status", "needs_review_at");

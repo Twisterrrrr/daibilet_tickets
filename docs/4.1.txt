@@ -75,7 +75,7 @@ SEO_AUDIT_BASE_URL
 
 пример:
 
-https://daibilet.com
+https://daibilet.ru
 
 ---
 

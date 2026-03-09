@@ -34,6 +34,12 @@ RUN pnpm --filter @daibilet/shared build
 # Собираем backend
 RUN pnpm --filter @daibilet/backend build
 
+# pnpm deploy создаёт standalone-директорию с корректным node_modules (включая @sentry/nestjs)
+RUN pnpm deploy --filter=@daibilet/backend --prod /prod/backend --legacy
+
+# deploy не копирует .prisma/client; prisma в deps backend — генерируем явно в бандле
+RUN cd /prod/backend && npx prisma generate --schema=./prisma/schema.prisma
+
 # --- Stage 2: Production image ---
 FROM node:22-alpine AS runner
 
@@ -43,13 +49,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Копируем собранное приложение
-COPY --from=builder /app/packages/backend/dist ./dist
-COPY --from=builder /app/packages/backend/prisma ./prisma
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/backend/node_modules ./packages/backend/node_modules
-COPY --from=builder /app/packages/shared ./packages/shared
-COPY --from=builder /app/package.json ./
+# Deploy-бандл: dist, prisma, node_modules (все production deps)
+COPY --from=builder /prod/backend ./
 
 EXPOSE 4000
 

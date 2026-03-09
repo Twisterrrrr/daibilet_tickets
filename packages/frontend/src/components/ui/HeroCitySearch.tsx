@@ -105,7 +105,7 @@ export function HeroCitySearch({ cities, initialCitySlug }: HeroCitySearchProps)
               >
                 <span className="font-medium text-slate-700">{city.name}</span>
                 {city._count?.events ? (
-                  <span className="text-xs text-slate-400">{city._count.events} событий</span>
+                  <span className="text-xs text-slate-400">{(city as { eventCount?: number }).eventCount ?? city._count?.events ?? 0} событий</span>
                 ) : null}
               </button>
             ))}

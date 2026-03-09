@@ -1,111 +1,97 @@
-import { Baby, Heart, PartyPopper, Ship, Snowflake, Sparkles, Umbrella, UtensilsCrossed } from 'lucide-react';
-import Link from 'next/link';
+'use client';
 
-interface PromoItem {
-  slug: string;
-  title: string;
-  description: string;
-  href: string;
-  icon: React.ElementType;
-  gradient: string;
-  months: number[]; // months when this promo is active (1-12)
+import {
+  Baby,
+  Building2,
+  CalendarDays,
+  Heart,
+  PartyPopper,
+  Ship,
+  Snowflake,
+  Sparkles,
+  Ticket,
+  Umbrella,
+  UtensilsCrossed,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
+import { api, type PromoBlockDto } from '@/lib/api';
+import {
+  loadPromoBlocksSafe,
+  PROMO_BLOCKS_FALLBACK,
+  PROMO_DEFAULT_GRADIENT,
+  resolvePromoBlocks,
+} from '@/lib/promo-blocks-fallback';
+
+import { PromoSvgIcon } from './PromoSvgIcon';
+
+const PROMO_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  ship: Ship,
+  sparkles: Sparkles,
+  'party-popper': PartyPopper,
+  snowflake: Snowflake,
+  heart: Heart,
+  'utensils-crossed': UtensilsCrossed,
+  umbrella: Umbrella,
+  baby: Baby,
+  'calendar-days': CalendarDays,
+  'building-2': Building2,
+  ticket: Ticket,
+};
+
+interface PromoBlockProps {
+  /** Блоки с сервера (SSR на главной). Если не переданы — клиентский fetch (страница /events) */
+  initialBlocks?: PromoBlockDto[] | null;
+  /** Текущий город для фильтрации (targetCitySlugs). Используется при клиентском fetch */
+  citySlug?: string;
 }
 
-const PROMOS: PromoItem[] = [
-  // --- Сезонные (навигация / праздники) ---
-  {
-    slug: 'bridges',
-    title: 'Развод мостов',
-    description: 'Ночные экскурсии с видом на разводные мосты',
-    href: '/events?tag=bridges',
-    icon: Ship,
-    gradient: 'from-indigo-600 to-blue-500',
-    months: [4, 5, 6, 7, 8, 9, 10, 11], // April-November
-  },
-  {
-    slug: 'white-nights',
-    title: 'Белые ночи',
-    description: 'Особые маршруты в период белых ночей',
-    href: '/events?tag=white-nights',
-    icon: Sparkles,
-    gradient: 'from-violet-600 to-purple-500',
-    months: [5, 6, 7], // May-July
-  },
-  {
-    slug: 'scarlet-sails',
-    title: 'Алые паруса',
-    description: 'Праздничная программа «Алые паруса»',
-    href: '/events?tag=scarlet-sails',
-    icon: PartyPopper,
-    gradient: 'from-red-500 to-orange-500',
-    months: [6], // June only
-  },
-  {
-    slug: 'new-year',
-    title: 'Новогодняя программа',
-    description: 'Праздничные события и экскурсии',
-    href: '/events?tag=new-year',
-    icon: Snowflake,
-    gradient: 'from-cyan-500 to-blue-500',
-    months: [12, 1], // December-January
-  },
+export function PromoBlock({ initialBlocks, citySlug }: PromoBlockProps) {
+  const [blocks, setBlocks] = useState<PromoBlockDto[] | null>(initialBlocks ?? null);
 
-  // --- Всесезонные / зимние (через Collection-подборки) ---
-  {
-    slug: 'valentines',
-    title: 'День влюблённых',
-    description: 'Романтические экскурсии и ужины для двоих',
-    href: '/podborki/den-vlyublennyh',
-    icon: Heart,
-    gradient: 'from-rose-500 to-pink-500',
-    months: [2], // February
-  },
-  {
-    slug: 'maslenitsa',
-    title: 'Масленица',
-    description: 'Гастро-экскурсии, блины и народные гуляния',
-    href: '/podborki/maslenitsa',
-    icon: UtensilsCrossed,
-    gradient: 'from-amber-500 to-orange-500',
-    months: [2, 3], // February-March
-  },
-  {
-    slug: 'winter-city',
-    title: 'Зимний город',
-    description: 'Крытые экскурсии, музеи и тёплые маршруты',
-    href: '/podborki/zimniy-gorod',
-    icon: Umbrella,
-    gradient: 'from-slate-600 to-blue-700',
-    months: [11, 12, 1, 2, 3], // November-March
-  },
-  {
-    slug: 'kids-holidays',
-    title: 'Каникулы с детьми',
-    description: 'Интерактивные программы и семейные экскурсии',
-    href: '/podborki/kanikuly-s-detmi',
-    icon: Baby,
-    gradient: 'from-emerald-500 to-teal-500',
-    months: [1, 3, 6, 7, 8], // Jan (winter break), Mar (spring break), Jun-Aug (summer)
-  },
-];
+  useEffect(() => {
+    if (initialBlocks !== undefined) return;
+    let cancelled = false;
+    loadPromoBlocksSafe(() => api.getPromoBlocks(citySlug))
+      .then((result) => {
+        if (!cancelled) setBlocks(resolvePromoBlocks(result));
+      })
+      .catch(() => {
+        if (!cancelled) setBlocks(PROMO_BLOCKS_FALLBACK);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialBlocks, citySlug]);
 
-export function PromoBlock() {
-  const currentMonth = new Date().getMonth() + 1;
-  const activePromos = PROMOS.filter((p) => p.months.includes(currentMonth));
-
-  if (activePromos.length === 0) return null;
+  if (blocks === null) return null;
+  if (blocks.length === 0) return null;
 
   return (
     <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
-      {activePromos.map((promo) => {
-        const Icon = promo.icon;
+      {blocks.map((promo) => {
+        const bgStyle =
+          promo.bgMode === 'SOLID' && promo.bgColor
+            ? { backgroundColor: promo.bgColor }
+            : promo.bgMode === 'GRADIENT' && promo.gradientFrom && promo.gradientTo
+              ? { backgroundImage: `linear-gradient(135deg, ${promo.gradientFrom}, ${promo.gradientTo})` }
+              : { backgroundImage: PROMO_DEFAULT_GRADIENT };
+
+        const IconComponent = promo.iconSource === 'LIBRARY' && promo.iconKey ? PROMO_ICON_MAP[promo.iconKey] : null;
+
         return (
           <Link
             key={promo.slug}
             href={promo.href}
-            className={`group relative overflow-hidden rounded-xl bg-gradient-to-br ${promo.gradient} p-5 text-white shadow-lg transition-transform hover:scale-[1.02] sm:p-6`}
+            className="group relative overflow-hidden rounded-xl p-5 text-white shadow-lg transition-transform hover:scale-[1.02] sm:p-6"
+            style={bgStyle}
           >
-            <Icon className="mb-3 h-8 w-8 opacity-80" />
+            {IconComponent ? (
+              <IconComponent className="mb-3 h-8 w-8 opacity-80" />
+            ) : promo.iconSource === 'SVG' && promo.iconSvg ? (
+              <PromoSvgIcon svg={promo.iconSvg} className="mb-3 h-8 w-8 opacity-80 [&_svg]:h-8 [&_svg]:w-8" />
+            ) : null}
             <h3 className="text-lg font-bold">{promo.title}</h3>
             <p className="mt-1 text-sm text-white/80">{promo.description}</p>
             <div className="absolute -bottom-4 -right-4 h-24 w-24 rounded-full bg-white/10 transition-transform group-hover:scale-150" />

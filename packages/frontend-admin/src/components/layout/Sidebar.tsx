@@ -2,6 +2,7 @@ import {
   AlertCircle,
   BarChart3,
   BookOpen,
+  BoxSelect,
   CalendarDays,
   ChevronLeft,
   ClipboardList,
@@ -14,6 +15,7 @@ import {
   Layers,
   LayoutDashboard,
   LayoutList,
+  LayoutTemplate,
   MapPin,
   Merge,
   MessageSquare,
@@ -92,6 +94,8 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/reviews', label: 'Отзывы', icon: MessageSquare },
       { to: '/external-reviews', label: 'Внешние отзывы', icon: ExternalLink },
       { to: '/upsells', label: 'Upsells', icon: DollarSign },
+      { to: '/promo-blocks', label: 'Промо-блоки', icon: LayoutTemplate },
+      { to: '/promo-collections', label: 'Promo-коллекции', icon: BoxSelect },
       ...(flags.showOps
         ? [
             { to: '/jobs/failed', label: 'Failed Jobs', icon: AlertCircle },

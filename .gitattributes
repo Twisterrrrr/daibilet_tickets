@@ -1,0 +1,2 @@
+# Shell scripts — LF (иначе deploy.sh падает на Linux с $'\r': command not found)
+*.sh text eol=lf

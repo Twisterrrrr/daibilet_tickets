@@ -1,52 +1,50 @@
 # ============================================
 # Дайбилет — Admin Panel (Vite SPA)
-# Multi-stage build: собирает статику, отдаёт через Nginx
+# pnpm monorepo: сборка через pnpm --filter (резолв бинарников и плагинов воркспейсом).
 # ============================================
 
-# --- Stage 1: Install dependencies + build ---
+# --- Stage 1: Зависимости + сборка ---
 FROM node:22-alpine AS builder
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
-# Копируем конфиги workspace
+# Конфиги воркспейса
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 
-# Копируем package.json всех нужных пакетов
+# Только пакеты, нужные для admin (shared + frontend-admin)
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/frontend-admin/package.json ./packages/frontend-admin/
 
-# Устанавливаем зависимости
-RUN pnpm install --frozen-lockfile
+# Hoisted node_modules — бинарники и плагины резолвятся (закрывает ошибки №3, 4, 6, 7)
+# pnpm install до копирования кода — кэш слоя при изменении только исходников
+RUN echo "node-linker=hoisted" > .npmrc && pnpm install --frozen-lockfile
 
-# Копируем исходники shared + frontend-admin
+# Исходники
 COPY packages/shared/ ./packages/shared/
 COPY packages/frontend-admin/ ./packages/frontend-admin/
 
-# Собираем SPA
+# Сборка: pnpm сам резолвит tsc, vite, плагины внутри воркспейса
+RUN pnpm --filter @daibilet/shared build
 RUN pnpm --filter @daibilet/frontend-admin build
 
-# --- Stage 2: Nginx для отдачи статики ---
+# --- Stage 2: Nginx для статики ---
 FROM nginx:alpine
 
-# Копируем собранные файлы
 COPY --from=builder /app/packages/frontend-admin/dist /usr/share/nginx/html
 
-# SPA fallback: все пути отдают index.html
 RUN printf 'server {\n\
     listen 5173;\n\
     listen [::]:5173;\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
 \n\
-    # Кэш для статических ассетов\n\
     location /assets/ {\n\
         expires 1y;\n\
         add_header Cache-Control "public, immutable";\n\
     }\n\
 \n\
-    # SPA: все маршруты → index.html\n\
     location / {\n\
         try_files $uri $uri/ /index.html;\n\
     }\n\

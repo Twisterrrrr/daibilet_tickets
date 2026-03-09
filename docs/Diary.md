@@ -4,6 +4,46 @@
 
 ---
 
+## 08.03.2026 — Teplohod: висящие сессии (продажа приостановлена)
+
+### Наблюдения
+
+- Teplohod иногда оставляет сессии в API (eventTimes с available_tickets > 0), но фактически не продаёт — виджет показывает «Продажа приостановлена».
+- Пользователь видит дату (например 9 марта) и кнопку «Купить», но при клике получает «приостановлена».
+
+### Решения
+
+- **Шаг 1. Debug:** В `tep-api.service.ts` добавлено условное логирование (при `LOG_RAW_TEP_EVENT=1`) — дамп первого слота и ключей события с eventTimes для поиска флага приостановки в ответе API.
+- **Шаг 2. Фильтрация в sync:** В `tep-sync.service.ts` при создании сессий из eventTimes: сессия считается непродаваемой (`isActive=false`), если `available_tickets === 0` или `slot.sale_suspended === true` или `slot.status === 'suspended' | 'closed'`. Интерфейс `TepTimeSlot` расширен опциональными полями `sale_suspended`, `status`.
+- **Отложено (шаг 3/4):** UX с `isBookable` и заглушкой «Продажа приостановлена» — до подтверждения наличия этих полей в API Teplohod. Для отладки: запустить sync с `LOG_RAW_TEP_EVENT=1` и проверить логи.
+
+### Проблемы
+
+- В compact API нет eventTimes (нужен белый IP). Полные данные — в full API. Если Teplohod не отдаёт sale_suspended/status, рассмотреть периодический `checkWidgetStatusByTepWidgetId` и кэширование результата.
+
+---
+
+## 06.03.2026 — Phase A: Checkout/Session UX (A1–A8)
+
+### Наблюдения
+
+- Реализованы все 8 задач Phase A: scarcity trigger (widgets + EventPageView), smart sorting (tags, bestOption), sold-out recommendation, dynamic price hint, hold timer, social proof, calendar integration, smart prefetch.
+
+### Решения
+
+- **A1–A4, A6:** Уже были в widgets-api (scarcityLevel, tags, soldLast24h, bestOption). Добавлены soldOutAlternatives, cheaperSession, totalSold24h в SessionPickerClient.
+- **A5 Hold timer:** `expiresAt` в getStatus (CheckoutSession), компонент HoldTimer на странице /checkout/[packageId].
+- **A7 Calendar:** sessionStartsAt в track items (loadSessionStartsAtFromSnapshot), кнопки Google Calendar и .ics в OrdersTrackClient.
+- **A8 Smart prefetch:** getLastCustomerByEmail при вводе email в SessionPickerClient (debounce 500ms), prefill name/phone.
+- **getScarcityState(null):** Возвращает NONE (раньше null→0→SOLD_OUT).
+- **Тесты:** session-ux.util.spec.ts — getScarcityState, getSessionBadges, findCheaperAlternative, getRecommendedSessionsForSoldOut.
+
+### Проблемы
+
+- Нет. Линт backend — 6 pre-existing errors в других модулях, в изменённых файлах замечаний нет.
+
+---
+
 ## 10.03.2026 — Promo Blocks hardening: runtime validation, нормализация дат
 
 ### Наблюдения

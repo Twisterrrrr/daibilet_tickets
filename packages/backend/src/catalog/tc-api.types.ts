@@ -95,6 +95,18 @@ export interface TcTicketSet {
 }
 
 // ============================================================
+// TC Ticket (из GET /v1/resources/events/:id/tickets)
+// ============================================================
+
+export interface TcTicket {
+  _id?: string;
+  id?: string;
+  set_id?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+// ============================================================
 // TC Order
 // ============================================================
 

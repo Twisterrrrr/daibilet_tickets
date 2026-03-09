@@ -126,7 +126,7 @@ export function CityFilterSelect({
                 >
                   <span className="block truncate">{city.name}</span>
                   {city._count?.events ? (
-                    <span className="mt-0.5 block text-xs text-slate-400">{city._count.events} событий</span>
+                    <span className="mt-0.5 block text-xs text-slate-400">{(city as { eventCount?: number }).eventCount ?? city._count?.events ?? 0} событий</span>
                   ) : null}
                 </Link>
               ))}

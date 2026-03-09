@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { TicketCategory, TicketPriority, TicketStatus } from '@prisma/client';
+import { Prisma, TicketCategory, TicketPriority, TicketStatus } from '@prisma/client';
 
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -123,9 +123,9 @@ export class SupportService {
   // ===========================
 
   async listTickets(params: { status?: string; category?: string; search?: string; page: number; limit: number }) {
-    const where: any = {};
-    if (params.status) where.status = params.status;
-    if (params.category) where.category = params.category;
+    const where: Prisma.SupportTicketWhereInput = {};
+    if (params.status) where.status = params.status as TicketStatus;
+    if (params.category) where.category = params.category as TicketCategory;
     if (params.search) {
       where.OR = [
         { shortCode: { contains: params.search, mode: 'insensitive' } },
@@ -161,7 +161,7 @@ export class SupportService {
   }
 
   async updateTicketStatus(id: string, status: string, assignedTo?: string) {
-    const updateData: any = { status: status as TicketStatus };
+    const updateData: Prisma.SupportTicketUpdateInput = { status: status as TicketStatus };
     if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
     if (status === 'RESOLVED' || status === 'CLOSED') {
       updateData.resolvedAt = new Date();

@@ -109,7 +109,7 @@ export class AdminLandingsController {
       }
 
       const after = await this.prisma.landingPage.findUnique({ where: { id } });
-      await this.audit.log(req.user.id, 'UPDATE', 'LandingPage', id, before, after);
+      await this.audit.log(req.user.id, 'UPDATE', 'LandingPage', id, before ?? undefined, after ?? undefined);
       return after;
     }
 

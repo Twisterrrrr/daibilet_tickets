@@ -1,7 +1,7 @@
 'use client';
 
 import { formatPrice } from '@daibilet/shared';
-import { AlertCircle, ArrowLeft, CheckCircle, CreditCard, Loader2, User, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle, Clock, CreditCard, Loader2, User, XCircle } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -28,6 +28,7 @@ interface PackageStatus {
   totalPrice: number;
   voucherUrl: string | null;
   paidAt: string | null;
+  expiresAt?: string | null;
   trackUrl?: string | null;
   items: PackageItem[];
 }
@@ -48,6 +49,36 @@ const STEPS = [
   { key: 'payment', label: 'Оплата', icon: CreditCard },
   { key: 'done', label: 'Готово', icon: CheckCircle },
 ];
+
+/** A5: Hold timer — показывает оставшееся время до истечения резерва */
+function HoldTimer({ expiresAt, className = '' }: { expiresAt: string; className?: string }) {
+  const [remaining, setRemaining] = useState<number | null>(null);
+  useEffect(() => {
+    const update = () => {
+      const end = new Date(expiresAt).getTime();
+      const now = Date.now();
+      const sec = Math.max(0, Math.floor((end - now) / 1000));
+      setRemaining(sec);
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [expiresAt]);
+  if (remaining === null || remaining <= 0) return null;
+  const m = Math.floor(remaining / 60);
+  const s = remaining % 60;
+  const text = m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `${s} сек`;
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 ${className}`}
+    >
+      <Clock className="h-4 w-4 flex-shrink-0" />
+      <span>
+        Резерв действителен ещё <strong>{text}</strong>
+      </span>
+    </div>
+  );
+}
 
 interface Props {
   packageId: string;
@@ -240,6 +271,10 @@ export function CheckoutPackageClient({ packageId }: Props) {
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             Оплата отменена.
           </div>
+        )}
+
+        {canProceed && data.expiresAt && (
+          <HoldTimer expiresAt={data.expiresAt} className="mb-4" />
         )}
 
         {/* Step: Review (composition) */}

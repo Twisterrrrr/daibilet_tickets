@@ -114,6 +114,7 @@
 - **Tag** — теги для фильтрации и группировки (тема, аудитория, сезон)
 - **LandingPage** — SEO-подборка по тегу/фильтрам
 - **ComboPage** — готовая программа с курированными событиями
+- **PromoBlock** (планируется) — карточки на главной («Масленица», «Зимний город» и др.). Сейчас захардкожены в `PromoBlock.tsx`; планируется модель + раздел админки «Промо-блоки».
 - **Article** — SEO-статья с перелинковкой
 - **Package** — заказ (Trip Planner)
 - **Review** — отзыв на событие/оператора. Поля: rating (1-5), text, authorName, authorEmail (скрыт), isVerified (подтверждённая покупка), voucherCode, verifyToken (email-верификация, 48h TTL), helpfulCount (кэш голосов), status (PENDING_EMAIL/PENDING/APPROVED/REJECTED), adminComment. Unique: authorEmail + eventId.

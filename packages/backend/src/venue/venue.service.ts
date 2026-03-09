@@ -227,7 +227,7 @@ export class VenueService {
         durationMinutes: number | null;
       }[];
     },
-    requireActive: boolean,
+    _requireActive: boolean,
   ) {
     const events = venue.events;
     // Загрузим последние отзывы: прямые venue-отзывы + по привязанным events
@@ -237,7 +237,7 @@ export class VenueService {
       OR: [...(eventIds.length > 0 ? [{ eventId: { in: eventIds } }] : []), { venueId: venue.id }],
     };
 
-    let reviews: any[] = [];
+    let reviews: { id: string; authorName: string; rating: unknown; text: string | null; createdAt: Date }[] = [];
     let recommendPercent = 0;
 
     // eslint-disable-next-line no-constant-condition -- always load reviews for venue stats

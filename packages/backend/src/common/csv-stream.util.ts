@@ -21,7 +21,8 @@ const HARD_LIMIT = 50_000;
 export interface CsvFieldDef {
   /** Заголовок CSV */
   header: string;
-  /** Извлечь значение из записи (any — намеренно, CSV-утилита работает с произвольными моделями) */
+  /** Извлечь значение из записи. Row — произвольная модель Prisma (orderRequest, checkoutSession и т.д.) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic CSV export, row shape varies by caller
   accessor: (row: any) => string | number | null | undefined;
 }
 
@@ -38,6 +39,7 @@ export interface CsvStreamOptions {
    * @param take — количество записей
    * @returns массив записей с обязательным полем `id`
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic, fetchBatch returns Prisma model[]
   fetchBatch: (cursor: string | undefined, take: number) => Promise<{ id: string; [key: string]: any }[]>;
 }
 

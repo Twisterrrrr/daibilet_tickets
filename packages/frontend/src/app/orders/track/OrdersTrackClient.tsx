@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  Calendar,
   CalendarCheck,
   CheckCircle,
   ChevronRight,
@@ -36,6 +37,7 @@ interface TrackingItem {
     imageUrl: string | null;
   } | null;
   offerTitle: string | null;
+  sessionStartsAt?: string | null;
   meetingPoint?: string | null;
   meetingInstructions?: string | null;
   operationalPhone?: string | null;
@@ -89,6 +91,32 @@ function formatPrice(kopecks: number) {
   return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(
     kopecks / 100,
   );
+}
+
+/** A7: Генерирует .ics и URL для Google Calendar */
+function buildCalendarLinks(title: string, startsAt: string) {
+  const d = new Date(startsAt);
+  const end = new Date(d.getTime() + 60 * 60 * 1000); // +1 час
+  const fmt = (x: Date) => x.toISOString().replace(/[-:]/g, '').slice(0, 15);
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Daibilet//Calendar',
+    'BEGIN:VEVENT',
+    `DTSTART:${fmt(d)}`,
+    `DTEND:${fmt(end)}`,
+    `SUMMARY:${title.replace(/\n/g, ' ')}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  const gcalUrl =
+    'https://calendar.google.com/calendar/render?' +
+    new URLSearchParams({
+      action: 'TEMPLATE',
+      text: title,
+      dates: `${fmt(d)}/${fmt(end)}`,
+    }).toString();
+  return { ics, gcalUrl };
 }
 
 // ─── Timeline ─────────────────────────────────
@@ -349,6 +377,31 @@ export function OrdersTrackClient() {
                                 {formatPrice(item.priceSnapshot * item.quantity)}
                               </span>
                             </div>
+                            {item.sessionStartsAt && (() => {
+                              const title = item.event?.title || item.offerTitle || 'Событие';
+                              const { ics, gcalUrl } = buildCalendarLinks(title, item.sessionStartsAt);
+                              return (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                                  <a
+                                    href={gcalUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    Google Calendar
+                                  </a>
+                                  <span className="text-slate-300">|</span>
+                                  <a
+                                    href={`data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`}
+                                    download="event.ics"
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    .ics
+                                  </a>
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           {/* Status badge */}

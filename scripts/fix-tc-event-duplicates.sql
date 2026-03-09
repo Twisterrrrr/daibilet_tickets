@@ -1,0 +1,2 @@
+-- Skip: migration 20260305120000 produces duplicates for Teplohod.
+-- Use: prisma migrate resolve --applied 20260305120000_teplohod_tcEventId_normalize

@@ -41,6 +41,11 @@ import { VenueEditPage } from './pages/venues/VenueEdit';
 import { TagsListPage } from './pages/tags/TagsList';
 import { TagEditPage } from './pages/tags/TagEdit';
 import { UpsellsListPage } from './pages/upsells/UpsellsList';
+import { PromoBlocksListPage } from './pages/promo-blocks/PromoBlocksListPage';
+import { PromoBlockCreatePage } from './pages/promo-blocks/PromoBlockCreatePage';
+import { PromoBlockEditPage } from './pages/promo-blocks/PromoBlockEditPage';
+import { PromoCollectionsListPage } from './pages/promo-collections/PromoCollectionsListPage';
+import { PromoCollectionEditPage } from './pages/promo-collections/PromoCollectionEditPage';
 import { UpsellEditPage } from './pages/upsells/UpsellEdit';
 import { SupportListPage } from './pages/support/SupportList';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -100,6 +105,12 @@ export default function App() {
           <Route path="upsells" element={<UpsellsListPage />} />
           <Route path="upsells/new" element={<UpsellEditPage />} />
           <Route path="upsells/:id" element={<UpsellEditPage />} />
+          <Route path="promo-blocks" element={<PromoBlocksListPage />} />
+          <Route path="promo-blocks/new" element={<PromoBlockCreatePage />} />
+          <Route path="promo-blocks/:id" element={<PromoBlockEditPage />} />
+          <Route path="promo-collections" element={<PromoCollectionsListPage />} />
+          <Route path="promo-collections/new" element={<PromoCollectionEditPage />} />
+          <Route path="promo-collections/:id" element={<PromoCollectionEditPage />} />
           <Route path="suppliers" element={<SuppliersListPage />} />
           <Route path="suppliers/:id" element={<SupplierDetailPage />} />
           <Route path="moderation" element={<ModerationQueuePage />} />

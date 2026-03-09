@@ -177,6 +177,7 @@ export class CatalogService {
 
           return {
             ...c,
+            eventCount: eventCount(c),
             region: regionByHub.get(c.id) ?? null,
             museumCount,
           };
@@ -252,18 +253,27 @@ export class CatalogService {
   }
 
   private async fetchCityBySlug(slug: string) {
-    // Активные события: SCHEDULED с будущими сеансами ИЛИ OPEN_DATE (без endDate или не истёк)
+    // Активные события: SCHEDULED с будущими сеансами ИЛИ OPEN_DATE (без endDate или не истёк).
+    // publishedInCatalog — как в getCities/getEvents: только override=null или override.editorStatus=PUBLISHED.
+    const publishedInCatalog: Prisma.EventWhereInput = {
+      OR: [{ override: null }, { override: { editorStatus: 'PUBLISHED' } }],
+    };
     const activeEventFilter: Prisma.EventWhereInput = {
       isActive: true,
       isDeleted: false,
-      OR: [
+      AND: [
+        publishedInCatalog,
         {
-          dateMode: DateMode.SCHEDULED,
-          sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
-        },
-        {
-          dateMode: DateMode.OPEN_DATE,
-          OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+          OR: [
+            {
+              dateMode: DateMode.SCHEDULED,
+              sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
+            },
+            {
+              dateMode: DateMode.OPEN_DATE,
+              OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+            },
+          ],
         },
       ],
     };
@@ -276,11 +286,13 @@ export class CatalogService {
           orderBy: { rating: 'desc' },
           take: 20,
           include: {
+            city: { select: { slug: true, name: true } },
             tags: { include: { tag: true } },
             sessions: {
               where: { isActive: true, startsAt: { gte: new Date() } },
               orderBy: { startsAt: 'asc' },
-              take: 1,
+              take: 20,
+              select: { startsAt: true, availableTickets: true },
             },
           },
         },
@@ -300,9 +312,6 @@ export class CatalogService {
         { dateMode: DateMode.SCHEDULED, sessions: { some: { isActive: true, startsAt: { gte: new Date() } } } },
         { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: new Date() } }] },
       ],
-    };
-    const publishedInCatalog: Prisma.EventWhereInput = {
-      OR: [{ override: null }, { override: { editorStatus: 'PUBLISHED' } }],
     };
     const [excursionCount, eventCount, totalCount, venueCount, eventsAtVenuesCount] = await Promise.all([
       this.prisma.event.count({
@@ -375,8 +384,14 @@ export class CatalogService {
     // Превью событий региона (если город — хаб)
     const regionPreview = await this.regionService.getRegionPreviewByHubCity(city.id);
 
+    // Маппинг событий в EventListItem: override + badges + toEventCard (как в getEvents)
+    const overriddenEvents = await this.overrideService.applyOverrides(city.events);
+    const enrichedEvents = this.enrichWithBadges(overriddenEvents);
+    const eventItems = enrichedEvents.map((e) => this.toEventCard(e));
+
     return {
       ...city,
+      events: eventItems,
       stats: { excursionCount, museumCount, eventCount, totalCount },
       popularTags: sortedTags,
       regionPreview,
@@ -767,9 +782,26 @@ export class CatalogService {
   }
 
   async getMultiEventBySlug(slug: string) {
-    const group = await this.prisma.eventGroup.findUnique({
+    type GroupRef = { groupingKey: string; slug: string };
+    let group: GroupRef | null = await this.prisma.eventGroup.findUnique({
       where: { slug },
     });
+
+    // Fallback: если EventGroup нет (скрипт не запускали), ищем по slug события — ЛЕДИ НАЙТ и др.
+    if (!group) {
+      const event = await this.prisma.event.findFirst({
+        where: {
+          slug,
+          isActive: true,
+          isDeleted: false,
+          groupingKey: { not: null },
+        },
+        select: { groupingKey: true },
+      });
+      if (event?.groupingKey) {
+        group = { groupingKey: event.groupingKey, slug };
+      }
+    }
     if (!group) {
       throw new NotFoundException(`EventGroup with slug "${slug}" not found`);
     }
@@ -848,14 +880,25 @@ export class CatalogService {
 
   // Даты по группе событий и городу (для /events/m/[slug]).
   async getMultiEventDates(slug: string, citySlug: string, limit?: number) {
-    const group = await this.prisma.eventGroup.findUnique({
+    type GroupRef = { groupingKey: string };
+    let group: GroupRef | null = await this.prisma.eventGroup.findUnique({
       where: { slug },
     });
+    if (!group) {
+      const event = await this.prisma.event.findFirst({
+        where: { slug, isActive: true, isDeleted: false, groupingKey: { not: null } },
+        select: { groupingKey: true },
+      });
+      if (event?.groupingKey) {
+        group = { groupingKey: event.groupingKey };
+      }
+    }
     if (!group) {
       throw new NotFoundException(`EventGroup with slug "${slug}" not found`);
     }
 
     const safeLimit = limit && limit > 0 && limit <= 200 ? limit : 60;
+    const groupingKey = group.groupingKey;
 
     const rows = await this.prisma.$queryRaw<
       {
@@ -867,12 +910,7 @@ export class CatalogService {
         availableTickets: number | null;
       }[]
     >`
-      WITH grp AS (
-        SELECT "groupingKey"
-        FROM "event_groups"
-        WHERE slug = ${slug}
-      ),
-      ct AS (
+      WITH ct AS (
         SELECT id AS "cityId", slug AS "citySlug"
         FROM "cities"
         WHERE slug = ${citySlug}
@@ -880,9 +918,9 @@ export class CatalogService {
       ev AS (
         SELECT e.id AS "eventId", e.slug AS "eventSlug", e."priceFrom" AS "priceFrom"
         FROM "events" e
-        JOIN grp ON grp."groupingKey" = e."groupingKey"
-        JOIN ct  ON ct."cityId" = e."cityId"
-        WHERE e."isActive" = true
+        JOIN ct ON ct."cityId" = e."cityId"
+        WHERE e."groupingKey" = ${groupingKey}
+          AND e."isActive" = true
           AND e."isDeleted" = false
       )
       SELECT
@@ -1237,7 +1275,20 @@ export class CatalogService {
    * Облегчённая DTO для листингов: только данные, нужные карточке события.
    * Не включает tcData, сырые JSON из интеграций и тяжёлые поля.
    */
-  private toEventCard(event: any) {
+  private toEventCard(
+    event: Record<
+      string,
+      | string
+      | string[]
+      | number
+      | null
+      | boolean
+      | unknown
+      | Date
+      | { slug?: string; name?: string }[]
+      | { id?: string; name?: string }[]
+    >,
+  ) {
     return {
       id: event.id,
       slug: event.slug,
@@ -1253,11 +1304,13 @@ export class CatalogService {
       priceFrom: event.priceFrom ?? null,
       rating: event.rating ?? null,
       reviewCount: event.reviewCount ?? 0,
+      durationMinutes: event.durationMinutes ?? null,
       nextSessionAt: event.nextSessionAt ?? null,
       totalAvailableTickets: event.totalAvailableTickets ?? null,
       tagSlugs: event.tagSlugs ?? [],
       highlights: event.highlights ?? [],
       isOptimalChoice: event.isOptimalChoice ?? false,
+      groupingKey: event.groupingKey ?? null,
     };
   }
 

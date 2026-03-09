@@ -337,9 +337,9 @@ export class CheckoutService {
       let currentPrice = offer.priceFrom ?? null;
 
       // OPEN_PRICE: используем клиентскую цену из item.priceFrom, валидируем minAmount
-      if ((offer as any).priceMode === 'OPEN_PRICE') {
+      if (offer.priceMode === 'OPEN_PRICE') {
         const clientPrice = item.priceFrom;
-        const minAmount = (offer as any).minAmount as number | null | undefined;
+        const minAmount = offer.minAmount ?? null;
         if (!clientPrice || clientPrice <= 0) {
           validated.push({
             ...item,
@@ -375,8 +375,8 @@ export class CheckoutService {
       }
 
       // Validity window (UNTIL_DATE / DAYS_FROM_PURCHASE / NO_EXPIRY)
-      const validityMode = (offer as any).validityMode as string | undefined;
-      const validUntil = (offer as any).validUntil as Date | null | undefined;
+      const validityMode = offer.validityMode;
+      const validUntil = offer.validUntil;
       if (validityMode === 'UNTIL_DATE' && validUntil && validUntil < now) {
         validated.push({
           ...item,
@@ -512,7 +512,7 @@ export class CheckoutService {
       const quantity = cartItem?.quantity || 1;
       // Цена единицы: для OPEN_PRICE берём цену из корзины, иначе актуальную priceFrom
       let unitPrice = o.priceFrom || 0;
-      if ((o as any).priceMode === 'OPEN_PRICE' && cartItem) {
+      if (o.priceMode === 'OPEN_PRICE' && cartItem) {
         unitPrice = cartItem.priceFrom;
       }
       const lineTotal = unitPrice * quantity;
@@ -790,35 +790,77 @@ export class CheckoutService {
         },
       });
       if (!session) return null;
-      return this.formatTrackingResult(session);
+      return await this.formatTrackingResult(session);
     }
     return this.trackByShortCode(id);
   }
 
-  private formatTrackingResult(session: {
-    shortCode: string;
-    status: string;
-    totalPrice: number | null;
-    customerName: string | null;
-    customerEmail: string | null;
-    customerPhone: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-    completedAt: Date | null;
-    expiresAt: Date | null;
-    offersSnapshot: unknown;
-    orderRequests: Array<{
-      id: string;
+  private async formatTrackingResult(
+    session: {
+      shortCode: string;
       status: string;
-      quantity: number;
-      priceSnapshot: number;
-      confirmedAt: Date | null;
-      eventOffer?: { meetingPoint?: string | null; meetingInstructions?: string | null; operationalPhone?: string | null; operationalNote?: string | null } | null;
-      event?: { title: string; slug: string; imageUrl: string | null } | null;
-    }>;
-  }) {
+      totalPrice: number | null;
+      customerName: string | null;
+      customerEmail: string | null;
+      customerPhone: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      completedAt: Date | null;
+      expiresAt: Date | null;
+      offersSnapshot: unknown;
+      orderRequests: Array<{
+        id: string;
+        status: string;
+        quantity: number;
+        priceSnapshot: number;
+        confirmedAt: Date | null;
+        eventOffer?: { meetingPoint?: string | null; meetingInstructions?: string | null; operationalPhone?: string | null; operationalNote?: string | null } | null;
+        event?: { title: string; slug: string; imageUrl: string | null } | null;
+      }>;
+    },
+  ) {
+    const sessionStartsAtMap = await this.loadSessionStartsAtFromSnapshot(session.offersSnapshot);
+    return this.formatTrackingResultSync(session, sessionStartsAtMap);
+  }
+
+  private async loadSessionStartsAtFromSnapshot(offersSnapshot: unknown): Promise<Map<string, string>> {
+    const snapshot = (offersSnapshot as Array<{ sessionId?: string | null }>) || [];
+    const ids = [...new Set(snapshot.map((s) => s.sessionId).filter(Boolean) as string[])];
+    if (ids.length === 0) return new Map();
+    const sessions = await this.prisma.eventSession.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, startsAt: true },
+    });
+    return new Map(sessions.map((s) => [s.id, s.startsAt.toISOString()]));
+  }
+
+  private formatTrackingResultSync(
+    session: {
+      shortCode: string;
+      status: string;
+      totalPrice: number | null;
+      customerName: string | null;
+      customerEmail: string | null;
+      customerPhone: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      completedAt: Date | null;
+      expiresAt: Date | null;
+      offersSnapshot: unknown;
+      orderRequests: Array<{
+        id: string;
+        status: string;
+        quantity: number;
+        priceSnapshot: number;
+        confirmedAt: Date | null;
+        eventOffer?: { meetingPoint?: string | null; meetingInstructions?: string | null; operationalPhone?: string | null; operationalNote?: string | null } | null;
+        event?: { title: string; slug: string; imageUrl: string | null } | null;
+      }>;
+    },
+    sessionStartsAtMap: Map<string, string> = new Map(),
+  ) {
     const showOperational = ['CONFIRMED', 'COMPLETED', 'AWAITING_PAYMENT'].includes(session.status);
-    const snapshot = (session.offersSnapshot as Array<{ eventTitle: string; eventSlug: string; eventImage?: string; quantity: number; lineTotal: number }>) || [];
+    const snapshot = (session.offersSnapshot as Array<{ eventTitle: string; eventSlug: string; eventImage?: string; sessionId?: string | null; quantity: number; lineTotal: number }>) || [];
     const items = session.orderRequests.length > 0
       ? session.orderRequests.map((req) => ({
           id: req.id,
@@ -828,6 +870,7 @@ export class CheckoutService {
           confirmedAt: req.confirmedAt,
           event: req.event ? { title: req.event.title, slug: req.event.slug, imageUrl: req.event.imageUrl } : null,
           offerTitle: req.event?.title || null,
+          sessionStartsAt: null as string | null,
           ...(showOperational && req.eventOffer ? {
             meetingPoint: req.eventOffer.meetingPoint || undefined,
             meetingInstructions: req.eventOffer.meetingInstructions || undefined,
@@ -843,6 +886,7 @@ export class CheckoutService {
           confirmedAt: null,
           event: { title: s.eventTitle, slug: s.eventSlug, imageUrl: s.eventImage || null },
           offerTitle: s.eventTitle,
+          sessionStartsAt: (s.sessionId ? sessionStartsAtMap.get(s.sessionId) : null) ?? null,
         }));
     const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3000');
     const voucherUrl =
@@ -893,7 +937,7 @@ export class CheckoutService {
     });
 
     if (!session) return null;
-    return this.formatTrackingResult(session as Parameters<typeof this.formatTrackingResult>[0]);
+    return await this.formatTrackingResult(session as Parameters<typeof this.formatTrackingResult>[0]);
   }
 
   // ============================
@@ -1030,7 +1074,7 @@ export class CheckoutService {
     }
 
     // Last-seats guard: при виджетном checkout перепроверяем доступность по сессиям
-    if (Boolean(body.forcePlatformPayment)) {
+    if (body.forcePlatformPayment) {
       const bySession = new Map<string, number>();
       for (const item of body.items) {
         if (!item.sessionId || !item.eventId) continue;
@@ -1211,6 +1255,7 @@ export class CheckoutService {
       id: session.id,
       code: session.shortCode,
       status: statusMap[session.status] || session.status,
+      expiresAt: session.expiresAt?.toISOString() ?? null,
       totalPrice: session.totalPrice || 0,
       voucherUrl,
       paidAt: lastIntent?.paidAt?.toISOString() || null,

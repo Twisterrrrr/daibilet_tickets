@@ -5,8 +5,10 @@ import { ArrowRight, Headphones, Landmark, MapPin, Star, Ticket, TrendingUp, X }
 import Image from 'next/image';
 import Link from 'next/link';
 
+import type { MultiEventListItemDto } from '@/lib/api.types';
 import { EventCard } from '@/components/ui/EventCard';
 import { HeroCitySearch } from '@/components/ui/HeroCitySearch';
+import { MultiEventCard } from '@/components/ui/MultiEventCard';
 import { PromoBlock } from '@/components/ui/PromoBlock';
 import { api } from '@/lib/api';
 import { devWarn } from '@/lib/devlog';
@@ -34,9 +36,9 @@ interface HomePageProps {
   searchParams?: Promise<{ city?: string }>;
 }
 
-/** Убрать максимально похожие карточки для витрин на главной.
- *  Ключ — нормализованный title (основной) + fallback по imageUrl.
- *  Так в "Популярных" и "Ближайших" показываем по одному событию на шоу.
+/** Убрать повторяющиеся карточки для витрин "Популярные" и "Ближайшие".
+ *  Фото не должны повторяться: один imageUrl = одна карточка.
+ *  Плюс дедупликация по названию (одинаковое шоу — одна карточка).
  */
 function uniqueByImage(events: EventListItem[], max: number): EventListItem[] {
   const seenTitles = new Set<string>();
@@ -45,15 +47,77 @@ function uniqueByImage(events: EventListItem[], max: number): EventListItem[] {
   for (const e of events) {
     const titleKey = (e.title || '').trim().toLowerCase();
     const imageKey = (e.imageUrl || '').trim();
-    // Сначала пытаемся не повторять шоу по названию
+    // Повторяющееся фото — всегда пропускаем
+    if (imageKey && seenImages.has(imageKey)) continue;
+    // Одинаковое шоу (название) — одна карточка
     if (titleKey && seenTitles.has(titleKey)) continue;
-    // Если названия нет, страхуемся по картинке
-    if (!titleKey && imageKey && seenImages.has(imageKey)) continue;
 
     if (titleKey) seenTitles.add(titleKey);
     if (imageKey) seenImages.add(imageKey);
     result.push(e);
     if (result.length >= max) break;
+  }
+  return result;
+}
+
+/** Элемент для отображения в "Популярные": либо группа мультисобытий, либо одиночное событие */
+type PopularDisplayItem = { type: 'group'; item: MultiEventListItemDto } | { type: 'event'; event: EventListItem };
+
+/** Группирует события по groupingKey для блока "Популярные" (только без выбранного города).
+ *  Сохраняет порядок по первому вхождению в events. */
+function buildPopularDisplayItems(events: EventListItem[]): PopularDisplayItem[] {
+  const byKey = new Map<string, EventListItem[]>();
+  const seenKeys = new Set<string>();
+  const result: PopularDisplayItem[] = [];
+  for (const e of events) {
+    const key = e.groupingKey?.trim();
+    if (key && key.length > 0) {
+      const list = byKey.get(key) ?? [];
+      list.push(e);
+      byKey.set(key, list);
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      const group = byKey.get(key)!;
+      if (group.length === 1) {
+        result.push({ type: 'event', event: group[0]! });
+      } else {
+        const citiesMap = new Map<string, string>();
+        for (const ev of group) {
+          if (ev.city) citiesMap.set(ev.city.slug, ev.city.name);
+        }
+        const citiesArray = Array.from(citiesMap.entries()).map(([slug, name]) => ({ slug, name }));
+        const previewCount = Math.min(3, citiesArray.length);
+        const citiesPreview = citiesArray.slice(0, previewCount);
+        const remainingCities = citiesArray.length - previewCount;
+        const prices = group.map((ev) => ev.priceFrom).filter((p): p is number => p != null && p > 0);
+        const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+        const ratings = group.map((ev) => ev.rating ?? 0).filter((r) => r > 0);
+        const rating = ratings.length > 0 ? Math.max(...ratings) : null;
+        const dates = group
+          .map((ev) => ev.nextSessionAt)
+          .filter((d): d is string => typeof d === 'string' && d.length > 0);
+        const nextDate = dates.length > 0 ? dates.sort()[0]! : null;
+        const first = group[0]!;
+        result.push({
+          type: 'group',
+          item: {
+            slug: key,
+            groupingKey: key,
+            title: first.title || '',
+            coverUrl: first.imageUrl ?? null,
+            totalEvents: group.length,
+            totalCities: citiesArray.length,
+            citiesPreview,
+            remainingCities,
+            minPrice,
+            rating,
+            nextDate,
+          },
+        });
+      }
+    } else {
+      result.push({ type: 'event', event: e });
+    }
   }
   return result;
 }
@@ -152,6 +216,22 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   }
   if (nearestEvents.length > 0) {
     nearestEvents = uniqueByImage(nearestEvents, 8);
+  }
+
+  /** Для "Популярные" без города — группируем по groupingKey; с городом — просто события */
+  const popularDisplayItems: PopularDisplayItem[] =
+    !citySlug && popularEvents.length > 0 ? buildPopularDisplayItems(popularEvents) : [];
+  const showPopularGrouped = popularDisplayItems.length > 0;
+
+  let promoBlocks: Awaited<ReturnType<typeof api.getPromoBlocks>> = [];
+  try {
+    const { loadPromoBlocksSafe, resolvePromoBlocks } = await import('@/lib/promo-blocks-fallback');
+    const result = await loadPromoBlocksSafe(() => api.getPromoBlocks(citySlug || undefined));
+    promoBlocks = resolvePromoBlocks(result);
+  } catch (e) {
+    if (process.env.NODE_ENV === 'development') devWarn('[HomePage] getPromoBlocks failed:', e);
+    const { PROMO_BLOCKS_FALLBACK } = await import('@/lib/promo-blocks-fallback');
+    promoBlocks = PROMO_BLOCKS_FALLBACK;
   }
 
   let popularTags: TagWithCount[] = [];
@@ -296,38 +376,75 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </div>
             </div>
             <div className="mt-6 grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {popularEvents.map((event) => (
-                <EventCard
-                  key={event.id}
-                  slug={event.slug}
-                  title={event.title}
-                  category={event.category}
-                  subcategories={event.subcategories}
-                  imageUrl={event.imageUrl}
-                  priceFrom={event.priceFrom ?? null}
-                  priceOriginalKopecks={event.priceOriginalKopecks ?? null}
-                  rating={Number(event.rating) || 0}
-                  reviewCount={Number(event.reviewCount ?? 0)}
-                  durationMinutes={event.durationMinutes ?? null}
-                  city={event.city ?? undefined}
-                  totalAvailableTickets={event.totalAvailableTickets}
-                  departingSoonMinutes={event.departingSoonMinutes ?? undefined}
-                  nextSessionAt={typeof event.nextSessionAt === 'string' ? event.nextSessionAt : undefined}
-                  isOptimalChoice={event.isOptimalChoice}
-                  dateMode={event.dateMode}
-                  groupSize={
-                    typeof event.groupSize === 'string'
-                      ? event.groupSize
-                      : ((): string | undefined => {
-                          const g = (event.templateData as Record<string, unknown> | null)?.groupSize;
-                          return typeof g === 'string' ? g : undefined;
-                        })()
-                  }
-                  sessionTimes={event.sessionTimes ?? []}
-                  highlights={event.highlights ?? []}
-                  compact
-                />
-              ))}
+              {showPopularGrouped
+                ? popularDisplayItems.map((d) =>
+                    d.type === 'group' ? (
+                      <MultiEventCard key={`g-${d.item.slug}`} item={d.item} />
+                    ) : (
+                      <EventCard
+                        key={d.event.id}
+                        slug={d.event.slug}
+                        title={d.event.title}
+                        category={d.event.category}
+                        subcategories={d.event.subcategories}
+                        imageUrl={d.event.imageUrl}
+                        priceFrom={d.event.priceFrom ?? null}
+                        priceOriginalKopecks={d.event.priceOriginalKopecks ?? null}
+                        rating={Number(d.event.rating) || 0}
+                        reviewCount={Number(d.event.reviewCount ?? 0)}
+                        durationMinutes={d.event.durationMinutes ?? null}
+                        city={d.event.city ?? undefined}
+                        totalAvailableTickets={d.event.totalAvailableTickets}
+                        departingSoonMinutes={d.event.departingSoonMinutes ?? undefined}
+                        nextSessionAt={typeof d.event.nextSessionAt === 'string' ? d.event.nextSessionAt : undefined}
+                        isOptimalChoice={d.event.isOptimalChoice}
+                        dateMode={d.event.dateMode}
+                        groupSize={
+                          typeof d.event.groupSize === 'string'
+                            ? d.event.groupSize
+                            : ((): string | undefined => {
+                                const g = (d.event.templateData as Record<string, unknown> | null)?.groupSize;
+                                return typeof g === 'string' ? g : undefined;
+                              })()
+                        }
+                        sessionTimes={d.event.sessionTimes ?? []}
+                        highlights={d.event.highlights ?? []}
+                        compact
+                      />
+                    ),
+                  )
+                : popularEvents.map((event) => (
+                    <EventCard
+                      key={event.id}
+                      slug={event.slug}
+                      title={event.title}
+                      category={event.category}
+                      subcategories={event.subcategories}
+                      imageUrl={event.imageUrl}
+                      priceFrom={event.priceFrom ?? null}
+                      priceOriginalKopecks={event.priceOriginalKopecks ?? null}
+                      rating={Number(event.rating) || 0}
+                      reviewCount={Number(event.reviewCount ?? 0)}
+                      durationMinutes={event.durationMinutes ?? null}
+                      city={event.city ?? undefined}
+                      totalAvailableTickets={event.totalAvailableTickets}
+                      departingSoonMinutes={event.departingSoonMinutes ?? undefined}
+                      nextSessionAt={typeof event.nextSessionAt === 'string' ? event.nextSessionAt : undefined}
+                      isOptimalChoice={event.isOptimalChoice}
+                      dateMode={event.dateMode}
+                      groupSize={
+                        typeof event.groupSize === 'string'
+                          ? event.groupSize
+                          : ((): string | undefined => {
+                              const g = (event.templateData as Record<string, unknown> | null)?.groupSize;
+                              return typeof g === 'string' ? g : undefined;
+                            })()
+                      }
+                      sessionTimes={event.sessionTimes ?? []}
+                      highlights={event.highlights ?? []}
+                      compact
+                    />
+                  ))}
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
               <Link
@@ -474,7 +591,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Сезонные предложения</h2>
           <p className="mt-1 text-slate-500">Лучшие события и экскурсии сезона</p>
           <div className="mt-6">
-            <PromoBlock />
+            <PromoBlock initialBlocks={promoBlocks} />
           </div>
         </div>
       </section>
@@ -491,8 +608,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               Все города →
             </Link>
           </div>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {cities.map((city) => (
+          <div className="mt-8 grid gap-4 grid-cols-2 sm:grid-cols-4 lg:grid-cols-6">
+            {cities.slice(0, Math.ceil(cities.length / 2)).map((city) => (
               <Link
                 key={city.slug}
                 href={`/cities/${city.slug}`}
@@ -516,10 +633,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 <div className="relative p-5">
                   <h3 className="text-xl font-bold text-white">{city.name}</h3>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {/* Общее количество событий в городе */}
+                    {/* Общее количество событий в городе (eventCount с API, fallback на _count.events) */}
                     <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-300">
                       <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
-                      {pluralEvents(city._count?.events ?? 0)}
+                      {pluralEvents((city as { eventCount?: number }).eventCount ?? city._count?.events ?? 0)}
                     </span>
                     {/* Музеи и арт: площадки + события в них (museumCount с бэкенда, fallback на venues) */}
                     {(city.museumCount ?? city._count?.venues ?? 0) > 0 && (

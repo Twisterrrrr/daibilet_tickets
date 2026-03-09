@@ -21,7 +21,7 @@ export class TepApiService {
   /**
    * C3: concurrency limit + retry с backoff на 429/5xx.
    */
-  private async request<T = any>(path: string, signal?: AbortSignal): Promise<T> {
+  private async request<T = unknown>(path: string, signal?: AbortSignal): Promise<T> {
     const doFetch = async (): Promise<T> => {
       const url = `${this.baseUrl}${path}`;
       this.logger.debug(`TEP API → GET ${url}`);
@@ -47,7 +47,21 @@ export class TepApiService {
         throw new Error(`TEP API returned ${res.status}: ${text.slice(0, 200)}`);
       }
 
-      return res.json() as Promise<T>;
+      const json = (await res.json()) as T;
+      // Debug: дамп сырого ответа для поиска флага приостановки продаж (LOG_RAW_TEP_EVENT=1)
+      if (path.includes('/events') && process.env.LOG_RAW_TEP_EVENT === '1') {
+        const arr = Array.isArray(json) ? json : [json];
+        const withTimes = arr.find((e: { eventTimes?: unknown[] }) => e?.eventTimes?.length);
+        if (withTimes) {
+          this.logger.log(
+            `[TEP DEBUG] Sample event with eventTimes: id=${(withTimes as { id?: number }).id} title="${(withTimes as { title?: string }).title?.slice(0, 50)}"`,
+          );
+          const slot = (withTimes as { eventTimes?: unknown[] }).eventTimes?.[0];
+          this.logger.log(`[TEP DEBUG] First slot raw: ${JSON.stringify(slot)}`);
+          this.logger.log(`[TEP DEBUG] Full event keys: ${JSON.stringify(Object.keys(withTimes as object))}`);
+        }
+      }
+      return json;
     };
 
     const { data, retries } = await withRetry(
@@ -235,6 +249,9 @@ export interface TepTimeSlot {
   id: number;
   datetime: string; // "2026-05-18T16:30:00+0300"
   available_tickets: number;
+  /** Приостановка продаж (если есть в API) */
+  sale_suspended?: boolean;
+  status?: string; // "active" | "suspended" | "closed"
 }
 
 export interface TepScheduleItem {

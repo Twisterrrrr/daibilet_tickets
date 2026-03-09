@@ -53,15 +53,14 @@ Staging уже настроен: APP_URL, CORS_ORIGIN, POSTGRES_DB — свои.
 cd /opt/daibilet/deploy/prod
 docker compose up -d --build
 
-# 2. Staging
+# 2. Staging (включает свой nginx на 80/443, по умолчанию HTTP без сертификатов)
 cd /opt/daibilet/deploy/staging
+mkdir -p ../nginx/certbot/{www,conf}
 docker compose up -d --build
-
-# 3. Nginx (если DNS настроен)
-mkdir -p /opt/daibilet/deploy/nginx/certbot/{www,conf}
-cd /opt/daibilet/deploy/nginx
-docker compose up -d
+# Или из корня репо: bash deploy/staging/deploy.sh
 ```
+
+На первом запуске без TLS staging отвечает по HTTP (порт 80). Для HTTPS после certbot подключайте `docker-compose.ssl.yml` и замените в `docker-compose.yml` конфиг nginx на `staging.conf`.
 
 ## Шаг 6: Миграции и seed
 
@@ -71,8 +70,8 @@ docker exec -it daibilet-prod-backend npx prisma migrate deploy
 docker exec -it daibilet-prod-backend pnpm run db:seed
 
 # Staging (опционально)
-docker exec -it daibilet-stg-backend npx prisma migrate deploy
-docker exec -it daibilet-stg-backend pnpm run db:seed
+docker exec -it daibilet-staging-backend npx prisma migrate deploy
+docker exec -it daibilet-staging-backend pnpm run db:seed
 ```
 
 ---

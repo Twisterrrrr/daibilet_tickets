@@ -1,5 +1,6 @@
-# Dependencies
+# Dependencies (в т.ч. во вложенных пакетах — иначе COPY перезаписывает node_modules в образе)
 node_modules
+**/node_modules
 .pnpm-store
 
 # Build artifacts
@@ -12,11 +13,13 @@ dist
 .env.local
 .env.*.local
 
-# Git
+# Git / CI
 .git
 .gitignore
+.github
+.husky
 
-# IDE
+# IDE / tooling
 .vscode
 .idea
 .cursor
@@ -40,3 +43,14 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Local/dev-only dirs
+tests
+coverage
+storybook
+playwright
+cypress
+infra
+ops
+scripts
+tools

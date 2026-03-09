@@ -62,7 +62,10 @@ export class TeplohodWidgetsService {
       id: s.id,
       startIso: s.startsAt.toISOString(),
       endIso: s.endsAt ? s.endsAt.toISOString() : undefined,
-      price: s.prices && Array.isArray(s.prices) && s.prices.length > 0 ? Number((s.prices[0] as any).price) : undefined,
+      price:
+        s.prices && Array.isArray(s.prices) && s.prices.length > 0
+          ? Number((s.prices[0] as { price?: number | string })?.price)
+          : undefined,
       available: s.isActive && !s.canceledAt,
       reasonClosed: s.canceledAt ? 'CANCELLED' : undefined,
     }));

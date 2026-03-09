@@ -17,7 +17,7 @@ interface WebhookJobData {
 export class PartnerWebhookProcessor extends WorkerHost {
   private readonly logger = new Logger(PartnerWebhookProcessor.name);
 
-  async process(job: Job<WebhookJobData>): Promise<any> {
+  async process(job: Job<WebhookJobData>): Promise<{ status: number }> {
     const { operatorId: _operatorId, operatorName, webhookUrl, webhookSecret, payload } = job.data;
 
     const bodyStr = JSON.stringify(payload);

@@ -110,7 +110,7 @@ export class AdminCombosController {
       }
 
       const after = await this.prisma.comboPage.findUnique({ where: { id } });
-      await this.audit.log(req.user.id, 'UPDATE', 'ComboPage', id, before, after);
+      await this.audit.log(req.user.id, 'UPDATE', 'ComboPage', id, before ?? undefined, after ?? undefined);
       return after;
     }
 

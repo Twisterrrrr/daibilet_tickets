@@ -31,6 +31,7 @@ const nextConfig: NextConfig = {
 
   images: {
     formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 86400, // 24h — кэш картинок (api.teplohod.info иногда даёт 504, кэш снижает нагрузку)
     remotePatterns: [
       {
         protocol: 'https',
