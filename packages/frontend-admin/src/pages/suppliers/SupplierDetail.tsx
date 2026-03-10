@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { FormActions, FormGrid, FormSection } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SupplierEventsTab } from './SupplierEventsTab';
 
@@ -87,22 +90,30 @@ export function SupplierDetailPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: 'Заказов', value: supplier.financials?.totalOrders || 0 },
-          { label: 'Оборот', value: `${((supplier.financials?.grossRevenue || 0) / 100).toLocaleString('ru')} руб` },
-          { label: 'Комиссия', value: `${((supplier.financials?.platformFee || 0) / 100).toLocaleString('ru')} руб` },
-          {
-            label: 'Доход поставщика',
-            value: `${((supplier.financials?.supplierRevenue || 0) / 100).toLocaleString('ru')} руб`,
-          },
-        ].map((c) => (
-          <div key={c.label} className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted-foreground">{c.label}</p>
-            <p className="text-lg font-bold mt-1">{c.value}</p>
-          </div>
-        ))}
-      </div>
+      <Card>
+        <CardContent className="grid gap-4 border-0 bg-transparent p-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Заказов', value: supplier.financials?.totalOrders || 0 },
+            {
+              label: 'Оборот',
+              value: `${((supplier.financials?.grossRevenue || 0) / 100).toLocaleString('ru')} руб`,
+            },
+            {
+              label: 'Комиссия',
+              value: `${((supplier.financials?.platformFee || 0) / 100).toLocaleString('ru')} руб`,
+            },
+            {
+              label: 'Доход поставщика',
+              value: `${((supplier.financials?.supplierRevenue || 0) / 100).toLocaleString('ru')} руб`,
+            },
+          ].map((c) => (
+            <div key={c.label} className="rounded-xl border bg-card p-4">
+              <p className="text-xs text-muted-foreground">{c.label}</p>
+              <p className="mt-1 text-lg font-bold">{c.value}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Tabs
         value={currentTab}
@@ -124,15 +135,17 @@ export function SupplierDetailPage() {
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
-          <div className="rounded-xl border bg-card p-6 space-y-4">
-            <h2 className="font-semibold">Настройки поставщика</h2>
-            <div className="grid grid-cols-2 gap-4">
+          <FormSection
+            title="Настройки поставщика"
+            description="Комиссия, промо и статус поставщика"
+          >
+            <FormGrid>
               <div>
-                <label className="block text-sm font-medium mb-1">Trust Level</label>
+                <label className="mb-1 block text-sm font-medium">Trust Level</label>
                 <select
                   value={form.trustLevel}
                   onChange={(e) => setForm({ ...form, trustLevel: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
                 >
                   <option value={0}>0 — Новый (модерация)</option>
                   <option value={1}>1 — Проверенный (авто)</option>
@@ -140,41 +153,41 @@ export function SupplierDetailPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Комиссия (%)</label>
+                <label className="mb-1 block text-sm font-medium">Комиссия (%)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={(Number(form.commissionRate) * 100).toFixed(0)}
                   onChange={(e) => setForm({ ...form, commissionRate: Number(e.target.value) / 100 })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Промо ставка (%)</label>
+                <label className="mb-1 block text-sm font-medium">Промо ставка (%)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={form.promoRate ? (Number(form.promoRate) * 100).toFixed(0) : ''}
                   onChange={(e) => setForm({ ...form, promoRate: e.target.value ? Number(e.target.value) / 100 : '' })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
                   placeholder="Пусто = нет промо"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Промо до</label>
+                <label className="mb-1 block text-sm font-medium">Промо до</label>
                 <input
                   type="date"
                   value={form.promoUntil}
                   onChange={(e) => setForm({ ...form, promoUntil: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">YooKassa Account ID</label>
+                <label className="mb-1 block text-sm font-medium">YooKassa Account ID</label>
                 <input
                   value={form.yookassaAccountId}
                   onChange={(e) => setForm({ ...form, yookassaAccountId: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
                   placeholder="Для split-платежей"
                 />
               </div>
@@ -188,17 +201,24 @@ export function SupplierDetailPage() {
                   <span className="text-sm">Активен</span>
                 </label>
               </div>
-            </div>
-            <button
-              onClick={save}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90"
-            >
-              Сохранить
-            </button>
-          </div>
+            </FormGrid>
+            <FormActions
+              primary={
+                <button
+                  type="button"
+                  onClick={save}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90"
+                >
+                  Сохранить
+                </button>
+              }
+            />
+          </FormSection>
 
-          <div className="rounded-xl border bg-card p-6">
-            <h2 className="font-semibold mb-3">Пользователи</h2>
+          <FormSection
+            title="Пользователи"
+            description="Доступы сотрудников поставщика к личному кабинету"
+          >
             <table className="w-full text-sm">
               <thead className="border-b">
                 <tr>
@@ -231,7 +251,7 @@ export function SupplierDetailPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </FormSection>
         </TabsContent>
 
         <TabsContent value="events">

@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { adminApi } from '@/api/client';
 import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -117,86 +117,80 @@ export function CityEditPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Основные данные</CardTitle>
-          <CardDescription>Название, slug и основные настройки города</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="name">Название</Label>
-              <Input
-                id="name"
-                value={form.name ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="slug">Slug</Label>
-              <Input
-                id="slug"
-                value={form.slug ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-                className="font-mono"
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-6">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isFeatured"
-                checked={form.isFeatured ?? false}
-                onChange={(e) => setForm((f) => ({ ...f, isFeatured: e.target.checked }))}
-                className="h-4 w-4 rounded border-input"
-              />
-              <Label htmlFor="isFeatured" className="cursor-pointer font-normal">
-                В топе
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isActive"
-                checked={form.isActive ?? false}
-                onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                className="h-4 w-4 rounded border-input"
-              />
-              <Label htmlFor="isActive" className="cursor-pointer font-normal">
-                Активен
-              </Label>
-            </div>
-          </div>
+      <FormSection
+        title="Основные данные"
+        description="Название, slug и основные настройки города"
+      >
+        <FormGrid>
           <div className="space-y-2">
-            <Label htmlFor="description">Описание</Label>
-            <Textarea
-              id="description"
-              rows={3}
-              value={form.description ?? ''}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Медиа</CardTitle>
-          <CardDescription>Hero изображение для лендинга</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="heroImage">Hero изображение (URL)</Label>
+            <Label htmlFor="name">Название</Label>
             <Input
-              id="heroImage"
-              type="text"
-              value={form.heroImage ?? ''}
-              onChange={(e) => setForm((f) => ({ ...f, heroImage: e.target.value }))}
+              id="name"
+              value={form.name ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
           </div>
-        </CardContent>
-      </Card>
+          <div className="space-y-2">
+            <Label htmlFor="slug">Slug</Label>
+            <Input
+              id="slug"
+              value={form.slug ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+              className="font-mono"
+            />
+          </div>
+        </FormGrid>
+        <div className="flex flex-wrap gap-6">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isFeatured"
+              checked={form.isFeatured ?? false}
+              onChange={(e) => setForm((f) => ({ ...f, isFeatured: e.target.checked }))}
+              className="h-4 w-4 rounded border-input"
+            />
+            <Label htmlFor="isFeatured" className="cursor-pointer font-normal">
+              В топе
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isActive"
+              checked={form.isActive ?? false}
+              onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+              className="h-4 w-4 rounded border-input"
+            />
+            <Label htmlFor="isActive" className="cursor-pointer font-normal">
+              Активен
+            </Label>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="description">Описание</Label>
+          <Textarea
+            id="description"
+            rows={3}
+            value={form.description ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          />
+        </div>
+      </FormSection>
+
+      <FormSection
+        title="Медиа"
+        description="Hero изображение для лендинга"
+      >
+        <div className="space-y-2">
+          <Label htmlFor="heroImage">Hero изображение (URL)</Label>
+          <Input
+            id="heroImage"
+            type="text"
+            value={form.heroImage ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, heroImage: e.target.value }))}
+          />
+        </div>
+      </FormSection>
 
       <SeoMetaEditor
         entityType="CITY"
@@ -205,12 +199,11 @@ export function CityEditPage() {
         previewPath={form.slug ? `/cities/${form.slug}` : '/cities/slug'}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Legacy SEO (City)</CardTitle>
-          <CardDescription>metaTitle/metaDescription на модели City — fallback</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <FormSection
+        title="Legacy SEO (City)"
+        description="metaTitle/metaDescription на модели City — fallback"
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="metaTitle">Meta title</Label>
             <Input
@@ -228,16 +221,15 @@ export function CityEditPage() {
               onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))}
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </FormSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Геолокация</CardTitle>
-          <CardDescription>Координаты и часовой пояс</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+      <FormSection
+        title="Геолокация"
+        description="Координаты и часовой пояс"
+      >
+        <div className="space-y-4">
+          <FormGrid>
             <div className="space-y-2">
               <Label htmlFor="lat">Широта (lat)</Label>
               <Input
@@ -258,7 +250,7 @@ export function CityEditPage() {
                 onChange={(e) => setForm((f) => ({ ...f, lng: e.target.value ? Number(e.target.value) : null }))}
               />
             </div>
-          </div>
+          </FormGrid>
           <div className="space-y-2">
             <Label htmlFor="timezone">Часовой пояс</Label>
             <Input
@@ -268,13 +260,15 @@ export function CityEditPage() {
               onChange={(e) => setForm((f) => ({ ...f, timezone: e.target.value }))}
             />
           </div>
-        </CardContent>
-        <CardFooter>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </Button>
-        </CardFooter>
-      </Card>
+        </div>
+        <FormActions
+          primary={
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Сохранение...' : 'Сохранить'}
+            </Button>
+          }
+        />
+      </FormSection>
     </div>
   );
 }
