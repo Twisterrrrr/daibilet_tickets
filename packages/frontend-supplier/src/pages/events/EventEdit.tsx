@@ -4,6 +4,10 @@ import { toast } from 'sonner';
 
 import { EventWizard, type EventWizardDraft, FormActions, FormGrid, FormSection, PageHeader } from '@daibilet/shared-ui';
 
+import {
+  mapDraftToSupplierCreatePayload,
+  mapDraftTiersToSupplierOffers,
+} from '../../adapters/supplier-event-wizard.adapter';
 import { api } from '../../lib/api';
 
 export default function EventEdit() {
@@ -27,7 +31,7 @@ export default function EventEdit() {
   const [wizardDraft, setWizardDraft] = useState<EventWizardDraft | null>(null);
 
   useEffect(() => {
-    api.get<any>('/cities').then((res) => setCities(res.items || res || []));
+    api.get<any>('/cities').then((res) => setCities(res.items ?? res ?? [])).catch(() => setCities([]));
     if (id) {
       api.get<any>(`/supplier/events/${id}`).then((event) => {
         setForm({
@@ -129,25 +133,28 @@ export default function EventEdit() {
   };
 
   const handleWizardSubmit = async (draft: EventWizardDraft) => {
+    if (!draft.basics.title.trim()) {
+      toast.error('Введите название события');
+      return;
+    }
+    if (!draft.basics.cityId) {
+      toast.error('Выберите город');
+      return;
+    }
     setLoading(true);
-    const payload = {
-      title: draft.basics.title,
-      cityId: draft.basics.cityId,
-      description: draft.basics.fullDescription,
-      shortDescription: draft.basics.shortDescription,
-      category: draft.basics.category || 'EXCURSION',
-      audience: 'ALL',
-      durationMinutes: null as number | null,
-      address: '',
-      imageUrl: draft.basics.coverImageUrl || '',
-      priceFrom: null as number | null,
-    };
     try {
-      await api.post('/supplier/events', payload);
+      const createPayload = mapDraftToSupplierCreatePayload(draft);
+      const event = await api.post<{ id: string }>('/supplier/events', createPayload);
+
+      const offerPayloads = mapDraftTiersToSupplierOffers(draft);
+      for (const offer of offerPayloads) {
+        await api.post(`/supplier/events/${event.id}/offers`, offer);
+      }
+
       toast.success('Событие создано!');
       navigate('/events');
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Ошибка создания');
     } finally {
       setLoading(false);
     }
@@ -167,14 +174,8 @@ export default function EventEdit() {
             initialDraft={wizardDraft}
             mode="create"
             onDraftChange={setWizardDraft}
-            onSubmit={(d, opts) => {
-              // Для поставщика сейчас различаем только создание, сохранение черновика ведёт себя как обычное создание без публикации.
-              if (opts?.action === 'saveDraft') {
-                handleWizardSubmit(d);
-              } else {
-                handleWizardSubmit(d);
-              }
-            }}
+            onSubmit={(d) => handleWizardSubmit(d)}
+            citiesOptions={cities.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
           />
         </div>
       )}
