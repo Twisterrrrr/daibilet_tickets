@@ -2,6 +2,8 @@ import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -157,12 +159,10 @@ export function OrdersListPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Заказы</h1>
-        <p className="text-muted-foreground">
-          {data ? `${data.total} заказов` : <Skeleton className="h-4 w-24 inline-block" />}
-        </p>
-      </div>
+      <PageHeader
+        title="Заказы"
+        subtitle={data ? `${data.total} заказов` : <Skeleton className="h-4 w-24 inline-block" />}
+      />
 
       {error && (
         <Card className="border-destructive">

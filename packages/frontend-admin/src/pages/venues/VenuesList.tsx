@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -100,16 +102,16 @@ export function VenuesListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Места</h1>
-          <p className="text-muted-foreground">Музеи, галереи, арт-пространства и выставочные залы</p>
-        </div>
-        <Button onClick={() => navigate('/venues/new')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Добавить место
-        </Button>
-      </div>
+      <PageHeader
+        title="Места"
+        subtitle="Музеи, галереи, арт-пространства и выставочные залы"
+        actions={
+          <Button onClick={() => navigate('/venues/new')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Добавить место
+          </Button>
+        }
+      />
 
       {error && (
         <Card className="border-destructive">

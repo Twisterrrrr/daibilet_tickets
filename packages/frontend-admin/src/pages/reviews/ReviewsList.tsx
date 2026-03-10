@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -285,20 +287,23 @@ export function ReviewsListPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          Отзывы
-          {pendingCount > 0 && (
-            <Badge variant="warning" className="ml-1">
-              {pendingCount}
-            </Badge>
-          )}
-        </h1>
-        <p className="text-muted-foreground">
-          {total} отзывов • {STATUS_LABELS[statusFilter]}
-        </p>
-      </div>
+      <PageHeader
+        title={
+          <span className="flex items-center gap-2">
+            Отзывы
+            {pendingCount > 0 && (
+              <Badge variant="warning" className="ml-1">
+                {pendingCount}
+              </Badge>
+            )}
+          </span>
+        }
+        subtitle={
+          <>
+            {total} отзывов • {STATUS_LABELS[statusFilter]}
+          </>
+        }
+      />
 
       {/* Status tabs */}
       <Tabs value={statusFilter} onValueChange={(v) => setFilter('status', v)}>

@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -98,19 +100,18 @@ export function TagsListPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Теги</h1>
-          <p className="text-muted-foreground">Управление тегами для категоризации событий</p>
-        </div>
-        <Button asChild>
-          <Link to="/tags/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Создать
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Теги"
+        subtitle="Управление тегами для категоризации событий"
+        actions={
+          <Button asChild>
+            <Link to="/tags/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Создать
+            </Link>
+          </Button>
+        }
+      />
 
       {error && (
         <Card className="border-destructive">

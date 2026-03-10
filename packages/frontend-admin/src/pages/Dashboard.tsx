@@ -22,6 +22,8 @@ import {
   YAxis,
 } from 'recharts';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -274,10 +276,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Обзор ключевых метрик Дайбилет</p>
-      </div>
+      <PageHeader title="Dashboard" subtitle="Обзор ключевых метрик Дайбилет" />
 
       {/* Stat cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

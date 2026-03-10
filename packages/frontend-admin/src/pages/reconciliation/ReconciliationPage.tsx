@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '../../api/client';
 
 // ============================================================
@@ -328,7 +330,7 @@ export default function ReconciliationPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Сверка платежей</h1>
+      <PageHeader title="Сверка платежей" />
 
       {/* Tabs */}
       <div className="flex gap-1 border-b">

@@ -2,6 +2,8 @@ import { ChevronDown, ExternalLink, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { getSeoAuditEvents } from '@/api/seoAudit';
 import type { SeoAuditEventRowDto } from '@/api/seoAudit';
 import { adminApi } from '@/api/client';
@@ -94,10 +96,10 @@ export function SeoAuditPage() {
 
   return (
     <div className="space-y-4 p-4">
-      <div>
-        <h1 className="text-2xl font-bold">SEO Audit</h1>
-        <p className="text-muted-foreground">Аудит событий: мета, индексируемость, качество контента</p>
-      </div>
+      <PageHeader
+        title="SEO Audit"
+        subtitle="Аудит событий: мета, индексируемость, качество контента"
+      />
 
       <Card>
         <CardHeader>

@@ -2,6 +2,8 @@ import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -106,11 +108,10 @@ export function CitiesListPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Города</h1>
-        <p className="text-muted-foreground">Управление городами для событий и лендингов</p>
-      </div>
+      <PageHeader
+        title="Города"
+        subtitle="Управление городами для событий и лендингов"
+      />
 
       {error && (
         <Card className="border-destructive">

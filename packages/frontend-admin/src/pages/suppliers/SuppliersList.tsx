@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 
 const TRUST_LABELS: Record<number, string> = {
@@ -96,9 +98,11 @@ export function SuppliersListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Поставщики ({total})</h1>
-        <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        title="Поставщики"
+        subtitle={`Всего: ${total}`}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -140,8 +144,9 @@ export function SuppliersListPage() {
             <option value="true">Активные</option>
             <option value="false">Неактивные</option>
           </select>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {error && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
