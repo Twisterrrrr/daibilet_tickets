@@ -1,0 +1,28 @@
+import type { ReactNode } from 'react';
+import { clsx } from 'clsx';
+
+export interface AppShellProps {
+  sidebar?: ReactNode;
+  topbar?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}
+
+/**
+ * Generic backoffice shell: sidebar + topbar + content area.
+ * Purely presentational, no routing or role logic.
+ */
+export function AppShell({ sidebar, topbar, children, className }: AppShellProps) {
+  return (
+    <div className={clsx('min-h-screen bg-slate-50 text-slate-900', className)}>
+      <div className="flex min-h-screen">
+        {sidebar ? <aside className="hidden w-64 shrink-0 border-r bg-white lg:block">{sidebar}</aside> : null}
+        <div className="flex min-h-screen flex-1 flex-col">
+          {topbar ? <header className="border-b bg-white">{topbar}</header> : null}
+          <main className="flex-1">{children}</main>
+        </div>
+      </div>
+    </div>
+  );
+}
+
