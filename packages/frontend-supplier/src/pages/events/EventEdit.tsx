@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { FormActions, FormGrid, FormSection, PageHeader } from '@daibilet/shared-ui';
+import { EventWizard, type EventWizardDraft, FormActions, FormGrid, FormSection, PageHeader } from '@daibilet/shared-ui';
 
 import { api } from '../../lib/api';
 
@@ -24,6 +24,7 @@ export default function EventEdit() {
     imageUrl: '',
     priceFrom: '',
   });
+  const [wizardDraft, setWizardDraft] = useState<EventWizardDraft | null>(null);
 
   useEffect(() => {
     api.get<any>('/cities').then((res) => setCities(res.items || res || []));
@@ -41,6 +42,61 @@ export default function EventEdit() {
           imageUrl: event.imageUrl || '',
           priceFrom: event.priceFrom?.toString() || '',
         });
+      });
+    } else {
+      // Новый черновик для мастера создания события
+      setWizardDraft({
+        mode: 'create',
+        eventId: null,
+        basics: {
+          title: '',
+          slug: '',
+          category: 'EXCURSION',
+          cityId: '',
+          venueId: null,
+          supplierId: null,
+          shortDescription: '',
+          fullDescription: '',
+          coverImageUrl: '',
+          gallery: [],
+        },
+        schedule: {
+          mode: 'single',
+          timezone: 'Europe/Moscow',
+          startsAtList: [],
+          recurrenceRule: null,
+          exceptions: {
+            removedStartsAt: [],
+            movedStartsAt: [],
+          },
+          salesPolicy: {
+            stopSalesBeforeMinutes: null,
+            salesStartAt: null,
+            salesEndAt: null,
+          },
+        },
+        tickets: {
+          tiers: [],
+          pricingMode: 'fixed',
+          serviceFeeMode: 'included',
+          currency: 'RUB',
+        },
+        capacity: {
+          eventCapacity: null,
+          perSessionCapacityEnabled: false,
+          oversellAllowed: false,
+          holdTimeoutMinutes: null,
+        },
+        publishing: {
+          status: 'draft',
+          visibility: 'hidden',
+          moderationNotes: '',
+        },
+        sourceMeta: {
+          sourceType: 'native',
+          externalId: null,
+          lockedFields: [],
+        },
       });
     }
   }, [id]);
@@ -72,10 +128,59 @@ export default function EventEdit() {
     }
   };
 
+  const handleWizardSubmit = async (draft: EventWizardDraft) => {
+    setLoading(true);
+    const payload = {
+      title: draft.basics.title,
+      cityId: draft.basics.cityId,
+      description: draft.basics.fullDescription,
+      shortDescription: draft.basics.shortDescription,
+      category: draft.basics.category || 'EXCURSION',
+      audience: 'ALL',
+      durationMinutes: null as number | null,
+      address: '',
+      imageUrl: draft.basics.coverImageUrl || '',
+      priceFrom: null as number | null,
+    };
+    try {
+      await api.post('/supplier/events', payload);
+      toast.success('Событие создано!');
+      navigate('/events');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader title={isNew ? 'Новое событие' : 'Редактирование события'} />
-      <form onSubmit={handleSubmit} className="space-y-6">
+
+      {isNew && wizardDraft && (
+        <div className="space-y-4 rounded-xl border bg-white px-4 py-4 sm:px-5 sm:py-5">
+          <p className="text-xs text-slate-600">
+            Новый мастер создания события. Основные шаги: базовая информация, расписание, билеты, вместимость и
+            публикация. Тарифы и продвинутая настройка по‑прежнему доступны через админский интерфейс.
+          </p>
+          <EventWizard
+            initialDraft={wizardDraft}
+            mode="create"
+            onDraftChange={setWizardDraft}
+            onSubmit={(d, opts) => {
+              // Для поставщика сейчас различаем только создание, сохранение черновика ведёт себя как обычное создание без публикации.
+              if (opts?.action === 'saveDraft') {
+                handleWizardSubmit(d);
+              } else {
+                handleWizardSubmit(d);
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {!isNew && (
+        <form onSubmit={handleSubmit} className="space-y-6">
         <FormSection title="Основная информация">
           <FormGrid>
             <div>
@@ -208,6 +313,7 @@ export default function EventEdit() {
           }
         />
       </form>
+      )}
     </div>
   );
 }

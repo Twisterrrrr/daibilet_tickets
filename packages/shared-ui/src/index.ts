@@ -20,3 +20,14 @@ export * from './forms/StickyFormActions';
 
 export * from './overlays/ConfirmDialog';
 
+export * from './workflow/WorkflowShell';
+export * from './workflow/event-wizard/EventWizard.types';
+export * from './workflow/event-wizard/EventWizard.validation';
+export * from './workflow/event-wizard/EventWizard.mappers';
+export * from './workflow/event-wizard/EventBasicsStep';
+export * from './workflow/event-wizard/EventScheduleStep';
+export * from './workflow/event-wizard/TicketsPricingStep';
+export * from './workflow/event-wizard/CapacityAvailabilityStep';
+export * from './workflow/event-wizard/PublishReviewStep';
+export * from './workflow/event-wizard/EventWizard';
+

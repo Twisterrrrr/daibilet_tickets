@@ -705,6 +705,10 @@ export function EventsPageClient() {
                   nextSessionAt={d.event.nextSessionAt}
                   isOptimalChoice={d.event.isOptimalChoice}
                   dateMode={d.event.dateMode ?? undefined}
+                  priceOriginalKopecks={d.event.priceOriginalKopecks}
+                  groupSize={d.event.groupSize ?? undefined}
+                  sessionTimes={d.event.sessionTimes ?? []}
+                  highlights={d.event.highlights ?? []}
                 />
               ),
             )}

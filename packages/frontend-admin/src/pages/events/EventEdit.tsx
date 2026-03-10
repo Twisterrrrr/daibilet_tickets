@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { EventWizard, type EventWizardDraft, mapDraftToUpdatePayload, mapEventToDraft } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { getEventQuality, type EventQuality, type EventQualityIssue, type QualityTabKey } from '@/api/adminEventsQuality';
 import { EventStatusLine } from '@/components/events/EventStatusLine';
@@ -32,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { EventTemplateFields } from './EventTemplateFields';
 import { ImageUploadField } from '@/components/forms/ImageUploadField';
 import { EventGroupTab } from './EventGroupTab';
+import { ScheduleSummary } from '@/components/events/ScheduleSummary';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -232,6 +235,8 @@ export function EventEditPage() {
     templateData?: Record<string, unknown>;
   }>({});
 
+  const [wizardDraft, setWizardDraft] = useState<EventWizardDraft | null>(null);
+
   // Venues list for museum linking
   const [venues, setVenues] = useState<VenueOption[]>([]);
 
@@ -293,6 +298,7 @@ export function EventEditPage() {
           endDate: data.endDate ? data.endDate.slice(0, 10) : null,
           templateData: (ov as EventOverride)?.templateData ?? {},
         });
+        setWizardDraft(mapEventToDraft(data));
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
@@ -423,6 +429,36 @@ export function EventEditPage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
       .finally(() => setSaving(false));
+  };
+
+  const handleWizardSubmit = async (draft: EventWizardDraft) => {
+    if (!id) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = mapDraftToUpdatePayload(draft);
+
+      if (event && payload.slug && payload.slug !== event.slug) {
+        const res = await adminApi.patch<{ slug: string }>(`/admin/events/${id}/slug`, { slug: payload.slug });
+        setEvent((prev) => (prev ? { ...prev, slug: res.slug } : prev));
+      }
+
+      const ov = await adminApi.patch(`/admin/events/${id}/override`, {
+        title: payload.title,
+        category: payload.category,
+        shortDescription: payload.shortDescription,
+        description: payload.description,
+        imageUrl: payload.imageUrl,
+      });
+      setEvent((prev) => (prev ? { ...prev, override: ov } : null));
+
+      toast.success('Сохранено через мастер');
+      await refreshQuality(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения через мастер');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleToggleHidden = () => {
@@ -599,13 +635,39 @@ export function EventEditPage() {
         publishing={publishing}
       />
 
+      <ScheduleSummary
+        draft={wizardDraft}
+        onOpenCalendar={() => setActiveTab('sessions')}
+      />
+
+      {wizardDraft && (
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Мастер события (основной UX)</CardTitle>
+              <CardDescription>
+                Основной способ править контент, расписание, билеты и вместимость. Детальные ручные инструменты ниже.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EventWizard
+                initialDraft={wizardDraft}
+                mode="edit"
+                onDraftChange={setWizardDraft}
+                onSubmit={(d) => handleWizardSubmit(d)}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as UiTab)} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="general">Основное</TabsTrigger>
+          <TabsTrigger value="general">Основное (override)</TabsTrigger>
           <TabsTrigger value="seo">SEO</TabsTrigger>
           <TabsTrigger value="offers">Способы покупки ({event.offers?.length || 0})</TabsTrigger>
-          <TabsTrigger value="sessions">Расписание ({event.sessions?.length || 0})</TabsTrigger>
+          <TabsTrigger value="sessions">Расписание (ручное, advanced) ({event.sessions?.length || 0})</TabsTrigger>
           <TabsTrigger value="rating">Рейтинг</TabsTrigger>
           <TabsTrigger value="group">Группа</TabsTrigger>
         </TabsList>
@@ -943,7 +1005,15 @@ export function EventEditPage() {
               </CardContent>
             </Card>
           ) : (
-            <ScheduleTab eventId={event.id} eventSource={event.source} />
+            <>
+              <Card className="mb-4">
+                <CardContent className="text-xs text-muted-foreground">
+                  Основное расписание задаётся через мастер события выше (правило‑бэйзд, без тяжёлых сеансов). Этот
+                  раздел — продвинутый инструмент для ручного управления отдельными сеансами, отмен и тонких правок.
+                </CardContent>
+              </Card>
+              <ScheduleTab eventId={event.id} eventSource={event.source} />
+            </>
           )}
         </TabsContent>
 

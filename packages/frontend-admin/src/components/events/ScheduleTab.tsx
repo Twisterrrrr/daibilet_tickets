@@ -134,6 +134,8 @@ export function ScheduleTab({
   const [toFocused, setToFocused] = useState(false);
   const fromDateInputRef = useRef<HTMLInputElement | null>(null);
   const toDateInputRef = useRef<HTMLInputElement | null>(null);
+  const [hideEmptyDates, setHideEmptyDates] = useState(false);
+  const [hideEmptyHours, setHideEmptyHours] = useState(false);
 
   const query = useQuery({
     queryKey: ['admin', 'eventSessionsRange', eventId, from, to, includeCancelled],
@@ -510,6 +512,29 @@ export function ScheduleTab({
               </div>
             </div>
 
+            {viewMode === 'grid' && (
+              <div className="flex items-center gap-3 text-xs text-slate-600">
+                <label className="inline-flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-primary-600 focus:ring-0"
+                    checked={hideEmptyDates}
+                    onChange={(e) => setHideEmptyDates(e.target.checked)}
+                  />
+                  <span>Скрывать пустые даты</span>
+                </label>
+                <label className="inline-flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-primary-600 focus:ring-0"
+                    checked={hideEmptyHours}
+                    onChange={(e) => setHideEmptyHours(e.target.checked)}
+                  />
+                  <span>Скрывать пустые часы</span>
+                </label>
+              </div>
+            )}
+
             <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <input
                 type="checkbox"
@@ -556,6 +581,7 @@ export function ScheduleTab({
                     selection={selectionDay}
                     onToggleSlot={handleToggleSlotDay}
                     onEditSession={(s) => setEditing(s)}
+                    hideEmptyHours={hideEmptyHours}
                   />
                   {!isImported && selectionDay.size > 0 && (
                     <div className="mt-3 flex items-center justify-between gap-2 text-xs text-slate-600">
@@ -592,6 +618,8 @@ export function ScheduleTab({
                     hoursStart={10}
                     hoursEnd={1}
                     sessions={rows}
+                    hideEmptyDates={hideEmptyDates}
+                    hideEmptyHours={hideEmptyHours}
                     selection={selectionRange}
                     onToggleCell={handleToggleCellRange}
                     onOpenSession={(sessionId) => {

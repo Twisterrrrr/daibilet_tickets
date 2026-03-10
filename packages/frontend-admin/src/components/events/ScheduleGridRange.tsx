@@ -15,6 +15,8 @@ type Props = {
   hoursStart: number;
   hoursEnd: number;
   sessions: AdminEventSessionRow[];
+  hideEmptyDates?: boolean;
+  hideEmptyHours?: boolean;
   selection: ScheduleGridRangeSelection;
   onToggleCell: (key: string) => void;
   onOpenSession: (sessionId: string) => void;
@@ -64,6 +66,8 @@ export function ScheduleGridRange({
   hoursStart,
   hoursEnd,
   sessions,
+  hideEmptyDates,
+  hideEmptyHours,
   selection,
   onToggleCell,
   onOpenSession,
@@ -129,6 +133,32 @@ export function ScheduleGridRange({
     });
   }, [sessions, dateKeys, hours]);
 
+  const nonEmptyDateKeys = useMemo(() => {
+    if (!hideEmptyDates) return dateKeys;
+    const set = new Set<string>();
+    for (const s of sessions) {
+      const d = new Date(s.startsAt);
+      const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      set.add(key);
+    }
+    return dateKeys.filter((k) => set.has(k));
+  }, [hideEmptyDates, dateKeys, sessions]);
+
+  const nonEmptyHours = useMemo(() => {
+    if (!hideEmptyHours) return hours;
+    const set = new Set<number>();
+    for (const s of sessions) {
+      const d = new Date(s.startsAt);
+      const dateKey = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      if (!nonEmptyDateKeys.includes(dateKey)) continue;
+      set.add(d.getHours());
+    }
+    return hours.filter((h) => set.has(h));
+  }, [hideEmptyHours, hours, sessions, nonEmptyDateKeys]);
+
+  const visibleDateKeys = nonEmptyDateKeys;
+  const visibleHours = nonEmptyHours;
+
   return (
     <div className="mt-4 rounded-lg border border-slate-200">
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
@@ -163,7 +193,7 @@ export function ScheduleGridRange({
               <th className="w-24 border-r border-slate-200 bg-slate-50 px-2 py-1 text-left text-[10px] font-medium text-slate-500">
                 Дата
               </th>
-              {hours.map((h) => (
+              {visibleHours.map((h) => (
                 <th
                   key={h}
                   className="min-w-[56px] border-r border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] font-medium text-slate-500"
@@ -174,12 +204,12 @@ export function ScheduleGridRange({
             </tr>
           </thead>
           <tbody>
-            {dateKeys.map((dateKey) => (
+            {visibleDateKeys.map((dateKey) => (
               <tr key={dateKey}>
                 <td className="border-r border-t border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-600">
                   {dateKey}
                 </td>
-                {hours.map((h) => {
+                {visibleHours.map((h) => {
                   const cellKey = `${dateKey}|${h}`;
                   const agg = aggByKey.get(cellKey);
                   const selected = selection.has(cellKey);

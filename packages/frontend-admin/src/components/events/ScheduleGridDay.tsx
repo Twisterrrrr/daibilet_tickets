@@ -14,6 +14,7 @@ type Props = {
   selection: ScheduleGridSelection;
   onToggleSlot: (startsAtIso: string) => void;
   onEditSession: (session: AdminEventSessionRow) => void;
+  hideEmptyHours?: boolean;
 };
 
 // Часы сетки: с 10:00 текущего дня до 01:00 следующего (10,11,...,23,00,01)
@@ -30,6 +31,7 @@ export function ScheduleGridDay({
   selection,
   onToggleSlot,
   onEditSession,
+  hideEmptyHours,
 }: Props) {
   const minutesRows = useMemo(() => {
     const rows: number[] = [];
@@ -65,6 +67,17 @@ export function ScheduleGridDay({
     }
     return map;
   }, [sessions, date]);
+
+  const nonEmptyHours = useMemo(() => {
+    if (!hideEmptyHours) return GRID_HOURS;
+    const set = new Set<number>();
+    sessions.forEach((s) => {
+      if (isoToDateInput(s.startsAt) !== date) return;
+      const d = new Date(s.startsAt);
+      set.add(d.getHours());
+    });
+    return GRID_HOURS.filter((h) => set.has(h));
+  }, [hideEmptyHours, sessions, date]);
 
   const handleCellClick = (hour: number, minute: number) => {
     const startsAtIso = new Date(
@@ -130,7 +143,7 @@ export function ScheduleGridDay({
               <th className="w-16 border-r border-slate-200 bg-slate-50 px-2 py-1 text-left text-[10px] font-medium text-slate-500">
                 Время
               </th>
-              {GRID_HOURS.map((h) => (
+              {nonEmptyHours.map((h) => (
                   <th
                     key={h}
                     className="min-w-[56px] border-r border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] font-medium text-slate-500"
@@ -148,7 +161,7 @@ export function ScheduleGridDay({
                 <td className="border-r border-t border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-500">
                   {minute.toString().padStart(2, '0')}
                 </td>
-                {GRID_HOURS.map((hour) => {
+                {nonEmptyHours.map((hour) => {
                   const key = `${hour.toString().padStart(2, '0')}:${minute
                     .toString()
                     .padStart(2, '0')}`;
