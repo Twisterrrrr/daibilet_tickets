@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { FormActions, FormGrid, FormSection, PageHeader } from '@daibilet/shared-ui';
+
 import { api } from '../../lib/api';
 
 export default function EventEdit() {
@@ -71,100 +73,140 @@ export default function EventEdit() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-xl font-bold mb-6">{isNew ? 'Новое событие' : 'Редактирование'}</h1>
-      <form onSubmit={handleSubmit} className="space-y-4 bg-white rounded-xl border p-6">
-        <div>
-          <label className="block text-sm font-medium mb-1">Название *</label>
-          <input value={form.title} onChange={set('title')} className="w-full px-3 py-2 border rounded-lg" required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Город *</label>
-          <select value={form.cityId} onChange={set('cityId')} className="w-full px-3 py-2 border rounded-lg" required>
-            <option value="">Выберите город</option>
-            {cities.map((c: any) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Описание</label>
-          <textarea
-            value={form.description}
-            onChange={set('description')}
-            rows={4}
-            className="w-full px-3 py-2 border rounded-lg"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+    <div className="max-w-2xl space-y-6">
+      <PageHeader title={isNew ? 'Новое событие' : 'Редактирование события'} />
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <FormSection title="Основная информация">
+          <FormGrid>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Название *</label>
+              <input
+                value={form.title}
+                onChange={set('title')}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Город *</label>
+              <select
+                value={form.cityId}
+                onChange={set('cityId')}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+                required
+              >
+                <option value="">Выберите город</option>
+                {cities.map((c: any) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </FormGrid>
           <div>
-            <label className="block text-sm font-medium mb-1">Категория</label>
-            <select value={form.category} onChange={set('category')} className="w-full px-3 py-2 border rounded-lg">
-              <option value="EXCURSION">Экскурсия</option>
-              <option value="EVENT">Мероприятие</option>
-              <option value="MUSEUM">Музей</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Аудитория</label>
-            <select value={form.audience} onChange={set('audience')} className="w-full px-3 py-2 border rounded-lg">
-              <option value="ALL">Все</option>
-              <option value="KIDS">Дети</option>
-              <option value="FAMILY">Семьи</option>
-            </select>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Длительность (мин)</label>
-            <input
-              type="number"
-              value={form.durationMinutes}
-              onChange={set('durationMinutes')}
-              className="w-full px-3 py-2 border rounded-lg"
+            <label className="mb-1 block text-sm font-medium">Описание</label>
+            <textarea
+              value={form.description}
+              onChange={set('description')}
+              rows={4}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
             />
           </div>
+        </FormSection>
+
+        <FormSection title="Категория и аудитория">
+          <FormGrid>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Категория</label>
+              <select
+                value={form.category}
+                onChange={set('category')}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              >
+                <option value="EXCURSION">Экскурсия</option>
+                <option value="EVENT">Мероприятие</option>
+                <option value="MUSEUM">Музей</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Аудитория</label>
+              <select
+                value={form.audience}
+                onChange={set('audience')}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              >
+                <option value="ALL">Все</option>
+                <option value="KIDS">Дети</option>
+                <option value="FAMILY">Семьи</option>
+              </select>
+            </div>
+          </FormGrid>
+        </FormSection>
+
+        <FormSection title="Цена и логистика">
+          <FormGrid columns={3}>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Длительность (мин)</label>
+              <input
+                type="number"
+                value={form.durationMinutes}
+                onChange={set('durationMinutes')}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Цена от (коп)</label>
+              <input
+                type="number"
+                value={form.priceFrom}
+                onChange={set('priceFrom')}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Адрес</label>
+              <input
+                value={form.address}
+                onChange={set('address')}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+          </FormGrid>
+        </FormSection>
+
+        <FormSection title="Изображение">
           <div>
-            <label className="block text-sm font-medium mb-1">Цена от (коп)</label>
+            <label className="mb-1 block text-sm font-medium">Изображение (URL)</label>
             <input
-              type="number"
-              value={form.priceFrom}
-              onChange={set('priceFrom')}
-              className="w-full px-3 py-2 border rounded-lg"
+              value={form.imageUrl}
+              onChange={set('imageUrl')}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              placeholder="https://..."
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Адрес</label>
-            <input value={form.address} onChange={set('address')} className="w-full px-3 py-2 border rounded-lg" />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Изображение (URL)</label>
-          <input
-            value={form.imageUrl}
-            onChange={set('imageUrl')}
-            className="w-full px-3 py-2 border rounded-lg"
-            placeholder="https://..."
-          />
-        </div>
-        <div className="flex gap-3 pt-4">
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Сохранение...' : isNew ? 'Создать' : 'Сохранить'}
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/events')}
-            className="px-6 py-2 border rounded-lg hover:bg-gray-50"
-          >
-            Отмена
-          </button>
-        </div>
+        </FormSection>
+
+        <FormActions
+          primary={
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg bg-blue-600 px-6 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? 'Сохранение...' : isNew ? 'Создать' : 'Сохранить'}
+            </button>
+          }
+          secondary={
+            <button
+              type="button"
+              onClick={() => navigate('/events')}
+              className="rounded-lg border px-6 py-2 text-sm hover:bg-gray-50"
+            >
+              Отмена
+            </button>
+          }
+        />
       </form>
     </div>
   );
