@@ -1,5 +1,6 @@
 import { ArrowLeft, Copy, Eye, EyeOff, Pencil, Plus, RotateCcw, Save, Star, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -35,6 +36,7 @@ import { EventTemplateFields } from './EventTemplateFields';
 import { ImageUploadField } from '@/components/forms/ImageUploadField';
 import { EventGroupTab } from './EventGroupTab';
 import { ScheduleSummary } from '@/components/events/ScheduleSummary';
+import { applyScheduleSyncPlan, getScheduleSyncPlan, type ScheduleSyncPlan } from '@/components/events/schedule-sync.adapter';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -202,6 +204,7 @@ function formatPrice(kopecks: number | null): string {
 
 export function EventEditPage() {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -236,6 +239,9 @@ export function EventEditPage() {
   }>({});
 
   const [wizardDraft, setWizardDraft] = useState<EventWizardDraft | null>(null);
+  const [schedulePlan, setSchedulePlan] = useState<ScheduleSyncPlan | null>(null);
+  const [schedulePlanLoading, setSchedulePlanLoading] = useState(false);
+  const [schedulePlanError, setSchedulePlanError] = useState<string | null>(null);
 
   // Venues list for museum linking
   const [venues, setVenues] = useState<VenueOption[]>([]);
@@ -461,6 +467,55 @@ export function EventEditPage() {
     }
   };
 
+  const reloadSchedulePlan = async () => {
+    if (!id || !wizardDraft) return;
+    setSchedulePlanLoading(true);
+    setSchedulePlanError(null);
+    try {
+      const plan = await getScheduleSyncPlan(id, wizardDraft);
+      setSchedulePlan(plan);
+    } catch (e) {
+      setSchedulePlan(null);
+      setSchedulePlanError(e instanceof Error ? e.message : 'Не удалось построить план синхронизации расписания');
+    } finally {
+      setSchedulePlanLoading(false);
+    }
+  };
+
+  const handleApplySchedulePlan = async () => {
+    if (!id || !wizardDraft) return;
+    if (!schedulePlan) {
+      await reloadSchedulePlan();
+    }
+    const planToUse = schedulePlan;
+    if (!planToUse) return;
+
+    const { createCount, stopCandidatesCount } = planToUse.summary;
+    const totalChanges = createCount + stopCandidatesCount;
+    if (totalChanges === 0) {
+      toast.info('План синхронизации пуст — изменений нет');
+      return;
+    }
+
+    const ok = window.confirm(
+      `Применить план синхронизации расписания?\n\nБудет создано: ${createCount}\nБудет остановлено: ${stopCandidatesCount}`,
+    );
+    if (!ok) return;
+
+    setSchedulePlanLoading(true);
+    setSchedulePlanError(null);
+    try {
+      const updatedPlan = await applyScheduleSyncPlan(id, wizardDraft);
+      setSchedulePlan(updatedPlan);
+      toast.success('План синхронизации расписания применён');
+      await qc.invalidateQueries({ queryKey: ['admin', 'eventSessionsRange'], exact: false });
+    } catch (e) {
+      setSchedulePlanError(e instanceof Error ? e.message : 'Ошибка применения плана синхронизации расписания');
+    } finally {
+      setSchedulePlanLoading(false);
+    }
+  };
+
   const handleToggleHidden = () => {
     if (!id) return;
     const newHidden = !(event?.override?.isHidden ?? false);
@@ -639,6 +694,72 @@ export function EventEditPage() {
         draft={wizardDraft}
         onOpenCalendar={() => setActiveTab('sessions')}
       />
+
+      {wizardDraft && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Синхронизация расписания (визард → сеансы)</CardTitle>
+            <CardDescription>
+              Dry-run адаптера: показывает, какие старты будут созданы на основе мастера и какие существующие сеансы
+              являются лишними. Применение плана использует только безопасные операции (создать новые, остановить
+              лишние).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 text-sm">
+            {schedulePlanLoading && <p className="text-muted-foreground">Пересчёт плана…</p>}
+            {schedulePlanError && <p className="text-destructive">{schedulePlanError}</p>}
+            {schedulePlan && !schedulePlanLoading && (
+              <div className="grid gap-2 text-xs sm:text-sm sm:grid-cols-2">
+                <div>
+                  <span className="text-slate-500">Будет создано по мастеру:</span>{' '}
+                  <span className="font-medium">{schedulePlan.summary.createCount}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Уже совпадает (keep):</span>{' '}
+                  <span className="font-medium">{schedulePlan.summary.keepCount}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Защищённые (sold/imported/manual):</span>{' '}
+                  <span className="font-medium">{schedulePlan.summary.preserveCount}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Лишние сеансы (кандидаты на стоп):</span>{' '}
+                  <span className="font-medium">{schedulePlan.summary.stopCandidatesCount}</span>
+                </div>
+              </div>
+            )}
+            {!schedulePlan && !schedulePlanLoading && !schedulePlanError && (
+              <p className="text-xs text-muted-foreground">
+                План ещё не построен. Нажмите «Пересчитать план», чтобы увидеть dry‑run синхронизации сессий.
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={reloadSchedulePlan}
+                disabled={!wizardDraft || schedulePlanLoading}
+              >
+                Пересчитать план
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleApplySchedulePlan}
+                disabled={
+                  !wizardDraft ||
+                  schedulePlanLoading ||
+                  !schedulePlan ||
+                  (schedulePlan.summary.createCount + schedulePlan.summary.stopCandidatesCount === 0)
+                }
+              >
+                Применить план
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {wizardDraft && (
         <div className="mt-6">
