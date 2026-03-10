@@ -33,9 +33,10 @@ export interface EventWizardProps {
   mode: EventWizardMode;
   onDraftChange?: (draft: EventWizardDraft) => void;
   onSubmit?: (draft: EventWizardDraft, options?: { action?: 'create' | 'saveDraft' | 'update' }) => void;
+  citiesOptions?: { id: string; name: string }[];
 }
 
-export function EventWizard({ initialDraft, mode, onDraftChange, onSubmit }: EventWizardProps) {
+export function EventWizard({ initialDraft, mode, onDraftChange, onSubmit, citiesOptions }: EventWizardProps) {
   const [draft, setDraft] = useState<EventWizardDraft>(initialDraft);
   const [currentStep, setCurrentStep] = useState<EventWizardStepKey>('basics');
   const [isDirty, setIsDirty] = useState(false);
@@ -125,6 +126,7 @@ export function EventWizard({ initialDraft, mode, onDraftChange, onSubmit }: Eve
             value={draft.basics}
             onChange={(nextBasics) => updateDraft({ ...draft, basics: nextBasics })}
             sourceMeta={draft.sourceMeta}
+            cities={citiesOptions}
           />
         );
       case 'schedule':

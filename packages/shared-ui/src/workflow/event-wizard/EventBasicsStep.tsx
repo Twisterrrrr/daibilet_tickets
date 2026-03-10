@@ -6,9 +6,10 @@ export interface EventBasicsStepProps {
   value: EventWizardBasicsDraft;
   onChange: (next: EventWizardBasicsDraft) => void;
   sourceMeta: EventWizardSourceMetaDraft;
+  cities?: { id: string; name: string }[];
 }
 
-export function EventBasicsStep({ value, onChange, sourceMeta }: EventBasicsStepProps) {
+export function EventBasicsStep({ value, onChange, sourceMeta, cities }: EventBasicsStepProps) {
   const handleChange =
     (key: keyof EventWizardBasicsDraft) =>
     (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -26,7 +27,13 @@ export function EventBasicsStep({ value, onChange, sourceMeta }: EventBasicsStep
           </p>
         </div>
       )}
-      <BasicsForm value={value} onChange={onChange} handleChange={handleChange} lockedFields={sourceMeta.lockedFields} />
+      <BasicsForm
+        value={value}
+        onChange={onChange}
+        handleChange={handleChange}
+        lockedFields={sourceMeta.lockedFields}
+        cities={cities}
+      />
       <MediaEditor value={value} onChange={onChange} />
     </div>
   );
@@ -39,9 +46,10 @@ interface BasicsFormProps {
     key: keyof EventWizardBasicsDraft,
   ) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   lockedFields?: string[];
+  cities?: { id: string; name: string }[];
 }
 
-export function BasicsForm({ value, handleChange, lockedFields }: BasicsFormProps) {
+export function BasicsForm({ value, handleChange, lockedFields, cities }: BasicsFormProps) {
   const locked = new Set(lockedFields ?? []);
 
   return (
