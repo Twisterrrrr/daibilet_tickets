@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -168,11 +168,7 @@ export function ReviewsListPage() {
       );
     }
     if (reviews.length === 0) {
-      return (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">Нет отзывов с таким статусом</CardContent>
-        </Card>
-      );
+      return <EmptyState title="Нет отзывов с таким статусом" />;
     }
     return (
       <div className="space-y-3">

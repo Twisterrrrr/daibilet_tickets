@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 
@@ -214,8 +214,11 @@ export function SuppliersListPage() {
             })}
             {!loading && suppliers.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                  Нет поставщиков
+                <td colSpan={6} className="px-4 py-6">
+                  <EmptyState
+                    title="Нет поставщиков"
+                    description="Попробуйте изменить фильтры или создать нового поставщика."
+                  />
                 </td>
               </tr>
             )}

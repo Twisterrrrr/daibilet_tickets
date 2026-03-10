@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { LoadingState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -103,17 +103,7 @@ export function SettingsPage() {
   const formatDate = (d: string | null) => (d ? new Date(d).toLocaleString('ru-RU') : 'никогда');
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-40" />
-          <Skeleton className="h-4 w-72" />
-        </div>
-        <Skeleton className="h-48 w-full rounded-lg" />
-        <Skeleton className="h-32 w-full rounded-lg" />
-        <Skeleton className="h-40 w-full rounded-lg" />
-      </div>
-    );
+    return <LoadingState label="Загружаем настройки..." />;
   }
 
   return (

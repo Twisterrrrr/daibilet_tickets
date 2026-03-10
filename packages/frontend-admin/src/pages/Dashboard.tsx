@@ -22,7 +22,7 @@ import {
   YAxis,
 } from 'recharts';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -251,12 +251,15 @@ export function DashboardPage() {
   if (loading) return <DashboardSkeleton />;
   if (error || !stats) {
     return (
-      <Card className="p-8 text-center">
-        <p className="text-destructive">Ошибка загрузки: {error || 'Неизвестная ошибка'}</p>
-        <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
-          Обновить
-        </Button>
-      </Card>
+      <ErrorState
+        title="Ошибка загрузки дашборда"
+        description={error || 'Неизвестная ошибка. Попробуйте обновить страницу.'}
+        action={
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Обновить
+          </Button>
+        }
+      />
     );
   }
 

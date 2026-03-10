@@ -2,7 +2,7 @@ import { ChevronDown, ExternalLink, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, LoadingState, PageHeader } from '@daibilet/shared-ui';
 
 import { getSeoAuditEvents } from '@/api/seoAudit';
 import type { SeoAuditEventRowDto } from '@/api/seoAudit';
@@ -206,28 +206,24 @@ export function SeoAuditPage() {
       )}
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="pt-4">
-            <p className="text-destructive">{error}</p>
-            <Button variant="outline" size="sm" onClick={load} className="mt-2">
+        <ErrorState
+          title="Ошибка загрузки SEO-аудита"
+          description={error}
+          action={
+            <Button variant="outline" size="sm" onClick={load}>
               Повторить
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       )}
 
       {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            {onlyIssues ? 'Проблем не найдено' : 'Ничего не найдено'}
-          </CardContent>
-        </Card>
+        <LoadingState label="Загружаем результаты аудита..." />
+      ) : !error && items.length === 0 ? (
+        <EmptyState
+          title={onlyIssues ? 'Проблем не найдено' : 'Ничего не найдено'}
+          description={onlyIssues ? 'Все отслеживаемые события выглядят ок.' : undefined}
+        />
       ) : (
         <div className="space-y-2">
           {items.map((row) => (
