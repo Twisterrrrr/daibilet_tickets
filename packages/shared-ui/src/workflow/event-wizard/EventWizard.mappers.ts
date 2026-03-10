@@ -134,13 +134,16 @@ export function mapDraftToCreatePayload(draft: EventWizardDraft): any {
   };
 
   // Tickets/offers: high‑level → первый offer payload как в EventCreatePage.
+  // Контракт POST /admin/events: offer опционален; при наличии — source и purchaseType обязательны.
   const primaryTier = tickets.tiers.find((t) => t.isPrimary) ?? tickets.tiers[0];
   if (primaryTier) {
+    const pt = primaryTier.purchaseType || 'REQUEST';
+    const validPurchaseType = ['REQUEST', 'REDIRECT', 'WIDGET'].includes(pt) ? pt : 'REQUEST';
     payload.offer = {
       source: 'MANUAL',
-      purchaseType: primaryTier.purchaseType,
+      purchaseType: validPurchaseType,
       deeplink: primaryTier.deeplink || undefined,
-      priceFrom: primaryTier.priceMinor || undefined,
+      priceFrom: primaryTier.priceMinor && primaryTier.priceMinor > 0 ? primaryTier.priceMinor : undefined,
       commissionPercent: primaryTier.commissionPercent ?? undefined,
       availabilityMode: primaryTier.availabilityMode || undefined,
       badge: primaryTier.badge || undefined,

@@ -183,8 +183,8 @@ export function validateTickets(tickets: EventWizardTicketsDraft): EventWizardVa
       issue(
         step,
         'NO_TIERS',
-        'Нужно добавить хотя бы один тип билета или оффера перед публикацией события',
-        'error',
+        'Нет типов билетов. Событие можно создать без оффера и настроить позже; для публикации потребуется хотя бы один оффер.',
+        'warning',
         'tiers',
       ),
     );
