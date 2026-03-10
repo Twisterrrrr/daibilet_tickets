@@ -8,14 +8,9 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "react": "workspace:*",
-    "react-dom": "workspace:*",
-    "clsx": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/react": "workspace:*",
-    "@types/react-dom": "workspace:*",
-    "typescript": "workspace:*"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "clsx": "^2.1.1"
   }
 }
 
