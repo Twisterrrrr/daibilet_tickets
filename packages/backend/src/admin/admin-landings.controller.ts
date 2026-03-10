@@ -13,6 +13,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -22,6 +23,7 @@ import { buildPaginatedResult, paginationArgs, parsePagination } from '../common
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
+import { LandingMaterializerService } from '../landing/landing-materializer.service';
 import { CreateLandingDto, UpdateLandingDto } from './dto/admin.dto';
 import {
   AdditionalFiltersSchema,
@@ -43,6 +45,7 @@ export class AdminLandingsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly materializer: LandingMaterializerService,
   ) {}
 
   @Get()
@@ -114,6 +117,13 @@ export class AdminLandingsController {
     }
 
     return this.prisma.landingPage.update({ where: { id }, data: clean });
+  }
+
+  @Post('materialize')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Materialize: обновить isActive лендингов по порогу событий' })
+  async materialize() {
+    return this.materializer.materialize();
   }
 
   @Delete(':id')

@@ -4,6 +4,45 @@
 
 ---
 
+## 11.03.2026 — Canonical Tag Enrichment + Auto Landing Engine
+
+### Наблюдения
+
+- Лендинги фильтруют по filterTag; TC и Teplohod дают разные теги. Нужен единый слой нормализации.
+- Пустые SEO-страницы нежелательны; желательно показывать лендинг только при достаточном количестве событий.
+
+### Решения
+
+- **Canonical Tag Enrichment** (`canonical-tag-enrichment.ts`): keyword → slug по title+description, city-specific правила. Подключён в `TcSyncService.syncTags`, retagAll для всех событий. Теги: nochnye-mosty, salyut-s-vody, meteor-petergof, rechnye-progulki-msk, sviyazhsk, zolotye-vorota-vlad, strelka-yaroslavl, kurshskaya-kosa, progulki-volga-nn.
+- **Auto Landing Engine** (`LandingMaterializerService`): TopicDefinition → isActive по порогу minEvents. POST /admin/landings/materialize.
+- **Тесты:** 29 unit-тестов в `canonical-tag-enrichment.spec.ts` — позитив, негатив, city-gating, multi-match.
+- **Документация:** docs/LandingTagsStrategy.md, docs/TopicDefinitionMatrix.md.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 08.03.2026 — GiftCertificate #11: поле «Ввести код» + произвольная сумма
+
+### Наблюдения
+
+- Task #11 (GiftCertificate в checkout): поле для ввода кода было в CheckoutClient, но лейбл/placeholder требовал уточнения.
+- При покупке подарочного сертификата — только фиксированные номиналы; нужна опция «Своя сумма».
+
+### Решения
+
+- **Checkout:** label «Подарочный сертификат», placeholder «Ввести код (GC-XXXX-XXXX)», id для accessibility.
+- **Произвольная сумма:** backend `createGiftCertificateCheckoutSession` принимает amount из denominations ИЛИ в диапазоне min–max (env: GIFT_CERTIFICATE_MIN_AMOUNT, GIFT_CERTIFICATE_MAX_AMOUNT, default 1000₽–50000₽). GET /checkout/gift-certificate/denominations расширен полями minAmount, maxAmount.
+- **Frontend GiftCertificateClient:** кнопка «Своя сумма» + input (рубли), placeholder с диапазоном, валидация на submit.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 08.03.2026 — Prompt 2 + Admin Ops: observability, flush по namespace, resync с прогрессом
 
 ### Наблюдения

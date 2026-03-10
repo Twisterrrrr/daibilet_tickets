@@ -29,6 +29,11 @@
 - **Инфраструктура:** VPS Timeweb Cloud, DNS staging, SSH, bootstrap/close-gate0, deploy, migrate, SSL (Let's Encrypt), health OK (status, db, redis).
 - **Бэкапы:** `scripts/backup-staging-db.sh`, `scripts/backup-production-db.sh` — дамп в `/opt/daibilet/backups/`, retention 14 дней. Запуск: на VPS в `cd /opt/daibilet`.
 
+## Canonical Tag Enrichment + Auto Landing Engine (11.03.2026) ✅
+
+- **Enrichment:** `canonical-tag-enrichment.ts` — единый слой тегов по title/description; city-specific правила; 29 unit-тестов. Подключён в retagAll.
+- **Materializer:** TopicDefinition, LandingMaterializerService, POST /admin/landings/materialize. См. docs/LandingTagsStrategy.md, docs/TopicDefinitionMatrix.md.
+
 ## Prompt 2 + Admin Ops (08.03.2026) ✅
 
 - **Prompt 2 (Catalog observability):** CacheService — hits/misses в getOrSet, getCacheStats(). GET /admin/ops/metrics расширен полем `cache: { hits, misses, hitRate }`.
@@ -124,7 +129,7 @@
 | 8 | Лендинг salyut | Проверить в проде, unit-test getPrice | — |
 | 9 | Типизация any | «Ни одного нового any» | — |
 | 10 | Кэш и инвалидация | CacheInvalidationService | ✅ |
-| 11 | GiftCertificate в checkout | Поле «Ввести код» | — |
+| 11 | GiftCertificate в checkout | Поле «Ввести код» + валидация; произвольная сумма при покупке | ✅ |
 | 12 | Избранное → аккаунт | Оставить localStorage | — |
 | 13 | Аудит категоризации | SQL-отчёт | — |
 

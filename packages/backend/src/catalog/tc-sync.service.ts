@@ -1,4 +1,5 @@
 import { normalizeEventTitle } from '@daibilet/shared';
+import { getCanonicalLandingTags } from './canonical-tag-enrichment';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
@@ -1215,8 +1216,19 @@ export class TcSyncService {
     'fast track': ['no-queue'],
   };
 
-  private async syncTags(eventId: string, tagNames: string[], title?: string, description?: string): Promise<void> {
+  private async syncTags(
+    eventId: string,
+    tagNames: string[],
+    title?: string,
+    description?: string,
+    citySlug?: string | null,
+  ): Promise<void> {
     const slugsToLink = new Set<string>();
+
+    // Canonical enrichment для лендингов (title+description, независимо от источника)
+    for (const slug of getCanonicalLandingTags(title ?? '', description ?? '', citySlug)) {
+      slugsToLink.add(slug);
+    }
 
     for (const tcTag of tagNames || []) {
       const mapped = TcSyncService.TC_TAG_MAP[tcTag.toLowerCase()];
@@ -1265,15 +1277,22 @@ export class TcSyncService {
 
     const events = await this.prisma.event.findMany({
       where: { isActive: true },
-      select: { id: true, title: true, description: true, tcData: true },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        tcData: true,
+        city: { select: { slug: true } },
+      },
     });
 
     let tagsLinked = 0;
     for (const ev of events) {
       const tc = (ev.tcData as { tags?: string[] } | null) ?? {};
       const tcTags: string[] = tc.tags ?? [];
+      const citySlug = (ev.city as { slug?: string } | null)?.slug ?? null;
       const before = await this.prisma.eventTag.count({ where: { eventId: ev.id } });
-      await this.syncTags(ev.id, tcTags, ev.title, ev.description || '');
+      await this.syncTags(ev.id, tcTags, ev.title, ev.description || '', citySlug);
       const after = await this.prisma.eventTag.count({ where: { eventId: ev.id } });
       tagsLinked += after - before;
     }
