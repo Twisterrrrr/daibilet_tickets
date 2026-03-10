@@ -1,23 +1,119 @@
+import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-import { EmptyState, PageHeader } from '@daibilet/shared-ui';
+import { PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 
 const TRUST_LABELS: Record<number, string> = {
   0: 'Новый',
   1: 'Проверенный',
   2: 'Доверенный',
 };
-const TRUST_COLORS: Record<number, string> = {
-  0: 'bg-gray-100 text-gray-700',
-  1: 'bg-blue-100 text-blue-700',
-  2: 'bg-green-100 text-green-700',
+const TRUST_VARIANTS: Record<number, 'secondary' | 'default' | 'success'> = {
+  0: 'secondary',
+  1: 'default',
+  2: 'success',
 };
 
+interface SupplierItem {
+  id: string;
+  name: string;
+  companyName: string | null;
+  contactEmail: string | null;
+  trustLevel: number;
+  commissionRate: number;
+  promoRate: number | null;
+  _count?: { events?: number; offers?: number; supplierUsers?: number };
+  successfulSales: number;
+  isActive: boolean;
+  inn?: string | null;
+  createdAt: string | null;
+}
+
+const columns: ColumnDef<SupplierItem>[] = [
+  {
+    accessorKey: 'name',
+    header: ({ column }) => <SortableHeader column={column}>Поставщик</SortableHeader>,
+    cell: ({ row }) => {
+      const s = row.original;
+      const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
+      const name = s.companyName || s.name;
+      return (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            {isAggregator ? (
+              <span className="font-medium text-muted-foreground">{name}</span>
+            ) : (
+              <Link to={`/suppliers/${s.id}`} className="font-medium text-primary hover:underline">
+                {name}
+              </Link>
+            )}
+            {isAggregator && (
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
+                агрегатор
+              </span>
+            )}
+          </div>
+          {!isAggregator && s.inn && (
+            <span className="text-xs text-muted-foreground">ИНН: {s.inn}</span>
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: 'contactEmail',
+    header: 'Контакт',
+    cell: ({ row }) => <span className="text-muted-foreground text-sm">{row.original.contactEmail || '—'}</span>,
+  },
+  {
+    accessorKey: 'trustLevel',
+    header: 'Trust',
+    cell: ({ row }) => (
+      <Badge variant={TRUST_VARIANTS[row.original.trustLevel] ?? 'secondary'}>
+        {TRUST_LABELS[row.original.trustLevel] ?? row.original.trustLevel}
+      </Badge>
+    ),
+  },
+  {
+    id: 'commission',
+    header: 'Комиссия',
+    cell: ({ row }) => {
+      const s = row.original;
+      const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
+      if (isAggregator) return <span className="text-sm text-muted-foreground">—</span>;
+      return (
+        <span className="text-sm tabular-nums">
+          {(Number(s.commissionRate) * 100).toFixed(0)}%
+          {s.promoRate && (
+            <span className="text-xs text-green-600 ml-1">
+              ({(Number(s.promoRate) * 100).toFixed(0)}% промо)
+            </span>
+          )}
+        </span>
+      );
+    },
+  },
+  {
+    id: 'eventsCount',
+    header: 'Событий',
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.events ?? 0}</span>,
+  },
+  {
+    id: 'offersCount',
+    header: 'Офферов',
+    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.offers ?? 0}</span>,
+  },
+];
+
 export function SuppliersListPage() {
-  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [trustFilter, setTrustFilter] = useState<'all' | '0' | '1' | '2'>('all');
@@ -101,154 +197,87 @@ export function SuppliersListPage() {
       <PageHeader
         title="Поставщики"
         subtitle={`Всего: ${total}`}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load({ page: 1, search: e.currentTarget.value })}
-            placeholder="Поиск..."
-            className="px-3 py-1.5 border rounded-lg text-sm w-64"
-          />
-          <button
-            type="button"
-            className="px-3 py-1.5 rounded-lg border text-sm bg-primary text-primary-foreground hover:opacity-90"
-            onClick={() => load({ page: 1, search })}
-          >
-            Найти
-          </button>
-          <select
-            value={trustFilter}
-            onChange={(e) => {
-              const v = e.target.value as typeof trustFilter;
-              setTrustFilter(v);
-              load({ page: 1, trust: v });
-            }}
-            className="px-2 py-1.5 border rounded-lg text-xs text-muted-foreground"
-          >
-            <option value="all">Trust: все</option>
-            <option value="0">0 — Новый</option>
-            <option value="1">1 — Проверенный</option>
-            <option value="2">2 — Доверенный</option>
-          </select>
-          <select
-            value={activeFilter}
-            onChange={(e) => {
-              const v = e.target.value as typeof activeFilter;
-              setActiveFilter(v);
-              load({ page: 1, isActive: v });
-            }}
-            className="px-2 py-1.5 border rounded-lg text-xs text-muted-foreground"
-          >
-            <option value="all">Статус: все</option>
-            <option value="true">Активные</option>
-            <option value="false">Неактивные</option>
-          </select>
-          </div>
-        }
       />
 
       {error && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          {error}
-        </div>
+        <Card className="border-destructive">
+          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+        </Card>
       )}
 
-      <div className="rounded-xl border bg-card">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/50">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium">Компания</th>
-              <th className="text-left px-4 py-3 font-medium">Контакт</th>
-              <th className="text-center px-4 py-3 font-medium">Trust</th>
-              <th className="text-center px-4 py-3 font-medium">Комиссия</th>
-              <th className="text-center px-4 py-3 font-medium">События</th>
-              <th className="text-center px-4 py-3 font-medium">Продажи</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {suppliers.map((s) => {
-              const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
-              const name = s.companyName || s.name;
-              return (
-                <tr key={s.id} className="hover:bg-muted/30">
-                  <td className="px-4 py-3">
-                    {isAggregator ? (
-                      <span className="font-medium text-muted-foreground">{name}</span>
-                    ) : (
-                      <Link to={`/suppliers/${s.id}`} className="font-medium text-primary hover:underline">
-                        {name}
-                      </Link>
-                    )}
-                    {s.inn && !isAggregator && (
-                      <span className="text-xs text-muted-foreground ml-2">ИНН: {s.inn}</span>
-                    )}
-                    {isAggregator && (
-                      <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
-                        агрегатор
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{s.contactEmail}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        TRUST_COLORS[s.trustLevel] || TRUST_COLORS[0]
-                      }`}
-                    >
-                      {TRUST_LABELS[s.trustLevel] || s.trustLevel}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {isAggregator ? '—' : `${(Number(s.commissionRate) * 100).toFixed(0)}%`}
-                    {!isAggregator && s.promoRate && (
-                      <span className="text-green-600 text-xs ml-1">
-                        ({(Number(s.promoRate) * 100).toFixed(0)}% промо)
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">{s._count?.events || 0}</td>
-                  <td className="px-4 py-3 text-center">{s._count?.offers || 0}</td>
-                </tr>
-              );
-            })}
-            {!loading && suppliers.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-6">
-                  <EmptyState
-                    title="Нет поставщиков"
-                    description="Попробуйте изменить фильтры или создать нового поставщика."
-                  />
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Фильтры</CardTitle>
+          <CardDescription>Поиск, trust-уровень и активность поставщика</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && load({ page: 1, search: e.currentTarget.value })}
+              placeholder="Поиск по названию или email..."
+              className="px-3 py-1.5 border rounded-lg text-sm w-64"
+            />
+            <button
+              type="button"
+              className="px-3 py-1.5 rounded-lg border text-sm bg-primary text-primary-foreground hover:opacity-90"
+              onClick={() => load({ page: 1, search })}
+            >
+              Найти
+            </button>
+            <select
+              value={trustFilter}
+              onChange={(e) => {
+                const v = e.target.value as typeof trustFilter;
+                setTrustFilter(v);
+                load({ page: 1, trust: v });
+              }}
+              className="px-2 py-1.5 border rounded-lg text-xs text-muted-foreground"
+            >
+              <option value="all">Trust: все</option>
+              <option value="0">0 — Новый</option>
+              <option value="1">1 — Проверенный</option>
+              <option value="2">2 — Доверенный</option>
+            </select>
+            <select
+              value={activeFilter}
+              onChange={(e) => {
+                const v = e.target.value as typeof activeFilter;
+                setActiveFilter(v);
+                load({ page: 1, isActive: v });
+              }}
+              className="px-2 py-1.5 border rounded-lg text-xs text-muted-foreground"
+            >
+              <option value="all">Статус: все</option>
+              <option value="true">Активные</option>
+              <option value="false">Неактивные</option>
+            </select>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-        <div>
-          Стр. {page} из {pages}
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="px-3 py-1.5 rounded-lg border disabled:opacity-40"
-            disabled={loading || page <= 1}
-            onClick={() => load({ page: page - 1 })}
-          >
-            Назад
-          </button>
-          <button
-            type="button"
-            className="px-3 py-1.5 rounded-lg border disabled:opacity-40"
-            disabled={loading || page >= pages}
-            onClick={() => load({ page: page + 1 })}
-          >
-            Далее
-          </button>
-        </div>
-      </div>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Список поставщиков</CardTitle>
+          <CardDescription>
+            Стр. {page} из {pages}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={suppliers}
+            loading={loading}
+            emptyText="Нет поставщиков"
+            onRowClick={(item) => {
+              const isAggregator = typeof item.id === 'string' && item.id.startsWith('agg:');
+              if (!isAggregator) navigate(`/suppliers/${item.id}`);
+            }}
+            pageSize={20}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
