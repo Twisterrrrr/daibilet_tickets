@@ -41,6 +41,20 @@ const mockPostEditQueue = {
   ensureOverridesForImportedEvents: vi.fn().mockResolvedValue({ created: 0, updated: 0 }),
 };
 
+const mockMaterializer = {
+  materialize: vi.fn().mockResolvedValue({
+    processed: 20,
+    beforeVisible: 15,
+    visible: 18,
+    hidden: 2,
+    updated: 3,
+    unchanged: 17,
+    skipped: 0,
+    changedSlugs: ['spb/nochnye-mosty'],
+    details: [],
+  }),
+};
+
 const makeJob = (name: string, attemptsMade = 0): Job<any, any, string> =>
   ({
     id: 'job-1',
@@ -65,6 +79,7 @@ describe('SyncProcessor', () => {
       mockCombo as any,
       mockCache as any,
       mockPostEditQueue as any,
+      mockMaterializer as any,
     );
   });
 
@@ -82,6 +97,7 @@ describe('SyncProcessor', () => {
       expect(mockTepSync.syncAll).toHaveBeenCalledTimes(1);
       expect(mockTcSync.retagAll).toHaveBeenCalledTimes(1);
       expect(mockCombo.populateAll).toHaveBeenCalledTimes(1);
+      expect(mockMaterializer.materialize).toHaveBeenCalledTimes(1);
       expect(mockCache.invalidateAfterSync).toHaveBeenCalledTimes(1);
     });
 
@@ -108,6 +124,17 @@ describe('SyncProcessor', () => {
           checked: 10,
           changed: 3,
         },
+        materialize: {
+          processed: 20,
+          beforeVisible: 15,
+          visible: 18,
+          hidden: 2,
+          updated: 3,
+          unchanged: 17,
+          skipped: 0,
+          changedSlugs: ['spb/nochnye-mosty'],
+          details: [],
+        },
       });
     });
 
@@ -119,26 +146,14 @@ describe('SyncProcessor', () => {
 
       const result = await processor.process(job);
 
-      // Should still return results with default combo values
-      expect(result).toEqual({
-        tc: {
-          status: 'ok',
-          uniqueEvents: 100,
-          sessionsSynced: 500,
-        },
-        tep: {
-          status: 'ok',
-          eventsSynced: 50,
-        },
-        retag: {
-          eventsProcessed: 100,
-          tagsLinked: 50,
-        },
-        combo: {
-          checked: 0,
-          changed: 0,
-        },
+      // Should still return results with default combo values; materialize runs after combo
+      expect(result).toMatchObject({
+        tc: { status: 'ok', uniqueEvents: 100, sessionsSynced: 500 },
+        tep: { status: 'ok', eventsSynced: 50 },
+        retag: { eventsProcessed: 100, tagsLinked: 50 },
+        combo: { checked: 0, changed: 0 },
       });
+      expect((result as any).materialize).toBeDefined();
 
       // All other methods should still be called
       expect(mockTcSync.syncAll).toHaveBeenCalled();
@@ -211,7 +226,7 @@ describe('SyncProcessor', () => {
       });
     });
 
-    it('should not include tep, retag, or combo in result', async () => {
+    it('should not include tep, retag, combo, or materialize in result', async () => {
       const job = makeJob('sync-incremental');
 
       const result = await processor.process(job);
@@ -219,6 +234,7 @@ describe('SyncProcessor', () => {
       expect(result).not.toHaveProperty('tep');
       expect(result).not.toHaveProperty('retag');
       expect(result).not.toHaveProperty('combo');
+      expect(result).not.toHaveProperty('materialize');
     });
   });
 
@@ -244,6 +260,7 @@ describe('SyncProcessor', () => {
       expect(mockTepSync.syncAll).not.toHaveBeenCalled();
       expect(mockTcSync.retagAll).not.toHaveBeenCalled();
       expect(mockCombo.populateAll).not.toHaveBeenCalled();
+      expect(mockMaterializer.materialize).not.toHaveBeenCalled();
       expect(mockCache.invalidateAfterSync).not.toHaveBeenCalled();
     });
 
@@ -286,6 +303,27 @@ describe('SyncProcessor', () => {
       const job = makeJob('sync-full');
 
       await expect(processor.process(job)).rejects.toThrow('Retag failed');
+    });
+
+    it('should handle materialize error gracefully (fallback result)', async () => {
+      mockMaterializer.materialize.mockRejectedValueOnce(new Error('Materialize failed'));
+
+      const job = makeJob('sync-full');
+
+      const result = await processor.process(job);
+
+      expect(result).toBeDefined();
+      expect((result as any).materialize).toEqual({
+        processed: 0,
+        beforeVisible: 0,
+        visible: 0,
+        hidden: 0,
+        updated: 0,
+        unchanged: 0,
+        skipped: 0,
+        changedSlugs: [],
+        details: [],
+      });
     });
 
     it('should propagate cache invalidation errors', async () => {

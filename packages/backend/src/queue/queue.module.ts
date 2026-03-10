@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { CatalogModule } from '../catalog/catalog.module';
 import { CheckoutModule } from '../checkout/checkout.module';
+import { LandingModule } from '../landing/landing.module';
 import { ComboModule } from '../combo/combo.module';
 import { EmailProcessor } from './email.processor';
 import { FulfillmentProcessor } from './fulfillment.processor';
@@ -46,6 +47,7 @@ export { QUEUE_EMAILS, QUEUE_FULFILLMENT, QUEUE_PARTNER_WEBHOOKS, QUEUE_REVIEW_T
     ),
     CatalogModule,
     ComboModule,
+    LandingModule,
     forwardRef(() => CheckoutModule),
   ],
   providers: [EmailProcessor, ReviewTaskProcessor, SyncProcessor, FulfillmentProcessor],

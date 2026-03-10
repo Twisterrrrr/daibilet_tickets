@@ -33,6 +33,8 @@
 
 - **Enrichment:** `canonical-tag-enrichment.ts` — единый слой тегов по title/description; city-specific правила; 29 unit-тестов. Подключён в retagAll.
 - **Materializer:** TopicDefinition, LandingMaterializerService, POST /admin/landings/materialize. См. docs/LandingTagsStrategy.md, docs/TopicDefinitionMatrix.md.
+- **Phase A (staging):** POST /admin/settings/ops/retag-and-materialize — retag + materialize с summary (beforeVisible, visible, hidden, changedSlugs). POST /admin/settings/ops/retag выполняет retagAll.
+- **Phase B (materialize после sync):** sync → retag → materialize. CatalogController sync/all и SyncProcessor sync-full вызывают materializer; результат в ответе. Идемпотентно, fallback при ошибке.
 
 ## Prompt 2 + Admin Ops (08.03.2026) ✅
 

@@ -6,9 +6,13 @@ import { TOPIC_DEFINITIONS_CITY } from './topic-definition.config';
 
 export interface MaterializeResult {
   processed: number;
-  activated: number;
-  deactivated: number;
+  beforeVisible: number;
+  visible: number;
+  hidden: number;
+  updated: number;
+  unchanged: number;
   skipped: number;
+  changedSlugs: string[];
   details: { slug: string; citySlug: string; count: number; minEvents: number; isActive: boolean }[];
 }
 
@@ -27,9 +31,11 @@ export class LandingMaterializerService {
   async materialize(): Promise<MaterializeResult> {
     const now = new Date();
     const details: MaterializeResult['details'] = [];
+    const changedSlugs: string[] = [];
     let activated = 0;
     let deactivated = 0;
     let skipped = 0;
+    let beforeVisible = 0;
 
     for (const def of TOPIC_DEFINITIONS_CITY) {
       const landing = await this.prisma.landingPage.findFirst({
@@ -45,6 +51,7 @@ export class LandingMaterializerService {
         skipped++;
         continue;
       }
+      if (landing.isActive) beforeVisible++;
 
       const tag = await this.prisma.tag.findFirst({
         where: { slug: def.filterTag, isActive: true },
@@ -89,18 +96,28 @@ export class LandingMaterializerService {
         });
         if (shouldBeActive) activated++;
         else deactivated++;
+        changedSlugs.push(`${def.citySlug}/${def.slug}`);
       }
     }
 
+    const visible = details.filter((d) => d.isActive).length;
+    const hidden = details.filter((d) => !d.isActive).length;
+    const updated = activated + deactivated;
+    const unchanged = details.length - updated;
+
     this.logger.log(
-      `Materialize: ${details.length} topics, activated=${activated}, deactivated=${deactivated}, skipped=${skipped}`,
+      `Landing materializer done: beforeVisible=${beforeVisible}, visible=${visible}, hidden=${hidden}, updated=${updated}, unchanged=${unchanged}, skipped=${skipped}`,
     );
 
     return {
       processed: details.length,
-      activated,
-      deactivated,
+      beforeVisible,
+      visible,
+      hidden,
+      updated,
+      unchanged,
       skipped,
+      changedSlugs,
       details,
     };
   }

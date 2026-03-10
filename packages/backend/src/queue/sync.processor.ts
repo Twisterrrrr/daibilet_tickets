@@ -5,6 +5,7 @@ import { EventSource } from '@prisma/client';
 
 import { CacheService } from '../cache/cache.service';
 import { PostEditQueueService } from '../catalog/postedit-queue.service';
+import { LandingMaterializerService } from '../landing/landing-materializer.service';
 import { TcSyncService } from '../catalog/tc-sync.service';
 import { TepSyncService } from '../catalog/tep-sync.service';
 import { ComboService } from '../combo/combo.service';
@@ -22,12 +23,13 @@ export type SyncJobData = SyncFullJobData | SyncIncrementalJobData;
 /** Имена задач в sync-очереди */
 export type SyncJobName = 'sync-full' | 'sync-incremental';
 
-/** Результат full sync — сумма результатов TC, TEP, retag, combo */
+/** Результат full sync — TC, TEP, retag, combo, materialize */
 export interface SyncFullResult {
   tc: Awaited<ReturnType<TcSyncService['syncAll']>>;
   tep: Awaited<ReturnType<TepSyncService['syncAll']>>;
   retag: Awaited<ReturnType<TcSyncService['retagAll']>>;
   combo: Awaited<ReturnType<ComboService['populateAll']>>;
+  materialize: Awaited<ReturnType<LandingMaterializerService['materialize']>>;
 }
 
 /** Результат incremental sync — только TC */
@@ -71,6 +73,7 @@ export class SyncProcessor extends WorkerHost {
     private readonly combo: ComboService,
     private readonly cache: CacheService,
     private readonly postEditQueue: PostEditQueueService,
+    private readonly materializer: LandingMaterializerService,
   ) {
     super();
   }
@@ -187,7 +190,26 @@ export class SyncProcessor extends WorkerHost {
       this.logger.warn(`Combo populate ошибка: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    // 5. Инвалидация кэша
+    // 5. Materialize landings (sync → retag → materialize)
+    let materializeResult: SyncFullResult['materialize'];
+    try {
+      materializeResult = await this.materializer.materialize();
+    } catch (err: unknown) {
+      this.logger.warn(`Landing materialize ошибка: ${err instanceof Error ? err.message : String(err)}`);
+      materializeResult = {
+        processed: 0,
+        beforeVisible: 0,
+        visible: 0,
+        hidden: 0,
+        updated: 0,
+        unchanged: 0,
+        skipped: 0,
+        changedSlugs: [],
+        details: [],
+      };
+    }
+
+    // 6. Инвалидация кэша
     await this.cache.invalidateAfterSync();
 
     return {
@@ -195,6 +217,7 @@ export class SyncProcessor extends WorkerHost {
       tep: tepResult,
       retag: retagResult,
       combo: populateResult,
+      materialize: materializeResult,
     };
   }
 

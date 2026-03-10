@@ -20,6 +20,7 @@ import { Request, Response } from 'express';
 import { EventSource } from '@prisma/client';
 
 import { CacheService } from '../cache/cache.service';
+import { LandingMaterializerService } from '../landing/landing-materializer.service';
 import { PostEditQueueService } from './postedit-queue.service';
 import { CatalogService } from './catalog.service';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
@@ -48,6 +49,7 @@ export class CatalogController {
     private readonly cache: CacheService,
     private readonly config: ConfigService,
     private readonly postEditQueue: PostEditQueueService,
+    private readonly materializer: LandingMaterializerService,
   ) {}
 
   // --- Города ---
@@ -334,6 +336,7 @@ export class CatalogController {
       // Не ломаем sync при ошибке очереди (логируется внутри PostEditQueueService)
     }
     await this.cache.invalidateAfterSync();
-    return { ticketscloud: tc, teplohod: tep, retag, postEditQueue };
+    const materialize = await this.materializer.materialize();
+    return { ticketscloud: tc, teplohod: tep, retag, postEditQueue, materialize };
   }
 }

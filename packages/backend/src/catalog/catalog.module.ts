@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 
 import { EventOverrideService } from '../admin/event-override.service';
+import { LandingModule } from '../landing/landing.module';
 import { EventQualityService } from './event-quality.service';
 import { QUEUE_EMAILS } from '../queue/queue.constants';
 import { CatalogController } from './catalog.controller';
@@ -18,7 +19,7 @@ import { PostEditQueueService } from './postedit-queue.service';
 import { TepSyncService } from './tep-sync.service';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: QUEUE_EMAILS })],
+  imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule],
   controllers: [CatalogController],
   providers: [
     CatalogService,

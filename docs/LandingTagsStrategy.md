@@ -66,7 +66,15 @@
 
 - **TopicDefinition** — конфиг в `topic-definition.config.ts`: citySlug, slug, filterTag, minEvents.
 - **LandingMaterializerService** — пересчитывает `isActive` для лендингов по правилам TopicDefinition.
-- **Эндпоинт**: `POST /admin/landings/materialize` (ADMIN). Рекомендуется вызывать после sync или по cron.
+- **Эндпоинты**: `POST /admin/landings/materialize`, `POST /admin/settings/ops/retag-and-materialize` (staging verification).
+- **Автоматически**: materialize вызывается после full sync (sync → retag → materialize) в CatalogController и SyncProcessor.
+
+### Staging verification
+
+`POST /admin/settings/ops/retag-and-materialize` — retag + materialize, возвращает `{ retag, materialize }` с полями:
+- `beforeVisible` / `visible` / `hidden` — сверка до/после;
+- `changedSlugs` — какие лендинги изменили статус;
+- `updated` / `unchanged` — для аудита.
 
 Подробнее: `docs/TopicDefinitionMatrix.md`.
 

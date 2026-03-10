@@ -4,6 +4,26 @@
 
 ---
 
+## 11.03.2026 — Phase A/B: staging verification + materialize после sync
+
+### Наблюдения
+
+- Phase A (staging): нужен единый endpoint retag + materialize для ручной сверки (beforeVisible/visible/hidden/changedSlugs).
+- Phase B: после full sync лендинги должны обновляться автоматически; иначе lifecycle: sync обновил события, теги новые, а видимость лендингов старая.
+
+### Решения
+
+- **Materializer summary:** `MaterializeResult` — добавлено `beforeVisible`; лог: `beforeVisible=X, visible=X, hidden=X, updated=X, unchanged=X, skipped=X`.
+- **Staging verification:** POST /admin/settings/ops/retag-and-materialize — retag + materialize, возвращает `{ retag, materialize }` для сверки. POST /admin/settings/ops/retag теперь реально выполняет retagAll (ранее только логировал).
+- **Materialize после sync:** sync → retag → materialize. CatalogController POST sync/all и SyncProcessor handleFullSync вызывают materializer после retag/combo; результат materialize в ответе sync. При ошибке materialize — fallback-результат, job не падает.
+- **Модули:** LandingModule добавлен в CatalogModule, QueueModule (для SyncProcessor).
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 11.03.2026 — Canonical Tag Enrichment + Auto Landing Engine
 
 ### Наблюдения

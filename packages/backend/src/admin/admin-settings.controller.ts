@@ -1,13 +1,14 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Body, Controller, Get, Logger, Patch, Post, Query, Request, UseGuards, UseInterceptors } from '@nestjs/common';
 import { BadRequestException } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Queue } from 'bullmq';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { cacheKeys, CacheService } from '../cache/cache.service';
 import { TcSyncService } from '../catalog/tc-sync.service';
+import { LandingMaterializerService } from '../landing/landing-materializer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QUEUE_SYNC } from '../queue/queue.constants';
 import { AuditInterceptor } from './audit.interceptor';
@@ -28,6 +29,7 @@ export class AdminSettingsController {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly tcSync: TcSyncService,
+    private readonly materializer: LandingMaterializerService,
     @InjectQueue(QUEUE_SYNC) private readonly syncQueue: Queue,
   ) {}
 
@@ -173,8 +175,20 @@ export class AdminSettingsController {
   @Roles('ADMIN')
   async retag() {
     this.logger.log('Admin triggered retag');
+    const result = await this.tcSync.retagAll();
     await this.updateOpsStatus({ lastRetagAt: new Date() });
-    return { success: true, message: 'Ретегирование запущено' };
+    return { success: true, message: 'Ретегирование выполнено', ...result };
+  }
+
+  @Post('ops/retag-and-materialize')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Staging verification: retag + materialize (visible/hidden/changedSlugs)' })
+  async retagAndMaterialize() {
+    this.logger.log('Admin retag-and-materialize (staging verification)');
+    const retag = await this.tcSync.retagAll();
+    const materialize = await this.materializer.materialize();
+    await this.updateOpsStatus({ lastRetagAt: new Date() });
+    return { retag, materialize };
   }
 
   @Post('ops/populate-combos')
