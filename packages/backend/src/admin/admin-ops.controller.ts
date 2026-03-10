@@ -5,6 +5,7 @@ import { Queue } from 'bullmq';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
+import { CacheService } from '../cache/cache.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
@@ -24,6 +25,7 @@ export class AdminOpsController {
     @InjectQueue(QUEUE_EMAILS) private readonly emailQueue: Queue,
     private readonly prisma: PrismaService,
     private readonly metrics: PaymentMetricsService,
+    private readonly cache: CacheService,
     private readonly tagAssignment: TagAssignmentService,
   ) {}
 
@@ -80,8 +82,11 @@ export class AdminOpsController {
       fulfillmentTotal > 0 ? (m.fulfillment_reserve_fail + m.fulfillment_confirm_fail) / fulfillmentTotal : 0;
     const webhookDedupRate = m.webhook_received > 0 ? m.webhook_duplicate / m.webhook_received : 0;
 
+    const cacheStats = this.cache.getCacheStats();
+
     return {
       ...m,
+      cache: cacheStats,
       rates: {
         fulfillment_fail_rate: Math.round(fulfillmentFailRate * 10000) / 10000,
         webhook_dedup_rate: Math.round(webhookDedupRate * 10000) / 10000,

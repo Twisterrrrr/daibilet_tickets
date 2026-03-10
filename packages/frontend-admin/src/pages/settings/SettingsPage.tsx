@@ -57,6 +57,7 @@ export function SettingsPage() {
   const [pricing, setPricing] = useState<PricingConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [opsLoading, setOpsLoading] = useState<string | null>(null);
+  const [flushNamespace, setFlushNamespace] = useState<string>('full');
   const [pricingSaving, setPricingSaving] = useState(false);
 
   useEffect(() => {
@@ -71,10 +72,11 @@ export function SettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const runOps = async (endpoint: string, label: string) => {
+  const runOps = async (endpoint: string, label: string, query?: Record<string, string>) => {
     setOpsLoading(label);
     try {
-      const result = await adminApi.post(endpoint);
+      const url = query ? `${endpoint}${endpoint.includes('?') ? '&' : '?'}${new URLSearchParams(query).toString()}` : endpoint;
+      const result = await adminApi.post(url);
       toast.success((result as any).message || `${label} выполнено`);
       const s = await adminApi.get<SyncStatus>('/admin/settings/sync-status');
       setStatus(s);
@@ -189,11 +191,26 @@ export function SettingsPage() {
               loading={opsLoading === 'Populate Combos'}
               onClick={() => runOps('/admin/settings/ops/populate-combos', 'Populate Combos')}
             />
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              value={flushNamespace}
+              onChange={(e) => setFlushNamespace(e.target.value)}
+            >
+              <option value="full">Кэш (всё)</option>
+              <option value="cities">cities</option>
+              <option value="events">events</option>
+              <option value="catalog">catalog</option>
+              <option value="tags">tags</option>
+              <option value="regions">regions</option>
+              <option value="landings">landings</option>
+              <option value="combos">combos</option>
+              <option value="search">search</option>
+            </select>
             <OpsButton
               label="Flush Cache"
               loading={opsLoading === 'Flush Cache'}
               variant="destructive"
-              onClick={() => runOps('/admin/settings/ops/cache/flush', 'Flush Cache')}
+              onClick={() => runOps('/admin/settings/ops/cache/flush', 'Flush Cache', { namespace: flushNamespace })}
             />
           </div>
         </CardContent>

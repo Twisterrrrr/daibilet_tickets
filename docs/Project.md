@@ -144,7 +144,7 @@
 ## Соглашения
 
 - REST API: `/api/v1`
-- Observability: `docs/Reference.md` §2 — requestId, PII masking
+- Observability: `docs/Reference.md` §2 — requestId, PII masking. Catalog cache metrics: GET /admin/ops/metrics (hits, misses, hitRate). Admin ops: flush по namespace, resync с прогрессом — см. docs/AdminOps.md.
 - Цены в копейках (целое число)
 - Даты — ISO 8601, UTC в БД, локальные при отображении
 - Slug — транслитерация кириллицы

@@ -4,6 +4,27 @@
 
 ---
 
+## 08.03.2026 — Prompt 2 + Admin Ops: observability, flush по namespace, resync с прогрессом
+
+### Наблюдения
+
+- Catalog observability: метрики cache hit/miss нужны для отладки эффективности кэша.
+- Admin ops: flush cache — ранее поддерживались cities/events/search/scope; требуется flush по любому namespace (catalog, tags, regions, landings, combos).
+- Resync: кнопка Full Sync обновляла только opsStatus, не ставила задачу в BullMQ; нужен реальный запуск sync и эндпоинт для опроса прогресса.
+
+### Решения
+
+- **Prompt 2 (Catalog observability):** CacheService — счётчики hits/misses в getOrSet, getCacheStats(). GET /admin/ops/metrics расширен полем `cache: { hits, misses, hitRate }`.
+- **Admin ops — Flush по namespace:** POST /admin/settings/ops/cache/flush?namespace={ns}. Поддерживаются: full, cities, events, catalog, tags, regions, landings, combos, search. UI: select + кнопка «Flush Cache».
+- **Admin ops — Resync с прогрессом:** POST /admin/settings/ops/sync/full и /incremental добавляют job в BullMQ (jobId singleton_sync_full / singleton_sync_incremental). GET /admin/settings/ops/sync/progress?jobId=... возвращает state, finishedOn, failedReason.
+- **Документация:** docs/AdminOps.md.
+
+### Проблемы
+
+- Счётчики cache — in-memory, обнуляются при рестарте. Для персистентной статистики потребуется Redis INCR (отложено).
+
+---
+
 ## 08.03.2026 — Teplohod: висящие сессии (продажа приостановлена)
 
 ### Наблюдения

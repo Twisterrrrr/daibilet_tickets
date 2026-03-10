@@ -162,14 +162,31 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   // Хелперы для кэш-паттернов
   // ==========================================
 
-  /** Кэш с автоматическим fetch-if-miss */
+  /** Счётчики для observability (in-memory, сбрасываются при рестарте). */
+  private hits = 0;
+  private misses = 0;
+
+  /** Кэш с автоматическим fetch-if-miss. Учитывает hits/misses для /admin/ops/metrics. */
   async getOrSet<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
     const cached = await this.get<T>(key);
-    if (cached !== null) return cached;
-
+    if (cached !== null) {
+      this.hits++;
+      return cached;
+    }
+    this.misses++;
     const data = await fetcher();
     await this.set(key, data, ttlSeconds);
     return data;
+  }
+
+  /** Метрики кэша (catalog observability, Prompt 2). */
+  getCacheStats(): { hits: number; misses: number; hitRate: number } {
+    const total = this.hits + this.misses;
+    return {
+      hits: this.hits,
+      misses: this.misses,
+      hitRate: total > 0 ? Math.round((this.hits / total) * 10000) / 10000 : 0,
+    };
   }
 
   // ==========================================
