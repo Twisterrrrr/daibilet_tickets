@@ -245,6 +245,7 @@ export function EventEditPage() {
 
   // Venues list for museum linking
   const [venues, setVenues] = useState<VenueOption[]>([]);
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
 
   // Load venues for MUSEUM category linking
   useEffect(() => {
@@ -256,6 +257,16 @@ export function EventEditPage() {
         else setVenues([]);
       })
       .catch(() => setVenues([]));
+  }, []);
+
+  useEffect(() => {
+    adminApi
+      .get<{ items: { id: string; name: string }[] } | { id: string; name: string }[]>('/admin/cities')
+      .then((res: any) => {
+        const list = res?.items ?? res;
+        setCities(Array.isArray(list) ? list : []);
+      })
+      .catch(() => setCities([]));
   }, []);
 
   const refreshQuality = useCallback(
@@ -776,6 +787,7 @@ export function EventEditPage() {
                 mode="edit"
                 onDraftChange={setWizardDraft}
                 onSubmit={(d) => handleWizardSubmit(d)}
+                citiesOptions={cities}
               />
             </CardContent>
           </Card>
