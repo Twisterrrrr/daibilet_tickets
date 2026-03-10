@@ -1,6 +1,8 @@
 import { AlertCircle, Calendar, CheckCircle, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { ErrorState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+
 import { api } from '../lib/api';
 
 interface DashboardData {
@@ -18,12 +20,35 @@ const TRUST_LABELS: Record<number, string> = {
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<DashboardData>('/supplier/dashboard').then(setData);
+    api
+      .get<DashboardData>('/supplier/dashboard')
+      .then((res) => {
+        setData(res);
+        setError(null);
+      })
+      .catch((e: any) => {
+        setError(e.message ?? 'Ошибка загрузки');
+      });
   }, []);
 
-  if (!data) return <div className="animate-pulse">Загрузка...</div>;
+  if (error && !data) {
+    return <ErrorState title="Не удалось загрузить дашборд" description={error} />;
+  }
+
+  useEffect(() => {
+    if (!data && !error) {
+      // initial load
+    }
+  }, [data, error]);
+
+  if (!data && !error) {
+    return <LoadingState label="Загружаем статистику по продажам..." />;
+  }
+
+  if (!data) return null;
 
   const cards = [
     { label: 'Активных событий', value: data.events.active, icon: Calendar, color: 'text-blue-600' },
@@ -39,28 +64,29 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{data.operator.name}</h1>
-        <p className="text-sm text-gray-500">
-          Trust Level: {data.operator.trustLevel} ({TRUST_LABELS[data.operator.trustLevel] || '?'}) | Комиссия:{' '}
-          {(Number(data.operator.commissionRate) * 100).toFixed(0)}%
-        </p>
-      </div>
+      <PageHeader
+        title={data.operator.name}
+        subtitle={
+          <span className="text-sm text-gray-500">
+            Trust Level: {data.operator.trustLevel} ({TRUST_LABELS[data.operator.trustLevel] || '?'}) · Комиссия{' '}
+            {(Number(data.operator.commissionRate) * 100).toFixed(0)}%
+          </span>
+        }
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {cards.map((c) => (
-          <div key={c.label} className="bg-white rounded-xl border p-4">
-            <div className="flex items-center gap-2 mb-2">
+          <SectionCard key={c.label}>
+            <div className="mb-2 flex items-center gap-2">
               <c.icon className={`h-4 w-4 ${c.color}`} />
               <span className="text-xs text-gray-500">{c.label}</span>
             </div>
             <p className="text-2xl font-bold">{c.value}</p>
-          </div>
+          </SectionCard>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border p-6">
-        <h2 className="font-semibold mb-4">Финансовая сводка</h2>
+      <SectionCard title="Финансовая сводка">
         <div className="grid grid-cols-3 gap-6 text-center">
           <div>
             <p className="text-sm text-gray-500">Оборот</p>
@@ -75,7 +101,7 @@ export default function Dashboard() {
             <p className="text-xl font-bold text-green-600">{(data.sales.netRevenue / 100).toLocaleString('ru')} руб</p>
           </div>
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { CheckCircle, Clock, Eye, EyeOff, Plus, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { EmptyState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+
 import { api } from '../../lib/api';
 
 const STATUS_ICONS: Record<string, any> = {
@@ -15,31 +17,43 @@ const STATUS_ICONS: Record<string, any> = {
 export default function EventsList() {
   const [events, setEvents] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get<{ items: any[]; total: number }>('/supplier/events').then((res) => {
-      setEvents(res.items);
-      setTotal(res.total);
-    });
+    setLoading(true);
+    api
+      .get<{ items: any[]; total: number }>('/supplier/events')
+      .then((res) => {
+        setEvents(res.items);
+        setTotal(res.total);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Мои события ({total})</h1>
-        <Link
-          to="/events/new"
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-        >
-          <Plus className="h-4 w-4" /> Создать событие
-        </Link>
-      </div>
+      <PageHeader
+        title="Мои события"
+        subtitle={`Всего: ${total}`}
+        actions={
+          <Link
+            to="/events/new"
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" /> Создать событие
+          </Link>
+        }
+      />
 
-      <div className="bg-white rounded-xl border divide-y">
-        {events.length === 0 && (
-          <div className="p-8 text-center text-gray-500">У вас пока нет событий. Создайте первое!</div>
-        )}
-        {events.map((event) => {
+      {loading && <LoadingState label="Загружаем ваши события..." />}
+
+      {!loading && events.length === 0 && (
+        <EmptyState title="У вас пока нет событий" description="Создайте первое событие, чтобы начать продажи." />
+      )}
+
+      {events.length > 0 && (
+        <SectionCard>
+          {events.map((event) => {
           const st = STATUS_ICONS[event.moderationStatus] || STATUS_ICONS.DRAFT;
           return (
             <Link
@@ -70,7 +84,8 @@ export default function EventsList() {
             </Link>
           );
         })}
-      </div>
+        </SectionCard>
+      )}
     </div>
   );
 }
