@@ -8,11 +8,18 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, ReviewStatus } from '@prisma/client';
+import {
+  EventSource,
+  Prisma,
+  ReviewDisputeStatus,
+  ReviewStatus,
+  ReviewSupplierResponseStatus,
+} from '@prisma/client';
 import { Queue } from 'bullmq';
 import { createHash, randomBytes } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { ReviewCapabilityService } from '../review/review-capability.service';
 import { EmailJobData } from '../queue/email.processor';
 import { QUEUE_EMAILS } from '../queue/queue.constants';
 import { ProcessedImage, UploadService } from '../upload/upload.service';
@@ -35,6 +42,7 @@ export class ReviewService {
     private readonly prisma: PrismaService,
     private readonly upload: UploadService,
     private readonly config: ConfigService,
+    private readonly reviewCapability: ReviewCapabilityService,
     @InjectQueue(QUEUE_EMAILS) private readonly emailQueue: Queue<EmailJobData>,
   ) {
     this.appUrl = this.config.get('APP_URL', 'http://localhost:3000');
@@ -82,14 +90,19 @@ export class ReviewService {
       throw new BadRequestException('Укажите событие или место для отзыва');
     }
 
-    // Проверить что событие существует
-    let event: { id: string; title: string; slug: string } | null = null;
+    // Проверить что событие существует и разрешены отзывы
+    let event: { id: string; title: string; slug: string; source: string; supplierId: string | null; operatorId: string | null } | null = null;
     if (dto.eventId) {
       event = await this.prisma.event.findUnique({
         where: { id: dto.eventId },
-        select: { id: true, title: true, slug: true },
+        select: { id: true, title: true, slug: true, source: true, supplierId: true, operatorId: true },
       });
       if (!event) throw new NotFoundException('Событие не найдено');
+      if (!this.reviewCapability.canAcceptReviews({ ...event, source: event.source as EventSource })) {
+        throw new ForbiddenException(
+          'Отзывы недоступны для данного события (импортированные события из Ticketscloud/Teplohod не поддерживают отзывы).',
+        );
+      }
     }
 
     // Проверить что место существует
@@ -160,6 +173,7 @@ export class ReviewService {
       data: {
         eventId: dto.eventId || null,
         venueId: dto.venueId || null,
+        supplierId: event?.supplierId || event?.operatorId || null,
         rating: dto.rating,
         title: dto.title?.trim() || null,
         text: dto.text.trim(),
@@ -397,10 +411,30 @@ export class ReviewService {
             select: { id: true, url: true, thumbUrl: true },
             orderBy: { sortOrder: 'asc' },
           },
+          supplierResponse: {
+            where: { status: 'APPROVED' },
+            select: { id: true, text: true, moderatedAt: true },
+          },
+          disputes: {
+            where: { status: 'MODERATOR_REVIEW' },
+            select: { id: true },
+            take: 1,
+          },
         },
       }),
       this.prisma.review.count({ where }),
     ]);
+
+    const itemsWithMeta = items.map((r) => {
+      const response = r.supplierResponse;
+      const activeDispute = (r.disputes ?? [])[0] ?? null;
+      const { supplierResponse: _sr, disputes: _d, ...rest } = r;
+      return {
+        ...rest,
+        supplierResponse: response ? { text: response.text, moderatedAt: response.moderatedAt } : null,
+        hasActiveDispute: !!activeDispute,
+      };
+    });
 
     // Внешние отзывы (первая страница)
     let externalReviews: Record<string, unknown>[] = [];
@@ -425,7 +459,7 @@ export class ReviewService {
     const summary = await this.getEventRatingSummary(event.id);
 
     return {
-      items,
+      items: itemsWithMeta,
       externalReviews,
       total,
       page,
@@ -468,15 +502,35 @@ export class ReviewService {
             select: { id: true, url: true, thumbUrl: true },
             orderBy: { sortOrder: 'asc' },
           },
+          supplierResponse: {
+            where: { status: 'APPROVED' },
+            select: { id: true, text: true, moderatedAt: true },
+          },
+          disputes: {
+            where: { status: 'MODERATOR_REVIEW' },
+            select: { id: true },
+            take: 1,
+          },
         },
       }),
       this.prisma.review.count({ where }),
     ]);
 
+    const itemsWithMeta = items.map((r) => {
+      const response = r.supplierResponse;
+      const activeDispute = (r.disputes ?? [])[0] ?? null;
+      const { supplierResponse: _sr, disputes: _d, ...rest } = r;
+      return {
+        ...rest,
+        supplierResponse: response ? { text: response.text, moderatedAt: response.moderatedAt } : null,
+        hasActiveDispute: !!activeDispute,
+      };
+    });
+
     const summary = await this.getVenueRatingSummary(venue.id);
 
     return {
-      items,
+      items: itemsWithMeta,
       externalReviews: [] as Array<{ id: string; source: string; authorName: string; rating: number; text: string }>,
       total,
       page,
@@ -713,11 +767,15 @@ export class ReviewService {
     });
     if (!review) throw new NotFoundException('Отзыв не найден');
 
-    const status = action === 'approve' ? 'APPROVED' : 'REJECTED';
-
+    const status: ReviewStatus = action === 'approve' ? 'APPROVED' : 'REJECTED';
+    const updateData: Prisma.ReviewUpdateInput = {
+      status,
+      adminComment: adminComment || null,
+      ...(action === 'approve' ? { publishedAt: new Date() } : {}),
+    };
     const updated = await this.prisma.review.update({
       where: { id: reviewId },
-      data: { status, adminComment: adminComment || null },
+      data: updateData,
     });
 
     // Пересчитать рейтинг события
@@ -879,5 +937,186 @@ export class ReviewService {
     }
 
     return { message: 'Внешний отзыв удалён' };
+  }
+
+  // ========================
+  // Admin: модерация ответов поставщика
+  // ========================
+
+  async adminListSupplierResponses(filters: { page?: number; limit?: number }) {
+    const { page = 1, limit = 20 } = filters;
+    const where = { status: ReviewSupplierResponseStatus.PENDING_MODERATION };
+    const [items, total] = await Promise.all([
+      this.prisma.reviewSupplierResponse.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          review: {
+            select: {
+              id: true,
+              rating: true,
+              title: true,
+              text: true,
+              authorName: true,
+              createdAt: true,
+              event: { select: { id: true, title: true, slug: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.reviewSupplierResponse.count({ where }),
+    ]);
+    return { items, total, page, pages: Math.ceil(total / limit) };
+  }
+
+  async adminModerateSupplierResponse(
+    responseId: string,
+    action: 'approve' | 'reject',
+    adminId: string,
+    moderationComment?: string,
+  ) {
+    const response = await this.prisma.reviewSupplierResponse.findUnique({
+      where: { id: responseId },
+      include: { review: true },
+    });
+    if (!response) throw new NotFoundException('Ответ не найден');
+    if (response.status !== ReviewSupplierResponseStatus.PENDING_MODERATION) {
+      throw new BadRequestException('Ответ уже смодерирован');
+    }
+    const status = action === 'approve' ? ReviewSupplierResponseStatus.APPROVED : ReviewSupplierResponseStatus.REJECTED;
+    await this.prisma.reviewSupplierResponse.update({
+      where: { id: responseId },
+      data: {
+        status,
+        moderationComment: moderationComment ?? null,
+        moderatedBy: adminId,
+        moderatedAt: new Date(),
+      },
+    });
+    const actionType = action === 'approve' ? 'ADMIN_RESPONSE_APPROVED' : 'ADMIN_RESPONSE_REJECTED';
+    await this.prisma.reviewActionLog.create({
+      data: {
+        reviewId: response.reviewId,
+        actorType: 'admin',
+        actorId: adminId,
+        actionType,
+        payload: { responseId, moderationComment: moderationComment ?? null } as Prisma.InputJsonValue,
+      },
+    });
+    return { message: action === 'approve' ? 'Ответ одобрен' : 'Ответ отклонён' };
+  }
+
+  // ========================
+  // Admin: disputes queue, resolve
+  // ========================
+
+  async adminListDisputes(filters: { page?: number; limit?: number }) {
+    const { page = 1, limit = 20 } = filters;
+    const where = { status: ReviewDisputeStatus.MODERATOR_REVIEW };
+    const [rows, total] = await Promise.all([
+      this.prisma.reviewDispute.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          review: {
+            select: {
+              id: true,
+              rating: true,
+              title: true,
+              text: true,
+              authorName: true,
+              createdAt: true,
+              status: true,
+              event: { select: { id: true, title: true, slug: true } },
+            },
+          },
+          evidence: { select: { id: true, storageKey: true, fileName: true, mimeType: true, fileSize: true } },
+        },
+      }),
+      this.prisma.reviewDispute.count({ where }),
+    ]);
+    const items = rows.map((d) => ({
+      ...d,
+      evidence: d.evidence.map((ev) => ({
+        ...ev,
+        url: this.upload.getFileUrl(ev.storageKey),
+      })),
+    }));
+    return { items, total, page, pages: Math.ceil(total / limit) };
+  }
+
+  async adminResolveDispute(disputeId: string, adminId: string, status: ReviewDisputeStatus, decisionComment?: string) {
+    const validStatuses: ReviewDisputeStatus[] = ['RESOLVED_KEEP', 'RESOLVED_EDIT', 'RESOLVED_HIDE', 'RESOLVED_DELETE'];
+    if (!validStatuses.includes(status)) {
+      throw new BadRequestException('Недопустимый статус решения');
+    }
+    const dispute = await this.prisma.reviewDispute.findUnique({
+      where: { id: disputeId },
+      include: { review: { include: { photos: true } }, evidence: true },
+    });
+    if (!dispute) throw new NotFoundException('Оспаривание не найдено');
+    if (dispute.status !== ReviewDisputeStatus.MODERATOR_REVIEW) {
+      throw new BadRequestException('Оспаривание уже закрыто');
+    }
+
+    const actionType = `ADMIN_RESOLVED_${status}`;
+    await this.prisma.reviewActionLog.create({
+      data: {
+        reviewId: dispute.reviewId,
+        disputeId,
+        actorType: 'admin',
+        actorId: adminId,
+        actionType,
+        payload: { decisionComment: decisionComment ?? null } as Prisma.InputJsonValue,
+      },
+    });
+
+    if (status === ReviewDisputeStatus.RESOLVED_DELETE) {
+      await this.prisma.reviewDispute.update({
+        where: { id: disputeId },
+        data: {
+          status: ReviewDisputeStatus.RESOLVED_DELETE,
+          decisionComment: decisionComment ?? null,
+          handledByAdminId: adminId,
+          resolvedAt: new Date(),
+        },
+      });
+      for (const ev of dispute.evidence) {
+        await this.upload.deleteFile(ev.storageKey);
+      }
+      await this.adminDelete(dispute.reviewId);
+    } else {
+      const reviewUpdate =
+        status === ReviewDisputeStatus.RESOLVED_HIDE
+          ? { status: ReviewStatus.HIDDEN }
+          : undefined;
+      if (reviewUpdate) {
+        await this.prisma.review.update({
+          where: { id: dispute.reviewId },
+          data: reviewUpdate,
+        });
+        if (dispute.review.eventId) {
+          await this.recalculateEventRating(dispute.review.eventId);
+        }
+        if (dispute.review.venueId) {
+          await this.recalculateVenueRating(dispute.review.venueId);
+        }
+      }
+      await this.prisma.reviewDispute.update({
+        where: { id: disputeId },
+        data: {
+          status: status === ReviewDisputeStatus.RESOLVED_EDIT ? ReviewDisputeStatus.RESOLVED_KEEP : status,
+          decisionComment: decisionComment ?? null,
+          handledByAdminId: adminId,
+          resolvedAt: new Date(),
+        },
+      });
+    }
+
+    return { message: 'Оспаривание закрыто' };
   }
 }

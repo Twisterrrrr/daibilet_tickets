@@ -19,10 +19,17 @@ function getUtmParams() {
 
 interface GiftCertificateClientProps {
   denominations: number[];
+  minAmount: number;
+  maxAmount: number;
 }
 
-export function GiftCertificateClient({ denominations }: GiftCertificateClientProps) {
-  const [amount, setAmount] = useState(denominations[0] ?? 500000);
+const CUSTOM_VALUE = -1;
+
+export function GiftCertificateClient({ denominations, minAmount, maxAmount }: GiftCertificateClientProps) {
+  const [selectedPreset, setSelectedPreset] = useState<number>(denominations[0] ?? 500000);
+  const [customAmountRub, setCustomAmountRub] = useState<string>('');
+  const isCustom = selectedPreset === CUSTOM_VALUE;
+  const amount = isCustom ? Math.round(parseFloat(customAmountRub || '0') * 100) : selectedPreset;
   const [recipientEmail, setRecipientEmail] = useState('');
   const [senderName, setSenderName] = useState('');
   const [message, setMessage] = useState('');
@@ -36,6 +43,13 @@ export function GiftCertificateClient({ denominations }: GiftCertificateClientPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recipientEmail || !senderName || !name || !email || !phone) return;
+    if (isCustom) {
+      const kopecks = Math.round(parseFloat(customAmountRub || '0') * 100);
+      if (kopecks < minAmount || kopecks > maxAmount) {
+        setError(`Сумма должна быть от ${minAmount / 100} до ${maxAmount / 100} ₽`);
+        return;
+      }
+    }
 
     setSubmitting(true);
     setError(null);
@@ -126,20 +140,50 @@ export function GiftCertificateClient({ denominations }: GiftCertificateClientPr
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Номинал</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-3">
               {denominations.map((d) => (
                 <button
                   key={d}
                   type="button"
-                  onClick={() => setAmount(d)}
+                  onClick={() => {
+                    setSelectedPreset(d);
+                    setCustomAmountRub('');
+                  }}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                    amount === d ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    !isCustom && selectedPreset === d ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   {formatPrice(d)}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPreset(CUSTOM_VALUE);
+                  setCustomAmountRub('');
+                }}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  isCustom ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Своя сумма
+              </button>
             </div>
+            {isCustom && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={minAmount / 100}
+                  max={maxAmount / 100}
+                  step={1}
+                  value={customAmountRub}
+                  onChange={(e) => setCustomAmountRub(e.target.value)}
+                  placeholder={`От ${minAmount / 100} до ${maxAmount / 100} ₽`}
+                  className="w-40 rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                />
+                <span className="text-sm text-slate-500">₽</span>
+              </div>
+            )}
           </div>
 
           <div>
@@ -218,12 +262,14 @@ export function GiftCertificateClient({ denominations }: GiftCertificateClientPr
 
           <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4">
             <span className="font-medium text-slate-900">Итого</span>
-            <span className="text-xl font-bold text-primary-600">{formatPrice(amount)}</span>
+            <span className="text-xl font-bold text-primary-600">
+              {amount >= minAmount && amount <= maxAmount ? formatPrice(amount) : '—'}
+            </span>
           </div>
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || (isCustom && (amount < minAmount || amount > maxAmount))}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 font-medium text-white hover:bg-primary-700 disabled:opacity-50"
           >
             {submitting ? (

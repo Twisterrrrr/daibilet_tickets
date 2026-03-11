@@ -259,6 +259,9 @@ export class AdminVenuesController {
         ...(body.commissionRate !== undefined && {
           commissionRate: body.commissionRate ? Number(body.commissionRate) : null,
         }),
+        ...(body.refundPolicyMode !== undefined && { refundPolicyMode: body.refundPolicyMode }),
+        ...(body.refundPolicyText !== undefined && { refundPolicyText: body.refundPolicyText || null }),
+        ...(body.venueTemplateData !== undefined && { venueTemplateData: body.venueTemplateData }),
         version: { increment: 1 },
       } as Parameters<typeof this.prisma.venue.updateMany>[0]['data'],
     });

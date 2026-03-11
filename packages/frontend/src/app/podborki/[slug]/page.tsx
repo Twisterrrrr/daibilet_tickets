@@ -13,7 +13,7 @@ export const revalidate = 21600;
 
 interface Props {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; city?: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -46,12 +46,13 @@ function pluralEvents(n: number): string {
 
 export default async function CollectionPage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, city: cityParam } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
+  const city = cityParam?.trim() || undefined;
 
   let data: CollectionDetailResponse;
   try {
-    data = await api.getCollectionBySlug(slug, page);
+    data = await api.getCollectionBySlug(slug, page, city);
   } catch {
     return (
       <div className="mx-auto max-w-7xl px-4 py-20 text-center">
@@ -200,17 +201,23 @@ export default async function CollectionPage({ params, searchParams }: Props) {
           {/* Пагинация */}
           {totalPages > 1 && (
             <div className="mt-8 flex justify-center gap-2">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <Link
-                  key={p}
-                  href={`/podborki/${slug}${p > 1 ? `?page=${p}` : ''}`}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                const q = new URLSearchParams();
+                if (p > 1) q.set('page', String(p));
+                if (city) q.set('city', city);
+                const qs = q.toString() ? `?${q}` : '';
+                return (
+                  <Link
+                    key={p}
+                    href={`/podborki/${slug}${qs}`}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                     p === page ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
-                >
-                  {p}
-                </Link>
-              ))}
+                  >
+                    {p}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>

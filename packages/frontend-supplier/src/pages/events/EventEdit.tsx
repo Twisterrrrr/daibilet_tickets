@@ -174,7 +174,7 @@ export default function EventEdit() {
             initialDraft={wizardDraft}
             mode="create"
             onDraftChange={setWizardDraft}
-            onSubmit={(d) => handleWizardSubmit(d)}
+            onSubmit={(d: EventWizardDraft) => handleWizardSubmit(d)}
             citiesOptions={cities.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
           />
         </div>

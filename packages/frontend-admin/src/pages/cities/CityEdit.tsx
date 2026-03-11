@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { FormActions, FormGrid, FormSection } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';

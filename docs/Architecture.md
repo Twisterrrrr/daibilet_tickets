@@ -95,17 +95,16 @@
 
 ## 5. Page Templates & Event Catalog Index
 
-### 5.1 Page template specs (черновик)
+### 5.1 Page template specs (гибридная модель)
 
-**Event (EventOverride.templateData):**
+Главный документ: **[PageTemplateSpecs.md](PageTemplateSpecs.md)**.
 
-| Категория | Подкатегории | Поля |
-|-----------|--------------|------|
-| EXCURSION | RIVER, WALKING, BUS | route, shipName*, menu*, rules, advantages, bookingRules |
-| MUSEUM | MUSEUM_CLASSIC, EXHIBITION | rules |
-| EVENT | CONCERT, SHOW, THEATER | program, cast, hall, rules |
+Принцип: не «всё в templateData», а 4 слоя:
+- **Core columns** — структурированные поля (ageLimit, meetingPoint, routeSummary, refundPolicy*)
+- **contentTemplateData** / **venueTemplateData** — PDP-контент (program, menu, routeDescription)
+- **Refund policy** — наследуемый слой Supplier → Venue → Event
 
-**Venue:** фиксированные поля (description, openingHours, highlights, faq). Специфика по VenueType — в черновике `archive/old-specs/PageTemplateSpecs.md`.
+Event: core columns + contentTemplateData; Venue: core + venueTemplateData; Schema registry — основа для category/subcategory-driven UI.
 
 ### 5.2 Event Catalog Index (future design)
 

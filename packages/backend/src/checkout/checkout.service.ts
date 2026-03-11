@@ -239,9 +239,12 @@ export class CheckoutService {
     ip?: string;
   }) {
     const denominations = this.getGiftCertificateDenominations();
-    if (!denominations.includes(data.amount)) {
+    const bounds = this.getGiftCertificateAmountBounds();
+    const inDenominations = denominations.includes(data.amount);
+    const inBounds = data.amount >= bounds.min && data.amount <= bounds.max;
+    if (!inDenominations && !inBounds) {
       throw new BadRequestException(
-        `Недопустимый номинал. Доступные: ${denominations.map((a) => `${a / 100} ₽`).join(', ')}`,
+        `Недопустимый номинал. Фиксированные: ${denominations.map((a) => `${a / 100} ₽`).join(', ')}. Произвольная сумма: ${bounds.min / 100}–${bounds.max / 100} ₽.`,
       );
     }
 
@@ -292,6 +295,15 @@ export class CheckoutService {
       .split(',')
       .map((s) => parseInt(s.trim(), 10))
       .filter((n) => !isNaN(n) && n > 0);
+  }
+
+  /** Min/max для произвольной суммы (копейки). По умолчанию 1000₽–50000₽. */
+  getGiftCertificateAmountBounds(): { min: number; max: number } {
+    const minRaw = this.config.get<string>('GIFT_CERTIFICATE_MIN_AMOUNT', '100000'); // 1000₽
+    const maxRaw = this.config.get<string>('GIFT_CERTIFICATE_MAX_AMOUNT', '5000000'); // 50000₽
+    const min = Math.max(10000, parseInt(minRaw, 10) || 100000); // не менее 100₽
+    const max = Math.min(100000000, parseInt(maxRaw, 10) || 5000000); // не более 1M₽
+    return { min, max };
   }
 
   // ============================

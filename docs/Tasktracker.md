@@ -29,12 +29,32 @@
 - **Инфраструктура:** VPS Timeweb Cloud, DNS staging, SSH, bootstrap/close-gate0, deploy, migrate, SSL (Let's Encrypt), health OK (status, db, redis).
 - **Бэкапы:** `scripts/backup-staging-db.sh`, `scripts/backup-production-db.sh` — дамп в `/opt/daibilet/backups/`, retention 14 дней. Запуск: на VPS в `cd /opt/daibilet`.
 
+## Review Module MVP (11.03.2026, этапы 1–11) ✅
+
+- **Prisma:** ReviewSupplierResponse, ReviewDispute, ReviewDisputeEvidence, ReviewActionLog; Review: supplierId, publishedAt, HIDDEN.
+- **Domain:** ReviewCapabilityService (canAcceptReviews, isImportedAggregatorEvent, requiresSupplierResponse). TC/TEPLOHOD — отзывы запрещены; MANUAL + owner — разрешены.
+- **Backend Public:** capability guard в create, reviewCapability в event detail, supplierResponse и hasActiveDispute в getByEventSlug.
+- **Backend Supplier:** GET/POST reviews, response, submit, accept, dispute, evidence upload.
+- **Backend Admin:** модерация supplier responses (approve/reject), disputes queue (resolve: KEEP/HIDE/DELETE).
+- **Frontend Public:** форма скрыта при DISABLED, плашка «Оспаривается», блок «Ответ организатора».
+- **Frontend Supplier:** раздел «Отзывы» (вкладки, карточка, response/dispute/evidence).
+- **Frontend Admin:** вкладки «Ответы поставщика», «Оспаривания».
+- **Тесты:** review-capability.service.spec.ts. См. `docs/ReviewModuleAudit.md`.
+
+## Content Model / PageTemplateSpecs MVP+ (11.03.2026) ✅
+
+- **Гибридная архитектура:** core-колонки vs content JSON vs наследуемая refund policy. См. [PageTemplateSpecs.md](PageTemplateSpecs.md), [ContentModel.md](ContentModel.md).
+- **Prisma:** Event (meetingPoint, routeSummary, refundPolicy*), EventOverride (contentTemplateData, meetingPoint, routeSummary, refundPolicy*), Venue (refundPolicy*, venueTemplateData), Operator (defaultRefundPolicyText).
+- **Shared:** content-template.types (Zod), refund-policy (enum), page-template-specs (schema registry).
+- **Backend:** RefundPolicyResolutionService; CatalogService — refundPolicyResolved; DTO для Event/Venue/Supplier.
+
 ## Canonical Tag Enrichment + Auto Landing Engine (11.03.2026) ✅
 
 - **Enrichment:** `canonical-tag-enrichment.ts` — единый слой тегов по title/description; city-specific правила; 29 unit-тестов. Подключён в retagAll.
 - **Materializer:** TopicDefinition, LandingMaterializerService, POST /admin/landings/materialize. См. [Architecture.md](Architecture.md).
 - **Phase A (staging):** POST /admin/settings/ops/retag-and-materialize — retag + materialize с summary (beforeVisible, visible, hidden, changedSlugs). POST /admin/settings/ops/retag выполняет retagAll.
 - **Phase B (materialize после sync):** sync → retag → materialize. CatalogController sync/all и SyncProcessor sync-full вызывают materializer; результат в ответе. Идемпотентно, fallback при ошибке.
+- **Phase C (Collection salyut):** кросс-городская коллекция salyut в seed; CollectionService.getBySlug поддерживает cityId=null и ?city=; /podborki/salyut и ?city=saint-petersburg; тесты в collection.service.spec.ts.
 
 ## Prompt 2 + Admin Ops (08.03.2026) ✅
 
@@ -126,7 +146,7 @@
 | 3 | GiftCertificate — email | Шаблон, fulfillment, retry, лог admin | ✅ |
 | 4 | Скрыть корзину | Прямой checkout per-offer | ✅ |
 | 5 | Планировщик MVP | Отложить до базы 2000+ событий | — |
-| 6 | PageTemplateSpecs | Аудит соответствия | — |
+| 6 | PageTemplateSpecs | Гибридная модель (core + content JSON + refund policy) | ✅ |
 | 7 | session.prices | NormalizedPrice | ✅ |
 | 8 | Лендинг salyut | Проверить в проде, unit-test getPrice | — |
 | 9 | Типизация any | «Ни одного нового any» | — |
@@ -227,7 +247,7 @@
 - [ ] **Критический**: SEO-описания для ТОП-10 площадок (venues)
 - [ ] **Высокий**: Тематические лендинги («Ночные экскурсии СПб», «Музеи Казани с детьми» и др.)
 - [x] **Высокий**: Базовый JSON-LD и meta-теги на городах, venues, событиях, комбо ✅ (buildPageMetadata, og+twitter)
-- [x] **Высокий**: Аудит PageTemplateSpecs — соответствие реализаций фронта/админки описанным шаблонам ✅ (docs/PageTemplateSpecsAudit.md)
+- [x] **Высокий**: PageTemplateSpecs — гибридная модель (11.03): core + content JSON + refund policy; аудит соответствия ✅ (docs/PageTemplateSpecsAudit.md)
 - [ ] **Средний**: Контентный план — 30 статей (ArticlePlanner)
 - [ ] **Средний** (3+ мес): Отображение «Музеи» (детальная страница venue) — режим работы, галерея, выставки (см. `docs/Reference.md` §1)
 - [ ] **Средний**: Аудит категоризации — SQL-отчёт уже из Gate 1 можно переиспользовать как инструмент SEO

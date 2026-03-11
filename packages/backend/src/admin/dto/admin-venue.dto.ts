@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { VenueType } from '@prisma/client';
+import { VenueRefundPolicyMode, VenueType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -168,6 +168,21 @@ export class CreateVenueDto {
   @Type(() => Number)
   @IsNumber()
   commissionRate?: number;
+
+  @ApiPropertyOptional({ enum: VenueRefundPolicyMode })
+  @IsOptional()
+  @IsEnum(VenueRefundPolicyMode)
+  refundPolicyMode?: VenueRefundPolicyMode;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  refundPolicyText?: string;
+
+  @ApiPropertyOptional({ description: 'Typed blocks: collections, halls, cloakroom, seasonality' })
+  @IsOptional()
+  @IsObject()
+  venueTemplateData?: Record<string, unknown>;
 }
 
 export class UpdateVenueDto extends PartialType(CreateVenueDto) {

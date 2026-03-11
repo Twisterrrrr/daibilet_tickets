@@ -41,6 +41,11 @@ export class UpdateSupplierDto {
   @IsOptional()
   @IsBoolean()
   verifiedAt?: boolean;
+
+  @ApiPropertyOptional({ description: 'Дефолтный текст правил возврата/обмена для Venue/Event' })
+  @IsOptional()
+  @IsString()
+  defaultRefundPolicyText?: string;
 }
 
 export class CreateApiKeyDto {

@@ -376,9 +376,10 @@ export const api = {
   // Подборки (тематические посадочные страницы)
   getCollections: (city?: string) => fetchApi<LandingItem[]>(city ? `/collections?city=${city}` : '/collections'),
 
-  getCollectionBySlug: (slug: string, page?: number) => {
+  getCollectionBySlug: (slug: string, page?: number, city?: string) => {
     const params = new URLSearchParams();
     if (page && page > 1) params.set('page', String(page));
+    if (city) params.set('city', city);
     const query = params.toString() ? `?${params}` : '';
     return fetchApi<CollectionDetailResponse>(`/collections/${slug}${query}`);
   },
@@ -442,7 +443,9 @@ export const api = {
 
   // Подарочные сертификаты
   getGiftCertificateDenominations: () =>
-    fetchApi<{ denominations: number[] }>('/checkout/gift-certificate/denominations'),
+    fetchApi<{ denominations: number[]; minAmount?: number; maxAmount?: number }>(
+      '/checkout/gift-certificate/denominations',
+    ),
 
   createGiftCertificateSession: (data: {
     amount: number;

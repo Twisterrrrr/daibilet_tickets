@@ -14,6 +14,8 @@ export type EventDetailFrontend = SharedEventDetail & {
   externalSource?: string | null;
   tcMetaEventId?: string | null;
   source?: string;
+  /** MVP: ENABLED — отзывы разрешены (MANUAL + owner). DISABLED — TC/TEPLOHOD. */
+  reviewCapability?: 'ENABLED' | 'DISABLED';
 };
 
 /** SEO meta (GET /seo/:entityType/:entityId) */

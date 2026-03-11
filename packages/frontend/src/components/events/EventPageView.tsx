@@ -318,6 +318,7 @@ export function EventPageView({ event }: EventPageViewProps) {
             <ReviewSection
               eventId={event.id}
               eventSlug={event.slug}
+              reviewCapability={event.reviewCapability}
               externalRating={event.externalRating ? Number(event.externalRating) : undefined}
               externalSource={event.externalSource || undefined}
             />

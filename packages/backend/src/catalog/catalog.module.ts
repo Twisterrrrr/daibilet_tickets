@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 
 import { EventOverrideService } from '../admin/event-override.service';
 import { LandingModule } from '../landing/landing.module';
+import { ReviewCapabilityService } from '../review/review-capability.service';
 import { EventQualityService } from './event-quality.service';
 import { QUEUE_EMAILS } from '../queue/queue.constants';
 import { CatalogController } from './catalog.controller';
@@ -16,6 +17,7 @@ import { TcGrpcService } from './tc-grpc.service';
 import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
 import { PostEditQueueService } from './postedit-queue.service';
+import { RefundPolicyResolutionService } from './refund-policy-resolution.service';
 import { TepSyncService } from './tep-sync.service';
 
 @Module({
@@ -25,6 +27,7 @@ import { TepSyncService } from './tep-sync.service';
     CatalogService,
     RegionService,
     ReviewService,
+    ReviewCapabilityService,
     TcApiService,
     TcGrpcService,
     TcSyncService,
@@ -35,11 +38,13 @@ import { TepSyncService } from './tep-sync.service';
     EventOverrideService,
     PostEditQueueService,
     EventQualityService,
+    RefundPolicyResolutionService,
   ],
   exports: [
     CatalogService,
     RegionService,
     ReviewService,
+    ReviewCapabilityService,
     TcApiService,
     TcGrpcService,
     TcSyncService,
@@ -49,6 +54,7 @@ import { TepSyncService } from './tep-sync.service';
     EventOverrideService,
     PostEditQueueService,
     EventQualityService,
+    RefundPolicyResolutionService,
   ],
 })
 export class CatalogModule {}

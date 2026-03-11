@@ -1,6 +1,18 @@
 'use client';
 
-import { AlertCircle, Camera, CheckCircle, ChevronDown, ExternalLink, Send, Star, ThumbsUp, X } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  Building2,
+  Camera,
+  CheckCircle,
+  ChevronDown,
+  ExternalLink,
+  Send,
+  Star,
+  ThumbsUp,
+  X,
+} from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 
@@ -33,6 +45,8 @@ interface ReviewItem {
   helpfulCount: number;
   createdAt: string;
   photos: ReviewPhoto[];
+  supplierResponse?: { text: string; moderatedAt: string } | null;
+  hasActiveDispute?: boolean;
 }
 
 interface ExternalReviewItem {
@@ -257,8 +271,33 @@ function ReviewCard({ review }: { review: ReviewItem }) {
         <StarRating value={review.rating} size="sm" />
       </div>
 
+      {review.hasActiveDispute && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>Отзыв оспаривается поставщиком и находится на проверке</span>
+        </div>
+      )}
       {review.title && <p className="mt-3 text-sm font-semibold text-slate-800">{review.title}</p>}
       <p className="mt-2 text-sm leading-relaxed text-slate-600">{review.text}</p>
+
+      {review.supplierResponse && (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-1 flex items-center gap-2 text-xs font-medium text-slate-500">
+            <Building2 className="h-3.5 w-3.5" />
+            Ответ организатора
+            {review.supplierResponse.moderatedAt && (
+              <span>
+                · {new Date(review.supplierResponse.moderatedAt).toLocaleDateString('ru-RU', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </span>
+            )}
+          </div>
+          <p className="text-sm leading-relaxed text-slate-700">{review.supplierResponse.text}</p>
+        </div>
+      )}
 
       {/* Photos */}
       <PhotoGallery photos={review.photos} />
@@ -606,6 +645,7 @@ export function ReviewSection({
   eventSlug,
   venueId,
   venueSlug,
+  reviewCapability,
   externalRating,
   externalSource,
   prefillEmail,
@@ -615,6 +655,8 @@ export function ReviewSection({
   eventSlug?: string;
   venueId?: string;
   venueSlug?: string;
+  /** ENABLED — форма разрешена. DISABLED — для TC/TEPLOHOD, форма скрыта. undefined — legacy, форма показывается. */
+  reviewCapability?: 'ENABLED' | 'DISABLED';
   externalRating?: number;
   externalSource?: string;
   prefillEmail?: string;
@@ -629,7 +671,8 @@ export function ReviewSection({
     summary: RatingSummary;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(!!reviewRequestToken);
+  const canShowForm = reviewCapability !== 'DISABLED';
+  const [showForm, setShowForm] = useState(!!reviewRequestToken && canShowForm);
 
   const loadReviews = async (page = 1) => {
     try {
@@ -671,12 +714,14 @@ export function ReviewSection({
           Отзывы{' '}
           {summary.reviewCount > 0 && <span className="text-slate-400 font-normal">({summary.reviewCount})</span>}
         </h2>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="rounded-lg border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 transition hover:bg-primary-100"
-        >
-          {showForm ? 'Скрыть форму' : 'Написать отзыв'}
-        </button>
+        {canShowForm && (
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="rounded-lg border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 transition hover:bg-primary-100"
+          >
+            {showForm ? 'Скрыть форму' : 'Написать отзыв'}
+          </button>
+        )}
       </div>
 
       {/* Rating summary */}
@@ -718,13 +763,15 @@ export function ReviewSection({
         </div>
       ) : !showForm ? (
         <div className="rounded-xl border border-slate-100 bg-slate-50 p-8 text-center">
-          <p className="text-sm text-slate-500">Пока нет отзывов. Будьте первым!</p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="mt-3 text-sm font-medium text-primary-600 hover:text-primary-700 transition"
-          >
-            Написать отзыв
-          </button>
+          <p className="text-sm text-slate-500">Пока нет отзывов.{canShowForm ? ' Будьте первым!' : ''}</p>
+          {canShowForm && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="mt-3 text-sm font-medium text-primary-600 hover:text-primary-700 transition"
+            >
+              Написать отзыв
+            </button>
+          )}
         </div>
       ) : null}
 

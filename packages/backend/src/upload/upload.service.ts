@@ -77,4 +77,18 @@ export class UploadService {
   async deleteImage(filename: string, thumbFilename: string): Promise<void> {
     await Promise.all([this.storage.delete(filename), this.storage.delete(thumbFilename)]);
   }
+
+  /**
+   * Удалить файл по storageKey (для dispute evidence и др.).
+   */
+  async deleteFile(storageKey: string): Promise<void> {
+    await this.storage.delete(storageKey);
+  }
+
+  /**
+   * Получить публичный URL файла по storageKey.
+   */
+  getFileUrl(storageKey: string): string {
+    return this.storage.getUrl(storageKey);
+  }
 }

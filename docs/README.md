@@ -18,6 +18,8 @@
 | Файл | Описание |
 |------|----------|
 | [Architecture.md](Architecture.md) | Каталог, лендинги, topic definitions, page templates |
+| [PageTemplateSpecs.md](PageTemplateSpecs.md) | Гибридная модель полей Event/Venue (core vs content JSON vs refund policy) |
+| [ContentModel.md](ContentModel.md) | Core vs content JSON vs refund policy (краткая справка) |
 | [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) | Журнал ключевых решений |
 | [SupplierArchitecture.md](SupplierArchitecture.md) | Маркетплейс: supplier model, ownership, offer, ЛК поставщика |
 

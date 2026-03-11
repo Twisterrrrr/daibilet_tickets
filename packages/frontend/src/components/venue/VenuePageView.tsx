@@ -59,6 +59,28 @@ const SCHEMA_DAY: Record<string, string> = {
   sun: 'Sunday',
 };
 
+/** Оффер площадки (для типизации venue.offers) */
+type VenueOffer = {
+  id?: string;
+  purchaseType?: string;
+  deeplink?: string | null;
+  priceFrom?: number | null;
+  availabilityMode?: string;
+};
+/** Выставка (venue.exhibitions) */
+type VenueExhibition = {
+  id: string;
+  slug: string;
+  title: string;
+  imageUrl?: string | null;
+  isPermanent?: boolean;
+  dateMode?: string;
+  endDate?: string | null;
+  priceFrom?: number | null;
+};
+/** Статья (venue.relatedArticles) */
+type ArticleItem = { slug: string; title: string; coverImage?: string | null };
+
 const FEATURE_LABELS: Record<string, { label: string; icon: string }> = {
   no_queue: { label: 'Без очереди', icon: 'zap' },
   audio_guide: { label: 'Аудиогид', icon: 'headphones' },
@@ -78,12 +100,13 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
   const openNow = isOpenNow(hours);
   const hasNoQueue = (venue.features || []).includes('no_queue');
 
-  const permanentExhibitions = (venue.exhibitions ?? []).filter((e) => e.isPermanent);
-  const temporaryExhibitions = (venue.exhibitions ?? []).filter((e) => !e.isPermanent);
+  const allExhibitions = (venue.exhibitions ?? []) as VenueExhibition[];
+  const permanentExhibitions = allExhibitions.filter((e) => e.isPermanent);
+  const temporaryExhibitions = allExhibitions.filter((e) => !e.isPermanent);
   const highlights: string[] = venue.highlights || [];
   const faq: { q: string; a: string }[] = venue.faq || [];
   const features: string[] = venue.features || [];
-  const primaryOffer = venue.offers?.[0];
+  const primaryOffer = venue.offers?.[0] as VenueOffer | undefined;
 
   const quickFacts: string[] = [];
   if (venue.metro) quickFacts.push(venue.metro);
@@ -92,11 +115,11 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
   if (venue.district) quickFacts.push(venue.district);
   const displayFacts = quickFacts.slice(0, 3);
 
-  const offersJsonLd = (venue.offers ?? [])
+  const offersJsonLd = ((venue.offers ?? []) as VenueOffer[])
     .filter((o) => o.priceFrom)
     .map((o) => ({
       '@type': 'Offer',
-      price: (o.priceFrom / 100).toFixed(0),
+      price: ((o.priceFrom ?? 0) / 100).toFixed(0),
       priceCurrency: 'RUB',
       availability: o.availabilityMode === 'SOLD_OUT' ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
       url: o.deeplink || venue.website || '',
@@ -168,7 +191,7 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
     primaryOffer?.purchaseType === 'REDIRECT' && primaryOffer?.deeplink ? primaryOffer.deeplink : '#tickets';
   const stickyIsExternal = primaryOffer?.purchaseType === 'REDIRECT' && !!primaryOffer?.deeplink;
 
-  const isOpenDate = (venue.exhibitions ?? []).some((e) => e.dateMode === 'OPEN_DATE') || false;
+  const isOpenDate = allExhibitions.some((e) => e.dateMode === 'OPEN_DATE') || false;
 
   return (
     <>
@@ -318,7 +341,7 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
           <div className="lg:col-span-2 space-y-10">
             {/* ═══ 2. БИЛЕТЫ (интерактивный блок) ═══ */}
             <TicketsBlock
-              offers={venue.offers || []}
+              offers={(venue.offers || []) as Parameters<typeof TicketsBlock>[0]['offers']}
               isOpenDate={isOpenDate}
               venueName={venue.title}
               website={venue.website}
@@ -546,7 +569,7 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
               <section>
                 <h2 className="text-xl font-bold mb-4">Читайте также</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {venue.relatedArticles.map((article) => (
+                  {(venue.relatedArticles as ArticleItem[]).map((article) => (
                     <Link
                       key={article.slug}
                       href={`/blog/${article.slug}`}

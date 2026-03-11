@@ -12,8 +12,11 @@ import {
   Query,
   Req,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ModerationStatus, OfferSource, Prisma, SupplierRole } from '@prisma/client';
 import { Request, Response } from 'express';
@@ -33,9 +36,11 @@ import {
   UpdateSupplierOfferDto,
   UpdateSupplierSettingsDto,
 } from './dto/supplier.dto';
+import { CreateDisputeDto, CreateSupplierResponseDto } from './dto/supplier-reviews.dto';
 import { SupplierRbacService } from './supplier-rbac.service';
 import { SupplierJwtGuard, SupplierRoles, SupplierRolesGuard } from './supplier.guard';
 import { SupplierAuthService } from './supplier-auth.service';
+import { SupplierReviewsService } from './supplier-reviews.service';
 
 @ApiTags('supplier')
 @Controller('supplier')
@@ -44,6 +49,7 @@ export class SupplierController {
     private readonly prisma: PrismaService,
     private readonly authService: SupplierAuthService,
     private readonly rbac: SupplierRbacService,
+    private readonly reviewsService: SupplierReviewsService,
   ) {}
 
   // ─── Auth (public / refresh / guarded) ─────────────────────────────────────
@@ -495,5 +501,97 @@ export class SupplierController {
       data: { isDeleted: true, deletedAt: new Date(), status: 'DISABLED' },
     });
     return { message: 'Оффер удалён (soft-delete)' };
+  }
+
+  // ─── Reviews ────────────────────────────────────────────────────────────────
+
+  @Get('reviews')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Список отзывов поставщика' })
+  async listReviews(
+    @Req() req: { user: SupplierAuthUser },
+    @Query('tab') tab: 'all' | 'needs_response' | 'disputed' | 'responded' = 'all',
+    @Query() query: { page?: string; limit?: string },
+  ) {
+    return this.reviewsService.list(req.user.operatorId, tab, query);
+  }
+
+  @Get('reviews/:id')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Детали отзыва' })
+  async getReview(@Req() req: { user: SupplierAuthUser }, @Param('id') id: string) {
+    return this.reviewsService.getOne(req.user.operatorId, id);
+  }
+
+  @Post('reviews/:id/response')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Создать/обновить ответ на отзыв (draft)' })
+  async createOrUpdateResponse(
+    @Req() req: { user: SupplierAuthUser },
+    @Param('id') reviewId: string,
+    @Body() dto: CreateSupplierResponseDto,
+  ) {
+    return this.reviewsService.upsertResponse(req.user.operatorId, req.user.id, reviewId, dto);
+  }
+
+  @Post('reviews/:id/response/submit')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Отправить ответ на модерацию' })
+  async submitResponse(@Req() req: { user: SupplierAuthUser }, @Param('id') reviewId: string) {
+    return this.reviewsService.submitResponse(req.user.operatorId, req.user.id, reviewId);
+  }
+
+  @Post('reviews/:id/accept')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Принять отзыв без оспаривания' })
+  async acceptReview(@Req() req: { user: SupplierAuthUser }, @Param('id') reviewId: string) {
+    return this.reviewsService.accept(req.user.operatorId, req.user.id, reviewId);
+  }
+
+  @Post('reviews/:id/dispute')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Оспорить отзыв' })
+  async createDispute(
+    @Req() req: { user: SupplierAuthUser },
+    @Param('id') reviewId: string,
+    @Body() dto: CreateDisputeDto,
+  ) {
+    return this.reviewsService.createDispute(req.user.operatorId, req.user.id, reviewId, dto);
+  }
+
+  @Get('disputes')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Список оспариваний' })
+  async listDisputes(@Req() req: { user: SupplierAuthUser }, @Query() query: { page?: string; limit?: string }) {
+    return this.reviewsService.listDisputes(req.user.operatorId, query);
+  }
+
+  @Post('disputes/:id/evidence')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT')
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Загрузить доказательство для оспаривания' })
+  async addDisputeEvidence(
+    @Req() req: { user: SupplierAuthUser },
+    @Param('id') disputeId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Файл не загружен');
+    return this.reviewsService.addEvidence(req.user.operatorId, disputeId, file);
   }
 }

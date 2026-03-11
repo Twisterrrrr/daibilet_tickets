@@ -76,7 +76,7 @@ export function buildScheduleSyncPlan(
   existingSessions: AdminEventSessionRow[],
 ): ScheduleSyncPlan {
   const desired = buildDesiredStarts(draft.schedule);
-  const desiredSet = new Set(desired);
+  const _desiredSet = new Set(desired);
 
   const byStartsAt = new Map<string, AdminEventSessionRow[]>();
   for (const s of existingSessions) {

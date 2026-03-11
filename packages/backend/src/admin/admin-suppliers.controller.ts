@@ -310,6 +310,10 @@ export class AdminSuppliersController {
     if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
     if (data.yookassaAccountId !== undefined) updateData.yookassaAccountId = data.yookassaAccountId || null;
     if (data.verifiedAt !== undefined) updateData.verifiedAt = data.verifiedAt ? new Date() : null;
+    if (data.defaultRefundPolicyText !== undefined) {
+      updateData.defaultRefundPolicyText = data.defaultRefundPolicyText ?? null;
+      updateData.defaultRefundPolicyUpdatedAt = new Date();
+    }
 
     return this.prisma.operator.update({ where: { id }, data: updateData });
   }

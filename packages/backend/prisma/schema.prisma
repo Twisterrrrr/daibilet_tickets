@@ -143,6 +143,19 @@ enum SubcategoriesMode {
   CLEAR
 }
 
+/// Режим наследования правил возврата/обмена (Venue)
+enum VenueRefundPolicyMode {
+  INHERIT_SUPPLIER
+  CUSTOM
+}
+
+/// Режим наследования правил возврата/обмена (Event)
+enum EventRefundPolicyMode {
+  INHERIT_SUPPLIER
+  INHERIT_VENUE
+  CUSTOM
+}
+
 enum LocationType {
   PIER // Причал
   VENUE // Площадка
@@ -203,8 +216,37 @@ enum ValidityMode {
 enum ReviewStatus {
   PENDING_EMAIL // Ожидает подтверждения email
   PENDING // Email подтверждён, ожидает модерации
+  APPROVED // Опубликован
+  REJECTED
+  HIDDEN // Скрыт админом (soft-hide)
+}
+
+/// Ответ поставщика на отзыв (модерация админом)
+enum ReviewSupplierResponseStatus {
+  DRAFT
+  PENDING_MODERATION
   APPROVED
   REJECTED
+}
+
+/// Статус dispute (MVP: без client reply)
+enum ReviewDisputeStatus {
+  MODERATOR_REVIEW
+  RESOLVED_KEEP
+  RESOLVED_EDIT
+  RESOLVED_HIDE
+  RESOLVED_DELETE
+}
+
+/// Код причины оспаривания
+enum ReviewDisputeReasonCode {
+  FALSE_FACTS
+  OFF_TOPIC
+  ABUSIVE
+  PERSONAL_DATA
+  BLACKMAIL
+  SPAM
+  OTHER
 }
 
 enum CreatedByType {
@@ -429,6 +471,14 @@ model Event {
   operatorId      String? @db.Uuid
   routeId         String? @db.Uuid
 
+  // --- Core structured fields (гибридная модель PageTemplateSpecs) ---
+  meetingPoint    String?  @db.Text // Точка сбора
+  boardingPierId  String?  @db.Uuid // Причал отправления (UUID Location)
+  disembarkPierId String?  @db.Uuid // Причал прибытия
+  routeSummary    String?  @db.Text // Короткий маршрут
+  refundPolicyMode   EventRefundPolicyMode? @default(INHERIT_SUPPLIER)
+  refundPolicyText   String?  @db.Text
+
   city            City             @relation(fields: [cityId], references: [id])
   venue           Venue?           @relation("VenueEvents", fields: [venueId], references: [id])
   startLocation   Location?        @relation("EventStartLocation", fields: [startLocationId], references: [id])
@@ -601,7 +651,12 @@ model EventOverride {
   isHidden      Boolean            @default(false)
   tagsAdd       String[] // tag slugs to add
   tagsRemove    String[] // tag slugs to remove
-  templateData  Json? // category-specific: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)
+  templateData        Json? // legacy: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)
+  contentTemplateData Json? // typed PDP blocks: routeDescription, program, menu, cast, bookingRules, visitorTips, extraFaq
+  meetingPoint        String? @db.Text // override Event.meetingPoint
+  routeSummary        String? @db.Text
+  refundPolicyMode    EventRefundPolicyMode?
+  refundPolicyText    String? @db.Text
   // --- Качество события (валидация перед публикацией) ---
   qualityStatus   String?   // DRAFT | READY | BLOCKED
   qualityIssues   Json?     // массив объектов { code, message, field? }
@@ -1008,8 +1063,12 @@ model Venue {
   isDeleted        Boolean        @default(false)
   deletedAt        DateTime?
   highlights       Json? // ["3 млн экспонатов","В центре города","Детям бесплатно"]
-  faq              Json? // [{q:"Можно ли вернуть билет?",a:"Да, до начала визита"}]
-  features         String[]       @default([]) // ["no_queue","audio_guide","kids_friendly","wheelchair"]
+  faq                 Json? // [{q:"Можно ли вернуть билет?",a:"Да, до начала визита"}]
+  features            String[]       @default([]) // ["no_queue","audio_guide","kids_friendly","wheelchair"]
+  // --- Refund policy (наследование от Operator) ---
+  refundPolicyMode    VenueRefundPolicyMode? @default(INHERIT_SUPPLIER)
+  refundPolicyText    String?        @db.Text
+  venueTemplateData   Json? // typed blocks: collections, halls, cloakroom, seasonality, etc.
   commissionRate   Decimal?       @db.Decimal(4, 2) // Индивидуальная ставка (госмузеи и др.), админ может менять
   metaTitle        String?
   metaDescription  String?        @db.Text
@@ -1281,12 +1340,18 @@ model Operator {
   webhookUrl    String? // URL для отправки webhook-уведомлений
   webhookSecret String? // HMAC-секрет для подписи payload
 
-  events        Event[]
-  venues        Venue[]        @relation("VenueOperator")
-  reviews       Review[]
-  offers        EventOffer[]
-  supplierUsers SupplierUser[]
-  apiKeys       ApiKey[]
+  // --- Default refund policy (наследование Venue → Event) ---
+  defaultRefundPolicyText       String?   @db.Text
+  defaultRefundPolicyUpdatedAt  DateTime?
+
+  events                 Event[]
+  venues                 Venue[]        @relation("VenueOperator")
+  reviews                Review[]
+  offers                 EventOffer[]
+  supplierUsers          SupplierUser[]
+  apiKeys                ApiKey[]
+  reviewSupplierResponses ReviewSupplierResponse[] @relation("SupplierResponseOperator")
+  reviewDisputes         ReviewDispute[] @relation("DisputeOperator")
 
   @@map("operators")
 }
@@ -1367,6 +1432,7 @@ model Review {
   eventId      String?      @db.Uuid // Отзыв на конкретное событие
   operatorId   String?      @db.Uuid // Отзыв на оператора (будущее)
   venueId      String?      @db.Uuid // Отзыв на место (музей, галерея)
+  supplierId   String?      @db.Uuid // Snapshot поставщика события на момент создания (для supplier cabinet)
   rating       Int // 1-5
   title        String? // Заголовок отзыва (опционально)
   text         String       @db.Text
@@ -1378,6 +1444,7 @@ model Review {
   helpfulCount Int          @default(0) // Кэш количества полезных голосов
   status       ReviewStatus @default(PENDING_EMAIL)
   adminComment String? // Причина отклонения
+  publishedAt  DateTime? // Когда одобрен (публикация)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -1386,12 +1453,17 @@ model Review {
   venue    Venue?        @relation(fields: [venueId], references: [id], onDelete: SetNull)
   photos   ReviewPhoto[]
   votes    ReviewVote[]
+  supplierResponse ReviewSupplierResponse?
+  disputes         ReviewDispute[]
+  actionLogs       ReviewActionLog[]
 
   @@unique([authorEmail, eventId, venueId])
   @@index([eventId, status])
   @@index([operatorId, status])
   @@index([venueId, status])
+  @@index([supplierId, status])
   @@index([status])
+  @@index([createdAt])
   @@map("reviews")
 }
 
@@ -1431,6 +1503,94 @@ model ReviewVote {
   @@unique([reviewId, ipHash])
   @@index([reviewId])
   @@map("review_votes")
+}
+
+// ========================
+// Ответ поставщика на отзыв (модерация админом)
+// ========================
+
+model ReviewSupplierResponse {
+  id                String                     @id @default(uuid()) @db.Uuid
+  reviewId          String                     @unique @db.Uuid
+  supplierId        String                     @db.Uuid
+  text              String                     @db.Text
+  status            ReviewSupplierResponseStatus @default(DRAFT)
+  moderationComment String?                    @db.Text
+  moderatedBy       String?                    @db.Uuid
+  moderatedAt       DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  review   Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  operator Operator @relation("SupplierResponseOperator", fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId, status])
+  @@index([status])
+  @@map("review_supplier_responses")
+}
+
+// ========================
+// Оспаривание отзыва (dispute)
+// ========================
+
+model ReviewDispute {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  reviewId              String                 @db.Uuid
+  supplierId            String                 @db.Uuid
+  status                ReviewDisputeStatus    @default(MODERATOR_REVIEW)
+  reasonCode            ReviewDisputeReasonCode
+  claimText             String                 @db.Text
+  supplierConfirmedTruth Boolean
+  decisionComment       String?                @db.Text
+  handledByAdminId      String?                @db.Uuid
+  resolvedAt            DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  operator  Operator @relation("DisputeOperator", fields: [supplierId], references: [id], onDelete: Cascade)
+  evidence  ReviewDisputeEvidence[]
+  actionLogs ReviewActionLog[]
+
+  @@unique([reviewId])
+  @@index([supplierId, status])
+  @@index([status])
+  @@index([createdAt])
+  @@map("review_disputes")
+}
+
+model ReviewDisputeEvidence {
+  id         String   @id @default(uuid()) @db.Uuid
+  disputeId  String   @db.Uuid
+  storageKey String
+  fileName   String
+  mimeType   String
+  fileSize   Int
+  uploadedAt DateTime @default(now())
+
+  dispute ReviewDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId])
+  @@map("review_dispute_evidence")
+}
+
+model ReviewActionLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  reviewId  String?  @db.Uuid
+  disputeId String?  @db.Uuid
+  actorType String
+  actorId   String?  @db.Uuid
+  actionType String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  review  Review?       @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  dispute ReviewDispute? @relation(fields: [disputeId], references: [id], onDelete: SetNull)
+
+  @@index([reviewId, createdAt])
+  @@index([disputeId, createdAt])
+  @@index([actionType])
+  @@map("review_action_logs")
 }
 
 // ========================

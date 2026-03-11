@@ -309,17 +309,20 @@ export function CheckoutClient() {
               })}
             </div>
 
-            {/* Gift certificate */}
+            {/* Gift certificate — #11 */}
             <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-medium text-slate-500 mb-2">Подарочный сертификат</p>
+              <label htmlFor="gift-cert-code" className="block text-sm font-medium text-slate-700 mb-2">
+                Подарочный сертификат
+              </label>
               <div className="flex gap-2">
                 <input
+                  id="gift-cert-code"
                   value={giftCertCode}
                   onChange={(e) => {
                     setGiftCertCode(e.target.value.toUpperCase());
                     setGiftCertValidation(null);
                   }}
-                  placeholder="Введите код (напр. GC-XXXX-XXXX)"
+                  placeholder="Ввести код (GC-XXXX-XXXX)"
                   className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm uppercase placeholder:normal-case focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400"
                 />
                 <button

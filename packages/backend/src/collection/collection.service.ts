@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DateMode, EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
 
 import { CACHE_TTL, cacheKeys, CacheService } from '../cache/cache.service';
@@ -54,9 +54,11 @@ export class CollectionService {
 
   /**
    * Подборка по slug + события (с пагинацией).
+   * Для кросс-городской (cityId = null): опционально ?city сужает выдачу по городу.
+   * При неизвестном city — 400.
    */
-  async getBySlug(slug: string, page = 1, limit = 20) {
-    const cacheKey = cacheKeys.collections.detail(slug, page, limit);
+  async getBySlug(slug: string, page = 1, limit = 20, citySlug?: string) {
+    const cacheKey = cacheKeys.collections.detail(slug, page, limit, citySlug);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_DETAIL, async () => {
       const collection = await this.prisma.collection.findFirst({
         where: { slug, isActive: true, isDeleted: false },
@@ -67,6 +69,19 @@ export class CollectionService {
 
       if (!collection) {
         throw new NotFoundException(`Подборка "${slug}" не найдена`);
+      }
+
+      // Для кросс-городской: citySlug из query сужает выдачу; неизвестный город → 400
+      let cityOverrideSlug: string | undefined;
+      if (collection.cityId === null && citySlug) {
+        const city = await this.prisma.city.findFirst({
+          where: { slug: citySlug, isActive: true },
+          select: { id: true },
+        });
+        if (!city) {
+          throw new BadRequestException(`Город "${citySlug}" не найден`);
+        }
+        cityOverrideSlug = citySlug;
       }
 
       // 1) Закреплённые события (pinned) — отдельный запрос
@@ -107,7 +122,7 @@ export class CollectionService {
       }
 
       // 2) Фильтрованные события
-      const eventWhere = this.buildEventFilter(collection);
+      const eventWhere = this.buildEventFilter(collection, cityOverrideSlug);
       // Исключаем уже отображённые pinned-события
       const pinnedIds = new Set(pinnedEvents.map((e) => e.id));
 
@@ -229,17 +244,20 @@ export class CollectionService {
 
   /**
    * Построить Prisma where-фильтр из полей подборки.
-   * Переиспользует логику, аналогичную CatalogService.getEvents.
+   * cityOverrideSlug — для кросс-городской (cityId = null): сузить по городу из query.
    */
-  private buildEventFilter(collection: {
-    cityId: string | null;
-    filterTags: string[];
-    filterCategory: string | null;
-    filterSubcategory: string | null;
-    filterAudience: string | null;
-    excludedEventIds: string[];
-    additionalFilters: unknown;
-  }): Prisma.EventWhereInput {
+  private buildEventFilter(
+    collection: {
+      cityId: string | null;
+      filterTags: string[];
+      filterCategory: string | null;
+      filterSubcategory: string | null;
+      filterAudience: string | null;
+      excludedEventIds: string[];
+      additionalFilters: unknown;
+    },
+    cityOverrideSlug?: string,
+  ): Prisma.EventWhereInput {
     // Базовый фильтр: активные, не удалённые, не дубли
     const where: Prisma.EventWhereInput = {
       isActive: true,
@@ -258,9 +276,11 @@ export class CollectionService {
       ],
     };
 
-    // Фильтр по городу
+    // Фильтр по городу: из коллекции или из query (для cross-city)
     if (collection.cityId) {
       where.cityId = collection.cityId;
+    } else if (cityOverrideSlug) {
+      where.city = { slug: cityOverrideSlug, isActive: true };
     }
 
     // Фильтр по тегам (OR-логика)

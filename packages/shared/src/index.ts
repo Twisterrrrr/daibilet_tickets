@@ -40,6 +40,24 @@ export {
 
 // (дополнительные re-export ниже удалены, чтобы избежать дублирования)
 
+// --- Content model (PageTemplateSpecs) ---
+export {
+  EventContentTemplateDataSchema,
+  VenueTemplateDataSchema,
+  ExtraFaqItemSchema,
+  parseEventContentTemplateData,
+  parseVenueTemplateData,
+} from './content/content-template.types';
+export type { EventContentTemplateData, VenueTemplateData, ExtraFaqItem } from './content/content-template.types';
+export { VenueRefundPolicyMode, EventRefundPolicyMode, DEFAULT_REFUND_POLICY_TEXT } from './content/refund-policy';
+export {
+  getEventTemplateSpecs,
+  getVenueTemplateSpecs,
+  type TemplateFieldSpec,
+  type TemplateSpec,
+  type TemplateSection,
+} from './content/page-template-specs';
+
 export {
   TeplohodWidgetQueryDto,
   TeplohodWidgetEventDto,

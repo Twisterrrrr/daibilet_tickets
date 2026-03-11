@@ -110,6 +110,11 @@ export class EventOverrideService {
           minAge: override.minAge ?? ev.minAge,
           rating: override.manualRating ?? ev.rating,
           templateData: (override as { templateData?: unknown }).templateData ?? null,
+          contentTemplateData: (override as { contentTemplateData?: unknown }).contentTemplateData ?? (ev as Record<string, unknown>).contentTemplateData ?? null,
+          meetingPoint: (override as { meetingPoint?: string | null }).meetingPoint ?? ev.meetingPoint,
+          routeSummary: (override as { routeSummary?: string | null }).routeSummary ?? ev.routeSummary,
+          refundPolicyMode: (override as { refundPolicyMode?: string | null }).refundPolicyMode ?? ev.refundPolicyMode,
+          refundPolicyText: (override as { refundPolicyText?: string | null }).refundPolicyText ?? ev.refundPolicyText,
           _hasOverride: true,
         } as T;
       })

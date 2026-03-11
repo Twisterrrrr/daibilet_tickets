@@ -1,4 +1,4 @@
-import { BarChart3, Calendar, LayoutDashboard, LogOut, Settings } from 'lucide-react';
+import { BarChart3, Calendar, LayoutDashboard, LogOut, MessageSquare, Settings } from 'lucide-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { AppShell, PageContainer } from '@daibilet/shared-ui';
@@ -8,6 +8,7 @@ import { clearToken } from '../lib/api';
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/events', icon: Calendar, label: 'Мои события' },
+  { to: '/reviews', icon: MessageSquare, label: 'Отзывы' },
   { to: '/reports', icon: BarChart3, label: 'Отчёты' },
   { to: '/settings', icon: Settings, label: 'Настройки' },
 ];

@@ -117,9 +117,14 @@
 - **PromoBlock** (планируется) — карточки на главной («Масленица», «Зимний город» и др.). Сейчас захардкожены в `PromoBlock.tsx`; планируется модель + раздел админки «Промо-блоки».
 - **Article** — SEO-статья с перелинковкой
 - **Package** — заказ (Trip Planner)
-- **Review** — отзыв на событие/оператора. Поля: rating (1-5), text, authorName, authorEmail (скрыт), isVerified (подтверждённая покупка), voucherCode, verifyToken (email-верификация, 48h TTL), helpfulCount (кэш голосов), status (PENDING_EMAIL/PENDING/APPROVED/REJECTED), adminComment. Unique: authorEmail + eventId.
-  - **ReviewPhoto** — до 5 фото на отзыв (url, thumbUrl, filename). WebP, ресайз 1200px + thumb 300px.
+- **Review** — отзыв на событие/оператора. Поля: rating (1-5), text, authorName, authorEmail (скрыт), isVerified, voucherCode, verifyToken, helpfulCount, status (PENDING_EMAIL/PENDING/APPROVED/REJECTED/HIDDEN), adminComment, supplierId (snapshot), publishedAt. Unique: authorEmail + eventId.
+  - **ReviewPhoto** — до 5 фото (url, thumbUrl, filename). WebP, 1200px + thumb 300px.
   - **ReviewVote** — голоса "Полезный отзыв" (ipHash SHA-256, isHelpful). Unique: reviewId + ipHash.
+  - **ReviewSupplierResponse** — ответ поставщика. Статусы: DRAFT → PENDING_MODERATION → APPROVED/REJECTED. Модерация админом.
+  - **ReviewDispute** — оспаривание отзыва (reasonCode: FALSE_FACTS/OFF_TOPIC/ABUSIVE). Один активный dispute на отзыв. Статусы: MODERATOR_REVIEW → RESOLVED_KEEP/RESOLVED_HIDE/RESOLVED_DELETE.
+  - **ReviewDisputeEvidence** — доказательства (jpg/png/pdf, до 25 МБ, до 5 файлов).
+  - **ReviewActionLog** — лог действий (actorType, actionType).
+- Отзывы для TC/TEPLOHOD отключены (`ReviewCapabilityService.canAcceptReviews`). Подробно: `docs/ReviewModuleSpec.md`, `docs/ReviewModuleAudit.md`.
 - **ExternalReview** — импортированные отзывы с внешних площадок (Яндекс.Карты, 2ГИС, Tripadvisor, Google). Поля: source, sourceUrl, authorName, rating, text, publishedAt. Участвует в recalculateEventRating.
 - **ReviewRequest** — пост-покупочный запрос на отзыв (email, eventId, token, sentAt, reminderSentAt, openedAt, clickedAt, reviewId). Unique: email + eventId.
 - **Event.externalRating/externalReviewCount/externalSource** — ручной импорт рейтинга из внешних платформ. Участвует в расчёте итогового rating через взвешенное среднее (вместе с Review и ExternalReview).

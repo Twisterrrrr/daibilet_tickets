@@ -49,7 +49,7 @@ interface BasicsFormProps {
   cities?: { id: string; name: string }[];
 }
 
-export function BasicsForm({ value, handleChange, lockedFields, cities }: BasicsFormProps) {
+export function BasicsForm({ value, onChange, handleChange, lockedFields, cities: _cities }: BasicsFormProps) {
   const locked = new Set(lockedFields ?? []);
 
   return (

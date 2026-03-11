@@ -3,7 +3,7 @@
  * Преобразует данные мастера в payload для POST /supplier/events и POST /supplier/events/:id/offers.
  */
 
-import type { EventWizardDraft } from '@daibilet/shared-ui';
+import type { EventWizardDraft, EventWizardTicketTierDraft } from '@daibilet/shared-ui';
 
 /** Payload для POST /supplier/events */
 export interface SupplierCreateEventPayload {
@@ -36,7 +36,7 @@ export interface SupplierCreateOfferPayload {
  */
 export function mapDraftToSupplierCreatePayload(draft: EventWizardDraft): SupplierCreateEventPayload {
   const { basics, tickets } = draft;
-  const primaryTier = tickets.tiers.find((t) => t.isPrimary) ?? tickets.tiers[0];
+  const primaryTier = tickets.tiers.find((t: EventWizardTicketTierDraft) => t.isPrimary) ?? tickets.tiers[0];
 
   const payload: SupplierCreateEventPayload = {
     title: basics.title,
@@ -64,7 +64,7 @@ export function mapDraftTiersToSupplierOffers(draft: EventWizardDraft): Supplier
     return [{ purchaseType: 'REQUEST', priority: 0 }];
   }
 
-  return tickets.tiers.map((t, idx) => ({
+  return tickets.tiers.map((t: EventWizardTicketTierDraft, idx: number) => ({
     source: 'MANUAL',
     purchaseType: t.purchaseType || 'REQUEST',
     deeplink: t.deeplink || undefined,

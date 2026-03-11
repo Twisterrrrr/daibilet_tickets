@@ -5,12 +5,14 @@ import { DateMode, EventCategory, EventSubcategory, LocationType, Prisma, TagCat
 
 import { asCatalogEntityLite, asCityLite, toDateSafe } from '../common/typing';
 import { EventOverrideService } from '../admin/event-override.service';
+import { ReviewCapabilityService } from '../review/review-capability.service';
 import { CACHE_TTL, cacheKeys, CacheService } from '../cache/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
 import { EventsQueryDto } from './dto/events-query.dto';
 import { RegionService } from './region.service';
 import { buildEventWhere, buildVenueWhere } from './where-builders';
+import { RefundPolicyResolutionService } from './refund-policy-resolution.service';
 
 /** Сократить адрес до улицы и номера: "Дворцовая наб., 18, Санкт-Петербург" → "Дворцовая наб., 18" */
 function shortenAddressToStreet(addr: string | null | undefined): string {
@@ -29,6 +31,8 @@ export class CatalogService {
     private readonly cache: CacheService,
     private readonly overrideService: EventOverrideService,
     private readonly regionService: RegionService,
+    private readonly reviewCapability: ReviewCapabilityService,
+    private readonly refundResolution: RefundPolicyResolutionService,
   ) {}
 
   private readonly logger = new Logger(CatalogService.name);
@@ -1336,7 +1340,19 @@ export class CatalogService {
       where: { ...whereUnique, isDeleted: false },
       include: {
         city: true,
-        venue: { select: { id: true, slug: true, title: true, shortTitle: true, venueType: true } },
+        venue: {
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            shortTitle: true,
+            venueType: true,
+            refundPolicyMode: true,
+            refundPolicyText: true,
+            operatorId: true,
+            operator: { select: { defaultRefundPolicyText: true } },
+          },
+        },
         sessions: {
           where: { isActive: true, startsAt: { gte: new Date() } },
           orderBy: { startsAt: 'asc' },
@@ -1399,11 +1415,41 @@ export class CatalogService {
     const displayRating =
       rc >= 10 ? rawR : ovHasSalute ? 4.8 + (Math.abs(h) % 21) / 100 : 4.5 + (Math.abs(h) % 51) / 100;
 
+    const canAcceptReviews = this.reviewCapability.canAcceptReviews({
+      source: overridden.source,
+      supplierId: overridden.supplierId,
+      operatorId: overridden.operatorId,
+    });
+
+    const operatorId = overridden.supplierId ?? overridden.venue?.operatorId;
+    const operator = overridden.venue?.operator
+      ? { defaultRefundPolicyText: overridden.venue.operator.defaultRefundPolicyText }
+      : operatorId
+        ? await this.prisma.operator
+            .findUnique({ where: { id: operatorId }, select: { defaultRefundPolicyText: true } })
+            .then((o) => (o ? { defaultRefundPolicyText: o.defaultRefundPolicyText } : null))
+        : null;
+
+    const refundPolicyResolved = this.refundResolution.resolveEventRefundPolicy(
+      {
+        refundPolicyMode: overridden.refundPolicyMode,
+        refundPolicyText: overridden.refundPolicyText,
+      },
+      overridden.venue
+        ? { refundPolicyMode: overridden.venue.refundPolicyMode, refundPolicyText: overridden.venue.refundPolicyText }
+        : null,
+      operator,
+    );
+
     return {
       ...overridden,
       rating: displayRating,
       address: overridden.address ? shortenAddressToStreet(overridden.address) : overridden.address,
       primaryOffer,
+      reviewCapability: canAcceptReviews ? 'ENABLED' : 'DISABLED',
+      refundPolicyResolved,
+      refundPolicyMode: overridden.refundPolicyMode,
+      refundPolicyText: overridden.refundPolicyText,
       relatedEvents: relatedEvents.map((r: Record<string, unknown>) => ({
         ...r,
         rating:

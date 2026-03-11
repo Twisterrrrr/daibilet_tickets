@@ -24,7 +24,8 @@ export const cacheKeys = {
   },
   collections: {
     list: (citySlug?: string) => `collections:list:${citySlug || 'all'}`,
-    detail: (slug: string, page: number, limit: number) => `collections:detail:${slug}:${page}:${limit}`,
+    detail: (slug: string, page: number, limit: number, citySlug?: string) =>
+      citySlug ? `collections:detail:${slug}:${page}:${limit}:${citySlug}` : `collections:detail:${slug}:${page}:${limit}`,
   },
   landings: {
     list: () => 'landings:list',

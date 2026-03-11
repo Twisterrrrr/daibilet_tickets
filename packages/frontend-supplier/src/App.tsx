@@ -8,6 +8,7 @@ import Layout from './pages/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Reports from './pages/Reports';
+import Reviews from './pages/Reviews';
 import Settings from './pages/Settings';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,8 @@ export default function App() {
         <Route path="events" element={<EventsList />} />
         <Route path="events/new" element={<EventEdit />} />
         <Route path="events/:id" element={<EventEdit />} />
+        <Route path="reviews" element={<Reviews />} />
+        <Route path="reviews/:id" element={<Reviews />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
       </Route>

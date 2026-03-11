@@ -16,12 +16,19 @@ export class CollectionController {
   }
 
   @Get(':slug')
-  @ApiOperation({ summary: 'Подборка по slug + события' })
+  @ApiOperation({ summary: 'Подборка по slug + события. Для кросс-городской: ?city=slug сужает выдачу.' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
-  getBySlug(@Param('slug') slug: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+  @ApiQuery({ name: 'city', required: false, description: 'Slug города (только для кросс-городских)' })
+  getBySlug(
+    @Param('slug') slug: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('city') city?: string,
+  ) {
     const p = Math.max(1, Number(page) || 1);
     const l = Math.min(100, Math.max(1, Number(limit) || 20));
-    return this.collectionService.getBySlug(slug, p, l);
+    const citySlug = city?.trim() || undefined;
+    return this.collectionService.getBySlug(slug, p, l, citySlug);
   }
 }

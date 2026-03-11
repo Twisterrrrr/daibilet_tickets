@@ -332,7 +332,7 @@ export class CatalogController {
         this.postEditQueue.ensureOverridesForImportedEvents({ source: EventSource.TEPLOHOD, since: runStartedAt }),
       ]);
       postEditQueue = { tc: queueTc, tep: queueTep };
-    } catch (err) {
+    } catch (_err) {
       // Не ломаем sync при ошибке очереди (логируется внутри PostEditQueueService)
     }
     await this.cache.invalidateAfterSync();

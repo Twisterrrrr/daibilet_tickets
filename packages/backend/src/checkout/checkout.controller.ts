@@ -190,10 +190,13 @@ export class CheckoutController {
   }
 
   @Get('gift-certificate/denominations')
-  @ApiOperation({ summary: 'Номиналы подарочных сертификатов (копейки)' })
+  @ApiOperation({ summary: 'Номиналы подарочных сертификатов (копейки) + границы произвольной суммы' })
   getGiftCertificateDenominations() {
+    const bounds = this.checkoutService.getGiftCertificateAmountBounds();
     return {
       denominations: this.checkoutService.getGiftCertificateDenominations(),
+      minAmount: bounds.min,
+      maxAmount: bounds.max,
     };
   }
 

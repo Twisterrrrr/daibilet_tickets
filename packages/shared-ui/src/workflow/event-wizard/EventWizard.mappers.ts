@@ -119,7 +119,7 @@ export function mapEventToDraft(event: AdminEventDetailLite): EventWizardDraft {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapDraftToCreatePayload(draft: EventWizardDraft): any {
-  const { basics, schedule, tickets } = draft;
+  const { basics, schedule: _schedule, tickets } = draft;
 
   const payload: any = {
     title: basics.title,

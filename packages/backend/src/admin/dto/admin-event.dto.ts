@@ -4,6 +4,7 @@ import {
   EditorStatus,
   EventAudience,
   EventCategory,
+  EventRefundPolicyMode,
   EventSubcategory,
   OfferSource,
   OfferStatus,
@@ -505,6 +506,33 @@ export class OverrideEventDto {
   @IsOptional()
   @IsObject()
   templateData?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description: 'Typed PDP blocks: routeDescription, program, menu, cast, bookingRules, visitorTips, extraFaq',
+  })
+  @IsOptional()
+  @IsObject()
+  contentTemplateData?: Record<string, unknown>;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  meetingPoint?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  routeSummary?: string;
+
+  @ApiPropertyOptional({ enum: EventRefundPolicyMode })
+  @IsOptional()
+  @IsEnum(EventRefundPolicyMode)
+  refundPolicyMode?: EventRefundPolicyMode;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  refundPolicyText?: string;
 
   @ApiPropertyOptional({
     enum: EditorStatus,
