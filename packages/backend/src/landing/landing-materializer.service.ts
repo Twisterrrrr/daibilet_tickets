@@ -20,7 +20,7 @@ export interface MaterializeResult {
  * Materializer — автоуправление видимостью лендингов по порогу событий.
  * visible = events(city, filterTag) >= minEvents
  *
- * @see docs/TopicDefinitionMatrix.md
+ * @see docs/Architecture.md
  */
 @Injectable()
 export class LandingMaterializerService {

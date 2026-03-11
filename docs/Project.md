@@ -144,7 +144,7 @@
 ## Соглашения
 
 - REST API: `/api/v1`
-- Observability: `docs/Reference.md` §2 — requestId, PII masking. Catalog cache metrics: GET /admin/ops/metrics (hits, misses, hitRate). Admin ops: flush по namespace, resync с прогрессом — см. docs/AdminOps.md.
+- Observability: `docs/Reference.md` §2 — requestId, PII masking. Catalog cache metrics: GET /admin/ops/metrics (hits, misses, hitRate). Admin ops: flush по namespace, resync с прогрессом — см. [AdminSystem.md](AdminSystem.md).
 - Цены в копейках (целое число)
 - Даты — ISO 8601, UTC в БД, локальные при отображении
 - Slug — транслитерация кириллицы
@@ -211,7 +211,7 @@
   - Prisma схема + миграции (`packages/backend/prisma`), скрипты синхронизации (`prisma/*.ts`, `src/catalog/*`).
 - **`packages/frontend`** — публичный сайт (Next.js App Router):
   - `/` (главная, города, подборки, события, билеты, блог, checkout).
-  - Виджет выбора сеанса и checkout: `docs/PR-C.md` (PR-C1…C5, архитектура CheckoutSession → PaymentIntent → Package).
+  - Виджет выбора сеанса и checkout: `docs/archive/PR-C.md` (PR-C1…C5, архитектура CheckoutSession → PaymentIntent → Package).
   - SSR/SSG для SEO, TailwindCSS, React Query.
 - **`packages/frontend-admin`** — админка Daibilet (React + Vite):
   - Страницы: `src/pages/events/*` (EventsList, EventEdit, EventCreate, EventsMerge), `cities/*`, `venues/*`, `landings/*`, `collections/*`, `combos/*`, `upsells/*`, `widgets/*`, `articles/*`, `reviews/*`, `support/*`, `orders/*`, `audit/*`, `moderation/*`, `reconciliation/*`, `settings/*`, `Dashboard`, `Login`.
@@ -228,7 +228,7 @@
 
 ### Админка: готовность, расписание, мультисобытия, SEO-аудит
 
-- **Спецификация:** `docs/AdminScheduleSpec.md` — готовность события (blocking/warnings), ручной publish + admin override, мультисобытия как отдельный уровень, SEO-аудит как список задач, Teplohod-style расписание (вкладка «Расписание»: сетка дата×час, drag/ctrl-brush, минуты, вместимость, Модель A при продажах). Scope: только события из админки/ЛК (импортируемые передаются как есть). **Pipeline:** `docs/AdminSchedulePipeline.md` — PR1→PR4 с подзадачами, AC и UX для Cursor.
+- **Спецификация:** [AdminSystem.md](AdminSystem.md) — готовность события, ручной publish, мультисобытия, SEO-аудит, Teplohod-style расписание (сетка дата×час, drag/ctrl-brush, Модель A при продажах). Scope: только MANUAL события.
 
 ### Глобальные мульти-события (одно шоу в разных городах)
 

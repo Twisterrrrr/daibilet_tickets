@@ -16,13 +16,13 @@
 
 # Часть I — Закрытые задачи (Выполнено)
 
-> Сводка выполненных работ по темам. Детали — в секциях ниже и в `docs/Diary.md`.
+> Сводка выполненных работ по темам. Исторические детали — `docs/archive/Diary.md`.
 
 ## Checkout + Smart UX (C0–C7) + E2E validation (06.03.2026) ✅
 
 - **C0–C7 реализованы:** контракты ошибок, read API, smart sorting (bestOption зафиксирован), checkout + redirect, holds (в т.ч. AWAITING_PAYMENT), paid = PackageItem + FulfillmentItem, webhook, precomputed stats (soldLast24h), last-customer snapshot.
-- **Правило bestOption** нормализовано и документировано (один сеанс на событие = ближайший по startsAt среди доступных). См. `docs/PR-C0-C7-Final.md` §6.
-- **E2E validation pass (06.03.2026)** выполнен: smoke path (Read API → Checkout → Payment → Webhook → Fulfillment → Stats → Last customer), 5 edge cases (last seats race, duplicate webhook, late payment after expiry, soldLast24h, last-customer). См. `docs/PR-C0-C7-Final.md` §8.
+- **Правило bestOption** нормализовано и документировано (один сеанс на событие = ближайший по startsAt среди доступных). См. `docs/archive/PR-C0-C7-Final.md` §6.
+- **E2E validation pass (06.03.2026)** выполнен: smoke path (Read API → Checkout → Payment → Webhook → Fulfillment → Stats → Last customer), 5 edge cases (last seats race, duplicate webhook, late payment after expiry, soldLast24h, last-customer). См. `docs/archive/PR-C0-C7-Final.md` §8.
 
 ## Gate 0a — Staging (03.2026) ✅
 
@@ -32,7 +32,7 @@
 ## Canonical Tag Enrichment + Auto Landing Engine (11.03.2026) ✅
 
 - **Enrichment:** `canonical-tag-enrichment.ts` — единый слой тегов по title/description; city-specific правила; 29 unit-тестов. Подключён в retagAll.
-- **Materializer:** TopicDefinition, LandingMaterializerService, POST /admin/landings/materialize. См. docs/LandingTagsStrategy.md, docs/TopicDefinitionMatrix.md.
+- **Materializer:** TopicDefinition, LandingMaterializerService, POST /admin/landings/materialize. См. [Architecture.md](Architecture.md).
 - **Phase A (staging):** POST /admin/settings/ops/retag-and-materialize — retag + materialize с summary (beforeVisible, visible, hidden, changedSlugs). POST /admin/settings/ops/retag выполняет retagAll.
 - **Phase B (materialize после sync):** sync → retag → materialize. CatalogController sync/all и SyncProcessor sync-full вызывают materializer; результат в ответе. Идемпотентно, fallback при ошибке.
 
@@ -40,7 +40,7 @@
 
 - **Prompt 2 (Catalog observability):** CacheService — hits/misses в getOrSet, getCacheStats(). GET /admin/ops/metrics расширен полем `cache: { hits, misses, hitRate }`.
 - **Admin ops — Flush по namespace:** POST /admin/settings/ops/cache/flush?namespace={ns}. Поддержка: full, cities, events, catalog, tags, regions, landings, combos, search. UI: select + «Flush Cache».
-- **Admin ops — Resync с прогрессом:** Full Sync / Incr Sync ставят задачу в BullMQ. GET /admin/settings/ops/sync/progress?jobId=... — state, finishedOn, failedReason. См. docs/AdminOps.md.
+- **Admin ops — Resync с прогрессом:** Full Sync / Incr Sync ставят задачу в BullMQ. GET /admin/settings/ops/sync/progress?jobId=... — state, finishedOn, failedReason. См. [AdminSystem.md](AdminSystem.md).
 
 ## Publish-gate UI + каталог городов (08.03.2026) ✅
 
@@ -206,7 +206,7 @@
 
 ### Gate 2.5 — админка событий (готовность, расписание, поставщики)
 
-> Спецификация: `docs/AdminScheduleSpec.md`, pipeline: `docs/AdminSchedulePipeline.md`. Поставщики: см. раздел ниже.
+> Спецификация: [AdminSystem.md](AdminSystem.md). Поставщики: см. раздел ниже.
 > **Статус:** Gate 2.5 завершён; админка событий, расписания и поставщиков готова к ежедневной работе.
 
 - [x] **Высокий**: PR1 — GET /admin/events/:id/quality (on-demand), UI «Причины неактивности» + подсветка вкладок, field→tabKey (**v1 реализован**: endpoint + `EventQualityService` + `QualityBanner`)
@@ -240,7 +240,7 @@
 
 ### Контент-операции админки (FEATURE 7–10) ✅
 
-> Ownership полей и риски зафиксированы в `docs/PR-C0-C7-Final.md` §9. Реализовано 06.03.2026.
+> Ownership полей и риски зафиксированы в `docs/archive/PR-C0-C7-Final.md` §9. Реализовано 06.03.2026.
 
 - [x] **FEATURE 7** — Quick view: пометки ownership [S]/[L] в EventQuickViewDrawer (заголовок, категория, SEO-блок)
 - [x] **FEATURE 9** — Quality score: в issues добавлено поле ownership (source/local), отображается в QualityBanner
@@ -469,7 +469,7 @@
 
 ### Checkout + Smart UX pipeline (C0–C7)
 - [x] **Высокий**: Checkout + Smart UX (C0–C7) — **implemented** ✅
-- [x] **Высокий**: E2E validation + edge-case hardening (smoke path + 5 edge cases) — **выполнен 06.03** (см. `docs/PR-C0-C7-Final.md` §8) ✅
+- [x] **Высокий**: E2E validation + edge-case hardening (smoke path + 5 edge cases) — **выполнен 06.03** (см. `docs/archive/PR-C0-C7-Final.md` §8) ✅
 
 ### YooKassa + Checkout (Фаза 4)
 - [ ] **Критический**: Модуль PaymentModule — YooKassa API v3, создание платежа, webhook handler
@@ -556,4 +556,4 @@
 
 ---
 
-> **Порядок приоритетов:** платежи (Неделя 1) → контент (1–2) → планировщик MVP (3–4). Подробнее — `docs/Diary.md`.
+> **Порядок приоритетов:** платежи (Неделя 1) → контент (1–2) → планировщик MVP (3–4). Подробнее — `docs/archive/Diary.md`.
