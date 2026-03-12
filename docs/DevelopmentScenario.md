@@ -14,17 +14,17 @@
 
 ## 2. Ближайшие этапы (приоритет)
 
-### Этап A — UX-полировка Supplier Cabinet (средний)
+### Этап A — UX-полировка Supplier Cabinet (средний) ✅
 
-| Задача | Файл | Действие | Приоритет |
-|-------|------|----------|-----------|
-| A1. StatCard на дашборде | `frontend-supplier/pages/Dashboard.tsx` | Заменить KPI через SectionCard на StatCard из shared-ui (заказы, выручка, trust, лимит) | Высокий |
-| A2. Reviews — shared-ui | `frontend-supplier/pages/Reviews.tsx` | Добавить PageHeader, SectionCard, LoadingState, ErrorState | Высокий |
-| A3. Balance — tooltips | `frontend-supplier/pages/Balance.tsx` | Добавить tooltip/подсказки по статусам заявок (NEW, APPROVED, REJECTED, PAID) и срокам обработки | Средний |
-| A4. EventsList — визуал | `frontend-supplier/pages/events/EventsList.tsx` | Унифицировать бейджи/иконки статусов (как в Event Horizon Hub) | Средний |
+| Задача | Файл | Действие | Статус |
+|-------|------|----------|--------|
+| A1. StatCard на дашборде | `Dashboard.tsx` | KPI через StatCard (заказы, выручка, trust, лимит) | ✅ |
+| A2. Reviews — shared-ui | `Reviews.tsx` | PageHeader, SectionCard, LoadingState, ErrorState, retry | ✅ |
+| A3. Balance — tooltips | `Balance.tsx` | PAYOUT_STATUS_LABELS + title tooltips (сроки обработки) | ✅ |
+| A4. EventsList — визуал | `EventsList.tsx` | STATUS_ICONS с badgeClass (rounded-full, цвета) | ✅ |
 
 **Definition of Done A:**  
-Dashboard, EventsList, EventEdit, Reviews, Balance, Reports, Settings, Notifications — везде PageHeader, SectionCard, EmptyState, ErrorState, LoadingState. KPI через StatCard.
+Dashboard, Reviews, Balance, EventsList — StatCard, shared-ui, tooltips, бейджи унифицированы.
 
 ---
 

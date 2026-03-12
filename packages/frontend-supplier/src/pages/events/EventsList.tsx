@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle, Clock, Eye, EyeOff, Plus, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Eye, EyeOff, Plus, Trash2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -6,23 +6,23 @@ import { EmptyState, LoadingState, PageHeader, SectionCard } from '@daibilet/sha
 
 import { api } from '../../lib/api';
 
-const STATUS_ICONS: Record<string, any> = {
-  APPROVED: { icon: CheckCircle, color: 'text-green-600', label: 'Одобрено' },
-  AUTO_APPROVED: { icon: CheckCircle, color: 'text-blue-600', label: 'Авто' },
-  PENDING_REVIEW: { icon: Clock, color: 'text-orange-500', label: 'На модерации' },
-  REJECTED: { icon: XCircle, color: 'text-red-500', label: 'Отклонено' },
-  DRAFT: { icon: EyeOff, color: 'text-gray-400', label: 'Черновик' },
+const STATUS_ICONS: Record<string, { icon: any; badgeClass: string; label: string }> = {
+  APPROVED: { icon: CheckCircle, badgeClass: 'bg-emerald-50 text-emerald-700', label: 'Одобрено' },
+  AUTO_APPROVED: { icon: CheckCircle, badgeClass: 'bg-blue-50 text-blue-700', label: 'Авто' },
+  PENDING_REVIEW: { icon: Clock, badgeClass: 'bg-amber-50 text-amber-800', label: 'На модерации' },
+  REJECTED: { icon: XCircle, badgeClass: 'bg-red-50 text-red-700', label: 'Отклонено' },
+  DRAFT: { icon: EyeOff, badgeClass: 'bg-slate-100 text-slate-600', label: 'Черновик' },
 };
 
 export default function EventsList() {
   const [events, setEvents] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [trustInfo, setTrustInfo] = useState<{ activeEventsCount: number; activeEventsLimit: number } | null>(null);
 
-  useEffect(() => {
+  const loadEvents = () => {
     setLoading(true);
-
     api
       .get<{ items: any[]; total: number }>('/supplier/events')
       .then((res) => {
@@ -30,6 +30,11 @@ export default function EventsList() {
         setTotal(res.total);
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    loadEvents();
 
     api
       .get<{
@@ -47,6 +52,23 @@ export default function EventsList() {
         setTrustInfo(null);
       });
   }, []);
+
+  const handleDelete = async (event: any) => {
+    if (!event.id) return;
+    const status = event.moderationStatus as string;
+    if (!['DRAFT', 'REJECTED'].includes(status)) return;
+    if (!window.confirm('Удалить это событие? Его нельзя будет восстановить из кабинета поставщика.')) return;
+    setDeletingId(event.id);
+    try {
+      await api.del(`/supplier/events/${event.id}`);
+      loadEvents();
+    } catch (e) {
+      console.error(e);
+      alert(e instanceof Error ? e.message : 'Не удалось удалить событие');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -97,33 +119,53 @@ export default function EventsList() {
         <SectionCard>
           {events.map((event) => {
             const st = STATUS_ICONS[event.moderationStatus] || STATUS_ICONS.DRAFT;
+            const canDelete = ['DRAFT', 'REJECTED'].includes(event.moderationStatus);
+            const rating = event.rating != null ? Number(event.rating) : 0;
+            const reviewsCount = typeof event.reviewCount === 'number' ? event.reviewCount : event._count?.reviews || 0;
+            const hasRating = reviewsCount > 0 && rating > 0;
+
             return (
-              <Link
-                key={event.id}
-                to={`/events/${event.id}`}
-                className="flex items-center gap-4 p-4 transition-colors hover:bg-gray-50"
-              >
-                {event.imageUrl ? (
-                  <img src={event.imageUrl} alt="" className="h-16 w-16 rounded-lg object-cover" />
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-gray-100">
-                    <Eye className="h-6 w-6 text-gray-300" />
+              <div key={event.id} className="flex items-center gap-4 p-4 transition-colors hover:bg-gray-50">
+                <Link to={`/events/${event.id}`} className="flex flex-1 items-center gap-4">
+                  {event.imageUrl ? (
+                    <img src={event.imageUrl} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-gray-100">
+                      <Eye className="h-6 w-6 text-gray-300" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{event.title}</p>
+                    <p className="text-sm text-gray-500">
+                      {event.city?.name} | {event._count?.offers || 0} офферов
+                      {hasRating && (
+                        <>
+                          {' '}
+                          · Рейтинг {rating.toFixed(1)} ({reviewsCount})
+                        </>
+                      )}
+                    </p>
                   </div>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${st.badgeClass}`}>
+                    <st.icon className="h-3.5 w-3.5" />
+                    {st.label}
+                  </span>
+                  {event.moderationNote && (
+                    <span className="max-w-[200px] truncate text-xs text-red-500">{event.moderationNote}</span>
+                  )}
+                </Link>
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(event)}
+                    disabled={deletingId === event.id}
+                    className="inline-flex items-center gap-1 rounded-lg border border-red-100 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {deletingId === event.id ? 'Удаление…' : 'Удалить'}
+                  </button>
                 )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{event.title}</p>
-                  <p className="text-sm text-gray-500">
-                    {event.city?.name} | {event._count?.offers || 0} офферов
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <st.icon className={`h-4 w-4 ${st.color}`} />
-                  <span className={`text-xs ${st.color}`}>{st.label}</span>
-                </div>
-                {event.moderationNote && (
-                  <span className="max-w-[200px] truncate text-xs text-red-500">{event.moderationNote}</span>
-                )}
-              </Link>
+              </div>
             );
           })}
         </SectionCard>

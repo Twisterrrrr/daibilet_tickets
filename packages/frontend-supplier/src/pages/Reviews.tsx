@@ -2,7 +2,7 @@ import { AlertTriangle, CheckCircle2, FileText, MessageSquare, Send } from 'luci
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { EmptyState } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
 
 import { api } from '../lib/api';
 
@@ -59,9 +59,12 @@ export default function Reviews() {
   const [detail, setDetail] = useState<ReviewDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  const [listError, setListError] = useState<string | null>(null);
+
   const fetchList = useCallback(async (resetPage: boolean) => {
     const p = resetPage ? 1 : page;
     setLoading(true);
+    setListError(null);
     try {
       const params = new URLSearchParams();
       params.set('tab', tab);
@@ -75,8 +78,9 @@ export default function Reviews() {
       setHasMore(res.hasMore ?? (res.items.length + (p - 1) * 20 < res.total));
       if (resetPage) setPage(1);
       else setPage(p);
-    } catch {
+    } catch (e) {
       setItems([]);
+      setListError(e instanceof Error ? e.message : 'Ошибка загрузки');
     } finally {
       setLoading(false);
     }
@@ -106,15 +110,15 @@ export default function Reviews() {
 
   if (id) {
     if (detailLoading && !detail) {
-      return <div className="flex min-h-[200px] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /></div>;
+      return <LoadingState label="Загружаем отзыв..." />;
     }
     if (detail) {
       return <ReviewDetailView review={detail} onBack={handleBack} onUpdate={() => fetchList(true)} />;
     }
     return (
-      <div>
-        <button onClick={handleBack} className="text-sm text-gray-500 hover:text-gray-700">← К списку</button>
-        <p className="mt-4 text-gray-600">Отзыв не найден</p>
+      <div className="space-y-4">
+        <button onClick={handleBack} className="text-sm text-slate-500 hover:text-slate-700">← К списку</button>
+        <ErrorState title="Отзыв не найден" description="Возможно, он был удалён или у вас нет доступа." />
       </div>
     );
   }
@@ -127,13 +131,28 @@ export default function Reviews() {
   ];
 
   return (
-    <div>
-      <h1 className="mb-6 flex items-center gap-2 text-xl font-bold">
-        <MessageSquare className="h-6 w-6" />
-        Отзывы
-      </h1>
-      <div className="space-y-4">
-        <div className="flex gap-2 border-b">
+    <div className="space-y-6">
+      <PageHeader
+        title="Отзывы"
+        subtitle={total > 0 ? `Всего: ${total}` : undefined}
+      />
+      {listError && (
+        <ErrorState
+          title="Ошибка загрузки"
+          description={listError}
+          action={
+            <button
+              type="button"
+              onClick={() => fetchList(true)}
+              className="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+            >
+              Повторить
+            </button>
+          }
+        />
+      )}
+      <SectionCard>
+        <div className="flex flex-wrap gap-2 border-b pb-3">
           {tabs.map((t) => (
             <button
               key={t.value}
@@ -145,9 +164,7 @@ export default function Reviews() {
           ))}
         </div>
         {loading && items.length === 0 ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-lg bg-gray-100" />)}
-          </div>
+          <LoadingState label="Загружаем отзывы..." />
         ) : items.length === 0 ? (
           <EmptyState title="Нет отзывов" />
         ) : (
@@ -185,14 +202,14 @@ export default function Reviews() {
               <button
                 onClick={() => fetchList(false)}
                 disabled={loading}
-                className="w-full rounded-lg border py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                className="mt-4 w-full rounded-lg border py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
               >
                 {loading ? 'Загрузка...' : `Показать ещё (всего ${total})`}
               </button>
             )}
           </>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 }
