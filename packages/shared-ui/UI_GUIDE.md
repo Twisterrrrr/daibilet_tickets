@@ -185,13 +185,54 @@ if (error) {
   - **обернуть** куски в `SectionCard`/`FormSection` для единых отступов;
   - **не трогать** внутреннюю структуру до отдельной задачи по рефакторингу.
 
-### 10. TL;DR для новых экранов
+### 10. KPI-карточки (`StatCard`)
+
+Для дашбордов — компактные метрики вместо крупных SectionCard:
+
+```tsx
+import { StatCard } from '@daibilet/shared-ui';
+
+<StatCard
+  label="Активных событий"
+  value={activeCount}
+  icon={<Calendar className="h-5 w-5 text-slate-400" />}
+  description="По вашим листингам"
+/>
+```
+
+- `label` — подпись метрики (заказы, выручка, trust level, лимит событий).
+- `value` — число или текст.
+- `icon` — опционально, справа сверху.
+- Используется в Supplier Dashboard и Admin Dashboard.
+
+### 11. Единый паттерн списков (admin)
+
+| Элемент | Компонент |
+|---------|-----------|
+| Заголовок | `PageHeader` |
+| Фильтры | `Card` / `SectionCard` над таблицей |
+| Таблица | `DataTable` |
+| Пусто | `EmptyState` |
+| Ошибка | `ErrorState` |
+| Загрузка | `LoadingState` |
+
+Фильтры в Card, не разбросаны по странице. Иконки и кнопки — единообразны (lucide-react).
+
+### 12. Регрессия
+
+Перед внедрением новых UX-изменений пройти Critical Path: `docs/RegressionChecklist.md` (S1–S9 Supplier, A1–A11 Admin).
+
+---
+
+### 13. TL;DR для новых экранов
 
 1. Каркас страницы: `AppShell + PageHeader + PageContainer`.
 2. Логику разбиваем на секции: `SectionCard` (просмотр) и `FormSection` (формы).
-3. Поля формы — всегда через `FormGrid`.
-4. Таблицы admin — `DataTable` + `SectionCard`.
-5. Loading/Empty/Error — только через `LoadingState` / `EmptyState` / `ErrorState`.
-6. Кнопки в формах — через `FormActions` (и при необходимости `StickyFormActions`).
-7. Подтверждения — через `ConfirmDialog`.
+3. KPI на дашбордах — через `StatCard`.
+4. Поля формы — всегда через `FormGrid`.
+5. Таблицы admin — `DataTable` + `SectionCard`.
+6. Loading/Empty/Error — только через `LoadingState` / `EmptyState` / `ErrorState`.
+7. Кнопки в формах — через `FormActions` (и при необходимости `StickyFormActions`).
+8. Подтверждения — через `ConfirmDialog`.
+9. Перед коммитом UX — пройти Critical Path из RegressionChecklist.md.
 
