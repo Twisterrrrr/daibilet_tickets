@@ -2,16 +2,22 @@ import { CheckCircle, Clock, Eye, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { EmptyState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
+
+type SortBy = 'created_desc' | 'trust_asc';
 
 export function ModerationQueuePage() {
   const [events, setEvents] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
+  const [sortBy, setSortBy] = useState<SortBy>('created_desc');
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   const load = () => {
-    adminApi.get('/admin/moderation/queue').then((res: any) => {
+    const params = sortBy === 'trust_asc' ? '?sortBy=trust_asc' : '';
+    adminApi.get(`/admin/moderation/queue${params}`).then((res: any) => {
       setEvents(res.items || []);
       setTotal(res.total || 0);
     });
@@ -19,7 +25,7 @@ export function ModerationQueuePage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [sortBy]);
 
   const approve = async (id: string) => {
     try {
@@ -46,34 +52,37 @@ export function ModerationQueuePage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Очередь модерации ({total})</h1>
+      <PageHeader
+        title="Модерация событий"
+        subtitle={`В очереди: ${total}`}
+      />
 
       {/* Reject dialog */}
       {rejectId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl p-6 w-[400px] space-y-4 shadow-xl">
+          <div className="w-[400px] space-y-4 rounded-xl bg-white p-6 shadow-xl">
             <h3 className="font-semibold">Причина отклонения</h3>
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
               rows={3}
               placeholder="Укажите причину..."
             />
-            <div className="flex gap-2 justify-end">
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => {
                   setRejectId(null);
                   setRejectReason('');
                 }}
-                className="px-4 py-2 border rounded-lg text-sm"
+                className="rounded-lg border px-4 py-2 text-sm"
               >
                 Отмена
               </button>
               <button
                 onClick={reject}
                 disabled={!rejectReason.trim()}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm disabled:opacity-50"
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white disabled:opacity-50"
               >
                 Отклонить
               </button>
@@ -82,58 +91,70 @@ export function ModerationQueuePage() {
         </div>
       )}
 
-      <div className="rounded-xl border bg-card divide-y">
-        {events.length === 0 && (
-          <div className="p-8 text-center text-muted-foreground">
-            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
-            Нет событий на модерации
+      <SectionCard
+        headerRight={
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            className="rounded-lg border px-3 py-2 text-sm"
+          >
+            <option value="created_desc">По дате (новые первыми)</option>
+            <option value="trust_asc">По trust (низкий приоритет)</option>
+          </select>
+        }
+      >
+        {events.length === 0 ? (
+          <EmptyState
+            title="Нет событий на модерации"
+            description="Все отправленные события уже рассмотрены."
+          />
+        ) : (
+          <div className="divide-y">
+            {events.map((event) => (
+            <div key={event.id} className="flex items-start gap-4 p-4">
+              {event.imageUrl ? (
+                <img src={event.imageUrl} alt="" className="h-20 w-20 rounded-lg object-cover" />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-muted">
+                  <Eye className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              <div className="flex-1">
+                <div className="mb-1 flex items-center gap-2">
+                  <h3 className="font-medium">{event.title}</h3>
+                  {event.moderationStatus === 'PENDING_REVIEW' && (
+                    <span className="flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
+                      <Clock className="h-3 w-3" /> Ожидает
+                    </span>
+                  )}
+                  {event.moderationStatus === 'AUTO_APPROVED' && (
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">Авто (пост-модерация)</span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {event.city?.name} | Оператор: {event.operator?.companyName || event.operator?.name || '—'} (Trust:{' '}
+                  {event.operator?.trustLevel}) | {event._count?.offers || 0} офферов
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  onClick={() => approve(event.id)}
+                  className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs text-white hover:bg-green-700"
+                >
+                  <CheckCircle className="h-3.5 w-3.5" /> Одобрить
+                </button>
+                <button
+                  onClick={() => setRejectId(event.id)}
+                  className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700"
+                >
+                  <XCircle className="h-3.5 w-3.5" /> Отклонить
+                </button>
+              </div>
+            </div>
+          ))}
           </div>
         )}
-        {events.map((event) => (
-          <div key={event.id} className="p-4 flex items-start gap-4">
-            {event.imageUrl ? (
-              <img src={event.imageUrl} alt="" className="w-20 h-20 rounded-lg object-cover" />
-            ) : (
-              <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
-                <Eye className="h-6 w-6 text-muted-foreground" />
-              </div>
-            )}
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-medium">{event.title}</h3>
-                {event.moderationStatus === 'PENDING_REVIEW' && (
-                  <span className="px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700 flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> Ожидает
-                  </span>
-                )}
-                {event.moderationStatus === 'AUTO_APPROVED' && (
-                  <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
-                    Авто (пост-модерация)
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {event.city?.name} | Оператор: {event.operator?.companyName || event.operator?.name || '—'} (Trust:{' '}
-                {event.operator?.trustLevel}) | {event._count?.offers || 0} офферов
-              </p>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <button
-                onClick={() => approve(event.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700"
-              >
-                <CheckCircle className="h-3.5 w-3.5" /> Одобрить
-              </button>
-              <button
-                onClick={() => setRejectId(event.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700"
-              >
-                <XCircle className="h-3.5 w-3.5" /> Отклонить
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      </SectionCard>
     </div>
   );
 }

@@ -9,6 +9,8 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import { EmptyState, ErrorState, LoadingState, PageHeader } from '@daibilet/shared-ui';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -94,6 +96,7 @@ export function SupportListPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const status = searchParams.get('status') || '';
   const category = searchParams.get('category') || '';
@@ -104,6 +107,7 @@ export function SupportListPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (category) params.set('category', category);
@@ -130,6 +134,7 @@ export function SupportListPage() {
       }
     } catch (e) {
       console.error('Load tickets failed:', e);
+      setError(e instanceof Error ? e.message : 'Ошибка загрузки');
     }
     setLoading(false);
   }, [status, category, search, page, token]);
@@ -148,23 +153,17 @@ export function SupportListPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <HeadphonesIcon className="h-6 w-6 text-blue-600" />
-          <h1 className="text-2xl font-bold">Поддержка</h1>
-          {stats && stats.slaBreached > 0 && (
-            <span className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
-              <AlertTriangle className="h-3 w-3" />
-              {stats.slaBreached} SLA
-            </span>
-          )}
-        </div>
-        <Button variant="outline" size="sm" onClick={fetchData}>
-          <RefreshCw className="h-4 w-4 mr-1" />
-          Обновить
-        </Button>
-      </div>
+      <PageHeader
+        title="Поддержка"
+        subtitle={stats && stats.slaBreached > 0 ? `${stats.slaBreached} SLA нарушено` : `Всего: ${total}`}
+        actions={
+          <Button variant="outline" size="sm" onClick={fetchData}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Обновить
+          </Button>
+        }
+      />
+      {error && <ErrorState title="Ошибка загрузки" description={error} action={<Button variant="outline" size="sm" onClick={fetchData}>Повторить</Button>} />}
 
       {/* Stats cards */}
       {stats && (
@@ -241,9 +240,9 @@ export function SupportListPage() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-8 text-center text-slate-400">Загрузка...</div>
+            <LoadingState label="Загружаем тикеты..." />
           ) : tickets.length === 0 ? (
-            <div className="p-8 text-center text-slate-400">Тикеты не найдены</div>
+            <EmptyState title="Тикеты не найдены" description="Попробуйте изменить фильтры" />
           ) : (
             <div className="divide-y">
               {tickets.map((ticket) => (
