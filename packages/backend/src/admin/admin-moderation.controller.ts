@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { SupplierTrustService } from '../supplier/supplier-trust.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { RejectModerationDto } from './dto/admin.dto';
 
@@ -25,7 +26,10 @@ import { RejectModerationDto } from './dto/admin.dto';
 @UseInterceptors(AuditInterceptor)
 @Controller('admin/moderation')
 export class AdminModerationController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly supplierTrust: SupplierTrustService,
+  ) {}
 
   /**
    * Очередь модерации: события со статусом PENDING_REVIEW или AUTO_APPROVED (пост-модерация).
@@ -82,6 +86,11 @@ export class AdminModerationController {
 
     if (!['PENDING_REVIEW', 'AUTO_APPROVED', 'REJECTED'].includes(event.moderationStatus)) {
       throw new BadRequestException(`Нельзя одобрить событие в статусе ${event.moderationStatus}`);
+    }
+
+    if (event.operatorId) {
+      // Проверка лимита активных событий для поставщика перед публикацией.
+      await this.supplierTrust.assertSupplierCanActivateEvent(event.operatorId);
     }
 
     const updated = await this.prisma.event.update({

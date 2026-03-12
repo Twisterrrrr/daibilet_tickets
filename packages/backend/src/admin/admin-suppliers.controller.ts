@@ -126,6 +126,20 @@ export class AdminSuppliersController {
         platformFee: payments._sum.platformFee || 0,
         supplierRevenue: payments._sum.supplierAmount || 0,
       },
+      trust: {
+        score: supplier.trustScore,
+        level: supplier.trustLevel,
+        profile: supplier.trustProfileScore,
+        catalog: supplier.trustCatalogScore,
+        operations: supplier.trustOperationsScore,
+        reputation: supplier.trustReputationScore,
+        stability: supplier.trustStabilityScore,
+        penalties: supplier.trustPenaltyScore,
+        manualOverrideLevel: supplier.trustManualOverrideLevel,
+        manualOverrideScore: supplier.trustManualOverrideScore,
+        manualOverrideExpiresAt: supplier.trustManualExpiresAt,
+        lastCalculatedAt: supplier.trustLastCalculatedAt,
+      },
     };
   }
 

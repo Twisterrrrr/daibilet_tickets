@@ -77,7 +77,7 @@ export function SupplierDetailPage() {
   if (!supplier) return <div className="animate-pulse">Загрузка...</div>;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">{supplier.companyName || supplier.name}</h1>
@@ -115,6 +115,47 @@ export function SupplierDetailPage() {
         </CardContent>
       </Card>
 
+      {supplier.trust && (
+        <Card>
+          <CardContent className="grid gap-4 border-0 bg-transparent p-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Уровень доверия</p>
+              <p className="text-2xl font-bold">
+                {supplier.trust.level} уровень{' '}
+                <span className="text-sm font-medium text-muted-foreground">
+                  ({supplier.trust.score}/100)
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Последний пересчёт:{' '}
+                {supplier.trust.lastCalculatedAt
+                  ? new Date(supplier.trust.lastCalculatedAt).toLocaleString('ru')
+                  : 'нет данных'}
+              </p>
+              {supplier.trust.manualOverrideLevel != null && (
+                <p className="text-xs text-amber-700">
+                  Ручной override до уровня {supplier.trust.manualOverrideLevel}
+                  {supplier.trust.manualOverrideExpiresAt && (
+                    <> до {new Date(supplier.trust.manualOverrideExpiresAt).toLocaleDateString('ru')}</>
+                  )}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Разложение по блокам</p>
+              <ul className="space-y-0.5 text-sm text-muted-foreground">
+                <li>Профиль: {supplier.trust.profile}</li>
+                <li>Каталог: {supplier.trust.catalog}</li>
+                <li>Операции: {supplier.trust.operations}</li>
+                <li>Репутация: {supplier.trust.reputation}</li>
+                <li>Стабильность: {supplier.trust.stability}</li>
+                <li>Штрафы: {supplier.trust.penalties}</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs
         value={currentTab}
         onValueChange={(value) => {
@@ -137,7 +178,7 @@ export function SupplierDetailPage() {
         <TabsContent value="general" className="space-y-6">
           <FormSection
             title="Настройки поставщика"
-            description="Комиссия, промо и статус поставщика"
+            description="Комиссия, trust-уровень и статус поставщика"
           >
             <FormGrid>
               <div>
@@ -147,9 +188,10 @@ export function SupplierDetailPage() {
                   onChange={(e) => setForm({ ...form, trustLevel: Number(e.target.value) })}
                   className="w-full rounded-lg border px-3 py-2 text-sm"
                 >
-                  <option value={0}>0 — Новый (модерация)</option>
-                  <option value={1}>1 — Проверенный (авто)</option>
-                  <option value={2}>2 — Доверенный</option>
+                  <option value={0}>0 — Новый</option>
+                  <option value={1}>1 — Базовый</option>
+                  <option value={2}>2 — Проверенный</option>
+                  <option value={3}>3 — Надёжный</option>
                 </select>
               </div>
               <div>

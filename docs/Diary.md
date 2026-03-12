@@ -28,6 +28,48 @@
 
 ---
 
+## 12.03.2026 — Supplier Trust System: лимиты и UI (фазы 3–7)
+
+### Наблюдения
+
+- Trust System уже имел backend‑каркас (`SupplierTrustService`, поля trust* в `Operator`), но не был до конца подключён к операциям активации событий и admin/Supplier UI.
+- Важно не ломать существующие контракты: Partner API, /supplier/* и /admin/suppliers уже используются в других частях системы.
+- Требование — мягкое введение лимитов активных событий (через trustLevel) с понятной визуализацией и без скрытых сайд‑эффектов.
+
+### Решения
+
+- **Фаза 3 — Enforcement лимитов:**
+  - В `AdminModerationController.approve` перед установкой `isActive: true` добавлена проверка `SupplierTrustService.assertSupplierCanActivateEvent(operatorId)`; при достижении лимита модератор получает `400 SUPPLIER_ACTIVE_EVENTS_LIMIT_REACHED`.
+  - В `PartnerController.upsertEvent`:
+    - при апдейте MANUAL‑события, если `data.isActive` переводит его в активное состояние, проверяется лимит;
+    - при создании нового события с автоодобрением (trustLevel ≥ 1) также вызывается `assertSupplierCanActivateEvent`.
+  - `AdminModule` теперь импортирует `SupplierModule`, чтобы reuse‑ить `SupplierTrustService` без дублирования провайдера.
+- **Фаза 4 — Ежедневный пересчёт:**
+  - Добавлен `SupplierTrustJob` (Nest Scheduler) с cron `EVERY_DAY_AT_3AM`, который идёт по всем `Operator.isSupplier=true` и дергает `recalculateSupplierTrust`.
+  - Job зарегистрирован в `SupplierModule`; `SchedulerModule` уже присутствует в `AppModule`.
+- **Фаза 5 — Admin API расширен:**
+  - `GET /admin/suppliers/:id` возвращает блок `trust` (score, level, breakdown, penalties, manualOverride*, lastCalculatedAt), не ломая существующую структуру ответа (старые поля остаются на корне).
+- **Фаза 6 — Supplier UI:**
+  - Dashboard (frontend-supplier) уже отображает Trust (уровень, прогресс‑бар, лимит активных событий и шаги до следующего уровня); логика сохранена.
+  - `EventsList` (frontend-supplier) дополнен баннером:
+    - грузится `/supplier/dashboard`, берутся `activeEventsCount`/`activeEventsLimit`;
+    - при загрузке показывается карточка с текстом: текущий лимит, рекомендации (деактивировать часть событий или улучшать профиль/каталог);
+    - цвет: жёлтый при >80% лимита, красный при полном достижении.
+- **Фаза 7 — Admin UI:**
+  - `SuppliersList` обновлён под 4 уровня доверия (0–3) с новыми подписями «Новый/Базовый/Проверенный/Надёжный».
+  - `SupplierDetailPage`:
+    - добавлена отдельная панель Trust с отображением score/100, разложения по блокам (profile/catalog/operations/reputation/stability/penalties), временем последнего пересчёта и признаком ручного override (если заполнены поля override);
+    - блок «Настройки поставщика» обновлён: select Trust Level теперь поддерживает уровни 0–3 с новыми русскими подписями.
+- **Документация и трекер:**
+  - `docs/Project.md` дополнен разделом Supplier Trust System с описанием уровней, лимитов и пересчёта.
+  - `docs/Tasktracker.md` добавлен блок ST‑1…ST‑7 со статусами по фазам Trust System.
+
+### Проблемы
+
+- Полноценный CRUD для ручного override (trustManualOverrideLevel/Score/Reason/ExpiresAt) пока не выведен в отдельную admin‑форму; текущий UI даёт только редактирование `trustLevel` и просмотр breakdown. Это оставлено как отдельный шаг, чтобы не усложнять MVP и не размывать ответственность между auto-score и ручными корректировками.
+
+---
+
 ## 11.03.2026 — Review Module MVP: этапы 3–11 закрыты
 
 ### Наблюдения

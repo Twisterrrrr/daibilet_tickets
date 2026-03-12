@@ -258,6 +258,57 @@
 - [ ] **Средний**: Нормализация offers (ACTIVE только для продаваемых, наличие хотя бы одного ACTIVE offer как publish-gate)
 - [ ] **Средний**: TEPLOHOD события с открытой датой (OPEN_DATE): в админке задавать диапазон дат для продажи билетов (startDate/endDate или только endDate), делать событие активным для каталога при наличии валидного диапазона.
 
+---
+
+## Supplier Trust System (Trust Score + Trust Levels)
+
+- **Приоритет:** Высокий
+
+### ST-1 — Backend Trust Service (SupplierTrustService) ✅
+
+- [x] Рассчитать Trust Score (0–100) по блокам profile/catalog/operations/reputation/stability/penalties.
+- [x] Map Trust Score → Trust Level (0–3).
+- [x] Лимиты активных событий по уровню (0→5, 1→10, 2→25, 3→50).
+- [x] Метод `assertSupplierCanActivateEvent` с ошибкой `SUPPLIER_ACTIVE_EVENTS_LIMIT_REACHED`.
+- [x] Юнит‑тесты для mapScoreToLevel, getActiveEventsLimitByTrustLevel, assertSupplierCanActivateEvent.
+
+### ST-2 — Supplier Dashboard API + Trust Block ✅
+
+- [x] `/supplier/dashboard` возвращает блок `trust` (score, level, breakdown, activeEventsLimit, activeEventsCount, nextLevelRequirements).
+- [x] Supplier Dashboard (frontend-supplier) отображает уровень доверия, прогресс‑бар и лимит активных событий.
+- [x] Settings (frontend-supplier) показывает текущий `trustLevel` и статус верификации.
+
+### ST-3 — Limit Enforcement (Admin + Partner) ✅
+
+- [x] Admin: при `POST /admin/moderation/:id/approve` выполняется проверка `assertSupplierCanActivateEvent` перед установкой isActive=true.
+- [x] Partner API: при создании MANUAL‑событий с автоодобрением (trustLevel ≥ 1) проверяется лимит активных событий.
+- [x] Ошибка `SUPPLIER_ACTIVE_EVENTS_LIMIT_REACHED` документирована в `SupplierTrustService`.
+
+### ST-4 — Daily Recalculation Job ✅
+
+- [x] `SupplierTrustJob` (Nest Scheduler) пересчитывает trust всех `Operator.isSupplier=true` ежедневно в 03:00.
+- [x] AppModule уже содержит `SchedulerModule`, job зарегистрирован в `SupplierModule`.
+
+### ST-5 — Supplier UI (Кабинет поставщика) ✅
+
+- [x] Dashboard: карточка лимита активных событий (текущий счётчик, лимит, прогресс‑бар, текстовые подсказки).
+- [x] EventsList (frontend-supplier): баннер‑предупреждение по лимиту (жёлтый при >80%, красный при достижении лимита), текстовое объяснение действий.
+- [ ] Events Edit: inline‑подсказки по улучшению каталога и профиля (отложено).
+
+### ST-6 — Admin UI (Список и карточка поставщика) ✅
+
+- [x] SuppliersList: Trust‑бейджи скорректированы под уровни 0–3 (Новый/Базовый/Проверенный/Надёжный).
+- [x] SupplierDetail: панель Trust (score/100, разложение по блокам, timestamp последнего пересчёта, индикация ручного override при наличии).
+- [x] SupplierDetail: select Trust Level обновлён под уровни 0–3.
+- [ ] Полноценный CRUD ручного override (trustManualOverrideLevel/Score/Reason/ExpiresAt) — отдельная задача.
+
+### ST-7 — Docs, Tests, Lint, Merge Checklist ✅
+
+- [x] Обновлён `docs/Project.md` — раздел Supplier Trust System.
+- [x] Все backend‑тесты (`npx pnpm test` в `packages/backend`) проходят.
+- [x] Линтер на изменённых файлах (backend, frontend-admin, frontend-supplier) без ошибок.
+- [ ] Отдельный документ `docs/SupplierTrustSpec.md` с формулами и сценариями — можно добавить позже при усложнении модели.
+
 ### Контент-операции админки (FEATURE 7–10) ✅
 
 > Ownership полей и риски зафиксированы в `docs/archive/PR-C0-C7-Final.md` §9. Реализовано 06.03.2026.

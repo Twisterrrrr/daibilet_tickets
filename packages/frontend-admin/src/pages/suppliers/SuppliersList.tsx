@@ -11,13 +11,15 @@ import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 
 const TRUST_LABELS: Record<number, string> = {
   0: 'Новый',
-  1: 'Проверенный',
-  2: 'Доверенный',
+  1: 'Базовый',
+  2: 'Проверенный',
+  3: 'Надёжный',
 };
 const TRUST_VARIANTS: Record<number, 'secondary' | 'default' | 'success'> = {
   0: 'secondary',
   1: 'default',
   2: 'success',
+  3: 'success',
 };
 
 interface SupplierItem {

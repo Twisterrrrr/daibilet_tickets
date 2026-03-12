@@ -132,7 +132,7 @@
 - **GiftCertificate** — подарочный сертификат (номинал, код GC-XXXX-XXXX, email получателя, сообщение). Создаётся при успешной оплате, статусы ISSUED/ACTIVATED/EXPIRED.
 - **OrderRequest** — заявка на подтверждение (SLA/TTL, expireReason, confirmedAt). Привязана к CheckoutSession.
 - **PaymentIntent** — платёжное намерение (PENDING/PROCESSING/PAID/FAILED/CANCELLED/REFUNDED). Привязка к CheckoutSession, idempotencyKey, provider (STUB/YOOKASSA). Split-поля для маркетплейса: supplierId, grossAmount, platformFee, supplierAmount, commissionRate.
-- **Operator** — юридическое лицо/правообладатель. Поля маркетплейса: isSupplier, trustLevel, commissionRate, status (ACTIVE/ARCHIVED/SUSPENDED). Подробно: § Архитектура Supplier ниже.
+- **Operator** — юридическое лицо/правообладатель. Поля маркетплейса: isSupplier, trustLevel, commissionRate, status (ACTIVE/ARCHIVED/SUSPENDED), trustScore + разложение по блокам доверия (profile/catalog/operations/reputation/stability/penalties), флаги ручного override. Подробно: § Архитектура Supplier ниже.
 - **SupplierUser** — аккаунт поставщика (Operator 1—N SupplierUser). Роли: OWNER, MANAGER, CONTENT, ACCOUNTANT.
 - **User** — пользователь сайта (регистрация/вход). Избранное в UserFavorite (eventSlug).
 - **ApiKey** — API-ключ для Partner B2B API: SHA-256 хеш (не храним оригинал), prefix (8 символов для UI), rateLimit, ipWhitelist, expiresAt.
@@ -145,6 +145,42 @@
 ### Классификация при синхронизации
 
 При синхронизации (TC gRPC, Teplohod) используется улучшенный ключевой классификатор: по заголовку и описанию автоматически назначаются **category** и **subcategory**. Порядок проверки важен: маркеры EVENT проверяются **до** EXCURSION, чтобы избежать ложных срабатываний (например, «tribute tour», «мастер-класс» в названии концерта не должны уходить в экскурсии). Категория KIDS проверяется первой (например, «детский спектакль» → KIDS, а не EVENT).
+
+## Supplier Trust System (MVP)
+
+- **Цель:** прозрачная, но лёгкая для объяснения система доверия к поставщикам (Operator) с влиянием на лимиты и приоритеты модерации.
+- **Trust Score (0–100)**: внутренний числовой балл, собираемый из пяти блоков:
+  - Profile (до 20): заполненность профиля, контакты, юр. данные, сайт/политика возвратов.
+  - Catalog (до 25): качество витринных карточек (фото, описание, расписание, цена), доля отклонённых событий.
+  - Operations (до 25): доля возвратов, частота отклонений на модерации, висящие черновики.
+  - Reputation (до 15): средний рейтинг отзывов, доля негативных.
+  - Stability (до 15): возраст оператора, наличие успешных продаж.
+  - Penalties: штрафы за высокий refund rate и частые отклонения.
+- **Trust Levels (0–3)**:
+  - 0 — Новый
+  - 1 — Базовый
+  - 2 — Проверенный
+  - 3 — Надёжный
+- **Лимиты активных событий** (Operator → Event.isActive=true + APPROVED/AUTO_APPROVED):
+  - Уровень 0: до 5 активных событий.
+  - Уровень 1: до 10 активных событий.
+  - Уровень 2: до 25 активных событий.
+  - Уровень 3: до 50 активных событий.
+- **Применение лимитов:**
+  - Partner API: при автоодобрении MANUAL-событий (trustLevel ≥ 1) перед установкой isActive=true вызывается `SupplierTrustService.assertSupplierCanActivateEvent`.
+  - Admin модерация: `POST /admin/moderation/:id/approve` проверяет лимит перед переводом события в APPROVED + isActive=true.
+  - Supplier Dashboard: `/supplier/dashboard` возвращает `trust.activeEventsCount` и `trust.activeEventsLimit` для отображения в кабинете поставщика.
+- **Пересчёт и сглаживание:**
+  - `SupplierTrustService.recalculateSupplierTrust`:
+    - читает свежие сигналы (оператор, события, платежи, отзывы),
+    - считает свежий breakdown,
+    - смешивает с предыдущим score (экспоненциальное сглаживание + ограничение дельты за один шаг),
+    - обновляет поля `trustScore`, `trustLevel`, breakdown-колонки и `trustLastCalculatedAt`.
+  - Ночной job `SupplierTrustJob` (cron 03:00) проходит по всем `Operator.isSupplier=true` и пересчитывает уровни.
+- **Ручной override (MVP каркас):**
+  - Схема содержит `trustManualOverrideLevel`, `trustManualOverrideScore`, `trustManualReason`, `trustManualExpiresAt`.
+  - При активном override (level задан и не истёк) итоговый level фиксируется в этом значении, даже если auto-score ниже.
+  - Admin UI сейчас позволяет явно задавать `trustLevel` и видеть текущий breakdown/override; полноценный CRUD для полей override планируется отдельной фазой.
 
 ## Соглашения
 

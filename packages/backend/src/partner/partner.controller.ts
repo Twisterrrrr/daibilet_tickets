@@ -20,6 +20,7 @@ import { Response } from 'express';
 
 import { tryTransitionCheckout, tryTransitionOrderRequest } from '../checkout/checkout-state-machine';
 import { PrismaService } from '../prisma/prisma.service';
+import { SupplierTrustService } from '../supplier/supplier-trust.service';
 import {
   ConfirmOrderDto,
   CreatePartnerEventDto,
@@ -37,7 +38,10 @@ import { ApiKeyGuard } from './partner-auth.guard';
 @UseGuards(ApiKeyGuard)
 @Controller('partner')
 export class PartnerController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly supplierTrust: SupplierTrustService,
+  ) {}
 
   @Get('whoami')
   @ApiOperation({ summary: 'Информация о текущем ключе' })
@@ -69,6 +73,9 @@ export class PartnerController {
       Date.now().toString(36);
 
     if (existing) {
+      if (data.isActive === true && !existing.isActive) {
+        await this.supplierTrust.assertSupplierCanActivateEvent(operatorId);
+      }
       return this.prisma.event.update({
         where: { id: existing.id },
         data: {
@@ -89,6 +96,11 @@ export class PartnerController {
 
     const operator = await this.prisma.operator.findUnique({ where: { id: operatorId }, select: { trustLevel: true } });
     const moderationStatus = (operator?.trustLevel ?? 0) >= 1 ? 'AUTO_APPROVED' : 'PENDING_REVIEW';
+
+    if ((operator?.trustLevel ?? 0) >= 1) {
+      // При автоапруве событие сразу становится активным — учитываем лимит.
+      await this.supplierTrust.assertSupplierCanActivateEvent(operatorId);
+    }
 
     return this.prisma.event.create({
       data: {
