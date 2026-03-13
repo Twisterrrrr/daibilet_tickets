@@ -5,11 +5,14 @@ import Dashboard from './pages/Dashboard';
 import EventEdit from './pages/events/EventEdit';
 import EventsList from './pages/events/EventsList';
 import Layout from './pages/Layout';
+import OrdersPage from './pages/Orders';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Reports from './pages/Reports';
 import Reviews from './pages/Reviews';
 import Settings from './pages/Settings';
+import Notifications from './pages/Notifications';
+import BalancePage from './pages/Balance';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated() ? <>{children}</> : <Navigate to="/login" />;
@@ -32,9 +35,12 @@ export default function App() {
         <Route path="events" element={<EventsList />} />
         <Route path="events/new" element={<EventEdit />} />
         <Route path="events/:id" element={<EventEdit />} />
+        <Route path="orders" element={<OrdersPage />} />
         <Route path="reviews" element={<Reviews />} />
         <Route path="reviews/:id" element={<Reviews />} />
+        <Route path="notifications" element={<Notifications />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="balance" element={<BalancePage />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

@@ -259,32 +259,47 @@ export class PartnerController {
   ) {
     const operatorId = req.user.operatorId;
     const take = Math.min(parseInt(limit) || 20, 100);
-    const skip = (Math.max(parseInt(page) || 1, 1) - 1) * take;
-    const events = await this.prisma.event.findMany({ where: { operatorId }, select: { id: true } });
-    const eventIds = events.map((e) => e.id);
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const skip = (pageNum - 1) * take;
 
-    if (eventIds.length === 0) {
-      return { items: [], total: 0, page: parseInt(page), limit: take };
+    const where: Prisma.OrderRequestWhereInput = {
+      event: { operatorId },
+    };
+    if (status) {
+      where.status = status.toUpperCase();
+    }
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from);
+      if (to) where.createdAt.lte = new Date(to);
     }
 
-    const orderRequests = await this.prisma.orderRequest.findMany({
-      where: {
-        ...(status ? { status: status.toUpperCase() } : {}),
-        ...(from || to ? { createdAt: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}),
-        checkoutSession: {},
-      },
-      include: {
-        checkoutSession: { select: { id: true, status: true, totalPrice: true, customerName: true, customerEmail: true, customerPhone: true, offersSnapshot: true, createdAt: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: take + 50,
-    });
-
-    const filtered = orderRequests.filter(() => true);
-    const paged = filtered.slice(skip, skip + take);
+    const [items, total] = await Promise.all([
+      this.prisma.orderRequest.findMany({
+        where,
+        include: {
+          checkoutSession: {
+            select: {
+              id: true,
+              status: true,
+              totalPrice: true,
+              customerName: true,
+              customerEmail: true,
+              customerPhone: true,
+              offersSnapshot: true,
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.orderRequest.count({ where }),
+    ]);
 
     return {
-      items: paged.map((or) => ({
+      items: items.map((or) => ({
         id: or.id,
         status: or.status,
         sessionId: or.checkoutSessionId,
@@ -299,8 +314,8 @@ export class PartnerController {
         createdAt: or.createdAt,
         updatedAt: or.updatedAt,
       })),
-      total: filtered.length,
-      page: parseInt(page),
+      total,
+      page: pageNum,
       limit: take,
     };
   }

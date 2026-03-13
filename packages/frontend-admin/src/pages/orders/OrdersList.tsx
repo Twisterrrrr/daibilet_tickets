@@ -2,7 +2,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -77,7 +77,15 @@ const columns: ColumnDef<OrderItem>[] = [
   {
     accessorKey: 'code',
     header: ({ column }) => <SortableHeader column={column}>Код</SortableHeader>,
-    cell: ({ row }) => <span className="font-medium text-primary">{row.original.code}</span>,
+    cell: ({ row }) => (
+      <button
+        type="button"
+        className="font-medium text-primary hover:underline"
+        onClick={() => row.original.id && (window.location.href = `/orders/${row.original.id}`)}
+      >
+        {row.original.code}
+      </button>
+    ),
   },
   {
     accessorKey: 'customerName',
@@ -157,18 +165,26 @@ export function OrdersListPage() {
       .finally(() => setLoading(false));
   }, [filters]);
 
+  if (error) {
+    return (
+      <ErrorState
+        title="Не удалось загрузить заказы"
+        description={error}
+        action={
+          <Button variant="outline" onClick={() => setFilters((f) => ({ ...f }))}>
+            Повторить попытку
+          </Button>
+        }
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Заказы"
         subtitle={data ? `${data.total} заказов` : <Skeleton className="h-4 w-24 inline-block" />}
       />
-
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardContent className="py-4">
@@ -216,13 +232,20 @@ export function OrdersListPage() {
         </CardContent>
       </Card>
 
-      <DataTable
-        columns={columns}
-        data={data?.items ?? []}
-        loading={loading}
-        emptyText="Нет заказов"
-        onRowClick={(item) => navigate(`/orders/${item.id}`)}
-      />
+      {data && data.items.length === 0 && !loading ? (
+        <EmptyState
+          title="Нет заказов"
+          description="Как только появятся оформленные заказы, они отобразятся здесь."
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={data?.items ?? []}
+          loading={loading}
+          emptyText="Нет заказов"
+          onRowClick={(item) => navigate(`/orders/${item.id}`)}
+        />
+      )}
 
       {data && data.pages > 1 && (
         <div className="flex items-center justify-between">
