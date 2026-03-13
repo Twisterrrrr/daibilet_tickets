@@ -60,18 +60,11 @@ RegressionChecklist.md и UI_GUIDE обновлены. Critical Path — мин�
 
 ## 3. Roadmap Phases 2–9 (после этапов A–C)
 
-Архитектура и implementation plan: `docs/RoadmapPhases2-9Architecture.md`.
+Архитектура: `docs/archive/specs/RoadmapPhases2-9Architecture.md`. Phase 2–9 ✅ реализованы.
 
-| Phase | Детали | Документ |
-|-------|--------|----------|
-| 2 | Supplier Orders / Booking | [SupplierOrdersArchitecture.md](SupplierOrdersArchitecture.md) |
-| 3 | Availability / Sessions | [AvailabilityAndSessionsArchitecture.md](AvailabilityAndSessionsArchitecture.md) |
-| 4 | Listing Health | [ListingHealthArchitecture.md](ListingHealthArchitecture.md) |
-| 5 | Supplier Analytics | [SupplierAnalyticsArchitecture.md](SupplierAnalyticsArchitecture.md) |
-| 6 | Pricing & Promotions | [PricingAndPromotionsArchitecture.md](PricingAndPromotionsArchitecture.md) |
-| 7 | Ranking / Merchandising | [RankingAndMerchandisingArchitecture.md](RankingAndMerchandisingArchitecture.md) |
-| 8 | Integrations Extension Points | [IntegrationsExtensionPoints.md](IntegrationsExtensionPoints.md) |
-| 9 | Team / Roles / Support | [TeamRolesSupportArchitecture.md](TeamRolesSupportArchitecture.md) |
+| Phase | Документ |
+|-------|----------|
+| 2–9 | `docs/archive/specs/` (SupplierOrders, Availability, ListingHealth, Analytics, Pricing, Ranking, Integrations, TeamRoles) |
 
 ### Phase 2 — Supplier Orders / Booking Operations
 Supplier: страница «Заказы», фильтры, confirm/reject. Projection над OrderRequest (без SupplierOrder). Partner listOrders: fix filter.

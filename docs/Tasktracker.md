@@ -1,7 +1,17 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> Последнее обновление: 2026-03-11. См. `docs/Reference.md`, `docs/Deploy.md`.
-> **Отложено 6+ мес** (Q3 2026+): Planner, Unified Checkout, ML-рекомендации, PWA, сложная дедупликация, gRPC-оптимизации, расширенная CI-инфра.
+> 2026-03-12. См. `Reference.md`, `Deploy.md`.
+
+---
+
+## Приоритеты до prod
+
+1. **Полный контур поставщика** — замкнуть цикл: регистрация → события → заказы → оплата → выплаты.
+2. **YooKassa** — заменить STUB, webhook, fulfil, тестовые платежи в sandbox.
+3. **Базовый контент** — SEO-описания городов/площадок, ТОП-лендинги.
+4. **Деплой на prod** — Gate 0b (DNS, SSL, бэкапы).
+
+**Отложено 6+ мес:** Planner, Unified Checkout, ML, PWA, gRPC-оптимизации, расширенная CI.
 
 ---
 
@@ -42,7 +52,7 @@
 
 ## Content Model / PageTemplateSpecs MVP+ (11.03.2026) ✅
 
-- **Гибридная архитектура:** core-колонки vs content JSON vs наследуемая refund policy. См. [PageTemplateSpecs.md](PageTemplateSpecs.md), [ContentModel.md](ContentModel.md).
+- **Гибридная архитектура:** core-колонки vs content JSON vs наследуемая refund policy. См. `archive/specs/`.
 - **Prisma:** Event (meetingPoint, routeSummary, refundPolicy*), EventOverride (contentTemplateData, meetingPoint, routeSummary, refundPolicy*), Venue (refundPolicy*, venueTemplateData), Operator (defaultRefundPolicyText).
 - **Shared:** content-template.types (Zod), refund-policy (enum), page-template-specs (schema registry).
 - **Backend:** RefundPolicyResolutionService; CatalogService — refundPolicyResolved; DTO для Event/Venue/Supplier.
@@ -59,7 +69,7 @@
 
 - **Prompt 2 (Catalog observability):** CacheService — hits/misses в getOrSet, getCacheStats(). GET /admin/ops/metrics расширен полем `cache: { hits, misses, hitRate }`.
 - **Admin ops — Flush по namespace:** POST /admin/settings/ops/cache/flush?namespace={ns}. Поддержка: full, cities, events, catalog, tags, regions, landings, combos, search. UI: select + «Flush Cache».
-- **Admin ops — Resync с прогрессом:** Full Sync / Incr Sync ставят задачу в BullMQ. GET /admin/settings/ops/sync/progress?jobId=... — state, finishedOn, failedReason. См. [AdminSystem.md](AdminSystem.md).
+- **Admin ops — Resync с прогрессом:** Full Sync / Incr Sync ставят задачу в BullMQ. GET /admin/settings/ops/sync/progress?jobId=... — state, finishedOn, failedReason.
 
 ## Publish-gate UI + каталог городов (08.03.2026) ✅
 
@@ -225,7 +235,7 @@
 
 ### Gate 2.5 — админка событий (готовность, расписание, поставщики)
 
-> Спецификация: [AdminSystem.md](AdminSystem.md). Поставщики: см. раздел ниже.
+> Поставщики: см. раздел ниже.
 > **Статус:** Gate 2.5 завершён; админка событий, расписания и поставщиков готова к ежедневной работе.
 
 - [x] **Высокий**: PR1 — GET /admin/events/:id/quality (on-demand), UI «Причины неактивности» + подсветка вкладок, field→tabKey (**v1 реализован**: endpoint + `EventQualityService` + `QualityBanner`)
@@ -321,46 +331,46 @@
 
 ## Roadmap Phases 2–9 (Implementation)
 
-> Архитектура: [RoadmapPhases2-9Architecture.md](RoadmapPhases2-9Architecture.md). Phase-специфичные: SupplierOrders, Availability, ListingHealth, Analytics, Pricing, Ranking, Integrations, TeamRoles.
+> Архитектура: `archive/specs/RoadmapPhases2-9Architecture.md`. Phase 2–9 ✅ реализованы.
 
-### Phase 2 — Supplier Orders
-- [ ] SupplierOrdersService: projection OrderRequest by eventOffer.operatorId
-- [ ] GET/POST /supplier/orders, confirm, reject
-- [ ] Fix Partner listOrders (eventId in eventIds)
-- [ ] Supplier: OrdersListPage
-- [ ] Admin: OrdersList → link CheckoutSession, dispute hint
+### Phase 2 — Supplier Orders ✅
+- [x] SupplierOrdersService: projection OrderRequest by eventOffer.operatorId
+- [x] GET/POST /supplier/orders, confirm, reject
+- [x] Fix Partner listOrders (eventId in eventIds)
+- [x] Supplier: OrdersListPage
+- [x] Admin: OrdersList → link CheckoutSession, dispute hint
 
-### Phase 3 — Availability / Sessions
-- [ ] Supplier: SessionsPage
-- [ ] Admin: GET /admin/catalog/availability-diagnostics
-- [ ] Sync-source sessions: read-only guard
+### Phase 3 — Availability / Sessions ✅
+- [x] Supplier: SessionsPage
+- [x] Admin: GET /admin/catalog/availability-diagnostics
+- [x] Sync-source sessions: read-only guard
 
-### Phase 4 — Listing Health
-- [ ] ListingHealthService (deterministic)
-- [ ] GET /supplier/listing-health, /admin/catalog/health
-- [ ] Supplier: ListingHealthPanel
+### Phase 4 — Listing Health ✅
+- [x] ListingHealthService (deterministic)
+- [x] GET /supplier/listing-health, /admin/catalog/health
+- [x] Supplier: ListingHealthPanel
 
-### Phase 5 — Analytics
-- [ ] Extend ReportsService
-- [ ] Supplier Analytics page, Admin reports
+### Phase 5 — Analytics ✅
+- [x] Extend ReportsService
+- [x] Supplier Analytics page, Admin reports
 - [ ] Pre-aggregation (LATER)
 
-### Phase 6 — Pricing & Promotions
-- [ ] PromoCode model, PromoCodeService
-- [ ] Checkout: validate promoCode
-- [ ] Supplier/Admin: PromoCodes CRUD
+### Phase 6 — Pricing & Promotions ✅
+- [x] PromoCode model, PromoCodeService
+- [x] Checkout: validate promoCode
+- [x] Supplier/Admin: PromoCodes CRUD
 
-### Phase 7 — Ranking
-- [ ] manualBoost, suppressLowQuality
-- [ ] Catalog: apply in sort/filter
-- [ ] Admin: boost/suppress UI
+### Phase 7 — Ranking ✅
+- [x] manualBoost, suppressLowQuality
+- [x] Catalog: apply in sort/filter
+- [x] Admin: boost/suppress UI
 
-### Phase 8 — Integrations
+### Phase 8 — Integrations ✅
 - [x] SyncAdapter interface (sync-adapter.interface.ts)
 - [x] SupplierIntegrationsService + GET /supplier/integrations
 - [x] Supplier: страница «Интеграции» (read-only статус TC, Teplohod, Partner, Manual)
 
-### Phase 9 — Team / Roles
+### Phase 9 — Team / Roles ✅
 - [x] SupplierInvitation model, API
 - [x] Invitations CRUD: POST/GET/DELETE /supplier/invitations, accept
 - [x] Supplier UI: страница «Команда», приглашение по ссылке /invite/:token
@@ -445,7 +455,7 @@
 
 ### Promo-блоки главной (админка)
 
-> Спецификация: `docs/PromoBlocksSpec.md`. v2: PromoCollection, PromoCollectionItem, PromoCollectionRule, resolver.
+> Спецификация: `archive/specs/PromoBlocksSpec.md`. v2: PromoCollection, PromoCollectionItem, PromoCollectionRule, resolver.
 
 - [x] **Средний**: Backend — модель `PromoBlock` + PromoBlockEvent, PromoBlockVenue + CRUD `/admin/promo-blocks` ✅
 - [x] **Средний**: Публичный API `GET /api/v1/promo-blocks` — активные по датам, сортировка priority/sortOrder ✅
@@ -466,289 +476,13 @@
 
 ## После запуска / 6+ мес
 
-> Задачи, явно помеченные в трекере как (⏸ 6+ мес) или требующие объёмной доработки после стабилизации ядра.
-
-- [ ] **Средний** (⏸ 6+ мес): CI/CD: GitHub Actions для автодеплоя на VPS
-- [ ] **Средний** (⏸ 6+ мес): GitHub Actions: lint → test → build (без деплоя)
-- [ ] **Средний** (⏸ 6+ мес): gRPC: фильтровать Cities/Venues по нужным ID
-- [ ] **Низкий** (⏸ 6+ мес): gRPC Seats — наличие конкретных мест
-- [ ] **Высокий** (⏸ 6+ мес): Web Vitals: LCP < 2.5s, CLS < 0.1 — lazy images, font preload, critical CSS
-- [ ] **Низкий** (⏸ 6+ мес): Персонализация / ML рекомендации («На основе интересов»)
-- [ ] **Средний** (⏸ 6+ мес): GitHub Action workflow_dispatch для restore smoke
+- [ ] CI/CD: GitHub Actions
+- [ ] gRPC: фильтры Cities/Venues
+- [ ] Web Vitals: LCP, CLS
+- [ ] Planner MVP, ML-рекомендации
 
 ---
 
-## Тематические группы (историческая разбивка)
+## Бэклог
 
-> Ниже — исходные разделы Part II (по темам). Для планирования по шагам используем в первую очередь Gate 0–3.
-
-### 1. Деплой / DevOps
-
-- [ ] **Критический**: Создать VPS на Timeweb Cloud (Ubuntu 22.04/24.04, 2 CPU, 4 GB RAM, 50 GB NVMe)
-- [ ] **Критический**: Настроить DNS A-записи: daibilet.ru, www.daibilet.ru, admin.daibilet.ru → IP VPS
-- [ ] **Критический**: SSH на сервер, запустить `deploy.sh` (первый раз — создаст .env с паролями)
-- [ ] **Критический**: Заполнить TC_API_TOKEN, TC_WIDGET_TOKEN в .env на сервере
-- [ ] **Критический**: Deploy: Docker + CI/CD pipeline
-- [ ] **Высокий**: Проверить https://daibilet.ru, https://admin.daibilet.ru, https://daibilet.ru/api/v1/health
-- [ ] **Средний** (⏸ 6+ мес): CI/CD: GitHub Actions для автодеплоя на VPS
-- [ ] **Средний**: Проверить SSL-сертификат (SAN: 3 домена, auto-renewal cron)
-- [ ] **Средний**: Первый бэкап БД
-- [ ] **Высокий**: ESLint + Prettier для всего monorepo
-- [ ] **Средний** (⏸ 6+ мес): GitHub Actions: lint → test → build (без деплоя)
-
----
-
-## 2. YooKassa / Платежи
-
-- [ ] **Критический**: .env production: YooKassa ключи, PAYMENT_PROVIDER=YOOKASSA
-- [ ] **Критический**: Зарегистрировать магазин в YooKassa, получить shopId + secretKey
-- [ ] **Критический**: Подключить YooKassa SDK → заменить STUB в payment.service
-- [ ] **Критический**: Тестовый платёж в sandbox — 3 сценария (PLATFORM, EXTERNAL, mixed)
-- [ ] **Высокий**: Тестирование на sandbox YooKassa перед продакшеном
-- [ ] **Высокий**: Страница «Оплата прошла» / «Ошибка оплаты» на фронте
-- [ ] **Высокий**: Sentry alerts на 5xx и payment failures
-- [ ] **Средний**: Подключение YooKassa Split API (после получения ключей)
-- [~] **Низкий**: Подключение YooKassa для online-оплаты → PaymentIntent stub готов
-
----
-
-## 3. Ops Foundation (Batches 1–6)
-
-> Спецификация: план A1–G3, Prisma/FSM/OrderDetails/IdempotencyKey.
-
-### Batch 1 — Audit + idempotency
-- [x] **Критический**: IdempotencyKey, IdempotencyService.run ✅
-- [x] **Высокий**: Unit-тесты IdempotencyService ✅
-
-### Batch 2 — Webhooks + Queue
-- [ ] **Критический**: POST /webhooks/yookassa — верификация, идемпотентность по event.id
-- [ ] **Критический**: PaymentService.applyWebhookEvent, BullMQ fulfill queue (retry, backoff)
-- [ ] **Высокий**: Fulfilment идемпотентен, PaymentEvent/audit storage, тесты
-
-### Batch 3 — Admin Operator Panel v1
-- [x] **Критический**: GET /admin/orders (list + search), GET /admin/orders/:id ✅
-- [x] **Высокий**: Admin UI: Orders search, OrderDetail (resend, retry fulfilment) ✅
-
-### Batch 4 — Admin Operator Panel v2
-- [x] **Критический**: POST resend-email, retry-fulfilment, set-status (с reason, audit) ✅
-- [x] **Высокий**: UI кнопки в админке для resend/retry (OrderDetail) ✅
-
-### Batch 5 — Runbooks
-- [x] **Высокий**: ops/runbooks/*.md ✅
-- [x] **Средний**: Support escalation checklist — docs/SupportEscalation.md ✅
-
-### Batch 6 — Backups + DR
-- [x] **Критический**: scripts/backup.sh, restore-to-staging.sh ✅
-- [ ] **Высокий**: Timeweb snapshot docs, Monthly restore drill
-- [ ] **Средний** (⏸ 6+ мес): GitHub Action workflow_dispatch для restore smoke
-
----
-
-## 4. Каталог / Venues / Teplohod
-
-- [ ] **Высокий**: Шаблон «Музеи» (детальная страница venue) — режим работы, галерея, выставки (см. `docs/Reference.md` §1)
-- [ ] **Высокий**: Продумать вывод виджетов для teplohod.info — справочник виджетов
-- [ ] **Средний**: Отображение каталога: карточками или широкими блоками
-- [ ] **Средний**: Контентный план — 30 статей (ArticlePlanner)
-- [ ] **Средний**: Агрегация выставок: isPermanent + endDate сортировка
-- [ ] **Средний**: Импорт внешних рейтингов (Яндекс/2ГИС) для топ-venue
-- [x] **Низкий**: EventEdit — «Оригинал»/«Для Daibilet» рядом с названием ✅
-- [ ] **Низкий**: Геолокация «Ближайший причал» (Phase 2)
-- [x] **Высокий**: Redis-кэш каталога (cities 6h, events 2m/10m; инвалидация при изменении события) ✅ (PR-2)
-- [x] **Средний**: Диетический режим листингов `/events` — `fields=card`/`full`, Prisma `select` для card, тайминги `fetchEvents` (dbMs/overrideMs/badgesMs/totalMs)
-- [~] **Средний**: Глобальные мульти-события (одно шоу в разных городах) — `normalizedTitle`/`groupingKey`, `GET /api/v1/multi-events` (backend готов, подключение фронта и `/events/m/{slug}` — отдельный PR)
-- [x] **Средний**: FULL SYNC (dev) — CLI `FULL_SYNC=1 pnpm full:sync` (Ticketscloud + Teplohod + retag + cache invalidate)
-- [ ] **Средний** (⏸ 6+ мес): gRPC: фильтровать Cities/Venues по нужным ID
-- [ ] **Низкий** (⏸ 6+ мес): gRPC Seats — наличие конкретных мест
-
----
-
-## 5. Frontend / UX
-
-### Hero и визуал
-- [ ] **Критический**: Hero с фотографией — полноэкранное фото города (карусель 3–4 города)
-- [ ] **Критический**: Качество фото каталога — галереи ТОП-20 с настоящими фото
-  - [ ] **Высокий**: Пайплайн статичных изображений городов и главного hero (`CITY_IMAGES`, `public/assets/images`, `scripts/image-assets.mjs`, `docs/image-assets-report.md`)
-
-### Приоритетные
-- [ ] **Высокий**: Карусель отзывов на главной (5–6 лучших отзывов)
-- [ ] **Высокий**: Лицо за экскурсией — фото/имя гида на карточке (Operator.avatar/bio)
-- [x] **Высокий**: Autocomplete — город из URL для фильтрации ✅
-- [x] **Высокий**: Скелетон loading.tsx для /events ✅
-- [ ] **Высокий** (⏸ 6+ мес): Web Vitals: LCP < 2.5s, CLS < 0.1 — lazy images, font preload, critical CSS
-- [x] **Высокий**: Мобильная корзина: fixed bottom bar для «Оформить» (≤420px) ✅ (PR-4)
-- [x] **Высокий**: Checkout UX: прогресс-бар (корзина → данные → оплата → готово) ✅ (PR-4)
-- [x] **Высокий**: Страница /orders/[id] — таймлайн, операционная инфо, ваучер ✅ (PR-5)
-- [ ] **Высокий**: Push/email уведомления о смене статуса заказа
-
-### Средний приоритет
-- [ ] **Средний**: Страница события: профиль оператора, маршрут на карте, фото
-- [ ] **Средний**: Живое социальное доказательство («Забронировано N раз сегодня»)
-- [ ] **Средний**: Мобильный UX: bottom sheet для фильтров (fixed bottom bar checkout уже есть)
-- [ ] **Средний**: Scroll-progress indicator на мобиле
-- [ ] **Средний**: «Похожие места» блок на venue page (если ещё не везде)
-- [ ] **Средний**: «Недавно просмотренные» на главной
-- [ ] **Средний**: Breadcrumbs (если ещё не везде), фильтры /events расширение
-
-### Низкий (polish)
-- [ ] **Низкий**: Анимации и микроинтеракции
-- [ ] **Низкий**: Блог/вдохновение на главной
-- [ ] **Низкий** (⏸ 6+ мес): Персонализация / ML рекомендации («На основе интересов»)
-- [ ] **Низкий**: A/B тестирование CTA-текстов
-- [ ] **Низкий**: Micro-animations для offer cards
-
----
-
-## 6. SEO / Контент
-
-### Посадочные и контент
-- [ ] **Критический**: SEO-описания для всех городов (уникальные)
-- [ ] **Критический**: SEO-описания для ТОП-10 площадок
-- [ ] **Высокий**: Тематические лендинги («Ночные экскурсии СПб», «Музеи Казани с детьми»)
-- [x] **Высокий**: JSON-LD и meta-теги на основных посадочных (города, venues, события, комбо, blog) ✅
-- [ ] **Высокий**: 5 SEO-статей для блога
-- [ ] **Высокий**: Описания ТОП-20 событий
-- [ ] **Высокий**: 5 SEO-подборок на город
-- [ ] **Высокий**: Наполнение: описания для всех городов
-- [ ] **Высокий**: Галереи ТОП-20 событий (качественные фото)
-- [ ] **Высокий**: SEO-тексты на /cities/[slug]
-- [ ] **Высокий**: Блог: 3–5 статей под SEO
-- [ ] **Высокий**: Подборки (Топ-10 экскурсий, Детям, Романтические)
-- [ ] **Средний**: Внутренняя перелинковка
-- [ ] **Средний**: Email-цепочка review request после покупки
-- [ ] **Средний**: FAQ-секции на площадках
-- [ ] **Средний**: Реализация ArticlePlanner + DataCollector + Renderer + Linker
-- [ ] **Средний**: OpenAI API для генерации контента
-- [x] **Средний**: OpenGraph и Twitter Cards (buildPageMetadata на городах, venues, событиях, комбо) ✅
-- [ ] **Низкий**: Сезонные гиды (Белые ночи, Новый год, Майские)
-- [ ] **Низкий**: Admin UI для управления статьями (перегенерация, превью)
-
-### Технический SEO
-- [ ] **Высокий** (⏸ 6+ мес): Core Web Vitals — микрооптимизация (LCP < 2.5s, FID < 100ms, CLS < 0.1)
-- [ ] **Высокий**: Яндекс.Вебмастер и Google Search Console
-- [x] **Средний**: JSON-LD Article schema для статей (buildArticleJsonLd на blog/[slug]) ✅
-- [x] **Средний**: Микроразметка FAQPage (FaqSection, combo, landings) ✅
-- [ ] **Низкий**: Alt-тексты для изображений
-
----
-
-## 7. Backend / Типизация
-
-- [ ] **Низкий**: Типизация `any` (backend ~31, frontend 100+), см. `docs/TechnicalDebt.md`
-- [ ] **Средний**: ESLint правило: запретить `any` в новых файлах (warning)
-- [ ] **Низкий**: Типизация `as any` в бэкенде (31 место) — type guards
-- [x] **Высокий**: Типизация tc-sync.service.ts (TcEvent, TcVenueCity, TcTicketSetRule, isTcEvent) ✅ (PR-8)
-- [ ] **Высокий** (⏸ 6+ мес): Proto-generated types для gRPC
-- [x] **Высокий**: JwtPayload, auth.types (AdminJwtUser, PartnerApiUser) ✅
-- [x] **Средний**: admin-orders where → Prisma.PackageWhereInput ✅
-
----
-
-## 8. Planner
-
-- [ ] **Критический** (⏸ 6+ мес): Планировщик MVP: город + даты + состав → 3 варианта → покупка
-- [x] **Высокий**: Кнопка «Заменить» на слоте → модалка + POST /planner/customize ✅
-- [ ] **Высокий** (⏸ 6+ мес): Кнопка «Оплатить программу» → checkout
-- [ ] **Высокий** (⏸ 6+ мес): Планировщик v2: drag-and-drop расписание, карта маршрута
-- [ ] **Средний** (⏸ 6+ мес): Учёт геолокации (минимизация переездов)
-- [ ] **Средний** (⏸ 6+ мес): Анимации переходов между шагами wizard
-- [ ] **Средний**: Админ-панель: настройка pricing через UI
-- [ ] **Низкий** (⏸ 6+ мес): Учёт погоды (indoor при дожде)
-- [ ] **Низкий** (⏸ 6+ мес): Сохранение программы в localStorage
-- [ ] **Низкий** (⏸ 6+ мес): Динамические upsell из БД
-- [ ] **Средний**: Combo для Казани, Владимира, Ярославля, Нижнего Новгорода
-
----
-
-## 9. Checkout / Orders / Voucher
-
-### Checkout + Smart UX pipeline (C0–C7)
-- [x] **Высокий**: Checkout + Smart UX (C0–C7) — **implemented** ✅
-- [x] **Высокий**: E2E validation + edge-case hardening (smoke path + 5 edge cases) — **выполнен 06.03** (см. `docs/archive/PR-C0-C7-Final.md` §8) ✅
-
-### YooKassa + Checkout (Фаза 4)
-- [ ] **Критический**: Модуль PaymentModule — YooKassa API v3, создание платежа, webhook handler
-- [ ] **Критический**: POST /api/v1/checkout — Package + платёж, BullMQ fulfill-package
-- [ ] **Критический**: Voucher: модель, QR, GET /vouchers/:shortCode
-- [ ] **Критический**: Страница /checkout/:packageId, /checkout/:packageId/status
-- [ ] **Высокий**: Prisma Package, PackageItem; ошибки TC → partial refund
-- [ ] **Высокий**: PDF ваучера, мобильная страница /v/:shortCode, Email
-- [ ] **Высокий** (⏸ 6+ мес): Unified Checkout — TC/TEP заказы при оплате через YooKassa
-- [ ] **Средний**: Таймаут PENDING_PAYMENT > 30 мин
-- [ ] **Средний**: Email при подтверждении/отклонении заявки (CheckoutSession)
-- [ ] **Средний**: Отслеживание кликов для аналитики конверсии
-
-### Unified Checkout (планировщик) — ⏸ 6+ мес
-- [ ] **Высокий** (⏸ 6+ мес): Создание заказов в TC/TEP API при оплате
-- [ ] **Высокий** (⏸ 6+ мес): Двойной резерв (15 мин TC vs наша оплата)
-- [ ] **Высокий** (⏸ 6+ мес): Partial failure → partial refund
-- [ ] **Средний** (⏸ 6+ мес): Объединение TC + TEP + MANUAL в одной корзине
-- [ ] **Средний** (⏸ 6+ мес): Rollback при ошибке оплаты
-
----
-
-## 10. Oфферы / Дедупликация
-
-- [ ] **Средний**: Admin: UI для ручного merge дублей (поиск + выбор canonical)
-- [ ] **Средний** (⏸ 6+ мес): Автодедуп: fuzzy matching по названию + площадка + дата
-- [ ] **Низкий**: Автовыбор primary по правилам (комиссия/цена/наличие)
-
----
-
-## 11. Afisha / Подборки / Контент
-
-- [ ] **Высокий**: Страницы причалов (/cities/:slug/piers/:pier)
-- [ ] **Высокий**: Страницы маршрутов (/routes/:slug)
-- [ ] **Средний**: Перелинковка: событие — причал — маршрут — подборка
-- [ ] **Средний**: Улучшить карточку: блок «как проходит», фото палуб, условия возврата
-- [ ] **Высокий**: Геолокация: ближайший причал + время доезда
-- [ ] **Высокий**: Погодный бейдж
-- [ ] **Средний**: «Следить за ценой», постпокупочный слой, TripCombo upsell
-
----
-
-## 12. Контент / Production
-
-- [ ] **Высокий**: Structured JSON logs → log aggregator (pino)
-- [ ] **Высокий**: Email шаблоны order-confirmed, order-completed — вёрстка
-- [ ] **Высокий**: Мониторинг первых платежей через reconciliation
-- [ ] **Высокий**: Feature flags: отключение EXTERNAL по городам
-- [x] **Высокий**: Supplier self-service: ЛК поставщика — создание событий как черновик, отправка на модерацию (редактор/админ) ✅
-- [ ] **Высокий**: Расширение географии: новые города по KPI
-- [ ] **Средний**: Проверка категоризации (стендапы, мастер-классы)
-- [ ] **Средний**: Сезонные лендинги, партнёрский контент
-- [ ] **Средний**: Нагрузочное тестирование checkout
-- [ ] **Средний**: ISR для страниц с высоким трафиком
-- [ ] **Средний**: Оптимизация изображений, мониторинг (Sentry, UptimeRobot)
-- [ ] **Низкий** (⏸ 6+ мес): PWA
-
----
-
-## 13. Системные теги / Геолокация
-
-- [ ] **Низкий**: Алгоритм динамических тегов (best-value, last-minute, today-available) — cron
-- [ ] **Низкий**: Интеграция геолокации (nearest) на фронтенде
-
----
-
-## 14. Бэклог (после основных фаз)
-
-- [ ] Мобильное приложение (React Native или PWA) (⏸ 6+ мес)
-- [ ] Личный кабинет (история заказов, избранное)
-- [ ] **Рекомендательная система (ML)** (⏸ 6+ мес)
-- [ ] Программа лояльности, партнёрская программа
-- [ ] Мультиязычность (EN)
-- [ ] Интеграция с другими билетными системами
-- [ ] Telegram-бот: алерты при ошибках
-- [ ] Telegram-канал: автопостинг событий и статей
-
----
-
-## Страницы городов: обязательные условия
-
-- **Мини-описание обязательно** — при добавлении города или отсутствии описания нужно **сгенерировать** его. Без `City.description` город не показывается на /cities.
-- **Столица региона** — если город хаб (Region.hubCityId), областные события выводятся под карточкой в «Также в регионе». Реализовано.
-
----
-
-> **Порядок приоритетов:** платежи (Неделя 1) → контент (1–2) → планировщик MVP (3–4). Подробнее — `docs/archive/Diary.md`.
+Детали — см. Gates выше и `archive/specs/`.

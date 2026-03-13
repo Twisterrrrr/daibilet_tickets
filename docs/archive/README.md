@@ -4,7 +4,8 @@
 
 | Папка/файл | Описание |
 |------------|----------|
-| [pr-specs/](pr-specs/) | PR4.1–4.3 SEO specs (Page Probe, Opportunity Finder, Auto-Generator) |
+| [pr-specs/](pr-specs/) | PR4.1–4.3 SEO specs |
+| [specs/](specs/) | Phase-архитектуры, AdminSystem, SEO, ContentModel, PromoBlocks и др. |
 | [old-specs/](old-specs/) | TopicDefinition, PageTemplateSpecs, AdminOps и др. |
 | [ReviewModuleAudit.md](ReviewModuleAudit.md) | Pre-implementation аудит модуля отзывов (MVP реализован) |
 | [Diary.md](Diary.md) | Исторический дневник (актуальный — `../Diary.md`) |
