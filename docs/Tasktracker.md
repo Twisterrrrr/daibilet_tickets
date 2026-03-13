@@ -1,8 +1,7 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
 > Последнее обновление: 2026-03-11. См. `docs/Reference.md`, `docs/Deploy.md`.
-> **Отложено 6+ мес** (Q3 2026+): Planner, Unified Checkout, ML-рекомендации, PWA, сложная дедупликация, gRPC-оптимизации, микрооптимизация Web Vitals, расширенная CI-инфра.
-> План 26 PR: `docs/InfraTypizationUXCheckoutPlan.md` (инфра, типизация, UX, Checkout + YooKassa).
+> **Отложено 6+ мес** (Q3 2026+): Planner, Unified Checkout, ML-рекомендации, PWA, сложная дедупликация, gRPC-оптимизации, расширенная CI-инфра.
 
 ---
 
@@ -39,7 +38,7 @@
 - **Frontend Public:** форма скрыта при DISABLED, плашка «Оспаривается», блок «Ответ организатора».
 - **Frontend Supplier:** раздел «Отзывы» (вкладки, карточка, response/dispute/evidence).
 - **Frontend Admin:** вкладки «Ответы поставщика», «Оспаривания».
-- **Тесты:** review-capability.service.spec.ts. См. `docs/ReviewModuleAudit.md`.
+- **Тесты:** review-capability.service.spec.ts. См. `docs/archive/ReviewModuleAudit.md`.
 
 ## Content Model / PageTemplateSpecs MVP+ (11.03.2026) ✅
 
@@ -308,6 +307,131 @@
 - [x] Все backend‑тесты (`npx pnpm test` в `packages/backend`) проходят.
 - [x] Линтер на изменённых файлах (backend, frontend-admin, frontend-supplier) без ошибок.
 - [ ] Отдельный документ `docs/SupplierTrustSpec.md` с формулами и сценариями — можно добавить позже при усложнении модели.
+
+### P1-Roadmap — Phase 1: Supplier Trust + Operations Foundation (12.03.2026) ✅
+
+- [x] Supplier Notifications Center: `GET /supplier/notifications` — агрегация из Event (модерация), PaymentIntent (продажи), trust (лимит).
+- [x] Frontend supplier: Notifications — fetch из API вместо mock; read/hidden — локальный state.
+- [x] Moderation priority: `GET /admin/moderation/queue?sortBy=trust_asc` — низкий trust первым.
+- [x] Admin ModerationQueuePage: выпадающий список сортировки (по дате / по trust).
+
+**Дальнейшая разработка:** см. [DevelopmentScenario.md](DevelopmentScenario.md) — этапы A (Supplier UX), B (Admin UX), C (регрессия), Phases 2–9.
+
+---
+
+## Roadmap Phases 2–9 (Implementation)
+
+> Архитектура: [RoadmapPhases2-9Architecture.md](RoadmapPhases2-9Architecture.md). Phase-специфичные: SupplierOrders, Availability, ListingHealth, Analytics, Pricing, Ranking, Integrations, TeamRoles.
+
+### Phase 2 — Supplier Orders
+- [ ] SupplierOrdersService: projection OrderRequest by eventOffer.operatorId
+- [ ] GET/POST /supplier/orders, confirm, reject
+- [ ] Fix Partner listOrders (eventId in eventIds)
+- [ ] Supplier: OrdersListPage
+- [ ] Admin: OrdersList → link CheckoutSession, dispute hint
+
+### Phase 3 — Availability / Sessions
+- [ ] Supplier: SessionsPage
+- [ ] Admin: GET /admin/catalog/availability-diagnostics
+- [ ] Sync-source sessions: read-only guard
+
+### Phase 4 — Listing Health
+- [ ] ListingHealthService (deterministic)
+- [ ] GET /supplier/listing-health, /admin/catalog/health
+- [ ] Supplier: ListingHealthPanel
+
+### Phase 5 — Analytics
+- [ ] Extend ReportsService
+- [ ] Supplier Analytics page, Admin reports
+- [ ] Pre-aggregation (LATER)
+
+### Phase 6 — Pricing & Promotions
+- [ ] PromoCode model, PromoCodeService
+- [ ] Checkout: validate promoCode
+- [ ] Supplier/Admin: PromoCodes CRUD
+
+### Phase 7 — Ranking
+- [ ] manualBoost, suppressLowQuality
+- [ ] Catalog: apply in sort/filter
+- [ ] Admin: boost/suppress UI
+
+### Phase 8 — Integrations
+- [x] SyncAdapter interface (sync-adapter.interface.ts)
+- [x] SupplierIntegrationsService + GET /supplier/integrations
+- [x] Supplier: страница «Интеграции» (read-only статус TC, Teplohod, Partner, Manual)
+
+### Phase 9 — Team / Roles
+- [x] SupplierInvitation model, API
+- [x] Invitations CRUD: POST/GET/DELETE /supplier/invitations, accept
+- [x] Supplier UI: страница «Команда», приглашение по ссылке /invite/:token
+- [ ] RBAC permissions matrix (документация)
+- [ ] Support link, audit
+
+---
+
+## UX Admin Refactor (EH alignment)
+
+- **Приоритет:** Высокий
+
+### UA-1 — AdminLayout + Topbar-каркас `[~]`
+
+- [x] Ввести чёткий layout-слой для админки (оболочка с Sidebar + Topbar + контент).
+- [x] Оставить существующий компонент `Layout` как точку входа (для минимального диффа), но выделить в нём:
+  - топбар (бургер, хлебные крошки, переключатель темы, профиль/выход),
+  - зону для содержимого страниц через `Outlet`.
+- [x] Сохранить текущую навигацию и авторизацию без изменений.
+
+### UA-2 — Shared UI кирпичи для админки `[~]`
+
+- [x] Подтвердить наличие базовых shared-компонентов в `@daibilet/shared-ui`:
+  - `PageHeader`, `SectionCard`,
+  - `EmptyState`, `LoadingState`, `ErrorState`,
+  - `FormSection`, `FormGrid`, `FormActions`.
+- [ ] Добавить недостающие кирпичи для следующего этапа:
+  - `StatCard` — маленькая KPI-карточка (label, value, icon?),
+  - (позже) `DataTableShell`, `StatusBadge`, `DetailSlideOver`.
+- [ ] Перевести минимум 1–2 экрана (Dashboard, Settings) на использование `PageHeader`/`SectionCard` из shared-ui.
+
+### UA-3 — Admin Dashboard как операционный центр `[ ]`
+
+- [ ] Пересобрать `/` в полноценный dashboard:
+  - 4–6 `StatCard` с KPI (активные события, заказы сегодня, выручка, новые отзывы, события на модерации).
+  - блок «Требует внимания» (проблемные события/отзывы),
+  - блок активности поставщиков (top N).
+- [ ] Использовать только существующие backend endpoints.
+
+### UA-4 — Единый list-паттерн (на примере Events) `[ ]`
+
+- [ ] Привести `EventsListPage` к шаблону:
+  - `PageHeader` (title/subtitle/actions),
+  - `FilterBar` (поиск, статус, город, поставщик),
+  - `DataTableShell` (таблица с `StatusBadge` и warnings),
+  - `EmptyState`/`LoadingState`/`ErrorState`.
+
+### UA-5 — Распространение list-паттерна на Suppliers/Venues/Cities/Tags `[ ]`
+
+- [ ] Применить тот же шаблон к:
+  - `SuppliersListPage`,
+  - `VenuesListPage`,
+  - `CitiesListPage`,
+  - `TagsListPage`.
+
+### UA-6 — Операционные экраны (Moderation, Orders, Reviews) `[ ]`
+
+- [ ] Привести `ModerationQueuePage`, `OrdersListPage`, `ReviewsListPage` к одному UX-паттерну:
+  - `PageHeader`, `FilterBar`, `DataTableShell`, единые пустые/ошибочные состояния.
+  - Для деталей — `DetailSlideOver` или единообразный detail-экран на базе `SectionCard`.
+
+### UA-7 — Settings как вкладочные формы `[ ]`
+
+- [ ] Превратить `SettingsPage` в много вкладочный экран:
+  - Tabs: `General`, `SEO`, `Marketing`, `Integrations` (MVP можно сделать заглушками).
+  - Внутри вкладок использовать `FormSection`, `FormGrid`, `FormActions`.
+
+### UA-8 — Supplier Cabinet: выравнивание с admin-паттернами `[ ]`
+
+- [ ] Sidebar ЛК поставщика: `Dashboard`, `Мои события`, `Отзывы`, `Уведомления`, `Отчёты`, `Настройки`.
+- [ ] Использовать те же shared-компоненты (`PageHeader`, `SectionCard`, `Empty/Loading/Error`) в поставщицком кабинете.
 
 ### Контент-операции админки (FEATURE 7–10) ✅
 

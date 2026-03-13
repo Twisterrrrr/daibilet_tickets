@@ -4,6 +4,67 @@
 
 ---
 
+## 12.03.2026 — Phase 8: Integrations / Extension Points
+
+### Наблюдения
+
+- TcSyncService, TepSyncService, Partner API уже есть.
+- Требовались extension point (SyncAdapter) и Supplier UI статус интеграций.
+
+### Решения
+
+- **SyncAdapter interface** (`catalog/sync-adapter.interface.ts`): SyncResult + syncAll(). Doc-only mapping на TcSync/TepSync.
+- **SupplierIntegrationsService:** getStatus(operatorId) — счётчики по Event.source (TC, TEPLOHOD, MANUAL) + наличие ApiKey для Partner.
+- **API:** GET /supplier/integrations.
+- **Supplier UI:** страница «Интеграции» — read-only статус (Подключено / Нет событий), кол-во событий.
+- **Docs:** IntegrationsExtensionPoints.md расширен.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 12.03.2026 — Phase 9: Team / Roles / Invitations
+
+### Наблюдения
+
+- SupplierUser, SupplierRole, RBAC guards уже реализованы.
+- Требовалось: SupplierInvitation, API приглашений, UI команды и приёма приглашения.
+
+### Решения
+
+- **Prisma:** модель `SupplierInvitation` (email, operatorId, role, token, expiresAt, acceptedAt).
+- **SupplierInvitationService:** create, list, delete, accept. Токен 32 байта, срок 7 дней.
+- **API:** GET/POST/DELETE /supplier/invitations (OWNER), POST /supplier/invitations/:token/accept (публичный).
+- **SupplierAuthService:** добавлен `issueTokensForUser` для автологина после accept.
+- **Frontend:** страница «Команда» (участники + приглашения + форма приглашения), страница `/invite/:token` для приёма приглашения.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 12.03.2026 — Phase 1 Roadmap: Notifications + Moderation Priority
+
+### Наблюдения
+
+- Trust system, active events limit и Supplier dashboard уже реализованы (audit Phase 1).
+- Notifications center использовал mock; moderation queue не имел сортировки по trust.
+
+### Решения
+
+- **Supplier Notifications API:** добавлен `SupplierNotificationsService` и `GET /supplier/notifications`. Агрегация из Event (модерация), PaymentIntent (продажи) и trust (предупреждение лимита). Без новой таблицы.
+- **Frontend supplier:** Notifications загружает данные из API; read/hidden — локальный state (session).
+- **Moderation queue:** в `GET /admin/moderation/queue` добавлен параметр `sortBy=trust_asc` (низкий trust первым). Admin ModerationQueuePage — выпадающий список сортировки.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 12.03.2026 — Тесты, линт, исправления ESLint
 
 ### Наблюдения

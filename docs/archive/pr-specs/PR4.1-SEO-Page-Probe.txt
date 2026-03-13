@@ -1,0 +1,32 @@
+# PR4.1 — Live SEO Page Probe
+
+Контекст:
+
+В PR4+ уже есть SEO аудит на основе данных базы (title, description, slug, image, sessions).
+
+Теперь нужно добавить проверку **реально сгенерированной страницы**.
+
+Это выявляет проблемы:
+
+- неправильный <title>
+- отсутствующий canonical
+- robots=noindex
+- отсутствующий JSON-LD
+- отсутствующий og:image
+- SSR ошибки
+
+Важно:
+НЕ делать тяжёлый crawler.
+
+Мы проверяем только **текущую страницу события** через HTTP fetch.
+
+---
+
+# Backend
+
+Создать сервис: SeoPageProbeService
+Файл: src/admin/seo/seo-page-probe.service.ts
+
+# Endpoint: GET /admin/seo-audit/events/:id/page
+
+# Commit: PR4.1: feat(admin-seo): live page SEO probe for events

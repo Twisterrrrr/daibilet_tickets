@@ -1,13 +1,13 @@
 # Архив документации
 
-В этой папке находятся устаревшие спецификации и исторические документы проекта.
+Устаревшие спецификации и исторические документы. **Не источник актуальной архитектуры.**
 
-Они сохранены для истории и **не являются источником актуальной архитектуры**.
+| Папка/файл | Описание |
+|------------|----------|
+| [pr-specs/](pr-specs/) | PR4.1–4.3 SEO specs (Page Probe, Opportunity Finder, Auto-Generator) |
+| [old-specs/](old-specs/) | TopicDefinition, PageTemplateSpecs, AdminOps и др. |
+| [ReviewModuleAudit.md](ReviewModuleAudit.md) | Pre-implementation аудит модуля отзывов (MVP реализован) |
+| [Diary.md](Diary.md) | Исторический дневник (актуальный — `../Diary.md`) |
+| PR-C*.md | Checkout/C0–C7 спецификации |
 
-Актуальная документация — в корне `docs/`:
-- [Project.md](../Project.md)
-- [Architecture.md](../Architecture.md)
-- [AdminSystem.md](../AdminSystem.md)
-- [DevOps.md](../DevOps.md)
-- [Reference.md](../Reference.md)
-- [Tasktracker.md](../Tasktracker.md)
+Актуальная документация: [../README.md](../README.md)

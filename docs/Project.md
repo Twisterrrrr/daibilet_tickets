@@ -124,7 +124,7 @@
   - **ReviewDispute** — оспаривание отзыва (reasonCode: FALSE_FACTS/OFF_TOPIC/ABUSIVE). Один активный dispute на отзыв. Статусы: MODERATOR_REVIEW → RESOLVED_KEEP/RESOLVED_HIDE/RESOLVED_DELETE.
   - **ReviewDisputeEvidence** — доказательства (jpg/png/pdf, до 25 МБ, до 5 файлов).
   - **ReviewActionLog** — лог действий (actorType, actionType).
-- Отзывы для TC/TEPLOHOD отключены (`ReviewCapabilityService.canAcceptReviews`). Подробно: `docs/ReviewModuleSpec.md`, `docs/ReviewModuleAudit.md`.
+- Отзывы для TC/TEPLOHOD отключены (`ReviewCapabilityService.canAcceptReviews`). Подробно: `docs/ReviewModuleSpec.md`, `docs/archive/ReviewModuleAudit.md`.
 - **ExternalReview** — импортированные отзывы с внешних площадок (Яндекс.Карты, 2ГИС, Tripadvisor, Google). Поля: source, sourceUrl, authorName, rating, text, publishedAt. Участвует в recalculateEventRating.
 - **ReviewRequest** — пост-покупочный запрос на отзыв (email, eventId, token, sentAt, reminderSentAt, openedAt, clickedAt, reviewId). Unique: email + eventId.
 - **Event.externalRating/externalReviewCount/externalSource** — ручной импорт рейтинга из внешних платформ. Участвует в расчёте итогового rating через взвешенное среднее (вместе с Review и ExternalReview).
@@ -260,6 +260,7 @@
   - Использует `@tanstack/react-query`, `@tanstack/react-table`, Radix UI.
 - **`packages/frontend-supplier`** — портал поставщика (упрощённый кабинет):
   - Страницы: `src/pages/events/*` (EventsList, EventEdit), `Dashboard`, `Reports`, `Settings`, `Login`, `Register`.
+  - **Roadmap Phases 2–9:** см. [RoadmapPhases2-9Architecture.md](RoadmapPhases2-9Architecture.md) — Orders, Availability, ListingHealth, Analytics, Pricing, Ranking, Integrations, Team/Roles.
   - Tailwind + Radix UI, React Router.
 - **`packages/shared`** — общий пакет `@daibilet/shared`:
   - Утилиты: `normalize-title`, `price-normalizer`, `seo-utils`, `widget-payload`, `address-utils`, `city-declension`.
