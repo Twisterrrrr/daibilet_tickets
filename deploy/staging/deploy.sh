@@ -32,6 +32,16 @@ ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
 [ -f "$ENV_FILE" ] || ENV_FILE="$SCRIPT_DIR/.env"
 COMPOSE_ENV="--env-file $ENV_FILE"
 
+# Опционально: логин в Docker Hub (снимает лимит 429 при pull образов)
+if [ -f "$ENV_FILE" ]; then
+  DOCKERHUB_USER=$(grep -E '^DOCKERHUB_USER=' "$ENV_FILE" 2>/dev/null | cut -d= -f2-)
+  DOCKERHUB_TOKEN=$(grep -E '^DOCKERHUB_TOKEN=' "$ENV_FILE" 2>/dev/null | cut -d= -f2-)
+fi
+if [ -n "$DOCKERHUB_USER" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+  echo "=== Docker Hub login (rate limit) ==="
+  echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin 2>/dev/null || true
+fi
+
 echo "=== Staging: перезапуск (context: $REPO_ROOT, env: $ENV_FILE) ==="
 cd "$SCRIPT_DIR"
 # Явный project name и удаление старых контейнеров

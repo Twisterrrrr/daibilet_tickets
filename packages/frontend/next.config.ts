@@ -1,4 +1,5 @@
 import os from 'node:os';
+import path from 'node:path';
 import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 
@@ -71,6 +72,13 @@ const nextConfig: NextConfig = {
         hostname: 'daibilet.ru',
       },
     ],
+  },
+
+  // Явный alias для workspace-пакета: в Docker pnpm symlinks могут не сохраняться.
+  webpack: (config) => {
+    config.resolve.alias = { ...config.resolve.alias };
+    config.resolve.alias['@daibilet/shared'] = path.join(__dirname, '../../shared');
+    return config;
   },
 };
 
