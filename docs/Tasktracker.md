@@ -227,6 +227,20 @@
 - [ ] **Средний**: Лендинг `salyut` — unit-test getPrice + проверка edge-cases
 - [ ] **Средний**: SQL-отчёт по категоризации (аудит качества каталога)
 
+### Buyer Account / ЛК покупателя (MVP, 15.03.2026)
+
+- [x] **Высокий**: Аудит текущего состояния (User, CheckoutSession, auth, orders, track) → `docs/BuyerAccountAudit.md` ✅
+- [x] **Высокий**: Архитектурная спецификация → `docs/BuyerAccountSpecs.md` ✅
+- [x] **Высокий**: Prisma: `userId` в CheckoutSession, миграция ✅
+- [x] **Высокий**: Привязка заказа к пользователю при создании сессии (опциональный JWT) ✅
+- [x] **Высокий**: Backend API: GET /account/me, /account/orders, /account/orders/:id, /account/tickets, GET/PATCH /account/profile, ownership checks ✅
+- [x] **Высокий**: Backend GET /account/purchases — единый список покупок с типами карточек (INTERNAL_TICKET, EXTERNAL_VOUCHER, BOOKING_CONFIRMATION, AWAITING_PAYMENT, MANUAL_CONFIRMATION) ✅
+- [x] **Высокий**: Frontend: layout /account, dashboard, заказы, деталь заказа, билеты, избранное (редирект), профиль ✅
+- [x] **Высокий**: Frontend /account/purchases — единый экран «Мои покупки» с визуальным различием типов карточек ✅
+- [x] **Высокий**: Навигация: «Мои покупки» в header (desktop + mobile) → /account/purchases, «Личный кабинет» → /account; редирект после логина по умолчанию на /account/purchases ✅
+- [ ] **Средний**: Тесты: order binding для auth user, account orders только свои, запрет чужого заказа, guest flow не сломан
+- [ ] **Низкий**: Реальная интеграция YooKassa: metadata.orderId/userId в payment init, webhook → оплата в ЛК
+
 ### Gate 2 — ежедневные ops в текущей админке
 
 - [x] **Высокий**: Admin UI — поиск заказа (id/code/email/paymentId) + resend, retry fulfilment (OrderDetail) ✅

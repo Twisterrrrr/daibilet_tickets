@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { join } from 'path';
+import { AccountModule } from './account/account.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { BlogModule } from './blog/blog.module';
@@ -86,6 +87,7 @@ import { VoucherModule } from './voucher/voucher.module';
     CollectionModule,
     SupportModule,
     UserModule,
+    AccountModule,
     SeoModule,
     PreviewModule,
   ],
