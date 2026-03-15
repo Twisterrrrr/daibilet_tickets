@@ -4,6 +4,25 @@
 
 ---
 
+## 15.03.2026 — Статусы внешних покупок (Ticketscloud / Teplohod) в «Мои покупки»
+
+### Наблюдения
+
+- Для покупок вне Дайбилет (EXTERNAL_VOUCHER, внешняя бронь) нужны понятные статусы: билет отправлен на e-mail, отменён/возврат, обрабатывается, неизвестно.
+- Ticketscloud отдаёт статус заказа (getOrder): executed → confirmed, cancelled/returned → отмена. Teplohod пока использует тот же TC-адаптер.
+
+### Решения
+
+- Введён тип `ProviderOrderStatus`: confirmed | cancelled | returned | pending | unknown и маппинг в сообщения: confirmed → «Билет отправлен на e-mail», cancelled/returned → «Билет отменен, ожидайте возврата», pending → «Обрабатывается», unknown → «Неизвестно».
+- В `getPurchaseDisplayType` для EXTERNAL_VOUCHER и внешней BOOKING_CONFIRMATION используется либо переданный `providerStatus`, либо `deriveProviderStatus(sessionStatus, paymentStatus)` по нашей сессии/платежу (REFUNDED/CANCELLED/EXPIRED → cancelled, COMPLETED+PAID → confirmed, и т.д.).
+- В коде добавлен комментарий: Teplohod сейчас идёт через TcBookingProvider, статус тот же; при появлении у Teplohod своего API заказов — отдельный провайдер с getStatus() и маппинг их статусов.
+
+### Проблемы
+
+- Нет. Реальный вызов TC getStatus при формировании списка покупок пока не добавлен (можно подставить providerStatus из FulfillmentItem.providerData или из cron, который опрашивает TC).
+
+---
+
 ## 15.03.2026 — Phase 2–5: Orders UX, Availability, Listing Health, Витрина SupplierDailyStat
 
 ### Наблюдения

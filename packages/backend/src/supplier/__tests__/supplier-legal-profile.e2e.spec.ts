@@ -1,3 +1,8 @@
+/**
+ * E2E: юридический профиль и банковские счета поставщика (P3-4).
+ * Сейчас исключён из vitest (exclude в vitest.config.ts): для запуска нужна зависимость supertest.
+ * После добавления supertest в devDependencies убрать exclude и запускать при необходимости.
+ */
 import request from 'supertest';
 
 import { createTestingApp } from '../../../test-utils/create-testing-app';

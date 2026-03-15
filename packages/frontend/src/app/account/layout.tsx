@@ -17,8 +17,6 @@ import { useUserAuth } from '@/hooks/useUserAuth';
 const nav = [
   { href: '/account', label: 'Обзор', icon: LayoutDashboard },
   { href: '/account/purchases', label: 'Мои покупки', icon: Ticket },
-  { href: '/account/orders', label: 'Мои заказы', icon: Ticket },
-  { href: '/account/tickets', label: 'Мои билеты', icon: Ticket },
   { href: '/account/favorites', label: 'Избранное', icon: Heart },
   { href: '/account/profile', label: 'Профиль', icon: User },
 ];

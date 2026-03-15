@@ -43,6 +43,9 @@ export class PurchaseReadService {
     const externalUrl =
       session.fulfillmentItems.find((f) => f.externalPaymentUrl)?.externalPaymentUrl ?? null;
     const isExternalFlow = session.fulfillmentItems.some((f) => f.purchaseFlow === 'EXTERNAL');
+    const isProviderTcOrTep = session.fulfillmentItems.some(
+      (f) => f.provider === 'TC' || f.provider === 'TEP',
+    );
 
     const { purchaseType, displayStatus } = getPurchaseDisplayType({
       sessionStatus: session.status,
@@ -50,6 +53,7 @@ export class PurchaseReadService {
       isExternalFlow,
       hasExternalUrl,
       hasTrack,
+      isProviderTcOrTep,
     });
 
     const capability = this.ticketCapability.getTicketCapability({

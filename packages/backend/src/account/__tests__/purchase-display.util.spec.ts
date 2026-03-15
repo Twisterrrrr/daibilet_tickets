@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computeTicketAvailable,
+  deriveProviderStatus,
   derivePurchaseActions,
+  getDisplayStatusByProviderStatus,
   getPurchaseDisplayType,
   type PurchaseActionsResult,
 } from '../purchase-display.util';
@@ -62,7 +64,7 @@ describe('getPurchaseDisplayType', () => {
       hasTrack: false,
     });
     expect(r.purchaseType).toBe('EXTERNAL_VOUCHER');
-    expect(r.displayStatus).toBe('Подтверждено партнёром');
+    expect(r.displayStatus).toBe('Билет отправлен на e-mail');
   });
 
   it('does not treat external completed booking as internal ticket even if track exists', () => {
@@ -89,7 +91,7 @@ describe('getPurchaseDisplayType', () => {
     expect(r.displayStatus).toBe('Бронирование подтверждено');
   });
 
-  it('treats completed external booking without artifacts as booking confirmation', () => {
+  it('treats completed external booking without artifacts as booking confirmation with provider status', () => {
     const r = getPurchaseDisplayType({
       sessionStatus: 'COMPLETED',
       paymentStatus: 'PAID',
@@ -98,7 +100,7 @@ describe('getPurchaseDisplayType', () => {
       hasTrack: false,
     });
     expect(r.purchaseType).toBe('BOOKING_CONFIRMATION');
-    expect(r.displayStatus).toBe('Бронирование подтверждено');
+    expect(r.displayStatus).toBe('Билет отправлен на e-mail'); // derived confirmed
   });
 
   it('does not create pay action when awaiting payment but paymentUrl is missing', () => {
@@ -123,6 +125,62 @@ describe('getPurchaseDisplayType', () => {
     });
     expect(r.purchaseType).toBe('MANUAL_CONFIRMATION');
     expect(r.displayStatus).toBe('В обработке');
+  });
+
+  it('shows cancelled message for external voucher when payment refunded', () => {
+    const r = getPurchaseDisplayType({
+      sessionStatus: 'COMPLETED',
+      paymentStatus: 'REFUNDED',
+      isExternalFlow: true,
+      hasExternalUrl: true,
+      hasTrack: false,
+    });
+    expect(r.purchaseType).toBe('EXTERNAL_VOUCHER');
+    expect(r.displayStatus).toBe('Билет отменен, ожидайте возврата');
+  });
+
+  it('uses passed providerStatus when provided', () => {
+    const r = getPurchaseDisplayType({
+      sessionStatus: 'COMPLETED',
+      paymentStatus: 'PAID',
+      isExternalFlow: true,
+      hasExternalUrl: true,
+      hasTrack: false,
+      providerStatus: 'pending',
+    });
+    expect(r.purchaseType).toBe('EXTERNAL_VOUCHER');
+    expect(r.displayStatus).toBe('Обрабатывается');
+  });
+
+  it('shows same provider statuses for Teplohod (isProviderTcOrTep) as for Ticketscloud', () => {
+    const r = getPurchaseDisplayType({
+      sessionStatus: 'COMPLETED',
+      paymentStatus: 'PAID',
+      isExternalFlow: false,
+      hasExternalUrl: false,
+      hasTrack: true,
+      isProviderTcOrTep: true,
+    });
+    expect(r.purchaseType).toBe('EXTERNAL_VOUCHER');
+    expect(r.displayStatus).toBe('Билет отправлен на e-mail');
+  });
+});
+
+describe('deriveProviderStatus and getDisplayStatusByProviderStatus', () => {
+  it('maps confirmed/cancelled/pending/unknown to messages', () => {
+    expect(getDisplayStatusByProviderStatus('confirmed')).toBe('Билет отправлен на e-mail');
+    expect(getDisplayStatusByProviderStatus('cancelled')).toBe('Билет отменен, ожидайте возврата');
+    expect(getDisplayStatusByProviderStatus('returned')).toBe('Билет отменен, ожидайте возврата');
+    expect(getDisplayStatusByProviderStatus('pending')).toBe('Обрабатывается');
+    expect(getDisplayStatusByProviderStatus('unknown')).toBe('Неизвестно');
+  });
+
+  it('derives provider status from session and payment', () => {
+    expect(deriveProviderStatus('COMPLETED', 'PAID')).toBe('confirmed');
+    expect(deriveProviderStatus('COMPLETED', 'REFUNDED')).toBe('cancelled');
+    expect(deriveProviderStatus('CANCELLED', 'PAID')).toBe('cancelled');
+    expect(deriveProviderStatus('AWAITING_PAYMENT', 'PENDING')).toBe('pending');
+    expect(deriveProviderStatus('STARTED', 'FAILED')).toBe('unknown');
   });
 });
 

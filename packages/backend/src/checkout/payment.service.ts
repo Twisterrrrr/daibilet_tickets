@@ -402,7 +402,8 @@ export class PaymentService {
       if (
         updatedIntent.supplierId &&
         intent.provider !== 'EXTERNAL' &&
-        (updatedIntent.supplierAmount ?? 0) > 0
+        (updatedIntent.supplierAmount ?? 0) > 0 &&
+        this.dailyStat
       ) {
         this.dailyStat
           .incrementToday(updatedIntent.supplierId, {

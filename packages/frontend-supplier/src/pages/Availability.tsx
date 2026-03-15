@@ -193,8 +193,8 @@ export default function AvailabilityPage() {
       {selectedEventId && (
         <SectionCard
           title="Сеансы"
-          action={
-            hasSelection && (
+          headerRight={
+            hasSelection ? (
               <button
                 type="button"
                 onClick={openBulkModal}
@@ -202,7 +202,7 @@ export default function AvailabilityPage() {
               >
                 Изменить вместимость ({selectedCount})
               </button>
-            )
+            ) : null
           }
         >
           {loadingSessions ? (

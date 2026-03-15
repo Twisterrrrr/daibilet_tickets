@@ -64,9 +64,19 @@ const CARD_STYLE: Record<
   },
 };
 
+/** Подпись типа артефакта для карточки (билет, ваучер, бронь и т.д.) */
+const ARTIFACT_LABEL: Record<PurchaseDisplayType, string> = {
+  INTERNAL_TICKET: 'Билет',
+  EXTERNAL_VOUCHER: 'Ваучер партнёра',
+  BOOKING_CONFIRMATION: 'Бронь',
+  AWAITING_PAYMENT: 'Ожидает оплаты',
+  MANUAL_CONFIRMATION: 'На подтверждении',
+};
+
 function PurchaseCard({ item }: { item: PurchaseListItem }) {
   const style = CARD_STYLE[item.purchaseType];
   const eventDateStr = formatEventDate(item.eventDate);
+  const artifactLabel = ARTIFACT_LABEL[item.purchaseType];
 
   return (
     <div
@@ -74,7 +84,15 @@ function PurchaseCard({ item }: { item: PurchaseListItem }) {
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-slate-900">{item.eventTitle}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-md border border-slate-200 bg-white/80 px-2 py-0.5 text-xs font-medium text-slate-600">
+              {artifactLabel}
+            </span>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style.badge}`}>
+              {item.displayStatus}
+            </span>
+          </div>
+          <p className="mt-2 font-semibold text-slate-900">{item.eventTitle}</p>
           <p className="mt-0.5 text-sm text-slate-500">
             Покупка: {formatDate(item.purchaseDate)}
             {eventDateStr && (
@@ -83,9 +101,6 @@ function PurchaseCard({ item }: { item: PurchaseListItem }) {
           </p>
           <p className="mt-1 text-sm font-medium text-slate-700">{item.shortCode}</p>
         </div>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style.badge}`}>
-          {item.displayStatus}
-        </span>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -195,7 +210,7 @@ export default function AccountPurchasesPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-900">Мои покупки</h1>
       <p className="text-slate-600">
-        Все ваши заказы и бронирования: билеты нашей платформы и покупки через партнёров.
+        Здесь собраны все заказы, билеты и брони — каждый пункт помечен типом артефакта (билет, ваучер партнёра, бронь, ожидает оплаты и т.д.).
       </p>
 
       {items.length === 0 ? (

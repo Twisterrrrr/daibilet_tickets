@@ -5,12 +5,56 @@ export type PurchaseDisplayType =
   | 'AWAITING_PAYMENT'
   | 'MANUAL_CONFIRMATION';
 
+/**
+ * Статус заказа у провайдера.
+ * Ticketscloud: getOrder().status → executed → confirmed, cancelled/returned → cancelled.
+ * Teplohod: сейчас бронирование идёт через тот же TC-адаптер (TcBookingProvider), статус тот же.
+ * Если у Teplohod появится свой API заказов — нужен отдельный провайдер с getStatus() и маппинг их статусов сюда.
+ */
+export type ProviderOrderStatus = 'confirmed' | 'cancelled' | 'returned' | 'pending' | 'unknown';
+
+const PROVIDER_STATUS_MESSAGE: Record<ProviderOrderStatus, string> = {
+  confirmed: 'Билет отправлен на e-mail',
+  cancelled: 'Билет отменен, ожидайте возврата',
+  returned: 'Билет отменен, ожидайте возврата',
+  pending: 'Обрабатывается',
+  unknown: 'Неизвестно',
+};
+
+/** Вывести displayStatus по статусу провайдера (TC/Teplohod). */
+export function getDisplayStatusByProviderStatus(providerStatus: ProviderOrderStatus): string {
+  return PROVIDER_STATUS_MESSAGE[providerStatus];
+}
+
+/** По нашей сессии и платежу вывести статус провайдера (когда реальный getStatus ещё не подставлен). */
+export function deriveProviderStatus(sessionStatus: string, paymentStatus: string): ProviderOrderStatus {
+  if (paymentStatus === 'REFUNDED' || sessionStatus === 'CANCELLED' || sessionStatus === 'EXPIRED') {
+    return 'cancelled';
+  }
+  if ((sessionStatus === 'COMPLETED' || sessionStatus === 'CONFIRMED') && paymentStatus === 'PAID') {
+    return 'confirmed';
+  }
+  if (
+    sessionStatus === 'AWAITING_PAYMENT' ||
+    sessionStatus === 'PENDING_CONFIRMATION' ||
+    paymentStatus === 'PENDING' ||
+    paymentStatus === 'PROCESSING'
+  ) {
+    return 'pending';
+  }
+  return 'unknown';
+}
+
 export interface PurchaseDisplayInput {
   sessionStatus: string;
   paymentStatus: string;
   isExternalFlow: boolean;
   hasExternalUrl: boolean;
   hasTrack: boolean;
+  /** Покупка через Ticketscloud или Teplohod (FulfillmentItem.provider TC/TEP) — те же статусы, что и для EXTERNAL. */
+  isProviderTcOrTep?: boolean;
+  /** Когда есть — используем для EXTERNAL_VOUCHER/внешней брони (Ticketscloud getStatus, позже Teplohod). */
+  providerStatus?: ProviderOrderStatus;
 }
 
 export interface PurchaseDisplayResult {
@@ -19,7 +63,9 @@ export interface PurchaseDisplayResult {
 }
 
 export function getPurchaseDisplayType(input: PurchaseDisplayInput): PurchaseDisplayResult {
-  const { sessionStatus, paymentStatus, isExternalFlow, hasExternalUrl, hasTrack } = input;
+  const { sessionStatus, paymentStatus, isExternalFlow, hasExternalUrl, hasTrack, isProviderTcOrTep, providerStatus } =
+    input;
+  const useProviderStatusMessages = isExternalFlow || isProviderTcOrTep;
 
   if (sessionStatus === 'PENDING_CONFIRMATION') {
     return { purchaseType: 'MANUAL_CONFIRMATION', displayStatus: 'Ожидает подтверждения' };
@@ -30,16 +76,35 @@ export function getPurchaseDisplayType(input: PurchaseDisplayInput): PurchaseDis
   }
 
   if (sessionStatus === 'COMPLETED' || sessionStatus === 'CONFIRMED') {
-    if (isExternalFlow && (hasExternalUrl || hasTrack)) {
-      return { purchaseType: 'EXTERNAL_VOUCHER', displayStatus: 'Подтверждено партнёром' };
+    if (useProviderStatusMessages && (hasExternalUrl || hasTrack)) {
+      const status = providerStatus ?? deriveProviderStatus(sessionStatus, paymentStatus);
+      return {
+        purchaseType: 'EXTERNAL_VOUCHER',
+        displayStatus: getDisplayStatusByProviderStatus(status === 'returned' ? 'cancelled' : status),
+      };
     }
 
-    if (isExternalFlow || (!hasTrack && !hasExternalUrl)) {
-      return { purchaseType: 'BOOKING_CONFIRMATION', displayStatus: 'Бронирование подтверждено' };
+    if (useProviderStatusMessages && !(hasExternalUrl || hasTrack)) {
+      const status = providerStatus ?? deriveProviderStatus(sessionStatus, paymentStatus);
+      return {
+        purchaseType: 'BOOKING_CONFIRMATION',
+        displayStatus: getDisplayStatusByProviderStatus(status === 'returned' ? 'cancelled' : status),
+      };
     }
 
     if (paymentStatus === 'PAID' && hasTrack) {
+      if (isProviderTcOrTep) {
+        const status = providerStatus ?? deriveProviderStatus(sessionStatus, paymentStatus);
+        return {
+          purchaseType: 'EXTERNAL_VOUCHER',
+          displayStatus: getDisplayStatusByProviderStatus(status === 'returned' ? 'cancelled' : status),
+        };
+      }
       return { purchaseType: 'INTERNAL_TICKET', displayStatus: 'Билет доступен' };
+    }
+
+    if (!hasTrack && !hasExternalUrl) {
+      return { purchaseType: 'BOOKING_CONFIRMATION', displayStatus: 'Бронирование подтверждено' };
     }
 
     return { purchaseType: 'BOOKING_CONFIRMATION', displayStatus: 'Бронирование подтверждено' };
