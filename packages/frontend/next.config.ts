@@ -76,8 +76,11 @@ const nextConfig: NextConfig = {
 
   // Явный alias для workspace-пакета: в Docker pnpm symlinks могут не сохраняться.
   webpack: (config) => {
-    config.resolve.alias = { ...config.resolve.alias };
-    config.resolve.alias['@daibilet/shared'] = path.join(__dirname, '../../shared');
+    const a = config.resolve?.alias ?? {};
+    if (typeof a === 'object' && !Array.isArray(a)) {
+      config.resolve = config.resolve ?? {};
+      config.resolve.alias = { ...a, '@daibilet/shared': path.resolve(__dirname, '../../shared') };
+    }
     return config;
   },
 };

@@ -13,8 +13,9 @@ WORKDIR /app
 # Конфиги воркспейса
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 
-# Только пакеты, нужные для admin (shared + frontend-admin)
+# Пакеты, нужные для admin (shared, shared-ui, frontend-admin)
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/shared-ui/package.json ./packages/shared-ui/
 COPY packages/frontend-admin/package.json ./packages/frontend-admin/
 
 # Hoisted node_modules — бинарники и плагины резолвятся (закрывает ошибки №3, 4, 6, 7)
@@ -23,6 +24,7 @@ RUN echo "node-linker=hoisted" > .npmrc && pnpm install --frozen-lockfile
 
 # Исходники
 COPY packages/shared/ ./packages/shared/
+COPY packages/shared-ui/ ./packages/shared-ui/
 COPY packages/frontend-admin/ ./packages/frontend-admin/
 
 # Сборка: pnpm сам резолвит tsc, vite, плагины внутри воркспейса
