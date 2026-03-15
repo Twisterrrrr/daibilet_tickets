@@ -65,5 +65,5 @@ describe('PurchaseReadService.mapSessionToPurchase', () => {
     expect(dto.ticketAvailable).toBe(true);
     expect(dto.primaryAction?.label).toBe('Посмотреть ваучер');
   });
-}
+});
 

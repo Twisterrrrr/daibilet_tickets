@@ -76,6 +76,7 @@
 - **Ticket** — отдельной сущности для checkout нет; «билет» = наличие trackUrl или externalPaymentUrl / артефакта. Показывать в UI только если реально есть что открыть.
 
 Единый экран «Мои покупки» — **presentation layer**: агрегат по CheckoutSession + PaymentIntent + FulfillmentItem. В БД сущности не объединять.
+В реализации MVP агрегат оформлен в виде read‑сервиса `PurchaseReadService` + маппер `PurchaseReadService.mapSessionToPurchase`, который собирает `PurchaseListItemDto`.
 
 ## 6. Привязка заказа к пользователю
 
@@ -156,6 +157,14 @@
   - **AccountTicketItemDto:** orderId/shortCode, eventTitle, eventSlug, sessionStartsAt, status, trackUrl или externalUrl.
   - **AccountProfileDto:** name, email, phone (если есть).
 - В проекте при наличии паттерна fields=card/full или mapper layer — использовать его для консистентности.
+
+**Текущий статус реализации read‑model:**
+
+- `CheckoutSession` выступает как **Order‑подобный агрегат** (владение покупкой, userId, статус, сумма).
+- `PaymentIntent` реализует слой **Payment** (provider, status, суммы, paidAt).
+- `FulfillmentItem` — слой **Fulfillment** (purchaseFlow, status, внешние ссылки).
+- `PurchaseListItemDto`/`PurchaseReadService` формируют **Purchase read‑model** для `/account/purchases`.
+  Маппинг типа карточки и доступных действий вынесен в `getPurchaseDisplayType` + `derivePurchaseActions` с unit‑тестами.
 
 ---
 

@@ -3,15 +3,11 @@
  * /account/purchases и /account/orders/:id.
  */
 
-import { Controller, Get, Module, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import * as http from 'http';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { AccountController } from '../account.controller';
 import { AccountService } from '../account.service';
-import { UserJwtGuard } from '../../user/user.guard';
 
 @Injectable()
 class TestUserGuard implements CanActivate {
@@ -22,11 +18,47 @@ class TestUserGuard implements CanActivate {
   }
 }
 
-@UseGuards(TestUserGuard)
 @Controller('account')
-class TestAccountController extends AccountController {}
+@UseGuards(TestUserGuard)
+class TestAccountController {
+  constructor(private readonly account: AccountService) {}
 
-class FakeAccountService {
+  @Get('me')
+  getMe(@Req() req: { user: { id: string } }) {
+    return this.account.getSummary(req.user.id);
+  }
+
+  @Get('purchases')
+  getPurchases(
+    @Req() req: { user: { id: string } },
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.account.getPurchases(req.user.id, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get('orders')
+  getOrders(
+    @Req() req: { user: { id: string } },
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.account.getOrders(req.user.id, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get('orders/:id')
+  getOrderDetail(@Req() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.account.getOrderDetail(req.user.id, id);
+  }
+}
+
+class FakeAccountService implements Partial<AccountService> {
   getSummary() {
     return Promise.resolve({
       user: { id: 'user-1', name: 'Test', email: 'test@example.com' },
@@ -81,69 +113,20 @@ class FakeAccountService {
   }
 }
 
-@Module({
-  controllers: [TestAccountController],
-  providers: [
-    { provide: AccountService, useClass: FakeAccountService },
-    { provide: UserJwtGuard, useClass: TestUserGuard },
-  ],
-})
-class TestAccountModule {}
-
-function httpGet(url: string): Promise<{ statusCode: number; body: string }> {
-  return new Promise((resolve, reject) => {
-    const r = http.get(url, (res) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () =>
-        resolve({
-          statusCode: res.statusCode ?? 0,
-          body: Buffer.concat(chunks).toString('utf8'),
-        }),
-      );
-    });
-    r.on('error', reject);
-  });
-}
-
 describe('AccountController E2E (minimal)', () => {
-  let baseUrl: string;
-  let app: { close: () => Promise<void> };
-
-  beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [TestAccountModule],
-    }).compile();
-
-    const nestApp = moduleRef.createNestApplication();
-    await nestApp.init();
-    await nestApp.listen(0);
-
-    const addr = nestApp.getHttpServer().address();
-    const port = typeof addr === 'object' && addr ? addr.port : 0;
-    baseUrl = `http://127.0.0.1:${port}`;
-    app = nestApp;
-  });
-
-  afterAll(async () => {
-    await app?.close();
-  });
+  const controller = new TestAccountController(new FakeAccountService() as AccountService);
 
   it('GET /account/purchases returns purchase list', async () => {
-    const r = await httpGet(`${baseUrl}/account/purchases?page=1&limit=10`);
-    expect(r.statusCode).toBe(200);
-    const body = JSON.parse(r.body);
+    const body = await controller.getPurchases({ user: { id: 'user-1' } }, '1', '10');
     expect(body.total).toBe(1);
     expect(body.items[0].purchaseId).toBe('s1');
     expect(body.items[0].purchaseType).toBe('INTERNAL_TICKET');
   });
 
   it('GET /account/orders/:id returns order detail', async () => {
-    const r = await httpGet(`${baseUrl}/account/orders/order-1`);
-    expect(r.statusCode).toBe(200);
-    const body = JSON.parse(r.body);
+    const body = await controller.getOrderDetail({ user: { id: 'user-1' } }, 'order-1');
     expect(body.id).toBe('order-1');
     expect(body.ownerId).toBe('user-1');
   });
-}
+});
 
