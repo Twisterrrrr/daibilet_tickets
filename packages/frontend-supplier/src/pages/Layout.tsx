@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BarChart3, Bell, Calendar, CreditCard, FileText, LayoutDashboard, LogOut, MessageSquare, Settings } from 'lucide-react';
+import { BarChart3, Bell, Calendar, CreditCard, FileText, LayoutDashboard, LogOut, MessageSquare, Plug2, Settings, Users } from 'lucide-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { AppShell, PageContainer } from '@daibilet/shared-ui';
@@ -25,6 +25,8 @@ const NAV: { to: string; icon: React.ComponentType<{ className?: string }>; labe
     { to: '/notifications', icon: Bell, label: 'Уведомления', badgeKey: 'notifications' },
     { to: '/reports', icon: BarChart3, label: 'Отчёты' },
     { to: '/balance', icon: CreditCard, label: 'Баланс' },
+    { to: '/team', icon: Users, label: 'Команда' },
+    { to: '/integrations', icon: Plug2, label: 'Интеграции' },
     { to: '/settings', icon: Settings, label: 'Настройки' },
   ];
 

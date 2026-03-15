@@ -38,7 +38,7 @@ function formatDate(value: string | null | undefined): string {
   return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-function formatMoneyKopecks(value: number | null | undefined): string {
+function _formatMoneyKopecks(value: number | null | undefined): string {
   if (!value) return '';
   return (value / 100).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 });
 }
@@ -80,7 +80,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     fetchOrders(1);
-  }, [status]);
+  }, [status, fetchOrders]);
 
   const handleConfirm = async (id: string) => {
     setActionLoadingId(id);

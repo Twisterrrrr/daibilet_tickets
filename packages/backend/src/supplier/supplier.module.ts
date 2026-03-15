@@ -7,7 +7,9 @@ import { MulterModule } from '@nestjs/platform-express';
 import { OperatorScopeGuard } from '../common/guards/operator-scope.guard';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ReviewCapabilityService } from '../review/review-capability.service';
+import { SupplierLedgerService } from '../ledger/supplier-ledger.service';
 import { ReportsModule } from '../reports/reports.module';
+import { CatalogModule } from '../catalog/catalog.module';
 import { SupplierRbacService } from './supplier-rbac.service';
 import { SupplierRolesGuard } from './supplier.guard';
 import { SupplierAuthService } from './supplier-auth.service';
@@ -15,7 +17,11 @@ import { SupplierController } from './supplier.controller';
 import { SupplierJwtStrategy } from './supplier-jwt.strategy';
 import { SupplierReviewsService } from './supplier-reviews.service';
 import { SupplierTrustService } from './supplier-trust.service';
+import { SupplierNotificationsService } from './supplier-notifications.service';
+import { SupplierUploadController } from './supplier-upload.controller';
 import { SupplierTrustJob } from './supplier-trust.job';
+import { SupplierIntegrationsService } from './supplier-integrations.service';
+import { SupplierInvitationService } from './supplier-invitation.service';
 
 @Module({
   imports: [
@@ -23,6 +29,7 @@ import { SupplierTrustJob } from './supplier-trust.job';
     MulterModule.register({ limits: { fileSize: 25 * 1024 * 1024 } }),
     PassportModule,
     ReportsModule,
+    CatalogModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -38,12 +45,16 @@ import { SupplierTrustJob } from './supplier-trust.job';
     SupplierRbacService,
     SupplierReviewsService,
     SupplierTrustService,
+    SupplierNotificationsService,
     SupplierTrustJob,
+    SupplierIntegrationsService,
+    SupplierInvitationService,
+    SupplierLedgerService,
     ReviewCapabilityService,
     OperatorScopeGuard,
     SupplierRolesGuard,
   ],
-  controllers: [SupplierController],
-  exports: [SupplierAuthService, SupplierRbacService],
+  controllers: [SupplierController, SupplierUploadController],
+  exports: [SupplierAuthService, SupplierRbacService, SupplierTrustService, SupplierLedgerService],
 })
 export class SupplierModule {}

@@ -108,12 +108,6 @@ export default function Dashboard() {
     return <ErrorState title="Не удалось загрузить дашборд" description={error} />;
   }
 
-  useEffect(() => {
-    if (!data && !error) {
-      // initial load
-    }
-  }, [data, error]);
-
   if (!data && !error) {
     return <LoadingState label="Загружаем статистику по продажам..." />;
   }
@@ -315,7 +309,7 @@ export default function Dashboard() {
       {recentSales && (
         <SectionCard
           title="Последние продажи"
-          actions={
+          headerRight={
             <Link
               to="/reports"
               className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"

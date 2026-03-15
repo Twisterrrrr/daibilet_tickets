@@ -45,7 +45,14 @@ import { SupplierAuthService } from './supplier-auth.service';
 import { SupplierReviewsService } from './supplier-reviews.service';
 import { SupplierLedgerService } from '../ledger/supplier-ledger.service';
 import { CreateSupplierPayoutRequestDto, SupplierBalanceDto } from './dto/supplier-payout.dto';
+import {
+  AcceptSupplierInvitationDto,
+  CreateSupplierInvitationDto,
+} from './dto/supplier-invitation.dto';
+import { SupplierIntegrationsService } from './supplier-integrations.service';
+import { SupplierInvitationService } from './supplier-invitation.service';
 import { SupplierNotificationsService } from './supplier-notifications.service';
+import { ListingHealthService } from '../catalog/listing-health.service';
 import { tryTransitionCheckout, tryTransitionOrderRequest } from '../checkout/checkout-state-machine';
 
 @ApiTags('supplier')
@@ -60,6 +67,9 @@ export class SupplierController {
     private readonly trustService: SupplierTrustService,
     private readonly supplierLedger: SupplierLedgerService,
     private readonly notificationsService: SupplierNotificationsService,
+    private readonly listingHealth: ListingHealthService,
+    private readonly invitationService: SupplierInvitationService,
+    private readonly integrationsService: SupplierIntegrationsService,
   ) {}
 
   // ─── Auth (public / refresh / guarded) ─────────────────────────────────────
@@ -389,6 +399,24 @@ export class SupplierController {
     });
   }
 
+  @Get('reports/dashboard')
+  @UseGuards(SupplierJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Сводная аналитика по продажам и сессиям' })
+  async supplierDashboard(@Req() req: { user: { operatorId: string } }) {
+    return this.reportsService.getSupplierDashboard(req.user.operatorId);
+  }
+
+  // ─── Listing health ────────────────────────────────────────────────────────
+
+  @Get('listing-health')
+  @UseGuards(SupplierJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Здоровье листингов поставщика (качество событий)' })
+  async listingHealthSummary(@Req() req: { user: { operatorId: string } }) {
+    return this.listingHealth.computeForOperator(req.user.operatorId);
+  }
+
   // ─── Orders / Booking Operations ───────────────────────────────────────────
 
   @Get('orders')
@@ -644,6 +672,75 @@ export class SupplierController {
       where: { id: user.operatorId },
       data: { name: data.name, logo: data.logo, website: data.website, companyName: data.companyName, inn: data.inn, contactEmail: data.contactEmail, contactPhone: data.contactPhone },
     });
+  }
+
+  // ─── Integrations (Phase 8) ─────────────────────────────────────────────────
+
+  @Get('integrations')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Статус интеграций поставщика' })
+  async getIntegrations(@CurrentSupplierUser() user: SupplierAuthUser) {
+    return this.integrationsService.getStatus(user.operatorId);
+  }
+
+  // ─── Invitations (Phase 9) ─────────────────────────────────────────────────
+
+  @Get('invitations')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Список приглашений и пользователей команды' })
+  async listInvitations(@CurrentSupplierUser() user: SupplierAuthUser) {
+    await this.rbac.requireSupplierRole(user.id, user.operatorId, [SupplierRole.OWNER]);
+    return this.invitationService.list(user.operatorId);
+  }
+
+  @Post('invitations')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Создать приглашение' })
+  async createInvitation(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Body() data: CreateSupplierInvitationDto,
+    @Res({ passthrough: true }) _res: Response,
+  ) {
+    await this.rbac.requireSupplierRole(user.id, user.operatorId, [SupplierRole.OWNER]);
+    const result = await this.invitationService.create(
+      user.operatorId,
+      user.id,
+      data.email,
+      data.role,
+    );
+    return result;
+  }
+
+  @Delete('invitations/:id')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Отменить приглашение' })
+  async deleteInvitation(@CurrentSupplierUser() user: SupplierAuthUser, @Param('id') id: string) {
+    await this.rbac.requireSupplierRole(user.id, user.operatorId, [SupplierRole.OWNER]);
+    return this.invitationService.delete(user.operatorId, id);
+  }
+
+  @Post('invitations/:token/accept')
+  @ApiOperation({ summary: 'Принять приглашение (публичный)' })
+  async acceptInvitation(
+    @Param('token') token: string,
+    @Body() body: AcceptSupplierInvitationDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.invitationService.accept(token, body.name, body.password);
+    res.cookie('supplier_refresh_token', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+    return { accessToken: result.accessToken, operatorId: result.operatorId };
   }
 
   // ─── Events ───────────────────────────────────────────────────────────────
@@ -992,7 +1089,7 @@ export class SupplierController {
             );
           }
 
-          let nextCapacity: number | null | undefined = dto.capacity ?? current.capacityTotal ?? null;
+          const nextCapacity: number | null | undefined = dto.capacity ?? current.capacityTotal ?? null;
           if (nextCapacity !== null && nextCapacity !== undefined && nextCapacity < soldTickets) {
             throw new BadRequestException(
               `Нельзя уменьшить вместимость ниже проданных билетов (${soldTickets}).`,

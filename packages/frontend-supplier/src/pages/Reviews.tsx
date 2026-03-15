@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, FileText, MessageSquare, Send } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Send } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -88,7 +88,7 @@ export default function Reviews() {
 
   useEffect(() => {
     fetchList(true);
-  }, [tab]);
+  }, [tab, fetchList]);
 
   useEffect(() => {
     if (id) {

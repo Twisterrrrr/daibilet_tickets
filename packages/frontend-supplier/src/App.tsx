@@ -13,6 +13,9 @@ import Reviews from './pages/Reviews';
 import Settings from './pages/Settings';
 import Notifications from './pages/Notifications';
 import BalancePage from './pages/Balance';
+import Team from './pages/Team';
+import Integrations from './pages/Integrations';
+import InviteAccept from './pages/InviteAccept';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated() ? <>{children}</> : <Navigate to="/login" />;
@@ -23,6 +26,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/invite/:token" element={<InviteAccept />} />
       <Route
         path="/"
         element={
@@ -42,6 +46,8 @@ export default function App() {
         <Route path="reports" element={<Reports />} />
         <Route path="balance" element={<BalancePage />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="team" element={<Team />} />
+        <Route path="integrations" element={<Integrations />} />
       </Route>
     </Routes>
   );

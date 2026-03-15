@@ -175,6 +175,11 @@ export class SupplierAuthService {
     });
   }
 
+  /** Выдать токены для существующего пользователя (напр. после принятия приглашения) */
+  async issueTokensForUser(userId: string, email: string, role: SupplierRole, operatorId: string) {
+    return this.issueTokens(userId, email, role, operatorId);
+  }
+
   private async issueTokens(userId: string, email: string, role: SupplierRole, operatorId: string) {
     const payload: SupplierJwtPayload = {
       sub: userId,

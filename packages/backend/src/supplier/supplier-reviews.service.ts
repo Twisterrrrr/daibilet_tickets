@@ -56,7 +56,7 @@ export class SupplierReviewsService {
       };
     }
 
-    const [items, total] = await Promise.all([
+    const [items, total, anyForSupplier] = await Promise.all([
       this.prisma.review.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -65,7 +65,19 @@ export class SupplierReviewsService {
         select: this.reviewListSelect(),
       }),
       this.prisma.review.count({ where }),
+      this.prisma.review.findFirst({ where: { supplierId: operatorId } }),
     ]);
+
+    // Временное логирование для отладки сида/фильтров
+    // eslint-disable-next-line no-console
+    console.log('SupplierReviewsService.list', {
+      operatorId,
+      tab,
+      total,
+      anyForSupplier: anyForSupplier
+        ? { id: anyForSupplier.id, status: anyForSupplier.status, supplierId: anyForSupplier.supplierId }
+        : null,
+    });
 
     return {
       items,
