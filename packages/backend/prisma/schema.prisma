@@ -289,7 +289,8 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  favorites UserFavorite[]
+  favorites       UserFavorite[]
+  checkoutSessions CheckoutSession[]
 
   @@map("users")
 }
@@ -497,6 +498,7 @@ model Event {
   orderRequests   OrderRequest[]
   promoBlockEvents     PromoBlockEvent[]
   promoCollectionItems PromoCollectionItem[]
+  promoCodes           PromoCode[]
 
   @@unique([source, tcEventId])
   @@index([source, tcEventId])
@@ -649,6 +651,10 @@ model EventOverride {
   minAge        Int?
   manualRating  Decimal?           @db.Decimal(2, 1)
   isHidden      Boolean            @default(false)
+  /// Ручной boost в ранжировании каталога (чем выше, тем выше в списке)
+  manualBoost   Int?
+  /// Подавление низкокачественных событий (не показывать в каталоге без жёсткого удаления)
+  suppressLowQuality Boolean?      @default(false)
   tagsAdd       String[] // tag slugs to add
   tagsRemove    String[] // tag slugs to remove
   templateData        Json? // legacy: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)
@@ -975,8 +981,40 @@ model Collection {
 }
 
 // ========================
-// Pricing Config (singleton)
+// Pricing & Promotions
 // ========================
+
+enum PromoType {
+  PERCENT
+  FIXED
+}
+
+model PromoCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  code       String    @unique
+  type       PromoType
+  /// value: percent (0-100) for PERCENT, kopecks for FIXED
+  value      Int
+  operatorId String?   @db.Uuid
+  /// If set, promo applies only to this event
+  eventId    String?   @db.Uuid
+
+  validFrom  DateTime?
+  validTo    DateTime?
+  maxUses    Int?
+  usedCount  Int       @default(0)
+  isActive   Boolean   @default(true)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  operator   Operator? @relation(fields: [operatorId], references: [id])
+  event      Event?    @relation(fields: [eventId], references: [id])
+
+  @@index([operatorId])
+  @@index([eventId])
+  @@map("promo_codes")
+}
 
 model PricingConfig {
   id                  String   @id @default(uuid()) @db.Uuid
@@ -1323,7 +1361,19 @@ model Operator {
 
   // === Supplier Portal ===
   isSupplier        Boolean   @default(false)
-  trustLevel        Int       @default(0) // 0=модерация, 1=авто+постмод, 2=доверенный
+  trustLevel        Int       @default(0) // 0=NEW, 1=BASIC, 2=VERIFIED, 3=TRUSTED
+  trustScore        Int       @default(0) // 0..100
+  trustProfileScore    Int    @default(0)
+  trustCatalogScore    Int    @default(0)
+  trustOperationsScore Int    @default(0)
+  trustReputationScore Int    @default(0)
+  trustStabilityScore  Int    @default(0)
+  trustPenaltyScore    Int    @default(0)
+  trustLastCalculatedAt DateTime?
+  trustManualOverrideLevel Int?
+  trustManualOverrideScore Int?
+  trustManualReason       String?  @db.Text
+  trustManualExpiresAt    DateTime?
   commissionRate    Decimal   @default(0.25) @db.Decimal(5, 4) // Базовая ставка 25% для всех (включает YooKassa)
   promoRate         Decimal?  @default(0.10) @db.Decimal(5, 4) // Промо-ставка 10% до promoUntil
   promoUntil        DateTime? // Окончание промо
@@ -1335,6 +1385,7 @@ model Operator {
   verifiedAt        DateTime?
   successfulSales   Int       @default(0)
   refundRate        Decimal   @default(0) @db.Decimal(5, 4)
+  settlementMode    String?   @default("DIRECT") // DIRECT=расчёты через нас | EXTERNAL=оплата у внешнего провайдера
 
   // === Partner B2B API ===
   webhookUrl    String? // URL для отправки webhook-уведомлений
@@ -1344,6 +1395,12 @@ model Operator {
   defaultRefundPolicyText       String?   @db.Text
   defaultRefundPolicyUpdatedAt  DateTime?
 
+  // === Payment settings (P3.2) ===
+  paymentMode        PaymentMode @default(SINGLE_MERCHANT)
+  agentSchemeEnabled Boolean     @default(false)
+  splitEnabled       Boolean     @default(false)
+  pspFeeMode         PspFeeMode  @default(PLATFORM_PAYS)
+
   events                 Event[]
   venues                 Venue[]        @relation("VenueOperator")
   reviews                Review[]
@@ -1352,8 +1409,63 @@ model Operator {
   apiKeys                ApiKey[]
   reviewSupplierResponses ReviewSupplierResponse[] @relation("SupplierResponseOperator")
   reviewDisputes         ReviewDispute[] @relation("DisputeOperator")
+  supplierPayoutRequests SupplierPayoutRequest[]
+
+  supplierReports   SupplierReport[]
+  supplierDocuments SupplierDocument[]
+  supplierDisputes  SupplierDispute[]
+
+  legalProfile SupplierLegalProfile?
+
+  promoCodes PromoCode[]
+  supplierInvitations SupplierInvitation[]
 
   @@map("operators")
+}
+
+model SupplierLegalProfile {
+  id         String   @id @default(cuid())
+  operatorId String   @unique @db.Uuid
+
+  legalName      String
+  legalAddress   String?
+  inn            String?
+  kpp            String?
+  ogrn           String?
+  taxMode        TaxMode                     @default(OSNO)
+  isVatPayer     Boolean                     @default(false)
+  defaultVatRate Decimal?                    @db.Decimal(5, 2)
+  signerFullName String?
+  signerPosition String?
+  financeEmail   String?
+  docsEmail      String?
+  status         SupplierLegalProfileStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operator     Operator            @relation(fields: [operatorId], references: [id])
+  bankAccounts SupplierBankAccount[]
+
+  @@map("supplier_legal_profiles")
+}
+
+model SupplierBankAccount {
+  id                     String   @id @default(cuid())
+  supplierLegalProfileId String
+
+  bankName             String?
+  bik                  String?
+  accountNumber        String?
+  correspondentAccount String?
+  isPrimary            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  legalProfile SupplierLegalProfile @relation(fields: [supplierLegalProfileId], references: [id])
+
+  @@index([supplierLegalProfileId])
+  @@map("supplier_bank_accounts")
 }
 
 // ========================
@@ -1401,6 +1513,26 @@ model SupplierUser {
 
   @@index([operatorId])
   @@map("supplier_users")
+}
+
+// Приглашения в команду поставщика (Phase 9)
+model SupplierInvitation {
+  id         String       @id @default(uuid()) @db.Uuid
+  operatorId String       @db.Uuid
+  email      String
+  role       SupplierRole @default(MANAGER)
+  token      String       @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  acceptedBy String?      @db.Uuid // SupplierUser.id
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  operator Operator @relation(fields: [operatorId], references: [id])
+
+  @@index([operatorId])
+  @@index([token])
+  @@map("supplier_invitations")
 }
 
 // ========================
@@ -1658,11 +1790,15 @@ enum CheckoutStatus {
 model CheckoutSession {
   id                             String            @id @default(uuid()) @db.Uuid
   shortCode                      String            @unique // "CS-XXXX" для UI
+  /// Покупатель (ЛК): если заказ оформлен авторизованным пользователем
+  userId                         String?           @db.Uuid
   cartSnapshot                   Json // Снимок корзины из localStorage
   validatedSnapshot              Json? // Результат validate (актуальные цены/наличие)
   offersSnapshot                 Json? // Immutable: данные офферов на момент оформления (title, price, type, deeplink, widgetPayload)
   giftCertificateSnapshot        Json? // Подарочный сертификат: { amount, recipientEmail, senderName?, message? }
   appliedGiftCertificateSnapshot Json? // Применённый код: { certificateId, code, discountAmount }
+  /// Applied promo code snapshot: { promoId, code, type, value, discountAmount }
+  appliedPromoCodeSnapshot       Json?
   customerName                   String?
   customerEmail                  String?
   customerPhone                  String?
@@ -1678,6 +1814,7 @@ model CheckoutSession {
   ip                             String?
   createdAt                      DateTime          @default(now())
   updatedAt                      DateTime          @updatedAt
+  user                           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   orderRequests                  OrderRequest[]
   paymentIntents                 PaymentIntent[]
   fulfillmentItems               FulfillmentItem[]
@@ -1685,6 +1822,7 @@ model CheckoutSession {
 
   @@index([status])
   @@index([customerEmail])
+  @@index([userId])
   @@index([status, expiresAt])
   @@map("checkout_sessions")
 }
@@ -2102,4 +2240,319 @@ model SourceCategoryUnknown {
   @@unique([source, externalCategoryNorm])
   @@index([source])
   @@map("source_category_unknowns")
+}
+
+model SupplierLedgerEntry {
+  id            String   @id @default(cuid())
+
+  operatorId    String   @db.Uuid
+
+  type          SupplierLedgerEntryType
+
+  amount        Decimal  @db.Decimal(12, 2)
+
+  currency      String   @default("RUB")
+
+  referenceType String?
+  referenceId   String?
+
+  note          String?  @db.Text
+  metaJson      Json?
+
+  createdAt     DateTime @default(now())
+
+  @@index([operatorId])
+  @@map("supplier_ledger_entries")
+}
+
+enum SupplierLedgerEntryType {
+  SALE
+  COMMISSION
+  REFUND
+  PAYOUT
+  ADJUSTMENT
+  CHARGEBACK_ADJUSTMENT
+  FEE_RECHARGE
+}
+
+model SupplierPayoutRequest {
+  id            String   @id @default(cuid())
+
+  operatorId    String   @db.Uuid
+  operator      Operator @relation(fields: [operatorId], references: [id])
+
+  amount        Decimal  @db.Decimal(12, 2)
+  currency      String   @default("RUB")
+
+  status        String   @default("NEW") // NEW | APPROVED | REJECTED | PAID
+
+  requestedAt   DateTime @default(now())
+  processedAt   DateTime?
+
+  comment       String?  @db.Text
+  adminComment  String?  @db.Text
+
+  isBlockedByDispute Boolean @default(false)
+
+  bankAccountSnapshot Json?
+
+  @@index([operatorId])
+  @@map("supplier_payout_requests")
+}
+
+enum SupplierReportBasis {
+  SOLD
+  COMPLETED
+}
+
+enum SupplierReportStatus {
+  DRAFT
+  FINAL
+}
+
+enum SupplierReportLineType {
+  SALE
+  COMMISSION
+  REFUND
+  PAYOUT
+  ADJUSTMENT
+}
+
+enum SupplierDocumentType {
+  AGENT_REPORT
+  COMMISSION_ACT
+  PAYOUT_STATEMENT
+}
+
+enum SupplierDocumentStatus {
+  DRAFT
+  GENERATED
+}
+
+enum SupplierDocumentFileKind {
+  PDF
+  JSON_SNAPSHOT
+}
+
+enum SupplierDisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+enum SupplierDisputeReasonCategory {
+  WRONG_COMMISSION
+  MISSING_SALE
+  WRONG_DETAILS
+  OTHER
+}
+
+enum SupplierLegalProfileStatus {
+  DRAFT
+  INCOMPLETE
+  VERIFIED
+  REJECTED
+}
+
+enum TaxMode {
+  OSNO
+  USN_6
+  USN_15
+  AUSN
+  NPD
+}
+
+enum SupplierDocumentTemplateType {
+  AGENT_REPORT
+  COMMISSION_ACT
+  PAYOUT_STATEMENT
+}
+
+enum PaymentMode {
+  SINGLE_MERCHANT
+  AGENT_SINGLE_PAYOUT
+  SPLIT_MERCHANT
+}
+
+enum PspFeeMode {
+  PLATFORM_PAYS
+  SUPPLIER_PAYS
+  SHARED_50_50
+  SERVICE_FEE
+}
+
+model SupplierReport {
+  id          String              @id @default(cuid())
+  operatorId  String              @db.Uuid
+  periodStart DateTime
+  periodEnd   DateTime
+  basis       SupplierReportBasis
+  status      SupplierReportStatus @default(DRAFT)
+  hasConflict Boolean              @default(false)
+
+  /// Явный акцепт отчёта поставщиком
+  supplierAcceptedAt      DateTime?
+  acceptedBySupplierUserId String?
+
+  grossAmount      Decimal @db.Decimal(14, 2)
+  commissionAmount Decimal @db.Decimal(14, 2)
+  refundAmount     Decimal @db.Decimal(14, 2)
+  netAmount        Decimal @db.Decimal(14, 2)
+
+  snapshotJson Json?
+  metaJson    Json?
+
+  legalProfileSnapshot Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operator Operator @relation(fields: [operatorId], references: [id])
+
+  lines     SupplierReportLine[]
+  documents SupplierDocument[]
+  disputes  SupplierDispute[]
+
+  @@unique([operatorId, periodStart, periodEnd, basis])
+  @@index([operatorId, periodStart, periodEnd])
+  @@map("supplier_reports")
+}
+
+model SupplierReportLine {
+  id               String                @id @default(cuid())
+  supplierReportId String
+
+  type          SupplierReportLineType
+  ledgerEntryId String?               @db.Uuid
+
+  referenceType String?
+  referenceId   String?
+
+  amount   Decimal @db.Decimal(14, 2)
+  netAmount Decimal @db.Decimal(14, 2)
+
+  metaJson Json?
+
+  createdAt DateTime @default(now())
+
+  report SupplierReport @relation(fields: [supplierReportId], references: [id])
+
+  @@index([supplierReportId])
+  @@index([ledgerEntryId])
+  @@map("supplier_report_lines")
+}
+
+model SupplierDispute {
+  id                     String                        @id @default(cuid())
+  supplierReportId       String
+  operatorId             String                        @db.Uuid
+  status                 SupplierDisputeStatus         @default(OPEN)
+  reasonCategory         SupplierDisputeReasonCategory
+  reasonText             String?                       @db.Text
+  resolutionText         String?                       @db.Text
+  openedBySupplierUserId String?                       @db.Uuid
+  resolvedByAdminId      String?                       @db.Uuid
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
+  resolvedAt             DateTime?
+
+  report   SupplierReport @relation(fields: [supplierReportId], references: [id])
+  operator Operator       @relation(fields: [operatorId], references: [id])
+
+  @@index([supplierReportId])
+  @@index([operatorId, status])
+  @@map("supplier_disputes")
+}
+
+model SupplierDocument {
+  id         String                 @id @default(cuid())
+  operatorId String                 @db.Uuid
+  reportId   String?
+  type       SupplierDocumentType
+  status     SupplierDocumentStatus @default(DRAFT)
+
+  title       String
+  payloadJson Json?
+
+   templateId        String?
+   templateVersionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operator Operator        @relation(fields: [operatorId], references: [id])
+  report   SupplierReport? @relation(fields: [reportId], references: [id])
+
+  template        SupplierDocumentTemplate?        @relation(fields: [templateId], references: [id])
+  templateVersion SupplierDocumentTemplateVersion? @relation(fields: [templateVersionId], references: [id])
+
+  files SupplierDocumentFile[]
+
+  @@index([operatorId])
+  @@index([reportId])
+  @@map("supplier_documents")
+}
+
+model SupplierDocumentFile {
+  id                 String                 @id @default(cuid())
+  supplierDocumentId String
+  kind               SupplierDocumentFileKind
+  storageKey         String
+  fileName           String?
+  mimeType           String?
+  sizeBytes          Int?
+
+  createdAt DateTime @default(now())
+
+  document SupplierDocument @relation(fields: [supplierDocumentId], references: [id])
+
+  @@index([supplierDocumentId])
+  @@map("supplier_document_files")
+}
+
+model SupplierDocumentTemplate {
+  id               String                        @id @default(cuid())
+  type             SupplierDocumentTemplateType
+  code             String                        @unique
+  title            String
+  description      String?
+  isActive         Boolean                       @default(true)
+  currentVersionId String?
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+
+  versions SupplierDocumentTemplateVersion[]
+  documents SupplierDocument[]
+
+  @@map("supplier_document_templates")
+}
+
+model SupplierDocumentTemplateVersion {
+  id         String   @id @default(cuid())
+  templateId String
+  version    Int
+  bodyHtml   String   @db.Text
+  schemaJson Json?
+  requiresVatData Boolean @default(false)
+  createdAt  DateTime @default(now())
+
+  template SupplierDocumentTemplate @relation(fields: [templateId], references: [id])
+
+  documents SupplierDocument[]
+
+  @@unique([templateId, version])
+  @@map("supplier_document_template_versions")
+}
+
+model DocumentSequence {
+  id         String @id @default(cuid())
+  operatorId String @db.Uuid
+  year       Int
+  type       String
+  lastNumber Int    @default(0)
+
+  @@unique([operatorId, year, type], name: "operatorId_year_type")
+  @@index([operatorId, year, type])
+  @@map("document_sequences")
 }

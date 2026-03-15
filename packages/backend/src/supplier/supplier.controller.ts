@@ -18,7 +18,14 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ModerationStatus, OfferSource, Prisma, SupplierRole } from '@prisma/client';
+import {
+  ModerationStatus,
+  OfferSource,
+  PaymentMode,
+  Prisma,
+  SupplierDisputeReasonCategory,
+  SupplierRole,
+} from '@prisma/client';
 import { Request, Response } from 'express';
 
 import { CurrentSupplierUser } from '../common/decorators/current-supplier-user.decorator';
@@ -54,6 +61,8 @@ import { SupplierInvitationService } from './supplier-invitation.service';
 import { SupplierNotificationsService } from './supplier-notifications.service';
 import { ListingHealthService } from '../catalog/listing-health.service';
 import { tryTransitionCheckout, tryTransitionOrderRequest } from '../checkout/checkout-state-machine';
+import { SupplierFinanceSummaryService } from '../supplier-finance/supplier-finance-summary.service';
+import { SupplierDisputeService } from '../supplier-finance/supplier-dispute.service';
 
 @ApiTags('supplier')
 @Controller('supplier')
@@ -70,6 +79,8 @@ export class SupplierController {
     private readonly listingHealth: ListingHealthService,
     private readonly invitationService: SupplierInvitationService,
     private readonly integrationsService: SupplierIntegrationsService,
+    private readonly financeSummary: SupplierFinanceSummaryService,
+    private readonly disputes: SupplierDisputeService,
   ) {}
 
   // ─── Auth (public / refresh / guarded) ─────────────────────────────────────
@@ -209,6 +220,45 @@ export class SupplierController {
 
   // ─── Balance & Payouts ──────────────────────────────────────────────────────
 
+  @Get('finance/summary')
+  @UseGuards(SupplierJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Финансовое резюме: баланс, pending payouts, отчёты' })
+  async getFinanceSummary(@Req() req: { user: { operatorId: string } }) {
+    return this.financeSummary.getSummary(req.user.operatorId);
+  }
+
+  @Get('finance/settings')
+  @UseGuards(SupplierJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Настройки финансовых расчётов (режим платежей, только чтение)' })
+  async getFinanceSettings(@Req() req: { user: { operatorId: string } }) {
+    const operator = await this.prisma.operator.findUnique({
+      where: { id: req.user.operatorId },
+      select: {
+        paymentMode: true,
+        agentSchemeEnabled: true,
+        splitEnabled: true,
+      },
+    });
+    if (!operator) {
+      throw new NotFoundException('Оператор не найден');
+    }
+
+    const modeText: Record<PaymentMode, string> = {
+      SINGLE_MERCHANT: 'Прямые выплаты от платформы',
+      AGENT_SINGLE_PAYOUT: 'Агентская схема (фискализация на стороне платформы)',
+      SPLIT_MERCHANT: 'Автоматический сплит платежей (YooKassa)',
+    };
+
+    return {
+      paymentMode: operator.paymentMode,
+      agentSchemeEnabled: operator.agentSchemeEnabled,
+      splitEnabled: operator.splitEnabled,
+      description: modeText[operator.paymentMode],
+    };
+  }
+
   @Get('balance')
   @UseGuards(SupplierJwtGuard)
   @ApiBearerAuth()
@@ -270,14 +320,106 @@ export class SupplierController {
       throw new BadRequestException('Недостаточно средств для вывода');
     }
 
+    const legalProfile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId },
+      include: { bankAccounts: true },
+    });
+
+    const primaryAccount = legalProfile
+      ? legalProfile.bankAccounts.find((a) => a.isPrimary) ?? legalProfile.bankAccounts[0]
+      : null;
+
     return this.prisma.supplierPayoutRequest.create({
       data: {
         operatorId,
         amount: dto.amount,
         comment: dto.comment ?? null,
         status: 'NEW',
+        bankAccountSnapshot:
+          primaryAccount &&
+          ({
+            bankName: primaryAccount.bankName,
+            bik: primaryAccount.bik,
+            accountNumber: primaryAccount.accountNumber,
+            correspondentAccount: primaryAccount.correspondentAccount,
+          } as Prisma.JsonObject),
       },
     });
+  }
+
+  @Post('finance/reports/:id/disputes')
+  @UseGuards(SupplierJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Открыть спор по отчёту' })
+  async openReportDispute(
+    @Req() req: { user: { operatorId: string; id: string } },
+    @Param('id') reportId: string,
+    @Body() body: { reasonCategory: SupplierDisputeReasonCategory; reasonText?: string },
+  ) {
+    return this.disputes.openDispute({
+      reportId,
+      operatorId: req.user.operatorId,
+      reasonCategory: body.reasonCategory,
+      reasonText: body.reasonText,
+      openedBySupplierUserId: req.user.id,
+    });
+  }
+
+  @Post('finance/reports/:id/accept')
+  @UseGuards(SupplierJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Акцептовать отчёт поставщиком' })
+  async acceptReport(
+    @Req() req: { user: { operatorId: string; id: string } },
+    @Param('id') reportId: string,
+  ) {
+    const operatorId = req.user.operatorId;
+
+    const report = await this.prisma.supplierReport.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!report || report.operatorId !== operatorId) {
+      throw new NotFoundException('Отчёт не найден');
+    }
+
+    const openDispute = await this.prisma.supplierDispute.findFirst({
+      where: {
+        supplierReportId: reportId,
+        status: { in: ['OPEN', 'UNDER_REVIEW'] },
+      },
+    });
+
+    if (openDispute) {
+      throw new BadRequestException('Нельзя акцептовать отчёт при наличии открытого спора');
+    }
+
+    const existingMeta = (report.metaJson as Prisma.JsonObject | null) ?? {};
+    const history: Prisma.InputJsonValue[] = Array.isArray((existingMeta as any).history)
+      ? ([...(existingMeta as any).history] as Prisma.InputJsonValue[])
+      : [];
+
+    history.push({
+      status: 'ACCEPTED',
+      changedAt: new Date().toISOString(),
+      changedByUserId: req.user.id,
+      changedByRole: 'SUPPLIER',
+      comment: null,
+    } as unknown as Prisma.InputJsonValue);
+
+    await this.prisma.supplierReport.update({
+      where: { id: reportId },
+      data: {
+        supplierAcceptedAt: new Date(),
+        acceptedBySupplierUserId: req.user.id,
+        metaJson: {
+          ...existingMeta,
+          history,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    return { ok: true };
   }
 
   // ─── Reports ──────────────────────────────────────────────────────────────

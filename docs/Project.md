@@ -18,6 +18,15 @@
 
 3. **Планировщик туров** — killer feature, отсутствующая у всех конкурентов (Tripster, GetYourGuide, Viator, Sputnik8). Пользователь выбирает город + даты + состав группы → получает готовую программу с билетами.
 
+## Центральные документы
+
+- **Архитектура проекта**: `Project.md` (этот файл).
+- **Финансы (Buyer + Supplier + Admin)**: `finance.md`.
+- **Личный кабинет покупателя / Buyer Account**: `BuyerAccountSpecs.md`.
+- **Система доверия поставщикам / Supplier Trust System**: `archive/specs/SupplierTrustSpec.md`.
+
+Эти 3–4 файла считаются “центром тяжести” документации; остальные спецификации рассматриваются как детализация или архив и должны ссылаться на них при изменениях.
+
 ## Архитектура
 
 | Слой | Технология | Каталог |
@@ -29,6 +38,16 @@
 | БД | PostgreSQL 16 (Docker) | — |
 | Кэш/очереди | Redis 7 + BullMQ | — |
 | Инфраструктура | Docker Compose, Nginx, Certbot, pnpm workspaces | корень |
+
+### Supplier Finance (P1–P3.2+)
+
+- **Цель:** прозрачный и воспроизводимый финансовый контур для поставщиков поверх уже существующих заказов/платежей.
+- **P1 — Reports & Documents:** над `SupplierLedgerEntry` построены агрегированные отчёты `SupplierReport`/`SupplierReportLine` и документы `SupplierDocument`/`SupplierDocumentFile`; отчёт генерируется сервисом расчёта, документ — сервисом рендеринга (stub‑HTML вместо PDF), есть seed‑сценарий «оператор → продажи → леджер → отчёт → документ».
+- **P2 — Disputes, Reconciliation, Summary:** добавлены споры по отчётам (`SupplierDispute` + admin/supplier API), флаг `hasConflict` и сверка отчёта с леджером (`SupplierReconciliationService`), блокировка выплат флагом `isBlockedByDispute` в `SupplierPayoutRequest`, а также `/supplier/finance/summary` для дашборда «Где мои деньги?» в кабинете поставщика.
+- **P3 — Legal profile & bank snapshot:** реализован снимок юридического профиля поставщика (`SupplierLegalProfile`) и его банковских реквизитов (`SupplierBankAccount`) в отчётах (`SupplierReport.legalProfileSnapshot`) и payout‑заявках (`SupplierPayoutRequest.bankAccountSnapshot`); любые юридически значимые операции опираются на эти snapshot’ы, а не на «живой» профиль.
+- **P3.1 — Tax & VAT Layer:** поверх snapshot‑логики введён декларативный налоговый слой (`TaxMode`, `isVatPayer`, `defaultVatRate`, `TAX_MATRIX`), расчёт НДС выполняется в слое отчётов/документов без усложнения леджера; введён `DocumentNumberService` и стратегия мягкого включения НДС (quiet numbering → shadow VAT payload → VAT‑шаблоны).
+- **P3.2+ — Payments & Clearing / pspFeeMode:** настройки платежей оператора (`paymentMode`, `agentSchemeEnabled`, `splitEnabled`, `pspFeeMode`) зафиксированы в `Operator` и передаются в PaymentContext/метаданные YooKassa; база для будущего разделения PSP‑комиссии по режимам `pspFeeMode` без изменения текущей экономики.
+- **Acceptance Flow & Chargebacks:** отчёты поддерживают явный акцепт поставщиком (`supplierAcceptedAt`, `acceptedBySupplierUserId`, `metaJson.history`), который блокируется при открытом споре; добавлены типы `CHARGEBACK_ADJUSTMENT` и `FEE_RECHARGE` для будущих корректировок и PSP‑fee, документ‑шаблоны версионируются без перезаписи существующих документов.
 
 ### Buyer Account (Личный кабинет покупателя)
 

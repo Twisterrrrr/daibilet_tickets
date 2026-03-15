@@ -283,6 +283,110 @@
 
 ---
 
+### Acceptance статус фаз 2–9 (2026‑03‑15)
+
+**Легенда вердиктов:**
+
+- **ACCEPT** — можно считать боевым; только регресс‑тесты и эксплуатационный мониторинг.
+- **ACCEPT WITH NOTES** — в main держать можно, но есть явно сформулированные follow‑up задачи (обычно по тестам или security/billing).
+- **ACCEPT WITH NOTES (high‑risk)** — то же самое, но зона повышенного риска (billing/security), rollout только под контролем.
+
+#### Phase 2 — Supplier Orders + admin links
+
+- **Verdict:** ACCEPT WITH NOTES
+- **Notes:**
+  - Нет зафиксированных integration‑тестов на `/supplier/orders` и `/supplier/orders/:id`.
+  - Нужны негативные сценарии:
+    - чужой order detail недоступен (403/404);
+    - confirm/reject чужого заказа невозможен (403/404).
+
+#### Phase 3 — Availability / Sessions
+
+- **Verdict:** ACCEPT WITH NOTES
+- **Notes:**
+  - Базовая защита MANUAL vs synced (read‑only для импортированных событий) сохранена.
+  - В этой итерации не вносились регрессии в core‑логику сессий (MANUAL/non‑MANUAL, sold tickets).
+  - Новые diagnostics endpoints требуют smoke‑проверки на тестовых данных (eventsWithoutSessions / expiredSessions / zeroCapacitySessions).
+
+#### Phase 4 — Listing Health
+
+- **Verdict:** ACCEPT
+- **Notes:**
+  - `ListingHealthService` — детерминированный read‑service без side‑effects.
+  - Checkout/orders/fulfillment не затрагиваются.
+  - Supplier/admin endpoints поверх него безопасны к включению.
+
+#### Phase 5 — Supplier Analytics
+
+- **Verdict:** ACCEPT WITH NOTES
+- **Notes:**
+  - Нужен отдельный smoke:
+    - **data isolation по operatorId** (оператор не видит чужие данные);
+    - **KPI consistency** (оборот/количество заказов/occupancy считаются из тех же источников, что и orders/payments);
+    - отсутствие leakage чужой аналитики в dashboard/report endpoints.
+
+#### Phase 6 — PromoCode
+
+- **Verdict:** ACCEPT WITH NOTES (high‑risk)
+- **Notes:**
+  - Если промокоды уже влияют на checkout total — это **risk‑bearing billing change**.
+  - До полного боевого включения должны быть доказаны инварианты:
+    - нет отрицательного `total` (total ≥ 0);
+    - нет двойного применения промокода на один checkout;
+    - корректный stacking с gift certificate (скидка не считается дважды);
+    - защита от гонок на `usedCount` (concurrency/idempotency);
+    - согласованность `total/gross/net/commission` после применения promo.
+  - В `main` держать можно при контролируемом rollout (feature‑flag), но считать “полностью боевым” — рано.
+
+#### Phase 7 — Ranking / Merchandising
+
+- **Verdict:** ACCEPT WITH NOTES
+- **Notes:**
+  - `manualBoost` и `suppressLowQuality` реально **wired** от Prisma до admin UI.
+  - `suppress` мягко влияет на каталог и не должен ломать прямой доступ и admin visibility.
+  - Нужны проверки:
+    - событие с `suppress` исчезает из обычного каталога;
+    - по прямой ссылке и в админке событие остаётся доступным (если так задумано);
+    - сортировка с учётом `manualBoost` детерминирована.
+
+#### Phase 8 — Integrations / Extension Points
+
+- **Verdict:** ACCEPT
+- **Notes:**
+  - Extension‑интерфейсы (SyncAdapter/AvailabilityProvider/BookingProvider) — формализация уже существующих точек расширения.
+  - Не являются поведенческим рефактором; не добавляют хрупкий “plugin framework ради plugin framework”.
+
+#### Phase 9 — Team / Roles / Support (Invitations & RBAC)
+
+- **Verdict:** ACCEPT WITH NOTES
+- **Notes (security‑sensitive):**
+  - Обязательно покрыть security‑тестами:
+    - `non-OWNER` create invitation → 403;
+    - истёкший токен → reject;
+    - повторное использование токена → reject;
+    - accept invitation создаёт SupplierUser с корректными `operatorId` и `role`;
+    - invite token не может быть переиспользован.
+  - Пока это не покрыто тестами, invitations/RBAC в `main` считать **условно боевыми**, rollout делать осторожно.
+
+#### Buyer Account V2 (спец‑блок)
+
+- **Verdict:** ACCEPT WITH NOTES
+- **Notes:**
+  - Уже сделано:
+    - `/account/purchases` и capability‑слой `getPurchaseDisplayType` с unit‑тестами;
+    - imported/external не превращаются в `INTERNAL_TICKET` просто по факту оплаты;
+    - ownership на `/account/orders/:id` реализован;
+    - guest `/orders/track` не затронут, проверен сидом.
+  - Нужно доделать:
+    - выделить `PurchaseReadService`/`PurchaseMapper` как отдельный read‑layer;
+    - интеграционные тесты:
+      - `/account/purchases` → только свои покупки;
+      - `/account/orders/:id` → 403 на чужой заказ;
+      - guest track по `shortCode` работает независимо от account.
+  - Buyer Account v1 — боевой; Buyer Account v2 — частично реализован (capabilities), требует завершения read‑слоя и e2e‑тестов.
+
+---
+
 ## Supplier Trust System (Trust Score + Trust Levels)
 
 - **Приоритет:** Высокий
@@ -393,6 +497,78 @@
 
 ---
 
+## Supplier Finance — Phase P3: Legal Profile & Bank Snapshot
+
+- **Приоритет:** Высокий
+
+### Вход в P3 (что уже есть после P1–P2)
+
+- [x] Леджер поставщика (`SupplierLedgerEntry`, `SupplierLedgerService`) — источник истины по движениям.
+- [x] P1: `SupplierReport`/`SupplierReportLine` + `SupplierDocument`/`SupplierDocumentFile` и seed‑сценарий.
+- [x] P2: `SupplierDispute`, флаг `hasConflict`, `SupplierReconciliationService`, `SupplierFinanceSummaryService`, флаг `isBlockedByDispute` в `SupplierPayoutRequest`, admin/supplier API для споров и summary.
+- [x] Документация по финансам обновлена (`finance.md`, записи в `Diary.md` от 15.03.2026).
+
+### P3‑Checklist — Legal Profile & Bank Snapshot
+
+- [ ] **P3-1 — Prisma: Legal Profile & Bank Accounts**
+  - [ ] Модель `SupplierLegalProfile` (1–1 к `Operator`): `legalName`, `legalAddress`, `inn`, `kpp`, `ogrn`, `taxMode`, `vatPercent`, `signerFullName`, `signerPosition`, `financeEmail`, `docsEmail`, `status` (`DRAFT`/`INCOMPLETE`/`VERIFIED`/`REJECTED`).
+  - [ ] Модель `SupplierBankAccount` (N–1 к `SupplierLegalProfile`): `bankName`, `bik`, `accountNumber`, `correspondentAccount`, `isPrimary`.
+  - [ ] Миграции применены, `prisma generate` проходит.
+
+- [ ] **P3-2 — Snapshot в отчётах и выплатах**
+  - [ ] `SupplierReport.snapshotJson` содержит вложенный блок `legalProfile` (юридические реквизиты и налоговый режим на момент генерации отчёта).
+  - [ ] `SupplierPayoutRequest` (либо отдельная snapshot‑структура) хранит `bankAccountSnapshot` с реквизитами счёта на момент создания/проведения payout.
+  - [ ] При изменении `SupplierLegalProfile`/`SupplierBankAccount` уже созданные отчёты/документы и выплаты продолжают читать данные только из snapshot’ов.
+
+- [ ] **P3-3 — Admin API/UX**
+  - [ ] Admin: `GET/PUT /admin/suppliers/:id/legal-profile` (чтение/редактирование профиля, статусы, базовая валидация ИНН/БИК).
+  - [ ] Admin: `GET/POST/PATCH /admin/suppliers/:id/bank-accounts` (CRUD счетов, ровно один `isPrimary=true`).
+  - [ ] Admin UI: вкладка «Юр. профиль / Реквизиты» в `SupplierDetail` с отображением текущего статуса и primary‑счёта.
+
+- [ ] **P3-4 — Supplier API/UX**
+  - [ ] Supplier: `GET/PUT /supplier/profile/legal` — просмотр/редактирование собственных юр. данных (в рамках допустимого статуса).
+  - [ ] Supplier: `GET/POST/PATCH /supplier/profile/bank-accounts` — управление своими счетами (но без возможности менять snapshot старых payout’ов).
+  - [ ] Supplier Dashboard: блок «Реквизиты» с подсказкой, если профиль не `VERIFIED` или отсутствует primary‑счёт.
+
+- [ ] **P3-5 — Инварианты и валидация**
+  - [ ] Нельзя создать payout, если нет `SupplierLegalProfile` в статусе `VERIFIED` и настроенного primary‑банковского счёта.
+  - [ ] При смене primary‑счёта новые payouts используют новые реквизиты, старые payout’ы остаются привязаны к своему snapshot.
+  - [ ] Миграции и код не ломают существующие P1–P2 сценарии (тесты backend проходят).
+
+- [ ] **P3-6 — Документация**
+  - [ ] `finance.md`: раздел P3 обновлён (описание моделей, snapshot‑логики и API).
+  - [ ] `Project.md`: упоминание P3 в блоке Supplier Finance.
+  - [ ] `Diary.md`: отдельная запись по завершению P3 с принятыми решениями и найденными проблемами.
+
+### P3.1 — Tax & VAT Layer (надстройка P3)
+
+- [ ] **P3.1-1 — Расширение налогового профиля**
+  - [ ] Prisma: добавить enum `TaxMode { OSNO, USN_6, USN_15, AUSN, NPD }` и поля `taxMode`, `isVatPayer`, `defaultVatRate` в `SupplierLegalProfile`.
+  - [ ] Миграция применена, `prisma generate` проходит.
+  - [ ] Snapshot в `SupplierReport.snapshotJson.legalProfile` содержит `taxMode`, `isVatPayer`, `defaultVatRate`.
+
+- [ ] **P3.1-2 — Tax Matrix (декларативная логика)**
+  - [ ] Создан `tax.config.ts` с `TAX_MATRIX: Record<TaxMode, TaxBehavior>` (поведение по режимам, а не if/else по строкам).
+  - [ ] `TaxBehavior` как минимум описывает: `requiresVat`, `defaultVatRate`, `mainDocumentType`, `needsInvoice`, `needsNpdReceiptLink`.
+  - [ ] Юнит‑тесты на Tax Matrix для базовых режимов (OSNO, USN, NPD).
+
+- [ ] **P3.1-3 — Нумерация НДС‑документов**
+  - [ ] Prisma: модель `DocumentSequence` (operatorId, year, type, lastNumber).
+  - [ ] Сервис `DocumentNumberService` с методом `nextNumber({ operatorId, year, type })` → строка `YYYY-000001`.
+  - [ ] Юнит‑тесты: последовательная выдача номеров и работа в нескольких потоках (минимальный happy‑path).
+
+- [ ] **P3.1-4 — Заготовка payload НДС‑документов**
+  - [ ] Выделен helper (например, `buildVatDocumentPayload`) поверх `SupplierReport` + `TaxBehavior`, возвращающий структуру `{ supplier, customer, document, lines, totals, npd? }`.
+  - [ ] В `SupplierDocumentService` добавлен (пока не вызываемый в прод‑коде) каркас формирования payload для типов `INVOICE`/`UPD_1`/`UPD_2` с использованием helper’а.
+  - [ ] Формулы расчёта НДС «в том числе» и округления до 2 знаков зафиксированы и покрыты тестами.
+
+- [ ] **P3.1-5 — Документация**
+  - [ ] `finance.md`: раздел «P3.1 — Tax & VAT Layer» с таблицей соответствия TaxMode → поведение и пример payload счёта‑фактуры/УПД.
+  - [ ] `Diary.md`: запись о включении налогового слоя (решения по Tax Matrix, расчёту НДС и нумерации документов).
+
+
+---
+
 ## UX Admin Refactor (EH alignment)
 
 - **Приоритет:** Высокий
@@ -500,3 +676,54 @@
 ## Бэклог
 
 Детали — см. Gates выше и `archive/specs/`.
+
+---
+
+## YooKassa — PaymentMode & Agent Scheme (подготовка к split)
+
+- [ ] **YK-1 — Настройки режима платежей (Operator)**
+  - [ ] Prisma: добавить в `Operator` (или отдельную `OperatorPaymentSettings`) поля:
+    - `paymentMode` (`SINGLE_MERCHANT` / `AGENT_SINGLE_PAYOUT` / `SPLIT_MERCHANT`),
+    - `agentSchemeEnabled Boolean @default(false)`,
+    - `splitEnabled Boolean @default(false)`.
+  - [ ] Миграция применена, `prisma generate` проходит.
+
+- [ ] **YK-2 — Admin UI: Supplier Payment Settings**
+  - [ ] Backend: `GET/PUT /admin/suppliers/:id/payment-settings` (чтение/редактирование только из админки).
+  - [ ] Frontend admin: вкладка/секция «Финансы / Платежи» на `SupplierDetail`:
+    - выпадающий список `paymentMode`,
+    - чекбоксы `agentSchemeEnabled`, `splitEnabled`,
+    - подсказки по режимам (краткое описание поведения).
+
+- [ ] **YK-3 — Supplier read-only view**
+  - [ ] Backend: `GET /supplier/finance/settings` — только чтение payment‑настроек оператора (без права менять).
+  - [ ] Frontend supplier: блок на `Dashboard` или `Settings → Финансы`:
+    - текстовое отображение схемы («Деньги на счёт платформы», «Агентская схема», «Подготовка к split‑платежам»),
+    - пометка, что настройки управляются админкой Daibilet.
+
+- [ ] **YK-4 — Docs**
+  - [ ] `finance.md`: раздел о YooKassa дополнен описанием `paymentMode` и agent‑scheme (что меняется в чеке и деньгах).
+  - [ ] `Diary.md`: запись о введении PaymentMode/agentScheme как подготовке к split‑платежам.
+
+---
+
+## Gate — Supplier Reports Acceptance & Disputes
+
+- [ ] **ACC-1 — Prisma миграции**
+  - [ ] Добавить в `SupplierReport` поля `supplierAcceptedAt` и `acceptedBySupplierUserId`.
+  - [ ] При необходимости расширить enum’ы типов леджера/строк отчёта (`CHARGEBACK_ADJUSTMENT`, `FEE_RECHARGE`).
+  - [ ] Прогнать `prisma migrate dev` и убедиться, что `prisma generate` проходит без ошибок.
+
+- [ ] **ACC-2 — Backend / API**
+  - [ ] `POST /supplier/finance/reports/:id/accept`:
+    - проверяет, что отчёт принадлежит текущему оператору и что нет открытого `SupplierDispute` (`OPEN`/`UNDER_REVIEW`),
+    - при успехе проставляет `supplierAcceptedAt`/`acceptedBySupplierUserId` и добавляет запись в `metaJson.history`.
+  - [ ] Поведение при открытии спора после акцепта: отчёт считается `DISPUTED`, дата акцепта сохраняется только в истории.
+
+- [ ] **ACC-3 — History / фронтенд‑совместимость**
+  - [ ] Формат `SupplierReport.metaJson.history` задокументирован в `finance.md` (массив `{ status, changedAt, changedByUserId, changedByRole, comment? }`).
+  - [ ] Фронтенд может отобразить историю отчёта как простой timeline без дополнительной обработки.
+
+- [ ] **ACC-4 — Docs**
+  - [ ] `finance.md`: раздел P2 дополнен подпунктами Acceptance Flow и History (edge‑кейсы, блокировка акцепта при споре).
+  - [ ] `Architecture.md`: описан контракт `POST /supplier/finance/reports/:id/accept` и связь со спорами/историей.

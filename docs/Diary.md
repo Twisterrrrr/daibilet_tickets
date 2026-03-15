@@ -180,6 +180,153 @@
 
 ---
 
+## 15.03.2026 — Supplier Finance P2: споры, сверка, summary
+
+### Наблюдения
+
+- P1 по Supplier Finance уже реализован: `SupplierReport`/`SupplierReportLine`, `SupplierDocument`/`SupplierDocumentFile`, сид‑сценарий полного цикла «оператор → продажа → леджер → отчёт → документ».
+- Требовалось замкнуть контур P2: дать поставщику возможность оспорить отчёт, зафиксировать расхождения между отчётом и леджером и показать компактное финансовое резюме в кабинете.
+
+### Решения
+
+- **Prisma:**
+  - Добавлены enum’ы `SupplierDisputeStatus` и `SupplierDisputeReasonCategory`.
+  - Модель `SupplierDispute` связана с `SupplierReport` и `Operator`; в `SupplierReport` добавлены связи `disputes` и флаг `hasConflict`, поле `metaJson` для хранения служебной информации.
+  - В `SupplierPayoutRequest` добавлен флаг `isBlockedByDispute Boolean @default(false)` для блокировки выплат при открытых спорах.
+- **Сервисы:**
+  - `SupplierDisputeService`:
+    - `openDispute` проверяет владение отчётом, создаёт спор, обновляет `SupplierReport.metaJson.dispute*` и помечает активные `SupplierPayoutRequest` (`NEW`/`APPROVED`) как `isBlockedByDispute=true`.
+    - `resolveDispute` обновляет статус спора, фиксирует `resolvedByAdminId`/`resolvedAt`, обновляет `metaJson` отчёта и снимает блокировку выплат (`isBlockedByDispute=false`).
+  - `SupplierReconciliationService.reconcileReport` пересчитывает сумму по линиям и по леджеру за период отчёта, ставит `hasConflict` и пишет в `metaJson.reconciliation` `{ expectedNet, sumLedger, sumLines, ok }`.
+  - `SupplierFinanceSummaryService.getSummary` возвращает `currentBalance` (через `SupplierLedgerService`), `pendingPayoutsAmount` и последние 3 отчёта с базовой информацией и привязанными документами.
+- **API:**
+  - Поставщик:
+    - `GET /supplier/finance/summary` в `SupplierController` использует `SupplierFinanceSummaryService` и возвращает данные для дашборда «Где мои деньги?».
+    - `POST /supplier/finance/reports/:id/disputes` (через `SupplierDisputeService`) позволяет открыть спор по отчёту с указанием категории/текста.
+  - Админ:
+    - `AdminSupplierDisputesController` (`/admin/supplier-disputes`) даёт список споров (с пагинацией и фильтром по статусу) и endpoint `PATCH /:id/resolve` для закрытия спора (RESOLVED/REJECTED).
+    - `AdminPayoutsController.updateStatus` проверяет `isBlockedByDispute` и не даёт провести payout при открытых спорах.
+- **Seed:**
+  - `prisma/seed-supplier-finance.ts` дополнен вызовами `SupplierDisputeService.openDispute` и `SupplierReconciliationService.reconcileReport`, чтобы в dev‑БД сразу был пример отчёта с открытым спором и результатами сверки.
+- **Тесты:**
+  - Backend‑тесты (`npx pnpm test` в `packages/backend`) проходят полностью; новые сервисы и контроллеры вписаны в существующую тестовую матрицу без регрессий.
+
+### Проблемы
+
+- Потенциально спорные сценарии вокруг частичного разрешения спора и повторной генерации отчёта оставлены на P3/P4 (пока считаем, что спор относится к конкретному отчёту и полностью блокирует выплаты до явного резолва).
+
+---
+
+## 15.03.2026 — Supplier Finance P3.1: Tax & VAT Layer
+
+### Наблюдения
+
+- Базовый P3 (Legal Profile & Bank Snapshot) делает выплаты и отчёты юридически привязанными к конкретным реквизитам и счетам, но не решает вопрос НДС и типов документов.
+- Требовалось превратить P3 из «адресной книги» в полноценный налоговый слой: режим налогообложения, ставка НДС, вид документа (акт/УПД/счёт‑фактура), при этом не усложнив леджер и сверку балансов.
+
+### Решения
+
+- **Налоговый профиль:**
+  - В `SupplierLegalProfile` заложены поля `taxMode`, `isVatPayer`, `defaultVatRate`, которые попадают в snapshot отчёта (`SupplierReport.snapshotJson.legalProfile`) и далее в payload документов.
+  - Выбран декларативный подход: логика не завязана на строковые режимы напрямую, а опирается на поведение (`TaxBehavior`) для каждого режима.
+- **Tax Matrix:**
+  - В архитектуре определена матрица соответствия `TaxMode → TaxBehavior`:
+    - для `OSNO` — плательщик НДС, основной тип документа `UPD_1` + при необходимости отдельный `INVOICE`, ставка 20/10%;
+    - для `USN_*`/`AUSN` — только акт/агентский отчёт без НДС (`ACT_NO_VAT`), счёт‑фактура не формируется;
+    - для `NPD` — агентский отчёт + обязательная ссылка на чек «Мой Налог`.
+  - Матрица фиксируется в `finance.md` и реализуется в коде в виде конфигурации `TAX_MATRIX`.
+- **Расчёт НДС:**
+  - Принцип: **ledger остаётся «чистым»** — `SupplierLedgerEntry` и агрегаты отчёта не получают специальных полей под НДС.
+  - НДС считается в слое отчёта/документа:
+    - для плательщиков НДС (`isVatPayer=true`) сумма к выплате (`amountWithVat`) раскладывается на базу и НДС «в том числе» по формуле `base = amountWithVat * 100 / (100 + rate)`, `vat = amountWithVat - base`;
+    - для неплательщиков все суммы маркируются как «Без НДС».
+  - Округление: расчёты в Decimal, визуализация до 2 знаков; totals в документе считаются по сумме округлённых линий, а сверка P2 по‑прежнему опирается на `netAmount`/ledger.
+- **Нумерация документов:**
+  - Введено требование отдельного sequence‑сервиса `DocumentNumberService` с хранением последних номеров по `(operatorId, year, type)`.
+  - Формат номера — `ГГГГ-000001`; номер пишется в `SupplierDocument.payloadJson.document.number` и может дублироваться в отдельное поле для поиска.
+- **Payload НДС‑документов:**
+  - Структура payload’а для счёта‑фактуры/УПД включает блоки `supplier`, `customer`, `document`, `lines`, `totals` и, при необходимости, `npd` (чек НПД).
+  - Источники данных:
+    - supplier — snapshot `SupplierLegalProfile`;
+    - customer — профиль Daibilet/покупателя;
+    - document — период/основание из `SupplierReport` + номер/дата из `DocumentNumberService`;
+    - lines/totals — агрегаты на основе отчёта с разложением НДС по матрице.
+
+### Проблемы
+
+- Потребуются дополнительные решения по «edge‑кейсам» (смена режима посреди года, разные ставки НДС для отдельных услуг, корректировочные документы), но они отнесены к будущим фазам; P3.1 фиксирует базовый, но расширяемый каркас налогового слоя.
+
+---
+
+## 15.03.2026 — Supplier Finance Acceptance Flow & Chargebacks (P2/P3.2+)
+
+### Наблюдения
+
+- После реализации P2–P3.2+ в финансах не хватало формального Acceptance Flow: отчёт мог быть FINAL с точки зрения админа, но не имел явного акцепта со стороны поставщика.
+- В дискуссиях было важно зафиксировать приоритет споров над акцептом: если после акцепта открывается спор, отчёт должен считаться DISPUTED без потери исторических данных.
+- Для будущих сценариев chargeback/rolling reserve требовалось аккуратно расширить типы леджера/отчёта, не ломая существующую P1‑/P2‑логику.
+
+### Решения
+
+- **Acceptance Flow:**
+  - В `SupplierReport` добавлены поля `supplierAcceptedAt` и `acceptedBySupplierUserId`, а также зафиксирован формат `metaJson.history` (массив событий `{ status, changedAt, changedByUserId, changedByRole, comment? }`).
+  - В `SupplierController` реализован `POST /supplier/finance/reports/:id/accept`, который:
+    - проверяет владение отчётом текущим оператором;
+    - проверяет отсутствие открытого `SupplierDispute` (`OPEN`/`UNDER_REVIEW`) и в этом случае возвращает 4xx без изменения отчёта;
+    - при успехе проставляет `supplierAcceptedAt`/`acceptedBySupplierUserId` и пушит в `metaJson.history` запись `ACCEPTED` с временем и пользователем.
+  - При открытии спора (`POST /supplier/finance/reports/:id/disputes`) отчёт де‑факто считается DISPUTED независимо от наличия акцепта: дата акцепта остаётся в полях и истории, но при вычислении текущего статуса приоритет имеет наличие открытого спора.
+- **History / audit trail:**
+  - `SupplierDisputeService.openDispute` и `resolveDispute` теперь дописывают события в `metaJson.history` (`DISPUTED` — от имени поставщика, `RESOLVED`/`REJECTED` — от имени админа), сохраняя предыдущую историю.
+  - История споров и акцептов читается как плоский, front‑friendly timeline без дополнительного парсинга на фронте.
+- **Chargebacks & PSP‑корректировки (подготовка C‑блока):**
+  - В `SupplierLedgerEntryType` и `SupplierReportLineType` добавлены значения `CHARGEBACK_ADJUSTMENT` и `FEE_RECHARGE`.
+  - `SupplierReportCalculationService` умеет транслировать новые типы в строки отчёта, не ломая существующие агрегаты; экономическая логика для `FEE_RECHARGE` пока не активирована и рассматривается как базис для будущего `pspFeeMode ≠ PLATFORM_PAYS`.
+  - Версионирование документов (`SupplierDocument` + `SupplierDocumentTemplateVersion`) оформлено так, что «регенерация» создаёт новые документы для того же отчёта вместо перезаписи существующих, что важно для юридически значимых PDF/HTML.
+
+### Проблемы
+
+- Полный UI‑таймлайн по history (в админке и ЛК поставщика) ещё не реализован, но контракт данных уже стабилен и задокументирован.
+- Экономическая логика `FEE_RECHARGE` и rolling reserve сознательно отложены: сейчас леджер остаётся простым, а новые типы используются как структурная подготовка к будущим фазам C‑блока.
+
+---
+
+## 15.03.2026 — YooKassa PaymentMode & Agent Scheme (подготовка к split)
+
+### Наблюдения
+
+- На первом этапе деньги по YooKassa будут идти только на счёт платформы (единый получатель), но в перспективе нужно:
+  - включить агентскую схему (Daibilet как агент, поставщик как принципал) с корректным чеком;
+  - перейти на split‑платежи и раздельные выплаты.
+- Важно заранее зафиксировать режимы на уровне настроек оператора, чтобы не ломать логику checkout/ledger при переходе.
+
+### Решения
+
+- **PaymentMode:**
+  - В архитектуре введены режимы:
+    - `SINGLE_MERCHANT` — деньги и чек от платформы (текущий стартовый вариант),
+    - `AGENT_SINGLE_PAYOUT` — деньги всё ещё на счёте платформы, но в чеке ставится агентский признак, реквизиты оператора идут как принципала,
+    - `SPLIT_MERCHANT` — целевой режим с разделением суммы между платформой и оператором.
+  - Дополнительные флаги:
+    - `agentSchemeEnabled` — включает агентский чек независимо от того, используется ли split,
+    - `splitEnabled` — разрешает split‑платежи для данного оператора.
+- **Где и как настраивается:**
+  - Все поля payment‑режима живут в настройках `Operator`/`OperatorPaymentSettings` и редактируются только через админку:
+    - backend: `GET/PUT /admin/suppliers/:id/payment-settings`,
+    - frontend admin: секция «Финансы / Платежи» в карточке поставщика.
+  - В ЛК поставщика эти настройки доступны только для чтения (API `GET /supplier/finance/settings`), в UI отображается текстовое описание схемы с пометкой, что изменить её может только админ.
+- **Интеграция с YooKassa (концептуально):**
+  - При создании платежа слой интеграции читает `paymentMode` и:
+    - в `SINGLE_MERCHANT` формирует обычный чек на платформу,
+    - в `AGENT_SINGLE_PAYOUT` добавляет фискальные теги агента/принципала и использует snapshot `SupplierLegalProfile` для реквизитов принципала,
+    - в `SPLIT_MERCHANT` (в будущем) конфигурирует split‑получателей и соответствующую форму чека.
+  - При этом `PaymentIntent` и `SupplierLedgerEntry` остаются общими для всех режимов; переключение схемы оплаты не ломает финансовый контур.
+
+### Проблемы
+
+- Точное наполнение фискальных тегов и сценарии split’а зависят от выбранного провайдера и тарифов YooKassa; эти детали будут доработаны в отдельной фазе после завершения P3/P3.1.
+
+---
+
 ## 11.03.2026 — Review Module MVP (disputes, supplier response)
 
 ### Наблюдения

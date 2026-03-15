@@ -143,6 +143,60 @@ Event: core columns + contentTemplateData; Venue: core + venueTemplateData; Sche
 
 ---
 
-## 7. Тесты
+## 7. Integration Layer — PaymentContext & YooKassa
+
+### 7.1 PaymentContext при создании платежа
+
+- **PaymentContext**:
+  - формируется в слое checkout/payments из:
+    - `CheckoutSession` (корзина, пользователь, operatorId),
+    - настроек оператора (`paymentMode`, `agentSchemeEnabled`, `splitEnabled`, `pspFeeMode` — future flag),
+    - snapshot `SupplierLegalProfile` (ИНН/КПП/адрес, налоговый режим, флаги НДС).
+  - контекст явно передаётся в сервис, создающий `PaymentIntent`, и сохраняется в:
+    - `PaymentIntent.provider`/`metadata` (в т.ч. `paymentMode`, `operatorId`, `agentSchemeEnabled`; для будущих фаз также может включать `pspFeeMode`, который на этапе MVP трактуется как `PLATFORM_PAYS`),
+    - объектах чека для YooKassa (receipt.items и agent‑теги).
+
+### 7.2 Связь с SupplierLegalProfile Snapshot (P3/P3.1)
+
+- Источник реквизитов для чека (особенно в агентском и split‑режимах):
+  - берётся из snapshot, зафиксированного в P3/P3.1:
+    - `SupplierReport.snapshotJson.legalProfile` / `SupplierReport.legalProfileSnapshot`,
+    - либо из свежего `SupplierLegalProfile` на момент **создания PaymentIntent**, который при необходимости также может быть снапшотнут в metadata/ledger.
+- **Инвариант:** реквизиты, которые уходят в чек (ИНН/КПП поставщика, признак агента), всегда соответствуют тем данным, которые зафиксированы в финансовых snapshot’ах на момент оплаты; дальнейшие правки профиля не меняют уже проведённые чеки и отчёты.
+
+---
+
+## 8. API‑контракты Supplier Finance
+
+- `POST /supplier/finance/reports/:id/accept`:
+  - доступен авторизованному поставщику (Supplier JWT),
+  - проверяет:
+    - что отчёт принадлежит оператору текущего пользователя,
+    - что по отчёту **нет** открытого `SupplierDispute` (статусы `OPEN`/`UNDER_REVIEW`),
+  - при успешном акцепте:
+    - обновляет поля `supplierAcceptedAt` и `acceptedBySupplierUserId` в `SupplierReport`,
+    - добавляет запись в `metaJson.history` с указанием статуса `ACCEPTED`, времени и пользователя.
+  - контракт по истории (`metaJson.history`) описан в `finance.md` и считается front‑friendly: backend всегда возвращает плоский массив событий, пригодный для прямого отображения таймлайна без дополнительного парсинга.
+- `POST /supplier/finance/reports/:id/disputes`:
+  - открывает `SupplierDispute` по отчёту (см. раздел SupplierDispute в finance.md),
+  - при открытии спора отчёт считается `DISPUTED`, даже если ранее был акцептован.
+
+---
+
+## 9. API‑контракты Payment Settings
+
+- `GET /admin/operators/:id/payment-settings` — полный объект `OperatorPaymentSettings`:
+  - используется админкой для чтения и редактирования схемы платежей (paymentMode, agentSchemeEnabled, splitEnabled),
+  - доступен только ролям ADMIN / SUPERUSER.
+- `PATCH /admin/operators/:id/payment-settings` — частичное обновление payment‑настроек:
+  - меняет только разрешённые поля (режимы и флаги), не содержит секретов/токенов эквайера,
+  - операции логируются и могут аудироваться отдельно.
+- `GET /supplier/finance/settings` — облегчённый read‑only объект для ЛК поставщика:
+  - включает только то, что нужно для отображения виджета «Статус финансовых расчётов» (режим, флаги, дата последнего изменения),
+  - не возвращает технические детали/токены, не даёт возможности изменить настройки.
+
+---
+
+## 10. Тесты
 
 `packages/backend/src/catalog/__tests__/canonical-tag-enrichment.spec.ts` — 29 тестов: позитив/негатив, city-gating, multi-match.
