@@ -25,6 +25,7 @@ import { SupplierUploadController } from './supplier-upload.controller';
 import { SupplierTrustJob } from './supplier-trust.job';
 import { SupplierIntegrationsService } from './supplier-integrations.service';
 import { SupplierInvitationService } from './supplier-invitation.service';
+import { SupplierDailyStatService } from './supplier-daily-stat.service';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { SupplierInvitationService } from './supplier-invitation.service';
     SupplierDisputeService,
     SupplierReconciliationService,
     SupplierFinanceSummaryService,
+    SupplierDailyStatService,
     ReviewCapabilityService,
     OperatorScopeGuard,
     SupplierRolesGuard,
@@ -69,6 +71,7 @@ import { SupplierInvitationService } from './supplier-invitation.service';
     SupplierDisputeService,
     SupplierReconciliationService,
     SupplierFinanceSummaryService,
+    SupplierDailyStatService,
   ],
 })
 export class SupplierModule {}

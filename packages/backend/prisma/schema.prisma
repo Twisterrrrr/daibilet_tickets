@@ -1414,6 +1414,7 @@ model Operator {
   supplierReports   SupplierReport[]
   supplierDocuments SupplierDocument[]
   supplierDisputes  SupplierDispute[]
+  supplierDailyStats SupplierDailyStat[]
 
   legalProfile SupplierLegalProfile?
 
@@ -1440,6 +1441,10 @@ model SupplierLegalProfile {
   financeEmail   String?
   docsEmail      String?
   status         SupplierLegalProfileStatus @default(DRAFT)
+
+  verifiedBy        String?   @db.Uuid
+  verifiedAt        DateTime?
+  rejectionComment  String?   @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2380,6 +2385,32 @@ enum PspFeeMode {
   SUPPLIER_PAYS
   SHARED_50_50
   SERVICE_FEE
+}
+
+/// Витрина Phase 5: дневная статистика по поставщику (предрасчёт для дашборда и аналитики).
+model SupplierDailyStat {
+  id         String   @id @default(uuid()) @db.Uuid
+  operatorId String   @db.Uuid
+  date       DateTime @db.Date
+
+  ordersCount        Int   @default(0)
+  grossAmountCents   Int   @default(0)
+  platformFeeCents   Int   @default(0)
+  supplierAmountCents Int  @default(0)
+
+  viewsCount     Int   @default(0)
+  conversionRate Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@unique([operatorId, date])
+  @@index([operatorId])
+  @@index([date])
+  @@index([operatorId, date])
+  @@map("supplier_daily_stats")
 }
 
 model SupplierReport {

@@ -7,6 +7,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -24,6 +25,7 @@ import {
   PaymentMode,
   Prisma,
   SupplierDisputeReasonCategory,
+  SupplierLegalProfileStatus,
   SupplierRole,
 } from '@prisma/client';
 import { Request, Response } from 'express';
@@ -41,6 +43,8 @@ import { SupplierLoginDto, SupplierRegisterDto } from './dto/supplier-auth.dto';
 import {
   CreateSupplierEventDto,
   CreateSupplierOfferDto,
+  CreateSupplierBankAccountDto,
+  UpdateSupplierLegalProfileDto,
   UpdateSupplierEventDto,
   UpdateSupplierOfferDto,
   UpdateSupplierSettingsDto,
@@ -63,6 +67,8 @@ import { ListingHealthService } from '../catalog/listing-health.service';
 import { tryTransitionCheckout, tryTransitionOrderRequest } from '../checkout/checkout-state-machine';
 import { SupplierFinanceSummaryService } from '../supplier-finance/supplier-finance-summary.service';
 import { SupplierDisputeService } from '../supplier-finance/supplier-dispute.service';
+import type { FinanceMetaJson } from '../common/finance.types';
+import { SupplierDailyStatService } from './supplier-daily-stat.service';
 
 @ApiTags('supplier')
 @Controller('supplier')
@@ -81,6 +87,7 @@ export class SupplierController {
     private readonly integrationsService: SupplierIntegrationsService,
     private readonly financeSummary: SupplierFinanceSummaryService,
     private readonly disputes: SupplierDisputeService,
+    private readonly dailyStat: SupplierDailyStatService,
   ) {}
 
   // ─── Auth (public / refresh / guarded) ─────────────────────────────────────
@@ -185,13 +192,60 @@ export class SupplierController {
         },
       }),
     ]);
-    const payments = await this.prisma.paymentIntent.aggregate({
-      where: { supplierId: operatorId, status: 'PAID' },
-      _sum: { grossAmount: true, platformFee: true, supplierAmount: true },
-      _count: { id: true },
-    });
+    const vitrinaTotals = await this.dailyStat.getTotalsForOperator(operatorId);
+    const payments =
+      vitrinaTotals != null
+        ? {
+            _count: { id: vitrinaTotals.totalOrders },
+            _sum: {
+              grossAmount: vitrinaTotals.grossRevenue,
+              platformFee: vitrinaTotals.platformFee,
+              supplierAmount: vitrinaTotals.netRevenue,
+            },
+          }
+        : await this.prisma.paymentIntent.aggregate({
+            where: { supplierId: operatorId, status: 'PAID' },
+            _sum: { grossAmount: true, platformFee: true, supplierAmount: true },
+            _count: { id: true },
+          });
     const trustBreakdown = await this.trustService.recalculateSupplierTrust(operatorId);
     const activeEventsLimit = this.trustService.getActiveEventsLimitByTrustLevel(trustBreakdown.level);
+    const nextLevelRequirements = await this.trustService.getNextLevelRequirements(operatorId);
+
+    const FACTOR_SPEC: { key: keyof typeof trustBreakdown; label: string; max: number }[] = [
+      { key: 'profile', label: 'Профиль', max: 20 },
+      { key: 'catalog', label: 'Каталог', max: 25 },
+      { key: 'operations', label: 'Операции', max: 25 },
+      { key: 'reputation', label: 'Репутация', max: 15 },
+      { key: 'stability', label: 'Стабильность', max: 15 },
+    ];
+    const keyFactors = FACTOR_SPEC.map(({ key, label, max }) => ({
+      name: key,
+      label,
+      score: trustBreakdown[key] as number,
+      max,
+    }))
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3);
+
+    const [listingHealthResult, reviewsWithoutResponse] = await Promise.all([
+      this.listingHealth.computeForOperator(operatorId),
+      this.prisma.review.count({
+        where: {
+          supplierId: operatorId,
+          status: 'APPROVED',
+          supplierResponse: null,
+        },
+      }),
+    ]);
+
+    const eventsWithoutSchedule = listingHealthResult.byEvent.filter((e) =>
+      e.issues.some((i) => i.code === 'NO_SESSIONS'),
+    ).length;
+    const eventsWithoutPhoto = listingHealthResult.byEvent.filter((e) =>
+      e.issues.some((i) => i.code === 'NO_PHOTO'),
+    ).length;
+
     return {
       operator,
       events: { total: totalEvents, active: activeEvents, pending: pendingEvents },
@@ -213,8 +267,70 @@ export class SupplierController {
         penalties: trustBreakdown.penalties,
         activeEventsLimit,
         activeEventsCount: activeEvents,
-        nextLevelRequirements: await this.trustService.getNextLevelRequirements(operatorId),
+        nextLevelRequirements,
+        keyFactors,
+        nextStepRecommendation: nextLevelRequirements[0]?.message ?? null,
       },
+      attention: {
+        eventsWithoutSchedule,
+        eventsWithoutPhoto,
+        reviewsWithoutResponse,
+      },
+    };
+  }
+
+  @Get('stats/daily')
+  @UseGuards(SupplierJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Тренды по дням для графиков (витрина, до 365 дней)' })
+  async getStatsDaily(
+    @Req() req: { user: { operatorId: string } },
+    @Query('days') daysRaw?: string,
+    @Query('from') fromQuery?: string,
+    @Query('to') toQuery?: string,
+  ) {
+    const operatorId = req.user.operatorId;
+    const MAX_DAYS = 365;
+    let from: Date;
+    let to: Date;
+
+    if (fromQuery && toQuery) {
+      from = new Date(fromQuery);
+      to = new Date(toQuery);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        throw new BadRequestException('Некорректный формат from/to (ожидается ISO дата)');
+      }
+      if (from > to) {
+        throw new BadRequestException('from не может быть позже to');
+      }
+      const diffDays = (to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000);
+      if (diffDays > MAX_DAYS) {
+        throw new BadRequestException(`Максимальный диапазон: ${MAX_DAYS} дней`);
+      }
+    } else {
+      const days = Math.min(MAX_DAYS, Math.max(1, Number(daysRaw) || 30));
+      to = new Date();
+      to.setUTCHours(23, 59, 59, 999);
+      from = new Date(to.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+      from.setUTCHours(0, 0, 0, 0);
+    }
+
+    return this.dailyStat.getDailySeries(operatorId, from, to);
+  }
+
+  @Get('analytics/sales-chart')
+  @UseGuards(SupplierJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Данные для графика продаж за последние 30 дней (витрина)' })
+  async getSalesChart(@Req() req: { user: { operatorId: string } }) {
+    const operatorId = req.user.operatorId;
+    const to = new Date();
+    const from = new Date(to.getTime() - 29 * 24 * 60 * 60 * 1000);
+    from.setUTCHours(0, 0, 0, 0);
+    const data = await this.dailyStat.getDailySeries(operatorId, from, to);
+    return {
+      period: { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) },
+      data,
     };
   }
 
@@ -226,6 +342,142 @@ export class SupplierController {
   @ApiOperation({ summary: 'Финансовое резюме: баланс, pending payouts, отчёты' })
   async getFinanceSummary(@Req() req: { user: { operatorId: string } }) {
     return this.financeSummary.getSummary(req.user.operatorId);
+  }
+
+  // ─── Legal profile & bank accounts (P3-4) ──────────────────────────────────
+
+  @Get('profile/legal')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Юридический профиль поставщика' })
+  async getLegalProfile(@CurrentSupplierUser() user: SupplierAuthUser) {
+    const profile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId: user.operatorId },
+    });
+
+    if (!profile) {
+      return null;
+    }
+
+    return profile;
+  }
+
+  @Patch('profile/legal')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Обновить юридический профиль (ИНН/КПП/ОГРН и реквизиты)' })
+  async updateLegalProfile(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Body() data: UpdateSupplierLegalProfileDto,
+  ) {
+    const existing = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId: user.operatorId },
+    });
+
+    if (!existing) {
+      return this.prisma.supplierLegalProfile.create({
+        data: {
+          operatorId: user.operatorId,
+          legalName: data.legalName ?? '',
+          legalAddress: data.legalAddress ?? null,
+          inn: data.inn ?? null,
+          kpp: data.kpp ?? null,
+          ogrn: data.ogrn ?? null,
+          financeEmail: data.financeEmail ?? null,
+          docsEmail: data.docsEmail ?? null,
+          status: SupplierLegalProfileStatus.INCOMPLETE,
+        },
+      });
+    }
+
+    return this.prisma.supplierLegalProfile.update({
+      where: { operatorId: user.operatorId },
+      data: {
+        legalName: data.legalName ?? existing.legalName,
+        legalAddress: data.legalAddress ?? existing.legalAddress,
+        inn: data.inn ?? existing.inn,
+        kpp: data.kpp ?? existing.kpp,
+        ogrn: data.ogrn ?? existing.ogrn,
+        financeEmail: data.financeEmail ?? existing.financeEmail,
+        docsEmail: data.docsEmail ?? existing.docsEmail,
+        status: SupplierLegalProfileStatus.INCOMPLETE,
+      },
+    });
+  }
+
+  @Get('profile/bank-accounts')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Банковские счета поставщика' })
+  async listBankAccounts(@CurrentSupplierUser() user: SupplierAuthUser) {
+    const profile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId: user.operatorId },
+      include: { bankAccounts: true },
+    });
+
+    if (!profile) {
+      return [];
+    }
+
+    return profile.bankAccounts;
+  }
+
+  @Post('profile/bank-accounts')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Добавить банковский счёт' })
+  async createBankAccount(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Body() data: CreateSupplierBankAccountDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      let profile = await tx.supplierLegalProfile.findUnique({
+        where: { operatorId: user.operatorId },
+        include: { bankAccounts: true },
+      });
+
+      if (!profile) {
+        profile = await tx.supplierLegalProfile.create({
+          data: {
+            operatorId: user.operatorId,
+            legalName: '',
+            status: SupplierLegalProfileStatus.INCOMPLETE,
+          },
+          include: { bankAccounts: true },
+        });
+      }
+
+      if (data.isPrimary) {
+        await tx.supplierBankAccount.updateMany({
+          where: { supplierLegalProfileId: profile.id, isPrimary: true },
+          data: { isPrimary: false },
+        });
+      }
+
+      const account = await tx.supplierBankAccount.create({
+        data: {
+          supplierLegalProfileId: profile.id,
+          bankName: data.bankName ?? null,
+          bik: data.bik,
+          accountNumber: data.accountNumber,
+          correspondentAccount: data.correspondentAccount ?? null,
+          isPrimary: data.isPrimary ?? (profile.bankAccounts.length === 0),
+        },
+      });
+
+      await tx.supplierLegalProfile.update({
+        where: { id: profile.id },
+        data: {
+          status: SupplierLegalProfileStatus.INCOMPLETE,
+        },
+      });
+
+      return account;
+    });
   }
 
   @Get('finance/settings')
@@ -315,19 +567,26 @@ export class SupplierController {
       throw new BadRequestException('Вывод средств недоступен: расчёты ведутся у внешнего провайдера');
     }
 
-    const balance = await this.balance(req);
-    if (dto.amount > balance.availableToRequest) {
-      throw new BadRequestException('Недостаточно средств для вывода');
-    }
-
     const legalProfile = await this.prisma.supplierLegalProfile.findUnique({
       where: { operatorId },
       include: { bankAccounts: true },
     });
 
-    const primaryAccount = legalProfile
-      ? legalProfile.bankAccounts.find((a) => a.isPrimary) ?? legalProfile.bankAccounts[0]
-      : null;
+    if (!legalProfile || legalProfile.status !== 'VERIFIED') {
+      throw new BadRequestException('Вывод средств недоступен: юридический профиль не подтверждён');
+    }
+
+    const primaryAccount =
+      legalProfile.bankAccounts.find((a) => a.isPrimary) ?? legalProfile.bankAccounts[0] ?? null;
+
+    if (!primaryAccount) {
+      throw new BadRequestException('Вывод средств недоступен: не указан основной банковский счёт');
+    }
+
+    const balance = await this.balance(req);
+    if (dto.amount > balance.availableToRequest) {
+      throw new BadRequestException('Недостаточно средств для вывода');
+    }
 
     return this.prisma.supplierPayoutRequest.create({
       data: {
@@ -335,14 +594,12 @@ export class SupplierController {
         amount: dto.amount,
         comment: dto.comment ?? null,
         status: 'NEW',
-        bankAccountSnapshot:
-          primaryAccount &&
-          ({
-            bankName: primaryAccount.bankName,
-            bik: primaryAccount.bik,
-            accountNumber: primaryAccount.accountNumber,
-            correspondentAccount: primaryAccount.correspondentAccount,
-          } as Prisma.JsonObject),
+        bankAccountSnapshot: {
+          bankName: primaryAccount.bankName,
+          bik: primaryAccount.bik,
+          accountNumber: primaryAccount.accountNumber,
+          correspondentAccount: primaryAccount.correspondentAccount,
+        } as Prisma.InputJsonValue,
       },
     });
   }
@@ -394,9 +651,13 @@ export class SupplierController {
       throw new BadRequestException('Нельзя акцептовать отчёт при наличии открытого спора');
     }
 
-    const existingMeta = (report.metaJson as Prisma.JsonObject | null) ?? {};
-    const history: Prisma.InputJsonValue[] = Array.isArray((existingMeta as any).history)
-      ? ([...(existingMeta as any).history] as Prisma.InputJsonValue[])
+    const rawMeta = report.metaJson as unknown;
+    const existingMeta: FinanceMetaJson =
+      rawMeta && typeof rawMeta === 'object'
+        ? (rawMeta as FinanceMetaJson)
+        : {};
+    const history: Prisma.InputJsonValue[] = Array.isArray(existingMeta.history)
+      ? ([...existingMeta.history] as Prisma.InputJsonValue[])
       : [];
 
     history.push({
@@ -561,6 +822,154 @@ export class SupplierController {
 
   // ─── Orders / Booking Operations ───────────────────────────────────────────
 
+  /** Стриминговый экспорт оплаченных заказов в CSV. Требуются dateFrom/dateTo или preset. Лимит 5000 строк. */
+  @Get('orders/export')
+  @UseGuards(SupplierJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Экспорт заказов в CSV (оплаченные, лимит 5000)' })
+  async ordersExport(
+    @Req() req: { user: { operatorId: string } },
+    @Res() res: Response,
+    @Query('dateFrom') dateFromQuery?: string,
+    @Query('dateTo') dateToQuery?: string,
+    @Query('status') statusQuery?: string,
+    @Query('preset') preset?: string,
+  ) {
+    const operatorId = req.user.operatorId;
+    const EXPORT_MAX_ROWS = 5000;
+
+    let dateFrom: Date;
+    let dateTo: Date;
+    if (preset) {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      switch (preset.toLowerCase()) {
+        case 'today':
+          dateFrom = todayStart;
+          dateTo = new Date(now.getTime());
+          break;
+        case 'yesterday': {
+          dateFrom = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+          dateTo = new Date(todayStart.getTime() - 1);
+          break;
+        }
+        case '7days':
+          dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          dateTo = new Date(now.getTime());
+          break;
+        case 'month':
+          dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          dateTo = new Date(now.getTime());
+          break;
+        default:
+          throw new BadRequestException('Неизвестный preset: today, yesterday, 7days, month');
+      }
+    } else {
+      if (!dateFromQuery || !dateToQuery) {
+        throw new BadRequestException('Укажите dateFrom и dateTo либо preset (today, yesterday, 7days, month)');
+      }
+      dateFrom = new Date(dateFromQuery);
+      dateTo = new Date(dateToQuery);
+      if (Number.isNaN(dateFrom.getTime()) || Number.isNaN(dateTo.getTime())) {
+        throw new BadRequestException('Некорректный формат даты');
+      }
+      if (dateFrom > dateTo) {
+        throw new BadRequestException('dateFrom не может быть позже dateTo');
+      }
+    }
+
+    const diffDays = (dateTo.getTime() - dateFrom.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays > 93) {
+      throw new BadRequestException('Максимальный период выгрузки: 93 дня');
+    }
+
+    type Row = {
+      id: string;
+      paidAt: Date | null;
+      status: string;
+      grossAmount: number | null;
+      checkoutSession: {
+        shortCode: string;
+        status: string;
+        offersSnapshot: unknown;
+        fulfillmentItems: { status: string }[];
+      } | null;
+    };
+
+    const where: Prisma.PaymentIntentWhereInput = {
+      supplierId: operatorId,
+      paidAt: { gte: dateFrom, lte: dateTo },
+    };
+    if (statusQuery) {
+      const s = statusQuery.toUpperCase();
+      if (['PENDING', 'PROCESSING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED'].includes(s)) {
+        where.status = s as 'PAID' | 'REFUNDED' | 'PENDING' | 'PROCESSING' | 'FAILED' | 'CANCELLED';
+      }
+    }
+
+    const total = await this.prisma.paymentIntent.count({ where });
+    if (total > EXPORT_MAX_ROWS) {
+      throw new BadRequestException(
+        `Слишком много записей (${total}). Сузьте период или фильтры. Максимум: ${EXPORT_MAX_ROWS}.`,
+      );
+    }
+
+    function eventTitleFromSnapshot(snapshot: unknown): string {
+      if (!Array.isArray(snapshot) || snapshot.length === 0) return '';
+      const first = snapshot[0] as { eventTitle?: string } | undefined;
+      return first?.eventTitle ?? '';
+    }
+
+    function fulfillmentStatusFromItems(items: { status: string }[]): string {
+      if (items.length === 0) return '';
+      const statuses = items.map((i) => i.status);
+      if (statuses.some((s) => s === 'REFUNDED')) return 'REFUNDED';
+      if (statuses.some((s) => s === 'FAILED' || s === 'CANCELLED')) return 'FAILED';
+      if (statuses.every((s) => s === 'CONFIRMED')) return 'CONFIRMED';
+      return 'PENDING';
+    }
+
+    await streamCsv({
+      res,
+      filename: 'orders',
+      fields: [
+        { header: 'orderId', accessor: (i) => (i as Row).checkoutSession?.shortCode ?? (i as Row).id },
+        { header: 'date', accessor: (i) => (i as Row).paidAt?.toISOString().split('T')[0] ?? '' },
+        { header: 'event', accessor: (i) => eventTitleFromSnapshot((i as Row).checkoutSession?.offersSnapshot) },
+        { header: 'sessionDate', accessor: () => '' },
+        {
+          header: 'qty',
+          accessor: (i) => {
+            const snap = (i as Row).checkoutSession?.offersSnapshot;
+            if (!Array.isArray(snap)) return 1;
+            return snap.reduce((sum: number, it: unknown) => sum + (Number((it as { quantity?: number }).quantity) || 1), 0);
+          },
+        },
+        { header: 'amount', accessor: (i) => (((i as Row).grossAmount ?? 0) / 100).toFixed(2) },
+        { header: 'status', accessor: (i) => (i as Row).checkoutSession?.status ?? '' },
+        { header: 'paymentStatus', accessor: (i) => (i as Row).status },
+        { header: 'fulfillmentStatus', accessor: (i) => fulfillmentStatusFromItems((i as Row).checkoutSession?.fulfillmentItems ?? []) },
+      ],
+      fetchBatch: (cursor, take) =>
+        this.prisma.paymentIntent.findMany({
+          where,
+          include: {
+            checkoutSession: {
+              select: {
+                shortCode: true,
+                status: true,
+                offersSnapshot: true,
+                fulfillmentItems: { select: { status: true } },
+              },
+            },
+          },
+          orderBy: { paidAt: 'desc' },
+          take,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        }) as Promise<Row[]>,
+    });
+  }
+
   @Get('orders')
   @UseGuards(SupplierJwtGuard)
   @ApiBearerAuth()
@@ -614,6 +1023,22 @@ export class SupplierController {
       this.prisma.orderRequest.count({ where }),
     ]);
 
+    const shortCodes = items
+      .map((or) => or.checkoutSession?.shortCode)
+      .filter((code): code is string => Boolean(code));
+
+    let ticketsByCode = new Set<string>();
+    if (shortCodes.length > 0) {
+      const tickets = await this.prisma.supportTicket.findMany({
+        where: {
+          orderCode: { in: shortCodes },
+          status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_CUSTOMER'] },
+        },
+        select: { orderCode: true },
+      });
+      ticketsByCode = new Set(tickets.map((t) => t.orderCode).filter((c): c is string => Boolean(c)));
+    }
+
     return {
       items: items.map((or) => ({
         id: or.id,
@@ -632,6 +1057,7 @@ export class SupplierController {
         expireReason: or.expireReason,
         createdAt: or.createdAt,
         confirmedAt: or.confirmedAt,
+        hasActiveDispute: !!or.checkoutSession?.shortCode && ticketsByCode.has(or.checkoutSession.shortCode),
       })),
       total,
       page,
@@ -1107,6 +1533,85 @@ export class SupplierController {
       capacity: s.capacityTotal ?? null,
       soldTickets: soldById[s.id] ?? 0,
     }));
+  }
+
+  @Patch('events/:eventId/sessions/bulk-capacity')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard, OperatorScopeGuard)
+  @SupplierRoles('OWNER', 'MANAGER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Массовое изменение вместимости сессий (newCapacity >= soldQty)' })
+  async bulkCapacitySessions(
+    @Req() req: { user: SupplierAuthUser },
+    @Param('eventId') eventId: string,
+    @Body() body: { sessionIds: string[]; newCapacity: number },
+  ) {
+    const operatorId = req.user.operatorId;
+    const sessionIds = Array.isArray(body.sessionIds) ? body.sessionIds : [];
+    const newCapacity = Number(body.newCapacity);
+
+    if (sessionIds.length === 0) {
+      throw new BadRequestException('sessionIds не может быть пустым');
+    }
+    if (!Number.isInteger(newCapacity) || newCapacity < 0) {
+      throw new BadRequestException('newCapacity должно быть неотрицательным целым числом');
+    }
+
+    const event = await this.prisma.event.findFirst({
+      where: { id: eventId, operatorId },
+      select: { id: true, source: true },
+    });
+    if (!event) throw new NotFoundException('Событие не найдено');
+    if (event.source !== 'MANUAL') {
+      throw new BadRequestException('Массовое изменение вместимости доступно только для ручных событий.');
+    }
+
+    const now = new Date();
+    const sessions = await this.prisma.eventSession.findMany({
+      where: {
+        eventId,
+        id: { in: sessionIds },
+        startsAt: { gte: now },
+        canceledAt: null,
+      },
+      select: { id: true },
+    });
+
+    const idsFound = sessions.map((s) => s.id);
+    if (idsFound.length === 0) {
+      return { updatedIds: [], failed: [] };
+    }
+
+    const sold = await this.prisma.packageItem.groupBy({
+      by: ['sessionId'],
+      where: {
+        sessionId: { in: idsFound },
+        status: { in: ['BOOKED', 'CONFIRMED'] },
+      },
+      _sum: { adultTickets: true, childTickets: true },
+    });
+
+    const soldById: Record<string, number> = {};
+    for (const row of sold) {
+      soldById[row.sessionId] = (row._sum.adultTickets ?? 0) + (row._sum.childTickets ?? 0);
+    }
+
+    const updatedIds: string[] = [];
+    const failed: { sessionId: string; soldQty: number }[] = [];
+
+    for (const sessionId of idsFound) {
+      const soldQty = soldById[sessionId] ?? 0;
+      if (newCapacity < soldQty) {
+        failed.push({ sessionId, soldQty });
+        continue;
+      }
+      await this.prisma.eventSession.update({
+        where: { id: sessionId },
+        data: { capacityTotal: newCapacity },
+      });
+      updatedIds.push(sessionId);
+    }
+
+    return { updatedIds, failed };
   }
 
   @Put('events/:eventId/sessions')

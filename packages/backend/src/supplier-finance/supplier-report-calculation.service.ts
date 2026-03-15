@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma, SupplierReportBasis } from '@prisma/client';
-
+import { Prisma, SupplierReportBasis, SupplierReportLineType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type Basis = SupplierReportBasis;
@@ -57,7 +56,7 @@ export class SupplierReportCalculationService {
 
     for (const entry of ledgerEntries) {
       const amount = entry.amount;
-      let lineType: Prisma.SupplierReportLineType = 'SALE';
+      let lineType: SupplierReportLineType = 'SALE';
       let lineNet = amount;
 
       switch (entry.type) {
@@ -83,12 +82,12 @@ export class SupplierReportCalculationService {
           lineType = 'ADJUSTMENT';
           break;
         case 'CHARGEBACK_ADJUSTMENT':
-          lineType = 'CHARGEBACK_ADJUSTMENT';
+          lineType = 'CHARGEBACK_ADJUSTMENT' as SupplierReportLineType;
           // отрицательная корректировка в пользу платформы
           lineNet = amount;
           break;
         case 'FEE_RECHARGE':
-          lineType = 'FEE_RECHARGE';
+          lineType = 'FEE_RECHARGE' as SupplierReportLineType;
           lineNet = amount;
           break;
         default:
@@ -118,25 +117,25 @@ export class SupplierReportCalculationService {
       where: { operatorId },
     });
 
-    const legalSnapshot = legalProfile
-      ? {
-          legalName: legalProfile.legalName,
-          inn: legalProfile.inn,
-          kpp: legalProfile.kpp,
-          ogrn: legalProfile.ogrn,
-          legalAddress: legalProfile.legalAddress,
-          taxMode: legalProfile.taxMode,
-          isVatPayer: legalProfile.isVatPayer,
-          defaultVatRate: legalProfile.defaultVatRate,
-          signerFullName: legalProfile.signerFullName,
-          signerPosition: legalProfile.signerPosition,
-        }
-      : null;
+    const legalSnapshotObj =
+      legalProfile &&
+      {
+        legalName: legalProfile.legalName,
+        inn: legalProfile.inn,
+        kpp: legalProfile.kpp,
+        ogrn: legalProfile.ogrn,
+        legalAddress: legalProfile.legalAddress,
+        taxMode: legalProfile.taxMode,
+        isVatPayer: legalProfile.isVatPayer,
+        defaultVatRate: legalProfile.defaultVatRate,
+        signerFullName: legalProfile.signerFullName,
+        signerPosition: legalProfile.signerPosition,
+      };
 
     const vatDetails =
-      legalSnapshot && legalSnapshot.isVatPayer && legalSnapshot.defaultVatRate
+      legalSnapshotObj && legalSnapshotObj.isVatPayer && legalSnapshotObj.defaultVatRate
         ? (() => {
-            const rate = Number(legalSnapshot.defaultVatRate);
+            const rate = Number(legalSnapshotObj.defaultVatRate);
             // netAmount трактуем как сумма с НДС (amountWithVat) для плательщиков НДС.
             const amountWithVat = netAmount;
             const base = amountWithVat.mul(100).div(100 + rate);
@@ -157,7 +156,7 @@ export class SupplierReportCalculationService {
         inn: operator.inn,
         commissionRate: operator.commissionRate,
       },
-      legalProfile: legalSnapshot,
+      legalProfile: legalSnapshotObj,
       vatDetails,
       period: {
         start: periodStart.toISOString(),
@@ -179,7 +178,7 @@ export class SupplierReportCalculationService {
           refundAmount,
           netAmount,
           snapshotJson: snapshot,
-          legalProfileSnapshot: legalSnapshot,
+          legalProfileSnapshot: (legalSnapshotObj ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         },
       });
 

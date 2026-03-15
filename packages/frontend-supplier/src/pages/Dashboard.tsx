@@ -6,6 +6,13 @@ import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatCard
 
 import { api } from '../lib/api';
 
+interface TrustKeyFactor {
+  name: string;
+  label: string;
+  score: number;
+  max: number;
+}
+
 interface DashboardData {
   operator: { name: string; trustLevel: number; commissionRate: string; successfulSales: number };
   events: { total: number; active: number; pending: number };
@@ -17,6 +24,13 @@ interface DashboardData {
     activeEventsLimit: number;
     activeEventsCount: number;
     nextLevelRequirements: { code: string; message: string }[];
+    keyFactors?: TrustKeyFactor[];
+    nextStepRecommendation?: string | null;
+  };
+  attention?: {
+    eventsWithoutSchedule: number;
+    eventsWithoutPhoto: number;
+    reviewsWithoutResponse: number;
   };
 }
 
@@ -41,6 +55,25 @@ interface SalesReportResponse {
   total: number;
 }
 
+interface ListingHealthIssue {
+  code: string;
+  message: string;
+  eventId?: string;
+  actionUrl?: string;
+}
+
+interface ListingHealthEvent {
+  eventId: string;
+  title: string;
+  score: number;
+  issues: ListingHealthIssue[];
+}
+
+interface ListingHealthResponse {
+  score: number;
+  byEvent: ListingHealthEvent[];
+}
+
 const TRUST_LABELS: Record<number, string> = {
   0: 'Новый',
   1: 'Базовый',
@@ -53,6 +86,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [attentionEvents, setAttentionEvents] = useState<SupplierEvent[] | null>(null);
   const [recentSales, setRecentSales] = useState<SalesReportResponse | null>(null);
+  const [listingHealth, setListingHealth] = useState<ListingHealthResponse | null>(null);
   const [loadingExtra, setLoadingExtra] = useState(true);
 
   useEffect(() => {
@@ -66,12 +100,13 @@ export default function Dashboard() {
         setError(e.message ?? 'Ошибка загрузки');
       });
 
-    // Дополнительные данные для блоков "Требует внимания" и "Последние продажи"
+    // Дополнительные данные для блоков "Требует внимания", "Качество листингов" и "Последние продажи"
     Promise.allSettled([
       api.get<{ items: SupplierEvent[]; total: number }>('/supplier/events?limit=25&page=1'),
       api.get<SalesReportResponse>('/supplier/reports/sales?limit=4'),
+      api.get<ListingHealthResponse>('/supplier/listing-health'),
     ])
-      .then(([eventsResult, salesResult]) => {
+      .then(([eventsResult, salesResult, healthResult]) => {
         if (eventsResult.status === 'fulfilled') {
           const rawItems = eventsResult.value.items || [];
           const problematic = rawItems.filter((e) => {
@@ -99,6 +134,12 @@ export default function Dashboard() {
           setRecentSales(canRenderItems ? value : null);
         } else {
           setRecentSales(null);
+        }
+
+        if (healthResult.status === 'fulfilled') {
+          setListingHealth(healthResult.value);
+        } else {
+          setListingHealth(null);
         }
       })
       .finally(() => setLoadingExtra(false));
@@ -149,7 +190,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Уровень доверия</p>
-              <p className="mt-1 text-sm font-semibold text-gray-900">{trustLabel}</p>
+              <p className="mt-1 text-sm font-semibold text-gray-900">
+                {trustLabel} · {trustScore} из 100
+              </p>
             </div>
             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               {data.operator.successfulSales} успешных продаж
@@ -162,9 +205,24 @@ export default function Dashboard() {
                 style={{ width: `${trustProgress}%` }}
               />
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Чем выше уровень, тем больше лимиты и приоритет в модерации.
-            </p>
+            {data.trust?.keyFactors && data.trust.keyFactors.length > 0 && (
+              <p className="mt-3 text-xs text-gray-600">
+                Ключевые факторы:{' '}
+                {data.trust.keyFactors
+                  .map((f) => `${f.label} ${f.score}/${f.max}`)
+                  .join(', ')}
+              </p>
+            )}
+            {data.trust?.nextStepRecommendation && (
+              <p className="mt-2 text-xs font-medium text-amber-700">
+                Что улучшить: {data.trust.nextStepRecommendation}
+              </p>
+            )}
+            {!data.trust?.nextStepRecommendation && (
+              <p className="mt-2 text-xs text-gray-500">
+                Чем выше уровень, тем больше лимиты и приоритет в модерации.
+              </p>
+            )}
           </div>
         </SectionCard>
 
@@ -254,9 +312,83 @@ export default function Dashboard() {
         </SectionCard>
       )}
 
-      {/* Требует внимания */}
+      {/* Требует внимания — сводка из API (listing health + отзывы без ответа) */}
+      {data.attention &&
+        (data.attention.eventsWithoutSchedule > 0 ||
+          data.attention.eventsWithoutPhoto > 0 ||
+          data.attention.reviewsWithoutResponse > 0) && (
+          <SectionCard title="Требует внимания">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-700">
+              {data.attention.eventsWithoutSchedule > 0 && (
+                <Link
+                  to="/availability"
+                  className="inline-flex items-center gap-1 font-medium text-amber-700 hover:text-amber-800"
+                >
+                  <AlertCircle className="h-4 w-4" />
+                  {data.attention.eventsWithoutSchedule} событий без расписания
+                </Link>
+              )}
+              {data.attention.eventsWithoutPhoto > 0 && (
+                <Link
+                  to="/events"
+                  className="inline-flex items-center gap-1 font-medium text-amber-700 hover:text-amber-800"
+                >
+                  <AlertCircle className="h-4 w-4" />
+                  {data.attention.eventsWithoutPhoto} без фото
+                </Link>
+              )}
+              {data.attention.reviewsWithoutResponse > 0 && (
+                <Link
+                  to="/reviews"
+                  className="inline-flex items-center gap-1 font-medium text-amber-700 hover:text-amber-800"
+                >
+                  <AlertCircle className="h-4 w-4" />
+                  {data.attention.reviewsWithoutResponse} отзывов без ответа
+                </Link>
+              )}
+            </div>
+          </SectionCard>
+        )}
+
+      {/* Качество листингов — список замечаний со ссылками «Исправить» */}
+      {listingHealth &&
+        listingHealth.byEvent.some((e) => e.issues.length > 0) && (
+          <SectionCard title="Качество листингов">
+            <p className="mb-3 text-xs text-gray-500">
+              Оценка: {listingHealth.score} из 100. Исправьте замечания, чтобы улучшить видимость событий.
+            </p>
+            <ul className="space-y-3">
+              {listingHealth.byEvent
+                .filter((e) => e.issues.length > 0)
+                .map((event) => (
+                  <li key={event.eventId} className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+                    <p className="mb-2 text-sm font-medium text-gray-900">{event.title}</p>
+                    <ul className="space-y-1">
+                      {event.issues.map((issue, idx) => (
+                        <li key={`${issue.code}-${idx}`} className="flex items-center gap-2 text-sm text-gray-700">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                          {issue.actionUrl ? (
+                            <Link
+                              to={issue.actionUrl}
+                              className="font-medium text-amber-700 hover:text-amber-800 hover:underline"
+                            >
+                              {issue.message} → Исправить
+                            </Link>
+                          ) : (
+                            <span>{issue.message}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+            </ul>
+          </SectionCard>
+        )}
+
+      {/* Требует внимания — список событий (модерация, черновики, без фото) */}
       {attentionEvents && attentionEvents.length > 0 && (
-        <SectionCard title="Требует внимания">
+        <SectionCard title="События с замечаниями">
           <div className="divide-y">
             {attentionEvents.map((event) => {
               const badges: { label: string; color: string }[] = [];

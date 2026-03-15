@@ -103,7 +103,6 @@ async function main() {
   const recon = new SupplierReconciliationService(prismaService);
   await recon.reconcileReport(report.id);
 
-  // eslint-disable-next-line no-console
   console.log('Seed supplier finance done', {
     operatorId: operator.id,
     reportId: report.id,
@@ -112,7 +111,6 @@ async function main() {
 
 main()
   .catch((e) => {
-    // eslint-disable-next-line no-console
     console.error(e);
     process.exit(1);
   })

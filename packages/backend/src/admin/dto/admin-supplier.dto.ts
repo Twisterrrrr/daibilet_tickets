@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
-import { PaymentMode, SupplierRole } from '@prisma/client';
+import { PaymentMode, PspFeeMode, SupplierRole } from '@prisma/client';
 
 export class UpdateSupplierDto {
   @ApiPropertyOptional({ description: 'Trust level: 0, 1, 2' })

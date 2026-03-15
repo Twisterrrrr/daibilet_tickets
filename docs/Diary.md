@@ -4,6 +4,50 @@
 
 ---
 
+## 15.03.2026 — Phase 2–5: Orders UX, Availability, Listing Health, Витрина SupplierDailyStat
+
+### Наблюдения
+
+- Phase 2 (Supplier Orders): экспорт и эскалация готовы; нужно было «приземлить» в UI бейджи и кнопку «Нужна помощь».
+- Phase 3 (Availability): массовое изменение вместимости (bulk capacity) — критичный предохранитель от овербукинга.
+- Phase 4 (Quality): Listing Health уже считал замечания; не хватало прямых ссылок на исправление (actionUrl) и панели в дашборде.
+- Phase 5 (Analytics): агрегаты по PaymentIntent при большом числе заказов нагружали БД; нужна предрасчитанная витрина и быстрые тренды для графиков.
+
+### Решения
+
+- **O2.2 (бейдж спорности):** В `GET /supplier/orders` добавлен флаг `hasActiveDispute` по открытым тикетам поддержки (orderCode). В UI supplier — бейдж «Есть обращение по заказу».
+- **O2.3 (эскалация):** Кнопка «Нужна помощь по заказу» в списке заказов открывает форму с предзаполненным orderCode; отправка в `POST /support/request`.
+- **T3.1 (Bulk Capacity):** `PATCH /supplier/events/:eventId/sessions/bulk-capacity` (sessionIds, newCapacity); проверка newCapacity >= soldQty; ответ updatedIds + failed[]. Frontend Availability уже был готов (чекбоксы, модалка).
+- **Q4.1 (Listing Health actionUrl):** В HealthIssue добавлено поле actionUrl; для NO_PHOTO, NO_SESSIONS, NO_PRICE, WEAK_DESC, VENUE_GAPS заданы ссылки на /events/:id/edit#… и /availability?eventId=…. Dashboard загружает `GET /supplier/listing-health` и выводит блок «Качество листингов» со ссылками «Исправить». Availability читает eventId из URL для автовыбора события.
+- **Техдолг:** Исправлен TS2322 в supplier-document.service.ts (payloadJson as Prisma.InputJsonValue).
+- **Phase 5 — Витрина:** Модель `SupplierDailyStat` (operatorId, date, ordersCount, grossAmountCents, platformFeeCents, supplierAmountCents, viewsCount, conversionRate). Cron в 00:05 UTC заполняет вчера; trigger при переходе PaymentIntent в PAID инкрементирует строку «сегодня» (incrementToday). Dashboard читает из витрины с fallback на PaymentIntent. Эндпоинты: `GET /supplier/stats/daily?days=30`, `GET /supplier/analytics/sales-chart` (30 дней для Chart.js), backfillDateRange для скрипта. Документы: SupplierDailyStat-Design.md, Admin-Health-Dashboard-Design.md (задел под «падающих» поставщиков).
+
+### Проблемы
+
+- Нет. Backfill витрины выполнять скриптом/эндпоинтом по одному дню, не одним большим запросом.
+
+---
+
+## 15.03.2026 — P3.1: Налоговый слой и документы (Tax Matrix, нумерация, payload)
+
+### Наблюдения
+
+- P3 (Legal Profile & Bank Snapshot) закрыт: снапшоты реквизитов в отчётах и выплатах, gating выплат по статусу VERIFIED.
+- Требовалось довести P3.1 до «бухгалтерской готовности»: автоматический расчёт НДС и комиссии по налоговому режиму, нумерация документов, единый payload для фронта и шаблонов.
+
+### Решения
+
+- **Tax Matrix (P3.1-2):** `tax.config.ts` — TAX_MATRIX по режимам OSNO/USN_6/USN_15/AUSN/NPD; `tax-calculations.ts` — vatFromGross, commissionFromGross (единый источник формул). Юнит-тесты tax.config.spec.ts (22 теста) на ОСНО, УСН, НПД, комиссию до/после налогов, краевые кейсы.
+- **Нумерация (P3.1-3):** DocumentNumberService.nextNumber(operatorId, year, type) → формат ГГГГ-XXXXXX; типы INVOICE, UPD_1, UPD_2, AGENT_REPORT; изоляция по оператору и году. Юнит-тесты document-number.service.spec.ts (9 тестов). Вызов при генерации AGENT_REPORT в SupplierDocumentService.
+- **Payload (P3.1-4):** buildVatDocumentPayload строит totals и lines по матрице; в generateDocumentsForReport payload и snapshotJson содержат честные netAmount, vatAmount, commissionAmount. В payload добавлены customer (заглушка под контрагента) и npd (для NPD — receiptUrl/receiptNumber, при needsNpdReceiptLink).
+- **Документация:** finance.md — новый раздел 6.5 «Налоговый слой и документы»: описание buildVatDocumentPayload, нумерации, структуры snapshotJson для фронта. Tasktracker: P3.1-2, P3.1-3 отмечены выполненными; P3.1-4/5 в процессе/документация.
+
+### Проблемы
+
+- Нет. Расширение payload для полноценных INVOICE/UPD_2 и заполнение customer/npd из конфига или профиля — в бэклоге (P3.1-4 хвосты).
+
+---
+
 ## 12.03.2026 — Phase 8: Integrations / Extension Points
 
 ### Наблюдения

@@ -13,6 +13,7 @@ import type {
   PurchaseListItemDto,
   UpdateAccountProfileDto,
 } from './dto/account.dto';
+import type { CheckoutSessionWithRelations } from './purchase-read.service';
 import { PurchaseReadService } from './purchase-read.service';
 
 @Injectable()
@@ -104,7 +105,7 @@ export class AccountService {
         : new Map<string, string>();
 
     const items: PurchaseListItemDto[] = sessions.map((s) =>
-      this.purchaseRead.mapSessionToPurchase(s as any, {
+      this.purchaseRead.mapSessionToPurchase(s as CheckoutSessionWithRelations, {
         appUrl,
         sessionStartsAtMap,
       }),

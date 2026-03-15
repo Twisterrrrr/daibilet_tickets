@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { CatalogModule } from '../catalog/catalog.module';
 import { UserModule } from '../user/user.module';
+import { SupplierModule } from '../supplier/supplier.module';
 import { SupplierLedgerService } from '../ledger/supplier-ledger.service';
 import { MailModule } from '../mail/mail.module';
 import { PricingModule } from '../pricing/pricing.module';
@@ -19,7 +20,7 @@ import { RefundService } from './refund.service';
 import { WebhookIdempotencyService } from './webhook-idempotency.service';
 
 @Module({
-  imports: [CatalogModule, MailModule, PricingModule, UserModule],
+  imports: [CatalogModule, MailModule, PricingModule, UserModule, SupplierModule],
   controllers: [CheckoutController],
   providers: [
     CheckoutService,

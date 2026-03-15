@@ -20,6 +20,7 @@ const NAV: { to: string; icon: React.ComponentType<{ className?: string }>; labe
   [
     { to: '/', icon: LayoutDashboard, label: 'Дашборд' },
     { to: '/events', icon: Calendar, label: 'Мои события' },
+    { to: '/availability', icon: Calendar, label: 'Наличие' },
     { to: '/orders', icon: FileText, label: 'Заказы' },
     { to: '/reviews', icon: MessageSquare, label: 'Отзывы', badgeKey: 'reviews' },
     { to: '/notifications', icon: Bell, label: 'Уведомления', badgeKey: 'notifications' },

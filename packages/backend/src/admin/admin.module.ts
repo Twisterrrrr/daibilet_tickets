@@ -50,6 +50,7 @@ import { AdminPromoCodesController } from './admin-promo-codes.controller';
 import { AdminSourceCategoriesController } from './admin-source-categories.controller';
 import { AdminReportsController } from './admin-reports.controller';
 import { AdminPayoutsController } from './admin-payouts.controller';
+import { AdminFinanceController } from './admin-finance.controller';
 import { AdminSupplierDisputesController } from './admin-supplier-disputes.controller';
 import { AdminListingHealthController } from './admin-listing-health.controller';
 import { AdminAvailabilityController } from './admin-availability.controller';
@@ -110,6 +111,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminSourceCategoriesController,
     AdminReportsController,
     AdminPayoutsController,
+    AdminFinanceController,
     AdminSupplierDisputesController,
     AdminAvailabilityController,
     AdminListingHealthController,

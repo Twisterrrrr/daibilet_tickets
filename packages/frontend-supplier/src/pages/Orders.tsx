@@ -22,6 +22,7 @@ interface SupplierOrder {
   expiresAt: string | null;
   createdAt: string;
   confirmedAt?: string | null;
+  hasActiveDispute?: boolean;
 }
 
 interface OrdersResponse {
@@ -180,10 +181,29 @@ export default function OrdersPage() {
                     </td>
                     <td className="px-2 py-2 align-top text-sm">{o.quantity}</td>
                     <td className="px-2 py-2 align-top text-xs">
-                      {o.status === 'PENDING' && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">В ожидании</span>}
-                      {o.status === 'CONFIRMED' && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">Подтверждён</span>}
-                      {o.status === 'REJECTED' && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-700">Отклонён</span>}
-                      {o.status === 'EXPIRED' && <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">Истёк</span>}
+                      <div className="space-y-1">
+                        <div>
+                          {o.status === 'PENDING' && (
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">В ожидании</span>
+                          )}
+                          {o.status === 'CONFIRMED' && (
+                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">Подтверждён</span>
+                          )}
+                          {o.status === 'REJECTED' && (
+                            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-700">Отклонён</span>
+                          )}
+                          {o.status === 'EXPIRED' && (
+                            <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">Истёк</span>
+                          )}
+                        </div>
+                        {o.hasActiveDispute && (
+                          <div>
+                            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                              Есть обращение по заказу
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-2 py-2 align-top text-xs text-slate-600">{formatDate(o.createdAt)}</td>
                     <td className="px-2 py-2 align-top text-xs text-slate-600">
@@ -195,28 +215,57 @@ export default function OrdersPage() {
                       )}
                     </td>
                     <td className="px-2 py-2 align-top text-right text-xs">
-                      {o.status === 'PENDING' ? (
-                        <div className="flex justify-end gap-1">
+                      <div className="flex flex-col items-end gap-1">
+                        {o.status === 'PENDING' ? (
+                          <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              disabled={actionLoadingId === o.id}
+                              onClick={() => handleConfirm(o.id)}
+                              className="rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+                            >
+                              Подтвердить
+                            </button>
+                            <button
+                              type="button"
+                              disabled={actionLoadingId === o.id}
+                              onClick={() => handleReject(o.id)}
+                              className="rounded-md bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 disabled:opacity-50"
+                            >
+                              Отклонить
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                        {o.shortCode && (
                           <button
                             type="button"
-                            disabled={actionLoadingId === o.id}
-                            onClick={() => handleConfirm(o.id)}
-                            className="rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+                            onClick={() => {
+                              const orderInfo = o.shortCode ? ` (заказ ${o.shortCode})` : '';
+                              const defaultMessage = `Опишите, что произошло${orderInfo}:`;
+                              const message = window.prompt('Нужна помощь по заказу? Опишите, что произошло:', defaultMessage);
+                              if (!message) return;
+                              void api
+                                .post('/support/request', {
+                                  name: 'Поставщик',
+                                  email: '', // будет заполнен менеджером поддержки по контексту
+                                  orderCode: o.shortCode,
+                                  message,
+                                })
+                                .then(() => {
+                                  window.alert('Обращение в поддержку создано. Мы свяжемся с вами по этому заказу.');
+                                })
+                                .catch(() => {
+                                  window.alert('Не удалось отправить обращение. Попробуйте позже.');
+                                });
+                            }}
+                            className="rounded-md border px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
                           >
-                            Подтвердить
+                            Нужна помощь по заказу
                           </button>
-                          <button
-                            type="button"
-                            disabled={actionLoadingId === o.id}
-                            onClick={() => handleReject(o.id)}
-                            className="rounded-md bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 disabled:opacity-50"
-                          >
-                            Отклонить
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

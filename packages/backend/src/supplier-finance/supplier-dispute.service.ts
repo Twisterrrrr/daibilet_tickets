@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, SupplierDisputeStatus, SupplierDisputeReasonCategory } from '@prisma/client';
 
+import type { FinanceMetaJson } from '../common/finance.types';
+
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -46,9 +48,9 @@ export class SupplierDisputeService {
       });
 
       // При открытии спора отчёт де-факто считается DISPUTED, но дата акцепта не обнуляется.
-      const existingMeta = (report.metaJson as Prisma.JsonObject | null) ?? {};
-      const history: Prisma.InputJsonValue[] = Array.isArray((existingMeta as any).history)
-        ? ([...(existingMeta as any).history] as Prisma.InputJsonValue[])
+      const existingMeta = ((report.metaJson as Prisma.JsonObject | null) ?? {}) as unknown as FinanceMetaJson;
+      const history: Prisma.InputJsonValue[] = Array.isArray(existingMeta.history)
+        ? ([...existingMeta.history] as Prisma.InputJsonValue[])
         : [];
 
       history.push({
@@ -63,7 +65,7 @@ export class SupplierDisputeService {
         where: { id: params.reportId },
         data: {
           metaJson: {
-            ...existingMeta,
+            ...(existingMeta as Record<string, unknown>),
             disputeStatus: dispute.status,
             disputeId: dispute.id,
             history,
@@ -88,7 +90,7 @@ export class SupplierDisputeService {
   async resolveDispute(params: {
     disputeId: string;
     resolvedByAdminId: string;
-    status: Exclude<SupplierDisputeStatus, 'OPEN' | 'UNDER_REVIEW'>;
+    status: SupplierDisputeStatus;
     resolutionText?: string;
   }) {
     const dispute = await this.prisma.supplierDispute.findUnique({
@@ -115,9 +117,9 @@ export class SupplierDisputeService {
       });
 
       if (report) {
-        const existingMeta = (report.metaJson as Prisma.JsonObject | null) ?? {};
-        const history: Prisma.InputJsonValue[] = Array.isArray((existingMeta as any).history)
-          ? ([...(existingMeta as any).history] as Prisma.InputJsonValue[])
+        const existingMeta = ((report.metaJson as Prisma.JsonObject | null) ?? {}) as unknown as FinanceMetaJson;
+        const history: Prisma.InputJsonValue[] = Array.isArray(existingMeta.history)
+          ? ([...existingMeta.history] as Prisma.InputJsonValue[])
           : [];
 
         history.push({
@@ -132,7 +134,7 @@ export class SupplierDisputeService {
           where: { id: dispute.supplierReportId },
           data: {
             metaJson: {
-              ...existingMeta,
+              ...(existingMeta as Record<string, unknown>),
               disputeStatus: updated.status,
               disputeId: updated.id,
               history,

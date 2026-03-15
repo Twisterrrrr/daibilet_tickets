@@ -384,6 +384,49 @@ P3 делает финконтур юридически чистым: всегд
   - `SupplierDocument.payloadJson.document.number`,
   - при необходимости — в отдельное текстовое поле `documentNumber` для поиска/фильтрации.
 
+#### 6.5. Налоговый слой и документы (реализация P3.1)
+
+**Точка сборки:** расчёты налогов и формирование payload документов автоматизированы и опираются на Tax Matrix и единый модуль формул. Ниже — как это устроено в коде и что попадает в snapshot для фронта.
+
+**Источники истины:**
+
+- **`tax.config.ts`** — `TAX_MATRIX: Record<TaxMode, TaxBehavior>`: для каждого режима (OSNO, USN_6, USN_15, AUSN, NPD) заданы `requiresVat`, `defaultVatRate`, `mainDocumentType`, `needsInvoice`, `needsNpdReceiptLink`. Логика «какой документ и как считать НДС» не размазана по коду, а декларирована в матрице.
+- **`tax-calculations.ts`** — единственное место формул:
+  - `vatFromGross(grossAmount, vatRatePercent)` → `{ net, vat }` (формула: net = gross / (1 + rate/100), vat = gross - net; краевые кейсы: нулевая сумма, rate=0);
+  - `commissionFromGross(grossAmount, commissionPercent, options?)` → комиссия до налогов (от gross) или после (от net при `commissionAfterVat: true`).
+- Юнит-тесты **`tax.config.spec.ts`** (22 теста) фиксируют ОСНО (выделение НДС), УСН (vat=0), НПД (флаг «налог у поставщика»), агентскую комиссию до/после налогов и краевые кейсы (деление на ноль, нулевая сумма).
+
+**`buildVatDocumentPayload` (P3.1-4):**
+
+- **Вход:** `grossAmount`, `commissionRatePercent`, `legalProfile` (snapshot из отчёта: taxMode, isVatPayer, defaultVatRate и др.).
+- **Логика:** по `legalProfile.taxMode` выбирается поведение из TAX_MATRIX; net/vat считаются через `vatFromGross`, комиссия — через `commissionFromGross` (для ОСНО комиссия считается после выделения НДС).
+- **Выход:** `{ totals, lines }`:
+  - `totals`: `grossAmount`, `netAmount`, `vatAmount`, `commissionAmount`, `vatText` («в т.ч. НДС» / «Без НДС»), `documentType` (UPD_1 / ACT_NO_VAT / AGENT_REPORT_ONLY);
+  - `lines`: массив строк документа с полями `description`, `quantity`, `unit`, `price`, `amount`, `vatRate`, `vatAmount`, `amountWithVat`.
+- Вызов: в `SupplierDocumentService.generateDocumentsForReport(reportId)` payload и итоги документа формируются через `buildVatDocumentPayload`; эти же значения попадают в `payloadJson` и в файл `JSON_SNAPSHOT` (snapshot для фронта и шаблонов).
+
+**Нумерация документов (P3.1-3):**
+
+- **`DocumentNumberService.nextNumber({ operatorId, year, type })`** возвращает строку формата **`ГГГГ-XXXXXX`** (год + 6 цифр с ведущими нулями).
+- Типы: `INVOICE`, `UPD_1`, `UPD_2`, `AGENT_REPORT` — у каждого своя последовательность в разрезе (operatorId, year).
+- Хранение: таблица `DocumentSequence` (operatorId, year, type, lastNumber); при смене года создаётся новая запись, первый номер года — 000001.
+- Изоляция: разные операторы и разные типы документов не делят один счётчик; юнит-тесты **`document-number.service.spec.ts`** (9 тестов) проверяют изоляцию по operatorId, смену года и независимость последовательностей по типу.
+- При генерации AGENT_REPORT вызывается `nextNumber(..., type: 'AGENT_REPORT')`; полученный номер записывается в `payloadJson.document.number` и в заголовок документа.
+
+**Что попадает в snapshotJson / payloadJson (для фронта и шаблонов):**
+
+- **supplier** — id, name, inn, commissionRate (из snapshot отчёта или Operator).
+- **legalProfile** — срез юр. профиля на момент отчёта (legalName, inn, kpp, ogrn, legalAddress, taxMode, isVatPayer, defaultVatRate, signerFullName, signerPosition).
+- **period** — start, end (период отчёта).
+- **totals** — рассчитанные по матрице: `grossAmount`, `netAmount`, `vatAmount`, `commissionAmount`, `refundAmount`, `vatText`.
+- **lines** — строки отчёта (type, referenceType, referenceId, amount, netAmount).
+- **vatDocument** — результат buildVatDocumentPayload: `documentType`, `lines` (строки с НДС), `totals` (дублируют итоги с vatText и documentType).
+- **document** — `number` (ГГГГ-XXXXXX), `date`, `type` (AGENT_REPORT и т.д.).
+- **customer** — (опционально) реквизиты контрагента/платформы для счёта/УПД; в текущей реализации — заглушка под будущее заполнение из конфига или профиля Daibilet.
+- **npd** — (опционально) для режима NPD: `receiptUrl`, `receiptNumber` (ссылка на чек самозанятого); в TAX_MATRIX для NPD задано `needsNpdReceiptLink: true`, при расширении генерации документов для НПД этот блок заполняется.
+
+Фронт может опираться на `payloadJson` (или JSON_SNAPSHOT файла документа): все суммы и НДС уже рассчитаны по матрице, номер документа уникален в разрезе оператор/год/тип.
+
 ### 7. VAT Transition Strategy (мягкое включение НДС)
 
 Чтобы не ломать существующие отчёты и не вводить сразу полноценные НДС‑документы, применяется поэтапная стратегия:

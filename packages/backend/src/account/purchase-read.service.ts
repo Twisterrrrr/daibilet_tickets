@@ -6,7 +6,7 @@ import type { PurchaseListItemDto } from './dto/account.dto';
 import { derivePurchaseActions, getPurchaseDisplayType } from './purchase-display.util';
 import { TicketCapabilityService } from './ticket-capability.service';
 
-type CheckoutSessionWithRelations = Prisma.CheckoutSessionGetPayload<{
+export type CheckoutSessionWithRelations = Prisma.CheckoutSessionGetPayload<{
   include: {
     paymentIntents: true;
     fulfillmentItems: true;

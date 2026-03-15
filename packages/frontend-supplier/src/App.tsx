@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { isAuthenticated } from './lib/api';
 import Dashboard from './pages/Dashboard';
 import EventEdit from './pages/events/EventEdit';
+import Availability from './pages/Availability';
 import EventsList from './pages/events/EventsList';
 import Layout from './pages/Layout';
 import OrdersPage from './pages/Orders';
@@ -36,6 +37,7 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="availability" element={<Availability />} />
         <Route path="events" element={<EventsList />} />
         <Route path="events/new" element={<EventEdit />} />
         <Route path="events/:id" element={<EventEdit />} />

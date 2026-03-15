@@ -4,18 +4,21 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 import { CatalogModule } from '../catalog/catalog.module';
 import { QUEUE_EMAILS, QUEUE_FULFILLMENT, QUEUE_REVIEW_TASKS, QUEUE_SYNC } from '../queue/queue.constants';
+import { SupplierModule } from '../supplier/supplier.module';
 import { FulfillmentSchedulerService } from './fulfillment-scheduler.service';
 import { OrderExpiryService } from './order-expiry.service';
 import { RetentionService } from './retention.service';
 import { ReviewSchedulerService } from './review-scheduler.service';
 import { SchedulerService } from './scheduler.service';
 import { SessionStatsService } from './session-stats.service';
+import { SupplierDailyStatSchedulerService } from './supplier-daily-stat-scheduler.service';
 import { TagAssignmentService } from './tag-assignment.service';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     CatalogModule,
+    SupplierModule,
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_REVIEW_TASKS },
@@ -31,6 +34,7 @@ import { TagAssignmentService } from './tag-assignment.service';
     TagAssignmentService,
     FulfillmentSchedulerService,
     SessionStatsService,
+    SupplierDailyStatSchedulerService,
   ],
   exports: [TagAssignmentService],
 })

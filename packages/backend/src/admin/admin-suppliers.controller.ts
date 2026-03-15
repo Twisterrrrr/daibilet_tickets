@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -28,7 +29,6 @@ import {
   UpdateSupplierUserRoleDto,
   UpdateOperatorPaymentSettingsDto,
 } from './dto/admin.dto';
-import { AuditService } from './audit.service';
 import { AuditService } from './audit.service';
 
 @ApiTags('admin')

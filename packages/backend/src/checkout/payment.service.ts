@@ -20,6 +20,7 @@ import { randomUUID } from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupplierLedgerService } from '../ledger/supplier-ledger.service';
+import { SupplierDailyStatService } from '../supplier/supplier-daily-stat.service';
 import { PromoCodeService } from '../pricing/promo-code.service';
 import { partitionCart, SnapshotLineItem } from './cart-partitioning';
 import { tryTransitionCheckout, tryTransitionPayment } from './checkout-state-machine';
@@ -39,6 +40,7 @@ export class PaymentService {
     private readonly mailService: MailService,
     private readonly supplierLedger: SupplierLedgerService,
     private readonly promoCodes: PromoCodeService,
+    private readonly dailyStat: SupplierDailyStatService,
   ) {
     this.appUrl =
       process.env.NODE_ENV === 'production'
@@ -238,12 +240,12 @@ export class PaymentService {
         description: `Заказ ${session.shortCode}`,
         metadata: {
           paymentIntentId: key,
-          checkoutSessionId,
-          paymentMode,
-          agentSchemeEnabled,
-          splitEnabled,
-          supplierId,
-          pspFeeMode,
+          checkoutSessionId: String(checkoutSessionId),
+          paymentMode: paymentMode ?? 'SINGLE_MERCHANT',
+          agentSchemeEnabled: String(!!agentSchemeEnabled),
+          splitEnabled: String(!!splitEnabled),
+          supplierId: supplierId ?? '',
+          pspFeeMode: pspFeeMode ?? 'PLATFORM_PAYS',
         },
         supplierId,
         supplierAmount,
@@ -396,6 +398,24 @@ export class PaymentService {
 
       return updatedIntent;
     }).then(async (updatedIntent) => {
+      // Real-time витрина: инкремент строки «сегодня» для дашборда (без блокировки ответа)
+      if (
+        updatedIntent.supplierId &&
+        intent.provider !== 'EXTERNAL' &&
+        (updatedIntent.supplierAmount ?? 0) > 0
+      ) {
+        this.dailyStat
+          .incrementToday(updatedIntent.supplierId, {
+            ordersCount: 1,
+            grossAmountCents: updatedIntent.grossAmount ?? 0,
+            platformFeeCents: updatedIntent.platformFee ?? 0,
+            supplierAmountCents: updatedIntent.supplierAmount ?? 0,
+          })
+          .catch((e) =>
+            this.logger.warn(`SupplierDailyStat.incrementToday failed: ${e instanceof Error ? e.message : String(e)}`),
+          );
+      }
+
       // T25: при PAID → order-confirmed. Ошибка письма не ломает checkout.
       const session = await this.prisma.checkoutSession.findUnique({
         where: { id: intent.checkoutSessionId },

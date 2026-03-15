@@ -8,6 +8,8 @@ export interface HealthIssue {
   message: string;
   field?: string;
   eventId?: string;
+  /** Ссылка «Исправить» в ЛК поставщика */
+  actionUrl?: string;
 }
 
 export interface EventHealth {
@@ -151,6 +153,7 @@ export class ListingHealthService {
         message: 'Нет главного фото события',
         field: 'imageUrl',
         eventId: event.id,
+        actionUrl: `/events/${event.id}/edit#photos`,
       });
       penalty += 15;
     }
@@ -162,6 +165,7 @@ export class ListingHealthService {
         message: 'Описание короче 200 символов',
         field: 'description',
         eventId: event.id,
+        actionUrl: `/events/${event.id}/edit#description`,
       });
       penalty += 10;
     }
@@ -176,6 +180,7 @@ export class ListingHealthService {
           message: 'Нет будущих активных сеансов',
           field: 'sessions',
           eventId: event.id,
+          actionUrl: `/availability?eventId=${event.id}`,
         });
         penalty += 20;
       }
@@ -190,6 +195,7 @@ export class ListingHealthService {
         message: 'Не указана цена события',
         field: 'priceFrom',
         eventId: event.id,
+        actionUrl: `/events/${event.id}/edit#prices`,
       });
       penalty += 15;
     }
@@ -200,6 +206,7 @@ export class ListingHealthService {
         message: 'У площадки не заполнен адрес',
         field: 'venue.address',
         eventId: event.id,
+        actionUrl: `/events/${event.id}/edit#venue`,
       });
       penalty += 5;
     }

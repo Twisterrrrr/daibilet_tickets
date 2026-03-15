@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Query, Req, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SupplierDisputeStatus } from '@prisma/client';
 
@@ -69,7 +69,7 @@ export class AdminSupplierDisputesController {
     @Body() body: ResolveSupplierDisputeDto,
   ) {
     if (!RESOLVE_STATUSES.includes(body.status)) {
-      throw new Error('Invalid dispute status');
+      throw new BadRequestException('Invalid dispute status');
     }
 
     return this.disputes.resolveDispute({

@@ -95,6 +95,19 @@ export class AdminPayoutsController {
       throw new BadRequestException('Выплата заблокирована из-за открытого спора по отчёту');
     }
 
+    // При переходе в PAID — проверяем, что юр. профиль поставщика подтверждён.
+    if (body.status === 'PAID') {
+      const payoutWithProfile = await this.prisma.supplierPayoutRequest.findUnique({
+        where: { id },
+        include: { operator: { include: { legalProfile: true } } },
+      });
+      if (payoutWithProfile?.operator.legalProfile?.status !== 'VERIFIED') {
+        throw new BadRequestException(
+          'Нельзя выплатить: профиль поставщика не подтверждён (INCOMPLETE)',
+        );
+      }
+    }
+
     // Простой сценарий: только смена статуса (без проводки)
     if (body.status !== 'PAID') {
       return this.prisma.supplierPayoutRequest.update({

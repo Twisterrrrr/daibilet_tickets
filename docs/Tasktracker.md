@@ -27,6 +27,14 @@
 
 > Сводка выполненных работ по темам. Исторические детали — `docs/archive/Diary.md`.
 
+## Phase 2–5: Orders UX, Availability, Listing Health, Витрина (15.03.2026) ✅
+
+- **Phase 2 (O2.2/O2.3):** hasActiveDispute в GET /supplier/orders по SupportTicket (orderCode); кнопка «Нужна помощь по заказу» → POST /support/request с orderCode. Экспорт заказов: GET /supplier/orders/export (dateFrom/dateTo или preset, лимит 5000, stream CSV).
+- **Phase 3 (T3.1):** PATCH /supplier/events/:eventId/sessions/bulk-capacity (sessionIds, newCapacity), защита newCapacity >= soldQty; UI Availability — чекбоксы, модалка, отчёт.
+- **Phase 4 (Q4.1):** actionUrl в HealthIssue (NO_PHOTO → edit#photos, NO_SESSIONS → /availability?eventId=…, NO_PRICE → edit#prices и др.); блок «Качество листингов» на Dashboard со ссылками «Исправить»; Availability читает eventId из URL.
+- **Phase 5 (SupplierDailyStat):** Витрина supplier_daily_stats; cron 00:05 UTC; incrementToday при PAID; Dashboard и тренды из витрины с fallback. GET /supplier/stats/daily, GET /supplier/analytics/sales-chart. Документы: SupplierDailyStat-Design.md, Admin-Health-Dashboard-Design.md.
+- **Техдолг:** supplier-document.service.ts — payloadJson as Prisma.InputJsonValue; npx tsc --noEmit без ошибок.
+
 ## Checkout + Smart UX (C0–C7) + E2E validation (06.03.2026) ✅
 
 - **C0–C7 реализованы:** контракты ошибок, read API, smart sorting (bestOption зафиксирован), checkout + redirect, holds (в т.ч. AWAITING_PAYMENT), paid = PackageItem + FulfillmentItem, webhook, precomputed stats (soldLast24h), last-customer snapshot.
@@ -501,6 +509,21 @@
 
 - **Приоритет:** Высокий
 
+### 🟦 P3: Legal Profile & Bank Snapshot (сводка)
+
+- [x] **P3-1: Prisma Models** — Сущности созданы.
+- [x] **P3-2: Snapshots** — Снапшоты пишутся в Report и PayoutRequest.
+- [~] **P3-3: Admin API/UX** — Очередь на верификацию: `GET …/profiles?status=INCOMPLETE`; смена статуса через `PATCH …/status`. Осталось: запись в metaJson.history при аппруве/отклонении; Admin UI (вкладка реквизитов в карточке поставщика).
+- [x] **P3-4: Supplier API** — API + тесты + gating. Осталось: UI-блок «Реквизиты» на дашборде поставщика.
+- [x] **P3-5: Invariants** — Блокировка выплат на стороне поставщика и админа реализована (без VERIFIED — нельзя создать payout; без VERIFIED нельзя перевести выплату в PAID).
+- [x] **P3-6: Docs** — Актуализировано.
+
+### 🛠 Tech Debt / Refactoring
+
+- [x] **Zero Errors** — ESLint проходит без ошибок.
+- [x] **Zero Warnings** — Целевая зачистка `any` в `account.service` и `supplier.controller` завершена.
+- [x] **Strict Typing (Point 9)** — Принят стандарт «No new any». Оставшиеся `any` (4 места) изолированы в `csv-stream.util` и `admin-checkout` под `eslint-disable` с обоснованием.
+
 ### Вход в P3 (что уже есть после P1–P2)
 
 - [x] Леджер поставщика (`SupplierLedgerEntry`, `SupplierLedgerService`) — источник истины по движениям.
@@ -510,61 +533,71 @@
 
 ### P3‑Checklist — Legal Profile & Bank Snapshot
 
-- [ ] **P3-1 — Prisma: Legal Profile & Bank Accounts**
-  - [ ] Модель `SupplierLegalProfile` (1–1 к `Operator`): `legalName`, `legalAddress`, `inn`, `kpp`, `ogrn`, `taxMode`, `vatPercent`, `signerFullName`, `signerPosition`, `financeEmail`, `docsEmail`, `status` (`DRAFT`/`INCOMPLETE`/`VERIFIED`/`REJECTED`).
-  - [ ] Модель `SupplierBankAccount` (N–1 к `SupplierLegalProfile`): `bankName`, `bik`, `accountNumber`, `correspondentAccount`, `isPrimary`.
-  - [ ] Миграции применены, `prisma generate` проходит.
+- [x] **P3-1 — Prisma: Legal Profile & Bank Accounts**
+  - [x] Модель `SupplierLegalProfile` (1–1 к `Operator`): `legalName`, `legalAddress`, `inn`, `kpp`, `ogrn`, `taxMode`, `vatPercent`, `signerFullName`, `signerPosition`, `financeEmail`, `docsEmail`, `status` (`DRAFT`/`INCOMPLETE`/`VERIFIED`/`REJECTED`).
+  - [x] Модель `SupplierBankAccount` (N–1 к `SupplierLegalProfile`): `bankName`, `bik`, `accountNumber`, `correspondentAccount`, `isPrimary`.
+  - [x] Миграции применены, `prisma generate` проходит.
 
-- [ ] **P3-2 — Snapshot в отчётах и выплатах**
-  - [ ] `SupplierReport.snapshotJson` содержит вложенный блок `legalProfile` (юридические реквизиты и налоговый режим на момент генерации отчёта).
-  - [ ] `SupplierPayoutRequest` (либо отдельная snapshot‑структура) хранит `bankAccountSnapshot` с реквизитами счёта на момент создания/проведения payout.
-  - [ ] При изменении `SupplierLegalProfile`/`SupplierBankAccount` уже созданные отчёты/документы и выплаты продолжают читать данные только из snapshot’ов.
+- [x] **P3-2 — Snapshot в отчётах и выплатах**
+  - [x] `SupplierReport.snapshotJson` содержит вложенный блок `legalProfile` (юридические реквизиты и налоговый режим на момент генерации отчёта).
+  - [x] `SupplierPayoutRequest` (либо отдельная snapshot‑структура) хранит `bankAccountSnapshot` с реквизитами счёта на момент создания/проведения payout.
+  - [x] При изменении `SupplierLegalProfile`/`SupplierBankAccount` уже созданные отчёты/документы и выплаты продолжают читать данные только из snapshot’ов.
 
-- [ ] **P3-3 — Admin API/UX**
-  - [ ] Admin: `GET/PUT /admin/suppliers/:id/legal-profile` (чтение/редактирование профиля, статусы, базовая валидация ИНН/БИК).
-  - [ ] Admin: `GET/POST/PATCH /admin/suppliers/:id/bank-accounts` (CRUD счетов, ровно один `isPrimary=true`).
+- [~] **P3-3 — Admin API/UX**
+  - [x] Admin: `GET /admin/finance/suppliers/profiles` — список профилей с фильтром по статусу (в т.ч. `?status=INCOMPLETE` — очередь на верификацию).
+  - [x] Admin: `GET /admin/finance/suppliers/profiles/:operatorId` — деталка профиля со всеми счетами.
+  - [x] Admin: `PATCH /admin/finance/suppliers/profiles/:operatorId/status` — смена статуса (VERIFIED с фиксацией verifiedBy/verifiedAt; REJECTED с обязательным comment).
+  - [ ] Admin: при PATCH status — запись в metaJson.history (кто из админов аппрувнул/отклонил); при необходимости поле metaJson в SupplierLegalProfile.
+  - [ ] Admin: CRUD счетов оператора (PATCH/DELETE банковских счетов) — при необходимости отдельная задача.
   - [ ] Admin UI: вкладка «Юр. профиль / Реквизиты» в `SupplierDetail` с отображением текущего статуса и primary‑счёта.
 
-- [ ] **P3-4 — Supplier API/UX**
-  - [ ] Supplier: `GET/PUT /supplier/profile/legal` — просмотр/редактирование собственных юр. данных (в рамках допустимого статуса).
-  - [ ] Supplier: `GET/POST/PATCH /supplier/profile/bank-accounts` — управление своими счетами (но без возможности менять snapshot старых payout’ов).
-  - [ ] Supplier Dashboard: блок «Реквизиты» с подсказкой, если профиль не `VERIFIED` или отсутствует primary‑счёт.
+- [x] **P3-4 — Supplier API/UX**
+  - [x] Supplier: `GET/PATCH /supplier/profile/legal` — просмотр/редактирование собственных юр. данных (ИНН/КПП/ОГРН, emails); при изменении статус профиля сбрасывается в `INCOMPLETE`.
+  - [x] Supplier: `GET/POST /supplier/profile/bank-accounts` — управление своими счетами (создание, переключение primary, без изменения snapshot старых payout’ов).
+  - [ ] Supplier Dashboard: блок «Реквизиты» с подсказкой, если профиль не `VERIFIED` или отсутствует primary‑счёт (оставлено на UI-доработку).
 
-- [ ] **P3-5 — Инварианты и валидация**
-  - [ ] Нельзя создать payout, если нет `SupplierLegalProfile` в статусе `VERIFIED` и настроенного primary‑банковского счёта.
-  - [ ] При смене primary‑счёта новые payouts используют новые реквизиты, старые payout’ы остаются привязаны к своему snapshot.
-  - [ ] Миграции и код не ломают существующие P1–P2 сценарии (тесты backend проходят).
+- [x] **P3-5 — Инварианты и валидация**
+  - [x] Нельзя создать payout, если нет `SupplierLegalProfile` в статусе `VERIFIED` и настроенного primary‑банковского счёта.
+  - [x] При смене primary‑счёта новые payouts используют новые реквизиты, старые payout’ы остаются привязаны к своему snapshot.
+  - [x] При смене статуса выплаты на PAID в админке проверяется `operator.legalProfile?.status === 'VERIFIED'`; иначе BadRequest.
+  - [x] Миграции и код не ломают существующие P1–P2 сценарии (тесты backend проходят).
 
-- [ ] **P3-6 — Документация**
-  - [ ] `finance.md`: раздел P3 обновлён (описание моделей, snapshot‑логики и API).
-  - [ ] `Project.md`: упоминание P3 в блоке Supplier Finance.
-  - [ ] `Diary.md`: отдельная запись по завершению P3 с принятыми решениями и найденными проблемами.
+- [x] **P3-6 — Документация**
+  - [x] `finance.md`: раздел P3 обновлён (описание моделей, snapshot‑логики и API).
+  - [x] `Project.md`: упоминание P3 в блоке Supplier Finance.
+  - [x] `Diary.md`: отдельная запись по завершению P3 с принятыми решениями и найденными проблемами.
 
-### P3.1 — Tax & VAT Layer (надстройка P3)
+### Что дальше: P3.1 — Tax & VAT Layer (надстройка P3)
+
+Самый «бухгалтерский» блок. Рекомендуемый порядок: начать с **P3.1-2 (Tax Matrix)** и юнит-тестов для краевых кейсов расчётов (УСН vs ОСНО, НПД, агентская схема); затем P3.1-1 (расширение профиля), P3.1-3 (нумерация документов), P3.1-4 (payload Счёт/УПД в SupplierDocumentService).
+
+### P3.1‑Checklist
 
 - [ ] **P3.1-1 — Расширение налогового профиля**
   - [ ] Prisma: добавить enum `TaxMode { OSNO, USN_6, USN_15, AUSN, NPD }` и поля `taxMode`, `isVatPayer`, `defaultVatRate` в `SupplierLegalProfile`.
   - [ ] Миграция применена, `prisma generate` проходит.
   - [ ] Snapshot в `SupplierReport.snapshotJson.legalProfile` содержит `taxMode`, `isVatPayer`, `defaultVatRate`.
 
-- [ ] **P3.1-2 — Tax Matrix (декларативная логика)**
-  - [ ] Создан `tax.config.ts` с `TAX_MATRIX: Record<TaxMode, TaxBehavior>` (поведение по режимам, а не if/else по строкам).
-  - [ ] `TaxBehavior` как минимум описывает: `requiresVat`, `defaultVatRate`, `mainDocumentType`, `needsInvoice`, `needsNpdReceiptLink`.
-  - [ ] Юнит‑тесты на Tax Matrix для базовых режимов (OSNO, USN, NPD).
+- [x] **P3.1-2 — Tax Matrix (декларативная логика)**
+  - [x] Создан `tax.config.ts` с `TAX_MATRIX: Record<TaxMode, TaxBehavior>` (поведение по режимам, а не if/else по строкам).
+  - [x] `TaxBehavior` как минимум описывает: `requiresVat`, `defaultVatRate`, `mainDocumentType`, `needsInvoice`, `needsNpdReceiptLink`.
+  - [x] Юнит‑тесты на Tax Matrix для базовых режимов (OSNO, USN, NPD): `tax.config.spec.ts` (22 теста) — ОСНО (выделение НДС, net/vat), УСН (vat 0), НПД (флаг «налог у поставщика»), агентская комиссия до/после налогов, краевые кейсы (нулевая сумма, деление на ноль). Добавлен `tax-calculations.ts` (vatFromGross, commissionFromGross) как единый источник формул.
 
-- [ ] **P3.1-3 — Нумерация НДС‑документов**
-  - [ ] Prisma: модель `DocumentSequence` (operatorId, year, type, lastNumber).
-  - [ ] Сервис `DocumentNumberService` с методом `nextNumber({ operatorId, year, type })` → строка `YYYY-000001`.
-  - [ ] Юнит‑тесты: последовательная выдача номеров и работа в нескольких потоках (минимальный happy‑path).
+- [x] **P3.1-3 — Нумерация НДС‑документов**
+  - [x] Prisma: модель `DocumentSequence` (operatorId, year, type, lastNumber).
+  - [x] Сервис `DocumentNumberService` с методом `nextNumber({ operatorId, year, type })` → строка `ГГГГ-XXXXXX`. Типы: INVOICE, UPD_1, UPD_2, AGENT_REPORT.
+  - [x] Вызов `nextNumber` в `SupplierDocumentService.generateDocumentsForReport` при генерации AGENT_REPORT.
+  - [x] Юнит‑тесты: `document-number.service.spec.ts` (9 тестов) — формат YYYY-XXXXXX, изоляция по operatorId, смена года (новый год = 000001), независимые последовательности по типу (AGENT_REPORT/INVOICE/UPD_1/UPD_2).
 
-- [ ] **P3.1-4 — Заготовка payload НДС‑документов**
-  - [ ] Выделен helper (например, `buildVatDocumentPayload`) поверх `SupplierReport` + `TaxBehavior`, возвращающий структуру `{ supplier, customer, document, lines, totals, npd? }`.
-  - [ ] В `SupplierDocumentService` добавлен (пока не вызываемый в прод‑коде) каркас формирования payload для типов `INVOICE`/`UPD_1`/`UPD_2` с использованием helper’а.
-  - [ ] Формулы расчёта НДС «в том числе» и округления до 2 знаков зафиксированы и покрыты тестами.
-
-- [ ] **P3.1-5 — Документация**
-  - [ ] `finance.md`: раздел «P3.1 — Tax & VAT Layer» с таблицей соответствия TaxMode → поведение и пример payload счёта‑фактуры/УПД.
-  - [ ] `Diary.md`: запись о включении налогового слоя (решения по Tax Matrix, расчёту НДС и нумерации документов).
+- [~] **P3.1-4 — Заготовка payload НДС‑документов**
+  - [x] Выделен `buildVatDocumentPayload` поверх TAX_MATRIX и `tax-calculations`; возвращает totals (netAmount, vatAmount, commissionAmount) и lines.
+  - [x] В `SupplierDocumentService.generateDocumentsForReport` payload и snapshot формируются через `buildVatDocumentPayload`; в snapshotJson — честные netAmount, vatAmount, commission по матрице.
+  - [x] Формулы НДС и округление в `tax-calculations.ts`, покрыты тестами (tax.config.spec.ts).
+  - [ ] Расширение payload для INVOICE/UPD_2 и полей customer/npd при необходимости.
+- [~] **P3.1-5 — Документация**
+  - [x] `finance.md`: раздел 6.5 «Налоговый слой и документы» — логика buildVatDocumentPayload, нумерация (DocumentNumberService, ГГГГ-XXXXXX, привязка к оператору/году/типу), структура snapshotJson для фронта; таблица TaxMode в 6.2 сохранена.
+  - [x] `Diary.md`: запись 15.03.2026 по P3.1 (Tax Matrix, нумерация, payload, customer/npd).
+  - [ ] При необходимости: отдельный подраздел с примером payload счёта‑фактуры/УПД в finance.md.
 
 
 ---
@@ -727,3 +760,26 @@
 - [ ] **ACC-4 — Docs**
   - [ ] `finance.md`: раздел P2 дополнен подпунктами Acceptance Flow и History (edge‑кейсы, блокировка акцепта при споре).
   - [ ] `Architecture.md`: описан контракт `POST /supplier/finance/reports/:id/accept` и связь со спорами/историей.
+
+---
+
+## Gate — Content / PageTemplateSpecs (C-Gate)
+
+Связан с Phase 4 (Listing Health). Приоритет: **Средний**.
+
+- [ ] **C-1 — Admin: поля шаблонов и политики возврата**
+  - [ ] В админ-формах Event и Venue добавить поля:
+    - `contentTemplateData` (Event), `venueTemplateData` (Venue) — JSON, редактируемый (textarea или JSON-редактор).
+    - `refundPolicy` — текст/ссылка, где применимо.
+  - [ ] Сохранение через существующие API create/update без изменения контрактов.
+
+- [ ] **C-2 — Валидация JSON при create/update**
+  - [ ] При создании/обновлении Event применять `parseEventContentTemplateData` (полная валидация JSON).
+  - [ ] При создании/обновлении Venue применять `parseVenueTemplateData` (полная валидация JSON).
+  - [ ] При невалидном JSON возвращать 400 с понятным сообщением.
+
+- [ ] **C-3 — ageLimit / minAge**
+  - [ ] Зафиксировать в коде и документации: возрастное ограничение = `Event.minAge` (единый источник истины, без дублирования поля `ageLimit`).
+
+- [ ] **C-4 — Docs (опционально)**
+  - [ ] В `Project.md` или `Architecture.md` — одна секция/подпункт про Content Gate (PageTemplateSpecs, валидация шаблонов в админке).
