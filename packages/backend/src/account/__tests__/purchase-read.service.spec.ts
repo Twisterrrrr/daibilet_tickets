@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { PurchaseReadService } from '../purchase-read.service';
+import { TicketCapabilityService } from '../ticket-capability.service';
 
 describe('PurchaseReadService.mapSessionToPurchase', () => {
-  const service = new PurchaseReadService();
+  const ticketCapability = new TicketCapabilityService();
+  const service = new PurchaseReadService(ticketCapability as any);
 
   function makeSession(overrides: Partial<any> = {}): any {
     const now = new Date();

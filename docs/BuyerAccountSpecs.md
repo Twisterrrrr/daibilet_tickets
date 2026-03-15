@@ -76,7 +76,7 @@
 - **Ticket** — отдельной сущности для checkout нет; «билет» = наличие trackUrl или externalPaymentUrl / артефакта. Показывать в UI только если реально есть что открыть.
 
 Единый экран «Мои покупки» — **presentation layer**: агрегат по CheckoutSession + PaymentIntent + FulfillmentItem. В БД сущности не объединять.
-В реализации MVP агрегат оформлен в виде read‑сервиса `PurchaseReadService` + маппер `PurchaseReadService.mapSessionToPurchase`, который собирает `PurchaseListItemDto`.
+В реализации MVP агрегат оформлен в виде read‑сервиса `PurchaseReadService` + маппер `PurchaseReadService.mapSessionToPurchase`, который собирает `PurchaseListItemDto`. Артефакты билетов/ваучеров для отображения нормализуются через `TicketCapabilityService.getTicketCapability(session, appUrl)`.
 
 ## 6. Привязка заказа к пользователю
 
@@ -165,13 +165,14 @@
 - `FulfillmentItem` — слой **Fulfillment** (purchaseFlow, status, внешние ссылки).
 - `PurchaseListItemDto`/`PurchaseReadService` формируют **Purchase read‑model** для `/account/purchases`.
   Маппинг типа карточки и доступных действий вынесен в `getPurchaseDisplayType` + `derivePurchaseActions` с unit‑тестами.
-  Наличие «артефакта билета» (что реально можно открыть) нормализовано через helper `computeTicketAvailable` (trackUrl или externalUrl) и также покрыто тестами.
+  Наличие «артефакта билета» (что реально можно открыть) нормализовано через helper `computeTicketAvailable` (trackUrl или externalUrl) и каркас сервиса `TicketCapabilityService`, который собирает артефакты и используется в `PurchaseReadService`. Всё покрыто unit‑тестами.
 
 ## 13. Тестовая матрица Buyer Account (backend)
 
 - **Unit-тесты:**
   - `purchase-display.util.spec.ts` — правила `getPurchaseDisplayType`, `derivePurchaseActions`, `computeTicketAvailable`.
-  - `purchase-read.service.spec.ts` — маппинг `CheckoutSession` → `PurchaseListItemDto` для INTERNAL_TICKET, EXTERNAL_VOUCHER, BOOKING_CONFIRMATION, AWAITING_PAYMENT.
+  - `purchase-read.service.spec.ts` — маппинг `CheckoutSession` → `PurchaseListItemDto` для INTERNAL_TICKET, EXTERNAL_VOUCHER, BOOKING_CONFIRMATION, AWAITING_PAYMENT (через `TicketCapabilityService`).
+  - `ticket-capability.service.spec.ts` — артефакты билетов/ваучеров и флаги доступности (internal ticket, external voucher, отсутствие артефактов).
 - **Controller-level (mini-e2e) тесты:**
   - `account.e2e.spec.ts` — контракты `/account/purchases`, `/account/orders`, `/account/orders/:id` (включая 403 при чужом заказе), `/account/tickets`.
   - `track-order.e2e.spec.ts` — публичный трекинг `/checkout/track/:shortCode`.

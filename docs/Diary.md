@@ -150,7 +150,7 @@
 
 ---
 
-## 15.03.2026 — Buyer Account V2: read‑model, capability‑хелперы и тесты
+## 15.03.2026 — Buyer Account V2: read‑model, capability‑хелперы, artifact‑layer и тесты
 
 ### Наблюдения
 
@@ -164,8 +164,9 @@
 - Capability‑слой для отображения покупок оформлен через утилиты:
   - `getPurchaseDisplayType` — определяет тип карточки (INTERNAL_TICKET, EXTERNAL_VOUCHER, BOOKING_CONFIRMATION, AWAITING_PAYMENT, MANUAL_CONFIRMATION) и человекочитаемый статус.
   - `derivePurchaseActions` — вычисляет primary/secondary действия (открытие билета, ваучера, трекинга, оплату).
-  - `computeTicketAvailable` — явно определяет, есть ли «артефакт билета» (trackUrl или externalUrl), и используется в `PurchaseReadService` вместо inline‑логики.
-- Добавлены unit‑тесты для capability‑слоя (`purchase-display.util.spec.ts`, `purchase-read.service.spec.ts`) и mini-e2e‑тесты для:
+  - `computeTicketAvailable` — явно определяет, есть ли «артефакт билета» (trackUrl или externalUrl).
+- Добавлен каркас artifact‑layer в виде сервиса `TicketCapabilityService`, который собирает артефакты (`TicketArtifact`) поверх CheckoutSession/fulfillment и используется в `PurchaseReadService` для вычисления `ticketAvailable` и выдачи primary артефакта (при этом бизнес‑поведение осталось таким же, как у существующей логики).
+- Добавлены unit‑тесты для capability‑слоя (`purchase-display.util.spec.ts`, `ticket-capability.service.spec.ts`, `purchase-read.service.spec.ts`) и mini-e2e‑тесты для:
   - `/account/purchases` (возврат списка покупок с типами карточек),
   - `/account/orders`, `/account/orders/:id` (включая проброс `ForbiddenException` при чужом заказе),
   - `/account/tickets` (контракт списка билетов для текущего пользователя),

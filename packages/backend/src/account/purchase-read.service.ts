@@ -3,7 +3,8 @@ import { Injectable } from '@nestjs/common';
 import type { PaymentStatus, Prisma } from '@prisma/client';
 
 import type { PurchaseListItemDto } from './dto/account.dto';
-import { computeTicketAvailable, derivePurchaseActions, getPurchaseDisplayType } from './purchase-display.util';
+import { derivePurchaseActions, getPurchaseDisplayType } from './purchase-display.util';
+import { TicketCapabilityService } from './ticket-capability.service';
 
 type CheckoutSessionWithRelations = Prisma.CheckoutSessionGetPayload<{
   include: {
@@ -19,6 +20,8 @@ export interface PurchaseReadContext {
 
 @Injectable()
 export class PurchaseReadService {
+  constructor(private readonly ticketCapability: TicketCapabilityService) {}
+
   mapSessionToPurchase(session: CheckoutSessionWithRelations, ctx: PurchaseReadContext): PurchaseListItemDto {
     const lastIntent = session.paymentIntents[0];
     const paymentStatus = (lastIntent?.status ?? 'PENDING') as PaymentStatus;
@@ -49,12 +52,9 @@ export class PurchaseReadService {
       hasTrack,
     });
 
-    const ticketAvailable = computeTicketAvailable({
-      sessionStatus: session.status,
-      hasTrack,
-      hasExternalUrl,
-      trackUrl,
-      externalUrl,
+    const capability = this.ticketCapability.getTicketCapability({
+      session,
+      appUrl: ctx.appUrl,
     });
 
     const { primaryAction, secondaryAction } = derivePurchaseActions({
@@ -72,7 +72,7 @@ export class PurchaseReadService {
       eventDate,
       displayStatus,
       purchaseType,
-      ticketAvailable,
+      ticketAvailable: capability.hasArtifact,
       primaryAction,
       secondaryAction,
     };

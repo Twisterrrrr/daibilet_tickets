@@ -33,16 +33,16 @@
 ### Buyer Account (Личный кабинет покупателя)
 
 - **Цель:** единая точка входа для заказов, билетов и профиля пользователя.
-- **Backend:** модуль `AccountModule` (`AccountController`, `AccountService`, `PurchaseReadService`):
+- **Backend:** модуль `AccountModule` (`AccountController`, `AccountService`, `PurchaseReadService`, `TicketCapabilityService`):
   - `/account/me` — сводка ЛК (пользователь, количество заказов, активных билетов, избранное).
-  - `/account/purchases` — read‑model `PurchaseListItemDto` на базе `CheckoutSession` + `PaymentIntent` + `FulfillmentItem`.
+  - `/account/purchases` — read‑model `PurchaseListItemDto` на базе `CheckoutSession` + `PaymentIntent` + `FulfillmentItem` + artifact‑layer.
   - `/account/orders`, `/account/orders/:id` — список и деталь заказов с проверкой ownership по `userId`.
   - `/account/tickets` — плоский список билетов (`AccountTicketItemDto`) по оплаченным сессиям.
-- **Read‑model:** `PurchaseReadService.mapSessionToPurchase` агрегирует сессию, платёж и fulfilment в DTO:
+- **Read‑model и artifact‑layer:** `PurchaseReadService.mapSessionToPurchase` агрегирует сессию, платёж и fulfilment в DTO:
   - тип карточки и статус вычисляются через `getPurchaseDisplayType`,
   - доступные действия — через `derivePurchaseActions`,
-  - наличие «артефакта билета» (trackUrl или externalUrl) — через helper `computeTicketAvailable`.
-- **Тесты:** unit‑тесты для capability‑слоя (`purchase-display.util`, `purchase-read.service`) и mini-e2e для `/account/purchases`, `/account/orders`, `/account/orders/:id` (в т.ч. Forbidden), `/account/tickets`, `/checkout/track/:shortCode`.
+  - наличие «артефакта билета» (что реально можно открыть) нормализуется helper’ом `computeTicketAvailable` и сервисом `TicketCapabilityService.getTicketCapability`, который собирает артефакты билета/ваучера поверх CheckoutSession/fulfillment.
+- **Тесты:** unit‑тесты для capability‑слоя (`purchase-display.util`, `ticket-capability.service`, `purchase-read.service`) и mini-e2e для `/account/purchases`, `/account/orders`, `/account/orders/:id` (в т.ч. Forbidden), `/account/tickets`, `/checkout/track/:shortCode`.
 
 ## Интеграции
 
