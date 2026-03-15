@@ -6,11 +6,12 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { UserModule } from '../user/user.module';
 import { AccountController } from './account.controller';
 import { AccountService } from './account.service';
+import { PurchaseReadService } from './purchase-read.service';
 
 @Module({
   imports: [ConfigModule, PrismaModule, UserModule, CheckoutModule],
   controllers: [AccountController],
-  providers: [AccountService],
+  providers: [AccountService, PurchaseReadService],
   exports: [AccountService],
 })
 export class AccountModule {}

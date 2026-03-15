@@ -13,7 +13,7 @@ import type {
   PurchaseListItemDto,
   UpdateAccountProfileDto,
 } from './dto/account.dto';
-import { getPurchaseDisplayType } from './purchase-display.util';
+import { PurchaseReadService } from './purchase-read.service';
 
 @Injectable()
 export class AccountService {
@@ -23,6 +23,7 @@ export class AccountService {
     private readonly checkoutService: CheckoutService,
     private readonly userAuth: UserAuthService,
     private readonly userFavorites: UserFavoritesService,
+    private readonly purchaseRead: PurchaseReadService,
   ) {}
 
   async getSummary(userId: string): Promise<AccountSummaryDto> {
@@ -102,62 +103,12 @@ export class AccountService {
             .then((list) => new Map(list.map((e) => [e.id, e.startsAt.toISOString()])))
         : new Map<string, string>();
 
-    const items: PurchaseListItemDto[] = sessions.map((s) => {
-      const lastIntent = s.paymentIntents[0];
-      const paymentStatus = lastIntent?.status ?? 'PENDING';
-      const snapshot = (s.offersSnapshot as Array<{
-        eventTitle?: string;
-        sessionId?: string;
-        quantity?: number;
-      }>) ?? [];
-      const firstSnap = snapshot[0];
-      const eventTitle = firstSnap?.eventTitle ?? 'Покупка';
-      const firstSessionId = firstSnap?.sessionId;
-      const eventDate = firstSessionId ? sessionStartsAtMap.get(firstSessionId) ?? null : null;
-
-      const hasExternalUrl = s.fulfillmentItems.some((f) => f.externalPaymentUrl);
-      const hasTrack = s.status === 'COMPLETED';
-      const trackUrl = hasTrack ? `${appUrl}/orders/track?code=${s.shortCode}` : null;
-      const externalUrl = s.fulfillmentItems.find((f) => f.externalPaymentUrl)?.externalPaymentUrl ?? null;
-      const isExternalFlow = s.fulfillmentItems.some((f) => f.purchaseFlow === 'EXTERNAL');
-
-      const { purchaseType, displayStatus } = getPurchaseDisplayType({
-        sessionStatus: s.status,
-        paymentStatus,
-        isExternalFlow,
-        hasExternalUrl,
-        hasTrack,
-      });
-      const ticketAvailable =
-        (hasTrack && trackUrl !== null) || (hasExternalUrl && externalUrl !== null);
-
-      let primaryAction: { label: string; url: string } | null = null;
-      let secondaryAction: { label: string; url: string } | null = null;
-
-      if (purchaseType === 'INTERNAL_TICKET' && trackUrl) {
-        primaryAction = { label: 'Открыть билет', url: trackUrl };
-      } else if (purchaseType === 'EXTERNAL_VOUCHER' && externalUrl) {
-        primaryAction = { label: 'Посмотреть ваучер', url: externalUrl };
-        if (trackUrl) secondaryAction = { label: 'Открыть трекинг', url: trackUrl };
-      } else if (purchaseType === 'BOOKING_CONFIRMATION' && trackUrl) {
-        primaryAction = { label: 'Открыть трекинг', url: trackUrl };
-      } else if (purchaseType === 'AWAITING_PAYMENT' && lastIntent?.paymentUrl) {
-        primaryAction = { label: 'Оплатить', url: lastIntent.paymentUrl };
-      }
-
-      return {
-        purchaseId: s.id,
-        shortCode: s.shortCode,
-        eventTitle,
-        purchaseDate: s.createdAt.toISOString(),
-        eventDate,
-        displayStatus,
-        purchaseType,
-        ticketAvailable,
-        primaryAction,
-        secondaryAction,
-      };
-    });
+    const items: PurchaseListItemDto[] = sessions.map((s) =>
+      this.purchaseRead.mapSessionToPurchase(s as any, {
+        appUrl,
+        sessionStartsAtMap,
+      }),
+    );
 
     return { items, total };
   }

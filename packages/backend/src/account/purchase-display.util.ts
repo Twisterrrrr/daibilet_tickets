@@ -48,3 +48,35 @@ export function getPurchaseDisplayType(input: PurchaseDisplayInput): PurchaseDis
   return { purchaseType: 'MANUAL_CONFIRMATION', displayStatus: 'В обработке' };
 }
 
+export interface PurchaseActionsInput {
+  purchaseType: PurchaseDisplayType;
+  lastIntentPaymentUrl: string | null;
+  trackUrl: string | null;
+  externalUrl: string | null;
+}
+
+export interface PurchaseActionsResult {
+  primaryAction: { label: string; url: string } | null;
+  secondaryAction: { label: string; url: string } | null;
+}
+
+export function derivePurchaseActions(input: PurchaseActionsInput): PurchaseActionsResult {
+  const { purchaseType, lastIntentPaymentUrl, trackUrl, externalUrl } = input;
+
+  let primaryAction: { label: string; url: string } | null = null;
+  let secondaryAction: { label: string; url: string } | null = null;
+
+  if (purchaseType === 'INTERNAL_TICKET' && trackUrl) {
+    primaryAction = { label: 'Открыть билет', url: trackUrl };
+  } else if (purchaseType === 'EXTERNAL_VOUCHER' && externalUrl) {
+    primaryAction = { label: 'Посмотреть ваучер', url: externalUrl };
+    if (trackUrl) secondaryAction = { label: 'Открыть трекинг', url: trackUrl };
+  } else if (purchaseType === 'BOOKING_CONFIRMATION' && trackUrl) {
+    primaryAction = { label: 'Открыть трекинг', url: trackUrl };
+  } else if (purchaseType === 'AWAITING_PAYMENT' && lastIntentPaymentUrl) {
+    primaryAction = { label: 'Оплатить', url: lastIntentPaymentUrl };
+  }
+
+  return { primaryAction, secondaryAction };
+}
+
