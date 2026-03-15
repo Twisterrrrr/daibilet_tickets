@@ -18,6 +18,7 @@ import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
 import { PostEditQueueService } from './postedit-queue.service';
 import { RefundPolicyResolutionService } from './refund-policy-resolution.service';
+import { ListingHealthService } from './listing-health.service';
 import { TepSyncService } from './tep-sync.service';
 
 @Module({
@@ -39,6 +40,7 @@ import { TepSyncService } from './tep-sync.service';
     PostEditQueueService,
     EventQualityService,
     RefundPolicyResolutionService,
+    ListingHealthService,
   ],
   exports: [
     CatalogService,
@@ -55,6 +57,7 @@ import { TepSyncService } from './tep-sync.service';
     PostEditQueueService,
     EventQualityService,
     RefundPolicyResolutionService,
+    ListingHealthService,
   ],
 })
 export class CatalogModule {}
