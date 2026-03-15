@@ -513,7 +513,7 @@
 
 - [x] **P3-1: Prisma Models** — Сущности созданы.
 - [x] **P3-2: Snapshots** — Снапшоты пишутся в Report и PayoutRequest.
-- [~] **P3-3: Admin API/UX** — Очередь на верификацию: `GET …/profiles?status=INCOMPLETE`; смена статуса через `PATCH …/status`. Осталось: запись в metaJson.history при аппруве/отклонении; Admin UI (вкладка реквизитов в карточке поставщика).
+- [~] **P3-3: Admin API/UX** — Очередь на верификацию: `GET …/profiles?status=INCOMPLETE`; смена статуса через `PATCH …/status`. Admin UI: вкладка «Финансы и реквизиты» в карточке поставщика реализована. Осталось: запись в metaJson.history при аппруве/отклонении; при необходимости CRUD счетов.
 - [x] **P3-4: Supplier API** — API + тесты + gating. Осталось: UI-блок «Реквизиты» на дашборде поставщика.
 - [x] **P3-5: Invariants** — Блокировка выплат на стороне поставщика и админа реализована (без VERIFIED — нельзя создать payout; без VERIFIED нельзя перевести выплату в PAID).
 - [x] **P3-6: Docs** — Актуализировано.
@@ -549,7 +549,7 @@
   - [x] Admin: `PATCH /admin/finance/suppliers/profiles/:operatorId/status` — смена статуса (VERIFIED с фиксацией verifiedBy/verifiedAt; REJECTED с обязательным comment).
   - [ ] Admin: при PATCH status — запись в metaJson.history (кто из админов аппрувнул/отклонил); при необходимости поле metaJson в SupplierLegalProfile.
   - [ ] Admin: CRUD счетов оператора (PATCH/DELETE банковских счетов) — при необходимости отдельная задача.
-  - [ ] Admin UI: вкладка «Юр. профиль / Реквизиты» в `SupplierDetail` с отображением текущего статуса и primary‑счёта.
+  - [x] Admin UI: вкладка «Финансы и реквизиты» в `SupplierDetail` — статус, юр. данные, счета (primary ⭐), история, кнопки Одобрить/Отклонить (модалка с комментарием). Компонент `SupplierLegalProfileView`.
 
 - [x] **P3-4 — Supplier API/UX**
   - [x] Supplier: `GET/PATCH /supplier/profile/legal` — просмотр/редактирование собственных юр. данных (ИНН/КПП/ОГРН, emails); при изменении статус профиля сбрасывается в `INCOMPLETE`.

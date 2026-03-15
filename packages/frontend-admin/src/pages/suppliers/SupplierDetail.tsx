@@ -8,6 +8,7 @@ import { adminApi } from '@/api/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SupplierEventsTab } from './SupplierEventsTab';
+import { SupplierLegalProfileView } from './SupplierLegalProfileView';
 
 export function SupplierDetailPage() {
   const { id } = useParams();
@@ -72,7 +73,7 @@ export function SupplierDetailPage() {
     }
   };
 
-  const currentTab = (searchParams.get('tab') as 'general' | 'events' | 'api') || 'general';
+  const currentTab = (searchParams.get('tab') as 'general' | 'events' | 'finance' | 'api') || 'general';
 
   if (!supplier) return <div className="animate-pulse">Загрузка...</div>;
 
@@ -172,6 +173,7 @@ export function SupplierDetailPage() {
         <TabsList>
           <TabsTrigger value="general">Общее</TabsTrigger>
           <TabsTrigger value="events">События</TabsTrigger>
+          <TabsTrigger value="finance">Финансы и реквизиты</TabsTrigger>
           <TabsTrigger value="api">API</TabsTrigger>
         </TabsList>
 
@@ -298,6 +300,10 @@ export function SupplierDetailPage() {
 
         <TabsContent value="events">
           <SupplierEventsTab supplierId={id!} />
+        </TabsContent>
+
+        <TabsContent value="finance">
+          <SupplierLegalProfileView operatorId={id!} />
         </TabsContent>
 
         <TabsContent value="api" className="space-y-4">

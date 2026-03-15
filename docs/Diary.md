@@ -28,6 +28,48 @@
 
 ---
 
+## 15.03.2026 — Проверка фаз 1–5 и исправление ошибок
+
+### Наблюдения
+
+- В тестах PaymentService создаётся без 6-го аргумента (SupplierDailyStatService), из-за чего в markPaid падало при вызове `this.dailyStat.incrementToday`.
+- В frontend-supplier Availability.tsx использовался проп `action` у SectionCard; в shared-ui допустим только `headerRight`.
+- E2E supplier-legal-profile.e2e.spec.ts импортирует supertest, пакет не в devDependencies — при запуске vitest падала загрузка файла.
+
+### Решения
+
+- **payment.service.ts:** перед вызовом incrementToday добавлена проверка `this.dailyStat`; в unit/e2e тестах сервис по-прежнему создаётся без dailyStat — вызов не выполняется, тесты проходят.
+- **Availability.tsx:** проп `action` заменён на `headerRight` (и корректный тернарный вывод), типы shared-ui соблюдены.
+- **supplier-legal-profile.e2e.spec.ts:** файл исключён в vitest.config.ts (exclude), в начале файла добавлен комментарий: для запуска нужен supertest в devDependencies.
+
+### Проверка фаз 1–5
+
+- **Phase 1:** Dashboard (GET /supplier/dashboard) — trust, activeEventsLimit, dailyStat.getTotalsForOperator + fallback на PaymentIntent, listingHealth, attention; supplier-trust.service.spec.ts проходит.
+- **Phase 2:** listOrders — hasActiveDispute по SupportTicket (orderCode); orders/export — стрим CSV, preset/dateFrom/dateTo, лимит 93 дня/5000; POST /support/request с orderCode; UI Orders — бейдж и кнопка «Нужна помощь».
+- **Phase 3:** PATCH bulk-capacity — проверка newCapacity >= soldQty, updatedIds/failed; Availability — headerRight с кнопкой, модалка, eventId из URL.
+- **Phase 4:** ListingHealthService — actionUrl для NO_PHOTO, NO_SESSIONS, NO_PRICE, WEAK_DESC, VENUE_GAPS; Dashboard — блок «Качество листингов» со ссылками по actionUrl.
+- **Phase 5:** SupplierDailyStat, cron 00:05 UTC, incrementToday при PAID (с проверкой this.dailyStat); GET stats/daily, GET analytics/sales-chart; Dashboard читает из витрины с fallback.
+
+---
+
+## 15.03.2026 — P3-3: Admin UI «Финансы и реквизиты» (карточка поставщика)
+
+### Наблюдения
+
+- Backend для верификации юр. профилей уже был: GET/PATCH /admin/finance/suppliers/profiles/:operatorId. Админ мог менять статус только через Postman/БД.
+
+### Решения
+
+- **Вкладка «Финансы и реквизиты»** в `SupplierDetail` (frontend-admin): таб `finance`, контент — компонент `SupplierLegalProfileView`.
+- **SupplierLegalProfileView:** загрузка профиля по operatorId; empty state при отсутствии профиля; секции: статус (бейдж INCOMPLETE/VERIFIED/REJECTED), юр. данные и контакты (две колонки), банковские счета (основной ⭐ и бейдж «Основной»), история (таймлайн по verifiedAt/rejectionComment); action bar: «Одобрить», «Отклонить» с модалкой и обязательным комментарием. PATCH status после успеха с refetch.
+- **Документация:** Tasktracker P3-3 обновлён — пункт Admin UI отмечен выполненным.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 15.03.2026 — P3.1: Налоговый слой и документы (Tax Matrix, нумерация, payload)
 
 ### Наблюдения
