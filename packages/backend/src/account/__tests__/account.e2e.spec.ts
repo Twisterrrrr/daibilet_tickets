@@ -3,7 +3,7 @@
  * /account/purchases и /account/orders/:id.
  */
 
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, ForbiddenException, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 
@@ -56,6 +56,11 @@ class TestAccountController {
   getOrderDetail(@Req() req: { user: { id: string } }, @Param('id') id: string) {
     return this.account.getOrderDetail(req.user.id, id);
   }
+
+  @Get('tickets')
+  getTickets(@Req() req: { user: { id: string } }) {
+    return this.account.getTickets(req.user.id);
+  }
 }
 
 class FakeAccountService implements Partial<AccountService> {
@@ -100,8 +105,20 @@ class FakeAccountService implements Partial<AccountService> {
     return Promise.resolve({ id, ownerId: userId, shortCode: 'CS-1' });
   }
 
-  getTickets() {
-    return Promise.resolve([]);
+  getTickets(userId: string) {
+    return Promise.resolve([
+      {
+        orderId: 's1',
+        shortCode: 'CS-1',
+        eventTitle: 'Test ticket',
+        eventSlug: 'test-event',
+        sessionStartsAt: null,
+        status: 'CONFIRMED',
+        trackUrl: `http://localhost/orders/track?code=CS-1`,
+        externalPaymentUrl: null,
+        userId,
+      },
+    ]);
   }
 
   getProfile(userId: string) {
@@ -123,10 +140,30 @@ describe('AccountController E2E (minimal)', () => {
     expect(body.items[0].purchaseType).toBe('INTERNAL_TICKET');
   });
 
+  it('GET /account/tickets returns ticket list for current user', async () => {
+    const body = await controller.getTickets({ user: { id: 'user-1' } });
+    expect(body.length).toBe(1);
+    expect(body[0].shortCode).toBe('CS-1');
+    expect(body[0].trackUrl).toContain('CS-1');
+  });
+
   it('GET /account/orders/:id returns order detail', async () => {
     const body = await controller.getOrderDetail({ user: { id: 'user-1' } }, 'order-1');
     expect(body.id).toBe('order-1');
     expect(body.ownerId).toBe('user-1');
+  });
+
+  it('GET /account/orders/:id propagates ForbiddenException from service for foreign order', async () => {
+    class ForbiddenAccountService extends FakeAccountService {
+      override getOrderDetail(): Promise<never> {
+        throw new ForbiddenException('Доступ запрещён');
+      }
+    }
+    const ctrl = new TestAccountController(new ForbiddenAccountService() as AccountService);
+
+    expect(() => ctrl.getOrderDetail({ user: { id: 'user-1' } }, 'foreign-order')).toThrow(
+      ForbiddenException,
+    );
   });
 });
 

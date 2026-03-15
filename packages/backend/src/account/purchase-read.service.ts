@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import type { PaymentStatus, Prisma } from '@prisma/client';
 
 import type { PurchaseListItemDto } from './dto/account.dto';
-import { derivePurchaseActions, getPurchaseDisplayType } from './purchase-display.util';
+import { computeTicketAvailable, derivePurchaseActions, getPurchaseDisplayType } from './purchase-display.util';
 
 type CheckoutSessionWithRelations = Prisma.CheckoutSessionGetPayload<{
   include: {
@@ -49,7 +49,13 @@ export class PurchaseReadService {
       hasTrack,
     });
 
-    const ticketAvailable = (hasTrack && !!trackUrl) || (hasExternalUrl && !!externalUrl);
+    const ticketAvailable = computeTicketAvailable({
+      sessionStatus: session.status,
+      hasTrack,
+      hasExternalUrl,
+      trackUrl,
+      externalUrl,
+    });
 
     const { primaryAction, secondaryAction } = derivePurchaseActions({
       purchaseType,

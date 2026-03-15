@@ -65,5 +65,53 @@ describe('PurchaseReadService.mapSessionToPurchase', () => {
     expect(dto.ticketAvailable).toBe(true);
     expect(dto.primaryAction?.label).toBe('Посмотреть ваучер');
   });
+
+  it('maps completed booking without artifacts as internal ticket with track-only artifact', () => {
+    const session = makeSession({
+      status: 'COMPLETED',
+      paymentIntents: [
+        {
+          status: 'PAID',
+          paymentUrl: null,
+        },
+      ],
+      fulfillmentItems: [],
+    });
+    const ctx = {
+      appUrl: 'http://localhost:3000',
+      sessionStartsAtMap: new Map<string, string>(),
+    };
+
+    const dto = service.mapSessionToPurchase(session, ctx);
+
+    expect(dto.purchaseType).toBe('INTERNAL_TICKET');
+    // hasTrack=true даёт trackUrl, поэтому ticketAvailable=true как "есть что открыть"
+    expect(dto.ticketAvailable).toBe(true);
+  });
+
+  it('marks awaiting payment purchase with pay action when paymentUrl is present', () => {
+    const session = makeSession({
+      status: 'AWAITING_PAYMENT',
+      paymentIntents: [
+        {
+          status: 'PENDING',
+          paymentUrl: 'https://pay.example/session/awaiting',
+        },
+      ],
+      fulfillmentItems: [],
+    });
+    const ctx = {
+      appUrl: 'http://localhost:3000',
+      sessionStartsAtMap: new Map<string, string>(),
+    };
+
+    const dto = service.mapSessionToPurchase(session, ctx);
+
+    expect(dto.purchaseType).toBe('AWAITING_PAYMENT');
+    expect(dto.displayStatus).toBe('Ожидает оплаты');
+    expect(dto.ticketAvailable).toBe(false);
+    expect(dto.primaryAction?.label).toBe('Оплатить');
+    expect(dto.primaryAction?.url).toBe('https://pay.example/session/awaiting');
+  });
 });
 

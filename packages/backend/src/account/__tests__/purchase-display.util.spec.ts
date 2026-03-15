@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  computeTicketAvailable,
   derivePurchaseActions,
   getPurchaseDisplayType,
   type PurchaseActionsResult,
@@ -88,6 +89,30 @@ describe('getPurchaseDisplayType', () => {
     expect(r.displayStatus).toBe('Бронирование подтверждено');
   });
 
+  it('treats completed external booking without artifacts as booking confirmation', () => {
+    const r = getPurchaseDisplayType({
+      sessionStatus: 'COMPLETED',
+      paymentStatus: 'PAID',
+      isExternalFlow: true,
+      hasExternalUrl: false,
+      hasTrack: false,
+    });
+    expect(r.purchaseType).toBe('BOOKING_CONFIRMATION');
+    expect(r.displayStatus).toBe('Бронирование подтверждено');
+  });
+
+  it('does not create pay action when awaiting payment but paymentUrl is missing', () => {
+    const r = getPurchaseDisplayType({
+      sessionStatus: 'AWAITING_PAYMENT',
+      paymentStatus: 'PENDING',
+      isExternalFlow: false,
+      hasExternalUrl: false,
+      hasTrack: false,
+    });
+    expect(r.purchaseType).toBe('AWAITING_PAYMENT');
+    expect(r.displayStatus).toBe('Ожидает оплаты');
+  });
+
   it('falls back to manual confirmation for other statuses', () => {
     const r = getPurchaseDisplayType({
       sessionStatus: 'STARTED',
@@ -155,6 +180,54 @@ describe('derivePurchaseActions', () => {
     expect(strip(r)).toEqual({
       primaryLabel: 'Оплатить',
       secondaryLabel: null,
+    });
+  });
+
+  it('returns no actions for AWAITING_PAYMENT when paymentUrl is missing', () => {
+    const r = derivePurchaseActions({
+      purchaseType: 'AWAITING_PAYMENT',
+      lastIntentPaymentUrl: null,
+      trackUrl: null,
+      externalUrl: null,
+    });
+    expect(strip(r)).toEqual({
+      primaryLabel: null,
+      secondaryLabel: null,
+    });
+  });
+
+  describe('computeTicketAvailable', () => {
+    it('returns true for completed internal ticket with trackUrl', () => {
+      const available = computeTicketAvailable({
+        sessionStatus: 'COMPLETED',
+        hasTrack: true,
+        hasExternalUrl: false,
+        trackUrl: 'http://localhost/orders/track?code=CS-1',
+        externalUrl: null,
+      });
+      expect(available).toBe(true);
+    });
+
+    it('returns true for external voucher with external url', () => {
+      const available = computeTicketAvailable({
+        sessionStatus: 'COMPLETED',
+        hasTrack: false,
+        hasExternalUrl: true,
+        trackUrl: null,
+        externalUrl: 'https://partner/voucher/123',
+      });
+      expect(available).toBe(true);
+    });
+
+    it('returns false when there is no track or external artifact', () => {
+      const available = computeTicketAvailable({
+        sessionStatus: 'COMPLETED',
+        hasTrack: false,
+        hasExternalUrl: false,
+        trackUrl: null,
+        externalUrl: null,
+      });
+      expect(available).toBe(false);
     });
   });
 

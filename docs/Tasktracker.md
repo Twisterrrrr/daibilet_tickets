@@ -238,7 +238,7 @@
 - [x] **Высокий**: Frontend: layout /account, dashboard, заказы, деталь заказа, билеты, избранное (редирект), профиль ✅
 - [x] **Высокий**: Frontend /account/purchases — единый экран «Мои покупки» с визуальным различием типов карточек ✅
 - [x] **Высокий**: Навигация: «Мои покупки» в header (desktop + mobile) → /account/purchases, «Личный кабинет» → /account; редирект после логина по умолчанию на /account/purchases ✅
-- [x] **Средний**: Read‑model и тесты Buyer Account: вынесен `PurchaseReadService` + маппер `PurchaseListItemDto`, capability‑хелперы `getPurchaseDisplayType` + `derivePurchaseActions` покрыты unit‑тестами; добавлены controller‑level интеграционные тесты для `/account/purchases`, `/account/orders/:id`, `/checkout/track/:shortCode` ✅
+- [x] **Средний**: Read‑model и тесты Buyer Account: вынесен `PurchaseReadService` + маппер `PurchaseListItemDto`, capability‑хелперы `getPurchaseDisplayType` + `derivePurchaseActions` и helper `computeTicketAvailable` покрыты unit‑тестами; добавлены controller‑level интеграционные тесты для `/account/purchases`, `/account/orders`, `/account/orders/:id` (в т.ч. 403 при чужом заказе), `/account/tickets`, `/checkout/track/:shortCode` ✅
 - [ ] **Низкий**: Реальная интеграция YooKassa: metadata.orderId/userId в payment init, webhook → оплата в ЛК
 
 ### Gate 2 — ежедневные ops в текущей админке

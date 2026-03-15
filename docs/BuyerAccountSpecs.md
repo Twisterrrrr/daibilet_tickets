@@ -165,6 +165,16 @@
 - `FulfillmentItem` — слой **Fulfillment** (purchaseFlow, status, внешние ссылки).
 - `PurchaseListItemDto`/`PurchaseReadService` формируют **Purchase read‑model** для `/account/purchases`.
   Маппинг типа карточки и доступных действий вынесен в `getPurchaseDisplayType` + `derivePurchaseActions` с unit‑тестами.
+  Наличие «артефакта билета» (что реально можно открыть) нормализовано через helper `computeTicketAvailable` (trackUrl или externalUrl) и также покрыто тестами.
+
+## 13. Тестовая матрица Buyer Account (backend)
+
+- **Unit-тесты:**
+  - `purchase-display.util.spec.ts` — правила `getPurchaseDisplayType`, `derivePurchaseActions`, `computeTicketAvailable`.
+  - `purchase-read.service.spec.ts` — маппинг `CheckoutSession` → `PurchaseListItemDto` для INTERNAL_TICKET, EXTERNAL_VOUCHER, BOOKING_CONFIRMATION, AWAITING_PAYMENT.
+- **Controller-level (mini-e2e) тесты:**
+  - `account.e2e.spec.ts` — контракты `/account/purchases`, `/account/orders`, `/account/orders/:id` (включая 403 при чужом заказе), `/account/tickets`.
+  - `track-order.e2e.spec.ts` — публичный трекинг `/checkout/track/:shortCode`.
 
 ---
 

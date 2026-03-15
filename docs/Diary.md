@@ -150,6 +150,35 @@
 
 ---
 
+## 15.03.2026 — Buyer Account V2: read‑model, capability‑хелперы и тесты
+
+### Наблюдения
+
+- ЛК покупателя уже имел базовые эндпоинты `/account/me`, `/account/orders`, `/account/orders/:id`, `/account/tickets`, а также гостевой трекинг `/checkout/track/:shortCode`.
+- Логика отображения покупок и билетов была размазана между сервисами и UI, без явного capability‑слоя и единообразного правила «есть ли реальный билет/ваучер».
+- Тестовое покрытие Buyer Account ограничивалось локальными сценариями и не фиксировало контракты `/account/purchases`, `/account/orders/:id`, `/account/tickets`.
+
+### Решения
+
+- Вынесен read‑сервис `PurchaseReadService`, который собирает `PurchaseListItemDto` из `CheckoutSession` + `PaymentIntent` + `FulfillmentItem`, с единым маппером `mapSessionToPurchase`.
+- Capability‑слой для отображения покупок оформлен через утилиты:
+  - `getPurchaseDisplayType` — определяет тип карточки (INTERNAL_TICKET, EXTERNAL_VOUCHER, BOOKING_CONFIRMATION, AWAITING_PAYMENT, MANUAL_CONFIRMATION) и человекочитаемый статус.
+  - `derivePurchaseActions` — вычисляет primary/secondary действия (открытие билета, ваучера, трекинга, оплату).
+  - `computeTicketAvailable` — явно определяет, есть ли «артефакт билета» (trackUrl или externalUrl), и используется в `PurchaseReadService` вместо inline‑логики.
+- Добавлены unit‑тесты для capability‑слоя (`purchase-display.util.spec.ts`, `purchase-read.service.spec.ts`) и mini-e2e‑тесты для:
+  - `/account/purchases` (возврат списка покупок с типами карточек),
+  - `/account/orders`, `/account/orders/:id` (включая проброс `ForbiddenException` при чужом заказе),
+  - `/account/tickets` (контракт списка билетов для текущего пользователя),
+  - `/checkout/track/:shortCode` (публичный трекинг заказа по коду).
+- Документация обновлена: `BuyerAccountSpecs.md` (архитектура ЛК + тестовая матрица), `Project.md` (раздел Buyer Account), `Tasktracker.md` (статус и объём покрытия).
+
+### Проблемы
+
+- Главный риск — хрупкость правил `getPurchaseDisplayType` при росте числа источников/флоу; текущая реализация рассматривается как MVP capability‑уровня, а не финальный доменный сервис.
+- `AccountService.getTickets` пока остаётся отдельным путём к билетам (по оплаченным сессиям), не полностью унифицированным с purchase read‑model; для дальнейшего этапа возможна консолидация вокруг единого артефакт‑слоя.
+
+---
+
 ## 11.03.2026 — Review Module MVP (disputes, supplier response)
 
 ### Наблюдения

@@ -60,6 +60,29 @@ export interface PurchaseActionsResult {
   secondaryAction: { label: string; url: string } | null;
 }
 
+export interface TicketAvailabilityInput {
+  sessionStatus: string;
+  hasTrack: boolean;
+  hasExternalUrl: boolean;
+  trackUrl: string | null;
+  externalUrl: string | null;
+}
+
+export function computeTicketAvailable(input: TicketAvailabilityInput): boolean {
+  const { sessionStatus, hasTrack, hasExternalUrl, trackUrl, externalUrl } = input;
+
+  // Для MVP артефакт билета определяется как наличие того, что реально можно открыть:
+  // - внутренний trackUrl при COMPLETED,
+  // - внешний externalPaymentUrl при EXTERNAL‑fulfillment.
+  if (sessionStatus === 'COMPLETED' && hasTrack && trackUrl) {
+    return true;
+  }
+  if (hasExternalUrl && externalUrl) {
+    return true;
+  }
+  return false;
+}
+
 export function derivePurchaseActions(input: PurchaseActionsInput): PurchaseActionsResult {
   const { purchaseType, lastIntentPaymentUrl, trackUrl, externalUrl } = input;
 

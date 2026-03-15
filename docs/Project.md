@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-03-05
+> Последнее обновление: 2026-03-15
 
 ## Миссия
 
@@ -29,6 +29,20 @@
 | БД | PostgreSQL 16 (Docker) | — |
 | Кэш/очереди | Redis 7 + BullMQ | — |
 | Инфраструктура | Docker Compose, Nginx, Certbot, pnpm workspaces | корень |
+
+### Buyer Account (Личный кабинет покупателя)
+
+- **Цель:** единая точка входа для заказов, билетов и профиля пользователя.
+- **Backend:** модуль `AccountModule` (`AccountController`, `AccountService`, `PurchaseReadService`):
+  - `/account/me` — сводка ЛК (пользователь, количество заказов, активных билетов, избранное).
+  - `/account/purchases` — read‑model `PurchaseListItemDto` на базе `CheckoutSession` + `PaymentIntent` + `FulfillmentItem`.
+  - `/account/orders`, `/account/orders/:id` — список и деталь заказов с проверкой ownership по `userId`.
+  - `/account/tickets` — плоский список билетов (`AccountTicketItemDto`) по оплаченным сессиям.
+- **Read‑model:** `PurchaseReadService.mapSessionToPurchase` агрегирует сессию, платёж и fulfilment в DTO:
+  - тип карточки и статус вычисляются через `getPurchaseDisplayType`,
+  - доступные действия — через `derivePurchaseActions`,
+  - наличие «артефакта билета» (trackUrl или externalUrl) — через helper `computeTicketAvailable`.
+- **Тесты:** unit‑тесты для capability‑слоя (`purchase-display.util`, `purchase-read.service`) и mini-e2e для `/account/purchases`, `/account/orders`, `/account/orders/:id` (в т.ч. Forbidden), `/account/tickets`, `/checkout/track/:shortCode`.
 
 ## Интеграции
 
