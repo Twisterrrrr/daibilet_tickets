@@ -1,5 +1,12 @@
 import * as dotenv from 'dotenv';
-import { PrismaClient, TagCategory } from '@prisma/client';
+import {
+  PrismaClient,
+  TagCategory,
+  ReviewStatus,
+  ReviewSupplierResponseStatus,
+  ReviewDisputeStatus,
+  ReviewDisputeReasonCode,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 dotenv.config({ path: '../../.env' });
@@ -84,12 +91,23 @@ async function main() {
   const supplierPasswordHash = await bcrypt.hash('Partner123!', 10);
   const testOperator = await prisma.operator.upsert({
     where: { slug: 'test-supplier' },
-    update: {},
+    update: {
+      isSupplier: true,
+    },
     create: {
       slug: 'test-supplier',
       name: 'Test Supplier',
       isSupplier: true,
+      // Стартовый уровень доверия: BASIC (1) с умеренным score,
+      // чтобы в ЛК сразу был не нулевой прогресс и разумный лимит.
       trustLevel: 1,
+      trustScore: 40,
+      trustProfileScore: 16,
+      trustCatalogScore: 16,
+      trustOperationsScore: 4,
+      trustReputationScore: 2,
+      trustStabilityScore: 2,
+      trustPenaltyScore: 0,
       commissionRate: 0.25,
       promoRate: 0.1,
       companyName: 'ИП Тестовый Партнёр',
@@ -112,6 +130,461 @@ async function main() {
     },
   });
   console.log('  ✓ Test supplier account created (partner.test@daibilet.ru)');
+
+  // --- Supplier demo data (events + payments for dashboard/reports) ---
+  // Город Санкт-Петербург может ещё не существовать (он создаётся ниже в общем списке городов),
+  // поэтому здесь гарантируем его наличие, чтобы сид для поставщика всегда срабатывал.
+  let spbCity = await prisma.city.findUnique({ where: { slug: 'saint-petersburg' } });
+  if (!spbCity) {
+    spbCity = await prisma.city.create({
+      data: {
+        slug: 'saint-petersburg',
+        name: 'Санкт-Петербург',
+        description:
+          'Культурная столица России — город белых ночей, разводных мостов и величественной архитектуры.',
+        lat: 59.9343,
+        lng: 30.3351,
+        timezone: 'Europe/Moscow',
+        metaTitle: 'Экскурсии и билеты в Санкт-Петербурге — Дайбилет',
+        metaDescription:
+          'Билеты на экскурсии, музеи и мероприятия в Петербурге. Эрмитаж, Петергоф, прогулки по каналам и крышам.',
+        isFeatured: true,
+      },
+    });
+    console.log('  ✓ City saint-petersburg created for supplier demo');
+  }
+
+  if (spbCity) {
+    // Demo events for supplier cabinet (dashboard + "Мои события")
+    const _nightCruise = await prisma.event.upsert({
+      where: { slug: 'night-cruise-neva-test' },
+      update: {},
+      create: {
+        cityId: spbCity.id,
+        source: 'MANUAL',
+        tcEventId: 'seed-night-cruise',
+        title: 'Ночная прогулка по рекам и каналам',
+        slug: 'night-cruise-neva-test',
+        description: 'Классическая ночная прогулка на развод мостов для тестового поставщика.',
+        shortDescription: 'Ночная прогулка по Неве и каналам с разводом мостов.',
+        category: 'EXCURSION',
+        audience: 'ALL',
+        subcategories: ['RIVER'],
+        durationMinutes: 120,
+        address: 'Санкт-Петербург, Дворцовая набережная',
+        priceFrom: 120000,
+        isActive: true,
+        imageUrl: 'https://images.unsplash.com/photo-1521292270410-a8c53642e9d0?w=800',
+        galleryUrls: [],
+        supplierId: testOperator.id,
+        operatorId: testOperator.id,
+        moderationStatus: 'APPROVED',
+        createdByType: 'SUPPLIER',
+      },
+    });
+
+    await prisma.event.upsert({
+      where: { slug: 'day-walking-tour-test' },
+      update: {},
+      create: {
+        cityId: spbCity.id,
+        source: 'MANUAL',
+        tcEventId: 'seed-day-walking',
+        title: 'Дневной круиз по Неве',
+        slug: 'day-walking-tour-test',
+        description: 'Дневная обзорная прогулка по Неве для тестового поставщика.',
+        shortDescription: 'Дневной круиз с гидом по рекам и каналам.',
+        category: 'EXCURSION',
+        audience: 'ALL',
+        subcategories: ['RIVER'],
+        durationMinutes: 90,
+        address: 'Санкт-Петербург, Английская набережная',
+        priceFrom: 80000,
+        isActive: false,
+        imageUrl: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=800',
+        galleryUrls: [],
+        supplierId: testOperator.id,
+        operatorId: testOperator.id,
+        moderationStatus: 'PENDING_REVIEW',
+        moderationNote: 'Добавьте расписание и основное фото для публикации.',
+        createdByType: 'SUPPLIER',
+      },
+    });
+
+    // Demo checkout sessions + payments for supplier dashboard and reports (идемпотентно)
+    let demoCheckout1 = await prisma.checkoutSession.findFirst({ where: { shortCode: 'CS-DEMO-001' } });
+    if (!demoCheckout1) {
+      demoCheckout1 = await prisma.checkoutSession.create({
+        data: {
+          shortCode: 'CS-DEMO-001',
+          cartSnapshot: {},
+          validatedSnapshot: {},
+          offersSnapshot: {},
+          customerName: 'Иван Иванов',
+          customerEmail: 'test.user@daibilet.ru',
+          status: 'COMPLETED',
+          totalPrice: 240000,
+        },
+      });
+    }
+
+    let demoCheckout2 = await prisma.checkoutSession.findFirst({ where: { shortCode: 'CS-DEMO-002' } });
+    if (!demoCheckout2) {
+      demoCheckout2 = await prisma.checkoutSession.create({
+        data: {
+          shortCode: 'CS-DEMO-002',
+          cartSnapshot: {},
+          validatedSnapshot: {},
+          offersSnapshot: {},
+          customerName: 'Мария Петрова',
+          customerEmail: 'history.user@daibilet.ru',
+          status: 'COMPLETED',
+          totalPrice: 160000,
+        },
+      });
+    }
+
+    const existingDemoPayments = await prisma.paymentIntent.count({
+      where: { idempotencyKey: { in: ['seed-demo-payment-1', 'seed-demo-payment-2'] } },
+    });
+    if (existingDemoPayments < 2) {
+      await prisma.paymentIntent.createMany({
+        data: [
+          {
+            checkoutSessionId: demoCheckout1.id,
+            idempotencyKey: 'seed-demo-payment-1',
+            amount: 240000,
+            currency: 'RUB',
+            status: 'PAID',
+            provider: 'STUB',
+            paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+            supplierId: testOperator.id,
+            grossAmount: 240000,
+            platformFee: 60000,
+            supplierAmount: 180000,
+            commissionRate: 0.25,
+          },
+          {
+            checkoutSessionId: demoCheckout2.id,
+            idempotencyKey: 'seed-demo-payment-2',
+            amount: 160000,
+            currency: 'RUB',
+            status: 'PAID',
+            provider: 'STUB',
+            paidAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+            supplierId: testOperator.id,
+            grossAmount: 160000,
+            platformFee: 40000,
+            supplierAmount: 120000,
+            commissionRate: 0.25,
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
+
+    console.log(`  ✓ Supplier demo events and payments created for dashboard/reports (operatorId=${testOperator.id})`);
+
+    // Demo reviews for supplier cabinet (test supplier).
+    // Используем upsert по compound-уникальному индексу [authorEmail, eventId, venueId],
+    // чтобы сид был идемпотентным и гарантированно создавал тестовые кейсы.
+    const nightCruiseEvent = await prisma.event.findUnique({
+      where: { slug: 'night-cruise-neva-test' },
+    });
+    const dayCruiseEvent = await prisma.event.findUnique({
+      where: { slug: 'day-walking-tour-test' },
+    });
+
+    if (nightCruiseEvent) {
+      // 1) Позитивный отзыв без ответа (попадает во вкладку "Все")
+      const existingPositive = await prisma.review.findFirst({
+        where: {
+          authorEmail: 'supplier.demo+positive@daibilet.ru',
+          eventId: nightCruiseEvent.id,
+          venueId: null,
+        },
+      });
+      const _reviewPositive =
+        existingPositive ??
+        (await prisma.review.create({
+          data: {
+            eventId: nightCruiseEvent.id,
+            supplierId: testOperator.id,
+            rating: 5,
+            title: 'Отличная прогулка',
+            text: 'Очень понравилась ночная прогулка: комфортный теплоход, внимательный гид и красивая подсветка города.',
+            authorName: 'Анна Путешественница',
+            authorEmail: 'supplier.demo+positive@daibilet.ru',
+            isVerified: true,
+            voucherCode: 'DEMO-001',
+            helpfulCount: 3,
+            status: ReviewStatus.APPROVED,
+            publishedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+          },
+        }));
+
+      // 2) Негативный отзыв без ответа (вкладка "Требуют ответа")
+      const existingNeedsResponse = await prisma.review.findFirst({
+        where: {
+          authorEmail: 'supplier.demo+needs-response@daibilet.ru',
+          eventId: nightCruiseEvent.id,
+          venueId: null,
+        },
+      });
+      await (existingNeedsResponse ??
+        prisma.review.create({
+          data: {
+            eventId: nightCruiseEvent.id,
+            supplierId: testOperator.id,
+            rating: 2,
+            title: 'Неудачная погода',
+            text: 'Во время прогулки шёл дождь и было ветрено, хотелось бы заранее предупреждения об условиях.',
+            authorName: 'Игорь',
+            authorEmail: 'supplier.demo+needs-response@daibilet.ru',
+            isVerified: false,
+            helpfulCount: 0,
+            status: ReviewStatus.APPROVED,
+            publishedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          },
+        }));
+
+      // 3) Отзыв с одобренным ответом поставщика (вкладка "С ответом")
+      const existingResponded = await prisma.review.findFirst({
+        where: {
+          authorEmail: 'supplier.demo+responded@daibilet.ru',
+          eventId: nightCruiseEvent.id,
+          venueId: null,
+        },
+      });
+      const reviewWithResponse =
+        existingResponded ??
+        (await prisma.review.create({
+          data: {
+            eventId: nightCruiseEvent.id,
+            supplierId: testOperator.id,
+            rating: 4,
+            title: 'Красиво, но многолюдно',
+            text: 'Маршрут понравился, но хотелось бы меньше людей на борту в высокий сезон.',
+            authorName: 'Мария',
+            authorEmail: 'supplier.demo+responded@daibilet.ru',
+            isVerified: true,
+            helpfulCount: 1,
+            status: ReviewStatus.APPROVED,
+            publishedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+          },
+        }));
+
+      await prisma.reviewSupplierResponse.upsert({
+        where: { reviewId: reviewWithResponse.id },
+        update: {
+          text: 'Спасибо за отзыв! В пиковые даты действительно бывает много гостей, мы уже добавили дополнительные рейсы, чтобы уменьшить загрузку.',
+          status: ReviewSupplierResponseStatus.APPROVED,
+          moderatedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+        },
+        create: {
+          reviewId: reviewWithResponse.id,
+          supplierId: testOperator.id,
+          text: 'Спасибо за отзыв! В пиковые даты действительно бывает много гостей, мы уже добавили дополнительные рейсы, чтобы уменьшить загрузку.',
+          status: ReviewSupplierResponseStatus.APPROVED,
+          moderatedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      // 4) Отзыв с открытым оспариванием (вкладка "Оспоренные")
+      if (dayCruiseEvent) {
+        const existingDisputed = await prisma.review.findFirst({
+          where: {
+            authorEmail: 'supplier.demo+disputed@daibilet.ru',
+            eventId: dayCruiseEvent.id,
+            venueId: null,
+          },
+        });
+        const reviewWithDispute =
+          existingDisputed ??
+          (await prisma.review.create({
+            data: {
+              eventId: dayCruiseEvent.id,
+              supplierId: testOperator.id,
+              rating: 2,
+              title: 'Не совпало с описанием',
+              text: 'В отзыве указано, что прогулка длилась всего 30 минут, хотя фактически рейс стандартный — 1,5 часа.',
+              authorName: 'Пользователь',
+              authorEmail: 'supplier.demo+disputed@daibilet.ru',
+              isVerified: true,
+              helpfulCount: 0,
+              status: ReviewStatus.APPROVED,
+              publishedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+            },
+          }));
+
+        await prisma.reviewDispute.upsert({
+          where: { reviewId: reviewWithDispute.id },
+          update: {
+            status: ReviewDisputeStatus.MODERATOR_REVIEW,
+            reasonCode: ReviewDisputeReasonCode.FALSE_FACTS,
+            claimText:
+              'Гость неверно указал продолжительность рейса. По навигационным данным и расписанию рейс прошёл в стандартном временном интервале.',
+            supplierConfirmedTruth: true,
+          },
+          create: {
+            reviewId: reviewWithDispute.id,
+            supplierId: testOperator.id,
+            status: ReviewDisputeStatus.MODERATOR_REVIEW,
+            reasonCode: ReviewDisputeReasonCode.FALSE_FACTS,
+            claimText:
+              'Гость неверно указал продолжительность рейса. По навигационным данным и расписанию рейс прошёл в стандартном временном интервале.',
+            supplierConfirmedTruth: true,
+          },
+        });
+      }
+
+      const reviewsForSupplier = await prisma.review.count({ where: { supplierId: testOperator.id } });
+      console.log(
+        `  ✓ Supplier demo reviews ensured for cabinet (tabs: all / needs_response / responded / disputed), count=${reviewsForSupplier}`,
+      );
+    }
+
+    // --- Buyer Account: тестовое событие + пользователь с оплаченным билетом (проверка контура «Мои покупки») ---
+    const buyerTestUser = await prisma.user.findUnique({ where: { email: 'test.user@daibilet.ru' } });
+    if (buyerTestUser && spbCity) {
+      const buyerEvent = await prisma.event.upsert({
+        where: { slug: 'test-event-buyer-account' },
+        update: {},
+        create: {
+          cityId: spbCity.id,
+          source: 'MANUAL',
+          tcEventId: 'seed-buyer-account',
+          title: 'Тестовое событие для ЛК покупателя',
+          slug: 'test-event-buyer-account',
+          description: 'Событие для проверки контура «Мои покупки»: вход под test.user@daibilet.ru, пароль TestUser123!',
+          shortDescription: 'Тест ЛК',
+          category: 'EXCURSION',
+          audience: 'ALL',
+          subcategories: ['RIVER'],
+          durationMinutes: 60,
+          address: 'Санкт-Петербург',
+          priceFrom: 150000,
+          isActive: true,
+          imageUrl: 'https://images.unsplash.com/photo-1521292270410-a8c53642e9d0?w=400',
+          galleryUrls: [],
+          moderationStatus: 'APPROVED',
+          createdByType: 'ADMIN',
+        },
+      });
+
+      const buyerOffer = await prisma.eventOffer.upsert({
+        where: {
+          source_externalEventId: { source: 'MANUAL', externalEventId: 'seed-buyer-account' },
+        },
+        update: { eventId: buyerEvent.id },
+        create: {
+          eventId: buyerEvent.id,
+          source: 'MANUAL',
+          purchaseType: 'WIDGET',
+          externalEventId: 'seed-buyer-account',
+          priceFrom: 150000,
+          isPrimary: true,
+          status: 'ACTIVE',
+          priority: 0,
+        },
+      });
+
+      const sessionStartsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      sessionStartsAt.setHours(14, 0, 0, 0);
+      const sessionEndsAt = new Date(sessionStartsAt.getTime() + 60 * 60 * 1000);
+      let buyerSession = await prisma.eventSession.findFirst({
+        where: { eventId: buyerEvent.id },
+      });
+      if (!buyerSession) {
+        buyerSession = await prisma.eventSession.create({
+          data: {
+            eventId: buyerEvent.id,
+            offerId: buyerOffer.id,
+            tcSessionId: `manual-${buyerEvent.id.slice(0, 8)}`,
+            startsAt: sessionStartsAt,
+            endsAt: sessionEndsAt,
+            availableTickets: 50,
+            prices: [{ type: 'adult', price: 150000 }],
+            isActive: true,
+          },
+        });
+      }
+
+      const offersSnapshot = [
+        {
+          eventTitle: buyerEvent.title,
+          eventSlug: buyerEvent.slug,
+          sessionId: buyerSession.id,
+          quantity: 1,
+          priceSnapshot: 150000,
+        },
+      ];
+      const totalPrice = 150000;
+
+      let buyerCheckout = await prisma.checkoutSession.findFirst({
+        where: { shortCode: 'CS-BUYER-TEST' },
+      });
+      if (!buyerCheckout) {
+        buyerCheckout = await prisma.checkoutSession.create({
+          data: {
+            shortCode: 'CS-BUYER-TEST',
+            userId: buyerTestUser.id,
+            cartSnapshot: {},
+            validatedSnapshot: {},
+            offersSnapshot,
+            customerName: buyerTestUser.name ?? 'Test User',
+            customerEmail: buyerTestUser.email ?? 'test.user@daibilet.ru',
+            status: 'COMPLETED',
+            totalPrice,
+            completedAt: new Date(),
+          },
+        });
+      } else {
+        await prisma.checkoutSession.update({
+          where: { id: buyerCheckout.id },
+          data: { userId: buyerTestUser.id, offersSnapshot, totalPrice, status: 'COMPLETED', completedAt: new Date() },
+        });
+      }
+
+      const existingPayment = await prisma.paymentIntent.findFirst({
+        where: { checkoutSessionId: buyerCheckout.id, idempotencyKey: 'seed-buyer-account-payment' },
+      });
+      if (!existingPayment) {
+        await prisma.paymentIntent.create({
+          data: {
+            checkoutSessionId: buyerCheckout.id,
+            idempotencyKey: 'seed-buyer-account-payment',
+            amount: totalPrice,
+            currency: 'RUB',
+            status: 'PAID',
+            provider: 'STUB',
+            paidAt: new Date(),
+          },
+        });
+      }
+
+      const existingFulfillment = await prisma.fulfillmentItem.findFirst({
+        where: { checkoutSessionId: buyerCheckout.id, lineItemIndex: 0 },
+      });
+      if (!existingFulfillment) {
+        await prisma.fulfillmentItem.create({
+          data: {
+            checkoutSessionId: buyerCheckout.id,
+            lineItemIndex: 0,
+            offerId: buyerOffer.id,
+            purchaseFlow: 'PLATFORM',
+            provider: 'INTERNAL',
+            status: 'CONFIRMED',
+            amount: totalPrice,
+          },
+        });
+      }
+
+      console.log(
+        `  ✓ Buyer account test: event "${buyerEvent.title}", user test.user@daibilet.ru (TestUser123!), order ${buyerCheckout.shortCode} → Мои покупки`,
+      );
+    }
+  }
 
   // --- Города ---
 
