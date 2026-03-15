@@ -279,7 +279,7 @@ export default function ReconciliationPage() {
     if (tab === 'mismatches') loadMismatches();
     if (tab === 'webhooks') loadWebhooks();
     if (tab === 'metrics') loadMetrics();
-  }, [tab]);
+  }, [tab, loadIntents, loadMismatches, loadWebhooks, loadMetrics]);
 
   // ============================================================
   // Actions

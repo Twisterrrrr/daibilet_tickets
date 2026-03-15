@@ -1,14 +1,26 @@
 import { Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+import {
+  DateRangePicker,
+  type DateRange,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+  SectionCard,
+} from '@daibilet/shared-ui';
 
 import { api } from '../lib/api';
 
+function toIsoDate(d: Date | null): string {
+  if (!d) return '';
+  return d.toISOString().slice(0, 10);
+}
+
 export default function Reports() {
   const [data, setData] = useState<any>(null);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [range, setRange] = useState<DateRange>({ from: null, to: null });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,8 +28,8 @@ export default function Reports() {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
-    if (from) params.set('from', from);
-    if (to) params.set('to', to);
+    if (range.from) params.set('from', toIsoDate(range.from));
+    if (range.to) params.set('to', toIsoDate(range.to));
     api
       .get<any>(`/supplier/reports/sales?${params}`)
       .then((res) => {
@@ -32,6 +44,7 @@ export default function Reports() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -40,7 +53,7 @@ export default function Reports() {
         title="Отчёт о продажах"
         actions={
           <a
-            href={`/api/v1/supplier/reports/sales/export?from=${from}&to=${to}`}
+            href={`/api/v1/supplier/reports/sales/export?from=${toIsoDate(range.from)}&to=${toIsoDate(range.to)}`}
             className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-gray-50"
           >
             <Download className="h-4 w-4" /> Скачать CSV
@@ -49,33 +62,19 @@ export default function Reports() {
       />
 
       <SectionCard>
-        <div className="flex items-end gap-4">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">От</label>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="px-3 py-2 border rounded-lg text-sm"
-          />
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="flex-1">
+            <p className="mb-1 text-xs text-gray-500">Период</p>
+            <DateRangePicker value={range} onChange={setRange} />
+          </div>
+          <button
+            onClick={load}
+            className="mt-2 inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 md:mt-0"
+            disabled={loading}
+          >
+            {loading ? 'Загрузка...' : 'Применить'}
+          </button>
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">До</label>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="px-3 py-2 border rounded-lg text-sm"
-          />
-        </div>
-        <button
-          onClick={load}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-          disabled={loading}
-        >
-          {loading ? 'Загрузка...' : 'Применить'}
-        </button>
-      </div>
       </SectionCard>
 
       {error && <ErrorState title="Ошибка загрузки отчёта" description={error} />}
