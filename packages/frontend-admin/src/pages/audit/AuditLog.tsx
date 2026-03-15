@@ -1,5 +1,5 @@
 import { ColumnDef } from '@tanstack/react-table';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -55,7 +55,7 @@ export function AuditLogPage() {
   const [action, setAction] = useState('');
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
     params.set('page', String(page));
@@ -65,17 +65,17 @@ export function AuditLogPage() {
 
     adminApi
       .get(`/admin/audit?${params}`)
-      .then((data: any) => {
+      .then((data: { items: AuditEntry[]; total: number }) => {
         setItems(data.items);
         setTotal(data.total);
       })
       .catch((e) => console.error('Load audit log failed:', e))
       .finally(() => setLoading(false));
-  };
+  }, [page, entity, action]);
 
   useEffect(() => {
     load();
-  }, [page, entity, action]);
+  }, [load]);
 
   const columns: ColumnDef<AuditEntry>[] = [
     {

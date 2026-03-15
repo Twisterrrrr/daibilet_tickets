@@ -1404,16 +1404,10 @@ export class CatalogService {
     // Похожие события: город + категория + скоринг по тегам, подкатегории, priceFrom
     const relatedEvents = await this.fetchRelatedEvents(overridden);
 
-    // Рейтинг: до 10 отзывов — псевдослучайный. Салюты: 4.8–5, остальные: 4.5–5
+    // Рейтинг: до 10 отзывов — псевдо-5.0 (для сортировки/планировщика), на сайте не показываем (см. фронт)
     const rc = Number(overridden.reviewCount ?? 0) | 0;
     const rawR = Number(overridden.rating) || 0;
-    const h = String(overridden.id || overridden.slug || '')
-      .split('')
-      .reduce((a, c) => (a << 5) - a + c.charCodeAt(0), 0);
-    const ovTags = (overridden.tags || []).map((t: { tag?: { slug?: string } | null }) => t?.tag?.slug).filter((s): s is string => !!s);
-    const ovHasSalute = ovTags.some((s) => s === 'salute' || s === 'salyut-s-vody');
-    const displayRating =
-      rc >= 10 ? rawR : ovHasSalute ? 4.8 + (Math.abs(h) % 21) / 100 : 4.5 + (Math.abs(h) % 51) / 100;
+    const displayRating = rc >= 10 ? rawR : 5.0;
 
     const canAcceptReviews = this.reviewCapability.canAcceptReviews({
       source: overridden.source,
@@ -1450,21 +1444,16 @@ export class CatalogService {
       refundPolicyResolved,
       refundPolicyMode: overridden.refundPolicyMode,
       refundPolicyText: overridden.refundPolicyText,
-      relatedEvents: relatedEvents.map((r: Record<string, unknown>) => ({
-        ...r,
-        rating:
-          Number(r.reviewCount ?? 0) >= 10
-            ? Number(r.rating) || 0
-            : 4.5 +
-              (Math.abs(
-                String(r.id || r.slug || '')
-                  .split('')
-                  .reduce((a: number, c: string) => (a << 5) - a + c.charCodeAt(0), 0),
-              ) %
-                51) /
-                100,
-        address: r.address ? shortenAddressToStreet(String(r.address)) : r.address,
-      })),
+      relatedEvents: relatedEvents.map((r: Record<string, unknown>) => {
+        const rcRelated = Number(r.reviewCount ?? 0) || 0;
+        const baseRating = Number(r.rating) || 0;
+        const rating = rcRelated >= 10 ? baseRating : 5.0;
+        return {
+          ...r,
+          rating,
+          address: r.address ? shortenAddressToStreet(String(r.address)) : r.address,
+        };
+      }),
     };
   }
 
@@ -1638,7 +1627,7 @@ export class CatalogService {
     return [...withPhoto, ...withoutPhoto];
   }
 
-  private getEventsSort(sort?: string): Prisma.EventOrderByWithRelationInput {
+  private getEventsSort(sort?: string): Prisma.EventOrderByWithRelationInput | Prisma.EventOrderByWithRelationInput[] {
     switch (sort) {
       case 'price_asc':
         return { priceFrom: 'asc' };
@@ -1647,11 +1636,17 @@ export class CatalogService {
       case 'rating':
         return { rating: 'desc' };
       case 'departing_soon':
-        // Prisma relation orderBy doesn't support _min; we sort in memory in getEvents
+        // Prisma relation orderBy doesn't support _min; мы сортируем по времени сеансов в памяти,
+        // базовый порядок — rating desc.
         return { rating: 'desc' };
       case 'popular':
       default:
-        return { reviewCount: 'desc' };
+        // Базовый порядок каталога: manualBoost (override) → рейтинг → количество отзывов.
+        return [
+          { override: { manualBoost: 'desc' } },
+          { rating: 'desc' },
+          { reviewCount: 'desc' },
+        ];
     }
   }
 

@@ -105,6 +105,11 @@ export function BasicsForm({ value, onChange, handleChange, lockedFields, cities
               disabled={locked.has('cityId')}
             >
               <option value="">Выберите город</option>
+              {_cities?.map((city) => (
+                <option key={city.id} value={city.id}>
+                  {city.name}
+                </option>
+              ))}
             </select>
           </div>
           <div>

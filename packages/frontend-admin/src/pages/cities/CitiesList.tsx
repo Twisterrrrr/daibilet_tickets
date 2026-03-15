@@ -2,7 +2,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -114,9 +114,19 @@ export function CitiesListPage() {
       />
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState
+          title="Не удалось загрузить список городов"
+          description={error}
+          action={
+            <button
+              type="button"
+              className="rounded-lg border px-3 py-1.5 text-sm"
+              onClick={() => setFilters((f) => ({ ...f }))}
+            >
+              Повторить попытку
+            </button>
+          }
+        />
       )}
 
       {/* Filters */}
@@ -176,13 +186,20 @@ export function CitiesListPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={columns}
-            data={items}
-            onRowClick={handleRowClick}
-            loading={loading}
-            emptyText="Нет городов"
-          />
+          {items.length === 0 && !loading ? (
+            <EmptyState
+              title="Нет городов"
+              description="Добавьте хотя бы один город, чтобы начать заполнять каталог."
+            />
+          ) : (
+            <DataTable
+              columns={columns}
+              data={items}
+              onRowClick={handleRowClick}
+              loading={loading}
+              emptyText="Нет городов"
+            />
+          )}
         </CardContent>
       </Card>
     </div>

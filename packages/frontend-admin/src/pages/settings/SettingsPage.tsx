@@ -90,7 +90,7 @@ export function SettingsPage() {
     if (!pricing) return;
     setPricingSaving(true);
     try {
-      const { id: _id, ...data } = pricing;
+      const { id: _omitId, ...data } = pricing;
       const result = await adminApi.patch('/admin/settings/pricing', data);
       setPricing(result as any);
       toast.success('Pricing сохранён');

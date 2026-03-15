@@ -10,7 +10,6 @@ import {
   ExternalLink,
   FileText,
   HeadphonesIcon,
-  Inbox,
   Landmark,
   Layers,
   LayoutDashboard,
@@ -50,61 +49,67 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: 'Основное',
+    title: 'Дашборд',
+    items: [{ to: '/', label: 'Обзор', icon: LayoutDashboard }],
+  },
+  {
+    title: 'Каталог',
     items: [
-      { to: '/', label: 'Dashboard', icon: LayoutDashboard },
       ...(flags.showEvents
         ? [
             { to: '/events', label: 'События', icon: CalendarDays },
             { to: '/events/merge', label: 'Merge дублей', icon: Merge },
           ]
         : []),
-      ...(flags.showOrders ? [{ to: '/orders', label: 'Заказы', icon: ShoppingCart }] : []),
-      { to: '/checkout', label: 'Заявки', icon: Inbox },
-      { to: '/support', label: 'Поддержка', icon: HeadphonesIcon },
+      ...(flags.showCatalog ? [{ to: '/venues', label: 'Площадки', icon: Landmark }] : []),
+      ...(flags.showContent ? [{ to: '/cities', label: 'Города', icon: MapPin }] : []),
+      { to: '/suppliers', label: 'Поставщики', icon: Users },
+      ...(flags.showContent ? [{ to: '/tags', label: 'Теги', icon: Tag }] : []),
     ],
   },
   {
     title: 'Контент',
     items: [
-      ...(flags.showContent
-        ? [
-            { to: '/cities', label: 'Города', icon: MapPin },
-            { to: '/tags', label: 'Теги', icon: Tag },
-            { to: '/collections', label: 'Подборки', icon: LayoutList },
-            { to: '/landings', label: 'Лендинги', icon: FileText },
-            { to: '/combos', label: 'Combo', icon: Layers },
-            { to: '/articles', label: 'Статьи', icon: BookOpen },
-            { to: '/widgets', label: 'Виджеты Teplohod', icon: ExternalLink },
-          ]
-        : []),
-      ...(flags.showCatalog ? [{ to: '/venues', label: 'Места', icon: Landmark }] : []),
-    ],
-  },
-  {
-    title: 'Маркетплейс',
-    items: [
-      { to: '/suppliers', label: 'Поставщики', icon: Users },
-      { to: '/moderation', label: 'Модерация', icon: ShieldCheck },
-    ],
-  },
-  {
-    title: 'Управление',
-    items: [
-      { to: '/reviews', label: 'Отзывы', icon: MessageSquare },
-      { to: '/external-reviews', label: 'Внешние отзывы', icon: ExternalLink },
-      { to: '/upsells', label: 'Upsells', icon: DollarSign },
+      ...(flags.showContent ? [{ to: '/articles', label: 'Статьи', icon: BookOpen }] : []),
+      ...(flags.showContent ? [{ to: '/collections', label: 'Подборки', icon: LayoutList }] : []),
       { to: '/promo-blocks', label: 'Промо-блоки', icon: LayoutTemplate },
       { to: '/promo-collections', label: 'Promo-коллекции', icon: BoxSelect },
+      { to: '/promo-codes', label: 'Промокоды', icon: Tag },
+      ...(flags.showContent ? [{ to: '/landings', label: 'Лендинги', icon: FileText }] : []),
+      ...(flags.showContent ? [{ to: '/widgets', label: 'Виджеты Teplohod', icon: ExternalLink }] : []),
+      { to: '/upsells', label: 'Upsells', icon: DollarSign },
+      { to: '/external-reviews', label: 'Внешние отзывы', icon: ExternalLink },
+    ],
+  },
+  {
+    title: 'Операции',
+    items: [
+      { to: '/moderation', label: 'Модерация', icon: ShieldCheck },
+      ...(flags.showOrders ? [{ to: '/orders', label: 'Заказы', icon: ShoppingCart }] : []),
+      { to: '/reviews', label: 'Отзывы', icon: MessageSquare },
+      ...(flags.showOps ? [{ to: '/reconciliation', label: 'Сверка', icon: Scale }] : []),
+      { to: '/support', label: 'Поддержка', icon: HeadphonesIcon },
       ...(flags.showOps
         ? [
             { to: '/jobs/failed', label: 'Failed Jobs', icon: AlertCircle },
-            { to: '/reconciliation', label: 'Сверка', icon: Scale },
             { to: '/audit', label: 'Аудит', icon: ClipboardList },
           ]
         : []),
+    ],
+  },
+  {
+    title: 'Аналитика',
+    items: [
+      { to: '/checkout', label: 'Заявки (checkout)', icon: ClipboardList },
+      { to: '/payouts', label: 'Вывод средств', icon: DollarSign },
+      ...(flags.showContent ? [{ to: '/seo-audit', label: 'SEO аудит', icon: BarChart3 }] : []),
       ...(flags.showContent ? [{ to: '/source-categories', label: 'Категории источников', icon: Layers }] : []),
-      ...(flags.showContent ? [{ to: '/seo-audit', label: 'SEO Audit', icon: BarChart3 }] : []),
+    ],
+  },
+  {
+    title: 'Система',
+    items: [
+      // В будущем: отдельная страница пользователей админки (/users).
       { to: '/settings', label: 'Настройки', icon: Settings },
     ],
   },

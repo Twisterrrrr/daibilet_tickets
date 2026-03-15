@@ -48,6 +48,9 @@ import { PromoCollectionsListPage } from './pages/promo-collections/PromoCollect
 import { PromoCollectionEditPage } from './pages/promo-collections/PromoCollectionEditPage';
 import { UpsellEditPage } from './pages/upsells/UpsellEdit';
 import { SupportListPage } from './pages/support/SupportList';
+import { PayoutsListPage } from './pages/payouts/PayoutsListPage';
+import { PromoCodesListPage } from './pages/promo-codes/PromoCodesListPage';
+import { PromoCodeEditPage } from './pages/promo-codes/PromoCodeEditPage';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
@@ -102,12 +105,16 @@ export default function App() {
           <Route path="orders" element={flags.showOrders ? <OrdersListPage /> : <DisabledRoute />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
           <Route path="checkout" element={<CheckoutSessionsListPage />} />
+          <Route path="payouts" element={<PayoutsListPage />} />
           <Route path="upsells" element={<UpsellsListPage />} />
           <Route path="upsells/new" element={<UpsellEditPage />} />
           <Route path="upsells/:id" element={<UpsellEditPage />} />
           <Route path="promo-blocks" element={<PromoBlocksListPage />} />
           <Route path="promo-blocks/new" element={<PromoBlockCreatePage />} />
           <Route path="promo-blocks/:id" element={<PromoBlockEditPage />} />
+          <Route path="promo-codes" element={<PromoCodesListPage />} />
+          <Route path="promo-codes/new" element={<PromoCodeEditPage />} />
+          <Route path="promo-codes/:id" element={<PromoCodeEditPage />} />
           <Route path="promo-collections" element={<PromoCollectionsListPage />} />
           <Route path="promo-collections/new" element={<PromoCollectionEditPage />} />
           <Route path="promo-collections/:id" element={<PromoCollectionEditPage />} />

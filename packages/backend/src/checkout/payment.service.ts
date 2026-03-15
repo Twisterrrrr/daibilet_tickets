@@ -14,11 +14,13 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as Sentry from '@sentry/nestjs';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { PaymentMode, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SupplierLedgerService } from '../ledger/supplier-ledger.service';
+import { PromoCodeService } from '../pricing/promo-code.service';
 import { partitionCart, SnapshotLineItem } from './cart-partitioning';
 import { tryTransitionCheckout, tryTransitionPayment } from './checkout-state-machine';
 import { isYkPayment, YkPayment, YkRefund } from './yookassa.types';
@@ -35,6 +37,8 @@ export class PaymentService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly mailService: MailService,
+    private readonly supplierLedger: SupplierLedgerService,
+    private readonly promoCodes: PromoCodeService,
   ) {
     this.appUrl =
       process.env.NODE_ENV === 'production'
@@ -111,12 +115,20 @@ export class PaymentService {
     if (anyPreviousIntent) {
       const giftCertSnap = session.giftCertificateSnapshot as { amount: number } | null;
       const appliedCert = session.appliedGiftCertificateSnapshot as { discountAmount: number } | null | undefined;
+      const appliedPromo = session.appliedPromoCodeSnapshot as { discountAmount?: number } | null | undefined;
       let currentTotal: number;
       if (giftCertSnap?.amount) {
         currentTotal = Number(giftCertSnap.amount);
       } else {
         const pt = partitionCart((session.offersSnapshot as SnapshotLineItem[] | null) || []).platformTotal;
-        currentTotal = appliedCert?.discountAmount ? Math.max(0, pt - appliedCert.discountAmount) : pt;
+        let adjusted = pt;
+        if (appliedPromo?.discountAmount) {
+          adjusted = Math.max(0, adjusted - appliedPromo.discountAmount);
+        }
+        if (appliedCert?.discountAmount) {
+          adjusted = Math.max(0, adjusted - appliedCert.discountAmount);
+        }
+        currentTotal = adjusted;
       }
       if (anyPreviousIntent.grossAmount && currentTotal !== anyPreviousIntent.grossAmount) {
         this.logger.error(
@@ -149,7 +161,11 @@ export class PaymentService {
 
       // Платим только за PLATFORM позиции (EXTERNAL оплачиваются у провайдера)
       let platformTotal = partitioned.platformTotal;
+      const appliedPromo = session.appliedPromoCodeSnapshot as { discountAmount?: number } | null | undefined;
       const appliedCert = session.appliedGiftCertificateSnapshot as { discountAmount: number } | null | undefined;
+      if (appliedPromo?.discountAmount) {
+        platformTotal = Math.max(0, platformTotal - appliedPromo.discountAmount);
+      }
       if (appliedCert?.discountAmount) {
         platformTotal = Math.max(0, platformTotal - appliedCert.discountAmount);
       }
@@ -166,6 +182,27 @@ export class PaymentService {
         commissionRate = first.commissionRateSnapshot;
         platformFee = partitioned.platform.reduce((sum, s) => sum + (s.platformFeeSnapshot || 0), 0);
         supplierAmount = grossAmount - platformFee;
+      }
+    }
+
+    // ============================================
+    // PaymentContext (P3.2 — режимы платежей)
+    // ============================================
+    let paymentMode: PaymentMode | null = null;
+    let agentSchemeEnabled = false;
+    let splitEnabled = false;
+    let pspFeeMode: string | null = null;
+
+    if (supplierId) {
+      const operator = await this.prisma.operator.findUnique({
+        where: { id: supplierId },
+        select: { paymentMode: true, agentSchemeEnabled: true, splitEnabled: true, pspFeeMode: true },
+      });
+      if (operator) {
+        paymentMode = operator.paymentMode;
+        agentSchemeEnabled = operator.agentSchemeEnabled;
+        splitEnabled = operator.splitEnabled;
+        pspFeeMode = operator.pspFeeMode;
       }
     }
 
@@ -202,6 +239,11 @@ export class PaymentService {
         metadata: {
           paymentIntentId: key,
           checkoutSessionId,
+          paymentMode,
+          agentSchemeEnabled,
+          splitEnabled,
+          supplierId,
+          pspFeeMode,
         },
         supplierId,
         supplierAmount,
@@ -324,14 +366,32 @@ export class PaymentService {
         );
       }
 
-      // Инкрементируем successfulSales для поставщика
-      if (intent.supplierId) {
-        await tx.operator
-          .update({
-            where: { id: intent.supplierId },
-            data: { successfulSales: { increment: 1 } },
-          })
-          .catch((e) => this.logger.error('payment callback failed: ' + (e as Error).message));
+      // Инкрементируем successfulSales и записываем проводку в книге поставщика
+      // Только для оплат через платформу (provider !== EXTERNAL)
+      const supplierId = intent.supplierId;
+      const shouldRecordSale =
+        intent.provider !== 'EXTERNAL' &&
+        supplierId &&
+        updatedIntent.supplierAmount &&
+        updatedIntent.supplierAmount > 0;
+      if (shouldRecordSale && supplierId) {
+        await Promise.all([
+          tx.operator
+            .update({
+              where: { id: supplierId },
+              data: { successfulSales: { increment: 1 } },
+            })
+            .catch((e) => this.logger.error('payment callback failed: ' + (e as Error).message)),
+          this.supplierLedger
+            .recordSale(supplierId, Number(updatedIntent.supplierAmount) / 100, 'PAYMENT', updatedIntent.id)
+            .catch((e) =>
+              this.logger.error(
+                `supplier_ledger_sale_failed operatorId=${intent.supplierId} paymentIntentId=${updatedIntent.id} error=${
+                  e instanceof Error ? e.message : String(e)
+                }`,
+              ),
+            ),
+        ]);
       }
 
       return updatedIntent;
@@ -346,6 +406,7 @@ export class PaymentService {
           shortCode: true,
           offersSnapshot: true,
           giftCertificateSnapshot: true,
+          appliedPromoCodeSnapshot: true,
           totalPrice: true,
         },
       });
@@ -408,6 +469,18 @@ export class PaymentService {
             .catch((e: unknown) =>
               this.logger.warn(
                 `[intent=${intentId}] LastCustomerSnapshot upsert failed: ${e instanceof Error ? e.message : String(e)}`,
+              ),
+            );
+        }
+
+        // Отметить промокод использованным (best-effort, не ломает оплату)
+        const appliedPromo = session.appliedPromoCodeSnapshot as { promoId?: string } | null;
+        if (appliedPromo?.promoId) {
+          this.promoCodes
+            .markUsed(appliedPromo.promoId)
+            .catch((e: unknown) =>
+              this.logger.warn(
+                `[intent=${intentId}] markUsed promo failed: ${e instanceof Error ? e.message : String(e)}`,
               ),
             );
         }

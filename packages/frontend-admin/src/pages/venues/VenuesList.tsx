@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -114,9 +114,15 @@ export function VenuesListPage() {
       />
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState
+          title="Не удалось загрузить список мест"
+          description={error}
+          action={
+            <Button variant="outline" onClick={() => setSearch((s) => s)}>
+              Повторить попытку
+            </Button>
+          }
+        />
       )}
 
       <Card>
@@ -140,13 +146,20 @@ export function VenuesListPage() {
           <CardDescription>{items.length} мест</CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={columns}
-            data={items}
-            onRowClick={(item) => navigate(`/venues/${item.id}`)}
-            loading={loading}
-            emptyText="Нет мест. Добавьте первое!"
-          />
+          {items.length === 0 && !loading ? (
+            <EmptyState
+              title="Нет мест"
+              description="Создайте первое место, чтобы привязать к нему события."
+            />
+          ) : (
+            <DataTable
+              columns={columns}
+              data={items}
+              onRowClick={(item) => navigate(`/venues/${item.id}`)}
+              loading={loading}
+              emptyText="Нет мест. Добавьте первое!"
+            />
+          )}
         </CardContent>
       </Card>
     </div>

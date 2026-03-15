@@ -2,7 +2,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -192,19 +192,27 @@ export function SuppliersListPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load on mount only
   }, []);
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Поставщики"
-        subtitle={`Всего: ${total}`}
-      />
+      <PageHeader title="Поставщики" subtitle={`Всего: ${total}`} />
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState
+          title="Не удалось загрузить поставщиков"
+          description={error}
+          action={
+            <button
+              type="button"
+              className="rounded-lg border px-3 py-1.5 text-sm"
+              onClick={() => load({ page: 1 })}
+            >
+              Повторить попытку
+            </button>
+          }
+        />
       )}
 
       <Card>
@@ -267,17 +275,24 @@ export function SuppliersListPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={columns}
-            data={suppliers}
-            loading={loading}
-            emptyText="Нет поставщиков"
-            onRowClick={(item) => {
-              const isAggregator = typeof item.id === 'string' && item.id.startsWith('agg:');
-              if (!isAggregator) navigate(`/suppliers/${item.id}`);
-            }}
-            pageSize={20}
-          />
+          {suppliers.length === 0 && !loading ? (
+            <EmptyState
+              title="Нет поставщиков"
+              description="Как только появятся поставщики или подключённые агрегаторы, они отобразятся здесь."
+            />
+          ) : (
+            <DataTable
+              columns={columns}
+              data={suppliers}
+              loading={loading}
+              emptyText="Нет поставщиков"
+              onRowClick={(item) => {
+                const isAggregator = typeof item.id === 'string' && item.id.startsWith('agg:');
+                if (!isAggregator) navigate(`/suppliers/${item.id}`);
+              }}
+              pageSize={20}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

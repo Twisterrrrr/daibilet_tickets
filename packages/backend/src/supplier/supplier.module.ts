@@ -8,6 +8,9 @@ import { OperatorScopeGuard } from '../common/guards/operator-scope.guard';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ReviewCapabilityService } from '../review/review-capability.service';
 import { SupplierLedgerService } from '../ledger/supplier-ledger.service';
+import { SupplierDisputeService } from '../supplier-finance/supplier-dispute.service';
+import { SupplierReconciliationService } from '../supplier-finance/supplier-reconciliation.service';
+import { SupplierFinanceSummaryService } from '../supplier-finance/supplier-finance-summary.service';
 import { ReportsModule } from '../reports/reports.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { SupplierRbacService } from './supplier-rbac.service';
@@ -50,11 +53,22 @@ import { SupplierInvitationService } from './supplier-invitation.service';
     SupplierIntegrationsService,
     SupplierInvitationService,
     SupplierLedgerService,
+    SupplierDisputeService,
+    SupplierReconciliationService,
+    SupplierFinanceSummaryService,
     ReviewCapabilityService,
     OperatorScopeGuard,
     SupplierRolesGuard,
   ],
   controllers: [SupplierController, SupplierUploadController],
-  exports: [SupplierAuthService, SupplierRbacService, SupplierTrustService, SupplierLedgerService],
+  exports: [
+    SupplierAuthService,
+    SupplierRbacService,
+    SupplierTrustService,
+    SupplierLedgerService,
+    SupplierDisputeService,
+    SupplierReconciliationService,
+    SupplierFinanceSummaryService,
+  ],
 })
 export class SupplierModule {}

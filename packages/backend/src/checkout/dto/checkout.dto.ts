@@ -179,6 +179,10 @@ export class CreateCheckoutSessionDto {
 
   @IsOptional()
   @IsString()
+  promoCode?: string;
+
+  @IsOptional()
+  @IsString()
   referrer?: string;
 
   @IsOptional()

@@ -3,7 +3,7 @@
  *
  * Правила:
  *  - Идемпотентность: upsert по slug (update если есть, create если нет)
- *  - Slug генерируется из shortTitle или title (транслитерация)
+ *  - Slug задаётся явно в данных (не генерируется)
  *  - Не создаёт Event — только Venue
  *  - Реальные данные: адреса, координаты, часы работы, цены
  *
@@ -35,54 +35,6 @@ interface VenueSeed {
   highlights?: string[];
   features?: string[];
   faq?: Array<{ q: string; a: string }>;
-}
-
-// ─── Slug Generator ───────────────────────────────
-const TRANSLIT: Record<string, string> = {
-  а: 'a',
-  б: 'b',
-  в: 'v',
-  г: 'g',
-  д: 'd',
-  е: 'e',
-  ё: 'yo',
-  ж: 'zh',
-  з: 'z',
-  и: 'i',
-  й: 'j',
-  к: 'k',
-  л: 'l',
-  м: 'm',
-  н: 'n',
-  о: 'o',
-  п: 'p',
-  р: 'r',
-  с: 's',
-  т: 't',
-  у: 'u',
-  ф: 'f',
-  х: 'kh',
-  ц: 'ts',
-  ч: 'ch',
-  ш: 'sh',
-  щ: 'shch',
-  ъ: '',
-  ы: 'y',
-  ь: '',
-  э: 'e',
-  ю: 'yu',
-  я: 'ya',
-};
-
-function _generateSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .split('')
-    .map((c) => TRANSLIT[c] ?? c)
-    .join('')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .substring(0, 80);
 }
 
 // ════════════════════════════════════════════════════

@@ -20,7 +20,7 @@ export function PromoBlockCreatePage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    promoCollectionsApi.list().then(setCollections).catch(() => { /* noop */ });
+    promoCollectionsApi.list().then(setCollections).catch(() => undefined);
   }, []);
 
   const handleSave = async () => {

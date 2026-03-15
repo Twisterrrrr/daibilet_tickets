@@ -22,7 +22,7 @@ import {
   YAxis,
 } from 'recharts';
 
-import { ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { ErrorState, PageHeader, StatCard as SharedStatCard } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -131,43 +131,6 @@ function formatShortDate(iso: string): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
-}
-
-// ─── Stat Card ───────────────────────────────────────────────────────────────
-
-interface StatCardProps {
-  title: string;
-  value: string;
-  trend?: number;
-  icon: React.ElementType;
-  description?: string;
-}
-
-function StatCard({ title, value, trend, icon: Icon, description }: StatCardProps) {
-  const isPositive = trend !== undefined && trend >= 0;
-  const TrendIcon = isPositive ? TrendingUp : TrendingDown;
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {trend !== undefined && (
-          <p className={`flex items-center gap-1 text-xs ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
-            <TrendIcon className="h-3 w-3" />
-            <span>
-              {isPositive ? '+' : ''}
-              {trend}% за 30 дней
-            </span>
-          </p>
-        )}
-        {description && <p className="text-xs text-muted-foreground">{description}</p>}
-      </CardContent>
-    </Card>
-  );
 }
 
 // ─── Loading Skeleton ────────────────────────────────────────────────────────
@@ -283,29 +246,62 @@ export function DashboardPage() {
 
       {/* Stat cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Выручка (30 дн)"
+        <SharedStatCard
+          label="Выручка (30 дн)"
           value={formatCurrency(stats.revenue30d)}
-          trend={stats.revenueTrend}
-          icon={DollarSign}
+          icon={<DollarSign className="h-4 w-4 text-slate-400" />}
+          description={
+            stats.revenueTrend !== undefined ? (
+              <span className={`flex items-center gap-1 text-xs ${stats.revenueTrend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                {stats.revenueTrend >= 0 ? (
+                  <TrendingUp className="h-3 w-3" />
+                ) : (
+                  <TrendingDown className="h-3 w-3" />
+                )}
+                <span>
+                  {stats.revenueTrend >= 0 ? '+' : ''}
+                  {stats.revenueTrend}% за 30 дней
+                </span>
+              </span>
+            ) : null
+          }
         />
-        <StatCard
-          title="Продано билетов"
+        <SharedStatCard
+          label="Продано билетов"
           value={stats.ticketsSold30d.toString()}
-          trend={stats.ticketsSoldTrend}
-          icon={Ticket}
+          icon={<Ticket className="h-4 w-4 text-slate-400" />}
+          description={
+            stats.ticketsSoldTrend !== undefined ? (
+              <span
+                className={`flex items-center gap-1 text-xs ${
+                  stats.ticketsSoldTrend >= 0 ? 'text-emerald-600' : 'text-red-500'
+                }`}
+              >
+                {stats.ticketsSoldTrend >= 0 ? (
+                  <TrendingUp className="h-3 w-3" />
+                ) : (
+                  <TrendingDown className="h-3 w-3" />
+                )}
+                <span>
+                  {stats.ticketsSoldTrend >= 0 ? '+' : ''}
+                  {stats.ticketsSoldTrend}% за 30 дней
+                </span>
+              </span>
+            ) : null
+          }
         />
-        <StatCard
-          title="Активные события"
+        <SharedStatCard
+          label="Активные события"
           value={stats.activeEvents.toString()}
-          trend={stats.activeEventsTrend}
-          icon={CalendarDays}
-          description={`${stats.events.total} всего в базе`}
+          icon={<CalendarDays className="h-4 w-4 text-slate-400" />}
+          description={`${stats.events.total} всего в базе · ${
+            stats.activeEventsTrend >= 0 ? '+' : ''
+          }${stats.activeEventsTrend}% за 30 дней`}
         />
-        <StatCard
-          title="Отзывы на модерации"
+        <SharedStatCard
+          label="Отзывы на модерации"
           value={stats.pendingReviews.toString()}
-          icon={MessageSquare}
+          icon={<MessageSquare className="h-4 w-4 text-slate-400" />}
           description={stats.pendingReviews > 0 ? 'Требуют проверки' : 'Нет новых'}
         />
       </div>

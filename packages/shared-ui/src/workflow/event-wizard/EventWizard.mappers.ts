@@ -117,11 +117,10 @@ export function mapEventToDraft(event: AdminEventDetailLite): EventWizardDraft {
  * ВАЖНО: payload должен соответствовать тому, что сейчас формирует EventCreatePage.
  * Здесь НЕЛЬЗЯ менять структуру бэкенд‑контракта.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapDraftToCreatePayload(draft: EventWizardDraft): any {
+export function mapDraftToCreatePayload(draft: EventWizardDraft): Record<string, unknown> {
   const { basics, schedule: _schedule, tickets } = draft;
 
-  const payload: any = {
+  const payload: Record<string, unknown> = {
     title: basics.title,
     // TODO: slug: либо доверять автогенерации на бэке, либо маппить из basics.slug, если контракт это поддерживает.
     cityId: basics.cityId,
@@ -166,11 +165,10 @@ export function mapDraftToCreatePayload(draft: EventWizardDraft): any {
  * - SEO/quality
  * - offers/sessions отдельными вызовами.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapDraftToUpdatePayload(draft: EventWizardDraft): any {
+export function mapDraftToUpdatePayload(draft: EventWizardDraft): Record<string, unknown> {
   const { basics } = draft;
 
-  const payload: any = {
+  const payload: Record<string, unknown> = {
     // Минимальный набор для override‑обновления; остальные части (офферы, сессии)
     // будут обновляться через специализированные адаптеры поверх существующих API.
     title: basics.title || undefined,

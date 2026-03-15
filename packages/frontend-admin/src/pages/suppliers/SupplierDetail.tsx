@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -22,7 +22,7 @@ export function SupplierDetailPage() {
 
   const SUPPLIER_ROLES = ['OWNER', 'MANAGER', 'CONTENT', 'ACCOUNTANT'] as const;
 
-  const load = () => {
+  const load = useCallback(() => {
     adminApi.get(`/admin/suppliers/${id}`).then((data: any) => {
       setSupplier(data);
       setForm({
@@ -41,11 +41,11 @@ export function SupplierDetailPage() {
         setApiKeys(keys || []);
       })
       .catch((e) => console.error('Load API keys failed:', e));
-  };
+  }, [id]);
 
   useEffect(() => {
     load();
-  }, [id]);
+  }, [id, load]);
 
   const save = async () => {
     try {

@@ -97,6 +97,8 @@ export function EventCard({
 }: EventCardProps) {
   const router = useRouter();
   const safeReviewCount = reviewCount ?? 0;
+  const hasEnoughReviews = safeReviewCount >= 10;
+  const hasRating = hasEnoughReviews && Number(rating) > 0;
   const showLowTickets =
     totalAvailableTickets !== undefined && totalAvailableTickets > 0 && totalAvailableTickets <= LOW_TICKETS_THRESHOLD;
   const showPopular = safeReviewCount >= 100;
@@ -218,12 +220,14 @@ export function EventCard({
         <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500 sm:text-xs">
           <span className="flex items-center gap-0.5 shrink-0">
             <Star
-              className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${Number(rating) > 0 ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'}`}
+              className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${
+                hasRating ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'
+              }`}
             />
-            {Number(rating) > 0 ? (
+            {hasRating ? (
               <>
                 <span className="font-medium text-slate-700">{Number(rating).toFixed(1)}</span>
-                {safeReviewCount > 0 && <span className="text-slate-400">({safeReviewCount})</span>}
+                <span className="text-slate-400">({safeReviewCount})</span>
               </>
             ) : (
               <span className="font-medium text-slate-400">Новое</span>

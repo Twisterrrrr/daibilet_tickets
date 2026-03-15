@@ -12,6 +12,8 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -112,10 +114,10 @@ function formatDate(date: string): string {
 export function CheckoutSessionsListPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Заявки и сессии</h1>
-        <p className="text-muted-foreground">Управление заказами и заявками на подтверждение</p>
-      </div>
+      <PageHeader
+        title="Заявки и сессии"
+        subtitle="Управление заказами и заявками на подтверждение"
+      />
 
       <Tabs defaultValue="requests" className="space-y-4">
         <TabsList>

@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -114,9 +114,15 @@ export function TagsListPage() {
       />
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState
+          title="Не удалось загрузить теги"
+          description={error}
+          action={
+            <Button variant="outline" onClick={() => setCategory((c) => c)}>
+              Повторить попытку
+            </Button>
+          }
+        />
       )}
 
       {/* Filters */}
@@ -160,13 +166,20 @@ export function TagsListPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={columns}
-            data={data}
-            onRowClick={handleRowClick}
-            loading={loading}
-            emptyText="Нет тегов"
-          />
+          {data.length === 0 && !loading ? (
+            <EmptyState
+              title="Нет тегов"
+              description="Создайте первый тег, чтобы начать категоризацию событий и лендингов."
+            />
+          ) : (
+            <DataTable
+              columns={columns}
+              data={data}
+              onRowClick={handleRowClick}
+              loading={loading}
+              emptyText="Нет тегов"
+            />
+          )}
         </CardContent>
       </Card>
     </div>

@@ -21,7 +21,15 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { CreateApiKeyDto, UpdateSupplierDto, UpdateWebhookDto, UpdateSupplierUserRoleDto } from './dto/admin.dto';
+import {
+  CreateApiKeyDto,
+  UpdateSupplierDto,
+  UpdateWebhookDto,
+  UpdateSupplierUserRoleDto,
+  UpdateOperatorPaymentSettingsDto,
+} from './dto/admin.dto';
+import { AuditService } from './audit.service';
+import { AuditService } from './audit.service';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -29,7 +37,10 @@ import { CreateApiKeyDto, UpdateSupplierDto, UpdateWebhookDto, UpdateSupplierUse
 @UseInterceptors(AuditInterceptor)
 @Controller('admin/suppliers')
 export class AdminSuppliersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   /**
    * Список поставщиков.
@@ -504,5 +515,106 @@ export class AdminSuppliersController {
         platformFee: t._sum.platformFee || 0,
       })),
     };
+  }
+
+  // ============================
+  // Payment settings (P3.2)
+  // ============================
+
+  @Get(':id/payment-settings')
+  @Roles('ADMIN')
+  async getPaymentSettings(@Param('id') id: string) {
+    const operator = await this.prisma.operator.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        paymentMode: true,
+        agentSchemeEnabled: true,
+        splitEnabled: true,
+        pspFeeMode: true,
+      },
+    });
+    if (!operator) {
+      throw new NotFoundException('Поставщик не найден');
+    }
+    return operator;
+  }
+
+  @Patch(':id/payment-settings')
+  @Roles('ADMIN')
+  async updatePaymentSettings(
+    @Param('id') id: string,
+    @Body() dto: UpdateOperatorPaymentSettingsDto,
+    @Req() req: { user: { id: string } },
+  ) {
+    const operator = await this.prisma.operator.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        yookassaAccountId: true,
+        paymentMode: true,
+        agentSchemeEnabled: true,
+        splitEnabled: true,
+        pspFeeMode: true,
+      },
+    });
+    if (!operator) {
+      throw new NotFoundException('Поставщик не найден');
+    }
+
+    const before = {
+      paymentMode: operator.paymentMode,
+      agentSchemeEnabled: operator.agentSchemeEnabled,
+      splitEnabled: operator.splitEnabled,
+      pspFeeMode: operator.pspFeeMode,
+    };
+
+    const data: Prisma.OperatorUpdateInput = {};
+    if (dto.paymentMode !== undefined) {
+      data.paymentMode = dto.paymentMode;
+    }
+    if (dto.agentSchemeEnabled !== undefined) {
+      data.agentSchemeEnabled = dto.agentSchemeEnabled;
+    }
+    if (dto.splitEnabled !== undefined) {
+      if (dto.splitEnabled && !operator.yookassaAccountId) {
+        throw new BadRequestException('Нельзя включить splitEnabled без yookassaAccountId у оператора');
+      }
+      data.splitEnabled = dto.splitEnabled;
+    }
+    if (dto.pspFeeMode !== undefined) {
+      data.pspFeeMode = dto.pspFeeMode;
+    }
+
+    const updated = await this.prisma.operator.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        name: true,
+        paymentMode: true,
+        agentSchemeEnabled: true,
+        splitEnabled: true,
+        pspFeeMode: true,
+      },
+    });
+
+    await this.audit.log(
+      req.user.id,
+      'UPDATE',
+      'OperatorPaymentSettings',
+      updated.id,
+      before as unknown as Prisma.InputJsonValue,
+      {
+        paymentMode: updated.paymentMode,
+        agentSchemeEnabled: updated.agentSchemeEnabled,
+        splitEnabled: updated.splitEnabled,
+        pspFeeMode: updated.pspFeeMode,
+      } as unknown as Prisma.InputJsonValue,
+    );
+
+    return updated;
   }
 }

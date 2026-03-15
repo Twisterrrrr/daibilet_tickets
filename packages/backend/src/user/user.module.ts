@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
 import { PrismaModule } from '../prisma/prisma.module';
+import { OptionalUserJwtGuard } from './user-optional.guard';
 import { UserJwtGuard } from './user.guard';
 import { UserAuthController } from './user-auth.controller';
 import { UserAuthService } from './user-auth.service';
@@ -24,8 +25,8 @@ import { UserJwtStrategy } from './user-jwt.strategy';
       }),
     }),
   ],
-  providers: [UserJwtStrategy, UserAuthService, UserFavoritesService, UserJwtGuard],
+  providers: [UserJwtStrategy, UserAuthService, UserFavoritesService, UserJwtGuard, OptionalUserJwtGuard],
   controllers: [UserAuthController, UserFavoritesController],
-  exports: [UserAuthService, UserFavoritesService],
+  exports: [UserAuthService, UserFavoritesService, UserJwtGuard, OptionalUserJwtGuard],
 })
 export class UserModule {}

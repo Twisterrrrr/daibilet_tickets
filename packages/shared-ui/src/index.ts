@@ -12,6 +12,7 @@ export * from './states/ErrorState';
 export * from './actions/ActionGroup';
 
 export * from './cards/SectionCard';
+export * from './cards/StatCard';
 
 export * from './forms/FormSection';
 export * from './forms/FormGrid';
@@ -30,4 +31,6 @@ export * from './workflow/event-wizard/TicketsPricingStep';
 export * from './workflow/event-wizard/CapacityAvailabilityStep';
 export * from './workflow/event-wizard/PublishReviewStep';
 export * from './workflow/event-wizard/EventWizard';
+
+export * from './date/DateRangePicker';
 

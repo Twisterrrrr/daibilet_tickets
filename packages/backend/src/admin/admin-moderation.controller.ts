@@ -33,9 +33,15 @@ export class AdminModerationController {
 
   /**
    * Очередь модерации: события со статусом PENDING_REVIEW или AUTO_APPROVED (пост-модерация).
+   * sortBy=trust_asc — приоритет модерации по trust level (низкий первым).
    */
   @Get('queue')
-  async queue(@Query('status') status?: string, @Query('page') pageRaw = '1', @Query('limit') limitRaw = '25') {
+  async queue(
+    @Query('status') status?: string,
+    @Query('page') pageRaw = '1',
+    @Query('limit') limitRaw = '25',
+    @Query('sortBy') sortBy?: string,
+  ) {
     const page = Number(pageRaw) || 1;
     const limit = Number(limitRaw) || 25;
 
@@ -46,6 +52,11 @@ export class AdminModerationController {
       where.moderationStatus = { in: ['PENDING_REVIEW', 'AUTO_APPROVED'] };
     }
 
+    const orderByTrustAsc = sortBy === 'trust_asc';
+    const orderBy = orderByTrustAsc
+      ? [{ operator: { trustLevel: 'asc' as const } }, { createdAt: 'desc' as const }]
+      : [{ createdAt: 'desc' as const }];
+
     const [items, total] = await Promise.all([
       this.prisma.event.findMany({
         where,
@@ -54,14 +65,14 @@ export class AdminModerationController {
           operator: { select: { id: true, name: true, trustLevel: true, companyName: true } },
           _count: { select: { offers: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
       this.prisma.event.count({ where }),
     ]);
 
-    return { items, total, page, pages: Math.ceil(total / limit) };
+    return { items, total, page, pages: Math.ceil(total / limit), sortBy: sortBy ?? 'created_desc' };
   }
 
   /**

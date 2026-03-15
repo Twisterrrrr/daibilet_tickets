@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
-import { SupplierRole } from '@prisma/client';
+import { PaymentMode, SupplierRole } from '@prisma/client';
 
 export class UpdateSupplierDto {
   @ApiPropertyOptional({ description: 'Trust level: 0, 1, 2' })
@@ -83,4 +83,26 @@ export class UpdateSupplierUserRoleDto {
   @ApiProperty({ enum: SupplierRole })
   @IsEnum(SupplierRole)
   role!: SupplierRole;
+}
+
+export class UpdateOperatorPaymentSettingsDto {
+  @ApiPropertyOptional({ enum: PaymentMode })
+  @IsOptional()
+  @IsEnum(PaymentMode)
+  paymentMode?: PaymentMode;
+
+  @ApiPropertyOptional({ description: 'Включить агентскую схему (agent_sign) для чеков' })
+  @IsOptional()
+  @IsBoolean()
+  agentSchemeEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Разрешить split-платежи (будущее использование)' })
+  @IsOptional()
+  @IsBoolean()
+  splitEnabled?: boolean;
+
+  @ApiPropertyOptional({ enum: PspFeeMode })
+  @IsOptional()
+  @IsEnum(PspFeeMode)
+  pspFeeMode?: PspFeeMode;
 }

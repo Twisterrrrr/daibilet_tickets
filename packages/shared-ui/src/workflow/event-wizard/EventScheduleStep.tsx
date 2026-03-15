@@ -97,10 +97,10 @@ export function ScheduleBuilder({ value, onChange, summary }: ScheduleBuilderPro
 
 function modeButtonClasses(active: boolean) {
   return [
-    'rounded-full border px-3 py-1 font-medium transition-colors',
+    'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
     active
-      ? 'border-slate-900 bg-slate-900 text-white'
-      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+      ? 'border-sky-600 bg-sky-600 text-white shadow-sm'
+      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100',
   ].join(' ');
 }
 
@@ -184,15 +184,47 @@ export interface StartsAtListProps {
   onChange: (next: string[]) => void;
 }
 
+function isoToLocalDateTimeInput(value: string): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  const year = d.getFullYear();
+  const month = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  const hours = `${d.getHours()}`.padStart(2, '0');
+  const minutes = `${d.getMinutes()}`.padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function localDateTimeInputToIsoUtc(value: string): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toISOString();
+}
+
 export function StartsAtList({ startsAtList, onChange }: StartsAtListProps) {
   const handleAdd = () => {
     onChange([...startsAtList, '']);
   };
 
   const handleChange = (index: number, value: string) => {
+    const iso = localDateTimeInputToIsoUtc(value);
     const next = [...startsAtList];
-    next[index] = value;
-    onChange(next);
+    next[index] = iso;
+    // Простая защита от overlap: дедуп по ISO.
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const v of next) {
+      if (!v) {
+        deduped.push(v);
+        continue;
+      }
+      if (seen.has(v)) continue;
+      seen.add(v);
+      deduped.push(v);
+    }
+    onChange(deduped);
   };
 
   const handleRemove = (index: number) => {
@@ -216,7 +248,7 @@ export function StartsAtList({ startsAtList, onChange }: StartsAtListProps) {
           <div key={index} className="flex items-center gap-2">
             <input
               type="datetime-local"
-              value={start}
+              value={isoToLocalDateTimeInput(start)}
               onChange={(e) => handleChange(index, e.target.value)}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
             />

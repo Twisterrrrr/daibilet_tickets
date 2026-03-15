@@ -13,11 +13,13 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:prod": "prisma migrate deploy",
-    "db:seed": "ts-node prisma/seed.ts",
+    "db:seed": "npx tsx prisma/seed.ts",
     "db:seed:tep-widgets": "npx tsx prisma/seed-teplohod-widgets.ts",
     "db:seed:regions": "npx tsx prisma/seed-regions.ts",
     "db:seed:qf": "npx tsx prisma/seed-query-filters.ts",
     "db:seed:seo": "npx tsx prisma/seed-seo-templates.ts",
+    "db:seed:supplier-finance": "npx tsx prisma/seed-supplier-finance.ts",
+    "db:seed:buyer-test": "npx tsx prisma/seed-buyer-account-test.ts",
     "sync:tep": "npx tsx scripts/sync-teplohod.ts",
     "full:sync": "npx tsx scripts/full-sync.ts",
     "check:sync-env": "npx tsx scripts/check-sync-env.ts",
@@ -30,6 +32,9 @@
     "fix:teplohod-river": "npx tsx prisma/fix-teplohod-river-excursions.ts",
     "gen:proto": "node -e \"require('fs').mkdirSync('src/generated',{recursive:true})\" && protoc --plugin=protoc-gen-ts_proto=./node_modules/ts-proto/protoc-gen-ts_proto --ts_proto_out=./src/generated --ts_proto_opt=esModuleInterop=true --ts_proto_opt=outputServices=false -I ./proto/tc-simple -I ./node_modules/google-proto-files ./proto/tc-simple/events.proto ./proto/tc-simple/venues.proto ./proto/tc-simple/geo.proto ./proto/tc-simple/generic.proto ./proto/tc-simple/meta_events.proto ./proto/tc-simple/mods.proto",
     "db:studio": "prisma studio"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@daibilet/shared": "workspace:*",

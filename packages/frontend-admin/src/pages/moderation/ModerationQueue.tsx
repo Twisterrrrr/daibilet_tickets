@@ -1,5 +1,5 @@
 import { CheckCircle, Clock, Eye, XCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { EmptyState, PageHeader, SectionCard } from '@daibilet/shared-ui';
@@ -15,17 +15,17 @@ export function ModerationQueuePage() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  const load = () => {
+  const load = useCallback(() => {
     const params = sortBy === 'trust_asc' ? '?sortBy=trust_asc' : '';
-    adminApi.get(`/admin/moderation/queue${params}`).then((res: any) => {
+    adminApi.get<{ items: unknown[]; total: number }>(`/admin/moderation/queue${params}`).then((res) => {
       setEvents(res.items || []);
       setTotal(res.total || 0);
     });
-  };
+  }, [sortBy]);
 
   useEffect(() => {
     load();
-  }, [sortBy]);
+  }, [load]);
 
   const approve = async (id: string) => {
     try {

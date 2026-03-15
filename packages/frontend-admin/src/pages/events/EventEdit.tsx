@@ -146,6 +146,8 @@ interface EventOverride {
   minAge?: number | null;
   manualRating?: number | null;
   templateData?: Record<string, unknown> | null;
+  manualBoost?: number | null;
+  suppressLowQuality?: boolean | null;
 }
 
 interface VenueOption {
@@ -236,6 +238,8 @@ export function EventEditPage() {
     isPermanent?: boolean;
     endDate?: string | null;
     templateData?: Record<string, unknown>;
+    manualBoost?: number | null;
+    suppressLowQuality?: boolean;
   }>({});
 
   const [wizardDraft, setWizardDraft] = useState<EventWizardDraft | null>(null);
@@ -314,6 +318,8 @@ export function EventEditPage() {
           isPermanent: data.isPermanent ?? false,
           endDate: data.endDate ? data.endDate.slice(0, 10) : null,
           templateData: (ov as EventOverride)?.templateData ?? {},
+          manualBoost: ov?.manualBoost ?? null,
+          suppressLowQuality: ov?.suppressLowQuality ?? false,
         });
         setWizardDraft(mapEventToDraft(data));
       })
@@ -440,6 +446,8 @@ export function EventEditPage() {
           isPermanent: data.isPermanent ?? false,
           endDate: data.endDate ? data.endDate.slice(0, 10) : null,
           templateData: (ov as EventOverride)?.templateData ?? {},
+          manualBoost: ov?.manualBoost ?? null,
+          suppressLowQuality: ov?.suppressLowQuality ?? false,
         });
         toast.success('Override сброшен');
         refreshQuality(id);
@@ -1153,12 +1161,12 @@ export function EventEditPage() {
         {/* ── Rating Tab ── */}
         <TabsContent value="rating">
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Current rating */}
+            {/* Current rating + overrides */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Текущий рейтинг</CardTitle>
+                <CardTitle className="text-base">Рейтинг и видимость</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-50">
                     <Star className="h-8 w-8 fill-amber-400 text-amber-400" />
@@ -1179,6 +1187,41 @@ export function EventEditPage() {
                       setForm((f) => ({ ...f, manualRating: e.target.value ? Number(e.target.value) : null }))
                     }
                   />
+                </div>
+                <Separator className="my-4" />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Ручной boost в выдаче</Label>
+                    <Input
+                      type="number"
+                      value={form.manualBoost ?? ''}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          manualBoost: e.target.value === '' ? null : Number(e.target.value) || 0,
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Чем больше значение, тем выше событие в списке (по умолчанию 0).
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={form.suppressLowQuality ?? false}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, suppressLowQuality: e.target.checked }))
+                        }
+                      />
+                      Скрыть из каталога (низкое качество)
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      При включении событие исключается из клиентского каталога без удаления.
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

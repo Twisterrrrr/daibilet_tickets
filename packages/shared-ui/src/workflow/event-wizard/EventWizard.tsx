@@ -34,9 +34,17 @@ export interface EventWizardProps {
   onDraftChange?: (draft: EventWizardDraft) => void;
   onSubmit?: (draft: EventWizardDraft, options?: { action?: 'create' | 'saveDraft' | 'update' }) => void;
   citiesOptions?: { id: string; name: string }[];
+  stepOrderOverride?: EventWizardStepKey[];
 }
 
-export function EventWizard({ initialDraft, mode, onDraftChange, onSubmit, citiesOptions }: EventWizardProps) {
+export function EventWizard({
+  initialDraft,
+  mode,
+  onDraftChange,
+  onSubmit,
+  citiesOptions,
+  stepOrderOverride,
+}: EventWizardProps) {
   const [draft, setDraft] = useState<EventWizardDraft>(initialDraft);
   const [currentStep, setCurrentStep] = useState<EventWizardStepKey>('basics');
   const [isDirty, setIsDirty] = useState(false);
@@ -52,8 +60,8 @@ export function EventWizard({ initialDraft, mode, onDraftChange, onSubmit, citie
   }, [draft]);
 
   const stepOrder: EventWizardStepKey[] = useMemo(
-    () => ['basics', 'schedule', 'ticketsPricing', 'capacity', 'publish'],
-    [],
+    () => stepOrderOverride ?? ['basics', 'schedule', 'ticketsPricing', 'capacity', 'publish'],
+    [stepOrderOverride],
   );
 
   const steps: WorkflowSidebarStep[] = useMemo(() => {

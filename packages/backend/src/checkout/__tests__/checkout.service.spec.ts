@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CheckoutService } from '../checkout.service';
@@ -297,6 +297,74 @@ describe('CheckoutService', () => {
 
       expect(result.shortCode).toBeDefined();
       expect(result.shortCode).toMatch(/^CS-/);
+    });
+
+    it('should store userId when user is authenticated', async () => {
+      const createSpy = vi.fn().mockResolvedValue({
+        id: 'session-1',
+        status: 'PENDING_CONFIRMATION',
+        totalPrice: 1000,
+        expiresAt: new Date(Date.now() + 30 * 60_000),
+      });
+      mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+        return fn({
+          checkoutSession: { create: createSpy },
+          orderRequest: { create: vi.fn().mockResolvedValue({ id: 'or-1' }) },
+        });
+      });
+
+      await service.createCheckoutSession({
+        items: [validItem],
+        customer,
+        userId: 'user-uuid-123',
+      });
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'user-uuid-123',
+          }),
+        }),
+      );
+    });
+  });
+
+  // =========================================
+  // getOrderByIdForUser (ownership)
+  // =========================================
+
+  describe('getOrderByIdForUser', () => {
+    const sessionUuid = '11111111-1111-1111-1111-111111111111';
+
+    it('should throw ForbiddenException when order belongs to another user', async () => {
+      mockPrisma.checkoutSession.findUnique.mockResolvedValue({
+        id: sessionUuid,
+        shortCode: 'CS-ABC',
+        userId: 'other-user-id',
+        status: 'COMPLETED',
+        totalPrice: 1000,
+        customerName: 'Other',
+        customerEmail: 'other@test.com',
+        customerPhone: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        completedAt: new Date(),
+        expiresAt: null,
+        offersSnapshot: [],
+        orderRequests: [],
+      });
+
+      await expect(
+        service.getOrderByIdForUser('current-user-id', sessionUuid),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException when order does not exist', async () => {
+      mockPrisma.checkoutSession.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.getOrderByIdForUser('current-user-id', sessionUuid),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

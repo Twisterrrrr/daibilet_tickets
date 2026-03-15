@@ -83,7 +83,13 @@ describe('PaymentService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NODE_ENV = 'test';
-    service = new PaymentService(mockPrisma as any, mockConfig as any, mockMailService as any);
+    service = new PaymentService(
+      mockPrisma as any,
+      mockConfig as any,
+      mockMailService as any,
+      { recordSale: vi.fn().mockResolvedValue(undefined) } as any,
+      { markUsed: vi.fn().mockResolvedValue(undefined) } as any,
+    );
   });
 
   // =========================================
@@ -551,6 +557,7 @@ describe('PaymentService', () => {
         ...intent,
         status: 'PAID',
         paidAt: new Date(),
+        supplierAmount: 100000,
       });
       mockPrisma.checkoutSession.update.mockResolvedValue({
         ...intent.checkoutSession,

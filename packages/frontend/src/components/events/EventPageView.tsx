@@ -83,7 +83,7 @@ export function EventPageView({ event }: EventPageViewProps) {
               '@type': 'Organization',
               name: venueName || 'Организатор',
             },
-            ...(Number(event.rating) > 0 && event.reviewCount > 0
+            ...(Number(event.rating) > 0 && (event.reviewCount ?? 0) >= 10
               ? {
                   aggregateRating: {
                     '@type': 'AggregateRating',
@@ -194,8 +194,8 @@ export function EventPageView({ event }: EventPageViewProps) {
               </h1>
 
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/80">
-                {/* Рейтинг */}
-                {Number(event.rating) > 0 && (
+                {/* Рейтинг — показываем только при >= 10 отзывах */}
+                {Number(event.rating) > 0 && (event.reviewCount ?? 0) >= 10 && (
                   <a
                     href="#reviews"
                     className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-white transition hover:bg-white/25"

@@ -14,6 +14,7 @@ export default function FavoritesPage() {
   const [events, setEvents] = useState<EventListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const slugKey = slugs.join(',');
   useEffect(() => {
     if (!mounted || slugs.length === 0) {
       setEvents([]);
@@ -23,7 +24,7 @@ export default function FavoritesPage() {
     let cancelled = false;
     setLoading(true);
     api
-      .getEvents({ slugs: slugs.join(','), limit: 50 })
+      .getEvents({ slugs: slugKey, limit: 50 })
       .then((res) => {
         if (!cancelled) setEvents(res.items || []);
       })
@@ -36,7 +37,7 @@ export default function FavoritesPage() {
     return () => {
       cancelled = true;
     };
-  }, [mounted, slugs.join(',')]);
+  }, [mounted, slugs, slugKey]);
 
   if (!mounted) {
     return (

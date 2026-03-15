@@ -173,10 +173,8 @@ function createMockPrisma() {
         return Promise.resolve(op);
       }),
     },
-    $transaction: vi.fn().mockImplementation(async (fn: any) => fn(mockPrisma)),
+    $transaction: vi.fn().mockImplementation(async (fn: any) => fn(prisma)),
   };
-
-  let mockPrisma: any;
 }
 
 const mockConfig = {
@@ -211,7 +209,13 @@ describe('E2E Scenario 1: Happy Path (PLATFORM → PAID → FULFILLED → COMPLE
     });
 
     // Step 1: Create PaymentIntent
-    const service = new PaymentService(prisma as any, mockConfig as any, mockMailService as any);
+    const service = new PaymentService(
+      prisma as any,
+      mockConfig as any,
+      mockMailService as any,
+      { recordSale: vi.fn().mockResolvedValue(undefined) } as any,
+      { markUsed: vi.fn().mockResolvedValue(undefined) } as any,
+    );
     const result = await service.createPaymentIntent('session-1', 'key-1');
 
     expect(result.paymentIntentId).toBeDefined();

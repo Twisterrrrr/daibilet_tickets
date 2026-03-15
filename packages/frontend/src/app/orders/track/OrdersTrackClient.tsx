@@ -221,7 +221,7 @@ export function OrdersTrackClient() {
   // Auto-search on load if code in URL
   useEffect(() => {
     if (initialCode) handleSearch(initialCode);
-  }, []);
+  }, [initialCode]);
 
   const statusInfo = result ? SESSION_STATUS[result.status] || SESSION_STATUS.STARTED : null;
 

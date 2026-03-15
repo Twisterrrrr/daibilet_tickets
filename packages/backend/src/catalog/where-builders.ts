@@ -84,8 +84,12 @@ export function buildEventWhere(
     isActive: true,
     isDeleted: false,
     canonicalOfId: null,
-    // В каталоге на сайте только опубликованные: без override или override.editorStatus = PUBLISHED
-    OR: [{ override: null }, { override: { editorStatus: 'PUBLISHED' } }],
+    // В каталоге на сайте только опубликованные: без override или override.editorStatus = PUBLISHED,
+    // при этом события с suppressLowQuality=true в override не показываем.
+    OR: [
+      { override: null },
+      { override: { editorStatus: 'PUBLISHED', suppressLowQuality: { not: true } } },
+    ],
     ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),
     city: {
       isActive: true,

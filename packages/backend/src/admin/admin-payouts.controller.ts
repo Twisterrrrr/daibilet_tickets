@@ -91,6 +91,10 @@ export class AdminPayoutsController {
       throw new BadRequestException('Заявка не найдена');
     }
 
+    if (existing.isBlockedByDispute) {
+      throw new BadRequestException('Выплата заблокирована из-за открытого спора по отчёту');
+    }
+
     // Простой сценарий: только смена статуса (без проводки)
     if (body.status !== 'PAID') {
       return this.prisma.supplierPayoutRequest.update({

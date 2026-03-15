@@ -35,6 +35,7 @@ const ROUTE_LABELS: Record<string, string> = {
   articles: 'Статьи',
   reviews: 'Отзывы',
   upsells: 'Upsells',
+  'promo-codes': 'Промокоды',
   audit: 'Аудит',
   'seo-audit': 'SEO Audit',
   settings: 'Настройки',
@@ -81,11 +82,13 @@ function getPageTitle(pathname: string): string {
   return ROUTE_LABELS[first] || first;
 }
 
-export function Layout() {
+function AdminTopbar({
+  onOpenMobileSidebar,
+}: {
+  onOpenMobileSidebar: () => void;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, setTheme } = useTheme();
 
   const handleLogout = async () => {
@@ -99,6 +102,71 @@ export function Layout() {
   };
 
   const pageTitle = getPageTitle(location.pathname);
+
+  return (
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6">
+      {/* Mobile menu */}
+      <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenMobileSidebar}>
+        <Menu className="h-5 w-5" />
+        <span className="sr-only">Меню</span>
+      </Button>
+
+      <div className="flex-1">
+        <h1 className="text-lg font-semibold sm:hidden">{pageTitle}</h1>
+        <div className="hidden sm:block">
+          <Breadcrumbs />
+        </div>
+      </div>
+
+      {/* Theme toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        className="text-muted-foreground"
+      >
+        <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        <span className="sr-only">Переключить тему</span>
+      </Button>
+
+      <Separator orientation="vertical" className="h-6" />
+
+      {/* User menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">AD</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56" align="end" forceMount>
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-medium leading-none">Администратор</p>
+              <p className="text-xs leading-none text-muted-foreground">admin@daibilet.ru</p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => navigate('/settings')}>
+            <User className="mr-2 h-4 w-4" />
+            <span>Настройки</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Выйти</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </header>
+  );
+}
+
+export function Layout() {
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <TooltipProvider>
@@ -124,66 +192,8 @@ export function Layout() {
               collapsed ? 'lg:pl-[68px]' : 'lg:pl-60',
             )}
           >
-            {/* Header */}
-            <header className="sticky top-0 z-20 flex h-14 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6">
-              {/* Mobile menu */}
-              <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)}>
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Меню</span>
-              </Button>
+            <AdminTopbar onOpenMobileSidebar={() => setMobileOpen(true)} />
 
-              <div className="flex-1">
-                <h1 className="text-lg font-semibold sm:hidden">{pageTitle}</h1>
-                <div className="hidden sm:block">
-                  <Breadcrumbs />
-                </div>
-              </div>
-
-              {/* Theme toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="text-muted-foreground"
-              >
-                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="sr-only">Переключить тему</span>
-              </Button>
-
-              <Separator orientation="vertical" className="h-6" />
-
-              {/* User menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">AD</AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">Администратор</p>
-                      <p className="text-xs leading-none text-muted-foreground">admin@daibilet.ru</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/settings')}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Настройки</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Выйти</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </header>
-
-            {/* Page content */}
             <main className="flex-1">
               <PageContainer className="animate-in-page">
                 <Outlet />

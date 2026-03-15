@@ -1,12 +1,13 @@
 import { resolvePurchaseType } from '@daibilet/shared';
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 
 import { TcApiService } from '../catalog/tc-api.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { PaymentFlowType, resolvePaymentFlow } from './cart-partitioning';
+import { PromoCodeService } from '../pricing/promo-code.service';
+import { partitionCart, PaymentFlowType, resolvePaymentFlow, SnapshotLineItem } from './cart-partitioning';
 import {
   calculateExpiresAt,
   CHECKOUT_SESSION_TTL_MINUTES,
@@ -27,6 +28,7 @@ export class CheckoutService {
     private readonly tcApi: TcApiService,
     private readonly mailService: MailService,
     private readonly config: ConfigService,
+    private readonly promoCodes: PromoCodeService,
   ) {}
 
   /** Domain/host from APP_URL for vendor_data.source (e.g. daibilet.ru). */
@@ -469,10 +471,12 @@ export class CheckoutService {
   async createCheckoutSession(data: {
     items: CartItemDto[];
     customer: { name: string; email: string; phone: string };
+    userId?: string | null;
     utm?: { source?: string; medium?: string; campaign?: string };
     referrer?: string;
     userAgent?: string;
     ip?: string;
+    promoCode?: string;
     giftCertificateCode?: string;
   }) {
     if (!data.items || data.items.length === 0) {
@@ -593,9 +597,42 @@ export class CheckoutService {
     // totalPrice вычисляется ТОЛЬКО из snapshot (единственный источник правды по сумме)
     const snapshotTotalPrice = offersSnapshot.reduce((sum, s) => sum + s.lineTotal, 0);
 
+    // platformTotal используется для применяемых скидок (промокоды, сертификаты)
+    const partitioned = partitionCart(offersSnapshot as SnapshotLineItem[]);
+    const platformTotal = partitioned.platformTotal;
+
+    // Применение промокода
+    let appliedPromoSnapshot:
+      | {
+          promoId: string;
+          code: string;
+          type: string;
+          value: number;
+          discountAmount: number;
+        }
+      | null = null;
+
+    let finalTotalPrice = snapshotTotalPrice;
+
+    if (data.promoCode?.trim()) {
+      const promoResult = await this.promoCodes.validate(data.promoCode.trim(), {
+        eventIdsInCart: data.items.map((i) => i.eventId),
+        totalAmount: platformTotal,
+      });
+      if (promoResult.valid && promoResult.promo && promoResult.discountAmount > 0) {
+        appliedPromoSnapshot = {
+          promoId: promoResult.promo.id,
+          code: promoResult.promo.code,
+          type: promoResult.promo.type,
+          value: promoResult.promo.value,
+          discountAmount: promoResult.discountAmount,
+        };
+        finalTotalPrice = Math.max(0, finalTotalPrice - promoResult.discountAmount);
+      }
+    }
+
     // Применение подарочного сертификата
     let appliedGiftCertSnapshot: { certificateId: string; code: string; discountAmount: number } | null = null;
-    let finalTotalPrice = snapshotTotalPrice;
     if (data.giftCertificateCode?.trim()) {
       const validation = await this.validateGiftCertificate(data.giftCertificateCode.trim(), snapshotTotalPrice);
       if (validation.valid && validation.discountAmount) {
@@ -608,7 +645,7 @@ export class CheckoutService {
             code: cert.code,
             discountAmount: validation.discountAmount,
           };
-          finalTotalPrice = Math.max(0, snapshotTotalPrice - validation.discountAmount);
+          finalTotalPrice = Math.max(0, finalTotalPrice - validation.discountAmount);
         }
       }
     }
@@ -623,9 +660,13 @@ export class CheckoutService {
       const cs = await tx.checkoutSession.create({
         data: {
           shortCode,
+          userId: data.userId || null,
           cartSnapshot: data.items as unknown as Prisma.InputJsonValue,
           validatedSnapshot: validation.items as unknown as Prisma.InputJsonValue,
           offersSnapshot: offersSnapshot as unknown as Prisma.InputJsonValue,
+          appliedPromoCodeSnapshot: appliedPromoSnapshot
+            ? (appliedPromoSnapshot as unknown as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
           appliedGiftCertificateSnapshot: appliedGiftCertSnapshot
             ? (appliedGiftCertSnapshot as unknown as Prisma.InputJsonValue)
             : Prisma.JsonNull,
@@ -805,6 +846,51 @@ export class CheckoutService {
       return await this.formatTrackingResult(session);
     }
     return this.trackByShortCode(id);
+  }
+
+  /**
+   * Получить заказ по id (UUID или shortCode) только если он принадлежит пользователю.
+   * @throws NotFoundException если заказ не найден
+   * @throws ForbiddenException если заказ чужой
+   */
+  async getOrderByIdForUser(userId: string, id: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const session = isUuid
+      ? await this.prisma.checkoutSession.findUnique({
+          where: { id },
+          include: {
+            orderRequests: {
+              include: {
+                eventOffer: {
+                  select: {
+                    id: true, priceFrom: true, purchaseType: true,
+                    meetingPoint: true, meetingInstructions: true, operationalPhone: true, operationalNote: true,
+                  },
+                },
+                event: { select: { id: true, title: true, slug: true, imageUrl: true } },
+              },
+            },
+          },
+        })
+      : await this.prisma.checkoutSession.findFirst({
+          where: { shortCode: id.toUpperCase() },
+          include: {
+            orderRequests: {
+              include: {
+                eventOffer: {
+                  select: {
+                    id: true, priceFrom: true, purchaseType: true,
+                    meetingPoint: true, meetingInstructions: true, operationalPhone: true, operationalNote: true,
+                  },
+                },
+                event: { select: { id: true, title: true, slug: true, imageUrl: true } },
+              },
+            },
+          },
+        });
+    if (!session) throw new NotFoundException('Заказ не найден');
+    if (session.userId !== userId) throw new ForbiddenException('Доступ запрещён');
+    return this.formatTrackingResult(session as Parameters<typeof this.formatTrackingResult>[0]);
   }
 
   private async formatTrackingResult(

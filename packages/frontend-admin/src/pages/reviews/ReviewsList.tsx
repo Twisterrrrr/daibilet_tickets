@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { EmptyState, PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -117,6 +117,7 @@ export function ReviewsListPage() {
   const [pages, setPages] = useState(1);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [rejectDialogId, setRejectDialogId] = useState<string | null>(null);
   const [rejectComment, setRejectComment] = useState('');
   const [rejectResponseId, setRejectResponseId] = useState<string | null>(null);
@@ -125,10 +126,12 @@ export function ReviewsListPage() {
   const [responses, setResponses] = useState<SupplierResponseItem[]>([]);
   const [responsesTotal, setResponsesTotal] = useState(0);
   const [responsesLoading, setResponsesLoading] = useState(false);
+  const [responsesError, setResponsesError] = useState<string | null>(null);
 
   const [disputes, setDisputes] = useState<DisputeItem[]>([]);
   const [disputesTotal, setDisputesTotal] = useState(0);
   const [disputesLoading, setDisputesLoading] = useState(false);
+  const [disputesError, setDisputesError] = useState<string | null>(null);
   const [resolveDialogId, setResolveDialogId] = useState<string | null>(null);
   const [resolveStatus, setResolveStatus] = useState('');
   const [resolveComment, setResolveComment] = useState('');
@@ -142,6 +145,7 @@ export function ReviewsListPage() {
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
+    setReviewsError(null);
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
@@ -158,7 +162,12 @@ export function ReviewsListPage() {
       setPages(res.pages);
       setPendingCount(res.pendingCount);
     } catch (err) {
-      console.error('Failed to load reviews', err);
+      const message = err instanceof Error ? err.message : 'Ошибка загрузки отзывов';
+      setReviews([]);
+      setTotal(0);
+      setPages(1);
+      setPendingCount(0);
+      setReviewsError(message);
     } finally {
       setLoading(false);
     }
@@ -170,14 +179,18 @@ export function ReviewsListPage() {
 
   const fetchResponses = useCallback(async () => {
     setResponsesLoading(true);
+    setResponsesError(null);
     try {
       const res = await adminApi.get<{ items: SupplierResponseItem[]; total: number; page: number; pages: number }>(
         '/admin/reviews/supplier-responses?limit=20',
       );
       setResponses(res.items);
       setResponsesTotal(res.total);
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Ошибка загрузки ответов поставщика';
       setResponses([]);
+      setResponsesTotal(0);
+      setResponsesError(message);
     } finally {
       setResponsesLoading(false);
     }
@@ -185,14 +198,18 @@ export function ReviewsListPage() {
 
   const fetchDisputes = useCallback(async () => {
     setDisputesLoading(true);
+    setDisputesError(null);
     try {
       const res = await adminApi.get<{ items: DisputeItem[]; total: number; page: number; pages: number }>(
         '/admin/reviews/disputes?limit=20',
       );
       setDisputes(res.items);
       setDisputesTotal(res.total);
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Ошибка загрузки оспариваний';
       setDisputes([]);
+      setDisputesTotal(0);
+      setDisputesError(message);
     } finally {
       setDisputesLoading(false);
     }
@@ -422,6 +439,20 @@ export function ReviewsListPage() {
     );
   };
 
+  if (section === 'reviews' && reviewsError) {
+    return (
+      <ErrorState
+        title="Не удалось загрузить отзывы"
+        description={reviewsError}
+        action={
+          <Button variant="outline" onClick={fetchReviews}>
+            Повторить попытку
+          </Button>
+        }
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -459,6 +490,16 @@ export function ReviewsListPage() {
                 <Card key={i}><CardContent className="py-4"><Skeleton className="h-4 w-48" /><Skeleton className="mt-2 h-3 w-full" /></CardContent></Card>
               ))}
             </div>
+          ) : responsesError ? (
+            <ErrorState
+              title="Не удалось загрузить ответы поставщика"
+              description={responsesError}
+              action={
+                <Button variant="outline" size="sm" onClick={fetchResponses}>
+                  Повторить
+                </Button>
+              }
+            />
           ) : responses.length === 0 ? (
             <EmptyState title="Нет ответов на модерации" />
           ) : (
@@ -498,6 +539,16 @@ export function ReviewsListPage() {
                 <Card key={i}><CardContent className="py-4"><Skeleton className="h-4 w-48" /><Skeleton className="mt-2 h-3 w-full" /></CardContent></Card>
               ))}
             </div>
+          ) : disputesError ? (
+            <ErrorState
+              title="Не удалось загрузить оспаривания"
+              description={disputesError}
+              action={
+                <Button variant="outline" size="sm" onClick={fetchDisputes}>
+                  Повторить
+                </Button>
+              }
+            />
           ) : disputes.length === 0 ? (
             <EmptyState title="Нет оспариваний" />
           ) : (

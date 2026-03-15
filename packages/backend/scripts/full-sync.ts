@@ -34,7 +34,7 @@ async function runFullSync(): Promise<void> {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(300_000), // 5 min
+      signal: AbortSignal.timeout(Number(process.env.FULL_SYNC_TIMEOUT_MS) || 600_000), // 10 min default
     });
 
     const elapsedSec = ((Date.now() - startedAt.getTime()) / 1000).toFixed(1);

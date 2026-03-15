@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   ChevronRight,
-  HeadphonesIcon,
   MessageSquare,
   RefreshCw,
   Search,

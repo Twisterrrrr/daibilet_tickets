@@ -13,6 +13,8 @@ import { LandingModule } from '../landing/landing.module';
 import { SupportModule } from '../support/support.module';
 import { PreviewModule } from '../preview/preview.module';
 import { PromoModule } from '../promo/promo.module';
+import { ReportsModule } from '../reports/reports.module';
+import { SupplierModule } from '../supplier/supplier.module';
 
 import { AdminArticlesController } from './admin-articles.controller';
 import { AdminAuditController } from './admin-audit.controller';
@@ -44,7 +46,13 @@ import { AdminPromoBlocksController } from './admin-promo-blocks.controller';
 import { AdminPromoBlocksService } from './admin-promo-blocks.service';
 import { AdminPromoCollectionsController } from './admin-promo-collections.controller';
 import { AdminPromoCollectionsService } from './admin-promo-collections.service';
+import { AdminPromoCodesController } from './admin-promo-codes.controller';
 import { AdminSourceCategoriesController } from './admin-source-categories.controller';
+import { AdminReportsController } from './admin-reports.controller';
+import { AdminPayoutsController } from './admin-payouts.controller';
+import { AdminSupplierDisputesController } from './admin-supplier-disputes.controller';
+import { AdminListingHealthController } from './admin-listing-health.controller';
+import { AdminAvailabilityController } from './admin-availability.controller';
 import { AuditService } from './audit.service';
 import { EventOverrideService } from './event-override.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
@@ -61,6 +69,8 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     VoucherModule,
     PreviewModule,
     PromoModule,
+    ReportsModule,
+    SupplierModule,
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_SYNC },
@@ -96,7 +106,13 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminPreviewsController,
     AdminPromoBlocksController,
     AdminPromoCollectionsController,
+    AdminPromoCodesController,
     AdminSourceCategoriesController,
+    AdminReportsController,
+    AdminPayoutsController,
+    AdminSupplierDisputesController,
+    AdminAvailabilityController,
+    AdminListingHealthController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })

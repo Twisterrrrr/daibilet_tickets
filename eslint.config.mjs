@@ -1,6 +1,7 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   // Базовые правила JS
@@ -11,6 +12,17 @@ export default tseslint.config(
 
   // Prettier отключает конфликтующие правила форматирования
   prettier,
+
+  // React Hooks (rules-of-hooks, exhaustive-deps; set-state-in-effect — требует рефакторинга, отключаем)
+  {
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/incompatible-library': 'off',
+    },
+  },
 
   // Глобальные настройки
   {
@@ -84,7 +96,7 @@ export default tseslint.config(
     },
   },
 
-  // Игнорируемые файлы и папки
+  // Игнорируемые файлы
   {
     ignores: [
       '**/node_modules/**',

@@ -1,7 +1,9 @@
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { Eye, EyeOff, MoreHorizontal, Plus, RefreshCw, Star } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+
+import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -83,7 +85,7 @@ export function EventsListPage() {
     limit: 50,
   });
 
-  const fetchEvents = () => {
+  const fetchEvents = useCallback(() => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
@@ -101,7 +103,7 @@ export function EventsListPage() {
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  };
+  }, [filters]);
 
   const handleDuplicate = async (eventId: string) => {
     setDuplicatingId(eventId);
@@ -125,7 +127,7 @@ export function EventsListPage() {
 
   useEffect(() => {
     fetchEvents();
-  }, [filters]);
+  }, [fetchEvents]);
 
   // Загрузить все города для фильтра (админский список, не витрина)
   useEffect(() => {
@@ -349,35 +351,40 @@ export function EventsListPage() {
     },
   ];
 
+  if (error) {
+    return (
+      <ErrorState
+        title="Не удалось загрузить список событий"
+        description={error}
+        action={
+          <Button variant="outline" onClick={fetchEvents}>
+            Повторить попытку
+          </Button>
+        }
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">События</h1>
-          <div className="text-muted-foreground">
-            {data ? `${data.total} событий в базе` : <Skeleton className="h-4 w-32 inline-block" />}
+      <PageHeader
+        title="События"
+        subtitle={data ? `${data.total} событий в базе` : <Skeleton className="inline-block h-4 w-32" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button asChild>
+              <Link to="/events/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Создать событие
+              </Link>
+            </Button>
+            <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              Синхронизация
+            </Button>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button asChild>
-            <Link to="/events/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Создать событие
-            </Link>
-          </Button>
-          <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
-            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            Синхронизация
-          </Button>
-        </div>
-      </div>
-
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
-      )}
+        }
+      />
 
       {/* Filters */}
       <Card>
@@ -462,57 +469,64 @@ export function EventsListPage() {
       </Card>
 
       {/* Table */}
-      <DataTable
-        columns={columns}
-        data={data?.items ?? []}
-        loading={loading}
-        emptyText="Нет событий, соответствующих фильтрам"
-        onRowClick={(item) => navigate(`/events/${item.id}`)}
-        toolbar={
-          hasSelection && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => callBulkUpdate({ ids: selectedIds, isActive: true })}
-              >
-                Опубликовать
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => callBulkUpdate({ ids: selectedIds, isActive: false })}
-              >
-                Снять с публикации
-              </Button>
-              <Select
-                onValueChange={(value) => {
-                  if (value === '__none__') return;
-                  void callBulkUpdate({ ids: selectedIds, category: value });
-                }}
-              >
-                <SelectTrigger className="h-8 w-[180px]">
-                  <SelectValue placeholder="Сменить категорию" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Не изменять</SelectItem>
-                  <SelectItem value="EXCURSION">Экскурсии</SelectItem>
-                  <SelectItem value="MUSEUM">Музеи</SelectItem>
-                  <SelectItem value="EVENT">Мероприятия</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => callBulkUpdate({ ids: selectedIds, softDelete: true })}
-              >
-                Удалить (soft-delete)
-              </Button>
-            </div>
-          )
-        }
-      />
+      {data && data.items.length === 0 && !loading ? (
+        <EmptyState
+          title="Нет событий, соответствующих фильтрам"
+          description="Попробуйте изменить условия поиска или снять часть фильтров."
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={data?.items ?? []}
+          loading={loading}
+          emptyText="Нет событий, соответствующих фильтрам"
+          onRowClick={(item) => navigate(`/events/${item.id}`)}
+          toolbar={
+            hasSelection && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => callBulkUpdate({ ids: selectedIds, isActive: true })}
+                >
+                  Опубликовать
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => callBulkUpdate({ ids: selectedIds, isActive: false })}
+                >
+                  Снять с публикации
+                </Button>
+                <Select
+                  onValueChange={(value) => {
+                    if (value === '__none__') return;
+                    void callBulkUpdate({ ids: selectedIds, category: value });
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[180px]">
+                    <SelectValue placeholder="Сменить категорию" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Не изменять</SelectItem>
+                    <SelectItem value="EXCURSION">Экскурсии</SelectItem>
+                    <SelectItem value="MUSEUM">Музеи</SelectItem>
+                    <SelectItem value="EVENT">Мероприятия</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => callBulkUpdate({ ids: selectedIds, softDelete: true })}
+                >
+                  Удалить (soft-delete)
+                </Button>
+              </div>
+            )
+          }
+        />
+      )}
 
       {/* Server pagination */}
       {data && (data.pages ?? Math.ceil(data.total / filters.limit)) > 1 && (

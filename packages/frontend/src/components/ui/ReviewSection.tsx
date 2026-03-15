@@ -674,7 +674,7 @@ export function ReviewSection({
   const canShowForm = reviewCapability !== 'DISABLED';
   const [showForm, setShowForm] = useState(!!reviewRequestToken && canShowForm);
 
-  const loadReviews = async (page = 1) => {
+  const loadReviews = useCallback(async (page = 1) => {
     try {
       const res = venueSlug ? await api.getVenueReviews(venueSlug, page) : await api.getEventReviews(eventSlug!, page);
       setData(res as Parameters<typeof setData>[0]);
@@ -683,12 +683,12 @@ export function ReviewSection({
     } finally {
       setLoading(false);
     }
-  };
+  }, [venueSlug, eventSlug]);
 
   const slug = venueSlug ?? eventSlug;
   useEffect(() => {
     loadReviews();
-  }, [slug]);
+  }, [slug, loadReviews]);
 
   if (loading) {
     return (

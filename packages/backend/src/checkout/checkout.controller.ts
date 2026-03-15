@@ -9,6 +9,7 @@ import {
   Param,
   Post,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
@@ -16,6 +17,7 @@ import { Queue } from 'bullmq';
 import { Request } from 'express';
 
 import { QUEUE_FULFILLMENT } from '../queue/queue.constants';
+import { OptionalUserJwtGuard } from '../user/user-optional.guard';
 import { CheckoutService } from './checkout.service';
 import {
   CreateCheckoutSessionDto,
@@ -219,15 +221,21 @@ export class CheckoutController {
 
   @Post('session')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @UseGuards(OptionalUserJwtGuard)
   @ApiOperation({ summary: 'Создать checkout session + order requests' })
-  createSession(@Body() body: CreateCheckoutSessionDto, @Req() req: Request) {
+  createSession(
+    @Body() body: CreateCheckoutSessionDto,
+    @Req() req: Request & { user?: { id: string } },
+  ) {
     return this.checkoutService.createCheckoutSession({
       items: body.items,
       customer: body.customer,
+      userId: req.user?.id ?? null,
       utm: body.utm,
       referrer: req.headers.referer || body.referrer,
       userAgent: req.headers['user-agent'],
       ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip,
+      promoCode: body.promoCode,
       giftCertificateCode: body.giftCertificateCode,
     });
   }

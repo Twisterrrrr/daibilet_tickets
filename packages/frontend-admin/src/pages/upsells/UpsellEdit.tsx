@@ -54,7 +54,7 @@ export function UpsellEditPage() {
         })
         .finally(() => setLoading(false));
     }
-  }, [id]);
+  }, [id, isNew]);
 
   const handleSave = async () => {
     setSaving(true);
