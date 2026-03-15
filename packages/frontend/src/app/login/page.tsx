@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { useUserAuth } from '@/hooks/useUserAuth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get('returnUrl') ?? '/account/purchases';
   const { login, register } = useUserAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -26,7 +28,7 @@ export default function LoginPage() {
       } else {
         await register(email, password, name);
       }
-      router.push('/favorites');
+      router.push(returnUrl.startsWith('/') ? returnUrl : '/account/purchases');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка');
     } finally {

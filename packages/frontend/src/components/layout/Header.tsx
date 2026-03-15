@@ -202,7 +202,21 @@ export function Header() {
                 />
               </button>
               {userMenuOpen && (
-                <div className="absolute right-0 z-50 mt-1 w-40 rounded-xl border border-slate-200 bg-white shadow-lg">
+                <div className="absolute right-0 z-50 mt-1 w-48 rounded-xl border border-slate-200 bg-white shadow-lg">
+                  <Link
+                    href="/account/purchases"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="block px-3 py-2 text-left text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  >
+                    Мои покупки
+                  </Link>
+                  <Link
+                    href="/account"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="block px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
+                  >
+                    Личный кабинет
+                  </Link>
                   <button
                     type="button"
                     onClick={async () => {
@@ -269,6 +283,20 @@ export function Header() {
             {auth?.isLoggedIn ? (
               <div className="px-3 pt-2.5 pb-1">
                 <div className="text-sm text-slate-600">{auth.user?.name}</div>
+                <Link
+                  href="/account/purchases"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="mt-2 inline-flex rounded-lg px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50"
+                >
+                  Мои покупки
+                </Link>
+                <Link
+                  href="/account"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="mt-2 inline-flex rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  Личный кабинет
+                </Link>
                 <button
                   type="button"
                   onClick={async () => {
@@ -276,7 +304,7 @@ export function Header() {
                     setMobileMenuOpen(false);
                     router.push('/');
                   }}
-                  className="mt-2 inline-flex rounded-lg px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50"
+                  className="mt-2 ml-2 inline-flex rounded-lg px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50"
                 >
                   Выйти
                 </button>

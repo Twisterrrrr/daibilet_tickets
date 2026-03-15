@@ -529,11 +529,155 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Account / ЛК покупателя (требуют Bearer token)
+  accountMe: (token: string) =>
+    fetchApi<AccountSummary>('/account/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  accountOrders: (token: string, params?: { page?: number; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set('page', String(params.page));
+    if (params?.limit != null) search.set('limit', String(params.limit));
+    const q = search.toString();
+    return fetchApi<AccountOrdersResponse>(`/account/orders${q ? `?${q}` : ''}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  accountOrderDetail: (token: string, id: string) =>
+    fetchApi<AccountOrderDetail>(`/account/orders/${encodeURIComponent(id)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  accountPurchases: (token: string, params?: { page?: number; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set('page', String(params.page));
+    if (params?.limit != null) search.set('limit', String(params.limit));
+    const q = search.toString();
+    return fetchApi<AccountPurchasesResponse>(`/account/purchases${q ? `?${q}` : ''}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  accountTickets: (token: string) =>
+    fetchApi<AccountTicketItem[]>('/account/tickets', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  accountProfile: (token: string) =>
+    fetchApi<AccountProfile>('/account/profile', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  accountUpdateProfile: (token: string, data: { name?: string; email?: string }) =>
+    fetchApi<AccountProfile>('/account/profile', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    }),
+
   getPromoBlocks: (city?: string) =>
     fetchApi<PromoBlockDto[]>(city ? `/promo-blocks?city=${encodeURIComponent(city)}` : '/promo-blocks'),
 
   getPromoCollection: (slug: string) =>
     fetchApi<PromoCollectionDto>(`/promo-collections/${encodeURIComponent(slug)}`),
+};
+
+export type AccountSummary = {
+  user: { id: string; name: string; email: string };
+  ordersCount: number;
+  activeTicketsCount: number;
+  favoritesCount: number;
+};
+
+export type AccountOrderListItem = {
+  id: string;
+  shortCode: string;
+  createdAt: string;
+  status: string;
+  paymentStatus: string;
+  totalAmount: number | null;
+  currency: string;
+  itemsPreview: Array<{ eventTitle: string; quantity: number }>;
+  trackUrl: string | null;
+};
+
+export type AccountOrdersResponse = {
+  items: AccountOrderListItem[];
+  total: number;
+};
+
+export type PurchaseDisplayType =
+  | 'INTERNAL_TICKET'
+  | 'EXTERNAL_VOUCHER'
+  | 'BOOKING_CONFIRMATION'
+  | 'AWAITING_PAYMENT'
+  | 'MANUAL_CONFIRMATION';
+
+export type PurchaseListItem = {
+  purchaseId: string;
+  shortCode: string;
+  eventTitle: string;
+  purchaseDate: string;
+  eventDate: string | null;
+  displayStatus: string;
+  purchaseType: PurchaseDisplayType;
+  ticketAvailable: boolean;
+  primaryAction: { label: string; url: string } | null;
+  secondaryAction: { label: string; url: string } | null;
+};
+
+export type AccountPurchasesResponse = {
+  items: PurchaseListItem[];
+  total: number;
+};
+
+export type AccountOrderDetail = {
+  id: string;
+  shortCode: string;
+  status: string;
+  totalPrice: number | null;
+  customerName: string | null;
+  customerEmail: string | null;
+  customerPhone: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  expiresAt: string | null;
+  voucherUrl: string | null;
+  items: Array<{
+    id: string;
+    status?: string;
+    quantity: number;
+    priceSnapshot?: number;
+    event?: { title: string; slug: string; imageUrl: string | null };
+    offerTitle?: string;
+    sessionStartsAt?: string | null;
+    meetingPoint?: string | null;
+    meetingInstructions?: string | null;
+    operationalPhone?: string | null;
+    operationalNote?: string | null;
+  }>;
+};
+
+export type AccountTicketItem = {
+  orderId: string;
+  shortCode: string;
+  eventTitle: string;
+  eventSlug: string;
+  sessionStartsAt: string | null;
+  status: string;
+  trackUrl: string;
+  externalPaymentUrl: string | null;
+};
+
+export type AccountProfile = {
+  id: string;
+  email: string;
+  name: string;
+  lastLoginAt: string | null;
+  createdAt: string;
 };
 
 export type PromoBlockDto = {
