@@ -565,6 +565,108 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 
+  getAccountNotifications: (
+    token: string,
+    params?: { type?: string; page?: number; limit?: number },
+  ) => {
+    const search = new URLSearchParams();
+    if (params?.type) search.set('type', params.type);
+    if (params?.page) search.set('page', String(params.page));
+    if (params?.limit) search.set('limit', String(params.limit));
+    const qs = search.toString() ? `?${search.toString()}` : '';
+    return fetchApi<{
+      items: {
+        id: string;
+        type: string;
+        title: string;
+        body: string;
+        meta: Record<string, unknown> | null;
+        isRead: boolean;
+        createdAt: string;
+      }[];
+      total: number;
+      page: number;
+      totalPages: number;
+    }>(`/account/notifications${qs}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  markNotificationRead: (token: string, id: string) =>
+    fetchApi<{ ok: boolean }>(`/account/notifications/${encodeURIComponent(id)}/read`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  markAllNotificationsRead: (token: string) =>
+    fetchApi<{ ok: boolean }>('/account/notifications/read-all', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  getAccountReviewDispute: (id: string, token: string) =>
+    fetchApi<{
+      status: import('@prisma/client').ReviewDisputeStatus | null;
+      canReply: boolean;
+      messages: {
+        id: string;
+        authorType: 'USER' | 'MODERATOR' | 'SUPPLIER';
+        authorLabel: string;
+        body: string;
+        createdAt: string;
+        isMine: boolean;
+      }[];
+    }>(`/account/reviews/${encodeURIComponent(id)}/dispute`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  postAccountReviewDisputeMessage: (id: string, body: string, token: string) =>
+    fetchApi<{
+      id: string;
+      authorType: 'USER';
+      authorLabel: string;
+      body: string;
+      createdAt: string;
+      isMine: boolean;
+    }>(`/account/reviews/${encodeURIComponent(id)}/dispute/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ body }),
+    }),
+
+  postAccountReviewDisputeRead: (id: string, token: string) =>
+    fetchApi<{ updated: number }>(`/account/reviews/${encodeURIComponent(id)}/dispute/read`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  getAccountNotificationsUnread: (token: string) =>
+    fetchApi<{
+      totalUnread: number;
+      reviewsDisputesUnread: number;
+      supportUnread: number;
+      ordersUnread: number;
+    }>('/account/notifications/unread-count', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  getAccountReviews: (
+    token: string,
+    params?: { status?: string; page?: number; limit?: number },
+  ) => {
+    const search = new URLSearchParams();
+    if (params?.status) search.set('status', params.status);
+    if (params?.page) search.set('page', String(params.page));
+    if (params?.limit) search.set('limit', String(params.limit));
+    const qs = search.toString() ? `?${search.toString()}` : '';
+    return fetchApi<import('./api.types').AccountReviewsResponse>(
+      `/account/reviews${qs}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+  },
+
   accountProfile: (token: string) =>
     fetchApi<AccountProfile>('/account/profile', {
       headers: { Authorization: `Bearer ${token}` },

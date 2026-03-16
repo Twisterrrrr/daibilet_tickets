@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ReviewDisputeStatus, ReviewStatus } from '@prisma/client';
 
 import { UserJwtGuard } from '../user/user.guard';
 import { AccountService } from './account.service';
@@ -58,6 +59,76 @@ export class AccountController {
   @ApiOperation({ summary: 'Список билетов по оплаченным заказам' })
   getTickets(@Req() req: RequestWithUser) {
     return this.account.getTickets(req.user.id);
+  }
+
+  @Get('reviews')
+  @ApiOperation({ summary: 'Список отзывов текущего пользователя' })
+  getReviews(
+    @Req() req: RequestWithUser,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: ReviewStatus,
+  ) {
+    return this.account.getReviews(req.user.id, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      status,
+    });
+  }
+
+  @Get('reviews/:id/dispute')
+  @ApiOperation({ summary: 'Диалог по спору к отзыву' })
+  getReviewDispute(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.account.getReviewDispute(req.user.id, id);
+  }
+
+  @Post('reviews/:id/dispute/messages')
+  @ApiOperation({ summary: 'Отправить сообщение в спор по отзыву' })
+  postReviewDisputeMessage(
+    @Req() req: RequestWithUser,
+    @Param('id') id: string,
+    @Body() body: { body: string },
+  ) {
+    return this.account.postReviewDisputeMessage(req.user.id, id, body.body);
+  }
+
+  @Post('reviews/:id/dispute/read')
+  @ApiOperation({ summary: 'Пометить сообщения спора по отзыву как прочитанные пользователем' })
+  markReviewDisputeRead(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.account.markReviewDisputeRead(req.user.id, id);
+  }
+
+  @Get('notifications/unread-count')
+  @ApiOperation({ summary: 'Счётчик непрочитанных уведомлений ЛК' })
+  getNotificationsUnreadCount(@Req() req: RequestWithUser) {
+    return this.account.getNotificationsUnreadCount(req.user.id);
+  }
+
+  @Get('notifications')
+  @ApiOperation({ summary: 'Список уведомлений текущего пользователя' })
+  getNotifications(
+    @Req() req: RequestWithUser,
+    @Query('type') type?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.account.getNotifications(req.user.id, {
+      type: type || undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Post('notifications/:id/read')
+  @ApiOperation({ summary: 'Пометить уведомление как прочитанное' })
+  markNotificationRead(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.account.markNotificationRead(req.user.id, id);
+  }
+
+  @Post('notifications/read-all')
+  @ApiOperation({ summary: 'Пометить все уведомления как прочитанные' })
+  markAllNotificationsRead(@Req() req: RequestWithUser) {
+    return this.account.markAllNotificationsRead(req.user.id);
   }
 
   @Get('profile')

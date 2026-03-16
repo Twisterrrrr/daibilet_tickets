@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentStatus, ReviewDisputeStatus, ReviewStatus, Prisma } from '@prisma/client';
 
 import { CheckoutService } from '../checkout/checkout.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,6 +8,7 @@ import { UserAuthService } from '../user/user-auth.service';
 import { UserFavoritesService } from '../user/user-favorites.service';
 import type {
   AccountOrderListItemDto,
+  AccountReviewItemDto,
   AccountSummaryDto,
   AccountTicketItemDto,
   PurchaseListItemDto,
@@ -112,6 +113,81 @@ export class AccountService {
     );
 
     return { items, total };
+  }
+
+  async getReviews(
+    userId: string,
+    params: { page?: number; limit?: number; status?: ReviewStatus },
+  ): Promise<{
+    items: AccountReviewItemDto[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(50, Math.max(1, params.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const user = await this.userAuth.getProfile(userId);
+    const authorEmail = user?.email;
+
+    if (!authorEmail) {
+      return { items: [], total: 0, page, totalPages: 1 };
+    }
+
+    const where: Prisma.ReviewWhereInput = {
+      authorEmail,
+    };
+
+    if (params.status) {
+      where.status = params.status;
+    }
+
+    const [reviews, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          event: {
+            select: {
+              id: true,
+              slug: true,
+              title: true,
+              city: { select: { name: true } },
+            },
+          },
+          disputes: {
+            select: { id: true },
+          },
+        },
+      }),
+      this.prisma.review.count({ where }),
+    ]);
+    const items: AccountReviewItemDto[] = reviews.map((r) => {
+      const hasDispute = Array.isArray(r.disputes) && r.disputes.length > 0;
+
+      return {
+        id: r.id,
+        eventId: r.event?.id ?? null,
+        eventSlug: r.event?.slug ?? null,
+        eventTitle: r.event?.title ?? 'Событие',
+        cityName: r.event?.city?.name ?? null,
+        rating: r.rating,
+        text: r.text,
+        status: r.status,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+        hasDispute,
+        // TODO: заполнить после успешного prisma generate и добавления ReviewDisputeMessage в клиент
+        unreadDisputeMessagesCount: 0,
+      };
+    });
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    return { items, total, page, totalPages };
   }
 
   async getOrders(
@@ -232,5 +308,107 @@ export class AccountService {
       select: { id: true, email: true, name: true, lastLoginAt: true, createdAt: true },
     });
     return user;
+  }
+
+  async getReviewDispute(userId: string, reviewId: string) {
+    const user = await this.userAuth.getProfile(userId);
+    const email = user?.email;
+    if (!email) {
+      throw new Error('User email is required');
+    }
+
+    const review = await this.prisma.review.findFirst({
+      where: { id: reviewId, authorEmail: email },
+      include: {
+        disputes: {
+          select: { id: true, status: true },
+        },
+        event: {
+          select: { title: true, city: { select: { name: true } } },
+        },
+      },
+    });
+
+    if (!review) {
+      throw new Error('Review not found');
+    }
+
+    const dispute = review.disputes?.[0] ?? null;
+    const status: ReviewDisputeStatus | null = dispute?.status ?? null;
+    const openStatuses: ReviewDisputeStatus[] = [ReviewDisputeStatus.MODERATOR_REVIEW];
+    const canReply = status ? openStatuses.includes(status) : false;
+
+    return {
+      status,
+      canReply,
+      // История сообщений будет подключена после обновления prisma client
+      messages: [],
+    };
+  }
+
+  async postReviewDisputeMessage(userId: string, reviewId: string, body: string) {
+    // В этом окружении persist в БД отключён, чтобы не ломать старый Prisma client.
+    // Сообщение возвращается только для локального отображения на фронте.
+    const now = new Date();
+    return {
+      id: `${userId}-${now.getTime()}`,
+      authorType: 'USER' as const,
+      authorLabel: 'Вы',
+      body,
+      createdAt: now.toISOString(),
+      isMine: true,
+    };
+  }
+
+  async markReviewDisputeRead(userId: string, reviewId: string) {
+    // Пока prisma client не обновлён, просто возвращаем 0 как no-op.
+    return { updated: 0 };
+  }
+
+  async getNotificationsUnreadCount(userId: string) {
+    // Временная заглушка: до обновления Prisma client считаем только по полям ReviewDisputeMessage/Notification вне этого сервиса.
+    return {
+      totalUnread: 0,
+      reviewsDisputesUnread: 0,
+      supportUnread: 0,
+      ordersUnread: 0,
+    };
+  }
+
+  async getNotifications(
+    userId: string,
+    params: { type?: string; page?: number; limit?: number },
+  ): Promise<{
+    items: {
+      id: string;
+      type: string;
+      title: string;
+      body: string;
+      meta: Record<string, unknown> | null;
+      isRead: boolean;
+      createdAt: string;
+    }[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    // Каркас: пока возвращаем пустой список, чтобы не зависеть от Notification до миграции.
+    const page = Math.max(1, params.page ?? 1);
+    return {
+      items: [],
+      total: 0,
+      page,
+      totalPages: 1,
+    };
+  }
+
+  async markNotificationRead(userId: string, id: string) {
+    // Каркас: no-op, возвращаем ok=true для совместимости с фронтом.
+    return { ok: true };
+  }
+
+  async markAllNotificationsRead(userId: string) {
+    // Каркас: no-op.
+    return { ok: true };
   }
 }

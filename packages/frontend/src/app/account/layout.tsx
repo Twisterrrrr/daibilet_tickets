@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Loader2,
   LogIn,
+  MessageCircle,
   Ticket,
   User,
 } from 'lucide-react';
@@ -17,6 +18,7 @@ import { useUserAuth } from '@/hooks/useUserAuth';
 const nav = [
   { href: '/account', label: 'Обзор', icon: LayoutDashboard },
   { href: '/account/purchases', label: 'Мои покупки', icon: Ticket },
+  { href: '/account/reviews', label: 'Мои отзывы', icon: MessageCircle },
   { href: '/account/favorites', label: 'Избранное', icon: Heart },
   { href: '/account/profile', label: 'Профиль', icon: User },
 ];

@@ -309,6 +309,28 @@ export interface ReviewsResponse {
   };
 }
 
+export interface AccountReviewItem {
+  id: string;
+  eventId: string | null;
+  eventSlug: string | null;
+  eventTitle: string;
+  cityName: string | null;
+  rating: number;
+  text: string;
+  status: 'PENDING_EMAIL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'HIDDEN';
+  createdAt: string;
+  updatedAt: string;
+  hasDispute: boolean;
+  unreadDisputeMessagesCount: number;
+}
+
+export interface AccountReviewsResponse {
+  items: AccountReviewItem[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 // === Multi-events (глобальные группы событий) ===
 
 export type MultiEventSort = 'popular' | 'new';

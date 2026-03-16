@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import type { ReviewStatus } from '@prisma/client';
 
 /** Тип карточки покупки для единого экрана «Мои покупки» */
 export type PurchaseDisplayType =
@@ -116,6 +117,28 @@ export class AccountTicketItemDto {
 
   @ApiPropertyOptional()
   externalPaymentUrl!: string | null;
+}
+
+export class AccountReviewItemDto {
+  id!: string;
+  eventId!: string | null;
+  eventSlug!: string | null;
+  eventTitle!: string;
+  cityName!: string | null;
+  rating!: number;
+  text!: string;
+  status!: ReviewStatus;
+  createdAt!: string;
+  updatedAt!: string;
+  hasDispute!: boolean;
+  unreadDisputeMessagesCount!: number;
+}
+
+export class AccountReviewsResponseDto {
+  items!: AccountReviewItemDto[];
+  total!: number;
+  page!: number;
+  totalPages!: number;
 }
 
 export class UpdateAccountProfileDto {

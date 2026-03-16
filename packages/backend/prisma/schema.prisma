@@ -1687,6 +1687,7 @@ model ReviewDispute {
   review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   operator  Operator @relation("DisputeOperator", fields: [supplierId], references: [id], onDelete: Cascade)
   evidence  ReviewDisputeEvidence[]
+  messages  ReviewDisputeMessage[]
   actionLogs ReviewActionLog[]
 
   @@unique([reviewId])
@@ -1694,6 +1695,22 @@ model ReviewDispute {
   @@index([status])
   @@index([createdAt])
   @@map("review_disputes")
+}
+
+model ReviewDisputeMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  disputeId  String   @db.Uuid
+  authorType String   // 'USER' | 'MODERATOR' | 'SUPPLIER'
+  authorId   String?  @db.Uuid
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+  readAtUser DateTime?
+  readAtMod  DateTime?
+
+  dispute ReviewDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId, createdAt])
+  @@map("review_dispute_messages")
 }
 
 model ReviewDisputeEvidence {
@@ -2586,4 +2603,20 @@ model DocumentSequence {
   @@unique([operatorId, year, type], name: "operatorId_year_type")
   @@index([operatorId, year, type])
   @@map("document_sequences")
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  type      String
+  title     String
+  body      String   @db.Text
+  meta      Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
 }
