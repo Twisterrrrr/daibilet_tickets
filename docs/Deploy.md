@@ -63,7 +63,7 @@ sudo docker run --rm -v /etc/letsencrypt:/etc/letsencrypt -v /var/www/certbot:/v
   --email admin@daibilet.ru --agree-tos --non-interactive --expand
 ```
 
-### Запуск
+### Запуск (ручной)
 
 ```bash
 # Prod
@@ -72,6 +72,59 @@ docker compose -f docker-compose.prod.yml up -d --build
 # Staging
 docker compose -f docker-compose.staging.yml -p daibilet-staging up -d --build
 ```
+
+### CI/CD: staging-deploy (GitHub Actions)
+
+Staging окружение деплоится из ветки `staging` на тот же VPS (`/opt/daibilet`) через GitHub Actions workflow `staging-deploy.yml`.
+
+Высокоуровневый порядок:
+
+1. **Триггер**: push в ветку `staging` или ручной запуск `workflow_dispatch`.
+2. **CI** подключается по SSH к VPS (`STAGING_USER@STAGING_HOST`) с использованием приватного ключа из `STAGING_SSH_KEY`.
+3. На сервере запускается `bash scripts/remote-deploy-staging.sh`, который:
+   - жёстко синхронизирует локальную ветку с `origin/<DEPLOY_BRANCH>`:
+     ```bash
+     git fetch origin <DEPLOY_BRANCH>
+     git checkout -B "<DEPLOY_BRANCH>" "origin/<DEPLOY_BRANCH>"
+     git reset --hard "origin/<DEPLOY_BRANCH>"
+     ```
+   - поднимает `postgres` и `redis` для безопасного бэкапа:
+     ```bash
+     docker compose -f deploy/staging/docker-compose.yml --env-file deploy/staging/.env -p daibilet-staging up -d postgres redis
+     ```
+   - опционально запускает `scripts/backup-staging-db.sh` (флаг `STAGING_BACKUP_BEFORE_DEPLOY=1/0`);
+   - поднимает staging‑stack:
+     ```bash
+     docker compose -f deploy/staging/docker-compose.yml --env-file deploy/staging/.env -p daibilet-staging up -d --build
+     ```
+   - применяет миграции (через one‑off backend‑контейнер):
+     ```bash
+     docker compose -f deploy/staging/docker-compose.yml --env-file deploy/staging/.env -p daibilet-staging run --rm backend npx prisma migrate deploy
+     ```
+   - делает **FULL SYNC внутри backend‑контейнера** (также через one‑off контейнер):
+     ```bash
+     docker compose -f deploy/staging/docker-compose.yml --env-file deploy/staging/.env -p daibilet-staging run --rm backend env FULL_SYNC=1 pnpm full:sync
+     ```
+   - поднимает edge nginx stack:
+     ```bash
+     cd /opt/daibilet/deploy/nginx
+     docker compose up -d
+     ```
+   - выполняет post‑deploy health‑check (`scripts/verify-staging.sh`) и фейлит деплой при ошибке (проверяются как состояние контейнеров, так и публичные URL).
+
+#### Секреты CI для staging
+
+В GitHub Actions Secrets для репозитория должны быть заданы:
+
+- `STAGING_HOST` — IP или hostname VPS (например, `213.171.7.16`);
+- `STAGING_USER` — пользователь для SSH (обычно `root` или deploy‑user);
+- `STAGING_SSH_KEY` — приватный ключ для доступа к staging‑серверу (без пароля или с предварительно разлоченным ключом).
+
+#### Ветки и стратегия деплоя
+
+- **CI‑деплой staging по умолчанию идёт из ветки `staging`** (переменная `DEPLOY_BRANCH`).
+- Вручную можно переопределить `deploy_branch` при запуске `workflow_dispatch` (например, задеплоить hotfix из `main`).
+
 
 ---
 
@@ -123,6 +176,38 @@ npx prisma generate
 
 ### `host not found in upstream "daibilet-staging-backend:4000"`
 Nginx не может разрешить upstream при старте. Исправлено: `staging.conf` использует `resolver 127.0.0.11` и переменные в `proxy_pass` (резолв в runtime).
+
+### `Could not resolve host: daibilet-staging-backend` внутри nginx-контейнера
+Если staging-nginx запущен отдельно от docker-compose и не подключён к сети `daibilet-net`, он не видит `daibilet-staging-backend:4000` и отдаёт 502 по HTTPS.
+
+**Симптомы:**
+
+- `curl https://staging.daibilet.ru/api/v1/health` → 502 Bad Gateway (nginx/1.29.5)
+- внутри backend-контейнера:
+  - `curl http://localhost:4000/api/v1/health` → `{"status":"ok","db":true,"redis":true}`
+- внутри nginx-контейнера:
+  - `curl http://daibilet-staging-backend:4000/api/v1/health` → `Could not resolve host: daibilet-staging-backend`
+
+**Фикс (тактически, после пересоздания nginx-контейнера):**
+
+```bash
+cd /opt/daibilet
+docker network connect daibilet-net daibilet-staging-nginx
+
+# Проверка:
+docker exec -it daibilet-staging-nginx sh -c \
+  'curl -sS http://daibilet-staging-backend:4000/api/v1/health'
+# Ожидаем: {"status":"ok","db":true,"redis":true}
+```
+
+После этого:
+
+```bash
+curl https://staging.daibilet.ru/api/v1/health
+curl https://api-staging.daibilet.ru/api/v1/health
+```
+
+должны возвращать JSON со статусом `ok`.
 
 ### `Cannot find module '@sentry/nestjs'`
 Dockerfile.backend использует `pnpm deploy`, чтобы собрать standalone-образ с корректным node_modules. Пересоберите: `docker compose ... up -d --build`.

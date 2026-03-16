@@ -1,0 +1,66 @@
+name: Staging Deploy
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+    inputs:
+      deploy_branch:
+        description: 'Git branch to deploy to staging'
+        required: false
+        default: 'staging'
+      backup_before_deploy:
+        description: 'Run DB backup before deploy (1/0)'
+        required: false
+        default: '1'
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    environment:
+      name: staging
+      url: https://staging.daibilet.ru
+
+    env:
+      STAGING_HOST: ${{ secrets.STAGING_HOST }}
+      STAGING_USER: ${{ secrets.STAGING_USER }}
+      STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate SSH configuration
+        run: |
+          if [ -z "${STAGING_HOST}" ] || [ -z "${STAGING_USER}" ]; then
+            echo "STAGING_HOST and STAGING_USER must be set in GitHub secrets"
+            exit 1
+          fi
+          if [ -z "${STAGING_SSH_KEY}" ]; then
+            echo "STAGING_SSH_KEY must be set in GitHub secrets"
+            exit 1
+          fi
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ env.STAGING_SSH_KEY }}
+
+      - name: Add staging host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${STAGING_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to staging via forced command
+        run: |
+          set -euo pipefail
+          ssh "${STAGING_USER}@${STAGING_HOST}"
+
