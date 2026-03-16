@@ -10,6 +10,7 @@ import { Award, Clock, Flame, MapPin, Star, Ticket } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 import { FavoriteButton } from './FavoriteButton';
 
@@ -71,7 +72,7 @@ function formatNextSession(iso: string): string {
 export function EventCard({
   slug,
   title,
-  category,
+  category: _category,
   subcategories: _subcategories = [],
   audience: _audience,
   tagSlugs: _tagSlugs = [],
@@ -96,6 +97,7 @@ export function EventCard({
   cityLabelOverride,
 }: EventCardProps) {
   const router = useRouter();
+  const [hasImageError, setHasImageError] = useState(false);
   const safeReviewCount = reviewCount ?? 0;
   const hasEnoughReviews = safeReviewCount >= 10;
   const hasRating = hasEnoughReviews && Number(rating) > 0;
@@ -130,6 +132,8 @@ export function EventCard({
     router.push(`/events/${slug}?openBuy=1&sessionTime=${encodeURIComponent(time)}`);
   };
 
+  const showImage = Boolean(imageUrl && !hasImageError);
+
   return (
     <Link
       href={hrefOverride ?? `/events/${slug}`}
@@ -137,20 +141,26 @@ export function EventCard({
     >
       {/* Image */}
       <div className={`relative overflow-hidden bg-slate-100 ${compact ? 'h-28 sm:h-36' : 'h-36 sm:h-48'}`}>
-        {imageUrl ? (
+        {/* Плейсхолдер: серый фон + иконка + заголовок */}
+        <div
+          className={`absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,_#e5e7eb,_#f3f4f6)] transition-opacity duration-300 ${
+            showImage ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300/80 bg-white/60 shadow-sm">
+            <div className="h-3.5 w-3.5 rotate-45 rounded-[6px] border border-slate-300/90 bg-slate-200/90" />
+          </div>
+        </div>
+
+        {showImage && imageUrl && (
           <Image
             src={imageUrl}
             alt={title}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover transition-transform duration-500 group-hover:scale-110"
+            onError={() => setHasImageError(true)}
           />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary-100 to-primary-50">
-            <span className="text-3xl sm:text-4xl">
-              {category === 'EXCURSION' ? '🚶' : category === 'MUSEUM' ? '🏛️' : '🎭'}
-            </span>
-          </div>
         )}
 
         {/* Gradient overlay */}

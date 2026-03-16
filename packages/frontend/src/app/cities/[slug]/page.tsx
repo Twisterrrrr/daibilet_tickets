@@ -1,7 +1,6 @@
 import { CATEGORY_LABELS, EventCategory, type VenueListItem, type EventListItem } from '@daibilet/shared';
 import { ArrowRight, Tag, Ticket, TrendingUp } from 'lucide-react';
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 
 import { EventCard } from '@/components/ui/EventCard';
@@ -108,8 +107,7 @@ export default async function CityPage({ params }: Props) {
     );
   }
 
-  const imageConfig = CITY_IMAGES[slug];
-  const heroImage = imageConfig?.hero ?? city.heroImage ?? null;
+  const _imageConfig = CITY_IMAGES[slug];
 
   // Загрузить venues для города
   let venues: VenueListItem[] = [];
@@ -139,9 +137,6 @@ export default async function CityPage({ params }: Props) {
     <>
       {/* Hero */}
       <section className="relative bg-gradient-to-br from-primary-700 to-primary-900 py-16 sm:py-20">
-        {heroImage && (
-          <Image src={heroImage} alt={city.name} fill priority sizes="100vw" className="object-cover opacity-20" />
-        )}
         <div className="container-page relative">
           <div className="flex items-center gap-2 text-sm text-primary-200">
             <Link href="/" className="hover:text-white">

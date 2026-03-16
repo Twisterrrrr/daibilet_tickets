@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
 import { ArrowRight, Landmark, MapPin } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 
 interface CityCardRegion {
@@ -43,47 +41,17 @@ function pluralVenues(n: number): string {
 export function CityCard({
   slug,
   name,
-  heroImage,
+  heroImage: _heroImage,
   eventCount,
   venueCount,
   description,
   large = false,
   region,
 }: CityCardProps) {
-  const [hasImage, setHasImage] = useState(false);
-
-  useEffect(() => {
-    if (!heroImage) {
-      setHasImage(false);
-      return;
-    }
-    let cancelled = false;
-    const img = new window.Image();
-    img.onload = () => {
-      if (!cancelled) setHasImage(true);
-    };
-    img.onerror = () => {
-      if (!cancelled) setHasImage(false);
-    };
-    img.src = heroImage;
-    return () => {
-      cancelled = true;
-    };
-  }, [heroImage]);
-
   return (
     <div className="flex flex-col">
       <Link href={`/cities/${slug}`} className={`card group relative overflow-hidden ${large ? 'h-64' : 'h-48'}`}>
         <div className="absolute inset-0 bg-gradient-to-br from-primary-700 to-primary-900" />
-        {hasImage && heroImage && (
-          <Image
-            src={heroImage}
-            alt={name}
-            fill
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            sizes="(min-width: 1024px) 25vw, 50vw"
-          />
-        )}
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 

@@ -5,6 +5,7 @@ import { Award, Clock, Flame, MapPin, Star, Ticket } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 import { FavoriteButton } from './FavoriteButton';
 
@@ -66,7 +67,7 @@ interface EventCardHorizontalProps {
 export function EventCardHorizontal({
   slug,
   title,
-  category,
+  category: _category,
   imageUrl,
   priceFrom,
   rating,
@@ -87,6 +88,7 @@ export function EventCardHorizontal({
   cityLabelOverride,
 }: EventCardHorizontalProps) {
   const router = useRouter();
+  const [hasImageError, setHasImageError] = useState(false);
 
   const LOW_TICKETS_THRESHOLD = 20;
   const showLowTickets =
@@ -122,6 +124,8 @@ export function EventCardHorizontal({
     router.push(`/events/${slug}?openBuy=1&sessionTime=${encodeURIComponent(time)}`);
   };
 
+  const showImage = Boolean(imageUrl && !hasImageError);
+
   return (
     <Link
       href={hrefOverride ?? `/events/${slug}`}
@@ -129,18 +133,26 @@ export function EventCardHorizontal({
     >
       {/* Image — 16:9 слева */}
       <div className="relative w-full sm:w-80 sm:min-w-[20rem] aspect-video bg-slate-100 shrink-0">
-        {imageUrl ? (
+        {/* Плейсхолдер: серый фон + иконка + заголовок */}
+        <div
+          className={`absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,_#e5e7eb,_#f3f4f6)] transition-opacity duration-300 ${
+            showImage ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300/80 bg-white/60 shadow-sm">
+            <div className="h-4 w-4 rotate-45 rounded-[6px] border border-slate-300/90 bg-slate-200/90" />
+          </div>
+        </div>
+
+        {showImage && imageUrl && (
           <Image
             src={imageUrl}
             alt={title}
             fill
             sizes="(max-width: 640px) 100vw, 20rem"
             className="object-cover transition-transform duration-500 group-hover:scale-110"
+            onError={() => setHasImageError(true)}
           />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary-100 to-primary-50">
-            <span className="text-4xl">{category === 'EXCURSION' ? '🚶' : category === 'MUSEUM' ? '🏛️' : '🎭'}</span>
-          </div>
         )}
 
         {/* Top-left badges — Рекомендуем, Популярно, Скидка N%, N мест */}

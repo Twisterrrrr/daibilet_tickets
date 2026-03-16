@@ -2,7 +2,6 @@ import type { CityListItem, EventListItem } from '@daibilet/shared';
 import { CATEGORY_LABELS, cityToPrepositional, EventCategory } from '@daibilet/shared';
 import type { TagWithCount } from '@/lib/api.types';
 import { ArrowRight, Headphones, Landmark, MapPin, Star, Ticket, TrendingUp, X } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 
 import type { MultiEventListItemDto } from '@/lib/api.types';
@@ -12,7 +11,6 @@ import { MultiEventCard } from '@/components/ui/MultiEventCard';
 import { PromoBlock } from '@/components/ui/PromoBlock';
 import { api } from '@/lib/api';
 import { devWarn } from '@/lib/devlog';
-import { CITY_IMAGES } from '@/lib/cityImages';
 
 // ISR: обновлять каждый час
 export const revalidate = 3600;
@@ -615,20 +613,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 href={`/cities/${city.slug}`}
                 className="card group relative flex h-48 flex-col justify-end overflow-hidden bg-gradient-to-br from-primary-800 to-primary-950 transition-transform hover:scale-[1.02]"
               >
-                {(() => {
-                  const imageConfig = CITY_IMAGES[city.slug];
-                  const cardImage = imageConfig?.card ?? city.heroImage;
-                  if (!cardImage) return null;
-                  return (
-                    <Image
-                      src={cardImage}
-                      alt={city.name}
-                      fill
-                      className="absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-105"
-                      sizes="(min-width: 1024px) 25vw, 50vw"
-                    />
-                  );
-                })()}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                 <div className="relative p-5">
                   <h3 className="text-xl font-bold text-white">{city.name}</h3>
