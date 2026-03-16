@@ -45,6 +45,9 @@ RUN pnpm --filter @daibilet/backend build
 # pnpm deploy создаёт standalone-директорию с корректным node_modules (включая @sentry/nestjs)
 RUN pnpm deploy --filter=@daibilet/backend --prod /prod/backend --legacy
 
+# Добавляем вспомогательный Prisma-скрипт в deploy-бандл, чтобы он был доступен в рантайме
+COPY packages/backend/prisma/create-test-user.ts /prod/backend/prisma/create-test-user.ts
+
 # deploy не копирует .prisma/client; prisma в deps backend — генерируем явно в бандле
 RUN cd /prod/backend && npx prisma generate --schema=./prisma/schema.prisma
 
