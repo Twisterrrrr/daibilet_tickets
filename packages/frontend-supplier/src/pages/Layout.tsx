@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BarChart3, Bell, Calendar, CreditCard, FileText, LayoutDashboard, LogOut, MessageSquare, Plug2, Settings, Users } from 'lucide-react';
+import { BarChart3, Bell, Calendar, ChevronDown, CreditCard, FileText, LayoutDashboard, LogOut, MessageSquare, Plug2, Settings, Users } from 'lucide-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { AppShell, PageContainer } from '@daibilet/shared-ui';
@@ -20,15 +20,15 @@ const NAV: { to: string; icon: React.ComponentType<{ className?: string }>; labe
   [
     { to: '/', icon: LayoutDashboard, label: 'Дашборд' },
     { to: '/events', icon: Calendar, label: 'Мои события' },
-    { to: '/availability', icon: Calendar, label: 'Наличие' },
+    { to: '/availability', icon: Calendar, label: 'Вместимость и квота' },
     { to: '/orders', icon: FileText, label: 'Заказы' },
     { to: '/reviews', icon: MessageSquare, label: 'Отзывы', badgeKey: 'reviews' },
     { to: '/notifications', icon: Bell, label: 'Уведомления', badgeKey: 'notifications' },
     { to: '/reports', icon: BarChart3, label: 'Отчёты' },
     { to: '/balance', icon: CreditCard, label: 'Баланс' },
+    { to: '/settings', icon: Settings, label: 'Настройки' },
     { to: '/team', icon: Users, label: 'Команда' },
     { to: '/integrations', icon: Plug2, label: 'Интеграции' },
-    { to: '/settings', icon: Settings, label: 'Настройки' },
   ];
 
 export default function Layout() {
@@ -38,6 +38,8 @@ export default function Layout() {
   const [supplier, setSupplier] = useState<SidebarSupplierInfo | null>(null);
   const [reviewsBadge, setReviewsBadge] = useState<number | null>(null);
   const [notificationsBadge, setNotificationsBadge] = useState<number | null>(null);
+   const [showEventsGroup, setShowEventsGroup] = useState(true);
+   const [showSettingsGroup, setShowSettingsGroup] = useState(true);
 
   useEffect(() => {
     api
@@ -111,6 +113,13 @@ export default function Layout() {
       <nav className="flex-1 space-y-1 px-2 py-3 text-sm">
         {NAV.map((item) => {
           const active = item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
+          const isSubOfEvents = item.to === '/availability';
+          const isSubOfSettings = item.to === '/team' || item.to === '/integrations';
+          const isEventsParent = item.to === '/events';
+          const isSettingsParent = item.to === '/settings';
+
+          if (isSubOfEvents && !showEventsGroup) return null;
+          if (isSubOfSettings && !showSettingsGroup) return null;
           let badge: number | null = null;
           if (item.badgeKey === 'reviews') badge = reviewsBadge ?? null;
           if (item.badgeKey === 'notifications') badge = notificationsBadge ?? null;
@@ -121,14 +130,36 @@ export default function Layout() {
               to={item.to}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors ${
                 active ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
+              } ${
+                isSubOfEvents || isSubOfSettings
+                  ? 'ml-6 text-xs'
+                  : ''
               }`}
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className={`h-4 w-4 ${(isSubOfEvents || isSubOfSettings) ? 'opacity-60' : ''}`} />
               <span className="flex-1 truncate">{item.label}</span>
               {badge !== null && badge > 0 && (
                 <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
                   {badge}
                 </span>
+              )}
+              {(isEventsParent || isSettingsParent) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isEventsParent) setShowEventsGroup((v) => !v);
+                    if (isSettingsParent) setShowSettingsGroup((v) => !v);
+                  }}
+                  className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform ${
+                      (isEventsParent && showEventsGroup) || (isSettingsParent && showSettingsGroup) ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
               )}
             </Link>
           );

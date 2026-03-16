@@ -14,6 +14,8 @@ import { WebVitalsReporter } from '@/components/WebVitalsReporter';
 import { UserAuthProvider } from '@/hooks/useUserAuth';
 import { CartProvider } from '@/lib/cart';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: {
     default: 'Дайбилет — экскурсии, музеи и мероприятия по городам России',

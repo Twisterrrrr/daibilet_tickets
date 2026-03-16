@@ -1,5 +1,4 @@
 import os from 'node:os';
-import path from 'node:path';
 import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 
@@ -12,6 +11,12 @@ const forceStandalone = process.env.NEXT_OUTPUT === 'standalone';
 const useStandalone = forceStandalone || !isWindows;
 
 const nextConfig: NextConfig = {
+  // Транспиляция workspace-пакета (Next.js 14/15 иначе не подхватывает соседний пакет)
+  transpilePackages: ['@daibilet/shared'],
+
+  // В Docker нет корневого eslint.config.mjs — линт при сборке пропускаем
+  eslint: { ignoreDuringBuilds: true },
+
   // Standalone output — минимальный образ для Docker (~100 MB вместо ~500 MB)
   output: useStandalone ? ('standalone' as const) : undefined,
 
@@ -74,15 +79,16 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Явный alias для workspace-пакета: в Docker pnpm symlinks могут не сохраняться.
-  webpack: (config) => {
-    const a = config.resolve?.alias ?? {};
-    if (typeof a === 'object' && !Array.isArray(a)) {
-      config.resolve = config.resolve ?? {};
-      config.resolve.alias = { ...a, '@daibilet/shared': path.resolve(__dirname, '../../shared') };
-    }
-    return config;
-  },
+  // Без webpack-alias: опираемся на transpilePackages и симлинк из pnpm install.
+  // Если в Docker сборка не найдёт @daibilet/shared — раскомментировать блок ниже.
+  // webpack: (config) => {
+  //   const a = config.resolve?.alias ?? {};
+  //   if (typeof a === 'object' && !Array.isArray(a)) {
+  //     config.resolve = config.resolve ?? {};
+  //     config.resolve.alias = { ...a, '@daibilet/shared': path.resolve(__dirname, '../shared') };
+  //   }
+  //   return config;
+  // },
 };
 
 export default withSentryConfig(nextConfig, {

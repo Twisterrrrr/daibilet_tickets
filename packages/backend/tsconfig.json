@@ -16,7 +16,9 @@
     "skipLibCheck": true,
     "downlevelIteration": true,
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@daibilet/shared": ["../shared"],
+      "@daibilet/shared/*": ["../shared/*"]
     }
   },
   "include": ["src/**/*"],

@@ -1,0 +1,14 @@
+# Override: использовать готовые образы из registry (без сборки на сервере).
+# Подключается при заданном DOCKER_REGISTRY в deploy.sh.
+# Образы собираются локально/в CI: scripts/docker-build-push-staging.sh
+# !reset null убирает build из merge (Compose v2.18.1+)
+services:
+  backend:
+    image: ${DOCKER_REGISTRY}/daibilet-backend:${DOCKER_IMAGE_TAG:-staging}
+    build: !reset null
+  frontend:
+    image: ${DOCKER_REGISTRY}/daibilet-frontend:${DOCKER_IMAGE_TAG:-staging}
+    build: !reset null
+  admin:
+    image: ${DOCKER_REGISTRY}/daibilet-admin:${DOCKER_IMAGE_TAG:-staging}
+    build: !reset null

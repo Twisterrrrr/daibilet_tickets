@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { MultiEventListItemDto } from '@/lib/api.types';
 import { formatPrice } from '@daibilet/shared';
+import { useState } from 'react';
 
 interface MultiEventCardProps {
   item: MultiEventListItemDto;
@@ -20,22 +21,36 @@ export function MultiEventCard({ item, className = '' }: MultiEventCardProps) {
         ? `${cities.map((c) => c.name).join(', ')} и ещё ${item.remainingCities}`
         : cities.map((c) => c.name).join(', ');
 
+  const [hasImageError, setHasImageError] = useState(false);
+  const showImage = Boolean(item.coverUrl && !hasImageError);
+
   return (
     <Link
       href={`/events/m/${item.slug}`}
       className={`card group block overflow-hidden transition hover:shadow-lg ${className}`}
     >
-      {item.coverUrl ? (
-        <div className="relative aspect-[4/3] overflow-hidden bg-slate-200">
+      <div className="relative aspect-[4/3] overflow-hidden bg-slate-200">
+        <div
+          className={`absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,_#e5e7eb,_#f3f4f6)] transition-opacity duration-300 ${
+            showImage ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300/80 bg-white/60 shadow-sm">
+            <div className="h-4 w-4 rotate-45 rounded-[6px] border border-slate-300/90 bg-slate-200/90" />
+          </div>
+        </div>
+
+        {showImage && item.coverUrl && (
           <Image
             src={item.coverUrl}
             alt={item.title}
             fill
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             sizes="(min-width: 1024px) 25vw, 50vw"
+            onError={() => setHasImageError(true)}
           />
-        </div>
-      ) : null}
+        )}
+      </div>
       <div className="p-3 sm:p-4">
         <h3 className="font-semibold text-slate-900 line-clamp-2 group-hover:text-primary-600">{item.title}</h3>
         {citiesLabel ? <p className="mt-1 text-sm text-slate-500 line-clamp-2">{citiesLabel}</p> : null}
@@ -54,3 +69,4 @@ export function MultiEventCard({ item, className = '' }: MultiEventCardProps) {
     </Link>
   );
 }
+

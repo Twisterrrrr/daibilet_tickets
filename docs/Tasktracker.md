@@ -255,6 +255,13 @@
 - [x] **Высокий**: Cache invalidate в Settings (scope + ids → /admin/cache/invalidate) ✅
 - [x] **Средний**: Support escalation checklist — `docs/SupportEscalation.md` ✅
 
+### Gate 2.x — Популярные направления (лендинги, подборки, авто-материализация)
+
+- [ ] **Высокий**: `CollectionMaterializerService` — авто-пересчёт `isActive` для подборок по фактическому количеству событий с future-сессиями и порогу `minEvents`. См. `docs/PopularDirectionsBlueprint.md` §1.
+- [ ] **Средний**: Расширение auto-tagging (`canonical-tag-enrichment.ts`) под темы `bus-tour`, `meteor`, `rooftop`, `walking` с unit-тестами. См. `docs/PopularDirectionsBlueprint.md` §2.
+- [ ] **Средний**: Витрина «Обзорные автобусные экскурсии» (`Collection.slug = obzornye-avtobusnye-ekskursii`) — убедиться, что тег `bus-tour` размечен на автобусных турах Teplohod/TC и подборка не пустая в ключевых городах (Москва, СПб, НН, Казань, Ярославль). См. `docs/PopularDirectionsBlueprint.md` §3.
+- [ ] **Низкий**: Динамический блок «Популярные направления» на странице города — `getTopTagsByCity` / `getTopCollectionsByCity` + отображение ТОП тем с ссылками на /tags и /podborki по городу. См. `docs/PopularDirectionsBlueprint.md` §4.
+
 ### Gate 2.5 — админка событий (готовность, расписание, поставщики)
 
 > Поставщики: см. раздел ниже.

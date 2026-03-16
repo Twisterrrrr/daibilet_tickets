@@ -16,6 +16,15 @@ describe('getCanonicalLandingTags', () => {
       expect(hasTag(tags, 'nochnye-mosty')).toBe(true);
     });
 
+    it('assigns nochnye-mosty for phrasing "под разведенными мостами" in SPb', () => {
+      const tags = getCanonicalLandingTags(
+        'Ночная экскурсия под разведенными мостами',
+        'Прогулка на теплоходе по Неве под разведенными мостами',
+        'saint-petersburg',
+      );
+      expect(hasTag(tags, 'nochnye-mosty')).toBe(true);
+    });
+
     it('assigns nochnye-mosty for "ночные мосты" phrasing in SPb', () => {
       const tags = getCanonicalLandingTags(
         'Ночные мосты Петербурга',

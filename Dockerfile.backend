@@ -28,8 +28,16 @@ COPY packages/backend/ ./packages/backend/
 # Генерируем Prisma Client
 RUN pnpm --filter @daibilet/backend db:generate
 
-# Собираем shared (backend зависит от него)
-RUN pnpm --filter @daibilet/shared build
+# Собираем shared: убираем composite в контейнере (из‑за него tsc эмитит только .d.ts)
+RUN node -e "const fs=require('fs'); const p='/app/packages/shared/tsconfig.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.compilerOptions=j.compilerOptions||{}; j.compilerOptions.composite=false; j.compilerOptions.emitDeclarationOnly=false; fs.writeFileSync(p,JSON.stringify(j,null,2));" && pnpm --filter @daibilet/shared build
+
+# Подставляем собранный shared в оба node_modules: копируем содержимое dist/. чтобы не получить dist/dist
+RUN rm -rf /app/node_modules/@daibilet/shared /app/packages/backend/node_modules/@daibilet/shared && \
+  mkdir -p /app/node_modules/@daibilet/shared/dist /app/packages/backend/node_modules/@daibilet/shared/dist && \
+  cp /app/packages/shared/package.json /app/node_modules/@daibilet/shared/ && \
+  cp -r /app/packages/shared/dist/. /app/node_modules/@daibilet/shared/dist/ && \
+  cp /app/packages/shared/package.json /app/packages/backend/node_modules/@daibilet/shared/ && \
+  cp -r /app/packages/shared/dist/. /app/packages/backend/node_modules/@daibilet/shared/dist/
 
 # Собираем backend
 RUN pnpm --filter @daibilet/backend build

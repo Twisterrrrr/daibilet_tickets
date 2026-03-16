@@ -23,6 +23,7 @@ export default function Reports() {
   const [range, setRange] = useState<DateRange>({ from: null, to: null });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -47,6 +48,35 @@ export default function Reports() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const formatRangeLabel = () => {
+    if (!range.from && !range.to) return '';
+    const format = (d: Date | null) => (d ? d.toLocaleDateString('ru') : '…');
+    if (range.from && !range.to) return `С ${format(range.from)}`;
+    if (!range.from && range.to) return `До ${format(range.to)}`;
+    return `${format(range.from)} — ${format(range.to)}`;
+  };
+
+  const setPresetRange = (preset: 'today' | 'week' | 'month') => {
+    const now = new Date();
+    const start = new Date(now);
+    const end = new Date(now);
+
+    if (preset === 'today') {
+      // from = today, to = today
+    } else if (preset === 'week') {
+      const day = now.getDay() || 7; // Monday=1..Sunday=7
+      start.setDate(now.getDate() - (day - 1));
+      end.setDate(start.getDate() + 6);
+    } else if (preset === 'month') {
+      start.setDate(1);
+      end.setMonth(start.getMonth() + 1, 0);
+    }
+
+    const newRange: DateRange = { from: start, to: end };
+    setRange(newRange);
+    setTimeout(load, 0);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -65,7 +95,43 @@ export default function Reports() {
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex-1">
             <p className="mb-1 text-xs text-gray-500">Период</p>
-            <DateRangePicker value={range} onChange={setRange} />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setPresetRange('today')}
+                  className="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Сегодня
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPresetRange('week')}
+                  className="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Неделя
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPresetRange('month')}
+                  className="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Месяц
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPicker(true)}
+                  className="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Выбрать период
+                </button>
+              </div>
+              {formatRangeLabel() && (
+                <span className="text-xs text-gray-500">
+                  Выбрано: <span className="font-medium text-gray-700">{formatRangeLabel()}</span>
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={load}
@@ -130,6 +196,37 @@ export default function Reports() {
           </tbody>
         </table>
       </SectionCard>
+
+      {showPicker && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="inline-block rounded-xl bg-white px-6 py-5 shadow-xl">
+            <p className="mb-3 text-sm font-medium text-gray-700">Выберите произвольный период</p>
+            <div className="inline-block">
+              <DateRangePicker value={range} onChange={setRange} />
+              <div className="mt-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPicker(false)}
+                  className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPicker(false);
+                    load();
+                  }}
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  disabled={loading}
+                >
+                  Применить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

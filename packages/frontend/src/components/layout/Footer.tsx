@@ -4,6 +4,8 @@ import Link from 'next/link';
 
 import { api } from '@/lib/api';
 
+export const dynamic = 'force-dynamic';
+
 interface FooterCity {
   slug: string;
   name: string;
@@ -41,8 +43,12 @@ export async function Footer() {
     const all: CityListItem[] = await api.getTopCities();
     cities = (all || [])
       .map((c) => {
-        const events = c._count?.events ?? 0;
-        const museumCount = c.museumCount ?? c._count?.venues ?? 0;
+        const events = (c as CityListItem & { eventCount?: number; _count?: { events?: number } }).eventCount
+          ?? c._count?.events
+          ?? 0;
+        const museumCount = (c as CityListItem & { museumCount?: number; _count?: { venues?: number } }).museumCount
+          ?? c._count?.venues
+          ?? 0;
         const total = events + museumCount;
         return {
           slug: c.slug,

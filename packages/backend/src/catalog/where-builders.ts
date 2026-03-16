@@ -84,12 +84,17 @@ export function buildEventWhere(
     isActive: true,
     isDeleted: false,
     canonicalOfId: null,
-    // В каталоге на сайте только опубликованные: без override или override.editorStatus = PUBLISHED,
-    // при этом события с suppressLowQuality=true в override не показываем.
-    OR: [
-      { override: null },
-      { override: { editorStatus: 'PUBLISHED', suppressLowQuality: { not: true } } },
-    ],
+    // В прод-каталоге показываем только «прошедшие модерацию» события:
+    //   без override ИЛИ override.editorStatus = PUBLISHED и suppressLowQuality != true.
+    // На стейджинге/dev ослабляем фильтр и не режем по override вообще, чтобы видеть полный каталог.
+    ...(process.env.NODE_ENV === 'production'
+      ? {
+          OR: [
+            { override: null },
+            { override: { editorStatus: 'PUBLISHED', suppressLowQuality: { not: true } } },
+          ],
+        }
+      : {}),
     ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),
     city: {
       isActive: true,

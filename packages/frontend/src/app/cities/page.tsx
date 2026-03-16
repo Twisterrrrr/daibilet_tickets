@@ -6,6 +6,8 @@ import { api } from '@/lib/api';
 import { CITY_INFO } from '@/lib/cityInfo';
 import { CITY_IMAGES } from '@/lib/cityImages';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Города России — экскурсии, музеи и мероприятия',
   description:

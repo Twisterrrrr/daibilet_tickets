@@ -123,8 +123,9 @@ export class CatalogService {
         regionStats.map((r) => [r.hubCityId, { slug: r.slug, name: r.name, eventCount: Number(r.event_count) }]),
       );
 
-      // Отфильтрованные города: не менее 2 событий; областные (не-хаб) не выводим — группируем под хабом (Казань → Татарстан ниже)
-      const minEventsForCity = 2;
+      // Отфильтрованные города: не менее N событий; областные (не-хаб) не выводим — группируем под хабом (Казань → Татарстан ниже)
+      // На production держим порог 2, на стейджингах/dev можем ослабить до 1, чтобы витрина не была пустой.
+      const minEventsForCity = process.env.NODE_ENV === 'production' ? 2 : 1;
       const eventCount = (c: (typeof cities)[0]) => eventCountMap.get(c.id) ?? 0;
       const visibleCities = cities.filter(
         (c) => !hiddenCityIds.has(c.id) && eventCount(c) >= minEventsForCity,

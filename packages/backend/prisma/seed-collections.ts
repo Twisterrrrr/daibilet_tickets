@@ -10,6 +10,21 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('=== Seed: Collections (Подборки) ===\n');
 
+  // Тег для обзорных автобусных экскурсий (кросс-городская тема)
+  const busTourTag = await prisma.tag.upsert({
+    where: { slug: 'bus-tour' },
+    update: {
+      isActive: true,
+    },
+    create: {
+      slug: 'bus-tour',
+      name: 'Обзорные автобусные экскурсии',
+      category: 'THEME',
+      isActive: true,
+    },
+  });
+  console.log(`Тег bus-tour: id=${busTourTag.id}`);
+
   // Получить города
   const spb = await prisma.city.findFirst({ where: { slug: 'saint-petersburg' } });
   const kazan = await prisma.city.findFirst({ where: { slug: 'kazan' } });
@@ -60,6 +75,25 @@ async function main() {
         },
       ],
       sortOrder: 1,
+    },
+    {
+      slug: 'nochnye-mosty-spb',
+      title: 'Ночные прогулки под развод мостов',
+      subtitle: 'Лучшие теплоходные рейсы под разведёнными мостами Петербурга',
+      cityId: spb?.id || null,
+      filterTags: ['nochnye-mosty'],
+      filterCategory: 'EXCURSION',
+      filterSubcategory: 'RIVER',
+      filterAudience: null,
+      heroImage: 'https://images.unsplash.com/photo-1522599741188-3a42a97a1b78?w=1200',
+      description:
+        'Подборка ночных рейсов именно под развод мостов: оптимальное время старта, проверенные маршруты по Неве и Фонтанке и надёжные теплоходные компании. Все события в этой подборке проходят в Петербурге и дают гарантированный вид на развод.',
+      metaTitle: 'Ночные прогулки под развод мостов в Петербурге — билеты на теплоход | Дайбилет',
+      metaDescription:
+        'Подборка ночных прогулок под развод мостов в Санкт-Петербурге: рейсы на теплоходах, лучшие маршруты по Неве, онлайн-бронирование билетов.',
+      faq: [],
+      infoBlocks: [],
+      sortOrder: 1.5,
     },
     {
       slug: 'muzei-kazani-detyam',
@@ -172,6 +206,25 @@ async function main() {
       ],
       infoBlocks: [],
       sortOrder: 6,
+    },
+    {
+      slug: 'obzornye-avtobusnye-ekskursii',
+      title: 'Обзорные автобусные экскурсии',
+      subtitle: 'Hop-On Hop-Off и обзорные туры по Москве, Петербургу и другим городам',
+      cityId: null, // кросс-городская подборка
+      filterTags: ['bus-tour'],
+      filterCategory: null,
+      filterSubcategory: null,
+      filterAudience: null,
+      heroImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=1200',
+      description:
+        'Лучшие обзорные автобусные экскурсии по Москве, Санкт-Петербургу, Нижнему Новгороду, Ярославлю и Казани. Классические Hop-On Hop-Off туры и авторские маршруты по городу.',
+      metaTitle: 'Обзорные автобусные экскурсии — Hop-On Hop-Off по городам России | Дайбилет',
+      metaDescription:
+        'Обзорные автобусные экскурсии: двухэтажные автобусы Hop-On Hop-Off и классические туры по городам России. Расписание, цены и онлайн-бронирование на Дайбилет.',
+      faq: [],
+      infoBlocks: [],
+      sortOrder: 7,
     },
     {
       slug: 'zolotoe-koltso',

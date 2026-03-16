@@ -150,8 +150,8 @@ export default function AvailabilityPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Наличие и вместимость"
-        subtitle="Массовое изменение вместимости по сеансам события"
+        title="Вместимость и квота"
+        subtitle="Управление вместимостью и квотами по сеансам события"
       />
 
       {error && (

@@ -18,9 +18,9 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"],
+      "@daibilet/shared": ["../shared/src"],
+      "@daibilet/shared/*": ["../shared/src/*"]
     },
     "allowJs": true
   },
