@@ -261,6 +261,8 @@
 - [ ] **Средний**: Расширение auto-tagging (`canonical-tag-enrichment.ts`) под темы `bus-tour`, `meteor`, `rooftop`, `walking` с unit-тестами. См. `docs/PopularDirectionsBlueprint.md` §2.
 - [ ] **Средний**: Витрина «Обзорные автобусные экскурсии» (`Collection.slug = obzornye-avtobusnye-ekskursii`) — убедиться, что тег `bus-tour` размечен на автобусных турах Teplohod/TC и подборка не пустая в ключевых городах (Москва, СПб, НН, Казань, Ярославль). См. `docs/PopularDirectionsBlueprint.md` §3.
 - [ ] **Низкий**: Динамический блок «Популярные направления» на странице города — `getTopTagsByCity` / `getTopCollectionsByCity` + отображение ТОП тем с ссылками на /tags и /podborki по городу. См. `docs/PopularDirectionsBlueprint.md` §4.
+- [ ] **Низкий**: Админка Подборок — переключаемый режим списка (карточки vs таблица как у Лендингов) для UX-работы редакторов: карточки для визуального обзора витрины, таблица с фильтрами для массового редактирования и аудита. Настройки влияют только на представление в админке, публичный `/podborki` остаётся карточками.
+- [ ] **Средний**: Ежедневный sync → retag → materialize как «вечный инвариант»: убедиться, что cron-задачи `SchedulerService` (full-sync/инкрементальная TC-синхронизация) стабильно крутятся на staging/prod, поверх full-sync автоматически вызываются retag + LandingMaterializerService + (после внедрения) CollectionMaterializerService; описать это как обязательный ежедневный процесс в `Project.md` и ops-runbook (что проверять, как перезапускать, где смотреть логи).
 
 ### Gate 2.5 — админка событий (готовность, расписание, поставщики)
 

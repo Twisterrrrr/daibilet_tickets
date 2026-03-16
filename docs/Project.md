@@ -225,9 +225,9 @@
 - UUID v4 для всех первичных ключей
 - Коммиты: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`
 
-## FULL SYNC (dev) — полный ресинк каталога
+## FULL SYNC и ежедневная синхронизация каталога
 
-- **Назначение**: принудительно пересинхронизировать все внешние источники каталога (Ticketscloud + teplohod.info), пересчитать теги и сбросить кэш, чтобы витрина и админка видели актуальные данные.
+- **Назначение**: принудительно пересинхронизировать все внешние источники каталога (Ticketscloud + teplohod.info), пересчитать теги и сбросить кэш, чтобы витрина и админка видели актуальные данные. В боевых окружениях поверх разового FULL SYNC **всегда** работает регулярная фоновая синхронизация (cron), чтобы актуальность расписания и посадочных не зависела от ручных действий.
 - **Entry point**: CLI в backend.
   - Скрипт: `packages/backend/scripts/full-sync.ts`
   - Команда из корня монорепо:
@@ -237,15 +237,28 @@
   - Обязателен флаг окружения `FULL_SYNC=1` — без него скрипт немедленно завершится с ошибкой (защита от случайного запуска).
 - **Что делает FULL SYNC**:
   - Делает HTTP‑запрос `POST /api/v1/catalog/sync/all` к backend API.
-  - Внутри backend запускается комбинированная синхронизация:
+  - Внутри backend `SyncProcessor` (BullMQ worker) запускает комбинированную синхронизацию:
     - Полный sync Ticketscloud (`TcSyncService.syncAll`): города, площадки, события, офферы, сеансы, retag.
     - Полный sync teplohod.info (`TepSyncService.syncAll`): города, события, офферы, реальное расписание сеансов или виртуальные fallback‑сессии.
     - Дополнительный `retagAll` для унификации тегов по обоим источникам.
+    - Smart populate комбо-страниц (`ComboService.populateAll`).
+    - Materialize лендингов (`LandingMaterializerService.materialize`) — включение/выключение посадочных по фактическому наличию живых событий и порогам `minEvents`.
     - Инвалидация кэша каталога (`CacheService.invalidateAfterSync`).
-  - В stdout выводится JSON‑summary по источникам (кол-во событий/сеансов, новые города, ошибки).
+  - В stdout выводится JSON‑summary по источникам (кол-во событий/сеансов, новые города, ошибки) и агрегированный результат materialize.
 - **Идемпотентность**:
   - Все sync‑слои используют upsert по стабильным ключам (`source + tcEventId / externalEventId`, `tcSessionId` и др.), поэтому повторный FULL SYNC не плодит дубли и только актуализирует данные.
   - Soft‑delete и publish‑gate‑состояния (`isActive`/`isDeleted`, `EventOverride`, `offers.status`) при этом не ломаются — синк следует существующей бизнес‑логике.
+
+### Ежедневная синхронизация (cron, боевые окружения)
+
+- **Цель:** гарантировать, что расписание (`EventSession`), теги и посадочные (лендинги/подборки) автоматически обновляются без ручного запуска FULL SYNC.
+- **Реализация:** модуль `SchedulerModule` и `SchedulerService` в backend:
+  - `@Cron('0 0 0,6,12,18 * * *')` — каждые 6 часов ставится задача `sync-full` в очередь BullMQ (`QUEUE_SYNC`) с overlap‑защитой по `jobId`. Обработчик — `SyncProcessor.handleFullSync` (TC + TEP + retag + combo + materialize + cache).
+  - `@Cron('0 30 * * * *')` — инкрементальная синхронизация Ticketscloud (`sync-incremental`) каждые 30 минут вне окон full sync: `TcSyncService.syncAll` + очередь постредакции + инвалидация кэша.
+  - `@Cron('0 0 3 * * *')` — ежедневная дедупликация (`TcSyncService.deduplicateExisting` + `FuzzyDedupService.findDuplicates` в dry‑run) и ретеншн старых сессий/логов (`RetentionService.run`).
+- **Инвариант Ops:** на staging/prod cron‑задачи SchedulerService считаются **обязательным фоном**:
+  - при инцидентах с пустым расписанием/посадочными первым делом проверяются логи `SchedulerService` и состояние очереди `QUEUE_SYNC`;
+  - ручной FULL SYNC используется как аварийная операция, но не заменяет постоянные cron‑тикеры.
 
 ### Каталог событий — режимы ответа и производительность
 
