@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import type { LandingItem } from '@/lib/api.types';
 
-export const revalidate = 21600;
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Подборки — тематические коллекции событий | Дайбилет',
