@@ -548,8 +548,8 @@ function EventContentBlocks({
             label: typeof obj.label === 'string' ? obj.label : undefined,
           };
         })
-        .filter((x): x is { lat: number; lng: number; label?: string } => x !== null);
-      // Явное приведение типа, чтобы избежать жалоб TS на возможный null в массиве.
+        .filter((x) => x !== null);
+      // Здесь мы гарантированно отфильтровали null, поэтому приводим тип массива.
       points = parsed as { lat: number; lng: number; label?: string }[];
     }
     routeMap = { lat: rawRouteMap.lat, lng: rawRouteMap.lng, zoom, points };
