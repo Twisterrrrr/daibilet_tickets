@@ -60,7 +60,14 @@ jobs:
           ssh-keyscan -H "${STAGING_HOST}" >> ~/.ssh/known_hosts
 
       - name: Deploy to staging via forced command
+        env:
+          # Для push-событий inputs недоступны, поэтому подставляем дефолты.
+          DEPLOY_BRANCH_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_branch || 'staging' }}
+          BACKUP_BEFORE_DEPLOY_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_before_deploy || '1' }}
         run: |
           set -euo pipefail
-          ssh "${STAGING_USER}@${STAGING_HOST}"
+          ssh "${STAGING_USER}@${STAGING_HOST}" "cd /opt/daibilet && \
+            DEPLOY_BRANCH='${DEPLOY_BRANCH_INPUT}' \
+            STAGING_BACKUP_BEFORE_DEPLOY='${BACKUP_BEFORE_DEPLOY_INPUT}' \
+            bash scripts/remote-deploy-staging.sh"
 

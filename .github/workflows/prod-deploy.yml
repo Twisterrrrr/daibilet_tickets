@@ -1,0 +1,63 @@
+name: Production Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_branch:
+        description: 'Git branch to deploy to production'
+        required: false
+        default: 'main'
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    environment:
+      name: production
+      url: https://daibilet.ru
+
+    env:
+      PROD_HOST: ${{ secrets.PROD_HOST }}
+      PROD_USER: ${{ secrets.PROD_USER }}
+      PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate SSH configuration
+        run: |
+          if [ -z "${PROD_HOST}" ] || [ -z "${PROD_USER}" ]; then
+            echo "PROD_HOST and PROD_USER must be set in GitHub secrets"
+            exit 1
+          fi
+          if [ -z "${PROD_SSH_KEY}" ]; then
+            echo "PROD_SSH_KEY must be set in GitHub secrets"
+            exit 1
+          fi
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ env.PROD_SSH_KEY }}
+
+      - name: Add production host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${PROD_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to production
+        env:
+          DEPLOY_BRANCH_INPUT: ${{ inputs.deploy_branch || 'main' }}
+        run: |
+          set -euo pipefail
+          ssh "${PROD_USER}@${PROD_HOST}" "cd /opt/daibilet && \
+            DEPLOY_BRANCH='${DEPLOY_BRANCH_INPUT}' \
+            bash deploy/production/deploy.sh"
+
