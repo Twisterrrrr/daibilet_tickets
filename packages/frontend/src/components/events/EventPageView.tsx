@@ -537,7 +537,7 @@ function EventContentBlocks({
     const zoom = typeof rawRouteMap.zoom === 'number' ? rawRouteMap.zoom : undefined;
     let points: { lat: number; lng: number; label?: string }[] | undefined;
     if (Array.isArray(rawRouteMap.points)) {
-      points = rawRouteMap.points
+      const parsed = rawRouteMap.points
         .map((p) => {
           if (!p || typeof p !== 'object') return null;
           const obj = p as { lat?: unknown; lng?: unknown; label?: unknown };
@@ -549,6 +549,8 @@ function EventContentBlocks({
           };
         })
         .filter((x): x is { lat: number; lng: number; label?: string } => x !== null);
+      // Явное приведение типа, чтобы избежать жалоб TS на возможный null в массиве.
+      points = parsed as { lat: number; lng: number; label?: string }[];
     }
     routeMap = { lat: rawRouteMap.lat, lng: rawRouteMap.lng, zoom, points };
   }
