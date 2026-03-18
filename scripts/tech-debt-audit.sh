@@ -29,7 +29,7 @@ echo ""
 AS_ANY=$(grep -r "as any" --include="*.ts" --include="*.tsx" \
   packages/backend/src packages/frontend/src packages/shared/src \
   packages/frontend-admin/src packages/frontend-supplier/src \
-  2>/dev/null | grep -v "__tests__" | grep -v ".spec." | wc -l | tr -d ' ')
+  2>/dev/null | grep -v "__tests__" | grep -v ".spec." | wc -l | tr -d ' ' || true)
 
 echo -e "as any casts:       ${AS_ANY} / ${BUDGET_AS_ANY}"
 
@@ -37,19 +37,19 @@ echo -e "as any casts:       ${AS_ANY} / ${BUDGET_AS_ANY}"
 ANY_ANNOTATIONS=$(grep -rE ": any[;\),\]\s\|]" --include="*.ts" --include="*.tsx" \
   packages/backend/src packages/frontend/src packages/shared/src \
   packages/frontend-admin/src packages/frontend-supplier/src \
-  2>/dev/null | grep -v "__tests__" | grep -v ".spec." | wc -l | tr -d ' ')
+  2>/dev/null | grep -v "__tests__" | grep -v ".spec." | wc -l | tr -d ' ' || true)
 
 echo -e "any annotations:    ${ANY_ANNOTATIONS} / ${BUDGET_ANY_ANNOTATIONS}"
 
 # 3. empty catches: .catch(() => {}) or .catch(() => { })
 EMPTY_CATCH=$(grep -rE "\.catch\(\(\)\s*=>\s*\{\s*\}" --include="*.ts" --include="*.tsx" \
-  packages/ 2>/dev/null | wc -l | tr -d ' ')
+  packages/ 2>/dev/null | wc -l | tr -d ' ' || true)
 
 echo -e "empty catches:      ${EMPTY_CATCH} / ${BUDGET_EMPTY_CATCH}"
 
 # 4. @Body() : any (write endpoints without DTO)
 BODY_ANY=$(grep -rE "@Body\(\)\s+\w+:\s*any" --include="*.ts" \
-  packages/backend/src 2>/dev/null | wc -l | tr -d ' ')
+  packages/backend/src 2>/dev/null | wc -l | tr -d ' ' || true)
 
 echo -e "@Body() : any:      ${BODY_ANY} / 0"
 

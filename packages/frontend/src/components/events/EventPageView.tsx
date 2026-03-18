@@ -1,8 +1,11 @@
+'use client';
+
 import { CATEGORY_LABELS, formatPrice, getScarcityState, SUBCATEGORY_LABELS, type EventOffer, type EventSubcategory } from '@daibilet/shared';
 import type { EventDetailFrontend } from '@/lib/api.types';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Building2, Calendar, ChevronRight, Clock, MapPin, Shield, Users } from 'lucide-react';
+import { Building2, Calendar, ChevronDown, ChevronRight, Clock, MapPin, Shield, Users, X } from 'lucide-react';
+import { useState } from 'react';
 
 import { AddToCartButton } from '@/components/ui/AddToCartButton';
 import { BuyButton } from '@/components/ui/BuyModal';
@@ -43,6 +46,8 @@ export function EventPageView({ event }: EventPageViewProps) {
     const d = new Date(s.startsAt);
     return d > new Date() && s.isActive;
   });
+
+  const [activeGalleryImage, setActiveGalleryImage] = useState<string | null>(null);
 
   return (
     <>
@@ -194,8 +199,8 @@ export function EventPageView({ event }: EventPageViewProps) {
               </h1>
 
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/80">
-                {/* Рейтинг — показываем только при >= 10 отзывах */}
-                {Number(event.rating) > 0 && (event.reviewCount ?? 0) >= 10 && (
+                {/* Рейтинг: всегда показываем displayRating, бэкенд сам решает псевдорейтинг/реальный */}
+                {Number(event.rating) > 0 && (
                   <a
                     href="#reviews"
                     className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-white transition hover:bg-white/25"
@@ -209,10 +214,10 @@ export function EventPageView({ event }: EventPageViewProps) {
                     {formatDuration(event.durationMinutes)}
                   </span>
                 )}
-                {event.minAge > 0 && (
+                {event.minAge >= 0 && (
                   <span className="flex items-center gap-1.5">
                     <Users className="h-4 w-4" />
-                    {event.minAge}+
+                    {event.minAge || event.minAge === 0 ? `${event.minAge}+` : null}
                   </span>
                 )}
                 {nextSession && (
@@ -224,12 +229,21 @@ export function EventPageView({ event }: EventPageViewProps) {
               </div>
             </div>
 
-            {/* Price badge on hero (desktop) */}
+            {/* Hero CTA с ценой: ведёт к блоку покупки билетов */}
             {(event.priceFrom ?? 0) > 0 && (
-              <div className="hidden rounded-xl bg-white/15 px-5 py-3 text-right backdrop-blur-sm sm:block">
-                <p className="text-xs text-white/70">от</p>
-                <p className="text-2xl font-bold text-white">{formatPrice(event.priceFrom ?? 0)}</p>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('buy-card');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
+                className="hidden rounded-xl bg-white/90 px-5 py-3 text-right text-sm font-semibold text-slate-900 shadow-md shadow-slate-900/20 backdrop-blur-sm transition hover:bg-white sm:inline-flex sm:flex-col sm:items-end"
+              >
+                <span className="text-[11px] font-semibold tracking-[0.08em] text-slate-500">ОТ</span>
+                <span className="text-xl font-bold text-slate-900">{formatPrice(event.priceFrom ?? 0)}</span>
+              </button>
             )}
           </div>
         </div>
@@ -276,11 +290,13 @@ export function EventPageView({ event }: EventPageViewProps) {
                   <p className="text-sm font-medium text-slate-900">{formatDuration(event.durationMinutes)}</p>
                 </div>
               )}
-              {event.minAge > 0 && (
+              {event.minAge >= 0 && (
                 <div className="rounded-xl border border-slate-200 bg-white p-3.5">
                   <Users className="h-5 w-5 text-primary-500" />
                   <p className="mt-1.5 text-xs text-slate-500">Возраст</p>
-                  <p className="text-sm font-medium text-slate-900">от {event.minAge} лет</p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {event.minAge || event.minAge === 0 ? `${event.minAge}+` : 'Для всех'}
+                  </p>
                 </div>
               )}
             </div>
@@ -311,8 +327,40 @@ export function EventPageView({ event }: EventPageViewProps) {
               </div>
             )}
 
-            {/* templateData: program, cast, hall (из EventOverride) */}
+            {/* Контентные блоки события по contentTemplateData (PageTemplateSpecs) */}
+            <EventContentBlocks
+              contentTemplateData={(event as unknown as { contentTemplateData?: Record<string, unknown> | null })
+                .contentTemplateData}
+              refundPolicyResolved={(event as unknown as { refundPolicyResolved?: string | null }).refundPolicyResolved}
+            />
+
+            {/* legacy templateData: program, cast, hall (из EventOverride) */}
             {event.templateData && <TemplateDataBlocks templateData={event.templateData} />}
+
+            {/* Галерея события */}
+            {Array.isArray(event.galleryUrls) && event.galleryUrls.length > 0 && (
+              <section className="space-y-3">
+                <h2 className="text-lg font-bold text-slate-900">Фотогалерея</h2>
+                <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
+                  {event.galleryUrls.map((url, index) => (
+                    <button
+                      key={`${url}-${index}`}
+                      type="button"
+                      onClick={() => setActiveGalleryImage(url)}
+                      className="h-44 w-64 flex-shrink-0 overflow-hidden rounded-xl border border-slate-100 bg-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-300"
+                    >
+                      <Image
+                        src={url}
+                        alt={`${event.title} — фото ${index + 1}`}
+                        width={256}
+                        height={176}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Отзывы */}
             <ReviewSection
@@ -325,7 +373,7 @@ export function EventPageView({ event }: EventPageViewProps) {
 
             {/* Mobile buy button */}
             {(primaryOffer || event.tcEventId || event.offers?.some((o) => o.status === 'ACTIVE')) && (
-              <div className="lg:hidden">
+              <div className="lg:hidden" id="buy-card">
                 <BuyCard
                   event={event}
                   buyUrl={buyUrl}
@@ -340,7 +388,7 @@ export function EventPageView({ event }: EventPageViewProps) {
 
           {/* Right sidebar */}
           <div className="hidden lg:block lg:col-span-1">
-            <div className="sticky top-20">
+            <div className="sticky top-20" id="buy-card">
               <BuyCard
                 event={event}
                 buyUrl={buyUrl}
@@ -378,6 +426,34 @@ export function EventPageView({ event }: EventPageViewProps) {
           </div>
         </section>
       )}
+
+      {/* Лайтбокс для фотогалереи */}
+      {activeGalleryImage && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => setActiveGalleryImage(null)}
+          />
+          <div className="relative z-10 max-h-[90vh] w-full max-w-4xl px-4">
+            <button
+              type="button"
+              onClick={() => setActiveGalleryImage(null)}
+              className="absolute right-6 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="relative mt-8 h-[60vh] w-full overflow-hidden rounded-2xl bg-black/80">
+              <Image
+                src={activeGalleryImage}
+                alt={event.title}
+                fill
+                className="h-full w-full object-contain"
+                sizes="(min-width: 1024px) 960px, 100vw"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -409,6 +485,219 @@ function formatSessionDate(dateStr: string): { date: string; time: string; weekd
 
 function getTcBuyUrl(tcEventId: string): string {
   return `https://ticketscloud.com/v1/services/widget?event=${tcEventId}`;
+}
+
+function EventContentBlocks({
+  contentTemplateData,
+  refundPolicyResolved,
+}: {
+  contentTemplateData?: Record<string, unknown> | null;
+  refundPolicyResolved?: string | null;
+}) {
+  if (!contentTemplateData && !refundPolicyResolved) return null;
+
+  const routeDescription =
+    typeof contentTemplateData?.routeDescription === 'string' ? contentTemplateData.routeDescription : null;
+  const program =
+    typeof contentTemplateData?.program === 'string' ? contentTemplateData.program : null;
+  const menu =
+    typeof contentTemplateData?.menu === 'string' ? contentTemplateData.menu : null;
+  const bookingRules =
+    typeof contentTemplateData?.bookingRules === 'string' ? contentTemplateData.bookingRules : null;
+  const visitRules =
+    typeof contentTemplateData?.visitRules === 'string' ? contentTemplateData.visitRules : null;
+  const advantages =
+    Array.isArray(contentTemplateData?.advantages) && contentTemplateData.advantages.length > 0
+      ? (contentTemplateData.advantages as string[])
+      : null;
+  const visitorTips =
+    typeof contentTemplateData?.visitorTips === 'string' ? contentTemplateData.visitorTips : null;
+  const extraFaq =
+    Array.isArray(contentTemplateData?.extraFaq) && contentTemplateData.extraFaq.length > 0
+      ? (contentTemplateData.extraFaq as { q?: unknown; a?: unknown }[])
+      : null;
+
+  const rawRouteMap = contentTemplateData?.routeMap as
+    | {
+        lat?: unknown;
+        lng?: unknown;
+        zoom?: unknown;
+        points?: unknown;
+      }
+    | undefined;
+
+  let routeMap: {
+    lat: number;
+    lng: number;
+    zoom?: number;
+    points?: { lat: number; lng: number; label?: string }[];
+  } | null = null;
+
+  if (rawRouteMap && typeof rawRouteMap.lat === 'number' && typeof rawRouteMap.lng === 'number') {
+    const zoom = typeof rawRouteMap.zoom === 'number' ? rawRouteMap.zoom : undefined;
+    let points: { lat: number; lng: number; label?: string }[] | undefined;
+    if (Array.isArray(rawRouteMap.points)) {
+      points = rawRouteMap.points
+        .map((p) => {
+          if (!p || typeof p !== 'object') return null;
+          const obj = p as { lat?: unknown; lng?: unknown; label?: unknown };
+          if (typeof obj.lat !== 'number' || typeof obj.lng !== 'number') return null;
+          return {
+            lat: obj.lat,
+            lng: obj.lng,
+            label: typeof obj.label === 'string' ? obj.label : undefined,
+          };
+        })
+        .filter((x): x is { lat: number; lng: number; label?: string } => x !== null);
+    }
+    routeMap = { lat: rawRouteMap.lat, lng: rawRouteMap.lng, zoom, points };
+  }
+
+  const hasAnyContent =
+    advantages ||
+    program ||
+    routeDescription ||
+    routeMap ||
+    menu ||
+    visitRules ||
+    visitorTips ||
+    extraFaq ||
+    bookingRules ||
+    visitRules ||
+    (refundPolicyResolved && refundPolicyResolved.trim().length > 0);
+
+  if (!hasAnyContent) return null;
+
+  const routeMapEmbedUrl =
+    routeMap &&
+    // Центрируем карту и добавляем маркер в точке начала маршрута
+    `https://yandex.ru/map-widget/v1/?ll=${routeMap.lng.toFixed(6)}%2C${routeMap.lat.toFixed(
+      6,
+    )}&z=${routeMap.zoom ?? 15}&pt=${routeMap.lng.toFixed(6)},${routeMap.lat.toFixed(6)},pm2rdm`;
+
+  return (
+    <div className="space-y-6">
+      {advantages && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">Особенности</h2>
+          <ul className="mt-3 list-inside list-disc space-y-1.5 text-sm text-slate-600">
+            {advantages.map((item, index) => (
+              <li key={`${item}-${index}`}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {program && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">Программа</h2>
+          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{program}</p>
+        </section>
+      )}
+
+      {(routeDescription || routeMap) && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">Маршрут</h2>
+          {routeDescription && (
+            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{routeDescription}</p>
+          )}
+          {routeMapEmbedUrl && (
+            <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+              <iframe
+                src={routeMapEmbedUrl}
+                title="Карта маршрута"
+                loading="lazy"
+                className="h-64 w-full border-0"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            </div>
+          )}
+          {routeMap?.points && routeMap.points.length > 0 && (
+            <ul className="mt-3 space-y-1.5 text-sm text-slate-600">
+              {routeMap.points.map((p, idx) => (
+                <li key={`${p.lat}-${p.lng}-${idx}`}>
+                  <span className="font-medium text-slate-800">
+                    Точка {idx + 1}
+                    {p.label ? ` — ${p.label}` : ''}
+                  </span>
+                  <span className="ml-1 text-slate-500">
+                    ({p.lat.toFixed(5)}, {p.lng.toFixed(5)})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {menu && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">Меню</h2>
+          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{menu}</p>
+        </section>
+      )}
+
+      {visitRules && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">Транспорт</h2>
+          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{visitRules}</p>
+        </section>
+      )}
+
+      {visitorTips && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">Памятка гостя</h2>
+          <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{visitorTips}</p>
+        </section>
+      )}
+
+      {extraFaq && extraFaq.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">Частые вопросы</h2>
+          <div className="mt-3 space-y-2">
+            {extraFaq.map((item, index) => {
+              const question = typeof item.q === 'string' ? item.q : null;
+              const answer = typeof item.a === 'string' ? item.a : null;
+              if (!question || !answer) return null;
+              return (
+                <details
+                  key={`${question}-${index}`}
+                  className="group rounded-lg border border-slate-200 bg-white px-4 py-3"
+                >
+                  <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-900">
+                    <span>{question}</span>
+                    <ChevronDown className="h-4 w-4 text-slate-400 transition group-open:rotate-180" />
+                  </summary>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{answer}</p>
+                </details>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {(bookingRules || visitRules || (refundPolicyResolved && refundPolicyResolved.trim().length > 0)) && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-900">Правила обмена и возврата</h2>
+          {refundPolicyResolved && refundPolicyResolved.trim().length > 0 ? (
+            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+              {refundPolicyResolved}
+            </p>
+          ) : (
+            <>
+              {bookingRules && (
+                <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{bookingRules}</p>
+              )}
+              {visitRules && (
+                <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{visitRules}</p>
+              )}
+            </>
+          )}
+        </section>
+      )}
+    </div>
+  );
 }
 
 function TemplateDataBlocks({ templateData }: { templateData: Record<string, unknown> }) {
@@ -554,10 +843,11 @@ function OfferBadge({ badge }: { badge?: string | null }) {
     optimal: { label: 'Оптимальный', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
     cheapest: { label: 'Лучшая цена', className: 'bg-amber-100 text-amber-700 border-amber-200' },
     fastest: { label: 'Быстрее всего', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+    hit: { label: 'Хит продаж', className: 'bg-rose-600 text-white border-rose-600 shadow-sm shadow-rose-300' },
   };
   const cfg = BADGE_CONFIG[badge] || { label: badge, className: 'bg-slate-100 text-slate-700 border-slate-200' };
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${cfg.className}`}>
+    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${cfg.className}`}>
       {cfg.label}
     </span>
   );
@@ -581,6 +871,8 @@ function BuyCard({
   const purchaseType = primaryOffer?.purchaseType || (event.source === 'TEPLOHOD' ? 'REDIRECT' : 'WIDGET');
   const isWidget = purchaseType === 'WIDGET';
   const isRequest = purchaseType === 'REQUEST';
+  /** MANUAL — наши события, слоты показываем статично (без виджета TC). */
+  const isManualEvent = event.source === 'MANUAL';
 
   const widgetProvider = primaryOffer?.widgetProvider || primaryOffer?.source || event.source;
   const isTepWidget = widgetProvider === 'TEPLOHOD' || event.source === 'TEPLOHOD';
@@ -619,23 +911,35 @@ function BuyCard({
   }
   const showFromPrefix = allPrices.size > 1;
 
+  const [buyModalOpen, setBuyModalOpen] = useState(false);
+  const [preselectedSessionId, setPreselectedSessionId] = useState<string | null>(null);
+
+  const handleOpenBuyModal = (sessionId: string | null) => {
+    setPreselectedSessionId(sessionId);
+    setBuyModalOpen(true);
+  };
+
+  const firstSessionPrices =
+    event.sessions?.length ? ((event.sessions[0].prices as { type?: string; price?: number; name?: string }[] | null) ?? []) : [];
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/50">
       {(event.priceFrom ?? 0) > 0 ? (
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-slate-900">
-            {showFromPrefix ? `от ${formatPrice(event.priceFrom ?? 0)}` : formatPrice(event.priceFrom ?? 0)}
-          </span>
-          <span className="text-sm text-slate-400">/ чел.</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-slate-900">
+              {showFromPrefix ? `от ${formatPrice(event.priceFrom ?? 0)}` : formatPrice(event.priceFrom ?? 0)}
+            </span>
+            <span className="text-sm text-slate-400">/ чел.</span>
+          </div>
+          {offerBadge && (
+            <div className="flex-shrink-0">
+              <OfferBadge badge={offerBadge} />
+            </div>
+          )}
         </div>
       ) : (
         <p className="text-lg font-semibold text-slate-600">Цена уточняется</p>
-      )}
-
-      {offerBadge && (
-        <div className="mt-2">
-          <OfferBadge badge={offerBadge} />
-        </div>
       )}
 
       {allOffers.length > 1 && (
@@ -700,27 +1004,65 @@ function BuyCard({
         </div>
       )}
 
-      {event.sessions && event.sessions.length > 0 && (
+      {isManualEvent && firstSessionPrices.length > 0 && (
         <div className="mt-5">
-          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            <Calendar className="h-3.5 w-3.5" />
-            Ближайшие сеансы
-          </h3>
-          {isWidget && !isTepWidget && (
-            <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс для покупки</p>
-          )}
-          <div className="mt-2.5 space-y-1.5">
-            {event.sessions
-              .filter((s) => s.isActive)
-              .slice(0, 5)
-              .map((session) =>
-                isWidget && !isTepWidget ? (
-                  <TcSessionSlot key={session.id} session={session} />
-                ) : (
-                  <StaticSessionRow key={session.id} session={session} />
-                ),
-              )}
-          </div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Категории и цены</h3>
+          <ul className="mt-2 space-y-2">
+            {firstSessionPrices.map((p, idx) => {
+              const label =
+                p.type === 'adult'
+                  ? 'Взрослый билет'
+                  : p.type === 'child'
+                    ? 'Детский билет'
+                    : p.type === 'concession'
+                      ? 'Льготный билет'
+                      : p.type ?? 'Стандарт';
+              const desc =
+                p.type === 'adult'
+                  ? 'без льгот'
+                  : p.type === 'child'
+                    ? 'от 3 до 14 включительно'
+                    : p.type === 'concession'
+                      ? 'школьники от 15 лет, студенты, пенсионеры и пр. льготные категории'
+                      : (p as { description?: string }).description ?? null;
+              return (
+                <li key={`${p.type ?? 'price'}-${idx}`} className="flex flex-col gap-0.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-700">{label}</span>
+                    <span className="font-medium text-slate-900">{formatPrice(p.price ?? 0)}</span>
+                  </div>
+                  {desc && <p className="text-xs text-slate-500">{desc}</p>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Импортируемые события (TC/TEPLOHOD): показываем категории и цены из первого сеанса, если они есть */}
+      {!isManualEvent && firstSessionPrices.length > 0 && (
+        <div className="mt-5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Категории и цены</h3>
+          <ul className="mt-2 space-y-2">
+            {firstSessionPrices.map((p, idx) => {
+              const label =
+                p.type === 'adult'
+                  ? 'Взрослый билет'
+                  : p.type === 'child'
+                    ? 'Детский билет'
+                    : p.type === 'concession'
+                      ? 'Льготный билет'
+                      : p.name || p.type || 'Стандарт';
+              return (
+                <li key={`${p.type ?? p.name ?? 'price'}-${idx}`} className="flex flex-col gap-0.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-700">{label}</span>
+                    <span className="font-medium text-slate-900">{formatPrice(p.price ?? 0)}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
@@ -734,10 +1076,44 @@ function BuyCard({
         />
       ) : offerEventId ? (
         <div className="mt-5">
-          {isWidget ? (
+          {isWidget && !isManualEvent ? (
             <TcWidgetButton tcEventId={offerEventId} tcMetaEventId={offerMetaId}>
               Купить билет
             </TcWidgetButton>
+          ) : isManualEvent && (event.sessions?.length ?? 0) > 0 ? (
+            <BuyButton
+              eventTitle={event.title}
+              eventImage={event.imageUrl}
+              tcEventId={offerEventId}
+              source="TC"
+              sessions={(event.sessions || []).map((s) => ({
+                ...s,
+                prices: (s.prices || []).map((p: { type?: string; price?: number; description?: string }) => ({
+                  name: p.type === 'adult' ? 'Взрослый билет' : p.type === 'child' ? 'Детский билет' : p.type === 'concession' ? 'Льготный билет' : p.type ?? 'Стандарт',
+                  price: p.price ?? 0,
+                  setId: s.id,
+                  amount: 1,
+                  amountVacant: s.availableTickets ?? 0,
+                  description:
+                    p.type === 'adult'
+                      ? 'без льгот'
+                      : p.type === 'child'
+                        ? 'от 3 до 14 включительно'
+                        : p.type === 'concession'
+                          ? 'школьники от 15 лет, студенты, пенсионеры и пр. льготные категории'
+                          : (p as { description?: string }).description ?? undefined,
+                })),
+              }))}
+              address={event.address ?? undefined}
+              venueName={venueName ?? undefined}
+              priceFrom={event.priceFrom ?? 0}
+              isOpen={buyModalOpen}
+              onOpenChange={(open) => {
+                setBuyModalOpen(open);
+                if (open) setPreselectedSessionId(null);
+              }}
+              initialSessionId={preselectedSessionId}
+            />
           ) : purchaseType === 'REDIRECT' && offerDeeplink ? (
             <a
               href={offerDeeplink}
@@ -789,6 +1165,46 @@ function BuyCard({
         </button>
       )}
 
+      {event.sessions && event.sessions.length > 0 && (
+        <div className="mt-5">
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <Calendar className="h-3.5 w-3.5" />
+            Ближайшие сеансы
+          </h3>
+          {isWidget && !isTepWidget && !isManualEvent && (
+            <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс для покупки</p>
+          )}
+          {isManualEvent && (
+            <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс — откроется выбор билетов</p>
+          )}
+          <div className="mt-2.5 space-y-1.5">
+            {event.sessions
+              .filter((s) => s.isActive)
+              .slice(0, 5)
+              .map((session) =>
+                isWidget && !isTepWidget && !isManualEvent ? (
+                  <TcSessionSlot key={session.id} session={session} />
+                ) : isManualEvent ? (
+                      (session.availableTickets ?? 0) > 0 ? (
+                        <button
+                          key={session.id}
+                          type="button"
+                          onClick={() => handleOpenBuyModal(session.id)}
+                          className="w-full rounded-lg border border-slate-200 bg-white text-left transition hover:border-primary-200 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                        >
+                          <StaticSessionRow session={session} />
+                        </button>
+                      ) : (
+                        <StaticSessionRow key={session.id} session={session} />
+                      )
+                ) : (
+                  <StaticSessionRow key={session.id} session={session} />
+                ),
+              )}
+          </div>
+        </div>
+      )}
+
       {primaryOffer &&
         purchaseType !== 'WIDGET' &&
         !isRequest &&
@@ -815,7 +1231,13 @@ function BuyCard({
         <span className="text-xs text-slate-500">
           {isRequest
             ? 'Заявка будет подтверждена оператором'
-            : `Безопасная оплата через ${offerSource === 'TEPLOHOD' ? 'teplohod.info' : 'Дайбилет'}`}
+            : `Безопасная оплата через ${
+                offerSource === 'TEPLOHOD'
+                  ? 'teplohod.info'
+                  : offerSource === 'TC'
+                    ? 'Ticketscloud'
+                    : 'Дайбилет'
+              }`}
         </span>
       </div>
     </div>

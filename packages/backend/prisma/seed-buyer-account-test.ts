@@ -42,9 +42,32 @@ async function main() {
     console.log('  ✓ City saint-petersburg created');
   }
 
+  // Venue: Сквер Достоевского (реальная площадка в СПб)
+  const dostoevskyVenue = await prisma.venue.upsert({
+    where: { slug: 'skver-dostoevskogo' },
+    update: {},
+    create: {
+      cityId: spbCity.id,
+      slug: 'skver-dostoevskogo',
+      title: 'Сквер Достоевского',
+      shortTitle: 'Сквер Достоевского',
+      venueType: 'PARK',
+      description: 'Зелёный сквер в центре Санкт-Петербурга рядом со станцией метро «Достоевская».',
+      address: 'Санкт-Петербург, наб. реки Фонтанки, 114',
+      lat: 59.9245,
+      lng: 30.3475,
+      metro: 'Достоевская',
+      isActive: true,
+      isFeatured: false,
+    },
+  });
+  console.log('  ✓ Venue: Сквер Достоевского');
+
   const buyerEvent = await prisma.event.upsert({
     where: { slug: 'test-event-buyer-account' },
-    update: {},
+    update: {
+      venueId: dostoevskyVenue.id,
+    },
     create: {
       cityId: spbCity.id,
       source: 'MANUAL',
@@ -57,23 +80,63 @@ async function main() {
       category: 'EXCURSION',
       audience: 'ALL',
       subcategories: ['RIVER'],
+      minAge: 0,
       durationMinutes: 60,
-      address: 'Санкт-Петербург',
+      address: 'Санкт-Петербург, наб. реки Фонтанки, 114',
       priceFrom: 150000,
       isActive: true,
-      imageUrl: 'https://images.unsplash.com/photo-1521292270410-a8c53642e9d0?w=400',
-      galleryUrls: [],
+      imageUrl:
+        'https://images.unsplash.com/photo-1521292270410-a8c53642e9d0?auto=format&fit=crop&w=1600&q=80',
+      galleryUrls: [
+        'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1500534314211-0a24cd03f2c0?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80',
+      ],
       moderationStatus: 'APPROVED',
       createdByType: 'ADMIN',
     },
   });
   console.log(`  ✓ Event: ${buyerEvent.title}`);
 
+  // Тестовые теги
+  const familyTag = await prisma.tag.upsert({
+    where: { slug: 'test-family' },
+    update: {},
+    create: {
+      slug: 'test-family',
+      name: 'Для всей семьи (тест)',
+      category: 'AUDIENCE',
+      isActive: true,
+    },
+  });
+
+  const eveningTag = await prisma.tag.upsert({
+    where: { slug: 'test-evening' },
+    update: {},
+    create: {
+      slug: 'test-evening',
+      name: 'Вечерняя прогулка (тест)',
+      category: 'THEME',
+      isActive: true,
+    },
+  });
+
+  await prisma.eventTag.upsert({
+    where: { eventId_tagId: { eventId: buyerEvent.id, tagId: familyTag.id } },
+    update: {},
+    create: { eventId: buyerEvent.id, tagId: familyTag.id },
+  });
+  await prisma.eventTag.upsert({
+    where: { eventId_tagId: { eventId: buyerEvent.id, tagId: eveningTag.id } },
+    update: {},
+    create: { eventId: buyerEvent.id, tagId: eveningTag.id },
+  });
+
   const buyerOffer = await prisma.eventOffer.upsert({
     where: {
       source_externalEventId: { source: 'MANUAL', externalEventId: 'seed-buyer-account' },
     },
-    update: { eventId: buyerEvent.id },
+    update: { eventId: buyerEvent.id, badge: 'hit' },
     create: {
       eventId: buyerEvent.id,
       source: 'MANUAL',
@@ -83,6 +146,7 @@ async function main() {
       isPrimary: true,
       status: 'ACTIVE',
       priority: 0,
+      badge: 'hit',
     },
   });
 
@@ -101,7 +165,11 @@ async function main() {
         startsAt: sessionStartsAt,
         endsAt: sessionEndsAt,
         availableTickets: 50,
-        prices: [{ type: 'adult', price: 150000 }],
+        prices: [
+          { type: 'adult', price: 150000 },
+          { type: 'child', price: 70000 },
+          { type: 'concession', price: 100000 },
+        ],
         isActive: true,
       },
     });
@@ -186,6 +254,162 @@ async function main() {
       },
     });
     console.log('  ✓ FulfillmentItem (CONFIRMED) created');
+  }
+
+  // Контентные блоки и политика возврата на уровне события (override через EventOverride)
+  await prisma.eventOverride.upsert({
+    where: { eventId: buyerEvent.id },
+    update: {
+      subcategoriesOverride: [],
+      subcategoriesMode: 'INHERIT',
+      contentTemplateData: {
+        routeDescription:
+          'Отправление от Сквера Достоевского, прогулка по Фонтанке и Неве с видом на разведённые мосты.',
+        routeMap: {
+          lat: 59.922222,
+          lng: 30.339167,
+          zoom: 15,
+          points: [
+            {
+              lat: 59.922222,
+              lng: 30.339167,
+              label: 'Сквер Достоевского — точка сбора',
+            },
+          ],
+        },
+        program:
+          'Сбор группы в Сквере Достоевского · Инструктаж и посадка на теплоход · Прогулка по маршруту «Ночные мосты» · Фото‑паузы и рассказы гида · Возвращение к месту посадки.',
+        menu:
+          'Включён приветственный напиток и лёгкие закуски. В баре на борту можно дополнительно заказать горячие напитки и десерты.',
+        advantages: [
+          'Старт прямо из центра Петербурга — удобно добираться на метро',
+          'Комфортный тёплый салон и открытая палуба для фото',
+          'Небольшие группы — не будет ощущения «туристического автобуса»',
+        ],
+        bookingRules:
+          'Билет можно перенести один раз не позднее чем за 24 часа до начала сеанса. Для переноса напишите нам на почту, указанную в письме с билетом.',
+      },
+      refundPolicyMode: 'INHERIT_SUPPLIER',
+    },
+    create: {
+      eventId: buyerEvent.id,
+      title: buyerEvent.title,
+      subcategoriesOverride: [],
+      subcategoriesMode: 'INHERIT',
+      contentTemplateData: {
+        routeDescription:
+          'Отправление от Сквера Достоевского, прогулка по Фонтанке и Неве с видом на разведённые мосты.',
+        routeMap: {
+          lat: 59.922222,
+          lng: 30.339167,
+          zoom: 15,
+          points: [
+            {
+              lat: 59.922222,
+              lng: 30.339167,
+              label: 'Сквер Достоевского — точка сбора',
+            },
+          ],
+        },
+        program:
+          'Сбор группы в Сквере Достоевского · Инструктаж и посадка на теплоход · Прогулка по маршруту «Ночные мосты» · Фото‑паузы и рассказы гида · Возвращение к месту посадки.',
+        menu:
+          'Включён приветственный напиток и лёгкие закуски. В баре на борту можно дополнительно заказать горячие напитки и десерты.',
+        advantages: [
+          'Старт прямо из центра Петербурга — удобно добираться на метро',
+          'Комфортный тёплый салон и открытая палуба для фото',
+          'Небольшие группы — не будет ощущения «туристического автобуса»',
+        ],
+        bookingRules:
+          'Билет можно перенести один раз не позднее чем за 24 часа до начала сеанса. Для переноса напишите нам на почту, указанную в письме с билетом.',
+      },
+      refundPolicyMode: 'INHERIT_SUPPLIER',
+      isHidden: false,
+      editorStatus: 'PUBLISHED',
+    },
+  });
+
+  // Тестовые отзывы для события
+  // Сначала очищаем предыдущие сиды отзывов для этого события, чтобы избежать дубликатов при повторном запуске
+  await prisma.review.deleteMany({
+    where: { eventId: buyerEvent.id },
+  });
+
+  const [review1, review2] = await Promise.all([
+    prisma.review.upsert({
+      where: {
+        authorEmail_eventId_venueId: {
+          authorEmail: 'test.reviewer+buyer1@daibilet.ru',
+          eventId: buyerEvent.id,
+          venueId: dostoevskyVenue.id,
+        },
+      },
+      update: {},
+      create: {
+        eventId: buyerEvent.id,
+        venueId: dostoevskyVenue.id,
+        rating: 5,
+        title: 'Отличная тестовая прогулка',
+        text: 'Очень удобное тестовое событие: быстро нашлось в каталоге, понятные условия, хорошая точка старта. Подходит для ручной проверки интерфейса.',
+        authorName: 'Тестовый покупатель',
+        authorEmail: 'test.reviewer+buyer1@daibilet.ru',
+        isVerified: false,
+        status: 'APPROVED',
+        publishedAt: new Date(),
+      },
+    }),
+    prisma.review.upsert({
+      where: {
+        authorEmail_eventId_venueId: {
+          authorEmail: 'test.reviewer+buyer2@daibilet.ru',
+          eventId: buyerEvent.id,
+          venueId: dostoevskyVenue.id,
+        },
+      },
+      update: {},
+      create: {
+        eventId: buyerEvent.id,
+        venueId: dostoevskyVenue.id,
+        rating: 4,
+        title: 'Хороший кейс для UX‑проверок',
+        text: 'Используем это событие для проверки работы ЛК, отзывов и модалки покупки. Всё выглядит реалистично и не мешает реальному каталогу.',
+        authorName: 'UX‑исследователь',
+        authorEmail: 'test.reviewer+buyer2@daibilet.ru',
+        isVerified: false,
+        status: 'APPROVED',
+        publishedAt: new Date(),
+      },
+    }),
+  ]);
+
+  const reviewPhotosExist = await prisma.reviewPhoto.count({
+    where: { reviewId: { in: [review1.id, review2.id] } },
+  });
+
+  if (reviewPhotosExist === 0) {
+    await prisma.reviewPhoto.createMany({
+      data: [
+        {
+          reviewId: review1.id,
+          url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1400&q=80',
+          thumbUrl:
+            'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=320&q=70',
+          filename: 'seed-review1.webp',
+          thumbFilename: 'seed-review1-thumb.webp',
+          sortOrder: 0,
+        },
+        {
+          reviewId: review2.id,
+          url: 'https://images.unsplash.com/photo-1500534314211-0a24cd03f2c0?auto=format&fit=crop&w=1400&q=80',
+          thumbUrl:
+            'https://images.unsplash.com/photo-1500534314211-0a24cd03f2c0?auto=format&fit=crop&w=320&q=70',
+          filename: 'seed-review2.webp',
+          thumbFilename: 'seed-review2-thumb.webp',
+          sortOrder: 0,
+        },
+      ],
+      skipDuplicates: true,
+    });
   }
 
   console.log('\nГотово. Проверка контура:');

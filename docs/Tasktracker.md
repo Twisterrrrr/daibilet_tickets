@@ -249,6 +249,40 @@
 - [x] **Средний**: Read‑model и тесты Buyer Account: вынесен `PurchaseReadService` + маппер `PurchaseListItemDto`, capability‑хелперы `getPurchaseDisplayType` + `derivePurchaseActions` и helper `computeTicketAvailable` покрыты unit‑тестами; добавлены controller‑level интеграционные тесты для `/account/purchases`, `/account/orders`, `/account/orders/:id` (в т.ч. 403 при чужом заказе), `/account/tickets`, `/checkout/track/:shortCode` ✅
 - [ ] **Низкий**: Реальная интеграция YooKassa: metadata.orderId/userId в payment init, webhook → оплата в ЛК
 
+#### Buyer Account — Тестовое событие и страница события (Daibilet Event PDP)
+
+- [x] **Средний**: Тестовое событие `test-event-buyer-account` для сценариев Buyer Account / Event Page:
+  - Venue «Сквер Достоевского» (реальный `Venue` в СПб, привязка к событию, корректный адрес/метро),
+  - возраст 0+ (не скрывается на фронте, корректный рендер `0+` в Hero и карточках фактов),
+  - 1–2 тестовых тега для фильтрации/UX (`test-family`, `test-evening`),
+  - оффер с активной ценой и бейджем, сид‑сценарий `db:seed:buyer-test`.
+- [x] **Средний**: Сеансы для тестового события (`db:seed:event-sessions-test`):
+  - минимум 10 активных `EventSession` с разными датами/временем,
+  - карточка «Ближайшие сеансы» на PDP показывает максимум 5 ближайших слотов,
+  - BuyModal/BuyButton умеют работать с 10+ слотов как с базой для гибридного выбора дата‑время.
+- [x] **Средний**: Рейтинг события:
+  - backend: `CatalogService.getDisplayedEventRating(eventId, rawRating, reviewCount)` — детерминированный псевдорейтинг 4.5–5.0 при `<10` отзывов и фактический рейтинг при `>=10`, без изменения хранимых данных `Event.rating`,
+  - применяется для: листингов (`getEvents`/`enrichWithBadges`), детальной страницы события (`fetchEvent`), блока «Похожие события»,
+  - frontend: бейдж рейтинга на карточке (`EventCard`) и на PDP (`RatingBadge`) всегда видим, даже при малом числе отзывов.
+- [x] **Средний**: Контентные блоки PDP события (PageTemplateSpecs → `EventContentTemplateData`):
+  - реализованы блоки под описанием события строго в порядке:
+    1) «Особенности» (`advantages[]`),
+    2) «Программа» (`program`),
+    3) «Маршрут» (`routeDescription`),
+    4) «Меню» (`menu`),
+    5) «Транспорт» (`visitRules`),
+    6) «Памятка гостя» (`visitorTips`),
+    7) «Частые вопросы» (`extraFaq[]`),
+    8) «Правила обмена и возврата» (backend‑поле `refundPolicyResolved` с fallback на `bookingRules`),
+  - каждый блок рендерится только при наличии данных в `contentTemplateData` / `refundPolicyResolved`, без дублирования старого `templateData`.
+- [x] **Средний**: Refund policy inheritance на PDP:
+  - backend: `RefundPolicyResolutionService.resolveEventRefundPolicy` уже собирает финальную политику по цепочке Supplier → Venue → Event, результат отдан в поле `refundPolicyResolved`,
+  - frontend: EventPageView показывает уже **резолвленную** политику (без собственной логики наследования), либо fallback `bookingRules` из `contentTemplateData`, блок всегда подпиcан «Правила обмена и возврата».
+- [x] **Средний**: Hero / CTA / рейтинг:
+  - CTA в Hero стал «прайсовым»: компактный бейдж с «ОТ» и ценой `formatPrice(priceFrom)` (с символом рубля), по клику мягко скроллит к блоку покупки (`id="buy-card"`),
+  - возраст 0+ не скрывается из‑за falsy‑проверок (`minAge >= 0`),
+  - Hero‑рейтинг использует display‑rating с backend (с псевдорейтингом при `<10` отзывов).
+
 ### Gate 2 — ежедневные ops в текущей админке
 
 - [x] **Высокий**: Admin UI — поиск заказа (id/code/email/paymentId) + resend, retry fulfilment (OrderDetail) ✅

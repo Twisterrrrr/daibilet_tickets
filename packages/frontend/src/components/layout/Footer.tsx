@@ -92,8 +92,8 @@ export async function Footer() {
               Покупайте онлайн, посещайте лучшее!
             </p>
             <div className="mt-4 space-y-1.5 text-base font-medium leading-none text-slate-800">
-              <a href="tel:+78001234567" className="block transition-colors hover:text-primary-600">
-                8 800 123-45-67
+              <a href="tel:+79119886120" className="block transition-colors hover:text-primary-600">
+                +7 911 988-61-20
               </a>
               <a href="mailto:info@daibilet.ru" className="block transition-colors hover:text-primary-600">
                 info@daibilet.ru

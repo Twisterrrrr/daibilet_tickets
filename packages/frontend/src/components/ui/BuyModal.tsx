@@ -15,7 +15,8 @@ import {
   Ticket,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 
 import { shortenAddressToStreet } from '@/lib/address';
@@ -30,6 +31,8 @@ interface PriceItem {
   setId: string;
   amount: number;
   amountVacant: number;
+  /** Описание под категорией (серым цветом), напр. "от 3 до 14 включительно" */
+  description?: string | null;
 }
 
 interface Session {
@@ -56,6 +59,8 @@ interface BuyModalProps {
   address?: string | null;
   venueName?: string | null;
   priceFrom: number | null | undefined;
+  /** При открытии модалки выбрать этот сеанс (например, клик по слоту на странице события). */
+  initialSessionId?: string | null;
 }
 
 // ========================
@@ -77,7 +82,9 @@ function formatSessionDate(dateStr: string) {
 }
 
 function getSourceLabel(source: EventSource): string {
-  return source === 'TEPLOHOD' ? 'teplohod.info' : 'Дайбилет';
+  if (source === 'TEPLOHOD') return 'teplohod.info';
+  if (source === 'TC') return 'Ticketscloud';
+  return 'Дайбилет';
 }
 
 function getTepBuyUrl(tcEventId: string): string {
@@ -100,6 +107,7 @@ export function BuyModal({
   address,
   venueName,
   priceFrom: _priceFrom,
+  initialSessionId,
 }: BuyModalProps) {
   // Фильтруем только активные будущие сеансы
   const activeSessions = sessions.filter((s) => {
@@ -108,6 +116,21 @@ export function BuyModal({
   });
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(activeSessions[0]?.id || null);
+  const sessionsByDate = useMemo(() => {
+    const groups: Record<string, Session[]> = {};
+    activeSessions.forEach((s) => {
+      const d = new Date(s.startsAt);
+      const key = d.toISOString().slice(0, 10);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(s);
+    });
+    Object.values(groups).forEach((arr) => {
+      arr.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    });
+    return groups;
+  }, [activeSessions]);
+
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [sessionDropdownOpen, setSessionDropdownOpen] = useState(false);
   const [checkoutState, setCheckoutState] = useState<CheckoutState>('select');
@@ -131,20 +154,49 @@ export function BuyModal({
     };
   }, [isOpen, onClose]);
 
-  // Сброс при открытии/закрытии
+  // Сброс при открытии и выбор сеанса по initialSessionId (клик по слоту на странице)
+  const prevOpenRef = useRef(false);
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      prevOpenRef.current = false;
+      return;
+    }
+    const justOpened = !prevOpenRef.current;
+    prevOpenRef.current = true;
+    if (justOpened) {
       setCheckoutState('select');
       setOrderResult(null);
       setErrorMessage('');
       setQuantities({});
+      if (initialSessionId && activeSessions.some((s) => s.id === initialSessionId)) {
+        setSelectedSessionId(initialSessionId);
+        const sess = activeSessions.find((s) => s.id === initialSessionId)!;
+        const d = new Date(sess.startsAt);
+        setSelectedDateKey(d.toISOString().slice(0, 10));
+      } else if (activeSessions[0]) {
+        const d = new Date(activeSessions[0].startsAt);
+        setSelectedDateKey(d.toISOString().slice(0, 10));
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialSessionId, activeSessions]);
 
   // Сброс при смене сеанса
   useEffect(() => {
     setQuantities({});
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    if (!selectedDateKey && activeSessions[0]) {
+      const d = new Date(activeSessions[0].startsAt);
+      setSelectedDateKey(d.toISOString().slice(0, 10));
+    }
+  }, [activeSessions, selectedDateKey]);
+
+  const dateKeys = useMemo(() => Object.keys(sessionsByDate).sort().slice(0, 30), [sessionsByDate]);
+  const sessionsForSelectedDate =
+    selectedDateKey && sessionsByDate[selectedDateKey] && sessionsByDate[selectedDateKey].length > 0
+      ? sessionsByDate[selectedDateKey]
+      : activeSessions;
 
   const updateQty = useCallback((setId: string, delta: number, max: number) => {
     setQuantities((prev) => {
@@ -154,10 +206,19 @@ export function BuyModal({
     });
   }, []);
 
-  // Итого
+  // Итого (используем тот же ключ, что и для updateQty: rowKey при нескольких ценах с одним setId)
   const totalItems = Object.values(quantities).reduce((a, b) => a + b, 0);
   const totalPrice = selectedSession
-    ? selectedSession.prices.reduce((sum, p) => sum + (quantities[p.setId] || 0) * p.price, 0)
+    ? selectedSession.prices.reduce((sum, p, idx) => {
+        const sameSetIdForAll =
+          selectedSession.prices.length > 1 &&
+          selectedSession.prices.every((x) => x.setId === selectedSession.prices[0].setId);
+        const rowKey = sameSetIdForAll
+          ? `${selectedSession.id}-${p.name}-${idx}`
+          : p.setId;
+        const qty = quantities[rowKey] ?? 0;
+        return sum + qty * p.price;
+      }, 0)
     : 0;
 
   // Создание заказа в TC
@@ -224,8 +285,8 @@ export function BuyModal({
     return typeof ord.number === 'string' && typeof ord.totalPriceFormatted === 'string';
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
@@ -376,7 +437,7 @@ export function BuyModal({
                       Дата и время
                     </label>
 
-                    {activeSessions.length === 1 ? (
+                  {activeSessions.length === 1 ? (
                       <div className="mt-2 flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100 text-sm font-bold text-primary-700">
                           {formatSessionDate(activeSessions[0].startsAt).weekday}
@@ -396,6 +457,75 @@ export function BuyModal({
                           </p>
                         </div>
                       </div>
+                  ) : activeSessions.length > 5 ? (
+                    <div className="mt-2 space-y-3">
+                      {/* Мини-календарь по дням */}
+                      <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+                        {dateKeys.map((key) => {
+                          const daySessions = sessionsByDate[key];
+                          if (!daySessions || daySessions.length === 0) return null;
+                          const first = daySessions[0];
+                          const fmt = formatSessionDate(first.startsAt);
+                          const isSelected = key === selectedDateKey;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setSelectedDateKey(key);
+                                const firstSession = daySessions[0];
+                                if (firstSession) {
+                                  setSelectedSessionId(firstSession.id);
+                                }
+                              }}
+                              className={`flex min-w-[72px] flex-col items-center justify-center rounded-xl border px-2 py-2 text-xs font-medium transition ${
+                                isSelected
+                                  ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                  : 'border-slate-200 bg-white text-slate-700'
+                              }`}
+                            >
+                              <span className="uppercase tracking-wide">{fmt.weekday}</span>
+                              <span className="mt-0.5 text-[11px] text-slate-500">{fmt.date}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Слоты по выбранной дате: 2 колонки, сначала заполняем левую, затем правую */}
+                      <div className="mt-3 flex gap-2">
+                        {(() => {
+                          const mid = Math.ceil(sessionsForSelectedDate.length / 2);
+                          const left = sessionsForSelectedDate.slice(0, mid);
+                          const right = sessionsForSelectedDate.slice(mid);
+                          const columns = [left, right] as const;
+                          return columns.map((columnSessions, colIndex) => (
+                            <div key={colIndex} className="flex-1 space-y-2">
+                              {columnSessions.map((session) => {
+                                const fmt = formatSessionDate(session.startsAt);
+                                const isSelected = session.id === selectedSessionId;
+                                return (
+                                  <button
+                                    key={session.id}
+                                    type="button"
+                                    onClick={() => setSelectedSessionId(session.id)}
+                                    className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition ${
+                                      isSelected
+                                        ? 'border-primary-500 bg-primary-50 text-primary-800'
+                                        : 'border-slate-200 bg-white text-slate-800'
+                                    }`}
+                                  >
+                                    <span className="text-sm font-semibold">{fmt.time}</span>
+                                    <span className="text-[11px] font-semibold text-emerald-600">
+                                      {session.availableTickets} мест
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
                     ) : (
                       <div className="relative mt-2">
                         <button
@@ -464,27 +594,39 @@ export function BuyModal({
                   {/* Ticket types */}
                   {selectedSession && selectedSession.prices.length > 0 && (
                     <div className="mt-5">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Билеты</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                        Билеты
+                      </label>
                       <div className="mt-2 space-y-2">
-                        {selectedSession.prices.map((priceItem) => {
-                          const qty = quantities[priceItem.setId] || 0;
+                        {selectedSession.prices.map((priceItem, idx) => {
+                          const sameSetIdForAll =
+                            selectedSession.prices.length > 1 &&
+                            selectedSession.prices.every((p) => p.setId === selectedSession.prices[0].setId);
+                          const rowKey =
+                            sameSetIdForAll ? `${selectedSession.id}-${priceItem.name}-${idx}` : priceItem.setId;
+                          const qty = quantities[rowKey] ?? 0;
                           const maxQty = Math.min(priceItem.amountVacant, 10);
                           return (
                             <div
-                              key={priceItem.setId}
+                              key={`${selectedSession.id}-${idx}`}
                               className={`flex items-center justify-between rounded-xl border px-4 py-3 transition ${
                                 qty > 0 ? 'border-primary-200 bg-primary-50/50' : 'border-slate-200 bg-white'
                               }`}
                             >
                               <div>
                                 <p className="text-sm font-medium text-slate-900">{priceItem.name}</p>
-                                <p className="text-sm font-bold text-primary-600">{formatPrice(priceItem.price)}</p>
+                                {priceItem.description && (
+                                  <p className="mt-0.5 text-xs text-slate-500">{priceItem.description}</p>
+                                )}
+                                <p className="mt-0.5 text-sm font-bold text-primary-600">
+                                  {formatPrice(priceItem.price)}
+                                </p>
                               </div>
 
                               {/* Quantity controls */}
                               <div className="flex items-center gap-1">
                                 <button
-                                  onClick={() => updateQty(priceItem.setId, -1, maxQty)}
+                                  onClick={() => updateQty(rowKey, -1, maxQty)}
                                   disabled={qty === 0}
                                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition enabled:hover:bg-slate-100 disabled:opacity-30"
                                 >
@@ -494,7 +636,7 @@ export function BuyModal({
                                   {qty}
                                 </span>
                                 <button
-                                  onClick={() => updateQty(priceItem.setId, 1, maxQty)}
+                                  onClick={() => updateQty(rowKey, 1, maxQty)}
                                   disabled={qty >= maxQty}
                                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition enabled:hover:bg-slate-100 disabled:opacity-30"
                                 >
@@ -563,7 +705,8 @@ export function BuyModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -581,6 +724,11 @@ interface BuyButtonProps {
   venueName?: string | null;
   priceFrom: number | null | undefined;
   className?: string;
+  /** Выбрать этот сеанс при открытии (например, после клика по слоту на странице). */
+  initialSessionId?: string | null;
+  /** Управляемое открытие: родитель контролирует isOpen и может открыть модалку по клику на сеанс. */
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function BuyButton({
@@ -593,8 +741,19 @@ export function BuyButton({
   venueName,
   priceFrom,
   className = '',
+  initialSessionId,
+  isOpen: controlledOpen,
+  onOpenChange,
 }: BuyButtonProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setIsOpen = useCallback(
+    (open: boolean) => {
+      if (onOpenChange) onOpenChange(open);
+      else setInternalOpen(open);
+    },
+    [onOpenChange],
+  );
 
   return (
     <>
@@ -617,6 +776,7 @@ export function BuyButton({
         address={address}
         venueName={venueName}
         priceFrom={priceFrom}
+        initialSessionId={initialSessionId}
       />
     </>
   );

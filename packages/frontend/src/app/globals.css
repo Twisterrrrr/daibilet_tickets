@@ -95,20 +95,10 @@
   border-radius: 12px;
 }
 
-/* TC widget button overrides — основная кнопка «Купить билет» */
-.tc-buy-btn[data-tc-event] {
-  width: 100%;
-  font-family: inherit !important;
-  border-radius: 12px !important;
-  font-size: 16px !important;
-  padding: 14px 24px !important;
-  min-height: 48px;
-}
+/* .tc-buy-btn — дополнительные правки тут сейчас не нужны; внешний вид задаётся Tailwind-классами в компоненте. */
 
-/* TC widget session slot — кликабельные строки сеансов.
-   Сбрасываем стили tc-widget-button.css, который красит [data-tc-event] в зелёный. */
-.tc-session-slot[data-tc-event] {
-  all: unset !important;
+/* TC widget session slot — ссылка на виджет (GET), без data-tc-event (tcwidget.js POST даёт PredicateMismatch) */
+.tc-session-slot {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -122,9 +112,11 @@
   box-sizing: border-box !important;
   transition: background-color 0.15s, box-shadow 0.15s !important;
   min-height: auto !important;
+  text-decoration: none !important;
+  color: inherit !important;
 }
 
-.tc-session-slot[data-tc-event]:hover {
+.tc-session-slot:hover {
   background-color: #eff6ff !important; /* blue-50 */
   box-shadow: 0 0 0 1px #bfdbfe !important; /* ring blue-200 */
 }

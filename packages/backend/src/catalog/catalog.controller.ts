@@ -29,6 +29,7 @@ import { EventsQueryDto } from './dto/events-query.dto';
 import { RegionService } from './region.service';
 import { ReviewService } from './review.service';
 import { TcApiService } from './tc-api.service';
+import { TcGrpcService } from './tc-grpc.service';
 import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
 import { TepSyncService } from './tep-sync.service';
@@ -43,6 +44,7 @@ export class CatalogController {
     private readonly regionService: RegionService,
     private readonly reviewService: ReviewService,
     private readonly tcApi: TcApiService,
+    private readonly tcGrpc: TcGrpcService,
     private readonly tcSync: TcSyncService,
     private readonly tepApi: TepApiService,
     private readonly tepSync: TepSyncService,
@@ -131,6 +133,56 @@ export class CatalogController {
   @ApiOperation({ summary: 'Единый каталог: Event (EXCURSION/EVENT) или Venue (MUSEUM)' })
   getCatalog(@Query() query: CatalogQueryDto) {
     return this.catalogService.getCatalog(query);
+  }
+
+  @Get('catalog/tc-health')
+  @ApiOperation({ summary: 'Health-check gRPC-клиента Ticketscloud (tc-simple)' })
+  async getTcHealth() {
+    if (!this.tcGrpc.isReady()) {
+      return { status: 'not_ready', mode: 'grpc', details: 'gRPC-клиент не инициализирован' };
+    }
+
+    try {
+      const res = await this.tcGrpc.healthCheck();
+      return { status: res.status, mode: 'grpc' };
+    } catch (err: unknown) {
+      return {
+        status: 'error',
+        mode: 'grpc',
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  @Get('catalog/tc-rest-health')
+  @ApiOperation({ summary: 'Лёгкий health-check REST API Ticketscloud (simple/events?page_size=1)' })
+  async getTcRestHealth() {
+    try {
+      const events = await this.tcApi.getEvents({ page: 1, pageSize: 1 });
+      return {
+        status: 'ok',
+        mode: 'rest',
+        totalSample: events.length,
+      };
+    } catch (err: unknown) {
+      return {
+        status: 'error',
+        mode: 'rest',
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  @Get('catalog/tc-sync-test')
+  @ApiOperation({ summary: 'Тестовый запуск синхронизации Ticketscloud (dev/staging)' })
+  async tcSyncTest() {
+    return this.tcSync.syncAll();
+  }
+
+  @Get('catalog/tc-events-summary')
+  @ApiOperation({ summary: 'Сводка событий Ticketscloud по городам (из нашей БД)' })
+  async getTcEventsSummary() {
+    return this.catalogService.getTcEventsSummary();
   }
 
   // --- Multi-events (глобальные группы по groupingKey) ---

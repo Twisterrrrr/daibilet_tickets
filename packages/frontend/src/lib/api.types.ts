@@ -3,7 +3,13 @@
  * Shared types (CatalogItem, EventDetail, etc.) come from @daibilet/shared.
  */
 
-import type { EventDetail as SharedEventDetail, EventListItem, EventOffer, TagItem } from '@daibilet/shared';
+import type {
+  EventContentTemplateData,
+  EventDetail as SharedEventDetail,
+  EventListItem,
+  EventOffer,
+  TagItem,
+} from '@daibilet/shared';
 
 /** EventDetail с расширениями API (tcData, primaryOffer, venue, externalRating и т.д.) */
 export type EventDetailFrontend = SharedEventDetail & {
@@ -16,6 +22,10 @@ export type EventDetailFrontend = SharedEventDetail & {
   source?: string;
   /** MVP: ENABLED — отзывы разрешены (MANUAL + owner). DISABLED — TC/TEPLOHOD. */
   reviewCapability?: 'ENABLED' | 'DISABLED';
+  /** Типизированные контентные блоки события (PageTemplateSpecs) */
+  contentTemplateData?: EventContentTemplateData | null;
+  /** Итоговая политика возврата/обмена, уже разрешённая по цепочке Supplier → Venue → Event */
+  refundPolicyResolved?: string | null;
 };
 
 /** SEO meta (GET /seo/:entityType/:entityId) */
@@ -330,6 +340,14 @@ export interface AccountReviewsResponse {
   page: number;
   totalPages: number;
 }
+
+/** Статус dispute отзыва (совпадает с Prisma ReviewDisputeStatus, без зависимости от @prisma/client). */
+export type ReviewDisputeStatus =
+  | 'MODERATOR_REVIEW'
+  | 'RESOLVED_KEEP'
+  | 'RESOLVED_EDIT'
+  | 'RESOLVED_HIDE'
+  | 'RESOLVED_DELETE';
 
 // === Multi-events (глобальные группы событий) ===
 

@@ -141,6 +141,13 @@ export function Header() {
   const router = useRouter();
   const { slugs, mounted } = useFavorites();
   const favoritesCount = mounted ? slugs.length : 0;
+  const [authMounted, setAuthMounted] = useState(false);
+
+  useEffect(() => {
+    setAuthMounted(true);
+  }, []);
+
+  const isLoggedIn = authMounted && !!auth?.isLoggedIn;
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
@@ -189,7 +196,7 @@ export function Header() {
           >
             <HelpCircle className="h-5 w-5" />
           </Link>
-          {auth?.isLoggedIn ? (
+          {isLoggedIn ? (
             <div className="relative hidden sm:block">
               <button
                 type="button"

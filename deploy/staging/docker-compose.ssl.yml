@@ -1,10 +1,12 @@
-# Override: HTTP редирект (staging.conf) + HTTPS (staging-ssl.conf).
-# Запуск после certbot: docker compose -f docker-compose.yml -f docker-compose.ssl.yml up -d
+# Override для HTTPS на staging (Let's Encrypt).
+# Использовать ПОСЛЕ получения сертификата certbot:
+#   docker compose -f deploy/staging/docker-compose.yml --env-file deploy/staging/.env -f deploy/staging/docker-compose.ssl.yml -p daibilet-staging up -d
+# См. docs/Runbook-Staging-HTTPS.md
 
 services:
   nginx:
     volumes:
       - ../nginx/staging.conf:/etc/nginx/conf.d/default.conf:ro
-      - ../nginx/staging-ssl.conf:/etc/nginx/conf.d/staging-ssl.conf:ro
+      - ../nginx/staging-ssl.conf:/etc/nginx/conf.d/10-staging-ssl.conf:ro
       - ../nginx/certbot/conf:/etc/letsencrypt:ro
       - ../nginx/certbot/www:/var/www/certbot

@@ -1,15 +1,16 @@
 /**
  * Компоненты покупки билетов через Ticketscloud.
- * TcWidgetButton — всегда прямая ссылка (GET). tcwidget.js при POST к view widget
- * возвращает PredicateMismatch, поэтому используем href вместо data-tc-event.
+ * TcWidgetButton — кнопка, которая открывает overlay-виджет через tcwidget.js.
  *
  * TcSessionSlot — кликабельная строка сеанса:
- *   - Извлекает TC event ID из tcSessionId (формат "{tcEventId}-{set}")
- *   - По клику открывает виджет сразу на этом конкретном сеансе
+ *   - Извлекает TC event ID из tcSessionId (формат "{tcEventId}-main")
+ *   - По клику открывает overlay-виджет сразу на этом конкретном eventId
  *
  * Токен виджета: NEXT_PUBLIC_TC_WIDGET_TOKEN из .env
  */
 'use client';
+
+import { useRef } from 'react';
 
 import { trackWidgetOpen } from '@/lib/analytics';
 
@@ -29,12 +30,6 @@ function extractTcEventId(tcSessionId: string): string | null {
 // TcWidgetButton — основная кнопка покупки
 // ────────────────────────────────────────────────────────────────
 
-function getTcWidgetUrl(widgetEventId: string, isMeta: boolean): string {
-  return isMeta
-    ? `https://ticketscloud.com/v1/services/widget/meta?meta_event=${widgetEventId}`
-    : `https://ticketscloud.com/v1/services/widget?event=${widgetEventId}`;
-}
-
 export function TcWidgetButton({
   tcEventId,
   tcMetaEventId,
@@ -47,31 +42,52 @@ export function TcWidgetButton({
   compact?: boolean;
 }) {
   const label = children ?? (compact ? 'Купить' : 'Купить билет');
-  const widgetEventId = tcMetaEventId || tcEventId;
-  const isMeta = !!tcMetaEventId;
 
-  if (!widgetEventId) return null;
+  const eventId = tcEventId || tcMetaEventId || '';
+  // Скрытая техническая кнопка, к которой tcwidget.js привяжет свой обработчик.
+  const hiddenButtonRef = useRef<HTMLButtonElement | null>(null);
 
+  if (!eventId) return null;
+
+  // Для интеграции с официальным tcwidget.js нужно отдать data-* атрибуты,
+  // а сам скрипт повесит обработчики и откроет модалку.
   const sizeClasses = compact
-    ? 'rounded-lg px-3.5 py-2 text-sm font-bold'
-    : 'rounded-xl px-6 py-3 text-base font-semibold';
+    ? 'rounded-md px-3.5 py-2 text-sm font-semibold'
+    : 'rounded-md px-6 py-3 text-base font-semibold';
 
-  const href = getTcWidgetUrl(widgetEventId, isMeta);
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={() => trackWidgetOpen(widgetEventId)}
-      className={`tc-buy-btn tc-background-yellow flex w-full items-center justify-center gap-1.5 bg-amber-400 text-slate-900 transition-colors hover:bg-amber-500 ${sizeClasses}`}
-    >
-      {label}
-    </a>
+    <>
+      {/* Наша видимая кнопка с нужным стилем */}
+      <button
+        type="button"
+        className={`flex w-full items-center justify-center gap-1.5 bg-amber-400 text-slate-900 shadow-sm transition-colors hover:bg-amber-500 ${sizeClasses}`}
+        onClick={() => {
+          trackWidgetOpen(eventId);
+          // Проксируем клик на скрытую кнопку, чтобы tcwidget.js открыл модалку.
+          hiddenButtonRef.current?.click();
+        }}
+      >
+        {label}
+      </button>
+
+      {/* Невидимая кнопка-триггер для tcwidget.js */}
+      <button
+        ref={hiddenButtonRef}
+        type="button"
+        data-tc-event={eventId}
+        data-tc-token={TC_TOKEN}
+        style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, padding: 0, margin: 0 }}
+        aria-hidden="true"
+        tabIndex={-1}
+      >
+        Купить билет
+      </button>
+    </>
   );
 }
 
 // ────────────────────────────────────────────────────────────────
-// TcSessionSlot — кликабельная строка сеанса → виджет на конкретный слот
+// TcSessionSlot — кликабельная строка сеанса → overlay-виджет (tcwidget.js)
 // ────────────────────────────────────────────────────────────────
 
 export function TcSessionSlot({
@@ -85,6 +101,9 @@ export function TcSessionSlot({
     isActive?: boolean;
   };
 }) {
+  // Всегда инициализируем ref, чтобы соблюдать порядок вызова хуков.
+  const hiddenTriggerRef = useRef<HTMLButtonElement | null>(null);
+
   const tcEventId = extractTcEventId(session.tcSessionId ?? '');
 
   if (!tcEventId || !TC_TOKEN) {
@@ -98,30 +117,47 @@ export function TcSessionSlot({
   const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <button
-      type="button"
-      data-tc-event={tcEventId}
-      data-tc-token={TC_TOKEN}
-      onClick={() => trackWidgetOpen(tcEventId)}
-      className="tc-session-slot group"
-    >
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-bold text-slate-600 ring-1 ring-slate-200 group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:ring-blue-200">
-          {weekday}
+    <>
+      {/* Видимый слот с нашим стилем, без data-tc-* */}
+      <button
+        type="button"
+        className="tc-session-slot"
+        onClick={() => {
+          trackWidgetOpen(tcEventId);
+          hiddenTriggerRef.current?.click();
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs text-slate-600">
+            {weekday}
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-medium text-slate-800">{date}</p>
+            <p className="text-xs text-slate-400">{time}</p>
+          </div>
         </div>
-        <div className="text-left">
-          <p className="text-sm font-medium text-slate-800">{date}</p>
-          <p className="text-xs text-slate-400">{time}</p>
-        </div>
-      </div>
-      {session.availableTickets > 0 ? (
-        <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-600">
-          {session.availableTickets} мест
-        </span>
-      ) : (
-        <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500">Распродано</span>
-      )}
-    </button>
+        {session.availableTickets > 0 ? (
+          <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs text-emerald-600">
+            {session.availableTickets} мест
+          </span>
+        ) : (
+          <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-xs text-red-500">Распродано</span>
+        )}
+      </button>
+
+      {/* Невидимый триггер для tcwidget.js */}
+      <button
+        ref={hiddenTriggerRef}
+        type="button"
+        data-tc-event={tcEventId}
+        data-tc-token={TC_TOKEN}
+        style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, padding: 0, margin: 0 }}
+        aria-hidden="true"
+        tabIndex={-1}
+      >
+        {date} {time}
+      </button>
+    </>
   );
 }
 

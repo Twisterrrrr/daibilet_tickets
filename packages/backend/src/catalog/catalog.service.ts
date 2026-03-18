@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { SUBCATEGORY_LABELS } from '@daibilet/shared';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DateMode, EventCategory, EventSubcategory, LocationType, Prisma, TagCategory } from '@prisma/client';
+import { DateMode, EventCategory, EventSource, EventSubcategory, LocationType, Prisma, TagCategory } from '@prisma/client';
 
 import { asCatalogEntityLite, asCityLite, toDateSafe } from '../common/typing';
 import { EventOverrideService } from '../admin/event-override.service';
@@ -188,6 +188,86 @@ export class CatalogService {
           };
         });
     });
+  }
+
+  // --- Ticketscloud summary (dev helper) ---
+
+  async getTcEventsSummary() {
+    const rows = await this.prisma.event.groupBy({
+      by: ['cityId'],
+      where: {
+        source: EventSource.TC,
+        isDeleted: false,
+      },
+      _count: {
+        _all: true,
+      },
+    });
+
+    const cityIds = rows.map((r) => r.cityId).filter((id): id is string => id != null);
+
+    // Карта cityId → hubCityId (для областных городов)
+    const regions = await this.prisma.region.findMany({
+      select: {
+        id: true,
+        hubCityId: true,
+        cities: {
+          select: { cityId: true },
+        },
+      },
+    });
+
+    const hubByCityId = new Map<string, string>();
+    for (const r of regions) {
+      const hubId = r.hubCityId;
+      if (!hubId) continue;
+      for (const rc of r.cities) {
+        if (rc.cityId && rc.cityId !== hubId) {
+          hubByCityId.set(rc.cityId, hubId);
+        }
+      }
+    }
+
+    // Группируем события по хабу: либо hubCityId, либо сам город, если он не член региона
+    const eventsByHub = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.cityId) continue;
+      const hubId = hubByCityId.get(r.cityId) ?? r.cityId;
+      const prev = eventsByHub.get(hubId) ?? 0;
+      eventsByHub.set(hubId, prev + Number(r._count._all));
+    }
+
+    const hubCityIds = [...eventsByHub.keys()];
+
+    const hubCities = hubCityIds.length
+      ? await this.prisma.city.findMany({
+          where: { id: { in: hubCityIds } },
+          select: { id: true, slug: true, name: true },
+        })
+      : [];
+
+    const hubMap = new Map(hubCities.map((c) => [c.id, c]));
+
+    const perCity = [...eventsByHub.entries()]
+      .filter(([hubId]) => hubMap.has(hubId))
+      .map(([hubId, cnt]) => {
+        const city = hubMap.get(hubId)!;
+        return {
+          cityId: city.id,
+          citySlug: city.slug,
+          cityName: city.name,
+          events: cnt,
+        };
+      })
+      .sort((a, b) => b.events - a.events);
+
+    const totalEvents = perCity.reduce((acc, x) => acc + Number(x.events), 0);
+
+    return {
+      source: 'TC',
+      totalEvents,
+      perCity,
+    };
   }
 
   async getCityBySlug(slug: string) {
@@ -1006,7 +1086,10 @@ export class CatalogService {
                 isActive: true,
                 startsAt: {
                   ...(sort === 'departing_soon'
-                    ? { gte: new Date(), lte: new Date(Date.now() + 2 * 60 * 60 * 1000) }
+                    ? {
+                        gte: new Date(),
+                        lte: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+                      }
                     : { gte: dateFrom ? new Date(dateFrom) : new Date(), ...(dateTo && { lte: new Date(dateTo) }) }),
                 },
               },
@@ -1022,7 +1105,10 @@ export class CatalogService {
                     isActive: true,
                     startsAt: {
                       ...(sort === 'departing_soon'
-                        ? { gte: new Date(), lte: new Date(Date.now() + 2 * 60 * 60 * 1000) }
+                        ? {
+                            gte: new Date(),
+                            lte: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+                          }
                         : {
                             gte: dateFrom ? new Date(dateFrom) : new Date(),
                             ...(dateTo && { lte: new Date(dateTo) }),
@@ -1321,6 +1407,14 @@ export class CatalogService {
 
   async getEventBySlug(slug: string, nocache = false) {
     if (nocache) return this.fetchEvent({ slug }, { preview: false });
+    // События из нашей БД (MANUAL) не кэшируем — чтобы сеансы и правки отображались сразу.
+    const stub = await this.prisma.event.findFirst({
+      where: { slug, isDeleted: false },
+      select: { source: true },
+    });
+    if (stub?.source === 'MANUAL') {
+      return this.fetchEvent({ slug }, { preview: false });
+    }
     const cacheKey = cacheKeys.events.detail(slug);
     return this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_DETAIL, () => this.fetchEvent({ slug }, { preview: false }));
   }
@@ -1405,10 +1499,9 @@ export class CatalogService {
     // Похожие события: город + категория + скоринг по тегам, подкатегории, priceFrom
     const relatedEvents = await this.fetchRelatedEvents(overridden);
 
-    // Рейтинг: до 10 отзывов — псевдо-5.0 (для сортировки/планировщика), на сайте не показываем (см. фронт)
     const rc = Number(overridden.reviewCount ?? 0) | 0;
     const rawR = Number(overridden.rating) || 0;
-    const displayRating = rc >= 10 ? rawR : 5.0;
+    const displayRating = this.getDisplayedEventRating(String(overridden.id || overridden.slug || ''), rawR, rc);
 
     const canAcceptReviews = this.reviewCapability.canAcceptReviews({
       source: overridden.source,
@@ -1448,7 +1541,7 @@ export class CatalogService {
       relatedEvents: relatedEvents.map((r: Record<string, unknown>) => {
         const rcRelated = Number(r.reviewCount ?? 0) || 0;
         const baseRating = Number(r.rating) || 0;
-        const rating = rcRelated >= 10 ? baseRating : 5.0;
+        const rating = this.getDisplayedEventRating(String(r.id || r.slug || ''), baseRating, rcRelated);
         return {
           ...r,
           rating,
@@ -1652,6 +1745,29 @@ export class CatalogService {
   }
 
   /**
+   * Отображаемый рейтинг события:
+   * - если отзывов >= 10 — показываем фактический рейтинг;
+   * - если отзывов < 10 — детерминированный псевдослучайный рейтинг 4.5–5.0 на основе идентификатора события.
+   */
+  private getDisplayedEventRating(eventId: string, rawRating: number, reviewCount: number): number {
+    if (reviewCount >= 10 && rawRating > 0) {
+      return rawRating;
+    }
+
+    if (!eventId) {
+      return rawRating > 0 ? rawRating : 4.5;
+    }
+
+    const hash = eventId
+      .split('')
+      .reduce((acc: number, ch: string) => (acc << 5) - acc + ch.charCodeAt(0), 0);
+
+    const norm = Math.abs(hash) % 1000; // 0–999
+    // 0 → 4.5, 999 → чуть меньше 5.0
+    return 4.5 + (norm / 1000) * 0.5;
+  }
+
+  /**
    * Обогатить события смарт-бейджами:
    * - nextSessionAt: дата ближайшего сеанса
    * - totalAvailableTickets: сумма свободных мест по ближайшим сеансам
@@ -1758,18 +1874,9 @@ export class CatalogService {
       // Извлекаем slug-и тегов для бейджей на фронтенде (защита от null tag)
       const tagSlugs: string[] = tags.map((t) => t?.tag?.slug).filter((s): s is string => !!s);
 
-      // Рейтинг: до 10 отзывов — псевдослучайный. Салюты: 4.8–5, остальные: 4.5–5
       const reviewCount = Number(event.reviewCount ?? 0) | 0;
       const rawRating = Number(event.rating) || 0;
-      const hash = String(event.id || event.slug || '')
-        .split('')
-        .reduce((a: number, c: string) => (a << 5) - a + c.charCodeAt(0), 0);
-      const displayRating =
-        reviewCount >= 10
-          ? rawRating
-          : hasSaluteTag
-            ? 4.8 + (Math.abs(hash) % 21) / 100 // 4.80–5.00
-            : 4.5 + (Math.abs(hash) % 51) / 100; // 4.50–5.00
+      const displayRating = this.getDisplayedEventRating(String(event.id || event.slug || ''), rawRating, reviewCount);
 
       const shortAddr = event.address ? shortenAddressToStreet(String(event.address)) : '';
       return {

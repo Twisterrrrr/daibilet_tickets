@@ -37,8 +37,10 @@ services:
 networks:
   daibilet_prod_net:
     external: true
+    name: daibilet-prod-net
   daibilet_stg_net:
     external: true
+    name: daibilet-staging-net
 
 volumes:
   uploads_prod:

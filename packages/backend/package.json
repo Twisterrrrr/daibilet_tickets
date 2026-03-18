@@ -20,6 +20,7 @@
     "db:seed:seo": "npx tsx prisma/seed-seo-templates.ts",
     "db:seed:supplier-finance": "npx tsx prisma/seed-supplier-finance.ts",
     "db:seed:buyer-test": "npx tsx prisma/seed-buyer-account-test.ts",
+    "db:seed:event-sessions-test": "npx tsx prisma/seed-event-sessions-test.ts",
     "sync:tep": "npx tsx scripts/sync-teplohod.ts",
     "full:sync": "npx tsx scripts/full-sync.ts",
     "check:sync-env": "npx tsx scripts/check-sync-env.ts",

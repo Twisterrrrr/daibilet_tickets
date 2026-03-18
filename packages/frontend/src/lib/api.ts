@@ -606,7 +606,7 @@ export const api = {
 
   getAccountReviewDispute: (id: string, token: string) =>
     fetchApi<{
-      status: import('@prisma/client').ReviewDisputeStatus | null;
+      status: import('./api.types').ReviewDisputeStatus | null;
       canReply: boolean;
       messages: {
         id: string;

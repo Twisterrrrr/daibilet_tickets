@@ -132,9 +132,9 @@ enum ModerationStatus {
 /// Очередь постредакции: статус правок поверх импортного события (редактор в админке)
 enum EditorStatus {
   NEEDS_REVIEW // Импорт: нужна проверка редактором
-  IN_PROGRESS  // Редактор в работе
-  PUBLISHED    // Опубликовано (sync не сбрасывает)
-  REJECTED     // Отклонено
+  IN_PROGRESS // Редактор в работе
+  PUBLISHED // Опубликовано (sync не сбрасывает)
+  REJECTED // Отклонено
 }
 
 enum SubcategoriesMode {
@@ -289,8 +289,9 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  favorites       UserFavorite[]
+  favorites        UserFavorite[]
   checkoutSessions CheckoutSession[]
+  notifications    Notification[]
 
   @@map("users")
 }
@@ -473,29 +474,29 @@ model Event {
   routeId         String? @db.Uuid
 
   // --- Core structured fields (гибридная модель PageTemplateSpecs) ---
-  meetingPoint    String?  @db.Text // Точка сбора
-  boardingPierId  String?  @db.Uuid // Причал отправления (UUID Location)
-  disembarkPierId String?  @db.Uuid // Причал прибытия
-  routeSummary    String?  @db.Text // Короткий маршрут
-  refundPolicyMode   EventRefundPolicyMode? @default(INHERIT_SUPPLIER)
-  refundPolicyText   String?  @db.Text
+  meetingPoint     String?                @db.Text // Точка сбора
+  boardingPierId   String?                @db.Uuid // Причал отправления (UUID Location)
+  disembarkPierId  String?                @db.Uuid // Причал прибытия
+  routeSummary     String?                @db.Text // Короткий маршрут
+  refundPolicyMode EventRefundPolicyMode? @default(INHERIT_SUPPLIER)
+  refundPolicyText String?                @db.Text
 
-  city            City             @relation(fields: [cityId], references: [id])
-  venue           Venue?           @relation("VenueEvents", fields: [venueId], references: [id])
-  startLocation   Location?        @relation("EventStartLocation", fields: [startLocationId], references: [id])
-  endLocation     Location?        @relation("EventEndLocation", fields: [endLocationId], references: [id])
-  operator        Operator?        @relation(fields: [operatorId], references: [id])
-  route           Route?           @relation(fields: [routeId], references: [id])
-  offers          EventOffer[]
-  sessions        EventSession[]
-  tags            EventTag[]
-  packageItems    PackageItem[]
-  articleEvents   ArticleEvent[]
-  override        EventOverride?
-  reviews         Review[]
-  externalReviews ExternalReview[]
-  reviewRequests  ReviewRequest[]
-  orderRequests   OrderRequest[]
+  city                 City                  @relation(fields: [cityId], references: [id])
+  venue                Venue?                @relation("VenueEvents", fields: [venueId], references: [id])
+  startLocation        Location?             @relation("EventStartLocation", fields: [startLocationId], references: [id])
+  endLocation          Location?             @relation("EventEndLocation", fields: [endLocationId], references: [id])
+  operator             Operator?             @relation(fields: [operatorId], references: [id])
+  route                Route?                @relation(fields: [routeId], references: [id])
+  offers               EventOffer[]
+  sessions             EventSession[]
+  tags                 EventTag[]
+  packageItems         PackageItem[]
+  articleEvents        ArticleEvent[]
+  override             EventOverride?
+  reviews              Review[]
+  externalReviews      ExternalReview[]
+  reviewRequests       ReviewRequest[]
+  orderRequests        OrderRequest[]
   promoBlockEvents     PromoBlockEvent[]
   promoCollectionItems PromoCollectionItem[]
   promoCodes           PromoCode[]
@@ -549,8 +550,8 @@ model EventSession {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  event        Event         @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  offer        EventOffer?   @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  event        Event              @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  offer        EventOffer?        @relation(fields: [offerId], references: [id], onDelete: SetNull)
   packageItems PackageItem[]
   stats        EventSessionStats?
 
@@ -558,7 +559,7 @@ model EventSession {
   @@index([startsAt])
   @@index([eventId])
   @@index([eventId, startsAt])
-   @@index([eventId, canceledAt])
+  @@index([eventId, canceledAt])
   @@index([offerId])
   @@index([offerId, startsAt])
   @@map("event_sessions")
@@ -572,6 +573,7 @@ model EventSessionStats {
   updatedAt   DateTime @updatedAt
 
   session EventSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
   @@map("event_session_stats")
 }
 
@@ -594,7 +596,7 @@ model EventOffer {
   validityMode        ValidityMode @default(NO_EXPIRY)
   validUntil          DateTime?
   validDays           Int?
-  minAmount           Int?         // Мин. сумма (копейки) для OPEN_PRICE
+  minAmount           Int? // Мин. сумма (копейки) для OPEN_PRICE
   suggestedAmounts    Int[]        @default([]) // Предлагаемые суммы (копейки) для OPEN_PRICE
   status              OfferStatus  @default(ACTIVE)
   isPrimary           Boolean      @default(false)
@@ -640,44 +642,44 @@ model EventOffer {
 // ========================
 
 model EventOverride {
-  id            String             @id @default(uuid()) @db.Uuid
-  eventId       String             @unique @db.Uuid
-  title         String?
-  description   String?            @db.Text
-  imageUrl      String?
-  category      EventCategory?
-  subcategories EventSubcategory[] @default([])
-  audience      EventAudience?
-  minAge        Int?
-  manualRating  Decimal?           @db.Decimal(2, 1)
-  isHidden      Boolean            @default(false)
+  id                    String                 @id @default(uuid()) @db.Uuid
+  eventId               String                 @unique @db.Uuid
+  title                 String?
+  description           String?                @db.Text
+  imageUrl              String?
+  category              EventCategory?
+  subcategories         EventSubcategory[]     @default([])
+  audience              EventAudience?
+  minAge                Int?
+  manualRating          Decimal?               @db.Decimal(2, 1)
+  isHidden              Boolean                @default(false)
   /// Ручной boost в ранжировании каталога (чем выше, тем выше в списке)
-  manualBoost   Int?
+  manualBoost           Int?
   /// Подавление низкокачественных событий (не показывать в каталоге без жёсткого удаления)
-  suppressLowQuality Boolean?      @default(false)
-  tagsAdd       String[] // tag slugs to add
-  tagsRemove    String[] // tag slugs to remove
-  templateData        Json? // legacy: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)
-  contentTemplateData Json? // typed PDP blocks: routeDescription, program, menu, cast, bookingRules, visitorTips, extraFaq
-  meetingPoint        String? @db.Text // override Event.meetingPoint
-  routeSummary        String? @db.Text
-  refundPolicyMode    EventRefundPolicyMode?
-  refundPolicyText    String? @db.Text
+  suppressLowQuality    Boolean?               @default(false)
+  tagsAdd               String[] // tag slugs to add
+  tagsRemove            String[] // tag slugs to remove
+  templateData          Json? // legacy: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)
+  contentTemplateData   Json? // typed PDP blocks: routeDescription, program, menu, cast, bookingRules, visitorTips, extraFaq
+  meetingPoint          String?                @db.Text // override Event.meetingPoint
+  routeSummary          String?                @db.Text
+  refundPolicyMode      EventRefundPolicyMode?
+  refundPolicyText      String?                @db.Text
   // --- Качество события (валидация перед публикацией) ---
-  qualityStatus   String?   // DRAFT | READY | BLOCKED
-  qualityIssues   Json?     // массив объектов { code, message, field? }
-  qualityCheckedAt DateTime?
+  qualityStatus         String? // DRAFT | READY | BLOCKED
+  qualityIssues         Json? // массив объектов { code, message, field? }
+  qualityCheckedAt      DateTime?
   // --- Семантика подкатегорий (override / clear / inherit) ---
-  subcategoriesMode     SubcategoriesMode   @default(INHERIT)
+  subcategoriesMode     SubcategoriesMode      @default(INHERIT)
   subcategoriesOverride EventSubcategory[]
-  updatedBy     String?            @db.Uuid // null = создано sync (очередь постредакции)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  updatedBy             String?                @db.Uuid // null = создано sync (очередь постредакции)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   // --- Очередь постредакции (админка) ---
-  editorStatus   EditorStatus  @default(NEEDS_REVIEW) @map("editor_status")
-  needsReviewAt  DateTime?     @map("needs_review_at") // сортировка очереди
-  lastImportedAt DateTime?     @map("last_imported_at") // когда последний раз обновлялся импорт (Event.updatedAt)
+  editorStatus   EditorStatus @default(NEEDS_REVIEW) @map("editor_status")
+  needsReviewAt  DateTime?    @map("needs_review_at") // сортировка очереди
+  lastImportedAt DateTime?    @map("last_imported_at") // когда последний раз обновлялся импорт (Event.updatedAt)
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Restrict)
 
@@ -999,17 +1001,17 @@ model PromoCode {
   /// If set, promo applies only to this event
   eventId    String?   @db.Uuid
 
-  validFrom  DateTime?
-  validTo    DateTime?
-  maxUses    Int?
-  usedCount  Int       @default(0)
-  isActive   Boolean   @default(true)
+  validFrom DateTime?
+  validTo   DateTime?
+  maxUses   Int?
+  usedCount Int       @default(0)
+  isActive  Boolean   @default(true)
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  operator   Operator? @relation(fields: [operatorId], references: [id])
-  event      Event?    @relation(fields: [eventId], references: [id])
+  operator Operator? @relation(fields: [operatorId], references: [id])
+  event    Event?    @relation(fields: [eventId], references: [id])
 
   @@index([operatorId])
   @@index([eventId])
@@ -1071,56 +1073,56 @@ model OpsStatus {
 // ========================
 
 model Venue {
-  id               String         @id @default(uuid()) @db.Uuid
-  cityId           String         @db.Uuid
-  slug             String         @unique
-  title            String // "Государственный Эрмитаж"
-  shortTitle       String? // "Эрмитаж"
-  venueType        VenueType
-  description      String?        @db.Text // Markdown/HTML
-  shortDescription String?
-  imageUrl         String?
-  galleryUrls      String[]       @default([]) // фото залов/экспозиций
-  address          String?
-  lat              Float?
-  lng              Float?
-  metro            String? // "Адмиралтейская"
-  district         String?
-  phone            String?
-  email            String?
-  website          String?
-  openingHours     Json? // {"mon":"10:00-18:00","tue":"10:00-21:00",...,"wed":null}
-  priceFrom        Int? // мин. цена (копейки)
-  rating           Decimal        @default(0) @db.Decimal(2, 1)
-  reviewCount      Int            @default(0)
-  externalRating   Decimal?       @db.Decimal(2, 1)
-  externalSource   String?
-  operatorId       String?        @db.Uuid // партнер-музей
-  isActive         Boolean        @default(true)
-  isFeatured       Boolean        @default(false) // для главной
-  isDeleted        Boolean        @default(false)
-  deletedAt        DateTime?
-  highlights       Json? // ["3 млн экспонатов","В центре города","Детям бесплатно"]
-  faq                 Json? // [{q:"Можно ли вернуть билет?",a:"Да, до начала визита"}]
-  features            String[]       @default([]) // ["no_queue","audio_guide","kids_friendly","wheelchair"]
+  id                String                 @id @default(uuid()) @db.Uuid
+  cityId            String                 @db.Uuid
+  slug              String                 @unique
+  title             String // "Государственный Эрмитаж"
+  shortTitle        String? // "Эрмитаж"
+  venueType         VenueType
+  description       String?                @db.Text // Markdown/HTML
+  shortDescription  String?
+  imageUrl          String?
+  galleryUrls       String[]               @default([]) // фото залов/экспозиций
+  address           String?
+  lat               Float?
+  lng               Float?
+  metro             String? // "Адмиралтейская"
+  district          String?
+  phone             String?
+  email             String?
+  website           String?
+  openingHours      Json? // {"mon":"10:00-18:00","tue":"10:00-21:00",...,"wed":null}
+  priceFrom         Int? // мин. цена (копейки)
+  rating            Decimal                @default(0) @db.Decimal(2, 1)
+  reviewCount       Int                    @default(0)
+  externalRating    Decimal?               @db.Decimal(2, 1)
+  externalSource    String?
+  operatorId        String?                @db.Uuid // партнер-музей
+  isActive          Boolean                @default(true)
+  isFeatured        Boolean                @default(false) // для главной
+  isDeleted         Boolean                @default(false)
+  deletedAt         DateTime?
+  highlights        Json? // ["3 млн экспонатов","В центре города","Детям бесплатно"]
+  faq               Json? // [{q:"Можно ли вернуть билет?",a:"Да, до начала визита"}]
+  features          String[]               @default([]) // ["no_queue","audio_guide","kids_friendly","wheelchair"]
   // --- Refund policy (наследование от Operator) ---
-  refundPolicyMode    VenueRefundPolicyMode? @default(INHERIT_SUPPLIER)
-  refundPolicyText    String?        @db.Text
-  venueTemplateData   Json? // typed blocks: collections, halls, cloakroom, seasonality, etc.
-  commissionRate   Decimal?       @db.Decimal(4, 2) // Индивидуальная ставка (госмузеи и др.), админ может менять
-  metaTitle        String?
-  metaDescription  String?        @db.Text
-  version          Int            @default(0)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  createdByType    CreatedByType? @default(ADMIN)
-  createdById      String?        @db.Uuid
+  refundPolicyMode  VenueRefundPolicyMode? @default(INHERIT_SUPPLIER)
+  refundPolicyText  String?                @db.Text
+  venueTemplateData Json? // typed blocks: collections, halls, cloakroom, seasonality, etc.
+  commissionRate    Decimal?               @db.Decimal(4, 2) // Индивидуальная ставка (госмузеи и др.), админ может менять
+  metaTitle         String?
+  metaDescription   String?                @db.Text
+  version           Int                    @default(0)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  createdByType     CreatedByType?         @default(ADMIN)
+  createdById       String?                @db.Uuid
 
-  city     City         @relation(fields: [cityId], references: [id])
-  operator Operator?    @relation("VenueOperator", fields: [operatorId], references: [id])
-  events   Event[]      @relation("VenueEvents")
-  offers   EventOffer[] @relation("VenueOffers")
-  reviews  Review[]
+  city                 City                  @relation(fields: [cityId], references: [id])
+  operator             Operator?             @relation("VenueOperator", fields: [operatorId], references: [id])
+  events               Event[]               @relation("VenueEvents")
+  offers               EventOffer[]          @relation("VenueOffers")
+  reviews              Review[]
   promoBlockVenues     PromoBlockVenue[]
   promoCollectionItems PromoCollectionItem[]
 
@@ -1179,51 +1181,51 @@ enum PromoSortMode {
 }
 
 model PromoBlock {
-  id            String   @id @default(cuid())
-  slug          String   @unique
-  title         String
-  description   String
-  href          String?
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String
+  href        String?
 
-  contentMode   PromoContentMode @default(LINK_ONLY)
-  collectionId  String?
-  collection    PromoCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  contentMode  PromoContentMode @default(LINK_ONLY)
+  collectionId String?
+  collection   PromoCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
 
   selectionMode PromoSelectionMode @default(MANUAL)
   contentType   PromoContentType   @default(LINK_ONLY)
 
-  citySlug      String?
-  categorySlug  String?
-  tagSlugs      String[]  @default([])
+  citySlug     String?
+  categorySlug String?
+  tagSlugs     String[] @default([])
 
-  isKids        Boolean?
-  isIndoor      Boolean?
+  isKids   Boolean?
+  isIndoor Boolean?
 
-  autoSort      PromoSortMode?
-  autoLimit     Int?
+  autoSort  PromoSortMode?
+  autoLimit Int?
 
-  iconSource    PromoIconSource @default(LIBRARY)
-  iconKey       String?
-  iconSvg       String?         @db.Text
+  iconSource PromoIconSource @default(LIBRARY)
+  iconKey    String?
+  iconSvg    String?         @db.Text
 
-  bgMode        PromoBgMode @default(GRADIENT)
-  bgColor       String?
-  gradientFrom  String?
-  gradientTo    String?
+  bgMode       PromoBgMode @default(GRADIENT)
+  bgColor      String?
+  gradientFrom String?
+  gradientTo   String?
 
-  startsAt      DateTime?
-  endsAt        DateTime?
+  startsAt DateTime?
+  endsAt   DateTime?
 
-  priority         Int      @default(0)
-  sortOrder        Int      @default(0)
-  isActive         Boolean  @default(true)
-  targetCitySlugs  String[] @default([])
+  priority        Int      @default(0)
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  targetCitySlugs String[] @default([])
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  events           PromoBlockEvent[]
-  venues           PromoBlockVenue[]
+  events PromoBlockEvent[]
+  venues PromoBlockVenue[]
 
   @@index([isActive, sortOrder])
   @@index([collectionId])
@@ -1231,32 +1233,32 @@ model PromoBlock {
 }
 
 model PromoCollection {
-  id             String   @id @default(cuid())
-  slug           String   @unique
-  title          String
-  description    String?  @db.Text
-  selectionMode  PromoSelectionMode
-  contentType    PromoCollectionContentType
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String                     @id @default(cuid())
+  slug          String                     @unique
+  title         String
+  description   String?                    @db.Text
+  selectionMode PromoSelectionMode
+  contentType   PromoCollectionContentType
+  isActive      Boolean                    @default(true)
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
 
-  blocks         PromoBlock[]
-  items          PromoCollectionItem[]
-  rule           PromoCollectionRule?
+  blocks PromoBlock[]
+  items  PromoCollectionItem[]
+  rule   PromoCollectionRule?
 
   @@map("promo_collections")
 }
 
 model PromoCollectionItem {
-  id           String   @id @default(cuid())
+  id           String                  @id @default(cuid())
   collectionId String
   itemType     PromoCollectionItemType
-  eventId      String?  @db.Uuid
-  venueId      String?  @db.Uuid
-  sortOrder    Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  eventId      String?                 @db.Uuid
+  venueId      String?                 @db.Uuid
+  sortOrder    Int                     @default(0)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
 
   collection PromoCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   event      Event?          @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -1268,19 +1270,19 @@ model PromoCollectionItem {
 }
 
 model PromoCollectionRule {
-  id           String   @id @default(cuid())
-  collectionId String   @unique
+  id           String        @id @default(cuid())
+  collectionId String        @unique
   citySlug     String?
   categorySlug String?
-  tagSlugs     String[] @default([])
+  tagSlugs     String[]      @default([])
   isKids       Boolean?
   isIndoor     Boolean?
   sortMode     PromoSortMode @default(POPULAR)
-  limit        Int      @default(12)
-  onlyActive   Boolean  @default(true)
-  onlyBookable Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  limit        Int           @default(12)
+  onlyActive   Boolean       @default(true)
+  onlyBookable Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   collection PromoCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
 
@@ -1288,13 +1290,13 @@ model PromoCollectionRule {
 }
 
 model PromoBlockEvent {
-  id           String     @id @default(cuid())
+  id           String @id @default(cuid())
   promoBlockId String
-  eventId      String     @db.Uuid
-  sortOrder    Int        @default(0)
+  eventId      String @db.Uuid
+  sortOrder    Int    @default(0)
 
-  promoBlock   PromoBlock @relation(fields: [promoBlockId], references: [id], onDelete: Cascade)
-  event        Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  promoBlock PromoBlock @relation(fields: [promoBlockId], references: [id], onDelete: Cascade)
+  event      Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([promoBlockId, eventId])
   @@index([promoBlockId, sortOrder])
@@ -1302,13 +1304,13 @@ model PromoBlockEvent {
 }
 
 model PromoBlockVenue {
-  id           String     @id @default(cuid())
+  id           String @id @default(cuid())
   promoBlockId String
-  venueId      String     @db.Uuid
-  sortOrder    Int        @default(0)
+  venueId      String @db.Uuid
+  sortOrder    Int    @default(0)
 
-  promoBlock   PromoBlock @relation(fields: [promoBlockId], references: [id], onDelete: Cascade)
-  venue        Venue      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  promoBlock PromoBlock @relation(fields: [promoBlockId], references: [id], onDelete: Cascade)
+  venue      Venue      @relation(fields: [venueId], references: [id], onDelete: Cascade)
 
   @@unique([promoBlockId, venueId])
   @@index([promoBlockId, sortOrder])
@@ -1360,40 +1362,40 @@ model Operator {
   updatedAt     DateTime       @updatedAt
 
   // === Supplier Portal ===
-  isSupplier        Boolean   @default(false)
-  trustLevel        Int       @default(0) // 0=NEW, 1=BASIC, 2=VERIFIED, 3=TRUSTED
-  trustScore        Int       @default(0) // 0..100
-  trustProfileScore    Int    @default(0)
-  trustCatalogScore    Int    @default(0)
-  trustOperationsScore Int    @default(0)
-  trustReputationScore Int    @default(0)
-  trustStabilityScore  Int    @default(0)
-  trustPenaltyScore    Int    @default(0)
-  trustLastCalculatedAt DateTime?
+  isSupplier               Boolean   @default(false)
+  trustLevel               Int       @default(0) // 0=NEW, 1=BASIC, 2=VERIFIED, 3=TRUSTED
+  trustScore               Int       @default(0) // 0..100
+  trustProfileScore        Int       @default(0)
+  trustCatalogScore        Int       @default(0)
+  trustOperationsScore     Int       @default(0)
+  trustReputationScore     Int       @default(0)
+  trustStabilityScore      Int       @default(0)
+  trustPenaltyScore        Int       @default(0)
+  trustLastCalculatedAt    DateTime?
   trustManualOverrideLevel Int?
   trustManualOverrideScore Int?
-  trustManualReason       String?  @db.Text
-  trustManualExpiresAt    DateTime?
-  commissionRate    Decimal   @default(0.25) @db.Decimal(5, 4) // Базовая ставка 25% для всех (включает YooKassa)
-  promoRate         Decimal?  @default(0.10) @db.Decimal(5, 4) // Промо-ставка 10% до promoUntil
-  promoUntil        DateTime? // Окончание промо
-  yookassaAccountId String? // Sub-merchant ID в YooKassa
-  companyName       String?
-  inn               String?
-  contactEmail      String?
-  contactPhone      String?
-  verifiedAt        DateTime?
-  successfulSales   Int       @default(0)
-  refundRate        Decimal   @default(0) @db.Decimal(5, 4)
-  settlementMode    String?   @default("DIRECT") // DIRECT=расчёты через нас | EXTERNAL=оплата у внешнего провайдера
+  trustManualReason        String?   @db.Text
+  trustManualExpiresAt     DateTime?
+  commissionRate           Decimal   @default(0.25) @db.Decimal(5, 4) // Базовая ставка 25% для всех (включает YooKassa)
+  promoRate                Decimal?  @default(0.10) @db.Decimal(5, 4) // Промо-ставка 10% до promoUntil
+  promoUntil               DateTime? // Окончание промо
+  yookassaAccountId        String? // Sub-merchant ID в YooKassa
+  companyName              String?
+  inn                      String?
+  contactEmail             String?
+  contactPhone             String?
+  verifiedAt               DateTime?
+  successfulSales          Int       @default(0)
+  refundRate               Decimal   @default(0) @db.Decimal(5, 4)
+  settlementMode           String?   @default("DIRECT") // DIRECT=расчёты через нас | EXTERNAL=оплата у внешнего провайдера
 
   // === Partner B2B API ===
   webhookUrl    String? // URL для отправки webhook-уведомлений
   webhookSecret String? // HMAC-секрет для подписи payload
 
   // --- Default refund policy (наследование Venue → Event) ---
-  defaultRefundPolicyText       String?   @db.Text
-  defaultRefundPolicyUpdatedAt  DateTime?
+  defaultRefundPolicyText      String?   @db.Text
+  defaultRefundPolicyUpdatedAt DateTime?
 
   // === Payment settings (P3.2) ===
   paymentMode        PaymentMode @default(SINGLE_MERCHANT)
@@ -1401,62 +1403,62 @@ model Operator {
   splitEnabled       Boolean     @default(false)
   pspFeeMode         PspFeeMode  @default(PLATFORM_PAYS)
 
-  events                 Event[]
-  venues                 Venue[]        @relation("VenueOperator")
-  reviews                Review[]
-  offers                 EventOffer[]
-  supplierUsers          SupplierUser[]
-  apiKeys                ApiKey[]
+  events                  Event[]
+  venues                  Venue[]                  @relation("VenueOperator")
+  reviews                 Review[]
+  offers                  EventOffer[]
+  supplierUsers           SupplierUser[]
+  apiKeys                 ApiKey[]
   reviewSupplierResponses ReviewSupplierResponse[] @relation("SupplierResponseOperator")
-  reviewDisputes         ReviewDispute[] @relation("DisputeOperator")
-  supplierPayoutRequests SupplierPayoutRequest[]
+  reviewDisputes          ReviewDispute[]          @relation("DisputeOperator")
+  supplierPayoutRequests  SupplierPayoutRequest[]
 
-  supplierReports   SupplierReport[]
-  supplierDocuments SupplierDocument[]
-  supplierDisputes  SupplierDispute[]
+  supplierReports    SupplierReport[]
+  supplierDocuments  SupplierDocument[]
+  supplierDisputes   SupplierDispute[]
   supplierDailyStats SupplierDailyStat[]
 
   legalProfile SupplierLegalProfile?
 
-  promoCodes PromoCode[]
+  promoCodes          PromoCode[]
   supplierInvitations SupplierInvitation[]
 
   @@map("operators")
 }
 
 model SupplierLegalProfile {
-  id         String   @id @default(cuid())
-  operatorId String   @unique @db.Uuid
+  id         String @id @default(cuid())
+  operatorId String @unique @db.Uuid
 
   legalName      String
   legalAddress   String?
   inn            String?
   kpp            String?
   ogrn           String?
-  taxMode        TaxMode                     @default(OSNO)
-  isVatPayer     Boolean                     @default(false)
-  defaultVatRate Decimal?                    @db.Decimal(5, 2)
+  taxMode        TaxMode                    @default(OSNO)
+  isVatPayer     Boolean                    @default(false)
+  defaultVatRate Decimal?                   @db.Decimal(5, 2)
   signerFullName String?
   signerPosition String?
   financeEmail   String?
   docsEmail      String?
   status         SupplierLegalProfileStatus @default(DRAFT)
 
-  verifiedBy        String?   @db.Uuid
-  verifiedAt        DateTime?
-  rejectionComment  String?   @db.Text
+  verifiedBy       String?   @db.Uuid
+  verifiedAt       DateTime?
+  rejectionComment String?   @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  operator     Operator            @relation(fields: [operatorId], references: [id])
+  operator     Operator              @relation(fields: [operatorId], references: [id])
   bankAccounts SupplierBankAccount[]
 
   @@map("supplier_legal_profiles")
 }
 
 model SupplierBankAccount {
-  id                     String   @id @default(cuid())
+  id                     String @id @default(cuid())
   supplierLegalProfileId String
 
   bankName             String?
@@ -1585,11 +1587,11 @@ model Review {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  event    Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  operator Operator?     @relation(fields: [operatorId], references: [id], onDelete: SetNull)
-  venue    Venue?        @relation(fields: [venueId], references: [id], onDelete: SetNull)
-  photos   ReviewPhoto[]
-  votes    ReviewVote[]
+  event            Event?                  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  operator         Operator?               @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  venue            Venue?                  @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  photos           ReviewPhoto[]
+  votes            ReviewVote[]
   supplierResponse ReviewSupplierResponse?
   disputes         ReviewDispute[]
   actionLogs       ReviewActionLog[]
@@ -1647,16 +1649,16 @@ model ReviewVote {
 // ========================
 
 model ReviewSupplierResponse {
-  id                String                     @id @default(uuid()) @db.Uuid
-  reviewId          String                     @unique @db.Uuid
-  supplierId        String                     @db.Uuid
-  text              String                     @db.Text
+  id                String                       @id @default(uuid()) @db.Uuid
+  reviewId          String                       @unique @db.Uuid
+  supplierId        String                       @db.Uuid
+  text              String                       @db.Text
   status            ReviewSupplierResponseStatus @default(DRAFT)
-  moderationComment String?                    @db.Text
-  moderatedBy       String?                    @db.Uuid
+  moderationComment String?                      @db.Text
+  moderatedBy       String?                      @db.Uuid
   moderatedAt       DateTime?
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
 
   review   Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   operator Operator @relation("SupplierResponseOperator", fields: [supplierId], references: [id], onDelete: Cascade)
@@ -1671,23 +1673,23 @@ model ReviewSupplierResponse {
 // ========================
 
 model ReviewDispute {
-  id                    String                 @id @default(uuid()) @db.Uuid
-  reviewId              String                 @db.Uuid
-  supplierId            String                 @db.Uuid
-  status                ReviewDisputeStatus    @default(MODERATOR_REVIEW)
-  reasonCode            ReviewDisputeReasonCode
-  claimText             String                 @db.Text
+  id                     String                  @id @default(uuid()) @db.Uuid
+  reviewId               String                  @db.Uuid
+  supplierId             String                  @db.Uuid
+  status                 ReviewDisputeStatus     @default(MODERATOR_REVIEW)
+  reasonCode             ReviewDisputeReasonCode
+  claimText              String                  @db.Text
   supplierConfirmedTruth Boolean
-  decisionComment       String?                @db.Text
-  handledByAdminId      String?                @db.Uuid
-  resolvedAt            DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  decisionComment        String?                 @db.Text
+  handledByAdminId       String?                 @db.Uuid
+  resolvedAt             DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
-  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  operator  Operator @relation("DisputeOperator", fields: [supplierId], references: [id], onDelete: Cascade)
-  evidence  ReviewDisputeEvidence[]
-  messages  ReviewDisputeMessage[]
+  review     Review                  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  operator   Operator                @relation("DisputeOperator", fields: [supplierId], references: [id], onDelete: Cascade)
+  evidence   ReviewDisputeEvidence[]
+  messages   ReviewDisputeMessage[]
   actionLogs ReviewActionLog[]
 
   @@unique([reviewId])
@@ -1698,12 +1700,12 @@ model ReviewDispute {
 }
 
 model ReviewDisputeMessage {
-  id         String   @id @default(uuid()) @db.Uuid
-  disputeId  String   @db.Uuid
-  authorType String   // 'USER' | 'MODERATOR' | 'SUPPLIER'
-  authorId   String?  @db.Uuid
-  body       String   @db.Text
-  createdAt  DateTime @default(now())
+  id         String    @id @default(uuid()) @db.Uuid
+  disputeId  String    @db.Uuid
+  authorType String // 'USER' | 'MODERATOR' | 'SUPPLIER'
+  authorId   String?   @db.Uuid
+  body       String    @db.Text
+  createdAt  DateTime  @default(now())
   readAtUser DateTime?
   readAtMod  DateTime?
 
@@ -1729,16 +1731,16 @@ model ReviewDisputeEvidence {
 }
 
 model ReviewActionLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  reviewId  String?  @db.Uuid
-  disputeId String?  @db.Uuid
-  actorType String
-  actorId   String?  @db.Uuid
+  id         String   @id @default(uuid()) @db.Uuid
+  reviewId   String?  @db.Uuid
+  disputeId  String?  @db.Uuid
+  actorType  String
+  actorId    String?  @db.Uuid
   actionType String
-  payload   Json?
-  createdAt DateTime @default(now())
+  payload    Json?
+  createdAt  DateTime @default(now())
 
-  review  Review?       @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  review  Review?        @relation(fields: [reviewId], references: [id], onDelete: SetNull)
   dispute ReviewDispute? @relation(fields: [disputeId], references: [id], onDelete: SetNull)
 
   @@index([reviewId, createdAt])
@@ -2150,7 +2152,7 @@ model ExternalWidget {
 
 model QueryFilter {
   id       String  @id @default(cuid())
-  type     String  // excursion | venue | event
+  type     String // excursion | venue | event
   group    String
   slug     String
   title    String
@@ -2238,12 +2240,12 @@ model TicketResponse {
 // ========================
 
 model SourceCategoryMapping {
-  id                 String        @id @default(uuid()) @db.Uuid
-  source             String
+  id                   String        @id @default(uuid()) @db.Uuid
+  source               String
   externalCategoryNorm String
-  internalCategory   EventCategory
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  internalCategory     EventCategory
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   @@unique([source, externalCategoryNorm])
   @@index([source])
@@ -2251,13 +2253,13 @@ model SourceCategoryMapping {
 }
 
 model SourceCategoryUnknown {
-  id                  String   @id @default(uuid()) @db.Uuid
-  source              String
-  externalCategoryRaw String
+  id                   String   @id @default(uuid()) @db.Uuid
+  source               String
+  externalCategoryRaw  String
   externalCategoryNorm String
-  firstSeenAt         DateTime @default(now())
-  lastSeenAt          DateTime @default(now())
-  hits                Int      @default(1)
+  firstSeenAt          DateTime @default(now())
+  lastSeenAt           DateTime @default(now())
+  hits                 Int      @default(1)
 
   @@unique([source, externalCategoryNorm])
   @@index([source])
@@ -2265,23 +2267,23 @@ model SourceCategoryUnknown {
 }
 
 model SupplierLedgerEntry {
-  id            String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  operatorId    String   @db.Uuid
+  operatorId String @db.Uuid
 
-  type          SupplierLedgerEntryType
+  type SupplierLedgerEntryType
 
-  amount        Decimal  @db.Decimal(12, 2)
+  amount Decimal @db.Decimal(12, 2)
 
-  currency      String   @default("RUB")
+  currency String @default("RUB")
 
   referenceType String?
   referenceId   String?
 
-  note          String?  @db.Text
-  metaJson      Json?
+  note     String? @db.Text
+  metaJson Json?
 
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([operatorId])
   @@map("supplier_ledger_entries")
@@ -2298,21 +2300,21 @@ enum SupplierLedgerEntryType {
 }
 
 model SupplierPayoutRequest {
-  id            String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  operatorId    String   @db.Uuid
-  operator      Operator @relation(fields: [operatorId], references: [id])
+  operatorId String   @db.Uuid
+  operator   Operator @relation(fields: [operatorId], references: [id])
 
-  amount        Decimal  @db.Decimal(12, 2)
-  currency      String   @default("RUB")
+  amount   Decimal @db.Decimal(12, 2)
+  currency String  @default("RUB")
 
-  status        String   @default("NEW") // NEW | APPROVED | REJECTED | PAID
+  status String @default("NEW") // NEW | APPROVED | REJECTED | PAID
 
-  requestedAt   DateTime @default(now())
-  processedAt   DateTime?
+  requestedAt DateTime  @default(now())
+  processedAt DateTime?
 
-  comment       String?  @db.Text
-  adminComment  String?  @db.Text
+  comment      String? @db.Text
+  adminComment String? @db.Text
 
   isBlockedByDispute Boolean @default(false)
 
@@ -2410,10 +2412,10 @@ model SupplierDailyStat {
   operatorId String   @db.Uuid
   date       DateTime @db.Date
 
-  ordersCount        Int   @default(0)
-  grossAmountCents   Int   @default(0)
-  platformFeeCents   Int   @default(0)
-  supplierAmountCents Int  @default(0)
+  ordersCount         Int @default(0)
+  grossAmountCents    Int @default(0)
+  platformFeeCents    Int @default(0)
+  supplierAmountCents Int @default(0)
 
   viewsCount     Int   @default(0)
   conversionRate Float @default(0)
@@ -2431,8 +2433,8 @@ model SupplierDailyStat {
 }
 
 model SupplierReport {
-  id          String              @id @default(cuid())
-  operatorId  String              @db.Uuid
+  id          String               @id @default(cuid())
+  operatorId  String               @db.Uuid
   periodStart DateTime
   periodEnd   DateTime
   basis       SupplierReportBasis
@@ -2440,7 +2442,7 @@ model SupplierReport {
   hasConflict Boolean              @default(false)
 
   /// Явный акцепт отчёта поставщиком
-  supplierAcceptedAt      DateTime?
+  supplierAcceptedAt       DateTime?
   acceptedBySupplierUserId String?
 
   grossAmount      Decimal @db.Decimal(14, 2)
@@ -2449,7 +2451,7 @@ model SupplierReport {
   netAmount        Decimal @db.Decimal(14, 2)
 
   snapshotJson Json?
-  metaJson    Json?
+  metaJson     Json?
 
   legalProfileSnapshot Json?
 
@@ -2468,16 +2470,16 @@ model SupplierReport {
 }
 
 model SupplierReportLine {
-  id               String                @id @default(cuid())
+  id               String @id @default(cuid())
   supplierReportId String
 
   type          SupplierReportLineType
-  ledgerEntryId String?               @db.Uuid
+  ledgerEntryId String?                @db.Uuid
 
   referenceType String?
   referenceId   String?
 
-  amount   Decimal @db.Decimal(14, 2)
+  amount    Decimal @db.Decimal(14, 2)
   netAmount Decimal @db.Decimal(14, 2)
 
   metaJson Json?
@@ -2523,8 +2525,8 @@ model SupplierDocument {
   title       String
   payloadJson Json?
 
-   templateId        String?
-   templateVersionId String?
+  templateId        String?
+  templateVersionId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2543,7 +2545,7 @@ model SupplierDocument {
 }
 
 model SupplierDocumentFile {
-  id                 String                 @id @default(cuid())
+  id                 String                   @id @default(cuid())
   supplierDocumentId String
   kind               SupplierDocumentFileKind
   storageKey         String
@@ -2560,30 +2562,30 @@ model SupplierDocumentFile {
 }
 
 model SupplierDocumentTemplate {
-  id               String                        @id @default(cuid())
+  id               String                       @id @default(cuid())
   type             SupplierDocumentTemplateType
-  code             String                        @unique
+  code             String                       @unique
   title            String
   description      String?
-  isActive         Boolean                       @default(true)
+  isActive         Boolean                      @default(true)
   currentVersionId String?
-  createdAt        DateTime                      @default(now())
-  updatedAt        DateTime                      @updatedAt
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
 
-  versions SupplierDocumentTemplateVersion[]
+  versions  SupplierDocumentTemplateVersion[]
   documents SupplierDocument[]
 
   @@map("supplier_document_templates")
 }
 
 model SupplierDocumentTemplateVersion {
-  id         String   @id @default(cuid())
-  templateId String
-  version    Int
-  bodyHtml   String   @db.Text
-  schemaJson Json?
-  requiresVatData Boolean @default(false)
-  createdAt  DateTime @default(now())
+  id              String   @id @default(cuid())
+  templateId      String
+  version         Int
+  bodyHtml        String   @db.Text
+  schemaJson      Json?
+  requiresVatData Boolean  @default(false)
+  createdAt       DateTime @default(now())
 
   template SupplierDocumentTemplate @relation(fields: [templateId], references: [id])
 

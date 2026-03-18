@@ -107,7 +107,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      # По умолчанию HTTP (работает без сертификатов). Для HTTPS: заменить на staging.conf и добавить docker-compose.ssl.yml
+      # По умолчанию HTTP. Для HTTPS: см. docs/Runbook-Staging-HTTPS.md и -f deploy/staging/docker-compose.ssl.yml
       - ../nginx/staging-http.conf:/etc/nginx/conf.d/default.conf:ro
       - ../nginx/certbot/conf:/etc/letsencrypt:ro
       - ../nginx/certbot/www:/var/www/certbot

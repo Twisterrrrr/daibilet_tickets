@@ -81,6 +81,11 @@ export default async function LandingPage({ params }: Props) {
     notFound();
   }
 
+  const heroTitle =
+    city.slug === 'saint-petersburg' && landingSlug === 'nochnye-mosty'
+      ? 'Ночные прогулки на развод мостов в Санкт-Петербурге сегодня — расписание и билеты'
+      : landing.title;
+
   return (
     <>
       {/* Hero */}
@@ -97,14 +102,14 @@ export default async function LandingPage({ params }: Props) {
               {city.name}
             </Link>
             <ChevronRight className="h-3.5 w-3.5" />
-            <span className="text-primary-200">{landing.title.split('—')[0].trim()}</span>
+            <span className="text-primary-200">{heroTitle.split('—')[0].trim()}</span>
           </nav>
 
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             {/* Left: title + subtitle */}
             <div className="max-w-2xl">
               <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl">
-                {landing.title}
+                {heroTitle}
               </h1>
 
               {landing.subtitle && <p className="mt-3 text-base text-primary-200/90 sm:text-lg">{landing.subtitle}</p>}

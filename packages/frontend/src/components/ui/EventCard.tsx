@@ -99,8 +99,7 @@ export function EventCard({
   const router = useRouter();
   const [hasImageError, setHasImageError] = useState(false);
   const safeReviewCount = reviewCount ?? 0;
-  const hasEnoughReviews = safeReviewCount >= 10;
-  const hasRating = hasEnoughReviews && Number(rating) > 0;
+  const hasRating = Number(rating) > 0;
   const showLowTickets =
     totalAvailableTickets !== undefined && totalAvailableTickets > 0 && totalAvailableTickets <= LOW_TICKETS_THRESHOLD;
   const showPopular = safeReviewCount >= 100;
@@ -237,7 +236,7 @@ export function EventCard({
             {hasRating ? (
               <>
                 <span className="font-medium text-slate-700">{Number(rating).toFixed(1)}</span>
-                <span className="text-slate-400">({safeReviewCount})</span>
+                {safeReviewCount > 0 && <span className="text-slate-400">({safeReviewCount})</span>}
               </>
             ) : (
               <span className="font-medium text-slate-400">Новое</span>

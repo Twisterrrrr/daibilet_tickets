@@ -70,21 +70,30 @@ export class TcApiService {
           return '';
         });
         this.logger.error(`TC API ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
-        throw new Error(`TC API returned ${res.status}: ${text.slice(0, 200)}`);
+
+        // Отдельно помечаем 429/504, чтобы withRetry мог принять решение.
+        const baseError = new Error(`TC API returned ${res.status}: ${text.slice(0, 200)}`);
+        // @ts-expect-error attach status for retry helper
+        baseError.status = res.status;
+        throw baseError;
       }
 
       return res.json() as Promise<T>;
     };
 
-    const { data, retries } = await withRetry(
-      () => runWithLimit(doFetch),
-      {
-        maxRetries: 3,
-        initialBackoffMs: 1000,
-        onRetry: (attempt, status, delayMs) =>
-          this.logger.warn(`TC API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
+    const { data, retries } = await withRetry(() => runWithLimit(doFetch), {
+      maxRetries: 2,
+      initialBackoffMs: 1500,
+      shouldRetry: (status) => {
+        // Для discovery/health/ручных вызовов — максимум один повтор при 429/5xx.
+        if (status === 429) return true;
+        if (status === 504) return true;
+        if (status != null && status >= 500 && status < 600) return true;
+        return false;
       },
-    );
+      onRetry: (attempt, delayMs, status) =>
+        this.logger.warn(`TC API retry ${attempt} after ${status ?? 'error'}, delay ${delayMs}ms`),
+    });
     if (retries > 0) {
       this.logger.log(`TC API completed after ${retries} retries`);
     }
