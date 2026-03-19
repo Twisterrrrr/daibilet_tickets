@@ -55,7 +55,6 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-daibilet}:${POSTGRES_PASSWORD}@daibilet-postgres:5432/${POSTGRES_DB:-daibilet}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD:-}@daibilet-redis:6379
       TC_API_TOKEN: ${TC_API_TOKEN}
-      TC_WIDGET_TOKEN: ${TC_WIDGET_TOKEN}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://daibilet.ru,https://admin.daibilet.ru}
       ADMIN_INITIAL_EMAIL: ${ADMIN_INITIAL_EMAIL:-admin@daibilet.ru}
@@ -73,6 +72,9 @@ services:
       context: ../..
       dockerfile: Dockerfile.frontend
       args:
+        # Публичный токен Ticketscloud, который Next.js инлайнит в клиентский бандл
+        NEXT_PUBLIC_TC_WIDGET_TOKEN: ${NEXT_PUBLIC_TC_WIDGET_TOKEN}
+      args:
         # Пробрасываем публичный токен Ticketscloud в стадию сборки Next.js
         NEXT_PUBLIC_TC_WIDGET_TOKEN: ${TC_WIDGET_TOKEN}
     container_name: daibilet-frontend
@@ -84,7 +86,7 @@ services:
       INTERNAL_API_URL: http://daibilet-backend:4000/api/v1
       NEXT_PUBLIC_API_URL: /api/v1
       NEXT_PUBLIC_APP_URL: ${APP_URL:-https://daibilet.ru}
-      NEXT_PUBLIC_TC_WIDGET_TOKEN: ${TC_WIDGET_TOKEN}
+      NEXT_PUBLIC_TC_WIDGET_TOKEN: ${NEXT_PUBLIC_TC_WIDGET_TOKEN}
       NEXT_PUBLIC_YM_ID: ${NEXT_PUBLIC_YM_ID:-}
     networks:
       - daibilet-prod-net
