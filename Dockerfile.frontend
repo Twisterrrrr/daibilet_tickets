@@ -41,6 +41,10 @@ COPY packages/frontend/ ./packages/frontend/
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Пробрасываем публичный токен Ticketscloud в build, чтобы Next.js мог инлайнить его в клиентский бандл
+ARG NEXT_PUBLIC_TC_WIDGET_TOKEN
+ENV NEXT_PUBLIC_TC_WIDGET_TOKEN=${NEXT_PUBLIC_TC_WIDGET_TOKEN}
+
 # Собираем shared: в контейнере без composite иначе tsc не эмитит .js
 RUN node -e "const fs=require('fs'); const p='/app/packages/shared/tsconfig.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.compilerOptions=j.compilerOptions||{}; j.compilerOptions.composite=false; j.compilerOptions.emitDeclarationOnly=false; fs.writeFileSync(p,JSON.stringify(j,null,2));" && pnpm --filter @daibilet/shared build
 

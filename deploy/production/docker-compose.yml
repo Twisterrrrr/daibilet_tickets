@@ -72,6 +72,9 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile.frontend
+      args:
+        # Пробрасываем публичный токен Ticketscloud в стадию сборки Next.js
+        NEXT_PUBLIC_TC_WIDGET_TOKEN: ${TC_WIDGET_TOKEN}
     container_name: daibilet-frontend
     restart: unless-stopped
     depends_on:
