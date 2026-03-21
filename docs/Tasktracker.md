@@ -121,6 +121,7 @@
 ## Далее (приоритетная очередь) ✅
 
 - Merge дублей (admin UI), автодедуп, Review.venueId, sitemap, SeoTemplate, SeoMeta, SeoGeneratorService.
+- [x] **19.03.2026** Бейдж «Возможный дубль» в EventEdit при событии-кандидате на дедупликацию (ссылка на /events/merge).
 
 ## 23.02.2026 — UX + типизация + Planner ✅
 
@@ -533,6 +534,9 @@
 - [x] manualBoost, suppressLowQuality
 - [x] Catalog: apply in sort/filter
 - [x] Admin: boost/suppress UI
+- [x] Лимит boosted-слотов в Popular (макс. 4 в топе)
+- [x] Audit log при изменении manualBoost
+- [x] Бейдж «Продвижение» в админке при manualBoost > 0
 
 ### Phase 8 — Integrations ✅
 - [x] SyncAdapter interface (sync-adapter.interface.ts)

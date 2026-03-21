@@ -4,12 +4,12 @@ import { CATEGORY_LABELS, formatPrice, getScarcityState, SUBCATEGORY_LABELS, typ
 import type { EventDetailFrontend } from '@/lib/api.types';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Building2, Calendar, ChevronDown, ChevronRight, Clock, MapPin, Shield, Users, X } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronRight, Clock, MapPin, Shield, Users, X, Ticket } from 'lucide-react';
 import { useState } from 'react';
 
 import { AddToCartButton } from '@/components/ui/AddToCartButton';
 import { BuyButton } from '@/components/ui/BuyModal';
-import { EventCard } from '@/components/ui/EventCard';
+import { EventCard, type EventCardVM } from '@/components/ui/EventCard';
 import { RequestOfferForm } from '@/components/ui/RequestOfferForm';
 import { RatingBadge, ReviewSection } from '@/components/ui/ReviewSection';
 import { TcSessionSlot, TcWidgetButton } from '@/components/ui/TcWidget';
@@ -46,6 +46,21 @@ export function EventPageView({ event }: EventPageViewProps) {
     const d = new Date(s.startsAt);
     return d > new Date() && s.isActive;
   });
+
+  const nextSessionWithTickets = event.sessions?.find((s) => {
+    const d = new Date(s.startsAt);
+    return d > new Date() && s.isActive && (s.availableTickets ?? 0) > 0;
+  });
+
+  const urgencyText =
+    nextSessionWithTickets && (nextSessionWithTickets.availableTickets ?? 0) > 0
+      ? ((): string | null => {
+          const left = nextSessionWithTickets.availableTickets ?? 0;
+          if (left <= 10) return `Осталось ${left} мест на ближайший рейс`;
+          if (left <= 30) return `Осталось ${left} мест на ближайший рейс`;
+          return null;
+        })()
+      : null;
 
   const [activeGalleryImage, setActiveGalleryImage] = useState<string | null>(null);
 
@@ -139,7 +154,8 @@ export function EventPageView({ event }: EventPageViewProps) {
 
       {/* Hero Section */}
       <div className="relative">
-        <div className="h-72 overflow-hidden bg-slate-900 sm:h-80 lg:h-[420px]">
+        {/* Hero image */}
+        <div className="min-h-[calc(100vh-6rem)] overflow-hidden bg-slate-900 sm:min-h-0 sm:h-80 lg:h-[420px]">
           {event.imageUrl ? (
             <Image
               src={event.imageUrl}
@@ -147,7 +163,7 @@ export function EventPageView({ event }: EventPageViewProps) {
               fill
               priority
               sizes="100vw"
-              className="object-cover opacity-80"
+              className="object-cover opacity-80 sm:object-top"
             />
           ) : (
             <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary-600 to-primary-900">
@@ -227,23 +243,35 @@ export function EventPageView({ event }: EventPageViewProps) {
                   </span>
                 )}
               </div>
+
+              {(event.priceFrom ?? 0) > 0 && (
+                <div className="mt-4 sm:hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById('buy-card');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }}
+                    className="inline-flex w-full items-center justify-center rounded-xl bg-amber-500 px-5 py-3 text-base font-semibold text-white shadow-md shadow-amber-700/30 transition hover:bg-amber-600 active:bg-amber-700"
+                  >
+                    Купить билет — от {formatPrice(event.priceFrom ?? 0)}
+                  </button>
+                  {urgencyText && (
+                    <p className="mt-2 text-center text-xs font-medium text-amber-100">
+                      {urgencyText}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Hero CTA с ценой: ведёт к блоку покупки билетов */}
+            {/* Hero CTA с ценой (desktop/tablet): визуальный price-badge */}
             {(event.priceFrom ?? 0) > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  const el = document.getElementById('buy-card');
-                  if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }}
-                className="hidden rounded-xl bg-white/90 px-5 py-3 text-right text-sm font-semibold text-slate-900 shadow-md shadow-slate-900/20 backdrop-blur-sm transition hover:bg-white sm:inline-flex sm:flex-col sm:items-end"
-              >
-                <span className="text-[11px] font-semibold tracking-[0.08em] text-slate-500">ОТ</span>
-                <span className="text-xl font-bold text-slate-900">{formatPrice(event.priceFrom ?? 0)}</span>
-              </button>
+              <div className="hidden items-center justify-center rounded-xl bg-amber-500 px-6 py-2.5 text-base font-semibold text-white shadow-md shadow-amber-700/30 sm:flex">
+                Купить билет — от {formatPrice(event.priceFrom ?? 0)}
+              </div>
             )}
           </div>
         </div>
@@ -254,8 +282,57 @@ export function EventPageView({ event }: EventPageViewProps) {
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Left column */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Quick info cards */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Description */}
+            {event.description && (
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">О событии</h2>
+                <div
+                  className="mt-3 text-sm leading-relaxed text-slate-600 prose prose-sm max-w-none prose-p:my-2 prose-br:block"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(event.description) }}
+                />
+              </div>
+            )}
+
+            {/* Quick info — mobile: строки, desktop: карточки */}
+            {/* Mobile rows */}
+            <div className="space-y-2 sm:hidden">
+              {event.address && (
+                <div className="flex items-center gap-2 text-sm text-slate-700">
+                  <MapPin className="h-4 w-4 text-primary-500" />
+                  <div>
+                    <span className="text-xs text-slate-500">Адрес</span>
+                    <p className="text-sm font-medium text-slate-900">
+                      {shortenAddressToStreet(event.address)}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {event.durationMinutes && (
+                <div className="flex items-center gap-2 text-sm text-slate-700">
+                  <Clock className="h-4 w-4 text-primary-500" />
+                  <div>
+                    <span className="text-xs text-slate-500">Длительность</span>
+                    <p className="text-sm font-medium text-slate-900">
+                      {formatDuration(event.durationMinutes)}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {event.minAge >= 0 && (
+                <div className="flex items-center gap-2 text-sm text-slate-700">
+                  <Users className="h-4 w-4 text-primary-500" />
+                  <div>
+                    <span className="text-xs text-slate-500">Возраст</span>
+                    <p className="text-sm font-medium text-slate-900">
+                      {event.minAge || event.minAge === 0 ? `${event.minAge}+` : 'Для всех'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop cards */}
+            <div className="hidden gap-3 sm:grid sm:grid-cols-4">
               {event.address && (
                 <div className="rounded-xl border border-slate-200 bg-white p-3.5">
                   <MapPin className="h-5 w-5 text-primary-500" />
@@ -265,29 +342,13 @@ export function EventPageView({ event }: EventPageViewProps) {
                   </p>
                 </div>
               )}
-              {event.venue ? (
-                <Link
-                  href={`/venues/${event.venue.slug}`}
-                  className="rounded-xl border border-slate-200 bg-white p-3.5 hover:border-primary-300 transition-colors"
-                >
-                  <Building2 className="h-5 w-5 text-primary-500" />
-                  <p className="mt-1.5 text-xs text-slate-500">Место</p>
-                  <p className="text-sm font-medium text-primary-600 hover:underline line-clamp-2">
-                    {event.venue.shortTitle ?? event.venue.title ?? event.venue.name}
-                  </p>
-                </Link>
-              ) : venueName ? (
-                <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                  <Building2 className="h-5 w-5 text-primary-500" />
-                  <p className="mt-1.5 text-xs text-slate-500">Площадка</p>
-                  <p className="text-sm font-medium text-slate-900 line-clamp-2">{venueName}</p>
-                </div>
-              ) : null}
               {event.durationMinutes && (
                 <div className="rounded-xl border border-slate-200 bg-white p-3.5">
                   <Clock className="h-5 w-5 text-primary-500" />
                   <p className="mt-1.5 text-xs text-slate-500">Длительность</p>
-                  <p className="text-sm font-medium text-slate-900">{formatDuration(event.durationMinutes)}</p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {formatDuration(event.durationMinutes)}
+                  </p>
                 </div>
               )}
               {event.minAge >= 0 && (
@@ -316,13 +377,16 @@ export function EventPageView({ event }: EventPageViewProps) {
               </div>
             )}
 
-            {/* Description */}
-            {event.description && (
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">О событии</h2>
-                <div
-                  className="mt-3 text-slate-600 leading-relaxed prose prose-sm max-w-none prose-p:my-2 prose-br:block"
-                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(event.description) }}
+            {/* Mobile buy card — над правилами / контентными блоками */}
+            {(primaryOffer || event.tcEventId || event.offers?.some((o) => o.status === 'ACTIVE')) && (
+              <div className="mt-6 lg:hidden" id="buy-card">
+                <BuyCard
+                  event={event}
+                  buyUrl={buyUrl}
+                  hasActiveSessions={hasActiveSessions}
+                  categoryLabel={categoryLabel}
+                  venueName={venueName}
+                  primaryOffer={primaryOffer}
                 />
               </div>
             )}
@@ -370,20 +434,6 @@ export function EventPageView({ event }: EventPageViewProps) {
               externalRating={event.externalRating ? Number(event.externalRating) : undefined}
               externalSource={event.externalSource || undefined}
             />
-
-            {/* Mobile buy button */}
-            {(primaryOffer || event.tcEventId || event.offers?.some((o) => o.status === 'ACTIVE')) && (
-              <div className="lg:hidden" id="buy-card">
-                <BuyCard
-                  event={event}
-                  buyUrl={buyUrl}
-                  hasActiveSessions={hasActiveSessions}
-                  categoryLabel={categoryLabel}
-                  venueName={venueName}
-                  primaryOffer={primaryOffer}
-                />
-              </div>
-            )}
           </div>
 
           {/* Right sidebar */}
@@ -409,18 +459,7 @@ export function EventPageView({ event }: EventPageViewProps) {
             <h2 className="text-xl font-bold text-slate-900">Похожие события в {event.city?.name}</h2>
             <div className="mt-6 grid gap-4 grid-cols-1 min-[361px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
               {event.relatedEvents.map((related) => (
-                <EventCard
-                  key={related.id}
-                  slug={related.slug}
-                  title={related.title}
-                  category={related.category}
-                  imageUrl={related.imageUrl}
-                  priceFrom={related.priceFrom}
-                  rating={related.rating}
-                  reviewCount={related.reviewCount}
-                  durationMinutes={related.durationMinutes}
-                  address={related.address}
-                />
+                <EventCard key={related.id ?? related.slug} {...(related as EventCardVM)} />
               ))}
             </div>
           </div>
@@ -485,6 +524,65 @@ function formatSessionDate(dateStr: string): { date: string; time: string; weekd
 
 function getTcBuyUrl(tcEventId: string): string {
   return `https://ticketscloud.com/v1/services/widget?event=${tcEventId}`;
+}
+
+function splitTariffLabel(raw: string): { name: string; description: string | null } {
+  const text = raw.trim();
+  if (!text) return { name: 'Стандарт', description: null };
+  const idx = text.indexOf(',');
+  if (idx === -1) {
+    return { name: text, description: null };
+  }
+  const name = text.slice(0, idx).trim();
+  const rest = text.slice(idx + 1).trim();
+  return { name: name || text, description: rest || null };
+}
+
+type ImportedPrice = { type?: string; price?: number; name?: string };
+
+function buildImportedTariffGroups(prices: ImportedPrice[]): { key: string; name: string; description: string | null; minPrice: number; maxPrice: number }[] {
+  const groups = new Map<
+    string,
+    { name: string; descriptions: (string | null)[]; prices: number[] }
+  >();
+
+  for (const p of prices) {
+    const price = p.price ?? 0;
+    if (price <= 0) continue;
+
+    const baseLabel =
+      (typeof p.name === 'string' && p.name.trim()) ||
+      (typeof p.type === 'string' && p.type.trim()) ||
+      'Стандарт';
+
+    const { name, description } = splitTariffLabel(baseLabel);
+    const key = name.toLowerCase();
+
+    if (!groups.has(key)) {
+      groups.set(key, { name, descriptions: [], prices: [] });
+    }
+    const g = groups.get(key)!;
+    g.prices.push(price);
+    if (description) g.descriptions.push(description);
+  }
+
+  const result: { key: string; name: string; description: string | null; minPrice: number; maxPrice: number }[] = [];
+
+  for (const [key, g] of groups.entries()) {
+    if (g.prices.length === 0) continue;
+    const minPrice = Math.min(...g.prices);
+    const maxPrice = Math.max(...g.prices);
+    const uniqueDescriptions = Array.from(new Set(g.descriptions.filter((d): d is string => !!d)));
+    result.push({
+      key,
+      name: g.name,
+      description: uniqueDescriptions.length === 1 ? uniqueDescriptions[0] : null,
+      minPrice,
+      maxPrice,
+    });
+  }
+
+  return result;
 }
 
 function EventContentBlocks({
@@ -903,12 +1001,12 @@ function BuyCard({
 
   const allPrices = new Set<number>();
   for (const o of allOffers) {
-    if (o.priceFrom && o.priceFrom > 0) allPrices.add(o.priceFrom);
+    if (o.priceFrom && o.priceFrom >= 10000) allPrices.add(o.priceFrom);
   }
   for (const s of event.sessions || []) {
     const prices = (s.prices || []) as { price?: number }[];
     for (const p of prices) {
-      if (p.price && p.price > 0) allPrices.add(p.price);
+      if (p.price && p.price >= 10000) allPrices.add(p.price);
     }
   }
   const showFromPrefix = allPrices.size > 1;
@@ -1008,7 +1106,10 @@ function BuyCard({
 
       {isManualEvent && firstSessionPrices.length > 0 && (
         <div className="mt-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Категории и цены</h3>
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <Ticket className="h-3.5 w-3.5" />
+            Категории и цены
+          </h3>
           <ul className="mt-2 space-y-2">
             {firstSessionPrices.map((p, idx) => {
               const label =
@@ -1044,30 +1145,70 @@ function BuyCard({
       {/* Импортируемые события (TC/TEPLOHOD): показываем категории и цены из первого сеанса, если они есть */}
       {!isManualEvent && firstSessionPrices.length > 0 && (
         <div className="mt-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Категории и цены</h3>
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <Ticket className="h-3.5 w-3.5" />
+            Категории и цены
+          </h3>
           <ul className="mt-2 space-y-2">
-            {firstSessionPrices.map((p, idx) => {
-              const label =
-                p.type === 'adult'
-                  ? 'Взрослый билет'
-                  : p.type === 'child'
-                    ? 'Детский билет'
-                    : p.type === 'concession'
-                      ? 'Льготный билет'
-                      : p.name || p.type || 'Стандарт';
-              return (
-                <li key={`${p.type ?? p.name ?? 'price'}-${idx}`} className="flex flex-col gap-0.5">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-700">{label}</span>
-                    <span className="font-medium text-slate-900">{formatPrice(p.price ?? 0)}</span>
-                  </div>
-                </li>
-              );
-            })}
+            {buildImportedTariffGroups(firstSessionPrices).map((g) => (
+              <li key={g.key} className="flex flex-col gap-0.5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-700">{g.name}</span>
+                  <span className="font-medium text-slate-900">
+                    {g.minPrice === g.maxPrice
+                      ? formatPrice(g.minPrice)
+                      : `${formatPrice(g.minPrice).replace(/\s*₽/g, '')} – ${formatPrice(g.maxPrice)}`}
+                  </span>
+                </div>
+                {g.description && <p className="text-xs text-slate-500">{g.description}</p>}
+              </li>
+            ))}
           </ul>
         </div>
       )}
 
+      {/* Ближайшие сеансы перед основной кнопкой */}
+      {event.sessions && event.sessions.length > 0 && (
+        <div className="mt-5">
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <Calendar className="h-3.5 w-3.5" />
+            Ближайшие сеансы
+          </h3>
+          {isWidget && !isTepWidget && !isManualEvent && (
+            <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс для покупки</p>
+          )}
+          {isManualEvent && (
+            <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс — откроется выбор билетов</p>
+          )}
+          <div className="mt-2.5 space-y-1.5">
+            {event.sessions
+              .filter((s) => s.isActive)
+              .slice(0, 5)
+              .map((session) =>
+                isWidget && !isTepWidget && !isManualEvent ? (
+                  <TcSessionSlot key={session.id} session={session} />
+                ) : isManualEvent ? (
+                  (session.availableTickets ?? 0) > 0 ? (
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => handleOpenBuyModal(session.id)}
+                      className="w-full rounded-lg border border-slate-200 bg-white text-left transition hover:border-primary-200 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                    >
+                      <StaticSessionRow session={session} />
+                    </button>
+                  ) : (
+                    <StaticSessionRow key={session.id} session={session} />
+                  )
+                ) : (
+                  <StaticSessionRow key={session.id} session={session} />
+                ),
+              )}
+          </div>
+        </div>
+      )}
+
+      {/* Основная кнопка покупки — после списка сеансов */}
       {isRequest ? (
         primaryOffer ? <RequestOfferForm eventId={event.id} offerId={primaryOffer.id} /> : null
       ) : isTepWidget && (tepWidgetId || tepEventId || primaryOffer?.externalEventId) ? (
@@ -1165,46 +1306,6 @@ function BuyCard({
         >
           Билеты недоступны
         </button>
-      )}
-
-      {event.sessions && event.sessions.length > 0 && (
-        <div className="mt-5">
-          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            <Calendar className="h-3.5 w-3.5" />
-            Ближайшие сеансы
-          </h3>
-          {isWidget && !isTepWidget && !isManualEvent && (
-            <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс для покупки</p>
-          )}
-          {isManualEvent && (
-            <p className="mt-1 text-[11px] text-slate-400">Нажмите на сеанс — откроется выбор билетов</p>
-          )}
-          <div className="mt-2.5 space-y-1.5">
-            {event.sessions
-              .filter((s) => s.isActive)
-              .slice(0, 5)
-              .map((session) =>
-                isWidget && !isTepWidget && !isManualEvent ? (
-                  <TcSessionSlot key={session.id} session={session} />
-                ) : isManualEvent ? (
-                      (session.availableTickets ?? 0) > 0 ? (
-                        <button
-                          key={session.id}
-                          type="button"
-                          onClick={() => handleOpenBuyModal(session.id)}
-                          className="w-full rounded-lg border border-slate-200 bg-white text-left transition hover:border-primary-200 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                        >
-                          <StaticSessionRow session={session} />
-                        </button>
-                      ) : (
-                        <StaticSessionRow key={session.id} session={session} />
-                      )
-                ) : (
-                  <StaticSessionRow key={session.id} session={session} />
-                ),
-              )}
-          </div>
-        </div>
       )}
 
       {primaryOffer &&

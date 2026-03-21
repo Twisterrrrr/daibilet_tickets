@@ -37,6 +37,9 @@ export class CatalogService {
 
   private readonly logger = new Logger(CatalogService.name);
 
+  /** Макс. число boosted-слотов в блоке «Популярные» (manualBoost > 0 в топе). */
+  private static readonly POPULAR_BOOSTED_SLOTS_LIMIT = 4;
+
   // --- Города ---
 
   async getCities(featured?: boolean) {
@@ -1212,11 +1215,12 @@ export class CatalogService {
 
     const orderBy = this.getEventsSort(sort);
     const isDepartingSoon = sort === 'departing_soon';
+    const isPopular = sort === 'popular' || !sort;
 
-    // Для departing_soon: Prisma не поддерживает orderBy по min(sessions.startsAt),
-    // поэтому загружаем все подходящие (макс. 500), сортируем в памяти, затем пагинируем
-    const maxTake = isDepartingSoon ? 500 : limitNum;
-    const skip = isDepartingSoon ? 0 : (pageNum - 1) * limitNum;
+    // Для departing_soon: Prisma не поддерживает orderBy по min(sessions.startsAt).
+    // Для popular: нужна in-memory reorder (лимит boosted слотов), поэтому загружаем с запасом.
+    const maxTake = isDepartingSoon || isPopular ? 500 : limitNum;
+    const skip = isDepartingSoon || isPopular ? 0 : (pageNum - 1) * limitNum;
 
     const fields = query.fields ?? 'full';
 
@@ -1245,6 +1249,7 @@ export class CatalogService {
               reviewCount: true,
               city: { select: { slug: true, name: true } },
               venue: { select: { title: true, shortTitle: true } },
+              override: { select: { manualBoost: true } },
               tags: { include: { tag: true } },
               sessions: {
                 where: { isActive: true, startsAt: { gte: new Date() } },
@@ -1262,6 +1267,7 @@ export class CatalogService {
             include: {
               city: { select: { slug: true, name: true } },
               venue: { select: { title: true, shortTitle: true } },
+              override: { select: { manualBoost: true } },
               tags: { include: { tag: true } },
               offers: {
                 where: { status: 'ACTIVE', isDeleted: false },
@@ -1301,6 +1307,12 @@ export class CatalogService {
 
     // События без фото — в конец каталога
     items = this.moveNoPhotoToEnd(items);
+
+    // Спец-режим "Популярные": лимит boosted-слотов (макс. N событий с manualBoost > 0 в топе)
+    if (isPopular && items.length > 0) {
+      items = this.reorderPopularWithBoostLimit(items);
+      items = items.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+    }
 
     // Спец-режим "Начнутся скоро": показываем только события с ближайшими сеансами,
     // сортируем по времени ближайшего сеанса, пагинируем уже отсортированный список.
@@ -1538,16 +1550,10 @@ export class CatalogService {
       refundPolicyResolved,
       refundPolicyMode: overridden.refundPolicyMode,
       refundPolicyText: overridden.refundPolicyText,
-      relatedEvents: relatedEvents.map((r: Record<string, unknown>) => {
-        const rcRelated = Number(r.reviewCount ?? 0) || 0;
-        const baseRating = Number(r.rating) || 0;
-        const rating = this.getDisplayedEventRating(String(r.id || r.slug || ''), baseRating, rcRelated);
-        return {
-          ...r,
-          rating,
-          address: r.address ? shortenAddressToStreet(String(r.address)) : r.address,
-        };
-      }),
+      relatedEvents: relatedEvents.map((r: Record<string, unknown>) => ({
+        ...r,
+        address: r.address ? shortenAddressToStreet(String(r.address)) : r.address,
+      })),
     };
   }
 
@@ -1568,7 +1574,9 @@ export class CatalogService {
     const priceFrom = event.priceFrom ?? 0;
     const priceTolerance = Math.max(50000, Math.floor(priceFrom * 0.5)); // 500₽ или ±50%
 
-    const candidates = await this.prisma.event.findMany({
+    const importsEnabled = process.env.IMPORT_SOURCES_ENABLED !== '0';
+
+    const candidatesRaw = await this.prisma.event.findMany({
       where: {
         cityId: event.cityId,
         category: event.category as EventCategory,
@@ -1576,6 +1584,9 @@ export class CatalogService {
         isDeleted: false,
         canonicalOfId: null,
         id: { not: event.id },
+        ...(process.env.NODE_ENV === 'production' && !importsEnabled
+          ? { source: { in: ['MANUAL', 'INTERNAL'] as any } }
+          : {}),
         sessions: {
           some: { isActive: true, startsAt: { gte: new Date() } },
         },
@@ -1583,11 +1594,21 @@ export class CatalogService {
       include: {
         tags: { select: { tagId: true } },
         city: { select: { slug: true, name: true } },
+        venue: { select: { title: true, shortTitle: true } },
+        sessions: {
+          where: { isActive: true, startsAt: { gte: new Date() } },
+          orderBy: { startsAt: 'asc' },
+          take: 20,
+          select: { startsAt: true, availableTickets: true },
+        },
       },
       take: 30,
     });
 
-    const scored = candidates.map((c) => {
+    const overridden = await this.overrideService.applyOverrides(candidatesRaw);
+    const enriched = this.enrichWithBadges(overridden);
+
+    const scored = enriched.map((c) => {
       let score = 0;
       // Теги: +3 за каждый общий
       const cTags = (c as { tags?: { tagId: string }[] }).tags ?? [];
@@ -1596,14 +1617,17 @@ export class CatalogService {
         if (cTagIds.has(tid)) score += 3;
       }
       // Подкатегория: +5 за совпадение
-      for (const sub of c.subcategories) {
+      const subs = Array.isArray((c as { subcategories?: EventSubcategory[] }).subcategories)
+        ? ((c as { subcategories?: EventSubcategory[] }).subcategories as EventSubcategory[])
+        : [];
+      for (const sub of subs) {
         if (eventSubIds.has(sub)) {
           score += 5;
           break;
         }
       }
       // Цена: +2 если в допустимом диапазоне
-      const cp = c.priceFrom ?? 0;
+      const cp = (c as { priceFrom?: number | null }).priceFrom ?? 0;
       if (cp > 0 && priceFrom > 0 && Math.abs(cp - priceFrom) <= priceTolerance) {
         score += 2;
       }
@@ -1617,8 +1641,12 @@ export class CatalogService {
 
     return scored.slice(0, 6).map((s) => {
       const { event: e } = s;
-      const { tags: _t, ...rest } = e as typeof e & { tags?: unknown };
-      return rest;
+      const { tags: _t, sessions: _s, offers: _o, ...rest } = e as typeof e & {
+        tags?: unknown;
+        sessions?: unknown;
+        offers?: unknown;
+      };
+      return this.toEventCard(rest as Record<string, unknown>);
     });
   }
 
@@ -1706,6 +1734,31 @@ export class CatalogService {
   /** Экранировать спецсимволы для RegExp */
   private escapeRe(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Переупорядочить popular: макс. N событий с manualBoost > 0 в топе, остальные по рейтингу.
+   */
+  private reorderPopularWithBoostLimit<T extends { override?: { manualBoost?: number | null } | null; rating?: number | null; reviewCount?: number | null }>(
+    items: T[],
+  ): T[] {
+    const limit = CatalogService.POPULAR_BOOSTED_SLOTS_LIMIT;
+    const boosted: T[] = [];
+    const rest: T[] = [];
+    for (const e of items) {
+      const boost = e.override?.manualBoost ?? 0;
+      if (boost > 0) boosted.push(e);
+      else rest.push(e);
+    }
+    const boostedTop = boosted.slice(0, limit);
+    const restPool = [...boosted.slice(limit), ...rest];
+    restPool.sort((a, b) => {
+      const rA = Number(a.rating ?? 0);
+      const rB = Number(b.rating ?? 0);
+      if (rB !== rA) return rB - rA;
+      return (Number(b.reviewCount ?? 0) - Number(a.reviewCount ?? 0));
+    });
+    return [...boostedTop, ...restPool];
   }
 
   /** События без фото — в конец списка */

@@ -4,6 +4,26 @@
 
 ---
 
+## 19.03.2026 — P2: Anti-Duplicates badge, Manual Boost limit, audit log
+
+### Наблюдения
+
+- FuzzyDedupService, EventsMerge и canonicalOfId уже реализованы. Не хватало бейджа «Возможный дубль» в карточке события в админке.
+- manualBoost в EventOverride уже влияет на сортировку popular. Не было: лимита boosted-слотов, audit log при изменении, визуального бейджа «Продвижение».
+
+### Решения
+
+- **Anti-Duplicates:** В EventEdit при загрузке вызывается GET /admin/events/deduplicate-candidates; если event.id входит в пару кандидатов, показывается бейдж «Возможный дубль» со ссылкой на /events/merge.
+- **Manual Boost limit:** В CatalogService.getEvents при sort=popular применяется reorderPopularWithBoostLimit: макс. 4 события с manualBoost > 0 в топе, остальные по rating/reviewCount. Загрузка до 500 событий, in-memory reorder, пагинация после.
+- **Audit log:** В upsertOverride при изменении manualBoost пишется запись в AuditLog (entity EventOverride.manualBoost, before/after).
+- **Бейдж «Продвижение»:** В форме EventEdit рядом с полем «Ручной boost» показывается бейдж, когда manualBoost > 0.
+
+### Проблемы
+
+- OverrideEventDto не содержит manualBoost — для audit-проверки использована type assertion (data as Record<string, unknown>).
+
+---
+
 ## 16.03.2026 — B2B: наша форма, остатки по API, наш платёжный контур
 
 ### Наблюдения

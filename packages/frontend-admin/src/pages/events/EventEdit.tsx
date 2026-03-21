@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, Eye, EyeOff, Pencil, Plus, RotateCcw, Save, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, Eye, EyeOff, Merge, Pencil, Plus, RotateCcw, Save, Star, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
@@ -251,6 +251,9 @@ export function EventEditPage() {
   const [venues, setVenues] = useState<VenueOption[]>([]);
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
 
+  // Anti-duplicates: показывает бейдж, если событие в списке кандидатов на дедупликацию
+  const [isProbableDuplicate, setIsProbableDuplicate] = useState(false);
+
   // Load venues for MUSEUM category linking
   useEffect(() => {
     adminApi
@@ -272,6 +275,18 @@ export function EventEditPage() {
       })
       .catch(() => setCities([]));
   }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    adminApi
+      .get<{ candidates: { eventA: { id: string }; eventB: { id: string } }[] }>('/admin/events/deduplicate-candidates')
+      .then((res) => {
+        const candidates = res?.candidates ?? [];
+        const inCandidates = candidates.some((c) => c.eventA.id === id || c.eventB.id === id);
+        setIsProbableDuplicate(inCandidates);
+      })
+      .catch(() => setIsProbableDuplicate(false));
+  }, [id]);
 
   const refreshQuality = useCallback(
     async (eventId: string) => {
@@ -638,6 +653,14 @@ export function EventEditPage() {
               <Badge variant="outline">{SOURCE_LABELS[event.source] || event.source}</Badge>
               {event.override && <Badge variant="warning">Override</Badge>}
               {isHidden && <Badge variant="destructive">Скрыт</Badge>}
+              {isProbableDuplicate && (
+                <Link to="/events/merge" className="inline-flex">
+                  <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-muted">
+                    <Merge className="h-3 w-3" />
+                    Возможный дубль
+                  </Badge>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -1191,7 +1214,12 @@ export function EventEditPage() {
                 <Separator className="my-4" />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Ручной boost в выдаче</Label>
+                    <Label className="flex items-center gap-2">
+                      Ручной boost в выдаче
+                      {(form.manualBoost ?? 0) > 0 && (
+                        <Badge variant="secondary" className="text-xs">Продвижение</Badge>
+                      )}
+                    </Label>
                     <Input
                       type="number"
                       value={form.manualBoost ?? ''}

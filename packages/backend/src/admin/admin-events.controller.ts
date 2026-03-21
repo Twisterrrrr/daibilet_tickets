@@ -1425,6 +1425,27 @@ export class AdminEventsController {
   @Patch(':id/override')
   @Roles('ADMIN', 'EDITOR')
   async upsertOverride(@Param('id') id: string, @Body() data: OverrideEventDto, @Request() req: { user: { id: string } }) {
+    const dataAny = data as Record<string, unknown>;
+    if (dataAny.manualBoost !== undefined) {
+      const before = await this.prisma.eventOverride.findUnique({
+        where: { eventId: id },
+        select: { manualBoost: true },
+      });
+      const result = await this.overrideService.upsert(id, data as unknown as Record<string, unknown>, req.user.id);
+      await this.cacheInvalidation.invalidateOverride(id);
+      const afterVal = (result as { manualBoost?: number | null })?.manualBoost;
+      if (before?.manualBoost !== afterVal) {
+        await this.audit.log(
+          req.user.id,
+          'UPDATE',
+          'EventOverride.manualBoost',
+          id,
+          before ? { manualBoost: before.manualBoost } : null,
+          { manualBoost: afterVal ?? null },
+        );
+      }
+      return result;
+    }
     const result = await this.overrideService.upsert(id, data as unknown as Record<string, unknown>, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
