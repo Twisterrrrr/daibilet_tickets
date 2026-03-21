@@ -4,12 +4,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { getEventTemplateSpecs } from '@daibilet/shared';
 import { EventWizard, type EventWizardDraft, mapDraftToUpdatePayload, mapEventToDraft } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
+import { getEventAdminSummary, type EventAdminSummary } from '@/api/adminEventSummary';
 import { getEventQuality, type EventQuality, type EventQualityIssue, type QualityTabKey } from '@/api/adminEventsQuality';
 import { EventStatusLine } from '@/components/events/EventStatusLine';
 import { ScheduleTab } from '@/components/events/ScheduleTab';
+import { EventAdminSummaryPanel } from '@/components/events/EventAdminSummaryPanel';
 import { QualityBanner } from '@/components/events/QualityBanner';
 import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +35,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
+import { ContentBlocksPanel } from '@/components/content/ContentBlocksPanel';
 import { EventTemplateFields } from './EventTemplateFields';
 import { ImageUploadField } from '@/components/forms/ImageUploadField';
 import { EventGroupTab } from './EventGroupTab';
@@ -146,6 +150,7 @@ interface EventOverride {
   minAge?: number | null;
   manualRating?: number | null;
   templateData?: Record<string, unknown> | null;
+  contentTemplateData?: Record<string, unknown> | null;
   manualBoost?: number | null;
   suppressLowQuality?: boolean | null;
 }
@@ -219,6 +224,10 @@ export function EventEditPage() {
   const [qualityLoading, setQualityLoading] = useState(false);
   const [qualityError, setQualityError] = useState<string | null>(null);
 
+  const [adminSummary, setAdminSummary] = useState<EventAdminSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
   const [slug, setSlug] = useState<string>('');
   const [slugTouched, setSlugTouched] = useState(false);
 
@@ -238,6 +247,7 @@ export function EventEditPage() {
     isPermanent?: boolean;
     endDate?: string | null;
     templateData?: Record<string, unknown>;
+    contentTemplateData?: Record<string, unknown>;
     manualBoost?: number | null;
     suppressLowQuality?: boolean;
   }>({});
@@ -305,11 +315,26 @@ export function EventEditPage() {
     [],
   );
 
+  const refreshSummary = useCallback(async (eventId: string) => {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      const s = await getEventAdminSummary(eventId);
+      setAdminSummary(s);
+    } catch (e) {
+      setAdminSummary(null);
+      setSummaryError(e instanceof Error ? e.message : 'Ошибка загрузки сводки');
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     setError(null);
     refreshQuality(id);
+    refreshSummary(id);
     adminApi
       .get<EventDetail>(`/admin/events/${id}`)
       .then((data) => {
@@ -333,6 +358,10 @@ export function EventEditPage() {
           isPermanent: data.isPermanent ?? false,
           endDate: data.endDate ? data.endDate.slice(0, 10) : null,
           templateData: (ov as EventOverride)?.templateData ?? {},
+          contentTemplateData:
+            ((ov as EventOverride & { contentTemplateData?: Record<string, unknown> })?.contentTemplateData as
+              | Record<string, unknown>
+              | undefined) ?? {},
           manualBoost: ov?.manualBoost ?? null,
           suppressLowQuality: ov?.suppressLowQuality ?? false,
         });
@@ -340,7 +369,7 @@ export function EventEditPage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, [id, refreshQuality]);
+  }, [id, refreshQuality, refreshSummary]);
 
   const generateSlug = useCallback((value: string): string => {
     const map: Record<string, string> = {
@@ -410,6 +439,7 @@ export function EventEditPage() {
         minAge: form.minAge,
         description: form.description,
         templateData: form.templateData ?? {},
+        contentTemplateData: form.contentTemplateData ?? {},
       });
       setEvent((prev) => (prev ? { ...prev, override: ov } : null));
 
@@ -427,6 +457,7 @@ export function EventEditPage() {
 
       toast.success('Сохранено');
       await refreshQuality(id);
+      await refreshSummary(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения');
     } finally {
@@ -461,11 +492,16 @@ export function EventEditPage() {
           isPermanent: data.isPermanent ?? false,
           endDate: data.endDate ? data.endDate.slice(0, 10) : null,
           templateData: (ov as EventOverride)?.templateData ?? {},
+          contentTemplateData:
+            ((ov as EventOverride & { contentTemplateData?: Record<string, unknown> })?.contentTemplateData as
+              | Record<string, unknown>
+              | undefined) ?? {},
           manualBoost: ov?.manualBoost ?? null,
           suppressLowQuality: ov?.suppressLowQuality ?? false,
         });
         toast.success('Override сброшен');
         refreshQuality(id);
+        refreshSummary(id);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка'))
       .finally(() => setSaving(false));
@@ -494,6 +530,7 @@ export function EventEditPage() {
 
       toast.success('Сохранено через мастер');
       await refreshQuality(id);
+      await refreshSummary(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения через мастер');
     } finally {
@@ -575,6 +612,7 @@ export function EventEditPage() {
         setEvent(data);
         toast.success('Событие опубликовано — теперь оно видно в каталоге на сайте');
         refreshQuality(id);
+        refreshSummary(id);
       } else if (res.issues?.length) {
         setError(res.issues.map((i) => i.message).join('. '));
         toast.error('Исправьте проблемы перед публикацией');
@@ -731,6 +769,8 @@ export function EventEditPage() {
         onPublish={handlePublish}
         publishing={publishing}
       />
+
+      <EventAdminSummaryPanel summary={adminSummary} loading={summaryLoading} error={summaryError} />
 
       <ScheduleSummary
         draft={wizardDraft}
@@ -1121,6 +1161,17 @@ export function EventEditPage() {
                 subcategories={form.subcategories ?? event.subcategories ?? []}
                 templateData={form.templateData ?? {}}
                 onChange={(td) => setForm((f) => ({ ...f, templateData: td }))}
+              />
+
+              <ContentBlocksPanel
+                cardTitle="Контент PDP (contentTemplateData)"
+                cardDescription="Типизированные блоки для страницы события. Старый блок «Шаблон» выше — отдельное поле templateData (legacy)."
+                fieldSpecs={getEventTemplateSpecs(
+                  form.category ?? event.category,
+                  form.subcategories ?? event.subcategories ?? [],
+                )}
+                value={form.contentTemplateData ?? {}}
+                onChange={(ctd) => setForm((f) => ({ ...f, contentTemplateData: ctd }))}
               />
 
               {/* Tags */}

@@ -80,19 +80,23 @@ export function buildEventWhere(
     isOpenDateOnly: _isOpenDateOnly,
   } = dto;
 
+  const importsEnabled = process.env.IMPORT_SOURCES_ENABLED !== '0';
+
   const where: Prisma.EventWhereInput = {
     isActive: true,
     isDeleted: false,
     canonicalOfId: null,
     // В прод-каталоге показываем только «прошедшие модерацию» события:
     //   без override ИЛИ override.editorStatus = PUBLISHED и suppressLowQuality != true.
-    // На стейджинге/dev ослабляем фильтр и не режем по override вообще, чтобы видеть полный каталог.
+    // Дополнительно можно скрыть импортные источники с витрины через IMPORT_SOURCES_ENABLED=0,
+    // при этом они остаются доступны в админке и БД.
     ...(process.env.NODE_ENV === 'production'
       ? {
           OR: [
             { override: null },
             { override: { editorStatus: 'PUBLISHED', suppressLowQuality: { not: true } } },
           ],
+          ...(importsEnabled ? {} : { source: { in: ['MANUAL', 'INTERNAL'] as any } }),
         }
       : {}),
     ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),

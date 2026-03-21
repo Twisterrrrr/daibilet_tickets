@@ -1,9 +1,13 @@
 type VenueType = 'MUSEUM' | 'GALLERY' | 'ART_SPACE' | 'EXHIBITION_HALL' | 'THEATER' | 'PALACE' | 'PARK';
+import { getVenueTemplateSpecs } from '@daibilet/shared';
 import { ArrowLeft, ExternalLink, GripVertical, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { adminApi } from '@/api/client';
+import { getVenueAdminSummary, type VenueAdminSummary } from '@/api/adminVenueSummary';
+import { ContentBlocksPanel } from '@/components/content/ContentBlocksPanel';
+import { VenueAdminSummaryPanel } from '@/components/venues/VenueAdminSummaryPanel';
 import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -119,6 +123,8 @@ interface VenueFormData {
   features: string[];
   commissionRate: string;
   version: number;
+  /** Типизированные блоки PDP (venueTemplateData) */
+  venueTemplateData: Record<string, unknown>;
 }
 
 const FEATURE_OPTIONS = [
@@ -164,6 +170,7 @@ const defaultForm: VenueFormData = {
   features: [],
   commissionRate: '',
   version: 0,
+  venueTemplateData: {},
 };
 
 export function VenueEditPage() {
@@ -180,6 +187,9 @@ export function VenueEditPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [galleryInput, setGalleryInput] = useState('');
+  const [venueSummary, setVenueSummary] = useState<VenueAdminSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   useEffect(() => {
     // Load cities
@@ -202,6 +212,11 @@ export function VenueEditPage() {
 
     if (!isNew && id) {
       setLoading(true);
+      setSummaryLoading(true);
+      getVenueAdminSummary(id)
+        .then((s) => setVenueSummary(s))
+        .catch((e) => setSummaryError(e instanceof Error ? e.message : 'Ошибка сводки'))
+        .finally(() => setSummaryLoading(false));
       adminApi
         .get<any>(`/admin/venues/${id}`)
         .then((venue) => {
@@ -237,6 +252,10 @@ export function VenueEditPage() {
             features: venue.features || [],
             commissionRate: venue.commissionRate?.toString() || '',
             version: venue.version ?? 0,
+            venueTemplateData:
+              venue.venueTemplateData && typeof venue.venueTemplateData === 'object'
+                ? (venue.venueTemplateData as Record<string, unknown>)
+                : {},
           });
           setEvents(venue.events || []);
           setOffers(venue.offers || []);
@@ -271,6 +290,13 @@ export function VenueEditPage() {
       } else {
         await adminApi.patch(`/admin/venues/${id}`, payload);
         setForm((f) => ({ ...f, version: f.version + 1 }));
+        if (id) {
+          setSummaryLoading(true);
+          getVenueAdminSummary(id)
+            .then((s) => setVenueSummary(s))
+            .catch((e) => setSummaryError(e instanceof Error ? e.message : 'Ошибка сводки'))
+            .finally(() => setSummaryLoading(false));
+        }
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -389,6 +415,14 @@ export function VenueEditPage() {
         </Card>
       )}
 
+      {!isNew && id && (
+        <VenueAdminSummaryPanel
+          summary={venueSummary}
+          loading={summaryLoading}
+          error={summaryError}
+        />
+      )}
+
       <Tabs defaultValue="general">
         <TabsList>
           <TabsTrigger value="general">Основное</TabsTrigger>
@@ -397,6 +431,7 @@ export function VenueEditPage() {
           <TabsTrigger value="gallery">Галерея</TabsTrigger>
           <TabsTrigger value="conversion">Конверсия</TabsTrigger>
           <TabsTrigger value="seo">SEO</TabsTrigger>
+          <TabsTrigger value="content-pdp">Контент PDP</TabsTrigger>
           {!isNew && <TabsTrigger value="events">Выставки ({events.length})</TabsTrigger>}
           {!isNew && <TabsTrigger value="offers">Способы покупки ({offers.length})</TabsTrigger>}
         </TabsList>
@@ -918,6 +953,16 @@ export function VenueEditPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="content-pdp" className="space-y-4">
+          <ContentBlocksPanel
+            cardTitle="Контент PDP (venueTemplateData)"
+            cardDescription="Типизированные блоки для страницы площадки. Набор полей зависит от типа места (venueType)."
+            fieldSpecs={getVenueTemplateSpecs(form.venueType)}
+            value={form.venueTemplateData}
+            onChange={(v) => updateField('venueTemplateData', v)}
+          />
         </TabsContent>
 
         {!isNew && (

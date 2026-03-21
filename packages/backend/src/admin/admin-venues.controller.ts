@@ -24,7 +24,8 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { CreateVenueDto, UpdateVenueDto } from './dto/admin.dto';
+import { CreateVenueDto, UpdateVenueDto, VenueAdminSummaryDto } from './dto/admin.dto';
+import { VenueAdminSummaryService } from './venue-admin-summary.service';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -32,7 +33,10 @@ import { CreateVenueDto, UpdateVenueDto } from './dto/admin.dto';
 @UseInterceptors(AuditInterceptor)
 @Controller('admin/venues')
 export class AdminVenuesController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly venueAdminSummary: VenueAdminSummaryService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'EDITOR', 'VIEWER')
@@ -94,6 +98,17 @@ export class AdminVenuesController {
       nextCursor,
       hasMore,
     };
+  }
+
+  /**
+   * Единый read-model для админки площадки: витрина, контент, связанные события.
+   *
+   * GET /admin/venues/:id/summary
+   */
+  @Get(':id/summary')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async getSummary(@Param('id') id: string): Promise<VenueAdminSummaryDto> {
+    return this.venueAdminSummary.getSummary(id);
   }
 
   @Get(':id')

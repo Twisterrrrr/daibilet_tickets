@@ -15,6 +15,7 @@ import { PreviewModule } from '../preview/preview.module';
 import { PromoModule } from '../promo/promo.module';
 import { ReportsModule } from '../reports/reports.module';
 import { SupplierModule } from '../supplier/supplier.module';
+import { EdoModule } from '../edo/edo.module';
 
 import { AdminArticlesController } from './admin-articles.controller';
 import { AdminAuditController } from './admin-audit.controller';
@@ -54,7 +55,11 @@ import { AdminFinanceController } from './admin-finance.controller';
 import { AdminSupplierDisputesController } from './admin-supplier-disputes.controller';
 import { AdminListingHealthController } from './admin-listing-health.controller';
 import { AdminAvailabilityController } from './admin-availability.controller';
+import { AdminSupplierEdoController } from './admin-supplier-edo.controller';
+import { AdminEdoDeliveryController } from './admin-edo-delivery.controller';
 import { AuditService } from './audit.service';
+import { EventAdminSummaryService } from './event-admin-summary.service';
+import { VenueAdminSummaryService } from './venue-admin-summary.service';
 import { EventOverrideService } from './event-override.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
 import { SeoAuditService } from './seo-audit/seo-audit.service';
@@ -72,12 +77,24 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     PromoModule,
     ReportsModule,
     SupplierModule,
+    EdoModule,
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_SYNC },
     ),
   ],
-  providers: [AuditService, EventOverrideService, ReviewService, PaymentMetricsService, TagAssignmentService, SeoAuditService, AdminPromoBlocksService, AdminPromoCollectionsService],
+  providers: [
+    AuditService,
+    EventOverrideService,
+    EventAdminSummaryService,
+    VenueAdminSummaryService,
+    ReviewService,
+    PaymentMetricsService,
+    TagAssignmentService,
+    SeoAuditService,
+    AdminPromoBlocksService,
+    AdminPromoCollectionsService,
+  ],
   controllers: [
     AdminDashboardController,
     AdminCitiesController,
@@ -115,6 +132,8 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminSupplierDisputesController,
     AdminAvailabilityController,
     AdminListingHealthController,
+    AdminSupplierEdoController,
+    AdminEdoDeliveryController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })

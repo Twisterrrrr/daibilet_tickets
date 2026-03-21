@@ -4,6 +4,18 @@
 
 ---
 
+## Task 10 — Admin Intelligence (витрина)
+
+| Задача | Приоритет | Статус |
+|--------|-----------|--------|
+| Phase A: `GET /admin/events/:id/summary`, панель на EventEdit, age/KIDS в quality | Высокий | `[x]` |
+| Phase B: venue health + связанные события (`VenueEdit`) | Высокий | `[x]` |
+| Phase C: визуальный редактор контент-блоков PDP + preview | Средний | `[x]` |
+
+См. `docs/Task10-Admin-Intelligence-Audit.md` (**§8** — принятие Phase A, бэклог A.1, порядок B/C). **Phase B (детально):** `docs/Task10-PhaseB-Venue-Spec.md`. **Phase C (scope C1/C2):** `docs/Task10-PhaseC-Content-Blocks-Spec.md`.
+
+---
+
 ## Приоритеты до prod
 
 1. **Полный контур поставщика** — замкнуть цикл: регистрация → события → заказы → оплата → выплаты.
@@ -26,6 +38,15 @@
 # Часть I — Закрытые задачи (Выполнено)
 
 > Сводка выполненных работ по темам. Исторические детали — `docs/archive/Diary.md`.
+
+## P4 EDO Foundation (19.03.2026) ✅
+
+- **Prisma:** SupplierEdoProfile, EdoDelivery, EdoProviderType (NOOP, DIADOK), EdoDeliveryStatus. Миграция `edo_p4_foundation`.
+- **Backend:** EdoModule, EdoProvider interface, NoopEdoProvider, EdoProviderRegistry, EdoProfileService, EdoDeliveryService.
+- **Admin API:** GET/PUT /admin/suppliers/:id/edo-profile, GET /admin/documents/:id/edo-deliveries, POST send-to-edo, POST edo-deliveries/:id/refresh, retry.
+- **ENV:** EDO_ENABLED, EDO_PROVIDER, EDO_API_KEY, EDO_BOX_ID. Stub-режим (NOOP) — без реальной отправки.
+- **Тесты:** edo-profile, noop-edo, edo-delivery, edo-provider.registry (19 unit-тестов).
+- **Документация:** finance.md, EDO-Implementation-Plan.md обновлены.
 
 ## Phase 2–5: Orders UX, Availability, Listing Health, Витрина (15.03.2026) ✅
 

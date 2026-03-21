@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { X, LayoutGrid, List as ListIcon } from 'lucide-react';
+import { X, LayoutGrid, List as ListIcon, SlidersHorizontal } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { CityListItem, EventListItem, CatalogItem } from '@daibilet/shared';
 import type { MultiEventListItemDto } from '@/lib/api.types';
@@ -49,11 +49,63 @@ const PRICE_OPTIONS = [
   { value: '', label: 'Любая цена' },
   { value: '500', label: 'До 500 ₽' },
   { value: '1000', label: 'До 1 000 ₽' },
+  { value: '1500', label: 'До 1 500 ₽' },
   { value: '2000', label: 'До 2 000 ₽' },
   { value: '5000', label: 'До 5 000 ₽' },
 ];
 
 const LIMIT_OPTIONS = [20, 50, 100] as const;
+
+/** Быстрые chips для mobile — маппятся на date/timeOfDay/priceMax/tag/sort */
+type MobileQuickChip =
+  | {
+      id: string;
+      label: string;
+      active: boolean;
+      date: string | null;
+      timeOfDay: string | null;
+      priceMax: string | null;
+      preset?: undefined;
+    }
+  | { id: 'popular'; label: string; active: boolean; preset: 'popular' }
+  | { id: 'romantic'; label: string; active: boolean; preset: 'romantic' };
+
+function getMobileQuickChips(
+  selectedDate: string | null,
+  timeOfDay: string,
+  priceMax: string,
+  sort: string,
+  urlTag: string,
+  activeQuickFilter: string,
+): MobileQuickChip[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const dayOfWeek = d.getDay();
+  const daysToSat = dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek;
+  const sat = new Date(d);
+  sat.setDate(d.getDate() + daysToSat);
+  const sun = new Date(sat);
+  sun.setDate(sat.getDate() + 1);
+  const weekendRange = `${sat.toISOString().slice(0, 10)}..${sun.toISOString().slice(0, 10)}`;
+
+  const popularActive =
+    sort === 'popular' &&
+    !selectedDate &&
+    !timeOfDay &&
+    !priceMax &&
+    urlTag !== 'romantic' &&
+    !activeQuickFilter;
+
+  return [
+    { id: 'today', label: 'Сегодня', active: selectedDate === today, date: today, timeOfDay: null, priceMax: null },
+    { id: 'weekend', label: 'Выходные', active: selectedDate === weekendRange, date: weekendRange, timeOfDay: null, priceMax: null },
+    { id: 'evening', label: 'Вечер', active: timeOfDay === 'evening', date: null, timeOfDay: 'evening', priceMax: null },
+    { id: '1500', label: 'До 1500 ₽', active: priceMax === '1500', date: null, timeOfDay: null, priceMax: '1500' },
+    { id: 'popular', label: '🔥 Популярное', active: popularActive, preset: 'popular' },
+    { id: 'romantic', label: '❤️ Для свидания', active: urlTag === 'romantic', preset: 'romantic' },
+  ];
+}
 
 type DisplayItem = { type: 'group'; item: MultiEventListItemDto } | { type: 'event'; event: EventListItem };
 
@@ -181,6 +233,7 @@ export function EventsPageClient() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [activeQuickFilter, setActiveQuickFilter] = useState<string>('');
+  const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
 
   useEffect(() => {
     const f = filtersFromParams(searchParams);
@@ -400,6 +453,54 @@ export function EventsPageClient() {
     return city ? events.map((e) => ({ type: 'event' as const, event: e })) : buildDisplayItems(events);
   }, [events, city]);
 
+  const mobileQuickChips = useMemo(
+    () => getMobileQuickChips(selectedDate, timeOfDay, priceMax, sort, urlTag, activeQuickFilter),
+    [selectedDate, timeOfDay, priceMax, sort, urlTag, activeQuickFilter],
+  );
+
+  const handleMobileChipClick = useCallback(
+    (chip: MobileQuickChip) => {
+      if ('preset' in chip) {
+        if (chip.preset === 'popular') {
+          if (chip.active) {
+            updateUrl({ date: null, timeOfDay: null, priceMax: null, tag: null, qf: null, page: 1 });
+          } else {
+            updateUrl({ sort: 'popular', date: null, timeOfDay: null, priceMax: null, tag: null, qf: null, page: 1 });
+          }
+          return;
+        }
+        if (chip.preset === 'romantic') {
+          if (chip.active) {
+            updateUrl({ tag: null, page: 1 });
+          } else {
+            updateUrl({
+              sort: 'popular',
+              tag: 'romantic',
+              date: null,
+              timeOfDay: null,
+              priceMax: null,
+              qf: null,
+              page: 1,
+            });
+          }
+          return;
+        }
+      }
+      if (chip.active) {
+        updateUrl({ date: null, timeOfDay: null, priceMax: null, page: 1 });
+      } else {
+        updateUrl({
+          date: chip.date || null,
+          timeOfDay: chip.timeOfDay || null,
+          priceMax: chip.priceMax || null,
+          sort: chip.timeOfDay === 'evening' && sort === 'departing_soon' ? 'popular' : sort,
+          page: 1,
+        });
+      }
+    },
+    [updateUrl, sort],
+  );
+
   return (
     <div className="container-page py-6 sm:py-10">
       <div className="mb-5 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -411,7 +512,7 @@ export function EventsPageClient() {
               : 'Экскурсии, музеи и мероприятия по городам России'}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 self-start">
+        <div className="hidden sm:flex flex-wrap items-center gap-2 self-start">
           <label className="flex items-center gap-2 text-sm text-slate-600">
             <span className="whitespace-nowrap">Показывать по</span>
             <select
@@ -489,6 +590,26 @@ export function EventsPageClient() {
         </div>
       </div>
 
+      {/* Быстрые chips для mobile: Сегодня, Выходные, Вечер, До 1500 ₽ */}
+      {!isMuseumCategory && (
+        <div className="-mx-4 mb-4 flex md:hidden gap-1.5 overflow-x-auto px-4 scrollbar-hide">
+          {mobileQuickChips.map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              onClick={() => handleMobileChipClick(chip)}
+              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                chip.active
+                  ? 'bg-primary-600 text-white shadow-md ring-2 ring-primary-400 ring-offset-2 ring-offset-white'
+                  : 'border border-slate-200 bg-white text-slate-600 hover:border-primary-300 hover:text-slate-800'
+              }`}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {visibleQuickFilters.length > 0 && (
         <div className="-mx-4 mb-4 px-4 sm:mx-0 sm:px-0">
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
@@ -526,11 +647,28 @@ export function EventsPageClient() {
         </div>
       )}
 
-      <div className="-mx-4 mb-4 px-4 sm:mx-0 sm:mb-5 sm:px-0">
+      {/* На mobile: кнопка "Фильтры" + панель; на desktop: всегда видны */}
+      <div className="md:hidden sticky top-0 z-10 -mx-4 mb-2 px-4 py-2 bg-white/95 backdrop-blur-sm border-b border-slate-100">
+        <button
+          type="button"
+          onClick={() => setFiltersPanelOpen((o) => !o)}
+          className="flex items-center gap-2 w-full justify-center rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          Фильтры
+          {activeFiltersCount > 0 && (
+            <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-semibold text-primary-700">
+              {activeFiltersCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      <div className={`-mx-4 mb-4 px-4 sm:mx-0 sm:mb-5 sm:px-0 ${filtersPanelOpen ? 'block' : 'hidden md:block'}`}>
         <DateRibbon selected={selectedDate} onChange={(date) => updateUrl({ date: date || null, page: 1 })} />
       </div>
 
-      <div className="mb-5 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className={`mb-5 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${filtersPanelOpen ? 'block' : 'hidden md:flex'}`}>
         <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
           {TIME_OF_DAY_OPTIONS.map((opt) => (
             <button
@@ -681,14 +819,30 @@ export function EventsPageClient() {
           </div>
         ) : (
           <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-            {displayItems.map((d) =>
-              d.type === 'group' ? (
-                <MultiEventCard key={`g-${d.item.slug}`} item={d.item} />
-              ) : (
+            {displayItems.flatMap((d, idx) => {
+              const items: React.ReactNode[] = [];
+              if (d.type === 'event' && idx === 5) {
+                const hasPopularAhead = displayItems.slice(5, 11).some(
+                  (x) => x.type === 'event' && ((x.event.isOptimalChoice) || (x.event.reviewCount ?? 0) >= 100),
+                );
+                if (hasPopularAhead) {
+                  items.push(
+                    <div key={`break-${idx}`} className="col-span-full pt-2 pb-1 text-center md:hidden">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Популярное</p>
+                      <p className="mt-0.5 text-[11px] text-slate-400">Чаще всего выбирают</p>
+                    </div>,
+                  );
+                }
+              }
+              items.push(
+                d.type === 'group' ? (
+                  <MultiEventCard key={`g-${d.item.slug}`} item={d.item} />
+                ) : (
                 <EventCard
-                  key={d.event.id}
+                  key={d.event!.id}
                   slug={d.event.slug}
                   title={d.event.title}
+                  shortDescription={(d.event as { shortDescription?: string | null }).shortDescription ?? null}
                   category={d.event.category}
                   subcategories={d.event.subcategories}
                   audience={d.event.audience}
@@ -710,15 +864,25 @@ export function EventsPageClient() {
                   sessionTimes={d.event.sessionTimes ?? []}
                   highlights={d.event.highlights ?? []}
                 />
-              ),
-            )}
+              ));
+              return items;
+            })}
           </div>
         )
       ) : (
         <div className="rounded-xl border border-dashed border-slate-300 py-16 sm:py-20 text-center">
           <p className="text-4xl">🔍</p>
-          <h2 className="mt-4 text-lg font-semibold text-slate-700 sm:text-xl">Событий пока нет</h2>
-          <p className="mt-2 text-sm text-slate-500">Попробуйте изменить фильтры или выбрать другую категорию</p>
+          <h2 className="mt-4 text-lg font-semibold text-slate-700 sm:text-xl">Ничего не нашли</h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Попробуйте изменить фильтры или выбрать другую категорию
+          </p>
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="btn-primary mt-6 inline-flex items-center justify-center px-6 py-2.5 text-sm font-semibold"
+          >
+            Сбросить фильтры
+          </button>
         </div>
       )}
 

@@ -11,7 +11,7 @@
 - **Ledger**: внутренний учёт по поставщику (`SupplierLedgerEntry`, `SupplierLedgerService`).
 - **Supplier Reports & Documents**: агрегированные отчёты, акты, payout‑statement.
 - **Payouts**: заявки на вывод (`SupplierPayoutRequest`) и их админ‑обработка.
-- **(Future) ЭДО**: оператор электронного документооборота как транспорт и подпись.
+- **ЭДО (P4 foundation)**: оператор электронного документооборота как транспорт и подпись; реализован каркас (SupplierEdoProfile, EdoDelivery, EdoProvider, stub), реальная интеграция — следующий этап.
 
 Все три перспективы (buyer, supplier, admin) смотрят на один и тот же поток денег, но с разной стороны.
 
@@ -460,10 +460,9 @@ P3.1 таким образом превращает P3 из «адресной �
   - `SupplierLegalProfile` и `SupplierBankAccount` (юридические реквизиты и snapshot банковских данных на момент payout/report),
   - вынесение settlement‑правил (SOLD vs COMPLETED) и payout‑частоты в профиль,
   - API для редактирования профиля и счетов (admin + supplier), при этом источником истины для уже созданных документов остаются snapshot’ы.
-- **P4 (план):**
-  - интеграция с оператором ЭДО через `EdoProvider` interface,
-  - `SupplierEdoProfile`, `EdoDelivery`, история webhook’ов,
-  - передача уже сформированных `SupplierDocument` в ЭДО и обработка статусов подписи.
+- **P4 (foundation реализован):**
+  - Реализовано: Prisma `SupplierEdoProfile`, `EdoDelivery`, `EdoProviderType`, `EdoDeliveryStatus`; `EdoProvider`, `NoopEdoProvider`, `EdoProviderRegistry`; `EdoProfileService`, `EdoDeliveryService`; Admin API (edo-profile, edo-deliveries, send-to-edo, refresh).
+  - Остаётся: интеграция с Диадок (HTTP, XML, КЭП), webhook, очередь BullMQ.
 
 Этот файл фиксирует общую архитектуру финансового домена и текущее состояние реализаций P1–P3 (Buyer/Supplier/Admin). При изменениях в коде (новые статусы, модели или фичи) Finance‑архитектура должна обновляться здесь в первую очередь.
 

@@ -18,6 +18,7 @@ export type EventCardVM = {
   id?: string;
   slug: string;
   title: string;
+  shortDescription?: string | null;
   category?: EventCategory | string | null;
   subcategories?: EventSubcategory[];
   audience?: EventAudience | null;
@@ -72,6 +73,7 @@ function formatNextSession(iso: string): string {
 export function EventCard({
   slug,
   title,
+  shortDescription,
   category: _category,
   subcategories: _subcategories = [],
   audience: _audience,
@@ -158,6 +160,7 @@ export function EventCard({
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover transition-transform duration-500 group-hover:scale-110"
+            loading="lazy"
             onError={() => setHasImageError(true)}
           />
         )}
@@ -165,7 +168,7 @@ export function EventCard({
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 
-        {/* Top-left badges — Рекомендуем, Популярно, Скидка N%, N мест */}
+        {/* Top-left badges */}
         <div className="absolute left-2 top-2 flex flex-col gap-1 sm:left-3 sm:top-3">
           {isOptimalChoice && (
             <span className="flex items-center gap-1 rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-semibold text-amber-950 shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs">
@@ -174,12 +177,12 @@ export function EventCard({
             </span>
           )}
           {showPopular && (
-            <span className="rounded-full bg-emerald-500/95 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:text-xs">
+            <span className="rounded-full bg-emerald-500/95 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs">
               Популярно
             </span>
           )}
           {hasDiscount && discountPercent > 0 && (
-            <span className="rounded-full bg-orange-500/95 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:text-xs">
+            <span className="rounded-full bg-orange-500/95 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-xs">
               Скидка {discountPercent}%
             </span>
           )}
@@ -196,7 +199,7 @@ export function EventCard({
           <FavoriteButton slug={slug} size="sm" className="h-full w-full" />
         </div>
 
-        {/* Bottom-right фото: цена — синий pill */}
+        {/* Bottom-right фото: цена — как на десктопе (и на mobile) */}
         {priceFrom != null && priceFrom > 0 && (
           <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5 sm:bottom-3 sm:right-3">
             {hasDiscount && priceOriginalKopecks && (
@@ -225,8 +228,8 @@ export function EventCard({
 
       {/* Content */}
       <div className="flex flex-1 flex-col justify-between p-3 sm:p-4">
-        {/* Между фото и названием: Рейтинг слева, Город прижат вправо */}
-        <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500 sm:text-xs">
+        {/* Рейтинг + город */}
+        <div className="flex items-center justify-between gap-2 text-[10px] leading-relaxed text-slate-500 sm:text-xs">
           <span className="flex items-center gap-0.5 shrink-0">
             <Star
               className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${
@@ -250,22 +253,29 @@ export function EventCard({
           )}
         </div>
 
-        <h3 className="mt-2 line-clamp-2 text-xs font-semibold text-slate-900 transition-colors group-hover:text-primary-600 sm:text-sm">
+        <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-relaxed text-slate-900 transition-colors group-hover:text-primary-600 sm:text-sm">
           {title}
         </h3>
+        {shortDescription && (
+          <p className="mt-1 text-xs leading-relaxed text-slate-500 line-clamp-2 sm:text-xs">
+            {shortDescription}
+          </p>
+        )}
 
-        {/* Длительность, размер группы, ближайшая дата */}
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500 sm:gap-x-3 sm:text-xs">
+        {/* Meta: длительность, размер группы, дата/время сеанса */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] leading-relaxed text-slate-500 sm:gap-x-3 sm:text-xs">
           {durationMinutes && (
             <span className="flex items-center gap-0.5">
-              <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
               {durationMinutes >= 60
                 ? `${Math.floor(durationMinutes / 60)} ч${durationMinutes % 60 > 0 ? ` ${durationMinutes % 60} мин` : ''}`
                 : `${durationMinutes} мин`}
             </span>
           )}
           {groupSize && <span>{groupSize}</span>}
-          {dateMode === 'OPEN_DATE' && <span className="font-medium text-emerald-600">Билет с открытой датой</span>}
+          {dateMode === 'OPEN_DATE' && (
+            <span className="font-medium text-emerald-600">Билет с открытой датой</span>
+          )}
           {dateMode !== 'OPEN_DATE' && nextSessionAt && (
             <span className="font-medium text-primary-600">
               {isToday && displaySlots.length > 0 ? 'Сегодня' : formatNextSession(nextSessionAt)}
@@ -273,9 +283,9 @@ export function EventCard({
           )}
         </div>
 
-        {/* 3 highlights */}
+        {/* Highlights — как на desktop, в т.ч. mobile */}
         {displayHighlights.length > 0 && (
-          <ul className="mt-2 space-y-0.5 text-[10px] text-slate-600 sm:text-xs">
+          <ul className="mt-2 space-y-0.5 text-[10px] leading-relaxed text-slate-600 sm:text-xs">
             {displayHighlights.map((h, i) => (
               <li key={i} className="flex gap-1.5">
                 <span className="text-primary-500">•</span>
@@ -285,7 +295,7 @@ export function EventCard({
           </ul>
         )}
 
-        {/* Слоты времени — под хайлайтами, только если ближайший сеанс сегодня */}
+        {/* Session slots */}
         {isToday && displaySlots.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {displaySlots.map((time) => (
@@ -301,8 +311,8 @@ export function EventCard({
           </div>
         )}
 
-        {/* Footer: Подробнее прижат влево (цена на фото) */}
-        <div className="mt-auto flex items-center pt-2 sm:pt-3">
+        {/* Footer — как на десктопе на всех ширинах */}
+        <div className="mt-auto flex items-center justify-between gap-2 pt-2 sm:pt-3">
           <span className="flex items-center gap-1 text-[10px] font-medium text-primary-600 sm:text-xs">
             <Ticket className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             Подробнее →

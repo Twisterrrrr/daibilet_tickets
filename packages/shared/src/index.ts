@@ -57,6 +57,7 @@ export {
   type TemplateSpec,
   type TemplateSection,
 } from './content/page-template-specs';
+export { filterContentJsonSpecs, dedupeSpecsByKey } from './content/content-blocks.helpers';
 
 export {
   TeplohodWidgetQueryDto,
@@ -435,6 +436,8 @@ export interface EventListItem {
   address?: string | null;
   tagSlugs?: string[];
   shortTitle?: string;
+  /** Краткое описание для карточки каталога */
+  shortDescription?: string | null;
 }
 
 /** Единая карточка каталога: Event или Venue */

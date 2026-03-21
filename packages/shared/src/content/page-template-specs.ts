@@ -57,6 +57,17 @@ export const EVENT_MUSEUM_FIELDS: TemplateFieldSpec[] = [
   { key: 'bookingRules', label: 'Условия бронирования', storage: 'CONTENT_JSON', required: false, inputType: 'richtext' },
 ];
 
+/** Доп. FAQ для PDP — без привязки к category (показывается для всех типов событий). */
+export const EVENT_EXTRA_FAQ_FIELD: TemplateFieldSpec[] = [
+  {
+    key: 'extraFaq',
+    label: 'Дополнительные вопросы (FAQ)',
+    storage: 'CONTENT_JSON',
+    required: false,
+    inputType: 'textarea',
+  },
+];
+
 // ─── Venue type specs ───────────────────────────────────────────────────
 
 export const VENUE_MUSEUM_FIELDS: TemplateFieldSpec[] = [
@@ -93,6 +104,7 @@ export function getEventTemplateSpecs(category: string, subcategories?: string[]
   add(EVENT_EXCURSION_FIELDS);
   add(EVENT_EVENT_FIELDS);
   add(EVENT_MUSEUM_FIELDS);
+  add(EVENT_EXTRA_FAQ_FIELD);
   return all;
 }
 

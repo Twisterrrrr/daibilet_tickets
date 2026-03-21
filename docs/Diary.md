@@ -4,6 +4,112 @@
 
 ---
 
+## 19.03.2026 — Task 10 Phase C: контент-блоки PDP (Event + Venue)
+
+### Наблюдения
+
+- Phase C замыкает Task 10 по оси «редакторский UX»: после read-model A/B нужна структурированная работа с `contentTemplateData` / `venueTemplateData` без смены контрактов API и без mega-editor.
+
+### Решения
+
+- **Shared:** `filterContentJsonSpecs`, `dedupeSpecsByKey`; в шаблоне события добавлено поле `extraFaq` (`EVENT_EXTRA_FAQ_FIELD`); экспорты в `@daibilet/shared` (после `npm run build` в `packages/shared`).
+- **Админка:** `ContentBlocksPanel` — вкладки «Форма / Предпросмотр / Raw JSON», поля по `TemplateFieldSpec`; `EventEdit` — `contentTemplateData` в PATCH override; `VenueEdit` — вкладка «Контент PDP», `venueTemplateData` в PATCH, после сохранения — перезагрузка `getVenueAdminSummary`.
+- **Тесты:** `content-blocks.helpers.spec.ts` (backend) на shared-хелперы.
+- **Мелочь:** подсказка «Редактировать» у иконки в `VenueAdminSummaryPanel` перенесена на `Link` (Lucide `Pencil` не принимает `title`).
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 19.03.2026 — Task 10 Phase A: EventAdminSummary read-model
+
+### Наблюдения
+
+- Логика готовности уже была в `EventQualityService`, но админке не хватало единого DTO с чеклистом и статусом READY / NEEDS_WORK / BLOCKED.
+
+### Решения
+
+- Один endpoint `GET /admin/events/:id/summary`, сервис `EventAdminSummaryService` только агрегирует существующие проверки и данные Prisma, без дублирования правил витрины на фронте.
+- UI: блок `EventAdminSummaryPanel` на странице события; коммерческие метрики — частично (заявки за 30 дней), конверсия/возвраты — заглушка с пометкой PARTIAL.
+
+### Проблемы
+
+- Для KIDS при minAge 0 добавлено блокирующее условие — может потребоваться смягчение, если 0+ считается валидным без override.
+
+---
+
+## 19.03.2026 — Task 10 Phase B: спецификация Venue Storefront Health
+
+### Наблюдения
+
+- Для площадки нужен аналог Phase A: здоровье витрины (активные события, слоты, рейтинг, готовность) и таблица связанных событий с быстрыми действиями, без дублирования бизнес-правил на фронте.
+
+### Решения
+
+- Зафиксирована спецификация в **[Task10-PhaseB-Venue-Spec.md](./Task10-PhaseB-Venue-Spec.md)**: `GET /admin/venues/:id/summary`, DTO `VenueAdminSummaryDto`, блоки storefront / content / relatedEvents; B1 — read-model + UI; B2 — визуальный редактор `venueTemplateData` — отдельно.
+
+### Проблемы
+
+- Гибрид готовности (override vs полный `validateForPublish`) и лимит N событий требуют явного `truncated` в ответе.
+
+---
+
+## 19.03.2026 — Task 10: принятие Phase A, бэклог A.1, следующий шаг — B
+
+### Наблюдения
+
+- Phase A дала опорную структуру; дальнейшие «улучшения» в том же контуре легко распыляют темп, если не разделить accepted scope и follow-up.
+
+### Решения
+
+- **Phase A accepted** — дальше по событию только bugfix. Бэклог **Phase A.1** (пороги boost в конфиг, формулировки duplicate/grouping, KIDS/minAge на живых данных) зафиксирован в **Task10-Admin-Intelligence-Audit.md §8**.
+- **Следующий шаг реализации — только Phase B** (Venue Summary Slice); **Phase C** не смешивать: сначала продуктовая схема UI, потом отдельный пакет кода.
+
+### Проблемы
+
+- Нет — это организационная фиксация приоритетов.
+
+---
+
+## 19.03.2026 — Task 10 Phase B: реализация Venue Summary
+
+### Наблюдения
+
+- Phase B — симметричный read-model для площадки; реализован по спеке Task10-PhaseB-Venue-Spec.
+
+### Решения
+
+- **Backend:** `GET /admin/venues/:id/summary` → `VenueAdminSummaryDto`; `VenueAdminSummaryService` — агрегирует Prisma + вызовы `EventAdminSummaryService.getSummary` для первых 20 событий (readiness), остальные — из override.qualityStatus; storefront visibility из isHidden/suppressLowQuality.
+- **Frontend:** `getVenueAdminSummary`, `VenueAdminSummaryPanel` — блок витрины + таблица событий с бейджами, ссылками в админку и на сайт (VITE_PUBLIC_SITE_URL).
+- **Tasktracker:** Phase B закрыта.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 19.03.2026 — Task 10: шлифовка A/B + scope Phase C
+
+### Наблюдения
+
+- Phase A/B готовы, но нужна визуальная консистентность и зрелость UX перед Phase C.
+
+### Решения
+
+- **Shared badges:** `ReadinessBadge`, `StorefrontVisibilityBadge` в `components/admin/` — единый стиль для Event и Venue summary.
+- **Empty-state:** для площадки без событий — явный блок с иконкой и подсказкой «Привяжите события через поле Место».
+- **Сортировка relatedEvents:** backend сортирует по visibility (HIDDEN → SUPPRESSED → VISIBLE), затем по readiness (BLOCKED → NEEDS_WORK → UNKNOWN → READY), затем по title.
+- **Phase C scope** зафиксирован в `docs/Task10-PhaseC-Content-Blocks-Spec.md`: C1 (Event contentTemplateData), C2 (Venue venueTemplateData); без drag-and-drop, schema studio, mega-editor.
+
+### Проблемы
+
+- Нет.
+
+---
+
 ## 19.03.2026 — P2: Anti-Duplicates badge, Manual Boost limit, audit log
 
 ### Наблюдения

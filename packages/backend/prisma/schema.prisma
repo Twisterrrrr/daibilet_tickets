@@ -1419,6 +1419,7 @@ model Operator {
   supplierDailyStats SupplierDailyStat[]
 
   legalProfile SupplierLegalProfile?
+  edoProfile   SupplierEdoProfile?
 
   promoCodes          PromoCode[]
   supplierInvitations SupplierInvitation[]
@@ -2406,6 +2407,20 @@ enum PspFeeMode {
   SERVICE_FEE
 }
 
+enum EdoProviderType {
+  NOOP
+  DIADOK
+}
+
+enum EdoDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  SIGNED
+  REJECTED
+  ERROR
+}
+
 /// Витрина Phase 5: дневная статистика по поставщику (предрасчёт для дашборда и аналитики).
 model SupplierDailyStat {
   id         String   @id @default(uuid()) @db.Uuid
@@ -2537,11 +2552,61 @@ model SupplierDocument {
   template        SupplierDocumentTemplate?        @relation(fields: [templateId], references: [id])
   templateVersion SupplierDocumentTemplateVersion? @relation(fields: [templateVersionId], references: [id])
 
-  files SupplierDocumentFile[]
+  files       SupplierDocumentFile[]
+  edoDeliveries EdoDelivery[]
 
   @@index([operatorId])
   @@index([reportId])
   @@map("supplier_documents")
+}
+
+/// P4: Профиль поставщика в ЭДО (привязка к оператору и провайдеру).
+model SupplierEdoProfile {
+  id         String          @id @default(cuid())
+  operatorId String          @unique @db.Uuid
+  provider   EdoProviderType
+  boxId      String?
+  inn        String
+  kpp        String?
+  isActive   Boolean         @default(true)
+  settingsJson Json?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  operator  Operator      @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  deliveries EdoDelivery[]
+
+  @@map("supplier_edo_profiles")
+}
+
+/// P4: История отправки документа в ЭДО.
+model EdoDelivery {
+  id                    String            @id @default(cuid())
+  supplierDocumentId    String
+  supplierEdoProfileId  String
+  provider              EdoProviderType
+  providerDeliveryId    String?
+  status                EdoDeliveryStatus @default(PENDING)
+  errorCode             String?
+  errorMessage          String?           @db.Text
+  sentAt                DateTime?
+  deliveredAt           DateTime?
+  signedAt              DateTime?
+  rejectedAt            DateTime?
+  lastStatusAt          DateTime?
+  initiatedByAdminUserId String?          @db.Uuid
+  metaJson              Json?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  document SupplierDocument    @relation(fields: [supplierDocumentId], references: [id], onDelete: Restrict)
+  edoProfile SupplierEdoProfile @relation(fields: [supplierEdoProfileId], references: [id], onDelete: Restrict)
+
+  @@index([supplierDocumentId])
+  @@index([supplierEdoProfileId])
+  @@index([status])
+  @@index([provider, providerDeliveryId])
+  @@map("edo_deliveries")
 }
 
 model SupplierDocumentFile {

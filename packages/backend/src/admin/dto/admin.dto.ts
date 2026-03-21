@@ -223,7 +223,9 @@ export class UpdateCityDto {
 
 // ── Re-exports from other DTO modules ────────────────────────────────
 export * from './admin-event.dto';
+export * from './admin-event-summary.dto';
 export * from './admin-venue.dto';
+export * from './admin-venue-summary.dto';
 export * from './admin-landing.dto';
 export * from './admin-combo.dto';
 export * from './admin-article.dto';

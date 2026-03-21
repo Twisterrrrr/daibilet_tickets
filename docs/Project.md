@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-03-15
+> Последнее обновление: 2026-03-19
 
 ## Миссия
 
@@ -307,6 +307,7 @@
   - SSR/SSG для SEO, TailwindCSS, React Query.
 - **`packages/frontend-admin`** — админка Daibilet (React + Vite):
   - Страницы: `src/pages/events/*` (EventsList, EventEdit, EventCreate, EventsMerge), `cities/*`, `venues/*`, `landings/*`, `collections/*`, `combos/*`, `upsells/*`, `widgets/*`, `articles/*`, `reviews/*`, `support/*`, `orders/*`, `audit/*`, `moderation/*`, `reconciliation/*`, `settings/*`, `Dashboard`, `Login`.
+  - **Task 10 / Phase C:** контент-блоки PDP — `ContentBlocksPanel` на `EventEdit` (`contentTemplateData`) и `VenueEdit` (`venueTemplateData`, вкладка «Контент PDP»), спецификации полей из `@daibilet/shared` (`getEventTemplateSpecs`, `getVenueTemplateSpecs`); см. `docs/Task10-PhaseC-Content-Blocks-Spec.md`.
   - Общий layout (`components/layout/*`), UI‑компоненты (`components/ui/*`), SeoMetaEditor.
   - Использует `@tanstack/react-query`, `@tanstack/react-table`, Radix UI.
 - **`packages/frontend-supplier`** — портал поставщика (упрощённый кабинет):

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DateMode, EventCategory, Prisma } from '@prisma/client';
+import { DateMode, EventAudience, EventCategory, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { isSellable } from './sellable';
@@ -72,6 +72,20 @@ export class EventQualityService {
         field: 'category',
         ownership: event.override?.category !== undefined ? 'local' : 'source',
       });
+    }
+
+    const audience = event.override?.audience ?? event.audience;
+    if (audience === EventAudience.KIDS) {
+      const effMinAge = event.override?.minAge ?? event.minAge;
+      if (effMinAge === 0) {
+        issues.push({
+          code: 'MIN_AGE_REQUIRED_FOR_KIDS',
+          message:
+            'Для аудитории «Детям» укажите минимальный возраст (minAge): сейчас 0+ по умолчанию — задайте в override при необходимости',
+          field: 'minAge',
+          ownership: event.override?.minAge !== undefined ? 'local' : 'source',
+        });
+      }
     }
 
     const description = event.override?.description ?? event.description;

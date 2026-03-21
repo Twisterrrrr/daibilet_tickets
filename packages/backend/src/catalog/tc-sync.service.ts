@@ -663,7 +663,7 @@ export class TcSyncService {
       for (const rule of set.rules || []) {
         if (rule.simple?.price) {
           const p = Number(rule.simple.price);
-          if (p > 0) prices.push(p); // gRPC цены в копейках уже
+          if (p >= 10000) prices.push(p); // игнорируем тестовые/некорректные тарифы < 100 ₽
         }
       }
     }
@@ -1434,7 +1434,7 @@ export class TcSyncService {
     for (const set of sets) {
       if (set.price != null) {
         const p = Math.round(parseFloat(String(set.price)) * 100);
-        if (p > 0) prices.push(p);
+          if (p >= 10000) prices.push(p);
       }
       const rules = set.rules;
       if (rules && Array.isArray(rules)) {
@@ -1442,7 +1442,7 @@ export class TcSyncService {
           const r = rule as { current?: boolean; price?: string | number };
           if (r.current && r.price != null) {
             const p = Math.round(parseFloat(String(r.price)) * 100);
-            if (p > 0) prices.push(p);
+            if (p >= 10000) prices.push(p);
           }
         }
       }

@@ -52,6 +52,7 @@ import {
   EventActivationDto,
   UpdateEventSlugDto,
   EventQualityDto,
+  EventAdminSummaryDto,
   ExternalRatingDto,
   OverrideEventDto,
   PatchEventOfferDto,
@@ -60,6 +61,7 @@ import {
   BulkUpdateEventsDto,
 } from './dto/admin.dto';
 import { EventOverrideService } from './event-override.service';
+import { EventAdminSummaryService } from './event-admin-summary.service';
 import { EventQualityIssue, EventQualityService } from '../catalog/event-quality.service';
 import { AuditService } from './audit.service';
 import { toJsonValue } from '../common/typing';
@@ -77,6 +79,7 @@ export class AdminEventsController {
     private readonly fuzzyDedupService: FuzzyDedupService,
     private readonly cacheInvalidation: CacheInvalidationService,
     private readonly eventQuality: EventQualityService,
+    private readonly eventAdminSummary: EventAdminSummaryService,
     private readonly audit: AuditService,
   ) {}
 
@@ -675,6 +678,17 @@ export class AdminEventsController {
    *
    * GET /admin/events/:id/quality
    */
+  /**
+   * Единый read-model для админки: готовность, продвижение, операции, коммерция (частично), интеграция.
+   *
+   * GET /admin/events/:id/summary
+   */
+  @Get(':id/summary')
+  @Roles('ADMIN', 'EDITOR')
+  async getEventSummary(@Param('id') eventId: string): Promise<EventAdminSummaryDto> {
+    return this.eventAdminSummary.getSummary(eventId);
+  }
+
   @Get(':id/quality')
   @Roles('ADMIN', 'EDITOR')
   async getQuality(@Param('id') eventId: string): Promise<EventQualityDto> {
