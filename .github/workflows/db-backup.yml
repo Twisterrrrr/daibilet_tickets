@@ -6,35 +6,44 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  pg_dump:
+  backup:
+    name: Backup prod DB on server
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: production
 
     env:
-      PGHOST: ${{ secrets.PGHOST }}
-      PGPORT: ${{ secrets.PGPORT }}
-      PGUSER: ${{ secrets.PGUSER }}
-      PGPASSWORD: ${{ secrets.PGPASSWORD }}
-      PGDATABASE: ${{ secrets.PGDATABASE }}
+      PROD_HOST: ${{ secrets.PROD_HOST }}
+      PROD_USER: ${{ secrets.PROD_USER }}
+      PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
 
     steps:
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Run pg_dump
+      - name: Validate SSH config
         run: |
-          mkdir -p backup
-          pg_dump \
-            --host="$PGHOST" \
-            --port="${PGPORT:-5432}" \
-            --username="$PGUSER" \
-            --format=custom \
-            --file="backup/db-${PGDATABASE}-$(date -u +%Y%m%d-%H%M%S).dump" \
-            "$PGDATABASE"
+          PROD_HOST_CLEAN=$(printf '%s' "${{ secrets.PROD_HOST }}" | tr -d '\r\n' | xargs)
+          PROD_USER_CLEAN=$(printf '%s' "${{ secrets.PROD_USER }}" | tr -d '\r\n' | xargs)
+          if [ -z "${PROD_HOST_CLEAN}" ] || [ -z "${PROD_USER_CLEAN}" ] || [ -z "${{ secrets.PROD_SSH_KEY }}" ]; then
+            echo "PROD_HOST, PROD_USER, PROD_SSH_KEY must be set in GitHub secrets"
+            exit 1
+          fi
+          echo "PROD_HOST=${PROD_HOST_CLEAN}" >> $GITHUB_ENV
+          echo "PROD_USER=${PROD_USER_CLEAN}" >> $GITHUB_ENV
 
-      - name: Upload backup artifact
-        uses: actions/upload-artifact@v4
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          name: db-backup-${{ github.run_id }}
-          path: backup/
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${PROD_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Run backup on production server
+        run: |
+          ssh "${PROD_USER}@${PROD_HOST}" "cd /opt/daibilet && set -a && . deploy/production/.env 2>/dev/null || true && set +a && bash scripts/backup-production-db.sh"

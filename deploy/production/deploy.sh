@@ -25,8 +25,25 @@ fi
 
 COMPOSE_BASE=(docker compose -f deploy/production/docker-compose.yml --env-file "$ENV_FILE" -p daibilet-prod)
 
-echo "=== [1b/6] Ensure ssl/acme dirs exist ==="
+echo "=== [1b/6] Ensure ssl/acme dirs + migrate certs ==="
 mkdir -p "$REPO_ROOT/deploy/production/ssl/main" "$REPO_ROOT/deploy/production/ssl/subdomains" "$REPO_ROOT/deploy/production/acme"
+SSL_DIR="$REPO_ROOT/deploy/production/ssl"
+# Миграция: старый плоский ssl/ -> main/
+if [ ! -f "$SSL_DIR/main/fullchain.pem" ] && [ -f "$SSL_DIR/fullchain.pem" ]; then
+  echo "[ssl] Копирую сертификаты из ssl/ в ssl/main/"
+  cp -a "$SSL_DIR/fullchain.pem" "$SSL_DIR/main/" 2>/dev/null || cp "$SSL_DIR/fullchain.pem" "$SSL_DIR/main/"
+  cp -a "$SSL_DIR/privkey.pem" "$SSL_DIR/main/" 2>/dev/null || cp "$SSL_DIR/privkey.pem" "$SSL_DIR/main/"
+fi
+# subdomains: если нет — используем main (временный fallback до выпуска отдельного сертификата)
+if [ ! -f "$SSL_DIR/subdomains/fullchain.pem" ] && [ -f "$SSL_DIR/main/fullchain.pem" ]; then
+  echo "[ssl] subdomains/ пусто — использую main/ как fallback (выпусти отдельный cert для admin/api/supplier)"
+  cp -a "$SSL_DIR/main/fullchain.pem" "$SSL_DIR/subdomains/" 2>/dev/null || cp "$SSL_DIR/main/fullchain.pem" "$SSL_DIR/subdomains/"
+  cp -a "$SSL_DIR/main/privkey.pem" "$SSL_DIR/subdomains/" 2>/dev/null || cp "$SSL_DIR/main/privkey.pem" "$SSL_DIR/subdomains/"
+fi
+if [ ! -f "$SSL_DIR/main/fullchain.pem" ] || [ ! -f "$SSL_DIR/main/privkey.pem" ]; then
+  echo "[ERROR] Нет SSL: положи fullchain.pem и privkey.pem в deploy/production/ssl/main/ (или в ssl/ для автокопирования)"
+  exit 1
+fi
 
 echo "=== [2/6] Ensure Postgres/Redis are up ==="
 "${COMPOSE_BASE[@]}" up -d postgres redis
@@ -104,6 +121,8 @@ check_http "https://daibilet.ru/api/v1/health" "api"
 
 if [ "${failed}" -ne 0 ]; then
   echo "[deploy-production] Health check FAILED"
+  echo "Подсказка: 000 = нет соединения. Проверь: docker compose -f deploy/production/docker-compose.yml logs nginx"
+  echo "Убедись, что сертификаты есть в ssl/main/ и ssl/subdomains/"
   exit 1
 fi
 
