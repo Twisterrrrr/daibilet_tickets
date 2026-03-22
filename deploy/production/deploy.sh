@@ -48,6 +48,10 @@ echo "=== [5/6] Prisma migrations (prisma migrate deploy) ==="
 echo "=== [6/6] Production health-check (containers + HTTP) ==="
 "${COMPOSE_BASE[@]}" ps
 
+# Дать контейнерам время подняться после миграций
+echo "Waiting 15s for services to become ready..."
+sleep 15
+
 failed=0
 
 check_http() {
@@ -76,7 +80,8 @@ check_http() {
 echo "=== HTTP checks ==="
 check_http "https://daibilet.ru" "ui"
 check_http "https://admin.daibilet.ru" "ui"
-check_http "https://api.daibilet.ru/api/v1/health" "api"
+# API под /api/ на daibilet.ru (production.conf не использует api.daibilet.ru)
+check_http "https://daibilet.ru/api/v1/health" "api"
 
 if [ "${failed}" -ne 0 ]; then
   echo "[deploy-production] Health check FAILED"

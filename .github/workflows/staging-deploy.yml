@@ -33,6 +33,7 @@ jobs:
       STAGING_HOST: ${{ secrets.STAGING_HOST }}
       STAGING_USER: ${{ secrets.STAGING_USER }}
       STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout repository
