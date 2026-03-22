@@ -28,11 +28,29 @@ COMPOSE_BASE=(docker compose -f deploy/production/docker-compose.yml --env-file 
 echo "=== [1b/6] Ensure ssl/acme dirs + migrate certs ==="
 mkdir -p "$REPO_ROOT/deploy/production/ssl/main" "$REPO_ROOT/deploy/production/ssl/subdomains" "$REPO_ROOT/deploy/production/acme"
 SSL_DIR="$REPO_ROOT/deploy/production/ssl"
-# Миграция: старый плоский ssl/ -> main/
-if [ ! -f "$SSL_DIR/main/fullchain.pem" ] && [ -f "$SSL_DIR/fullchain.pem" ]; then
-  echo "[ssl] Копирую сертификаты из ssl/ в ssl/main/"
-  cp -a "$SSL_DIR/fullchain.pem" "$SSL_DIR/main/" 2>/dev/null || cp "$SSL_DIR/fullchain.pem" "$SSL_DIR/main/"
-  cp -a "$SSL_DIR/privkey.pem" "$SSL_DIR/main/" 2>/dev/null || cp "$SSL_DIR/privkey.pem" "$SSL_DIR/main/"
+CERTBOT_BASE="$REPO_ROOT/deploy/nginx/certbot"
+# Миграция: ищем сертификаты в нескольких местах (приоритет: ssl/main, ssl/, certbot)
+if [ ! -f "$SSL_DIR/main/fullchain.pem" ]; then
+  SOURCE=""
+  if [ -f "$SSL_DIR/fullchain.pem" ]; then
+    SOURCE="$SSL_DIR"
+  elif [ -f "$CERTBOT_BASE/conf/live/daibilet.ru/fullchain.pem" ]; then
+    SOURCE="$CERTBOT_BASE/conf/live/daibilet.ru"
+  elif [ -f "$CERTBOT_BASE/conf/live/www.daibilet.ru/fullchain.pem" ]; then
+    SOURCE="$CERTBOT_BASE/conf/live/www.daibilet.ru"
+  elif [ -f "$CERTBOT_BASE/www/fullchain.pem" ]; then
+    SOURCE="$CERTBOT_BASE/www"
+  else
+    LIVE_DIR=$(find "$CERTBOT_BASE/conf/live" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
+    if [ -n "$LIVE_DIR" ] && [ -f "$LIVE_DIR/fullchain.pem" ]; then
+      SOURCE="$LIVE_DIR"
+    fi
+  fi
+  if [ -n "$SOURCE" ]; then
+    echo "[ssl] Копирую сертификаты из $SOURCE в ssl/main/"
+    cp "$SOURCE/fullchain.pem" "$SSL_DIR/main/"
+    cp "$SOURCE/privkey.pem" "$SSL_DIR/main/"
+  fi
 fi
 # subdomains: если нет — используем main (временный fallback до выпуска отдельного сертификата)
 if [ ! -f "$SSL_DIR/subdomains/fullchain.pem" ] && [ -f "$SSL_DIR/main/fullchain.pem" ]; then
@@ -41,7 +59,11 @@ if [ ! -f "$SSL_DIR/subdomains/fullchain.pem" ] && [ -f "$SSL_DIR/main/fullchain
   cp -a "$SSL_DIR/main/privkey.pem" "$SSL_DIR/subdomains/" 2>/dev/null || cp "$SSL_DIR/main/privkey.pem" "$SSL_DIR/subdomains/"
 fi
 if [ ! -f "$SSL_DIR/main/fullchain.pem" ] || [ ! -f "$SSL_DIR/main/privkey.pem" ]; then
-  echo "[ERROR] Нет SSL: положи fullchain.pem и privkey.pem в deploy/production/ssl/main/ (или в ssl/ для автокопирования)"
+  echo "[ERROR] Нет SSL. Положи fullchain.pem и privkey.pem в один из путей:"
+  echo "  - deploy/production/ssl/main/"
+  echo "  - deploy/production/ssl/ (плоская структура)"
+  echo "  - deploy/nginx/certbot/conf/live/daibilet.ru/"
+  echo "  - deploy/nginx/certbot/www/"
   exit 1
 fi
 

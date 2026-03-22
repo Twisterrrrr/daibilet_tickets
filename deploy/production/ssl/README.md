@@ -2,7 +2,7 @@
 
 Используются **два набора сертификатов**:
 
-> **Миграция с одной пары:** если раньше сертификаты лежали в `ssl/`, перемести их в `ssl/main/`.
+> **Автомиграция при деплое:** deploy ищет сертификаты в `ssl/`, `deploy/nginx/certbot/conf/live/daibilet.ru/`, `deploy/nginx/certbot/www/` и копирует в `ssl/main/`.
 
 1. **main/** — daibilet.ru, www.daibilet.ru  
 2. **subdomains/** — admin.daibilet.ru, api.daibilet.ru, supplier.daibilet.ru  
