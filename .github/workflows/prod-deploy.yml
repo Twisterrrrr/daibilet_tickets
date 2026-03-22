@@ -32,9 +32,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate SSH configuration
+      - name: Validate and sanitize SSH configuration
         run: |
-          if [ -z "${PROD_HOST}" ] || [ -z "${PROD_USER}" ]; then
+          # Убрать пробелы, \r, \n из PROD_HOST и PROD_USER (часто ломают ssh при копировании)
+          PROD_HOST_CLEAN=$(printf '%s' "${{ secrets.PROD_HOST }}" | tr -d '\r\n' | xargs)
+          PROD_USER_CLEAN=$(printf '%s' "${{ secrets.PROD_USER }}" | tr -d '\r\n' | xargs)
+          if [ -z "${PROD_HOST_CLEAN}" ] || [ -z "${PROD_USER_CLEAN}" ]; then
             echo "PROD_HOST and PROD_USER must be set in GitHub secrets"
             exit 1
           fi
@@ -42,6 +45,8 @@ jobs:
             echo "PROD_SSH_KEY must be set in GitHub secrets"
             exit 1
           fi
+          echo "PROD_HOST=${PROD_HOST_CLEAN}" >> $GITHUB_ENV
+          echo "PROD_USER=${PROD_USER_CLEAN}" >> $GITHUB_ENV
 
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.9.0
