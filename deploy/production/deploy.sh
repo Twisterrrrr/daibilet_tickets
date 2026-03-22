@@ -26,7 +26,7 @@ fi
 COMPOSE_BASE=(docker compose -f deploy/production/docker-compose.yml --env-file "$ENV_FILE" -p daibilet-prod)
 
 echo "=== [1b/6] Ensure ssl/acme dirs exist ==="
-mkdir -p "$REPO_ROOT/deploy/production/ssl" "$REPO_ROOT/deploy/production/acme"
+mkdir -p "$REPO_ROOT/deploy/production/ssl/main" "$REPO_ROOT/deploy/production/ssl/subdomains" "$REPO_ROOT/deploy/production/acme"
 
 echo "=== [2/6] Ensure Postgres/Redis are up ==="
 "${COMPOSE_BASE[@]}" up -d postgres redis
@@ -99,7 +99,7 @@ check_http() {
 echo "=== HTTP checks ==="
 check_http "https://daibilet.ru" "ui"
 check_http "https://admin.daibilet.ru" "ui"
-# API под /api/ на daibilet.ru (production.conf не использует api.daibilet.ru)
+# API под /api/ на daibilet.ru
 check_http "https://daibilet.ru/api/v1/health" "api"
 
 if [ "${failed}" -ne 0 ]; then
