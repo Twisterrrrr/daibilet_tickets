@@ -86,18 +86,20 @@ export function buildEventWhere(
     isActive: true,
     isDeleted: false,
     canonicalOfId: null,
-    // В прод-каталоге показываем только «прошедшие модерацию» события:
-    //   без override ИЛИ override.editorStatus = PUBLISHED и suppressLowQuality != true.
-    // Дополнительно можно скрыть импортные источники с витрины через IMPORT_SOURCES_ENABLED=0,
-    // при этом они остаются доступны в админке и БД.
+    // В прод-каталоге: MANUAL — всегда, TC/TEPLOHOD — только с override.editorStatus=PUBLISHED.
+    // IMPORT_SOURCES_ENABLED=0 — скрыть импорт полностью (только MANUAL).
     ...(process.env.NODE_ENV === 'production'
-      ? {
-          OR: [
-            { override: null },
-            { override: { editorStatus: 'PUBLISHED', suppressLowQuality: { not: true } } },
-          ],
-          ...(importsEnabled ? {} : { source: EventSource.MANUAL }),
-        }
+      ? importsEnabled
+        ? {
+            OR: [
+              { source: EventSource.MANUAL },
+              {
+                source: { in: [EventSource.TC, EventSource.TEPLOHOD] },
+                override: { editorStatus: 'PUBLISHED', suppressLowQuality: { not: true } },
+              },
+            ],
+          }
+        : { source: EventSource.MANUAL }
       : {}),
     ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),
     city: {

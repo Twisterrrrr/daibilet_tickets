@@ -25,6 +25,9 @@ fi
 
 COMPOSE_BASE=(docker compose -f deploy/production/docker-compose.yml --env-file "$ENV_FILE" -p daibilet-prod)
 
+echo "=== [1b/6] Ensure ssl/acme dirs exist ==="
+mkdir -p "$REPO_ROOT/deploy/production/ssl" "$REPO_ROOT/deploy/production/acme"
+
 echo "=== [2/6] Ensure Postgres/Redis are up ==="
 "${COMPOSE_BASE[@]}" up -d postgres redis
 
@@ -45,7 +48,23 @@ echo "=== [4/6] Build & start production stack (up -d --build) ==="
 echo "=== [5/6] Prisma migrations (prisma migrate deploy) ==="
 "${COMPOSE_BASE[@]}" run --rm backend npx prisma migrate deploy
 
-echo "=== [6/6] Production health-check (containers + HTTP) ==="
+echo "=== [5b/7] Invalidate catalog cache (to apply visibility changes) ==="
+"${COMPOSE_BASE[@]}" run --rm backend node -e "
+const R=require('ioredis');
+const r=new R(process.env.REDIS_URL||'redis://localhost:6379');
+const prefixes=['cities:','events:','catalog:','tags:','regions:','landings:','combos:','search:'];
+(async()=>{
+  let n=0;
+  for(const p of prefixes){
+    const s=r.scanStream({match:p+'*',count:100});
+    for await(const k of s){if(k.length){await r.del(...k);n+=k.length;}}
+  }
+  console.log('Invalidated',n,'cache keys');
+  await r.quit();
+})();
+" || echo '[WARN] Cache invalidation skipped'
+
+echo "=== [6/7] Production health-check (containers + HTTP) ==="
 "${COMPOSE_BASE[@]}" ps
 
 # Дать контейнерам время подняться после миграций

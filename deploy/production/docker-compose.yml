@@ -111,8 +111,9 @@ services:
       - "443:443"
     volumes:
       - ../nginx/production.conf:/etc/nginx/conf.d/default.conf:ro
-      - nginx_certbot_conf:/etc/letsencrypt
-      - nginx_certbot_www:/var/www/certbot
+      # SSL: положи fullchain.pem и privkey.pem в deploy/production/ssl/ (Timeweb Pro, Let's Encrypt)
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./acme:/var/www/certbot:ro
       - uploads_data:/var/www/uploads:ro
     networks:
       - daibilet-prod-net
@@ -120,8 +121,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  nginx_certbot_conf:
-  nginx_certbot_www:
   uploads_data:
 
 networks:
