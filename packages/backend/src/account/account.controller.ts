@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ReviewDisputeStatus, ReviewStatus } from '@prisma/client';
+import { ReviewStatus } from '@prisma/client';
 
 import { UserJwtGuard } from '../user/user.guard';
 import { AccountService } from './account.service';

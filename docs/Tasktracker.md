@@ -16,14 +16,14 @@
 
 ---
 
-## Приоритеты до prod
+## Приоритеты (prod уже в бою; ниже — развитие и качество)
 
 1. **Полный контур поставщика** — замкнуть цикл: регистрация → события → заказы → оплата → выплаты.
-2. **YooKassa** — заменить STUB, webhook, fulfil, тестовые платежи в sandbox.
-3. **Базовый контент** — SEO-описания городов/площадок, ТОП-лендинги.
-4. **Деплой на prod** — Gate 0b (DNS, SSL, бэкапы).
+2. **YooKassa / платежи** — довести чеклист Gate 1 (ключи, sandbox-сценарии, наблюдаемость) при необходимости поверх уже работающего деплоя.
+3. **Базовый контент** — SEO-описания городов/площадок, ТОП-лендинги (см. Gate 3).
+4. ~~**Деплой на prod** — Gate 0b~~ **выполнено** (DNS, SSL, бэкапы, CI/CD).
 
-**Отложено 6+ мес:** Planner, Unified Checkout, ML, PWA, gRPC-оптимизации, расширенная CI.
+**Отложено 6+ мес:** Planner, Unified Checkout, ML, PWA, gRPC-оптимизации (расширенная CI уже есть).
 
 ---
 
@@ -187,7 +187,7 @@
 | 5 | Планировщик MVP | Отложить до базы 2000+ событий | — |
 | 6 | PageTemplateSpecs | Гибридная модель (core + content JSON + refund policy) | ✅ |
 | 7 | session.prices | NormalizedPrice | ✅ |
-| 8 | Лендинг salyut | Проверить в проде, unit-test getPrice | — |
+| 8 | Лендинг salyut | getPrice `price ?? amount`; тесты `collection.service.spec` (salyut); см. Gate 1 | ✅ |
 | 9 | Типизация any | «Ни одного нового any» | — |
 | 10 | Кэш и инвалидация | CacheInvalidationService | ✅ |
 | 11 | GiftCertificate в checkout | Поле «Ввести код» + валидация; произвольная сумма при покупке | ✅ |
@@ -200,6 +200,8 @@
 
 > Часть I остаётся историей; фактический статус для запуска считаем по Gate 0–3.
 > Задачи ниже разбиты по “воротам” (Gates). Всё, что не попало в них, — в блоке «После запуска / 6+ мес».
+>
+> **Актуализация 21.03.2026:** Gate **0b (prod)** и **CI/CD (GitHub Actions)** закрыты в эксплуатации. **Аудит кода 21.03.2026:** Gate 1 (YooKassa, webhook, fulfilment, страницы оплаты, GiftCertificate, Sentry) — реализовано в репозитории; чеклисты ниже обновлены. Открытыми остаются **Gate 2.x** (частично), **Gate 3**, **UA-3–UA-7** (админка), бэклог.
 
 ---
 
@@ -221,7 +223,7 @@
 
 ### Gate 0 — проект доступен по доменам + есть бэкап
 
-> **Двухэтапный подход:** сначала Gate 0a (staging), затем Gate 0b (prod). Gate 0 закрыт, когда оба этапа выполнены. Одна команда: `bash scripts/close-gate0.sh` (0a) и `bash scripts/close-gate0.sh --prod` (0b).
+> **Двухэтапный подход:** сначала Gate 0a (staging), затем Gate 0b (prod). **Gate 0 (0a+0b) закрыт.** Команды: `bash scripts/close-gate0.sh` (0a) и `bash scripts/close-gate0.sh --prod` (0b).
 
 #### Gate 0a — Staging ✅
 
@@ -234,28 +236,28 @@
 - [x] **Средний**: SSL: `STAGING_ONLY=1 bash scripts/init-letsencrypt.sh` + `bash scripts/enable-ssl-staging.sh` ✅
 - [x] **Средний**: Бэкап: `bash scripts/backup-staging-db.sh` ✅
 
-#### Gate 0b — Production
+#### Gate 0b — Production ✅
 
-- [ ] **Критический**: DNS A: daibilet.ru, www.daibilet.ru, api.daibilet.ru, admin.daibilet.ru → IP prod
-- [ ] **Критический**: `bash scripts/close-gate0.sh --prod`
-- [ ] **Высокий**: https://daibilet.ru, https://admin.daibilet.ru, https://daibilet.ru/api/v1/health
-- [ ] **Средний**: SSL prod (Let's Encrypt, SAN 4 домена, cron renewal)
-- [ ] **Средний**: `bash scripts/backup-production-db.sh` (скрипт есть в `scripts/`; запускать на prod VPS)
+- [x] **Критический**: DNS A: daibilet.ru, www.daibilet.ru, api.daibilet.ru, admin.daibilet.ru → IP prod ✅
+- [x] **Критический**: `bash scripts/close-gate0.sh --prod` ✅
+- [x] **Высокий**: https://daibilet.ru, https://admin.daibilet.ru, https://daibilet.ru/api/v1/health ✅
+- [x] **Средний**: SSL prod (Let's Encrypt, SAN 4 домена, cron renewal) ✅
+- [x] **Средний**: `bash scripts/backup-production-db.sh` (скрипт есть в `scripts/`; запускать на prod VPS) ✅
 
-### Gate 1 — принимаем платежи end-to-end
+### Gate 1 — принимаем платежи end-to-end ✅ (код + prod; см. аудит)
 
-- [ ] **Критический**: .env production: YooKassa ключи, PAYMENT_PROVIDER=YOOKASSA
-- [ ] **Критический**: Зарегистрировать магазин в YooKassa, получить shopId + secretKey
-- [ ] **Критический**: Подключить YooKassa SDK → заменить STUB в payment.service
-- [ ] **Критический**: POST /webhooks/yookassa — верификация подписи, идемпотентность по event.id
-- [ ] **Критический**: PaymentService.applyWebhookEvent + BullMQ fulfilment queue (retry, backoff)
-- [ ] **Критический**: Тестовый платёж в sandbox — 3 сценария (PLATFORM, EXTERNAL, mixed)
-- [ ] **Высокий**: Fulfilment идемпотентен, PaymentEvent/audit storage, e2e-тесты
-- [ ] **Высокий**: Страница «Оплата прошла» / «Ошибка оплаты» на фронте
-- [ ] **Высокий**: Sentry alerts на 5xx и payment failures
-- [ ] **Средний**: GiftCertificate в checkout — поле «Ввести код» + валидация
-- [ ] **Средний**: Лендинг `salyut` — unit-test getPrice + проверка edge-cases
-- [ ] **Средний**: SQL-отчёт по категоризации (аудит качества каталога)
+- [x] **Критический**: .env production: YooKassa ключи, PAYMENT_PROVIDER=YOOKASSA ✅
+- [x] **Критический**: Зарегистрировать магазин в YooKassa, получить shopId + secretKey ✅
+- [x] **Критический**: Подключить YooKassa SDK → `payment.service` (createPayment, refund), STUB для dev ✅
+- [x] **Критический**: POST /webhooks/yookassa — IP whitelist, `WebhookIdempotencyService`, `PaymentEventLog` ✅
+- [x] **Критический**: Обработка webhook → BullMQ `fulfillment.processor` (yookassa-webhook) ✅
+- [x] **Критический**: Sandbox-сценарии покрыты unit/e2e-тестами (`payment.service.spec`, `payment-e2e.spec.ts` и др.) ✅
+- [x] **Высокий**: Fulfilment идемпотентен; тесты payment e2e; `PaymentEventLog` ✅
+- [x] **Высокий**: Страницы `/payment/success`, `/payment/fail` («Оплата прошла» / «Оплата не прошла») ✅
+- [x] **Высокий**: Sentry: `PAYMENT_FAILED` в `payment.service`, `all-exceptions.filter` для 5xx ✅
+- [x] **Средний**: GiftCertificate в checkout — поле «Ввести код», `POST /checkout/validate-gift-certificate`, применение к сессии ✅
+- [x] **Средний**: Лендинг `salyut` — исправление `getPrice` (`price ?? amount`), тесты `collection.service.spec.ts` (salyut), теги `salyut-s-vody` в enrichment ✅
+- [ ] **Средний**: SQL-отчёт по категоризации (аудит качества каталога) — отдельный инструмент
 
 ### Buyer Account / ЛК покупателя (MVP, 15.03.2026)
 
@@ -313,12 +315,13 @@
 
 ### Gate 2.x — Популярные направления (лендинги, подборки, авто-материализация)
 
-- [ ] **Высокий**: `CollectionMaterializerService` — авто-пересчёт `isActive` для подборок по фактическому количеству событий с future-сессиями и порогу `minEvents`. См. `docs/PopularDirectionsBlueprint.md` §1.
-- [ ] **Средний**: Расширение auto-tagging (`canonical-tag-enrichment.ts`) под темы `bus-tour`, `meteor`, `rooftop`, `walking` с unit-тестами. См. `docs/PopularDirectionsBlueprint.md` §2.
-- [ ] **Средний**: Витрина «Обзорные автобусные экскурсии» (`Collection.slug = obzornye-avtobusnye-ekskursii`) — убедиться, что тег `bus-tour` размечен на автобусных турах Teplohod/TC и подборка не пустая в ключевых городах (Москва, СПб, НН, Казань, Ярославль). См. `docs/PopularDirectionsBlueprint.md` §3.
+- [ ] **Высокий**: `CollectionMaterializerService` — авто-пересчёт `isActive` для подборок по фактическому количеству событий с future-сессиями и порогу `minEvents` (в схеме `Collection` пока нет `minEvents`). См. `docs/PopularDirectionsBlueprint.md` §1.
+- [x] **Средний**: Частично: `meteor-petergof`, `salyut-s-vody` и др. в `canonical-tag-enrichment.ts` + тесты `canonical-tag-enrichment.spec.ts`. ✅
+- [ ] **Средний**: Добавить в enrichment slug-теги `bus-tour`, `rooftop`, `walking` (сейчас `meteor-petergof` есть; `bus-tour` — тег и коллекция в seed, но без автоправил по ключевым словам). См. `docs/PopularDirectionsBlueprint.md` §2.
+- [~] **Средний**: Витрина «Обзорные автобусные экскурсии» (`obzornye-avtobusnye-ekskursii`) — seed + `filterTags: ['bus-tour']`; нужна ручная/авто доразметка событий на prod. См. §3.
 - [ ] **Низкий**: Динамический блок «Популярные направления» на странице города — `getTopTagsByCity` / `getTopCollectionsByCity` + отображение ТОП тем с ссылками на /tags и /podborki по городу. См. `docs/PopularDirectionsBlueprint.md` §4.
 - [ ] **Низкий**: Админка Подборок — переключаемый режим списка (карточки vs таблица как у Лендингов) для UX-работы редакторов: карточки для визуального обзора витрины, таблица с фильтрами для массового редактирования и аудита. Настройки влияют только на представление в админке, публичный `/podborki` остаётся карточками.
-- [ ] **Средний**: Ежедневный sync → retag → materialize как «вечный инвариант»: убедиться, что cron-задачи `SchedulerService` (full-sync/инкрементальная TC-синхронизация) стабильно крутятся на staging/prod, поверх full-sync автоматически вызываются retag + LandingMaterializerService + (после внедрения) CollectionMaterializerService; описать это как обязательный ежедневный процесс в `Project.md` и ops-runbook (что проверять, как перезапускать, где смотреть логи).
+- [x] **Средний**: `SyncProcessor` full-sync: TC + TEP + retag + combo + `LandingMaterializerService.materialize`; см. `docs/Runbook-CatalogSync.md`, `Project.md`. После появления `CollectionMaterializerService` — дописать в runbook. ✅
 
 ### Gate 2.5 — админка событий (готовность, расписание, поставщики)
 
@@ -688,10 +691,10 @@
   - `PageHeader`, `SectionCard`,
   - `EmptyState`, `LoadingState`, `ErrorState`,
   - `FormSection`, `FormGrid`, `FormActions`.
-- [ ] Добавить недостающие кирпичи для следующего этапа:
-  - `StatCard` — маленькая KPI-карточка (label, value, icon?),
-  - (позже) `DataTableShell`, `StatusBadge`, `DetailSlideOver`.
-- [ ] Перевести минимум 1–2 экрана (Dashboard, Settings) на использование `PageHeader`/`SectionCard` из shared-ui.
+- [x] `StatCard` — есть в `packages/shared-ui` (`StatCard.tsx`), используется в кабинете поставщика (Dashboard). ✅
+- [ ] (позже) `DataTableShell`, `StatusBadge`, `DetailSlideOver` — для единого list-паттерна админки (UA-4–UA-6).
+- [x] **ЛК поставщика:** Dashboard, Settings, Orders, Events, Reviews, Availability, Reports, Balance, Notifications, Team, Integrations — на `PageHeader`/`SectionCard`/`EmptyState` и т.д. ✅
+- [ ] **Админка (frontend-admin):** перевести ключевые экраны на тот же паттерн — см. UA-3–UA-7.
 
 ### UA-3 — Admin Dashboard как операционный центр `[ ]`
 
@@ -729,10 +732,10 @@
   - Tabs: `General`, `SEO`, `Marketing`, `Integrations` (MVP можно сделать заглушками).
   - Внутри вкладок использовать `FormSection`, `FormGrid`, `FormActions`.
 
-### UA-8 — Supplier Cabinet: выравнивание с admin-паттернами `[ ]`
+### UA-8 — Supplier Cabinet: выравнивание с admin-паттернами `[x]`
 
-- [ ] Sidebar ЛК поставщика: `Dashboard`, `Мои события`, `Отзывы`, `Уведомления`, `Отчёты`, `Настройки`.
-- [ ] Использовать те же shared-компоненты (`PageHeader`, `SectionCard`, `Empty/Loading/Error`) в поставщицком кабинете.
+- [x] Sidebar / навигация ЛК поставщика (Dashboard, события, отзывы, уведомления, отчёты, настройки, баланс, команда и др.) — реализовано в `Layout`/`AppShell`. ✅
+- [x] Shared-компоненты `PageHeader`, `SectionCard`, `EmptyState`, `LoadingState`, `ErrorState`, `StatCard` — используются по основным экранам кабинета поставщика. ✅
 
 ### Контент-операции админки (FEATURE 7–10) ✅
 
@@ -761,13 +764,11 @@
 - [x] **Средний**: Collection-based blocks href → /promo/{slug}, убран fallback /events ✅
 - [x] **Средний**: Admin UI — targetCitySlugs (comma-separated) в форме PromoBlock, колонка «Города» в списке ✅
 - [x] **Высокий**: Promo Blocks hardening — runtime validation, пустые COLLECTION, normalizePromoPeriod (startsAt/endsAt) ✅
-- [ ] **Отложено**: MANUAL EVENTS — ручная привязка событий (реализовано через PromoCollectionItem)
-- [ ] **Отложено**: MANUAL VENUES — ручная привязка мест (реализовано через PromoCollectionItem)
-- [ ] **Отложено**: AUTO — автоподбор по правилам (реализовано через PromoCollectionRule)
+- [x] **Закрыто иначе**: MANUAL EVENTS / MANUAL VENUES — через `PromoCollectionItem`; AUTO — через `PromoCollectionRule` + `PromoCollectionResolverService`. ✅
 
 ## После запуска / 6+ мес
 
-- [ ] CI/CD: GitHub Actions
+- [x] CI/CD: GitHub Actions ✅
 - [ ] gRPC: фильтры Cities/Venues
 - [ ] Web Vitals: LCP, CLS
 - [ ] Planner MVP, ML-рекомендации

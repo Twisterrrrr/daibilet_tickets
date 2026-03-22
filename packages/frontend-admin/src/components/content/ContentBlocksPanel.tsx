@@ -1,10 +1,9 @@
 'use client';
 
-import {
-  dedupeSpecsByKey,
-  filterContentJsonSpecs,
-} from '@daibilet/shared';
+import * as sharedContent from '@daibilet/shared';
 import type { TemplateFieldSpec } from '@daibilet/shared';
+
+const { dedupeSpecsByKey, filterContentJsonSpecs } = sharedContent;
 import { Eye, FileJson, LayoutList } from 'lucide-react';
 import { useMemo } from 'react';
 

@@ -4,6 +4,11 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/, /packages\/shared/],
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

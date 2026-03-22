@@ -360,12 +360,12 @@ export class AccountService {
     };
   }
 
-  async markReviewDisputeRead(userId: string, reviewId: string) {
+  async markReviewDisputeRead(_userId: string, _reviewId: string) {
     // Пока prisma client не обновлён, просто возвращаем 0 как no-op.
     return { updated: 0 };
   }
 
-  async getNotificationsUnreadCount(userId: string) {
+  async getNotificationsUnreadCount(_userId: string) {
     // Временная заглушка: до обновления Prisma client считаем только по полям ReviewDisputeMessage/Notification вне этого сервиса.
     return {
       totalUnread: 0,
@@ -376,7 +376,7 @@ export class AccountService {
   }
 
   async getNotifications(
-    userId: string,
+    _userId: string,
     params: { type?: string; page?: number; limit?: number },
   ): Promise<{
     items: {
@@ -402,12 +402,12 @@ export class AccountService {
     };
   }
 
-  async markNotificationRead(userId: string, id: string) {
+  async markNotificationRead(_userId: string, _id: string) {
     // Каркас: no-op, возвращаем ok=true для совместимости с фронтом.
     return { ok: true };
   }
 
-  async markAllNotificationsRead(userId: string) {
+  async markAllNotificationsRead(_userId: string) {
     // Каркас: no-op.
     return { ok: true };
   }

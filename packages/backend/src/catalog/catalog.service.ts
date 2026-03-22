@@ -207,8 +207,6 @@ export class CatalogService {
       },
     });
 
-    const cityIds = rows.map((r) => r.cityId).filter((id): id is string => id != null);
-
     // Карта cityId → hubCityId (для областных городов)
     const regions = await this.prisma.region.findMany({
       select: {
@@ -1585,7 +1583,7 @@ export class CatalogService {
         canonicalOfId: null,
         id: { not: event.id },
         ...(process.env.NODE_ENV === 'production' && !importsEnabled
-          ? { source: { in: ['MANUAL', 'INTERNAL'] as any } }
+          ? { source: EventSource.MANUAL }
           : {}),
         sessions: {
           some: { isActive: true, startsAt: { gte: new Date() } },

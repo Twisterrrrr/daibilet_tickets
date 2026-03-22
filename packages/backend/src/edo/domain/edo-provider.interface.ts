@@ -1,4 +1,4 @@
-import type { EdoProviderType, EdoDeliveryStatus } from '@prisma/client';
+import type { EdoProviderType } from '@prisma/client';
 import type {
   EdoSendParams,
   EdoSendResult,

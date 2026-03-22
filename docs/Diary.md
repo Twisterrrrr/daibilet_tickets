@@ -4,6 +4,23 @@
 
 ---
 
+## 21.03.2026 — Аудит Tasktracker vs код (Gates, UA, Promo)
+
+### Наблюдения
+
+- В `docs/Tasktracker.md` часть пунктов оставалась `[ ]`, хотя в репозитории уже были YooKassa (`payment.service`, webhook, fulfilment), страницы `/payment/success|fail`, GiftCertificate в checkout, `LandingMaterializerService` в `SyncProcessor`, shared-ui в кабинете поставщика.
+
+### Решения
+
+- Обновлены **Gate 1** (отмечено выполненное по коду + prod), **Gate 2.x** (разделены: готово частично / `CollectionMaterializer` — нет), **UA-2** (`StatCard`, ЛК поставщика), **UA-8** `[x]`, Promo «отложено» заменено на одну строку «закрыто иначе».
+- Таблица «13 вопросов»: строка 8 (salyut) приведена к ✅ с отсылкой к Gate 1.
+
+### Проблемы
+
+- Открыты: SQL-отчёт категоризации, `CollectionMaterializerService`, enrichment `bus-tour`/`rooftop`/`walking`, UA-3–UA-7 для **frontend-admin**.
+
+---
+
 ## 19.03.2026 — Task 10 Phase C: контент-блоки PDP (Event + Venue)
 
 ### Наблюдения

@@ -1,7 +1,7 @@
 /**
  * P4: Тесты EdoProviderRegistry.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { EdoProviderRegistry } from '../providers/edo-provider.registry';
 import { EdoProviderNotImplementedError } from '../domain/edo.errors';

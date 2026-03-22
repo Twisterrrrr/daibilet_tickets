@@ -3,7 +3,7 @@
  * Вместо where: any в сервисах.
  */
 
-import { DateMode, EventSubcategory, Prisma } from '@prisma/client';
+import { DateMode, EventSource, EventSubcategory, Prisma } from '@prisma/client';
 
 export interface EventWhereDto {
   city?: string;
@@ -96,7 +96,7 @@ export function buildEventWhere(
             { override: null },
             { override: { editorStatus: 'PUBLISHED', suppressLowQuality: { not: true } } },
           ],
-          ...(importsEnabled ? {} : { source: { in: ['MANUAL', 'INTERNAL'] as any } }),
+          ...(importsEnabled ? {} : { source: EventSource.MANUAL }),
         }
       : {}),
     ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),

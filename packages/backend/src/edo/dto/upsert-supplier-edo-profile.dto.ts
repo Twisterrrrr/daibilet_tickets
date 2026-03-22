@@ -1,14 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EdoProviderType } from '@prisma/client';
-import {
-  IsBoolean,
-  IsEnum,
-  IsObject,
-  IsOptional,
-  IsString,
-  MinLength,
-  ValidateIf,
-} from 'class-validator';
+import { IsBoolean, IsEnum, IsObject, IsOptional, IsString, MinLength } from 'class-validator';
 
 const ALLOWED_PROVIDERS: EdoProviderType[] = ['NOOP', 'DIADOK'];
 
