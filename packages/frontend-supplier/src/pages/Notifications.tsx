@@ -11,7 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { EmptyState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+import { CountBadge, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '@daibilet/shared-ui';
 
 import { api } from '../lib/api';
 
@@ -114,7 +114,7 @@ function NotificationsPageView({
               }`}
             >
               {t.label}
-              {t.value === 'all' && unreadCount > 0 && <span className="ml-1 text-[10px] opacity-80">{unreadCount}</span>}
+              {t.value === 'all' && unreadCount > 0 && <CountBadge count={unreadCount} className="ml-1" />}
             </button>
           ))}
         </div>
@@ -145,9 +145,7 @@ function NotificationsPageView({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-slate-900">{n.title}</span>
                       {!n.isRead && (
-                        <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
-                          Новое
-                        </span>
+                        <StatusBadge tone="success" label="Новое" />
                       )}
                     </div>
                     <p className="mt-1 text-slate-600">{n.message}</p>
@@ -204,14 +202,22 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState<SupplierNotification[]>([]);
   const [filter, setFilter] = useState<FilterValue>('all');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     api
       .get<SupplierNotification[]>('/supplier/notifications?limit=50')
-      .then((data) => setNotifications(Array.isArray(data) ? data : []))
-      .catch(() => setNotifications([]))
+      .then((data) => {
+        setNotifications(Array.isArray(data) ? data : []);
+        setError(null);
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : 'Не удалось загрузить уведомления';
+        setError(message);
+        setNotifications([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -232,6 +238,10 @@ export default function Notifications() {
 
   if (loading) {
     return <LoadingState label="Загружаем уведомления..." />;
+  }
+
+  if (error) {
+    return <ErrorState title="Ошибка загрузки уведомлений" description={error} />;
   }
 
   const withEffectiveRead = visibleNotifications.map((n) => ({

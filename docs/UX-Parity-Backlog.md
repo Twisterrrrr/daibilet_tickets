@@ -71,9 +71,9 @@
 | CR-03 | CRITICAL | State UX rollout | Remaining critical pages | Shared `LoadingState`/`EmptyState`/`ErrorState` everywhere | DONE |
 | CR-04 | CRITICAL | List system enforcement | Supplier `reports`, residual list pages | Unified list layout + shared table/DataTable + toolbar | DONE |
 | HI-01 | HIGH | DataTable rollout | Remaining list pages | No legacy/new table coexistence | IN_PROGRESS |
-| HI-02A | HIGH | StatusBadge rollout | `admin/dashboard`, other status lists | All status badges via shared component | TODO |
-| HI-02B | HIGH | TagChip rollout | `admin/articles`, `admin/collections`, `supplier/notifications` | Tag chips via shared component | TODO |
-| HI-02C | HIGH | CountBadge rollout | Lists with counters/indicators | Unified counter badges | TODO |
+| HI-02A | HIGH | StatusBadge rollout | `admin/dashboard`, other status lists | All status badges via shared component | IN_PROGRESS |
+| HI-02B | HIGH | TagChip rollout | `admin/articles`, `admin/collections`, `supplier/notifications` | Tag chips via shared component | IN_PROGRESS |
+| HI-02C | HIGH | CountBadge rollout | Lists with counters/indicators | Unified counter badges | IN_PROGRESS |
 | HI-03 | HIGH | Detail/Form sections alignment | Admin edit/detail + supplier settings surfaces | Shared section rhythm and actions alignment | TODO |
 | MD-01 | MEDIUM | Typography harmonization | Scope-wide | Unified headings/secondary text rhythm | TODO |
 | MD-02 | MEDIUM | Hover/Focus/Selected polish | Tables/chips/controls | Uniform interactive feedback | IN_PROGRESS |

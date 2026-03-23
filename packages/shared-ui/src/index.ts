@@ -20,6 +20,9 @@ export * from './forms/FormActions';
 export * from './forms/StickyFormActions';
 
 export * from './overlays/ConfirmDialog';
+export * from './badges/StatusBadge';
+export * from './badges/TagChip';
+export * from './badges/CountBadge';
 
 export * from './workflow/WorkflowShell';
 export * from './workflow/event-wizard/EventWizard.types';

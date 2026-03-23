@@ -3,8 +3,11 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { ErrorState, PageHeader } from '@daibilet/shared-ui';
+
+import { StatusBadge, TagChip } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, SortableHeader } from '@/components/ui/DataTable';
@@ -44,7 +47,7 @@ const columns: ColumnDef<CollectionItem>[] = [
   {
     id: 'city',
     header: 'Город',
-    cell: ({ row }) => <span>{row.original.city?.name || <Badge variant="outline">Кросс-город</Badge>}</span>,
+    cell: ({ row }) => <span>{row.original.city?.name || <TagChip label="Кросс-город" />}</span>,
   },
   {
     id: 'filters',
@@ -52,14 +55,10 @@ const columns: ColumnDef<CollectionItem>[] = [
     cell: ({ row }) => (
       <div className="flex flex-wrap gap-1">
         {row.original.filterCategory && (
-          <Badge variant="outline" className="text-xs">
-            {row.original.filterCategory}
-          </Badge>
+          <TagChip label={row.original.filterCategory} />
         )}
         {row.original.filterTags.map((t) => (
-          <Badge key={t} variant="secondary" className="text-xs">
-            {t}
-          </Badge>
+          <TagChip key={t} label={t} />
         ))}
       </div>
     ),
@@ -76,11 +75,7 @@ const columns: ColumnDef<CollectionItem>[] = [
   {
     accessorKey: 'isActive',
     header: 'Статус',
-    cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
-        {row.original.isActive ? 'Активна' : 'Неактивна'}
-      </Badge>
-    ),
+    cell: ({ row }) => <StatusBadge tone={row.original.isActive ? 'success' : 'neutral'} label={row.original.isActive ? 'Активна' : 'Неактивна'} />,
   },
   {
     accessorKey: 'sortOrder',
@@ -113,21 +108,19 @@ export function CollectionsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Подборки</h1>
-          <p className="text-muted-foreground">Тематические посадочные страницы с курированным контентом</p>
-        </div>
-        <Button onClick={() => navigate('/collections/new')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Создать подборку
-        </Button>
-      </div>
+      <PageHeader
+        title="Подборки"
+        subtitle="Тематические посадочные страницы с курированным контентом"
+        actions={
+          <Button onClick={() => navigate('/collections/new')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Создать подборку
+          </Button>
+        }
+      />
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState title="Не удалось загрузить подборки" description={error} />
       )}
 
       <Card>

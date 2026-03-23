@@ -3,10 +3,9 @@ import { ExternalLink, Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { ErrorState, PageHeader, StatusBadge, TagChip } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/DataTable';
@@ -44,19 +43,13 @@ const columns: ColumnDef<ArticleItem>[] = [
   {
     id: 'tags',
     header: 'Теги',
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-[10px]">
-        тегов: {row.original._count?.articleTags ?? 0}
-      </Badge>
-    ),
+    cell: ({ row }) => <TagChip label={`тегов: ${row.original._count?.articleTags ?? 0}`} />,
   },
   {
     id: 'status',
     header: 'Статус',
     cell: ({ row }) => (
-      <Badge variant={row.original.isPublished ? 'default' : 'secondary'}>
-        {row.original.isPublished ? 'Опубликовано' : 'Черновик'}
-      </Badge>
+      <StatusBadge label={row.original.isPublished ? 'Опубликовано' : 'Черновик'} tone={row.original.isPublished ? 'success' : 'neutral'} />
     ),
   },
   {

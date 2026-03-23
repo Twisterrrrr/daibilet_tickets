@@ -25,10 +25,9 @@ import {
   YAxis,
 } from 'recharts';
 
-import { ErrorState } from '@daibilet/shared-ui';
+import { ErrorState, PageHeader, StatusBadge } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -90,15 +89,15 @@ const CHART_COLORS = [
   'hsl(340, 75%, 55%)',
 ];
 
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'destructive' | 'secondary'> = {
+const STATUS_TONE: Record<string, 'neutral' | 'success' | 'warning' | 'danger'> = {
   PAID: 'success',
   FULFILLING: 'success',
   FULFILLED: 'success',
   PARTIALLY_FULFILLED: 'warning',
   PENDING_PAYMENT: 'warning',
-  DRAFT: 'secondary',
-  FAILED: 'destructive',
-  REFUNDED: 'destructive',
+  DRAFT: 'neutral',
+  FAILED: 'danger',
+  REFUNDED: 'danger',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -269,26 +268,27 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Дашборд</h1>
-        <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
-          {(['today', '7d', '30d'] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setPeriod(key)}
-              className={
-                period === key
-                  ? 'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium text-foreground shadow-sm bg-background'
-                  : 'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium'
-              }
-            >
-              {PERIOD_LABELS[key]}
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title="Дашборд"
+        actions={
+          <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+            {(['today', '7d', '30d'] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPeriod(key)}
+                className={
+                  period === key
+                    ? 'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium text-foreground shadow-sm bg-background'
+                    : 'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium'
+                }
+              >
+                {PERIOD_LABELS[key]}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {/* Stat cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -495,9 +495,10 @@ export function DashboardPage() {
                         {formatCurrency(order.amount)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[order.status] || 'secondary'}>
-                          {STATUS_LABELS[order.status] || order.status}
-                        </Badge>
+                        <StatusBadge
+                          tone={STATUS_TONE[order.status] || 'neutral'}
+                          label={STATUS_LABELS[order.status] || order.status}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
