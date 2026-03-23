@@ -18,14 +18,17 @@ import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 
 import { EventSource } from '@prisma/client';
+import { TagKind, StructuralTagGroup } from '@prisma/client';
+import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
 
 import { CacheService } from '../cache/cache.service';
 import { LandingMaterializerService } from '../landing/landing-materializer.service';
 import { PostEditQueueService } from './postedit-queue.service';
 import { CatalogService } from './catalog.service';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
-import { CreateReviewDto } from './dto/create-review.dto';
 import { EventsQueryDto } from './dto/events-query.dto';
+import { CreateReviewDto } from './dto/create-review.dto';
 import { RegionService } from './region.service';
 import { ReviewService } from './review.service';
 import { TcApiService } from './tc-api.service';
@@ -135,6 +138,14 @@ export class CatalogController {
     return this.catalogService.getCatalog(query);
   }
 
+  // --- Catalog aliases (v2 structured/popular tags) ---
+
+  @Get('catalog/events')
+  @ApiOperation({ summary: 'Каталог событий: фильтрация по structuralTags/popularTags' })
+  getCatalogEvents(@Query() query: EventsQueryDto) {
+    return this.catalogService.getEvents(query);
+  }
+
   @Get('catalog/tc-health')
   @ApiOperation({ summary: 'Health-check gRPC-клиента Ticketscloud (tc-simple)' })
   async getTcHealth() {
@@ -234,6 +245,12 @@ export class CatalogController {
   @ApiQuery({ name: 'category', required: false })
   getTags(@Query('category') category?: string) {
     return this.catalogService.getTags(category);
+  }
+
+  @Get('catalog/tags')
+  @ApiOperation({ summary: 'Каталог теги: STRUCTURAL/POPULAR + group + activeOnly' })
+  getCatalogTags(@Query() query: CatalogTagsQueryDto) {
+    return this.catalogService.getCatalogTags(query);
   }
 
   @Get('tags/:slug')
@@ -391,4 +408,19 @@ export class CatalogController {
     const materialize = await this.materializer.materialize();
     return { ticketscloud: tc, teplohod: tep, retag, postEditQueue, materialize };
   }
+}
+
+class CatalogTagsQueryDto {
+  @IsOptional()
+  @IsEnum(TagKind)
+  kind?: TagKind;
+
+  @IsOptional()
+  @IsEnum(StructuralTagGroup)
+  group?: StructuralTagGroup;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  activeOnly?: boolean;
 }

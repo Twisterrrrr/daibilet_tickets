@@ -1,16 +1,16 @@
-import { ColumnDef } from '@tanstack/react-table';
-import { Plus } from 'lucide-react';
+import { Plus, Search, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const VENUE_TYPE_LABELS: Record<string, string> = {
   MUSEUM: 'Музей',
@@ -36,60 +36,24 @@ interface VenueItem {
   updatedAt: string;
 }
 
-const columns: ColumnDef<VenueItem>[] = [
-  {
-    accessorKey: 'title',
-    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
-    cell: ({ row }) => <span className="font-medium">{row.original.title}</span>,
-  },
-  {
-    accessorKey: 'venueType',
-    header: 'Тип',
-    cell: ({ row }) => (
-      <Badge variant="outline">{VENUE_TYPE_LABELS[row.original.venueType] || row.original.venueType}</Badge>
-    ),
-  },
-  {
-    id: 'city',
-    header: 'Город',
-    cell: ({ row }) => <span>{row.original.city?.name}</span>,
-  },
-  {
-    accessorKey: 'rating',
-    header: ({ column }) => <SortableHeader column={column}>Рейтинг</SortableHeader>,
-    cell: ({ row }) => <span className="tabular-nums">{row.original.rating.toFixed(1)}</span>,
-  },
-  {
-    accessorKey: 'isActive',
-    header: 'Активен',
-    cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Да' : 'Нет'}</Badge>
-    ),
-  },
-  {
-    id: 'eventsCount',
-    header: 'Выставок',
-    cell: ({ row }) => <span className="tabular-nums">{row.original.eventsCount}</span>,
-  },
-  {
-    id: 'offersCount',
-    header: 'Офферов',
-    cell: ({ row }) => <span className="tabular-nums">{row.original.offersCount}</span>,
-  },
-];
-
 export function VenuesListPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<VenueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [city, setCity] = useState('');
+  const [onlyWithoutEvents, setOnlyWithoutEvents] = useState(false);
+
+  const [cities, setCities] = useState<Array<{ slug: string; name: string }>>([]);
+  const [citiesLoaded, setCitiesLoaded] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
     if (search) params.set('search', search);
+    if (city) params.set('city', city);
     const query = params.toString();
     const path = query ? `/admin/venues?${query}` : '/admin/venues';
 
@@ -98,24 +62,48 @@ export function VenuesListPage() {
       .then((data) => setItems(data.items ?? []))
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, [search]);
+  }, [search, city]);
+
+  // Для фильтра по городу (админский список)
+  useEffect(() => {
+    let cancelled = false;
+    adminApi
+      .get<{ items: Array<{ slug: string; name: string }> }>(`/admin/cities?limit=1000`)
+      .then((res) => {
+        if (cancelled) return;
+        const list = Array.isArray(res.items) ? res.items : [];
+        setCities(list.filter((c) => typeof c?.slug === 'string' && typeof c?.name === 'string').map((c) => ({ slug: c.slug, name: c.name })));
+      })
+      .catch(() => {
+        // если endpoint недоступен — оставим пустой список, но UI не упадёт
+      })
+      .finally(() => {
+        if (!cancelled) setCitiesLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const visibleItems = onlyWithoutEvents ? items.filter((v) => v.eventsCount === 0) : items;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Места"
-        subtitle="Музеи, галереи, арт-пространства и выставочные залы"
-        actions={
-          <Button onClick={() => navigate('/venues/new')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Добавить место
-          </Button>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Площадки</h1>
+        <Button
+          onClick={() => navigate('/venues/new')}
+          className="gap-1"
+          aria-label="Добавить"
+        >
+          <Plus className="h-4 w-4" />
+          Добавить
+        </Button>
+      </div>
 
       {error && (
         <ErrorState
-          title="Не удалось загрузить список мест"
+          title="Не удалось загрузить список площадок"
           description={error}
           action={
             <Button variant="outline" onClick={() => setSearch((s) => s)}>
@@ -126,41 +114,99 @@ export function VenuesListPage() {
       )}
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Фильтры</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Input
-            type="text"
-            placeholder="Поиск по названию или адресу..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Поиск..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            <Select value={city || '__all__'} onValueChange={(v) => setCity(v === '__all__' ? '' : v)}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Все города" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все города</SelectItem>
+                {citiesLoaded && cities.length === 0 && (
+                  <>
+                    <SelectItem value="moscow">Москва</SelectItem>
+                    <SelectItem value="saint-petersburg">Санкт-Петербург</SelectItem>
+                    <SelectItem value="kazan">Казань</SelectItem>
+                    <SelectItem value="kaliningrad">Калининград</SelectItem>
+                    <SelectItem value="vladimir">Владимир</SelectItem>
+                    <SelectItem value="yaroslavl">Ярославль</SelectItem>
+                  </>
+                )}
+                {cities.map((c) => (
+                  <SelectItem key={c.slug} value={c.slug}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button variant="outline" size="sm" onClick={() => setOnlyWithoutEvents((v) => !v)}>
+              Без событий
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Список мест</CardTitle>
-          <CardDescription>{items.length} мест</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {items.length === 0 && !loading ? (
-            <EmptyState
-              title="Нет мест"
-              description="Создайте первое место, чтобы привязать к нему события."
-            />
-          ) : (
-            <DataTable
-              columns={columns}
-              data={items}
-              onRowClick={(item) => navigate(`/venues/${item.id}`)}
-              loading={loading}
-              emptyText="Нет мест. Добавьте первое!"
-            />
-          )}
-        </CardContent>
+        {visibleItems.length === 0 && !loading ? (
+          <div className="px-4 py-8">
+            <EmptyState title={onlyWithoutEvents ? 'Нет площадок без событий' : 'Нет площадок'} description="Измените фильтры или создайте новую площадку." />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Название</TableHead>
+                <TableHead>Город</TableHead>
+                <TableHead>Тип</TableHead>
+                <TableHead className="text-center">Событий</TableHead>
+                <TableHead className="text-center">Рейтинг</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visibleItems.map((v) => (
+                <TableRow
+                  key={v.id}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/venues/${v.id}`)}
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{v.title}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{v.city?.name ?? '—'}</p>
+                  </TableCell>
+                  <TableCell className="text-sm">{v.city?.name ?? '—'}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {VENUE_TYPE_LABELS[v.venueType] || v.venueType}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="font-medium">{v.eventsCount}</span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="flex items-center justify-center gap-1">
+                      <Star className="h-3 w-3 text-warning fill-warning" />
+                      {Number(v.rating).toFixed(1)}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </div>
   );

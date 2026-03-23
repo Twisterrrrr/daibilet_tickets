@@ -61,6 +61,7 @@ import { AuditService } from './audit.service';
 import { EventAdminSummaryService } from './event-admin-summary.service';
 import { VenueAdminSummaryService } from './venue-admin-summary.service';
 import { EventOverrideService } from './event-override.service';
+import { EventTagRulesService } from './event-tag-rules.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
 import { SeoAuditService } from './seo-audit/seo-audit.service';
 
@@ -86,6 +87,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
   providers: [
     AuditService,
     EventOverrideService,
+    EventTagRulesService,
     EventAdminSummaryService,
     VenueAdminSummaryService,
     ReviewService,

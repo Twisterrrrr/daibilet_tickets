@@ -56,6 +56,8 @@ interface EventCardHorizontalProps {
   sessionTimes?: string[];
   /** 3 highlights */
   highlights?: string[];
+  structuralTags?: { THEME: string[]; AUDIENCE: string[]; FORMAT: string[] };
+  popularTags?: string[];
   /** Описание для 3 строк под длительностью/датой */
   description?: string | null;
   /** Переопределение ссылки по клику (для мульти-событий) */
@@ -82,6 +84,8 @@ export function EventCardHorizontal({
   groupSize,
   sessionTimes = [],
   highlights = [],
+  structuralTags,
+  popularTags,
   description,
   totalAvailableTickets,
   hrefOverride,
@@ -256,6 +260,32 @@ export function EventCardHorizontal({
             {displayHighlights.join(' • ')}
           </p>
         )}
+
+        {/* Structural/Popular tags badges (из нового слоя тегов) */}
+        {(() => {
+          const structuralBadgeCandidates = structuralTags
+            ? [
+                structuralTags.THEME?.[0] ? `Тема: ${structuralTags.THEME[0]}` : null,
+                structuralTags.AUDIENCE?.[0] ? `Аудитория: ${structuralTags.AUDIENCE[0]}` : null,
+                structuralTags.FORMAT?.[0] ? `Формат: ${structuralTags.FORMAT[0]}` : null,
+              ].filter((x): x is string => !!x)
+            : [];
+          const popularBadgeCandidates = Array.isArray(popularTags) ? popularTags.slice(0, 2) : [];
+          const badges = [...structuralBadgeCandidates, ...popularBadgeCandidates].slice(0, 3);
+          if (!badges.length) return null;
+          return (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {badges.map((b) => (
+                <span
+                  key={b}
+                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 ring-1 ring-slate-200"
+                >
+                  {b}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* 3 строки описания, половина последней — в градиенте */}
         {stripDescription(description) && (

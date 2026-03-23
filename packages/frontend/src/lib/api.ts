@@ -236,6 +236,26 @@ export const api = {
   getTags: (category?: string) =>
     fetchApi<import('./api.types').TagWithCount[]>(`/tags${category ? `?category=${category}` : ''}`),
 
+  // Catalog tags (v2): STRUCTURAL/POPULAR + structuralGroup.
+  getCatalogTags: (query: { kind?: 'STRUCTURAL' | 'POPULAR'; group?: 'THEME' | 'AUDIENCE' | 'FORMAT'; activeOnly?: boolean }) =>
+    fetchApi<
+      Array<{
+        id: string;
+        slug: string;
+        name: string;
+        tagKind?: 'STRUCTURAL' | 'POPULAR' | null;
+        structuralGroup?: 'THEME' | 'AUDIENCE' | 'FORMAT' | null;
+        sortOrder?: number | null;
+        isActive?: boolean;
+      }>
+    >(
+      `/catalog/tags?${new URLSearchParams(
+        Object.entries(query)
+          .filter(([, v]) => v !== undefined && v !== null)
+          .map(([k, v]) => [k, String(v)]),
+      ).toString()}`,
+    ),
+
   getTagBySlug: (slug: string, city?: string, page?: number) => {
     const params = new URLSearchParams();
     if (city) params.set('city', city);

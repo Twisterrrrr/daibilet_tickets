@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['@daibilet/shared'],
+  },
   build: {
     commonjsOptions: {
       include: [/node_modules/, /packages\/shared/],
@@ -30,3 +33,4 @@ export default defineConfig({
     },
   },
 });
+

@@ -8,6 +8,7 @@ import { FormActions, FormGrid, FormSection } from '@daibilet/shared-ui';
 import { adminApi } from '@/api/client';
 import { SeoMetaEditor } from '@/components/SeoMetaEditor';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,14 +31,15 @@ interface CityDetail {
 
 export function CityEditPage() {
   const { id } = useParams<{ id: string }>();
+  const isNew = !id || id === 'new';
   const [city, setCity] = useState<CityDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState<Partial<CityDetail>>({});
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || isNew) return;
     setLoading(true);
     adminApi
       .get<CityDetail>(`/admin/cities/${id}`)
@@ -61,10 +63,14 @@ export function CityEditPage() {
         toast.error(e instanceof Error ? e.message : 'Ошибка загрузки');
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, isNew]);
 
   const handleSave = () => {
     if (!id) return;
+    if (isNew) {
+      toast.error('Создание города пока не поддерживается текущим API');
+      return;
+    }
     setSaving(true);
     adminApi
       .put(`/admin/cities/${id}`, form)
@@ -92,13 +98,100 @@ export function CityEditPage() {
       </div>
     );
   }
-  if (!city) {
+  if (!city && !isNew) {
     return (
       <div className="space-y-4">
         <div className="text-destructive">Город не найден</div>
         <Button variant="outline" asChild>
           <Link to="/cities">← Назад</Link>
         </Button>
+      </div>
+    );
+  }
+
+  if (isNew) {
+    const doneCount = [form.name, form.slug, form.description, form.heroImage].filter((x) => typeof x === 'string' && x.trim().length > 0).length;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/cities">
+              <ArrowLeft className="h-4 w-4 mr-1" /> Назад
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold flex-1">Новый город</h1>
+          <Button onClick={handleSave} disabled={saving} className="gap-1">
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Основное</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium mb-1 block">Название *</Label>
+                  <Input placeholder="Санкт-Петербург" value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-1 block">Slug *</Label>
+                  <Input className="font-mono text-sm" placeholder="spb" value={form.slug ?? ''} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-1 block">Короткое описание *</Label>
+                  <Input placeholder="Культурная столица России" value={form.description ?? ''} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium mb-1 block">Изображение *</Label>
+                  <Input placeholder="https://..." value={form.heroImage ?? ''} onChange={(e) => setForm((f) => ({ ...f, heroImage: e.target.value }))} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  Заполненность
+                  <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-secondary text-secondary-foreground">
+                    {doneCount}/4
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm"><span className={`w-2 h-2 rounded-full ${form.name ? 'bg-primary' : 'bg-muted-foreground/30'}`} /><span className="text-muted-foreground">Название</span></div>
+                  <div className="flex items-center gap-2 text-sm"><span className={`w-2 h-2 rounded-full ${form.slug ? 'bg-primary' : 'bg-muted-foreground/30'}`} /><span className="text-muted-foreground">Slug</span></div>
+                  <div className="flex items-center gap-2 text-sm"><span className={`w-2 h-2 rounded-full ${form.description ? 'bg-primary' : 'bg-muted-foreground/30'}`} /><span className="text-muted-foreground">Описание</span></div>
+                  <div className="flex items-center gap-2 text-sm"><span className={`w-2 h-2 rounded-full ${form.heroImage ? 'bg-primary' : 'bg-muted-foreground/30'}`} /><span className="text-muted-foreground">Изображение</span></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Превью на главной</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="h-24 bg-muted flex items-center justify-center text-muted-foreground text-xs">Нет изображения</div>
+                  <div className="p-3">
+                    <p className="font-semibold text-sm">{form.name || 'Название города'}</p>
+                    <p className="text-xs text-muted-foreground">{form.description || 'Описание'}</p>
+                    <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                      <span>0 событий</span>
+                      <span>0 площадок</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }
@@ -114,7 +207,7 @@ export function CityEditPage() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Редактировать город</h1>
-          <p className="text-muted-foreground">{city.name}</p>
+          <p className="text-muted-foreground">{city?.name ?? ''}</p>
         </div>
       </div>
 

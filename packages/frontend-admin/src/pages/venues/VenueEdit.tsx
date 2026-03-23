@@ -352,6 +352,188 @@ export function VenueEditPage() {
     );
   }
 
+  if (isNew) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/venues')}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Назад
+          </Button>
+          <h1 className="text-2xl font-bold flex-1">Новая площадка</h1>
+          <Button onClick={handleSave} disabled={saving} className="gap-1">
+            <Save className="h-4 w-4" />
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </Button>
+        </div>
+
+        {error && (
+          <Card className="border-destructive">
+            <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Основное</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium mb-1 block">Название</Label>
+                  <Input
+                    value={form.title}
+                    onChange={(e) => updateField('title', e.target.value)}
+                    placeholder="Эрмитаж"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block">Город</Label>
+                    <Select value={form.cityId || '__none__'} onValueChange={(v) => updateField('cityId', v === '__none__' ? '' : v)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Город" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Город</SelectItem>
+                        {cities.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block">Тип</Label>
+                    <Select value={form.venueType} onValueChange={(v) => updateField('venueType', v)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Тип" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VENUE_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium mb-1 block">Адрес</Label>
+                  <Input
+                    value={form.address}
+                    onChange={(e) => updateField('address', e.target.value)}
+                    placeholder="Дворцовая площадь, 2"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block">Lat</Label>
+                    <Input
+                      value={form.lat}
+                      onChange={(e) => updateField('lat', e.target.value)}
+                      placeholder="59.9398"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block">Lng</Label>
+                    <Input
+                      value={form.lng}
+                      onChange={(e) => updateField('lng', e.target.value)}
+                      placeholder="30.3146"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Цена и рейтинг</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground flex items-start gap-2">
+                  <span className="text-info">i</span>
+                  <span>
+                    Рейтинг и «цена от» рассчитываются автоматически на основе привязанных событий. Можно задать вручную для переопределения.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block">Цена от (переопр.)</Label>
+                    <Input
+                      type="number"
+                      value={form.priceFrom}
+                      onChange={(e) => updateField('priceFrom', e.target.value)}
+                      placeholder="Авто"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block">Рейтинг (переопр.)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={form.externalRating}
+                      onChange={(e) => updateField('externalRating', e.target.value)}
+                      placeholder="Авто"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-1">Карта</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg h-40 bg-muted flex items-center justify-center text-sm text-muted-foreground">
+                  Укажите координаты
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-1">Связанные события</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {events.length > 0 ? (
+                  <div className="space-y-2">
+                    {events.map((e: any) => (
+                      <Link key={e.id} to={`/events/${e.id}`}>
+                        <div className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 text-sm">
+                          <span className="flex-1 truncate">{e.title}</span>
+                          <Badge variant="outline" className="text-[10px]">
+                            active
+                          </Badge>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Пока нет связанных событий</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}

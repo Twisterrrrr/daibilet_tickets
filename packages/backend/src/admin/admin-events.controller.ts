@@ -28,6 +28,7 @@ import {
   OfferStatus,
   Prisma,
   PurchaseType,
+  TagKind,
 } from '@prisma/client';
 import type { Response } from 'express';
 
@@ -40,6 +41,7 @@ import { streamCsv } from '../common/csv-stream.util';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 import {
   AdminCreateSessionDto,
   AdminEventSessionsRangeDto,
@@ -65,6 +67,19 @@ import { EventAdminSummaryService } from './event-admin-summary.service';
 import { EventQualityIssue, EventQualityService } from '../catalog/event-quality.service';
 import { AuditService } from './audit.service';
 import { toJsonValue } from '../common/typing';
+import { EventTagRulesService } from './event-tag-rules.service';
+
+class UpdateEventTagsDto {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  structuralTags?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  popularTags?: string[];
+}
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -75,6 +90,7 @@ export class AdminEventsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly overrideService: EventOverrideService,
+    private readonly eventTagRules: EventTagRulesService,
     private readonly reviewService: ReviewService,
     private readonly fuzzyDedupService: FuzzyDedupService,
     private readonly cacheInvalidation: CacheInvalidationService,
@@ -1485,6 +1501,116 @@ export class AdminEventsController {
     const result = await this.overrideService.toggleHidden(id, isHidden, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
+  }
+
+  /**
+   * GET /admin/events/:id/tags
+   * Теги события с разделением логики STRUCTURAL/POPULAR.
+   */
+  @Get(':id/tags')
+  @Roles('ADMIN', 'EDITOR')
+  async getEventTags(@Param('id') id: string) {
+    const links = await this.prisma.eventTag.findMany({
+      where: {
+        eventId: id,
+        tag: {
+          tagKind: {
+            in: [TagKind.STRUCTURAL, TagKind.POPULAR],
+          },
+        },
+      },
+      include: { tag: true },
+    });
+    return links.map((l) => l.tag);
+  }
+
+  /**
+   * PUT /admin/events/:id/tags
+   * Задает слои STRUCTURAL и POPULAR (теги по slug).
+   */
+  @Put(':id/tags')
+  @Roles('ADMIN', 'EDITOR')
+  async setEventTags(
+    @Param('id') id: string,
+    @Body() dto: UpdateEventTagsDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    const hasStructural = dto.structuralTags !== undefined;
+    const hasPopular = dto.popularTags !== undefined;
+    if (!hasStructural && !hasPopular) {
+      throw new BadRequestException('Необходимо передать structuralTags и/или popularTags');
+    }
+
+    const structuralSlugsUnique = Array.from(new Set(dto.structuralTags ?? []));
+    const popularSlugsUnique = Array.from(new Set(dto.popularTags ?? []));
+
+    const eventExists = await this.prisma.event.findUnique({ where: { id }, select: { id: true } });
+    if (!eventExists) throw new NotFoundException('Событие не найдено');
+
+    const structuralRows = structuralSlugsUnique.length
+      ? await this.prisma.tag.findMany({
+          where: {
+            slug: { in: structuralSlugsUnique },
+            tagKind: TagKind.STRUCTURAL,
+            isActive: true,
+            structuralGroup: { not: null },
+          },
+          select: { id: true, slug: true, tagKind: true, structuralGroup: true },
+        })
+      : [];
+
+    if (structuralRows.length !== structuralSlugsUnique.length) {
+      throw new BadRequestException('Некоторые structuralTags не найдены/неактивны');
+    }
+
+    const popularRows = popularSlugsUnique.length
+      ? await this.prisma.tag.findMany({
+          where: {
+            slug: { in: popularSlugsUnique },
+            tagKind: TagKind.POPULAR,
+            isActive: true,
+          },
+          select: { id: true, slug: true, tagKind: true, structuralGroup: true },
+        })
+      : [];
+
+    if (popularRows.length !== popularSlugsUnique.length) {
+      throw new BadRequestException('Некоторые popularTags не найдены/неактивны');
+    }
+
+    this.eventTagRules.assertStructuralTagLimits(
+      structuralRows.map((r) => ({ id: r.id, tagKind: r.tagKind, structuralGroup: r.structuralGroup })),
+    );
+    this.eventTagRules.assertPopularTagWhitelist(
+      popularRows.map((r) => ({ id: r.id, tagKind: r.tagKind, structuralGroup: r.structuralGroup })),
+    );
+
+    // Удаляем только текущие слои STRUCTURAL/POPULAR, не трогая остальные legacy-связи.
+    await this.prisma.eventTag.deleteMany({
+      where: {
+        eventId: id,
+        tag: {
+          tagKind: { in: [TagKind.STRUCTURAL, TagKind.POPULAR] },
+        },
+      },
+    });
+
+    const assignedBy = req.user.id;
+    const newTagIds = [...structuralRows, ...popularRows].map((t) => t.id);
+    if (newTagIds.length > 0) {
+      await this.prisma.eventTag.createMany({
+        data: newTagIds.map((tagId) => ({ eventId: id, tagId, assignedBy })),
+        skipDuplicates: true,
+      });
+    }
+
+    await this.cacheInvalidation.invalidateEventById(id);
+
+    const links = await this.prisma.eventTag.findMany({
+      where: { eventId: id },
+      include: { tag: true },
+    });
+    return links.map((l) => l.tag);
   }
 
   /**

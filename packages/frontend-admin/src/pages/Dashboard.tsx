@@ -1,8 +1,11 @@
 import {
+  BarChart3,
   ArrowRight,
   CalendarDays,
   DollarSign,
+  Eye,
   MessageSquare,
+  ShoppingCart,
   Ticket,
   TrendingDown,
   TrendingUp,
@@ -22,7 +25,7 @@ import {
   YAxis,
 } from 'recharts';
 
-import { ErrorState, PageHeader, StatCard as SharedStatCard } from '@daibilet/shared-ui';
+import { ErrorState } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -107,6 +110,14 @@ const STATUS_LABELS: Record<string, string> = {
   PARTIALLY_FULFILLED: 'Частично',
   FAILED: 'Ошибка',
   REFUNDED: 'Возврат',
+};
+
+type PeriodFilter = 'today' | '7d' | '30d';
+
+const PERIOD_LABELS: Record<PeriodFilter, string> = {
+  today: 'Сегодня',
+  '7d': '7 дней',
+  '30d': '30 дней',
 };
 
 function formatCurrency(kopecks: number): string {
@@ -202,6 +213,7 @@ export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<PeriodFilter>('30d');
 
   useEffect(() => {
     adminApi
@@ -226,7 +238,23 @@ export function DashboardPage() {
     );
   }
 
-  const revenueChartData = stats.revenueByDay.map((d) => ({
+  const now = new Date();
+  const periodStart = new Date(now);
+  if (period === 'today') {
+    periodStart.setHours(0, 0, 0, 0);
+  } else if (period === '7d') {
+    periodStart.setDate(now.getDate() - 6);
+    periodStart.setHours(0, 0, 0, 0);
+  } else {
+    periodStart.setDate(now.getDate() - 29);
+    periodStart.setHours(0, 0, 0, 0);
+  }
+
+  const filteredRevenue = stats.revenueByDay.filter((d) => new Date(d.date) >= periodStart);
+  const revenueForPeriod = filteredRevenue.reduce((sum, day) => sum + day.revenue, 0);
+  const showThirtyDayTrend = period === '30d';
+
+  const revenueChartData = filteredRevenue.map((d) => ({
     ...d,
     date: formatShortDate(d.date),
   }));
@@ -242,68 +270,72 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <PageHeader title="Dashboard" subtitle="Обзор ключевых метрик Дайбилет" />
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Дашборд</h1>
+        <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+          {(['today', '7d', '30d'] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setPeriod(key)}
+              className={
+                period === key
+                  ? 'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium text-foreground shadow-sm bg-background'
+                  : 'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium'
+              }
+            >
+              {PERIOD_LABELS[key]}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Stat cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <SharedStatCard
-          label="Выручка (30 дн)"
-          value={formatCurrency(stats.revenue30d)}
-          icon={<DollarSign className="h-4 w-4 text-slate-400" />}
-          description={
-            stats.revenueTrend !== undefined ? (
-              <span className={`flex items-center gap-1 text-xs ${stats.revenueTrend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {stats.revenueTrend >= 0 ? (
-                  <TrendingUp className="h-3 w-3" />
-                ) : (
-                  <TrendingDown className="h-3 w-3" />
-                )}
-                <span>
-                  {stats.revenueTrend >= 0 ? '+' : ''}
-                  {stats.revenueTrend}% за 30 дней
-                </span>
-              </span>
-            ) : null
-          }
-        />
-        <SharedStatCard
-          label="Продано билетов"
-          value={stats.ticketsSold30d.toString()}
-          icon={<Ticket className="h-4 w-4 text-slate-400" />}
-          description={
-            stats.ticketsSoldTrend !== undefined ? (
-              <span
-                className={`flex items-center gap-1 text-xs ${
-                  stats.ticketsSoldTrend >= 0 ? 'text-emerald-600' : 'text-red-500'
-                }`}
-              >
-                {stats.ticketsSoldTrend >= 0 ? (
-                  <TrendingUp className="h-3 w-3" />
-                ) : (
-                  <TrendingDown className="h-3 w-3" />
-                )}
-                <span>
-                  {stats.ticketsSoldTrend >= 0 ? '+' : ''}
-                  {stats.ticketsSoldTrend}% за 30 дней
-                </span>
-              </span>
-            ) : null
-          }
-        />
-        <SharedStatCard
-          label="Активные события"
-          value={stats.activeEvents.toString()}
-          icon={<CalendarDays className="h-4 w-4 text-slate-400" />}
-          description={`${stats.events.total} всего в базе · ${
-            stats.activeEventsTrend >= 0 ? '+' : ''
-          }${stats.activeEventsTrend}% за 30 дней`}
-        />
-        <SharedStatCard
-          label="Отзывы на модерации"
-          value={stats.pendingReviews.toString()}
-          icon={<MessageSquare className="h-4 w-4 text-slate-400" />}
-          description={stats.pendingReviews > 0 ? 'Требуют проверки' : 'Нет новых'}
-        />
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Заказы</p>
+                <p className="text-2xl font-bold">{stats.orders.total}</p>
+              </div>
+              <ShoppingCart className="h-8 w-8 text-primary/30" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Выручка</p>
+                <p className="text-2xl font-bold">{formatCurrency(revenueForPeriod)}</p>
+              </div>
+              <DollarSign className="h-8 w-8 text-success/30" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Активных событий</p>
+                <p className="text-2xl font-bold">{stats.activeEvents}</p>
+              </div>
+              <Eye className="h-8 w-8 text-info/30" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">CTR промо</p>
+                <p className="text-2xl font-bold">—</p>
+              </div>
+              <BarChart3 className="h-8 w-8 text-accent/30" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Charts row */}
@@ -311,7 +343,7 @@ export function DashboardPage() {
         {/* Revenue chart */}
         <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle className="text-base">Выручка за 30 дней</CardTitle>
+            <CardTitle className="text-base">{`Выручка за ${PERIOD_LABELS[period].toLowerCase()}`}</CardTitle>
             <CardDescription>Общая сумма оплаченных заказов по дням</CardDescription>
           </CardHeader>
           <CardContent>

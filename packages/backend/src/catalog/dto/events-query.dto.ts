@@ -127,6 +127,28 @@ export class EventsQueryDto {
   @IsString()
   slugs?: string;
 
+  @ApiPropertyOptional({
+    description: 'STRUCTURAL теги (slug через запятую). AND по всем тегам внутри списка.',
+  })
+  @IsOptional()
+  @IsString()
+  structuralTags?: string;
+
+  @ApiPropertyOptional({
+    description: 'POPULAR теги (slug через запятую). AND по всем тегам внутри списка.',
+  })
+  @IsOptional()
+  @IsString()
+  popularTags?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Алиас для structuralTags: tags=history,family,walking (для совместимости с будущими UI-фильтрами).',
+  })
+  @IsOptional()
+  @IsString()
+  tags?: string;
+
   @ApiPropertyOptional({ description: 'T12: bypass cache (nocache=1)' })
   @IsOptional()
   @IsString()

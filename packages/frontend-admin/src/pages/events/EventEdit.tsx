@@ -41,6 +41,7 @@ import { ImageUploadField } from '@/components/forms/ImageUploadField';
 import { EventGroupTab } from './EventGroupTab';
 import { ScheduleSummary } from '@/components/events/ScheduleSummary';
 import { applyScheduleSyncPlan, getScheduleSyncPlan, type ScheduleSyncPlan } from '@/components/events/schedule-sync.adapter';
+import { EventTagsEditor } from '@/components/events/EventTagsEditor';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1174,22 +1175,8 @@ export function EventEditPage() {
                 onChange={(ctd) => setForm((f) => ({ ...f, contentTemplateData: ctd }))}
               />
 
-              {/* Tags */}
-              {event.tags && event.tags.length > 0 && (
-                <>
-                  <Separator className="my-4" />
-                  <div className="space-y-2">
-                    <Label>Теги</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {event.tags.map((t: any) => (
-                        <Badge key={t.tag?.id ?? t.id} variant="secondary">
-                          {t.tag?.name ?? t.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+              <Separator className="my-4" />
+              {id && <EventTagsEditor eventId={id} disabled={saving} />}
             </CardContent>
           </Card>
         </TabsContent>

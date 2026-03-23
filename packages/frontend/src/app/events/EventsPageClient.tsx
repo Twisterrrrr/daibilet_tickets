@@ -178,6 +178,8 @@ function filtersFromParams(sp: URLSearchParams) {
     sort,
     timeOfDay: isSoon ? 'soon' : sp.get('timeOfDay') || '',
     tag: sp.get('tag') || '',
+    structuralTags: sp.get('structuralTags') || '',
+    popularTags: sp.get('popularTags') || '',
     date: sp.get('date') || null,
     pier: sp.get('pier') || '',
     priceMax: sp.get('priceMax') || '',
@@ -186,6 +188,13 @@ function filtersFromParams(sp: URLSearchParams) {
     qf: sp.get('qf') || '',
     q: sp.get('q') || '',
   };
+}
+
+function parseCsvSlugs(value: string) {
+  return value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function EventsPageClient() {
@@ -227,6 +236,12 @@ export function EventsPageClient() {
   const [sort, setSort] = useState('popular');
   const [timeOfDay, setTimeOfDay] = useState('');
   const [urlTag, setUrlTag] = useState('');
+  const [structuralTagsFromUrl, setStructuralTagsFromUrl] = useState<string[]>([]);
+  const [themeTagSlug, setThemeTagSlug] = useState('');
+  const [audienceTagSlug, setAudienceTagSlug] = useState('');
+  const [formatTagSlug, setFormatTagSlug] = useState('');
+  const [popularTagSlugs, setPopularTagSlugs] = useState<string[]>([]);
+  const [popularAddSlug, setPopularAddSlug] = useState('');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [pier, setPier] = useState('');
   const [priceMax, setPriceMax] = useState('');
@@ -234,6 +249,25 @@ export function EventsPageClient() {
   const [limit, setLimit] = useState(20);
   const [activeQuickFilter, setActiveQuickFilter] = useState<string>('');
   const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
+
+  type StructuralTagGroup = 'THEME' | 'AUDIENCE' | 'FORMAT';
+  type TagKind = 'STRUCTURAL' | 'POPULAR';
+  type CatalogTagOption = {
+    id: string;
+    slug: string;
+    name: string;
+    tagKind?: TagKind | null;
+    structuralGroup?: StructuralTagGroup | null;
+    sortOrder?: number | null;
+  };
+
+  const [structuralTagOptions, setStructuralTagOptions] = useState<Record<StructuralTagGroup, CatalogTagOption[]>>({
+    THEME: [],
+    AUDIENCE: [],
+    FORMAT: [],
+  });
+  const [popularTagOptions, setPopularTagOptions] = useState<CatalogTagOption[]>([]);
+  const [tagOptionsLoaded, setTagOptionsLoaded] = useState(false);
 
   useEffect(() => {
     const f = filtersFromParams(searchParams);
@@ -243,6 +277,8 @@ export function EventsPageClient() {
     setSort(f.sort);
     setTimeOfDay(f.timeOfDay);
     setUrlTag(f.tag);
+    setStructuralTagsFromUrl(parseCsvSlugs(f.structuralTags));
+    setPopularTagSlugs(parseCsvSlugs(f.popularTags));
     setSelectedDate(f.date);
     setPier(f.pier);
     setPriceMax(f.priceMax);
@@ -311,6 +347,61 @@ export function EventsPageClient() {
     }
   }, [city]);
 
+  // Загружаем справочник tags для UI-фильтров STRUCTURAL/POPULAR.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTags() {
+      try {
+        const [theme, audience, format, popular] = await Promise.all([
+          api.getCatalogTags({ kind: 'STRUCTURAL', group: 'THEME', activeOnly: true }),
+          api.getCatalogTags({ kind: 'STRUCTURAL', group: 'AUDIENCE', activeOnly: true }),
+          api.getCatalogTags({ kind: 'STRUCTURAL', group: 'FORMAT', activeOnly: true }),
+          api.getCatalogTags({ kind: 'POPULAR', activeOnly: true }),
+        ]);
+
+        if (cancelled) return;
+        setStructuralTagOptions({ THEME: theme, AUDIENCE: audience, FORMAT: format });
+        setPopularTagOptions(popular);
+      } catch (e) {
+        console.warn('Events page tags load error:', e);
+      } finally {
+        if (!cancelled) setTagOptionsLoaded(true);
+      }
+    }
+
+    loadTags();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Преобразуем structuralTags из URL в UI-селекты (по структурным группам).
+  useEffect(() => {
+    if (!tagOptionsLoaded) return;
+
+    const slugToGroup = new Map<string, StructuralTagGroup>();
+    for (const group of Object.keys(structuralTagOptions) as StructuralTagGroup[]) {
+      for (const t of structuralTagOptions[group] ?? []) {
+        slugToGroup.set(t.slug, group);
+      }
+    }
+
+    let theme = '';
+    let aud = '';
+    let fmt = '';
+    for (const slug of structuralTagsFromUrl) {
+      const g = slugToGroup.get(slug);
+      if (g === 'THEME') theme = slug;
+      if (g === 'AUDIENCE') aud = slug;
+      if (g === 'FORMAT') fmt = slug;
+    }
+
+    setThemeTagSlug(theme);
+    setAudienceTagSlug(aud);
+    setFormatTagSlug(fmt);
+  }, [structuralTagsFromUrl, structuralTagOptions, tagOptionsLoaded]);
+
   const isMuseumCategory = category === 'MUSEUM';
 
   useEffect(() => {
@@ -321,6 +412,8 @@ export function EventsPageClient() {
     const categoryFromUrl = f.category;
     const audienceFromUrl = f.audience;
     const urlTagFromUrl = f.tag;
+    const structuralTagsFromUrlSlugs = parseCsvSlugs(f.structuralTags);
+    const popularTagsFromUrlSlugs = parseCsvSlugs(f.popularTags);
     const selectedDateFromUrl = f.date;
     const timeOfDayFromUrl = f.timeOfDay === 'soon' ? '' : f.timeOfDay;
     const pageFromUrl = f.page;
@@ -361,6 +454,8 @@ export function EventsPageClient() {
     if (categoryFromUrl) params.category = categoryFromUrl;
     if (audienceFromUrl) params.audience = audienceFromUrl;
     if (urlTagFromUrl) params.tag = urlTagFromUrl;
+    if (structuralTagsFromUrlSlugs.length) params.structuralTags = structuralTagsFromUrlSlugs.join(',');
+    if (popularTagsFromUrlSlugs.length) params.popularTags = popularTagsFromUrlSlugs.join(',');
     if (selectedDateFromUrl) {
       if (selectedDateFromUrl.includes('..')) {
         const [from, to] = selectedDateFromUrl.split('..');
@@ -400,6 +495,10 @@ export function EventsPageClient() {
     selectedDate,
     audience,
     urlTag,
+    themeTagSlug,
+    audienceTagSlug,
+    formatTagSlug,
+    popularTagSlugs.length ? 'popularTags' : null,
     timeOfDay,
     pier,
     priceMax,
@@ -415,6 +514,8 @@ export function EventsPageClient() {
         sort: null,
         timeOfDay: null,
         tag: null,
+        structuralTags: null,
+        popularTags: null,
         date: null,
         pier: null,
         priceMax: null,
@@ -696,7 +797,7 @@ export function EventsPageClient() {
             </button>
           ))}
         </div>
-        <div className="flex gap-2 flex-shrink-0">
+        <div className="flex flex-wrap gap-2 flex-shrink-0">
           <select
             value={city}
             onChange={(e) => updateUrl({ city: e.target.value || null, page: 1 })}
@@ -735,6 +836,134 @@ export function EventsPageClient() {
                 </option>
               ))}
             </select>
+          )}
+
+          {!isMuseumCategory && (
+            <>
+              {/* STRUCTURAL layer */}
+              <select
+                value={themeTagSlug}
+                onChange={(e) => {
+                  const next = e.target.value || '';
+                  setThemeTagSlug(next);
+                  const csv = [next, audienceTagSlug, formatTagSlug].filter(Boolean).join(',');
+                  updateUrl({ structuralTags: csv || null, page: 1 });
+                }}
+                disabled={!tagOptionsLoaded}
+                className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              >
+                <option value="">Любая тема</option>
+                {tagOptionsLoaded &&
+                  [...(structuralTagOptions.THEME ?? [])]
+                    .slice()
+                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
+                    .map((t) => (
+                      <option key={t.id} value={t.slug}>
+                        {t.name}
+                      </option>
+                    ))}
+              </select>
+
+              <select
+                value={audienceTagSlug}
+                onChange={(e) => {
+                  const next = e.target.value || '';
+                  setAudienceTagSlug(next);
+                  const csv = [themeTagSlug, next, formatTagSlug].filter(Boolean).join(',');
+                  updateUrl({ structuralTags: csv || null, page: 1 });
+                }}
+                disabled={!tagOptionsLoaded}
+                className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              >
+                <option value="">Любая аудитория</option>
+                {tagOptionsLoaded &&
+                  [...(structuralTagOptions.AUDIENCE ?? [])]
+                    .slice()
+                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
+                    .map((t) => (
+                      <option key={t.id} value={t.slug}>
+                        {t.name}
+                      </option>
+                    ))}
+              </select>
+
+              <select
+                value={formatTagSlug}
+                onChange={(e) => {
+                  const next = e.target.value || '';
+                  setFormatTagSlug(next);
+                  const csv = [themeTagSlug, audienceTagSlug, next].filter(Boolean).join(',');
+                  updateUrl({ structuralTags: csv || null, page: 1 });
+                }}
+                disabled={!tagOptionsLoaded}
+                className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              >
+                <option value="">Любой формат</option>
+                {tagOptionsLoaded &&
+                  [...(structuralTagOptions.FORMAT ?? [])]
+                    .slice()
+                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
+                    .map((t) => (
+                      <option key={t.id} value={t.slug}>
+                        {t.name}
+                      </option>
+                    ))}
+              </select>
+
+              {/* POPULAR layer (multi by AND) */}
+              <select
+                value={popularAddSlug}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (!next) {
+                    setPopularAddSlug('');
+                    return;
+                  }
+                  const combined = Array.from(new Set([...popularTagSlugs, next]));
+                  setPopularTagSlugs(combined);
+                  setPopularAddSlug('');
+                  updateUrl({ popularTags: combined.length ? combined.join(',') : null, page: 1 });
+                }}
+                disabled={!tagOptionsLoaded}
+                className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              >
+                <option value="">+ popular</option>
+                {tagOptionsLoaded &&
+                  popularTagOptions
+                    .slice()
+                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
+                    .map((t) => (
+                      <option key={t.id} value={t.slug} disabled={popularTagSlugs.includes(t.slug)}>
+                        {t.name}
+                      </option>
+                    ))}
+              </select>
+
+              {popularTagSlugs.length > 0 && (
+                <div className="flex flex-wrap gap-1 items-center">
+                  {popularTagSlugs.map((slug) => {
+                    const label = popularTagOptions.find((t) => t.slug === slug)?.name ?? slug;
+                    return (
+                      <span key={slug} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 ring-1 ring-slate-200">
+                        {label}
+                        <button
+                          type="button"
+                          aria-label={`Удалить popular тег ${label}`}
+                          className="rounded-full p-0.5 text-slate-500 hover:text-slate-700"
+                          onClick={() => {
+                            const next = popularTagSlugs.filter((x) => x !== slug);
+                            setPopularTagSlugs(next);
+                            updateUrl({ popularTags: next.length ? next.join(',') : null, page: 1 });
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
           <select
             value={isSoonMode ? 'departing_soon' : sort}
@@ -810,6 +1039,8 @@ export function EventsPageClient() {
                       groupSize={e.groupSize ?? undefined}
                       sessionTimes={e.sessionTimes ?? []}
                       highlights={e.highlights ?? []}
+                      structuralTags={e.structuralTags}
+                      popularTags={e.popularTags}
                       description={desc}
                     />
                   );
@@ -863,6 +1094,8 @@ export function EventsPageClient() {
                   groupSize={d.event.groupSize ?? undefined}
                   sessionTimes={d.event.sessionTimes ?? []}
                   highlights={d.event.highlights ?? []}
+                  structuralTags={d.event.structuralTags}
+                  popularTags={d.event.popularTags}
                 />
               ));
               return items;

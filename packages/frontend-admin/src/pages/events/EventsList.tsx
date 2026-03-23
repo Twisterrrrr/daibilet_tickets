@@ -1,9 +1,9 @@
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
-import { Eye, EyeOff, MoreHorizontal, Plus, RefreshCw, Star } from 'lucide-react';
+import { Eye, EyeOff, MoreHorizontal, Plus, RefreshCw, Search, Star } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -367,41 +367,48 @@ export function EventsListPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="События"
-        subtitle={data ? `${data.total} событий в базе` : <Skeleton className="inline-block h-4 w-32" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button asChild>
-              <Link to="/events/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Создать событие
-              </Link>
-            </Button>
-            <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
-              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              Синхронизация
-            </Button>
-          </div>
-        }
-      />
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">События</h1>
+        <div className="flex items-center gap-2">
+          {data ? (
+            <Badge variant="secondary" className="h-6 px-2.5 text-xs font-semibold">
+              {data.items.length} из {data.total}
+            </Badge>
+          ) : (
+            <Skeleton className="h-6 w-20" />
+          )}
+          <Button asChild>
+            <Link to="/events/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Создать событие
+            </Link>
+          </Button>
+          <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            Синхронизация
+          </Button>
+        </div>
+      </div>
 
       {/* Filters */}
       <Card>
-        <CardContent className="py-4">
+        <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Input
-              type="text"
-              placeholder="Поиск по названию..."
-              value={filters.search}
-              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
-              className="max-w-[250px]"
-            />
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Поиск по названию..."
+                value={filters.search}
+                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
+                className="pl-9"
+              />
+            </div>
             <Select
               value={filters.city || '__all__'}
               onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
             >
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-44">
                 <SelectValue placeholder="Все города" />
               </SelectTrigger>
               <SelectContent>
@@ -427,7 +434,7 @@ export function EventsListPage() {
               value={filters.category || '__all__'}
               onValueChange={(v) => setFilters((f) => ({ ...f, category: v === '__all__' ? '' : v, page: 1 }))}
             >
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-44">
                 <SelectValue placeholder="Все категории" />
               </SelectTrigger>
               <SelectContent>
@@ -441,8 +448,8 @@ export function EventsListPage() {
               value={filters.source || '__all__'}
               onValueChange={(v) => setFilters((f) => ({ ...f, source: v === '__all__' ? '' : v, page: 1 }))}
             >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Источник" />
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Все" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Все источники</SelectItem>
@@ -451,20 +458,7 @@ export function EventsListPage() {
                 <SelectItem value="MANUAL">Ручной ввод</SelectItem>
               </SelectContent>
             </Select>
-            <Select
-              value={filters.active || '__all__'}
-              onValueChange={(v) => setFilters((f) => ({ ...f, active: v === '__all__' ? '' : v, page: 1 }))}
-            >
-              <SelectTrigger className="w-[130px]">
-                <SelectValue placeholder="Статус" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Все</SelectItem>
-                <SelectItem value="true">Активные</SelectItem>
-                <SelectItem value="false">Неактивные</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            </div>
         </CardContent>
       </Card>
 
@@ -475,57 +469,61 @@ export function EventsListPage() {
           description="Попробуйте изменить условия поиска или снять часть фильтров."
         />
       ) : (
-        <DataTable
-          columns={columns}
-          data={data?.items ?? []}
-          loading={loading}
-          emptyText="Нет событий, соответствующих фильтрам"
-          onRowClick={(item) => navigate(`/events/${item.id}`)}
-          toolbar={
-            hasSelection && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => callBulkUpdate({ ids: selectedIds, isActive: true })}
-                >
-                  Опубликовать
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => callBulkUpdate({ ids: selectedIds, isActive: false })}
-                >
-                  Снять с публикации
-                </Button>
-                <Select
-                  onValueChange={(value) => {
-                    if (value === '__none__') return;
-                    void callBulkUpdate({ ids: selectedIds, category: value });
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[180px]">
-                    <SelectValue placeholder="Сменить категорию" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Не изменять</SelectItem>
-                    <SelectItem value="EXCURSION">Экскурсии</SelectItem>
-                    <SelectItem value="MUSEUM">Музеи</SelectItem>
-                    <SelectItem value="EVENT">Мероприятия</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => callBulkUpdate({ ids: selectedIds, softDelete: true })}
-                >
-                  Удалить (soft-delete)
-                </Button>
-              </div>
-            )
-          }
-        />
+        <Card>
+          <CardContent className="p-0">
+          <DataTable
+            columns={columns}
+            data={data?.items ?? []}
+            loading={loading}
+            emptyText="Нет событий, соответствующих фильтрам"
+            onRowClick={(item) => navigate(`/events/${item.id}`)}
+            toolbar={
+              hasSelection && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => callBulkUpdate({ ids: selectedIds, isActive: true })}
+                  >
+                    Опубликовать
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => callBulkUpdate({ ids: selectedIds, isActive: false })}
+                  >
+                    Снять с публикации
+                  </Button>
+                  <Select
+                    onValueChange={(value) => {
+                      if (value === '__none__') return;
+                      void callBulkUpdate({ ids: selectedIds, category: value });
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[180px]">
+                      <SelectValue placeholder="Сменить категорию" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Не изменять</SelectItem>
+                      <SelectItem value="EXCURSION">Экскурсии</SelectItem>
+                      <SelectItem value="MUSEUM">Музеи</SelectItem>
+                      <SelectItem value="EVENT">Мероприятия</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => callBulkUpdate({ ids: selectedIds, softDelete: true })}
+                  >
+                    Удалить (soft-delete)
+                  </Button>
+                </div>
+              )
+            }
+          />
+          </CardContent>
+        </Card>
       )}
 
       {/* Server pagination */}

@@ -14,15 +14,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { transliterate } from '@/lib/transliterate';
 
 type TagCategory = 'THEME' | 'AUDIENCE' | 'SEASON' | 'SPECIAL';
+type TagKind = 'STRUCTURAL' | 'POPULAR';
+type StructuralTagGroup = 'THEME' | 'AUDIENCE' | 'FORMAT';
 
 interface TagForm {
   name: string;
   slug: string;
   category: TagCategory;
+  code?: string;
+  tagKind?: TagKind;
+  structuralGroup?: StructuralTagGroup | null;
+  nameEn?: string;
   description: string;
   heroImage: string;
   metaTitle: string;
   metaDescription: string;
+  isFeatured?: boolean;
+  sortOrder?: number;
   isActive: boolean;
 }
 
@@ -37,10 +45,14 @@ const EMPTY_FORM: TagForm = {
   name: '',
   slug: '',
   category: 'THEME',
+  tagKind: 'STRUCTURAL',
+  structuralGroup: 'THEME',
   description: '',
   heroImage: '',
   metaTitle: '',
   metaDescription: '',
+  isFeatured: false,
+  sortOrder: 0,
   isActive: true,
 };
 
@@ -68,10 +80,16 @@ export function TagEditPage() {
           name: data.name ?? '',
           slug: data.slug ?? '',
           category: data.category ?? 'THEME',
+          code: data.code ?? '',
+          tagKind: data.tagKind ?? undefined,
+          structuralGroup: data.structuralGroup ?? null,
+          nameEn: data.nameEn ?? '',
           description: data.description ?? '',
           heroImage: data.heroImage ?? '',
           metaTitle: data.metaTitle ?? '',
           metaDescription: data.metaDescription ?? '',
+          isFeatured: data.isFeatured ?? false,
+          sortOrder: data.sortOrder ?? 0,
           isActive: data.isActive ?? true,
         }),
       )
@@ -193,6 +211,94 @@ export function TagEditPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="tagKind">Слой (tagKind)</Label>
+                <Select
+                  value={form.tagKind ?? ''}
+                  onValueChange={(v) => {
+                    if (!v) {
+                      setForm((f) => ({ ...f, tagKind: undefined, structuralGroup: null }));
+                      return;
+                    }
+                    const nextKind = v as TagKind;
+                    setForm((f) => ({
+                      ...f,
+                      tagKind: nextKind,
+                      structuralGroup: nextKind === 'STRUCTURAL' ? (f.structuralGroup ?? 'THEME') : null,
+                    }));
+                  }}
+                >
+                  <SelectTrigger id="tagKind">
+                    <SelectValue placeholder="Выберите слой" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">(не задано)</SelectItem>
+                    <SelectItem value="STRUCTURAL">STRUCTURAL</SelectItem>
+                    <SelectItem value="POPULAR">POPULAR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="structuralGroup">Группа (structuralGroup)</Label>
+                <Select
+                  value={form.structuralGroup ?? ''}
+                  onValueChange={(v) => setForm((f) => ({ ...f, structuralGroup: (v as StructuralTagGroup) || null }))}
+                  disabled={form.tagKind !== 'STRUCTURAL'}
+                >
+                  <SelectTrigger id="structuralGroup">
+                    <SelectValue placeholder="Выберите группу" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="THEME">THEME</SelectItem>
+                    <SelectItem value="AUDIENCE">AUDIENCE</SelectItem>
+                    <SelectItem value="FORMAT">FORMAT</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="code">code</Label>
+                <Input id="code" value={form.code ?? ''} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nameEn">nameEn</Label>
+                <Input
+                  id="nameEn"
+                  value={form.nameEn ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))}
+                  placeholder="необязательно"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sortOrder">sortOrder</Label>
+                <Input
+                  id="sortOrder"
+                  type="number"
+                  value={form.sortOrder ?? 0}
+                  onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isFeatured"
+                  checked={form.isFeatured ?? false}
+                  onChange={(e) => setForm((f) => ({ ...f, isFeatured: e.target.checked }))}
+                  className="h-4 w-4 rounded border-input"
+                />
+                <Label htmlFor="isFeatured" className="cursor-pointer font-normal">
+                  isFeatured
+                </Label>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <input

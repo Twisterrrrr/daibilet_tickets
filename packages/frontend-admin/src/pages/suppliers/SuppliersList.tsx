@@ -51,7 +51,11 @@ const columns: ColumnDef<SupplierItem>[] = [
             {isAggregator ? (
               <span className="font-medium text-muted-foreground">{name}</span>
             ) : (
-              <Link to={`/suppliers/${s.id}`} className="font-medium text-primary hover:underline">
+              <Link
+                to={`/suppliers/${s.id}`}
+                className="-m-2 block rounded p-2 font-medium text-primary hover:bg-muted/50 hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
                 {name}
               </Link>
             )}

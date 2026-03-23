@@ -1,7 +1,17 @@
 import { createHash } from 'crypto';
 import { SUBCATEGORY_LABELS } from '@daibilet/shared';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DateMode, EventCategory, EventSource, EventSubcategory, LocationType, Prisma, TagCategory } from '@prisma/client';
+import {
+  DateMode,
+  EventCategory,
+  EventSource,
+  EventSubcategory,
+  LocationType,
+  Prisma,
+  TagCategory,
+  TagKind,
+  StructuralTagGroup,
+} from '@prisma/client';
 
 import { asCatalogEntityLite, asCityLite, toDateSafe } from '../common/typing';
 import { EventOverrideService } from '../admin/event-override.service';
@@ -22,6 +32,15 @@ function shortenAddressToStreet(addr: string | null | undefined): string {
     .map((s) => s.trim())
     .filter(Boolean);
   return parts.length <= 2 ? addr.trim() : parts.slice(0, 2).join(', ');
+}
+
+function parseCsvSlugs(value?: string): string[] | undefined {
+  if (!value || typeof value !== 'string') return undefined;
+  const parts = value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length ? parts : undefined;
 }
 
 @Injectable()
@@ -1045,6 +1064,9 @@ export class CatalogService {
       subcategory,
       audience,
       tag,
+      structuralTags,
+      popularTags,
+      tags: tagsCsvParam,
       dateFrom,
       dateTo,
       sort,
@@ -1125,6 +1147,9 @@ export class CatalogService {
             ],
           };
 
+    const structuralTagsList = parseCsvSlugs(structuralTags ?? tagsCsvParam);
+    const popularTagsList = parseCsvSlugs(popularTags);
+
     const where = buildEventWhere(
       {
         city,
@@ -1133,6 +1158,8 @@ export class CatalogService {
         subcategory,
         audience,
         tag,
+        structuralTags: structuralTagsList,
+        popularTags: popularTagsList,
         pier,
         maxDuration,
         minDuration,
@@ -1409,6 +1436,14 @@ export class CatalogService {
       nextSessionAt: event.nextSessionAt ?? null,
       totalAvailableTickets: event.totalAvailableTickets ?? null,
       tagSlugs: event.tagSlugs ?? [],
+      structuralTags:
+        event.structuralTags ??
+        ({
+          THEME: [],
+          AUDIENCE: [],
+          FORMAT: [],
+        } as { THEME: string[]; AUDIENCE: string[]; FORMAT: string[] }),
+      popularTags: (event.popularTags as string[] | undefined) ?? [],
       highlights: event.highlights ?? [],
       isOptimalChoice: event.isOptimalChoice ?? false,
       groupingKey: event.groupingKey ?? null,
@@ -1539,6 +1574,38 @@ export class CatalogService {
       operator,
     );
 
+    const tags = Array.isArray((overridden as unknown as { tags?: unknown }).tags)
+      ? ((overridden as unknown as { tags: unknown[] }).tags as unknown[])
+      : [];
+
+    const structuralTags: { THEME: string[]; AUDIENCE: string[]; FORMAT: string[] } = {
+      THEME: [],
+      AUDIENCE: [],
+      FORMAT: [],
+    };
+    const popularTags: string[] = [];
+    for (const t of tags) {
+      const tag = (t as {
+        tag?: { name?: string; slug?: string; tagKind?: TagKind | null; structuralGroup?: StructuralTagGroup | null } | null;
+      }).tag;
+      const name = tag?.name;
+      if (!name || !tag?.tagKind) continue;
+
+      if (tag.tagKind === TagKind.STRUCTURAL) {
+        const group = tag.structuralGroup;
+        if (group === 'THEME' || group === 'AUDIENCE' || group === 'FORMAT') structuralTags[group].push(name);
+      } else if (tag.tagKind === TagKind.POPULAR) {
+        popularTags.push(name);
+      }
+    }
+
+    const uniqueStructuralTags = {
+      THEME: Array.from(new Set(structuralTags.THEME)),
+      AUDIENCE: Array.from(new Set(structuralTags.AUDIENCE)),
+      FORMAT: Array.from(new Set(structuralTags.FORMAT)),
+    };
+    const uniquePopularTags = Array.from(new Set(popularTags));
+
     return {
       ...overridden,
       rating: displayRating,
@@ -1548,6 +1615,8 @@ export class CatalogService {
       refundPolicyResolved,
       refundPolicyMode: overridden.refundPolicyMode,
       refundPolicyText: overridden.refundPolicyText,
+      structuralTags: uniqueStructuralTags,
+      popularTags: uniquePopularTags,
       relatedEvents: relatedEvents.map((r: Record<string, unknown>) => ({
         ...r,
         address: r.address ? shortenAddressToStreet(String(r.address)) : r.address,
@@ -1657,6 +1726,25 @@ export class CatalogService {
         ...(category && { category: category as TagCategory }),
       },
       orderBy: { name: 'asc' },
+      include: {
+        _count: { select: { events: true } },
+      },
+    });
+  }
+
+  async getCatalogTags(query: {
+    kind?: TagKind;
+    group?: StructuralTagGroup;
+    activeOnly?: boolean;
+  }) {
+    const { kind, group, activeOnly } = query;
+    return this.prisma.tag.findMany({
+      where: {
+        ...(activeOnly === false ? {} : { isActive: true }),
+        ...(kind && { tagKind: kind }),
+        ...(group && { structuralGroup: group }),
+      },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: {
         _count: { select: { events: true } },
       },
@@ -1898,7 +1986,21 @@ export class CatalogService {
         const label = SUBCATEGORY_LABELS[sub as EventSubcategory];
         if (label && !highlights.includes(label)) highlights.push(label);
       }
-      const tags: { tag?: { slug?: string; name?: string } | null }[] = (event.tags ?? []) as { tag?: { slug?: string; name?: string } | null }[];
+      const tags: {
+        tag?: {
+          slug?: string;
+          name?: string;
+          tagKind?: TagKind | null;
+          structuralGroup?: StructuralTagGroup | null;
+        } | null;
+      }[] = (event.tags ?? []) as {
+        tag?: {
+          slug?: string;
+          name?: string;
+          tagKind?: TagKind | null;
+          structuralGroup?: StructuralTagGroup | null;
+        } | null;
+      }[];
       const tagLabelMap: Record<string, string> = {
         'with-guide': 'Экскурсия от гида',
         audioguide: 'Аудиогид',
@@ -1925,6 +2027,33 @@ export class CatalogService {
       // Извлекаем slug-и тегов для бейджей на фронтенде (защита от null tag)
       const tagSlugs: string[] = tags.map((t) => t?.tag?.slug).filter((s): s is string => !!s);
 
+      // Слои тегов для структурированных фильтров и SEO-фасетов.
+      const structuralTags: { THEME: string[]; AUDIENCE: string[]; FORMAT: string[] } = {
+        THEME: [],
+        AUDIENCE: [],
+        FORMAT: [],
+      };
+      const popularTags: string[] = [];
+      for (const t of tags) {
+        const tag = t?.tag;
+        const name = tag?.name;
+        if (!name || !tag?.tagKind) continue;
+
+        if (tag.tagKind === TagKind.STRUCTURAL) {
+          const group = tag.structuralGroup;
+          if (group === 'THEME' || group === 'AUDIENCE' || group === 'FORMAT') structuralTags[group].push(name);
+        } else if (tag.tagKind === TagKind.POPULAR) {
+          popularTags.push(name);
+        }
+      }
+
+      const uniquePopularTags = Array.from(new Set(popularTags));
+      const uniqueStructuralTags = {
+        THEME: Array.from(new Set(structuralTags.THEME)),
+        AUDIENCE: Array.from(new Set(structuralTags.AUDIENCE)),
+        FORMAT: Array.from(new Set(structuralTags.FORMAT)),
+      };
+
       const reviewCount = Number(event.reviewCount ?? 0) | 0;
       const rawRating = Number(event.rating) || 0;
       const displayRating = this.getDisplayedEventRating(String(event.id || event.slug || ''), rawRating, reviewCount);
@@ -1941,6 +2070,8 @@ export class CatalogService {
         primaryOffer,
         offersCount: offers.length,
         tagSlugs,
+        structuralTags: uniqueStructuralTags,
+        popularTags: uniquePopularTags,
         groupSize,
         sessionTimes,
         highlights: displayHighlights,

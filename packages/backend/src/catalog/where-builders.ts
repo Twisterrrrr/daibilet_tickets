@@ -4,6 +4,7 @@
  */
 
 import { DateMode, EventSource, EventSubcategory, Prisma } from '@prisma/client';
+import { TagKind } from '@prisma/client';
 
 export interface EventWhereDto {
   city?: string;
@@ -12,6 +13,8 @@ export interface EventWhereDto {
   subcategory?: string;
   audience?: string;
   tag?: string;
+  structuralTags?: string[];
+  popularTags?: string[];
   pier?: string;
   maxDuration?: number;
   minDuration?: number;
@@ -66,6 +69,8 @@ export function buildEventWhere(
     subcategory,
     audience,
     tag,
+    structuralTags,
+    popularTags,
     pier,
     maxDuration,
     minDuration,
@@ -122,6 +127,7 @@ export function buildEventWhere(
         ? { audience: audience as Prisma.EnumEventAudienceFilter }
         : {}),
     ...(tag && { tags: { some: { tag: { slug: tag } } } }),
+    // NOTE: структурные/популярные теги обрабатываются ниже через AND-логику
     ...(pier && { startLocationId: pier }),
     ...(maxDuration != null || minDuration != null
       ? {
@@ -167,6 +173,28 @@ export function buildEventWhere(
   }
 
   // timeOfDay требует raw SQL (EXTRACT HOUR) — обрабатывается отдельно в catalog.service
+
+  // structuralTags/popularTags: AND по всем тегам внутри списка,
+  // и AND между structuralTags и popularTags.
+  const andFilters: Prisma.EventWhereInput[] = [];
+  if (structuralTags?.length) {
+    for (const slug of structuralTags) {
+      andFilters.push({ tags: { some: { tag: { slug, tagKind: TagKind.STRUCTURAL } } } });
+    }
+  }
+  if (popularTags?.length) {
+    for (const slug of popularTags) {
+      andFilters.push({ tags: { some: { tag: { slug, tagKind: TagKind.POPULAR } } } });
+    }
+  }
+  if (andFilters.length) {
+    const existingAnd = where.AND
+      ? Array.isArray(where.AND)
+        ? where.AND
+        : [where.AND]
+      : [];
+    where.AND = [...existingAnd, ...andFilters];
+  }
 
   return where;
 }

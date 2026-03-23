@@ -51,6 +51,7 @@ import { SupportListPage } from './pages/support/SupportList';
 import { PayoutsListPage } from './pages/payouts/PayoutsListPage';
 import { PromoCodesListPage } from './pages/promo-codes/PromoCodesListPage';
 import { PromoCodeEditPage } from './pages/promo-codes/PromoCodeEditPage';
+import { UsersStubPage } from './pages/users/UsersStubPage';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
@@ -81,6 +82,7 @@ export default function App() {
           <Route path="events/new" element={flags.showEvents ? <EventCreatePage /> : <DisabledRoute />} />
           <Route path="events/:id" element={flags.showEvents ? <EventEditPage /> : <DisabledRoute />} />
           <Route path="cities" element={flags.showContent ? <CitiesListPage /> : <DisabledRoute />} />
+          <Route path="cities/new" element={flags.showContent ? <CityEditPage /> : <DisabledRoute />} />
           <Route path="cities/:id" element={flags.showContent ? <CityEditPage /> : <DisabledRoute />} />
           <Route path="venues" element={flags.showCatalog ? <VenuesListPage /> : <DisabledRoute />} />
           <Route path="venues/new" element={<VenueEditPage />} />
@@ -124,13 +126,14 @@ export default function App() {
           <Route path="support" element={<SupportListPage />} />
           <Route path="support/:id" element={<SupportDetailPage />} />
           <Route path="jobs/failed" element={flags.showOps ? <FailedJobsPage /> : <DisabledRoute />} />
-          <Route path="reconciliation" element={flags.showOps ? <ReconciliationPage /> : <DisabledRoute />} />
+          <Route path="reconciliation" element={<ReconciliationPage />} />
           <Route path="audit" element={flags.showOps ? <AuditLogPage /> : <DisabledRoute />} />
           <Route path="seo-audit" element={flags.showContent ? <SeoAuditPage /> : <DisabledRoute />} />
           <Route path="source-categories" element={flags.showContent ? <SourceCategoriesPage /> : <DisabledRoute />} />
           <Route path="widgets" element={<WidgetsListPage />} />
           <Route path="widgets/new" element={<WidgetEditPage />} />
           <Route path="widgets/:id" element={<WidgetEditPage />} />
+          <Route path="users" element={<UsersStubPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

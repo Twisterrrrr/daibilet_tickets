@@ -1,19 +1,20 @@
-import { ColumnDef } from '@tanstack/react-table';
+import { Building2, Calendar, Megaphone, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface CityItem {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
   isFeatured: boolean;
   isActive: boolean;
   _count?: {
@@ -23,184 +24,121 @@ interface CityItem {
   };
 }
 
-const columns: ColumnDef<CityItem>[] = [
-  {
-    accessorKey: 'name',
-    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
-    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-  },
-  {
-    accessorKey: 'slug',
-    header: ({ column }) => <SortableHeader column={column}>Slug</SortableHeader>,
-    cell: ({ row }) => <span className="text-muted-foreground font-mono text-sm">{row.original.slug}</span>,
-  },
-  {
-    accessorKey: 'isFeatured',
-    header: 'В топе',
-    cell: ({ row }) => (
-      <Badge variant={row.original.isFeatured ? 'success' : 'secondary'}>
-        {row.original.isFeatured ? 'Да' : 'Нет'}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: 'isActive',
-    header: 'Активен',
-    cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Да' : 'Нет'}</Badge>
-    ),
-  },
-  {
-    id: 'eventsCount',
-    accessorFn: (row) => row._count?.events ?? 0,
-    header: ({ column }) => <SortableHeader column={column}>Событий</SortableHeader>,
-    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.events ?? 0}</span>,
-  },
-  {
-    id: 'landingsCount',
-    header: 'Лендингов',
-    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.landingPages ?? 0}</span>,
-  },
-  {
-    id: 'combosCount',
-    header: 'Combo',
-    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.comboPages ?? 0}</span>,
-  },
-];
-
 export function CitiesListPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<CityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState({
-    search: '',
-    hasEvents: false,
-    hasLandings: false,
-    hasCombos: false,
-  });
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams();
-    if (filters.search) params.set('search', filters.search);
-    if (filters.hasEvents) params.set('hasEvents', 'true');
-    if (filters.hasLandings) params.set('hasLandings', 'true');
-    if (filters.hasCombos) params.set('hasCombos', 'true');
-
-    const query = params.toString();
-    const path = query ? `/admin/cities?${query}` : '/admin/cities';
-
     adminApi
-      .get<CityItem[] | { items: CityItem[] }>(path)
+      .get<CityItem[] | { items: CityItem[] }>('/admin/cities')
       .then((data) => {
         const list = Array.isArray(data) ? data : (data as { items: CityItem[] }).items;
         setItems(list ?? []);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
-  }, [filters]);
+  }, []);
 
-  const handleRowClick = (item: CityItem) => {
-    navigate(`/cities/${item.id}`);
+  const handleToggleFeatured = async (id: string, value: boolean) => {
+    const prev = items;
+    setItems((curr) => curr.map((c) => (c.id === id ? { ...c, isFeatured: value } : c)));
+    try {
+      await adminApi.patch(`/admin/cities/${id}`, { isFeatured: value });
+    } catch {
+      setItems(prev);
+    }
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Города"
-        subtitle="Управление городами для событий и лендингов"
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Города</h1>
+        <Button className="gap-1" onClick={() => navigate('/cities/new')}>
+          <Plus className="h-4 w-4" />
+          Добавить
+        </Button>
+      </div>
 
       {error && (
         <ErrorState
           title="Не удалось загрузить список городов"
           description={error}
           action={
-            <button
-              type="button"
-              className="rounded-lg border px-3 py-1.5 text-sm"
-              onClick={() => setFilters((f) => ({ ...f }))}
-            >
+            <button type="button" className="rounded-lg border px-3 py-1.5 text-sm" onClick={() => window.location.reload()}>
               Повторить попытку
             </button>
           }
         />
       )}
 
-      {/* Filters */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Фильтры</CardTitle>
-          <CardDescription>Поиск по названию или slug и по наличию сущностей</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Input
-              type="text"
-              placeholder="Поиск..."
-              value={filters.search}
-              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-              className="max-w-sm"
-            />
-            <div className="flex flex-wrap gap-4 text-sm">
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border border-gray-300"
-                  checked={filters.hasEvents}
-                  onChange={(e) => setFilters((f) => ({ ...f, hasEvents: e.target.checked }))}
-                />
-                <span>Есть события</span>
-              </label>
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border border-gray-300"
-                  checked={filters.hasLandings}
-                  onChange={(e) => setFilters((f) => ({ ...f, hasLandings: e.target.checked }))}
-                />
-                <span>Есть лендинги</span>
-              </label>
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border border-gray-300"
-                  checked={filters.hasCombos}
-                  onChange={(e) => setFilters((f) => ({ ...f, hasCombos: e.target.checked }))}
-                />
-                <span>Есть combo</span>
-              </label>
-            </div>
+        {items.length === 0 && !loading ? (
+          <div className="p-6">
+            <EmptyState title="Нет городов" description="Добавьте хотя бы один город, чтобы начать заполнять каталог." />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Table */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Список городов</CardTitle>
-          <CardDescription>
-            {items.length} {items.length === 1 ? 'город' : items.length < 5 ? 'города' : 'городов'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {items.length === 0 && !loading ? (
-            <EmptyState
-              title="Нет городов"
-              description="Добавьте хотя бы один город, чтобы начать заполнять каталог."
-            />
-          ) : (
-            <DataTable
-              columns={columns}
-              data={items}
-              onRowClick={handleRowClick}
-              loading={loading}
-              emptyText="Нет городов"
-            />
-          )}
-        </CardContent>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Город</TableHead>
+                <TableHead className="text-center">
+                  <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                  Событий
+                </TableHead>
+                <TableHead className="text-center">
+                  <Building2 className="h-3.5 w-3.5 inline mr-1" />
+                  Площадок
+                </TableHead>
+                <TableHead className="text-center">
+                  <Megaphone className="h-3.5 w-3.5 inline mr-1" />
+                  Промо
+                </TableHead>
+                <TableHead className="text-center">В витрине</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id} className="cursor-pointer" onClick={() => navigate(`/cities/${item.id}`)}>
+                  <TableCell>
+                    <div>
+                      <span className="font-medium">{item.name}</span>
+                      <span className="text-xs text-muted-foreground ml-2">/{item.slug}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{item.description || '—'}</span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <a
+                      className="text-primary hover:underline font-medium"
+                      href={`/admin/events?city=${item.slug}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {item._count?.events ?? 0}
+                    </a>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <a
+                      className="text-primary hover:underline"
+                      href={`/admin/venues?city=${item.slug}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {item._count?.landingPages ?? 0}
+                    </a>
+                  </TableCell>
+                  <TableCell className="text-center text-muted-foreground">—</TableCell>
+                  <TableCell className="text-center">
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Switch checked={!!item.isFeatured} onCheckedChange={(v) => void handleToggleFeatured(item.id, v)} />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </div>
   );

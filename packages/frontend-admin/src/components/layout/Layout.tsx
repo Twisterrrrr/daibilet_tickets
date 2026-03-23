@@ -1,8 +1,8 @@
-import { ChevronRight, LogOut, Menu, Moon, Sun, User } from 'lucide-react';
-import { useState } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { LogOut, Moon, Sun, User } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 
-import { AppShell, PageContainer } from '@daibilet/shared-ui';
+import { PageContainer } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -16,79 +16,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { clearTokens } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
-import { cn } from '@/lib/utils';
+import { AdminSidebar } from './AdminSidebar';
+import { CommandPalette, CommandPaletteTrigger } from './CommandPalette';
 
-import { Sidebar } from './Sidebar';
-
-const ROUTE_LABELS: Record<string, string> = {
-  '': 'Dashboard',
-  events: 'События',
-  orders: 'Заказы',
-  cities: 'Города',
-  tags: 'Теги',
-  landings: 'Лендинги',
-  combos: 'Combo',
-  articles: 'Статьи',
-  reviews: 'Отзывы',
-  upsells: 'Upsells',
-  'promo-codes': 'Промокоды',
-  audit: 'Аудит',
-  'seo-audit': 'SEO Audit',
-  settings: 'Настройки',
-  new: 'Создание',
-};
-
-function Breadcrumbs() {
-  const location = useLocation();
-  const segments = location.pathname.split('/').filter(Boolean);
-
-  if (segments.length === 0) return null;
-
-  return (
-    <nav className="flex items-center gap-1 text-sm text-muted-foreground">
-      <Link to="/" className="hover:text-foreground transition-colors">
-        Dashboard
-      </Link>
-      {segments.map((segment, idx) => {
-        const path = '/' + segments.slice(0, idx + 1).join('/');
-        const label = ROUTE_LABELS[segment] || decodeURIComponent(segment);
-        const isLast = idx === segments.length - 1;
-
-        return (
-          <span key={path} className="flex items-center gap-1">
-            <ChevronRight className="h-3 w-3" />
-            {isLast ? (
-              <span className="font-medium text-foreground">{label}</span>
-            ) : (
-              <Link to={path} className="hover:text-foreground transition-colors">
-                {label}
-              </Link>
-            )}
-          </span>
-        );
-      })}
-    </nav>
-  );
-}
-
-function getPageTitle(pathname: string): string {
-  const segments = pathname.split('/').filter(Boolean);
-  if (segments.length === 0) return 'Dashboard';
-  const first = segments[0];
-  return ROUTE_LABELS[first] || first;
-}
-
-function AdminTopbar({
-  onOpenMobileSidebar,
-}: {
-  onOpenMobileSidebar: () => void;
-}) {
+function AdminTopbar({ onOpenCommandPalette }: { onOpenCommandPalette: () => void }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const { theme, setTheme } = useTheme();
 
   const handleLogout = async () => {
@@ -101,22 +36,14 @@ function AdminTopbar({
     navigate('/login');
   };
 
-  const pageTitle = getPageTitle(location.pathname);
-
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6">
-      {/* Mobile menu */}
-      <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenMobileSidebar}>
-        <Menu className="h-5 w-5" />
-        <span className="sr-only">Меню</span>
-      </Button>
+    <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:h-12 sm:px-4">
+      {/* Sidebar toggle: на mobile открывает Sheet, на desktop сворачивает */}
+      <SidebarTrigger className="shrink-0" />
 
-      <div className="flex-1">
-        <h1 className="text-lg font-semibold sm:hidden">{pageTitle}</h1>
-        <div className="hidden sm:block">
-          <Breadcrumbs />
-        </div>
-      </div>
+      <div className="flex-1" />
+
+      <CommandPaletteTrigger onClick={onOpenCommandPalette} />
 
       {/* Theme toggle */}
       <Button
@@ -165,43 +92,37 @@ function AdminTopbar({
 }
 
 export function Layout() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
-    <TooltipProvider>
-      <AppShell className="bg-background">
-        <div className="min-h-screen">
-          {/* Desktop sidebar */}
-          <div className="hidden lg:block">
-            <Sidebar collapsed={collapsed} onCollapse={setCollapsed} />
-          </div>
+    <SidebarProvider>
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
 
-          {/* Mobile sidebar */}
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetContent side="left" className="w-60 p-0">
-              <SheetTitle className="sr-only">Навигация</SheetTitle>
-              <Sidebar />
-            </SheetContent>
-          </Sheet>
+      <div className="flex min-h-screen w-full bg-[rgb(229,231,235)]">
+        <AdminSidebar />
+        <div className="flex min-w-0 flex-1 flex-col bg-background">
+          <AdminTopbar onOpenCommandPalette={() => setCommandOpen(true)} />
 
-          {/* Main content */}
-          <div
-            className={cn(
-              'flex flex-col transition-all duration-300',
-              collapsed ? 'lg:pl-[68px]' : 'lg:pl-60',
-            )}
-          >
-            <AdminTopbar onOpenMobileSidebar={() => setMobileOpen(true)} />
-
-            <main className="flex-1">
-              <PageContainer className="animate-in-page">
-                <Outlet />
-              </PageContainer>
-            </main>
-          </div>
+          <main className="flex-1 overflow-auto bg-[rgb(229,231,235)]">
+            <PageContainer className="animate-in-page max-w-none px-3 py-4 sm:px-4 xl:px-6 2xl:px-8 lg:py-5">
+              <Outlet />
+            </PageContainer>
+          </main>
         </div>
-      </AppShell>
-    </TooltipProvider>
+      </div>
+    </SidebarProvider>
   );
 }
+
+

@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye, Monitor, Save, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -161,6 +161,157 @@ export function ArticleEditPage() {
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (isCreate) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/articles">
+              <ArrowLeft className="mr-1 h-4 w-4" /> Назад
+            </Link>
+          </Button>
+          <h1 className="flex-1 text-2xl font-bold">Новая статья</h1>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground" />
+          <Button onClick={handleSave} disabled={saving} className="gap-1">
+            <Save className="h-4 w-4" />
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="space-y-4 lg:col-span-2">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Контент</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="mb-1 block text-sm font-medium">Заголовок</Label>
+                  <Input
+                    value={form.title ?? ''}
+                    onChange={(e) => handleTitleChange(e.target.value)}
+                    placeholder="Заголовок статьи"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-sm font-medium">Текст</Label>
+                  <Textarea
+                    value={form.content ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+                    placeholder="Содержание статьи..."
+                    rows={12}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">SEO</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="mb-1 block text-sm font-medium">
+                    SEO Title <span className="font-normal text-muted-foreground">({(form.metaTitle ?? '').length}/60)</span>
+                  </Label>
+                  <Input
+                    value={form.metaTitle ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, metaTitle: e.target.value }))}
+                    placeholder="Title для поисковиков"
+                    maxLength={60}
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-sm font-medium">
+                    SEO Description{' '}
+                    <span className="font-normal text-muted-foreground">({(form.metaDescription ?? '').length}/160)</span>
+                  </Label>
+                  <Textarea
+                    value={form.metaDescription ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))}
+                    placeholder="Description"
+                    rows={2}
+                    maxLength={160}
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-sm font-medium">Slug</Label>
+                  <Input
+                    value={form.slug ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                    placeholder="article-slug"
+                    className="font-mono text-sm"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Привязки</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="mb-1 block text-sm font-medium">Город</Label>
+                  <Select
+                    value={form.cityId ?? '__none__'}
+                    onValueChange={(v) => setForm((f) => ({ ...f, cityId: v === '__none__' ? null : v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите город" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Выберите город</SelectItem>
+                      {cities.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="mb-1 block text-sm font-medium">Теги</Label>
+                  <Input placeholder="Добавьте теги через запятую" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-1 text-base">
+                    <Eye className="h-4 w-4" />
+                    Превью
+                  </CardTitle>
+                  <div className="flex gap-1">
+                    <Button size="icon" className="h-7 w-7">
+                      <Monitor className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                      <Smartphone className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border bg-background p-4">
+                  <h2 className="text-lg font-bold">{form.title || 'Заголовок статьи'}</h2>
+                  <Separator className="my-2" />
+                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                    {form.content || 'Содержание статьи будет отображаться здесь...'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }

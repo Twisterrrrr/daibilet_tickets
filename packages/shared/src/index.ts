@@ -435,6 +435,10 @@ export interface EventListItem {
   /** Address / location for display */
   address?: string | null;
   tagSlugs?: string[];
+  /** STRUCTURAL (THEME/AUDIENCE/FORMAT) — для UI фасетов/бейджей. */
+  structuralTags?: { THEME: string[]; AUDIENCE: string[]; FORMAT: string[] };
+  /** POPULAR — для UI бейджей/выборов. */
+  popularTags?: string[];
   shortTitle?: string;
   /** Краткое описание для карточки каталога */
   shortDescription?: string | null;

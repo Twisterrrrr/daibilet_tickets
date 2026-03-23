@@ -9,12 +9,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SupplierEventsTab } from './SupplierEventsTab';
 import { SupplierLegalProfileView } from './SupplierLegalProfileView';
+import { SupplierEdoProfileView } from './SupplierEdoProfileView';
 
 export function SupplierDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [supplier, setSupplier] = useState<any>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<any>({});
   const [apiKeys, setApiKeys] = useState<any[]>([]);
   const [newKeyResult, setNewKeyResult] = useState<string | null>(null);
@@ -24,25 +26,36 @@ export function SupplierDetailPage() {
   const SUPPLIER_ROLES = ['OWNER', 'MANAGER', 'CONTENT', 'ACCOUNTANT'] as const;
 
   const load = useCallback(() => {
-    adminApi.get(`/admin/suppliers/${id}`).then((data: any) => {
-      setSupplier(data);
-      setForm({
-        trustLevel: data.trustLevel,
-        commissionRate: data.commissionRate,
-        promoRate: data.promoRate || '',
-        promoUntil: data.promoUntil ? new Date(data.promoUntil).toISOString().split('T')[0] : '',
-        isActive: data.isActive,
-        yookassaAccountId: data.yookassaAccountId || '',
+    if (!id || (typeof id === 'string' && id.startsWith('agg:'))) {
+      navigate('/suppliers', { replace: true });
+      return;
+    }
+    setLoadError(null);
+    adminApi
+      .get(`/admin/suppliers/${id}`)
+      .then((data: any) => {
+        setSupplier(data);
+        setForm({
+          trustLevel: data.trustLevel,
+          commissionRate: data.commissionRate,
+          promoRate: data.promoRate || '',
+          promoUntil: data.promoUntil ? new Date(data.promoUntil).toISOString().split('T')[0] : '',
+          isActive: data.isActive,
+          yookassaAccountId: data.yookassaAccountId || '',
+        });
+        setWebhookUrl(data.webhookUrl || '');
+      })
+      .catch((err: unknown) => {
+        setSupplier(null);
+        setLoadError(err instanceof Error ? err.message : String(err));
       });
-      setWebhookUrl(data.webhookUrl || '');
-    });
     adminApi
       .get(`/admin/suppliers/${id}/api-keys`)
       .then((keys: any) => {
         setApiKeys(keys || []);
       })
       .catch((e) => console.error('Load API keys failed:', e));
-  }, [id]);
+  }, [id, navigate]);
 
   useEffect(() => {
     load();
@@ -74,6 +87,21 @@ export function SupplierDetailPage() {
   };
 
   const currentTab = (searchParams.get('tab') as 'general' | 'events' | 'finance' | 'api') || 'general';
+
+  if (loadError) {
+    return (
+      <div className="space-y-4">
+        <p className="text-destructive">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => navigate('/suppliers')}
+          className="text-sm text-primary hover:underline"
+        >
+          ← Вернуться к списку
+        </button>
+      </div>
+    );
+  }
 
   if (!supplier) return <div className="animate-pulse">Загрузка...</div>;
 
@@ -302,8 +330,9 @@ export function SupplierDetailPage() {
           <SupplierEventsTab supplierId={id!} />
         </TabsContent>
 
-        <TabsContent value="finance">
+        <TabsContent value="finance" className="space-y-6">
           <SupplierLegalProfileView operatorId={id!} />
+          <SupplierEdoProfileView operatorId={id!} defaultInn={supplier?.inn} />
         </TabsContent>
 
         <TabsContent value="api" className="space-y-4">

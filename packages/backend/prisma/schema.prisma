@@ -71,6 +71,19 @@ enum TagCategory {
   SPECIAL // "Новинка", "Хит продаж", "Скидка"
 }
 
+// Универсальная типизация тегов для будущих структурных фильтров и SEO-фасетов.
+// Старый TagCategory остаётся для обратной совместимости текущего каталога/лендингов.
+enum TagKind {
+  STRUCTURAL
+  POPULAR
+}
+
+enum StructuralTagGroup {
+  THEME
+  AUDIENCE
+  FORMAT
+}
+
 enum Intensity {
   RELAXED
   NORMAL
@@ -696,14 +709,22 @@ model Tag {
   id              String      @id @default(uuid()) @db.Uuid
   slug            String      @unique
   name            String
+  nameEn          String?
   category        TagCategory
   description     String?     @db.Text
   heroImage       String?
   metaTitle       String?
   metaDescription String?     @db.Text
+  /// Стабильный идентификатор справочника (используется как основа для будущих SEO/Routing).
+  /// На этапе миграции поле nullable, чтобы не ломать существующие строки.
+  code            String?     @unique
+  tagKind         TagKind?
+  structuralGroup StructuralTagGroup?
   isActive        Boolean     @default(true)
   isDeleted       Boolean     @default(false)
   deletedAt       DateTime?
+  isFeatured      Boolean     @default(false)
+  sortOrder       Int         @default(0)
   version         Int         @default(0)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -712,11 +733,17 @@ model Tag {
   articleTags ArticleTag[]
 
   @@map("tags")
+  @@index([tagKind])
+  @@index([structuralGroup])
 }
 
 model EventTag {
   eventId String @db.Uuid
   tagId   String @db.Uuid
+
+  /// Кто назначил/пересчитал тег (для будущего аудита/мягких ограничений).
+  assignedBy String? @db.Uuid
+  createdAt  DateTime @default(now())
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)

@@ -13,7 +13,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { TagCategory } from '@prisma/client';
+import { StructuralTagGroup, TagCategory, TagKind } from '@prisma/client';
 
 // ── Reconciliation ────────────────────────────────
 
@@ -128,6 +128,26 @@ export class CreateTagDto {
   @IsEnum(TagCategory)
   category!: TagCategory;
 
+  @ApiPropertyOptional({ description: 'Стабильный идентификатор справочника (для будущих URL/SEO)' })
+  @IsOptional()
+  @IsString()
+  code?: string;
+
+  @ApiPropertyOptional({ enum: TagKind })
+  @IsOptional()
+  @IsEnum(TagKind)
+  tagKind?: TagKind;
+
+  @ApiPropertyOptional({ enum: StructuralTagGroup })
+  @IsOptional()
+  @IsEnum(StructuralTagGroup)
+  structuralGroup?: StructuralTagGroup;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  nameEn?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -147,6 +167,17 @@ export class CreateTagDto {
   @IsOptional()
   @IsString()
   metaDescription?: string;
+
+  @ApiPropertyOptional({ description: 'Подсветка в UI (рекомендованный тег)' })
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @ApiPropertyOptional({ description: 'Порядок сортировки в группах' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  sortOrder?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
