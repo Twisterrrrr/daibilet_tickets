@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { promoCodesApi, type PromoCode, type PromoCodeFormData } from '@/api/promo-codes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -111,19 +113,17 @@ export function PromoCodeEditPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {isNew ? 'Новый промокод' : `Промокод ${promo?.code ?? ''}`}
-          </h1>
-          <p className="text-muted-foreground">Скидка по коду для checkout</p>
-        </div>
-        {!isNew && (
-          <Button variant="outline" size="icon" onClick={handleDelete} disabled={saving}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title={isNew ? 'Новый промокод' : `Промокод ${promo?.code ?? ''}`}
+        subtitle="Скидка по коду для checkout"
+        actions={
+          !isNew ? (
+            <Button variant="outline" size="icon" onClick={handleDelete} disabled={saving}>
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          ) : undefined
+        }
+      />
 
       <Card>
         <CardHeader>

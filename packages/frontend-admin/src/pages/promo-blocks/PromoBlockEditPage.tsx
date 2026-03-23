@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { promoBlocksApi, type PromoBlockFormData } from '@/api/promo-blocks';
 import { promoCollectionsApi, type PromoCollection } from '@/api/promo-collections';
 import { Button } from '@/components/ui/button';
@@ -134,10 +136,7 @@ export function PromoBlockEditPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Редактировать промо-блок</h1>
-        <p className="text-muted-foreground">{form.title || form.slug}</p>
-      </div>
+      <PageHeader title="Редактировать промо-блок" subtitle={form.title || form.slug} />
 
       <Card>
         <CardHeader>

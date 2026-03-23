@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { api, setToken } from '../lib/api';
 
 export default function Login() {
@@ -27,8 +29,11 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-sm border">
-        <h1 className="text-2xl font-bold text-center mb-2">Дайбилет</h1>
-        <p className="text-center text-gray-500 mb-6">Кабинет поставщика</p>
+        <PageHeader
+          title={<span className="block text-center">Дайбилет</span>}
+          subtitle={<span className="block text-center">Кабинет поставщика</span>}
+          className="mb-6"
+        />
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>

@@ -3,7 +3,7 @@ import { Eye, EyeOff, MoreHorizontal, Plus, RefreshCw, Search, Star } from 'luci
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { EmptyState, ErrorState } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -367,100 +367,30 @@ export function EventsListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">События</h1>
-        <div className="flex items-center gap-2">
-          {data ? (
-            <Badge variant="secondary" className="h-6 px-2.5 text-xs font-semibold">
-              {data.items.length} из {data.total}
-            </Badge>
+      <PageHeader
+        title="События"
+        subtitle={
+          data ? (
+            `${data.items.length} из ${data.total}`
           ) : (
-            <Skeleton className="h-6 w-20" />
-          )}
-          <Button asChild>
-            <Link to="/events/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Создать событие
-            </Link>
-          </Button>
-          <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
-            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            Синхронизация
-          </Button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-48">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Поиск по названию..."
-                value={filters.search}
-                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
-                className="pl-9"
-              />
-            </div>
-            <Select
-              value={filters.city || '__all__'}
-              onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Все города" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Все города</SelectItem>
-                {citiesLoaded && cities.length === 0 && (
-                  <>
-                    <SelectItem value="moscow">Москва</SelectItem>
-                    <SelectItem value="saint-petersburg">Санкт-Петербург</SelectItem>
-                    <SelectItem value="kazan">Казань</SelectItem>
-                    <SelectItem value="kaliningrad">Калининград</SelectItem>
-                    <SelectItem value="vladimir">Владимир</SelectItem>
-                    <SelectItem value="yaroslavl">Ярославль</SelectItem>
-                  </>
-                )}
-                {cities.map((city) => (
-                  <SelectItem key={city.slug} value={city.slug}>
-                    {city.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.category || '__all__'}
-              onValueChange={(v) => setFilters((f) => ({ ...f, category: v === '__all__' ? '' : v, page: 1 }))}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Все категории" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Все категории</SelectItem>
-                <SelectItem value="EXCURSION">Экскурсии</SelectItem>
-                <SelectItem value="MUSEUM">Музеи</SelectItem>
-                <SelectItem value="EVENT">Мероприятия</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.source || '__all__'}
-              onValueChange={(v) => setFilters((f) => ({ ...f, source: v === '__all__' ? '' : v, page: 1 }))}
-            >
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Все" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Все источники</SelectItem>
-                <SelectItem value="TC">TicketsCloud</SelectItem>
-                <SelectItem value="TEPLOHOD">Теплоход</SelectItem>
-                <SelectItem value="MANUAL">Ручной ввод</SelectItem>
-              </SelectContent>
-            </Select>
-            </div>
-        </CardContent>
-      </Card>
+            <Skeleton className="h-4 w-24 inline-block" />
+          )
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <Button asChild>
+              <Link to="/events/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Создать событие
+              </Link>
+            </Button>
+            <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              Синхронизация
+            </Button>
+          </div>
+        }
+      />
 
       {/* Table */}
       {data && data.items.length === 0 && !loading ? (
@@ -478,48 +408,114 @@ export function EventsListPage() {
             emptyText="Нет событий, соответствующих фильтрам"
             onRowClick={(item) => navigate(`/events/${item.id}`)}
             toolbar={
-              hasSelection && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => callBulkUpdate({ ids: selectedIds, isActive: true })}
-                  >
-                    Опубликовать
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => callBulkUpdate({ ids: selectedIds, isActive: false })}
-                  >
-                    Снять с публикации
-                  </Button>
-                  <Select
-                    onValueChange={(value) => {
-                      if (value === '__none__') return;
-                      void callBulkUpdate({ ids: selectedIds, category: value });
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-[180px]">
-                      <SelectValue placeholder="Сменить категорию" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Не изменять</SelectItem>
-                      <SelectItem value="EXCURSION">Экскурсии</SelectItem>
-                      <SelectItem value="MUSEUM">Музеи</SelectItem>
-                      <SelectItem value="EVENT">Мероприятия</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => callBulkUpdate({ ids: selectedIds, softDelete: true })}
-                  >
-                    Удалить (soft-delete)
-                  </Button>
+              <div className="flex w-full flex-wrap items-center gap-2">
+                <div className="relative min-w-48 flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Поиск по названию..."
+                    value={filters.search}
+                    onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
+                    className="pl-9"
+                  />
                 </div>
-              )
+                <Select
+                  value={filters.city || '__all__'}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
+                >
+                  <SelectTrigger className="w-44">
+                    <SelectValue placeholder="Все города" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Все города</SelectItem>
+                    {citiesLoaded && cities.length === 0 && (
+                      <>
+                        <SelectItem value="moscow">Москва</SelectItem>
+                        <SelectItem value="saint-petersburg">Санкт-Петербург</SelectItem>
+                        <SelectItem value="kazan">Казань</SelectItem>
+                        <SelectItem value="kaliningrad">Калининград</SelectItem>
+                        <SelectItem value="vladimir">Владимир</SelectItem>
+                        <SelectItem value="yaroslavl">Ярославль</SelectItem>
+                      </>
+                    )}
+                    {cities.map((city) => (
+                      <SelectItem key={city.slug} value={city.slug}>
+                        {city.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filters.category || '__all__'}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, category: v === '__all__' ? '' : v, page: 1 }))}
+                >
+                  <SelectTrigger className="w-44">
+                    <SelectValue placeholder="Все категории" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Все категории</SelectItem>
+                    <SelectItem value="EXCURSION">Экскурсии</SelectItem>
+                    <SelectItem value="MUSEUM">Музеи</SelectItem>
+                    <SelectItem value="EVENT">Мероприятия</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filters.source || '__all__'}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, source: v === '__all__' ? '' : v, page: 1 }))}
+                >
+                  <SelectTrigger className="w-36">
+                    <SelectValue placeholder="Все" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Все источники</SelectItem>
+                    <SelectItem value="TC">TicketsCloud</SelectItem>
+                    <SelectItem value="TEPLOHOD">Теплоход</SelectItem>
+                    <SelectItem value="MANUAL">Ручной ввод</SelectItem>
+                  </SelectContent>
+                </Select>
+                {hasSelection && (
+                  <>
+                    <span className="ml-1 text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => callBulkUpdate({ ids: selectedIds, isActive: true })}
+                    >
+                      Опубликовать
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => callBulkUpdate({ ids: selectedIds, isActive: false })}
+                    >
+                      Снять с публикации
+                    </Button>
+                    <Select
+                      onValueChange={(value) => {
+                        if (value === '__none__') return;
+                        void callBulkUpdate({ ids: selectedIds, category: value });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[180px]">
+                        <SelectValue placeholder="Сменить категорию" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Не изменять</SelectItem>
+                        <SelectItem value="EXCURSION">Экскурсии</SelectItem>
+                        <SelectItem value="MUSEUM">Музеи</SelectItem>
+                        <SelectItem value="EVENT">Мероприятия</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => callBulkUpdate({ ids: selectedIds, softDelete: true })}
+                    >
+                      Удалить (soft-delete)
+                    </Button>
+                  </>
+                )}
+              </div>
             }
           />
           </CardContent>

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { FormActions, FormGrid, FormSection } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, FormActions, FormGrid, FormSection, LoadingState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SupplierEventsTab } from './SupplierEventsTab';
@@ -22,6 +23,7 @@ export function SupplierDetailPage() {
   const [newKeyResult, setNewKeyResult] = useState<string | null>(null);
   const [newKeyName, setNewKeyName] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const SUPPLIER_ROLES = ['OWNER', 'MANAGER', 'CONTENT', 'ACCOUNTANT'] as const;
 
@@ -31,6 +33,7 @@ export function SupplierDetailPage() {
       return;
     }
     setLoadError(null);
+    setLoading(true);
     adminApi
       .get(`/admin/suppliers/${id}`)
       .then((data: any) => {
@@ -48,6 +51,9 @@ export function SupplierDetailPage() {
       .catch((err: unknown) => {
         setSupplier(null);
         setLoadError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        setLoading(false);
       });
     adminApi
       .get(`/admin/suppliers/${id}/api-keys`)
@@ -90,34 +96,51 @@ export function SupplierDetailPage() {
 
   if (loadError) {
     return (
-      <div className="space-y-4">
-        <p className="text-destructive">{loadError}</p>
-        <button
-          type="button"
-          onClick={() => navigate('/suppliers')}
-          className="text-sm text-primary hover:underline"
-        >
-          ← Вернуться к списку
-        </button>
-      </div>
+      <ErrorState
+        title="Не удалось загрузить поставщика"
+        description={loadError}
+        action={
+          <Button type="button" variant="outline" onClick={() => navigate('/suppliers')}>
+            Вернуться к списку
+          </Button>
+        }
+      />
     );
   }
 
-  if (!supplier) return <div className="animate-pulse">Загрузка...</div>;
+  if (loading) {
+    return <LoadingState label="Загружаем карточку поставщика..." />;
+  }
+
+  if (!supplier) {
+    return (
+      <EmptyState
+        title="Поставщик не найден"
+        description="Карточка недоступна или была удалена."
+        action={
+          <Button type="button" variant="outline" onClick={() => navigate('/suppliers')}>
+            Вернуться к списку
+          </Button>
+        }
+      />
+    );
+  }
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">{supplier.companyName || supplier.name}</h1>
-          <p className="text-sm text-muted-foreground">
+      <PageHeader
+        title={supplier.companyName || supplier.name}
+        subtitle={
+          <>
             {supplier.contactEmail} | ИНН: {supplier.inn || '—'}
-          </p>
-        </div>
-        <button onClick={() => navigate('/suppliers')} className="text-sm text-muted-foreground hover:underline">
-          ← Назад
-        </button>
-      </div>
+          </>
+        }
+        actions={
+          <Button type="button" variant="ghost" onClick={() => navigate('/suppliers')}>
+            Назад
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent className="grid gap-4 border-0 bg-transparent p-4 sm:grid-cols-2 lg:grid-cols-4">

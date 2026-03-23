@@ -11,6 +11,8 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -176,24 +178,25 @@ export function SupportDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/support')}>
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Назад
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold flex items-center gap-2">
+      <PageHeader
+        title={
+          <span className="flex items-center gap-2">
             {ticket.shortCode}
             {isSlaBreached && (
               <span className="flex items-center gap-1 text-sm text-red-600">
                 <AlertTriangle className="h-4 w-4" /> SLA нарушен
               </span>
             )}
-          </h1>
-          <p className="text-sm text-slate-500">{ticket.subject}</p>
-        </div>
-      </div>
+          </span>
+        }
+        subtitle={ticket.subject}
+        actions={
+          <Button variant="ghost" size="sm" onClick={() => navigate('/support')}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Назад
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Conversation */}

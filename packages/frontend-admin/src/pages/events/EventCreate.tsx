@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { EventWizard, type EventWizardDraft, mapDraftToCreatePayload } from '@daibilet/shared-ui';
+import { EventWizard, PageHeader, type EventWizardDraft, mapDraftToCreatePayload } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -107,17 +107,15 @@ export function EventCreatePage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="mb-2 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/events')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Создать событие</h1>
-          <p className="text-sm text-muted-foreground">
-            Мастер создания события: контент, расписание, билеты, вместимость и публикация.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Создать событие"
+        subtitle="Мастер создания события: контент, расписание, билеты, вместимость и публикация."
+        actions={
+          <Button variant="ghost" size="icon" onClick={() => navigate('/events')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        }
+      />
 
       <EventWizard
         initialDraft={initialDraft}

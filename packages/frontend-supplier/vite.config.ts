@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['@daibilet/shared'],
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -19,3 +22,4 @@ export default defineConfig({
     },
   },
 });
+

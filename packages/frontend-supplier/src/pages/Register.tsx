@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { api, setToken } from '../lib/api';
 
 export default function Register() {
@@ -42,8 +44,11 @@ export default function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8">
       <div className="w-full max-w-lg p-8 bg-white rounded-xl shadow-sm border">
-        <h1 className="text-2xl font-bold text-center mb-2">Регистрация поставщика</h1>
-        <p className="text-center text-gray-500 mb-6">Размещайте события и зарабатывайте</p>
+        <PageHeader
+          title={<span className="block text-center">Регистрация поставщика</span>}
+          subtitle={<span className="block text-center">Размещайте события и зарабатывайте</span>}
+          className="mb-6"
+        />
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>

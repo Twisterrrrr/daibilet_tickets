@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { promoBlocksApi, type PromoBlock } from '@/api/promo-blocks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,13 +43,11 @@ export function PromoBlocksListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Промо-блоки</h1>
-          <p className="text-muted-foreground">{items.length} блоков</p>
-        </div>
-        <Button asChild><Link to="/promo-blocks/new" className="gap-2"><Plus className="h-4 w-4" />Добавить</Link></Button>
-      </div>
+      <PageHeader
+        title="Промо-блоки"
+        subtitle={`${items.length} блоков`}
+        actions={<Button asChild><Link to="/promo-blocks/new" className="gap-2"><Plus className="h-4 w-4" />Добавить</Link></Button>}
+      />
       <Card>
         <CardHeader>
           <CardTitle>Список промо-блоков</CardTitle>

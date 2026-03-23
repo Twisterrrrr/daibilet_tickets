@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import {
   promoCollectionsApi,
@@ -233,12 +235,10 @@ export function PromoCollectionEditPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {isNew ? 'Новая promo-коллекция' : collection?.title ?? 'Редактирование'}
-        </h1>
-        <p className="text-muted-foreground">Подборка событий или мест для промо-блока</p>
-      </div>
+      <PageHeader
+        title={isNew ? 'Новая promo-коллекция' : collection?.title ?? 'Редактирование'}
+        subtitle="Подборка событий или мест для промо-блока"
+      />
 
       <Card>
         <CardHeader>

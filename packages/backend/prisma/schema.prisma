@@ -84,6 +84,12 @@ enum StructuralTagGroup {
   FORMAT
 }
 
+enum EventTagAssignmentSource {
+  MANUAL_ADMIN
+  IMPORT_MAPPED
+  AUTO_RULE
+}
+
 enum Intensity {
   RELAXED
   NORMAL
@@ -742,14 +748,16 @@ model EventTag {
   tagId   String @db.Uuid
 
   /// Кто назначил/пересчитал тег (для будущего аудита/мягких ограничений).
-  assignedBy String? @db.Uuid
-  createdAt  DateTime @default(now())
+  assignedBy        String?                  @db.Uuid
+  assignmentSource  EventTagAssignmentSource?
+  createdAt         DateTime                 @default(now())
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([eventId, tagId])
   @@index([tagId])
+  @@index([assignmentSource])
   @@map("event_tags")
 }
 

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatCard } from '@daibilet/shared-ui';
 
+import { Button } from '@/components/ui/button';
 import { api } from '../lib/api';
 
 interface TrustKeyFactor {
@@ -174,14 +175,11 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title={`Добро пожаловать, ${data.operator.name}`}
-        subtitle={
-          <span className="text-sm text-gray-500">
-            Уровень доверия: {trustLabel} · Комиссия {commissionPct}%
-          </span>
-        }
+        subtitle={`Уровень доверия: ${trustLabel} · Комиссия ${commissionPct}%`}
+        meta={`Активных событий: ${data.events.active} · На модерации: ${data.events.pending}`}
       />
 
       {/* Trust & commission row */}
@@ -320,31 +318,28 @@ export default function Dashboard() {
           <SectionCard title="Требует внимания">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-700">
               {data.attention.eventsWithoutSchedule > 0 && (
-                <Link
-                  to="/availability"
-                  className="inline-flex items-center gap-1 font-medium text-amber-700 hover:text-amber-800"
-                >
+                <Button asChild variant="link" size="sm" className="h-auto p-0 font-medium text-amber-700 hover:text-amber-800">
+                  <Link to="/availability">
                   <AlertCircle className="h-4 w-4" />
                   {data.attention.eventsWithoutSchedule} событий без расписания
-                </Link>
+                  </Link>
+                </Button>
               )}
               {data.attention.eventsWithoutPhoto > 0 && (
-                <Link
-                  to="/events"
-                  className="inline-flex items-center gap-1 font-medium text-amber-700 hover:text-amber-800"
-                >
+                <Button asChild variant="link" size="sm" className="h-auto p-0 font-medium text-amber-700 hover:text-amber-800">
+                  <Link to="/events">
                   <AlertCircle className="h-4 w-4" />
                   {data.attention.eventsWithoutPhoto} без фото
-                </Link>
+                  </Link>
+                </Button>
               )}
               {data.attention.reviewsWithoutResponse > 0 && (
-                <Link
-                  to="/reviews"
-                  className="inline-flex items-center gap-1 font-medium text-amber-700 hover:text-amber-800"
-                >
+                <Button asChild variant="link" size="sm" className="h-auto p-0 font-medium text-amber-700 hover:text-amber-800">
+                  <Link to="/reviews">
                   <AlertCircle className="h-4 w-4" />
                   {data.attention.reviewsWithoutResponse} отзывов без ответа
-                </Link>
+                  </Link>
+                </Button>
               )}
             </div>
           </SectionCard>
@@ -442,13 +437,12 @@ export default function Dashboard() {
         <SectionCard
           title="Последние продажи"
           headerRight={
-            <Link
-              to="/reports"
-              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
-            >
-              Все отчёты
-              <ChevronRight className="h-3 w-3" />
-            </Link>
+            <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs font-medium text-blue-600 hover:text-blue-700">
+              <Link to="/reports">
+                Все отчёты
+                <ChevronRight className="h-3 w-3" />
+              </Link>
+            </Button>
           }
         >
           {recentSales.items.length === 0 && !loadingExtra ? (

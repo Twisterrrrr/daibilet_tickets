@@ -2,11 +2,11 @@ import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { ErrorState, FormActions, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -169,7 +169,7 @@ export function TagEditPage() {
         <ErrorState title="Ошибка загрузки тега" description={error} />
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Основные данные</CardTitle>
@@ -366,21 +366,25 @@ export function TagEditPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardFooter className="flex flex-wrap gap-3 pt-6">
+        <FormActions
+          primary={
             <Button type="submit" disabled={saving}>
               {saving ? 'Сохранение...' : 'Сохранить'}
             </Button>
-            {!isCreate && (
-              <Button type="button" variant="destructive" onClick={handleDelete} disabled={saving}>
-                Удалить
+          }
+          secondary={
+            <>
+              {!isCreate && (
+                <Button type="button" variant="destructive" onClick={handleDelete} disabled={saving}>
+                  Удалить
+                </Button>
+              )}
+              <Button type="button" variant="outline" onClick={() => navigate('/tags')}>
+                Назад
               </Button>
-            )}
-            <Button type="button" variant="outline" onClick={() => navigate('/tags')}>
-              Назад
-            </Button>
-          </CardFooter>
-        </Card>
+            </>
+          }
+        />
       </form>
     </div>
   );

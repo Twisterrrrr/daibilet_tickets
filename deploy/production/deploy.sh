@@ -29,27 +29,62 @@ echo "=== [1b/6] Ensure ssl/acme dirs + migrate certs ==="
 mkdir -p "$REPO_ROOT/deploy/production/ssl/main" "$REPO_ROOT/deploy/production/ssl/subdomains" "$REPO_ROOT/deploy/production/acme"
 SSL_DIR="$REPO_ROOT/deploy/production/ssl"
 CERTBOT_BASE="$REPO_ROOT/deploy/nginx/certbot"
-# Миграция: ищем сертификаты в нескольких местах (приоритет: ssl/main, ssl/, certbot)
+# Миграция: ищем main cert в нескольких местах
 if [ ! -f "$SSL_DIR/main/fullchain.pem" ]; then
   SOURCE=""
   if [ -f "$SSL_DIR/fullchain.pem" ]; then
     SOURCE="$SSL_DIR"
+  elif [ -f "$SSL_DIR/letsencrypt/live/daibilet.ru/fullchain.pem" ]; then
+    SOURCE="$SSL_DIR/letsencrypt/live/daibilet.ru"
   elif [ -f "$CERTBOT_BASE/conf/live/daibilet.ru/fullchain.pem" ]; then
     SOURCE="$CERTBOT_BASE/conf/live/daibilet.ru"
   elif [ -f "$CERTBOT_BASE/conf/live/www.daibilet.ru/fullchain.pem" ]; then
     SOURCE="$CERTBOT_BASE/conf/live/www.daibilet.ru"
   elif [ -f "$CERTBOT_BASE/www/fullchain.pem" ]; then
     SOURCE="$CERTBOT_BASE/www"
+  elif [ -f "$CERTBOT_BASE/www/daibilet.crt" ]; then
+    echo "[ssl] Копирую из certbot/www (daibilet.crt/key)"
+    cp "$CERTBOT_BASE/www/daibilet.crt" "$SSL_DIR/main/fullchain.pem"
+    cp "$CERTBOT_BASE/www/daibilet.key" "$SSL_DIR/main/privkey.pem"
+    SOURCE="done"
   else
     LIVE_DIR=$(find "$CERTBOT_BASE/conf/live" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
     if [ -n "$LIVE_DIR" ] && [ -f "$LIVE_DIR/fullchain.pem" ]; then
       SOURCE="$LIVE_DIR"
     fi
   fi
-  if [ -n "$SOURCE" ]; then
+  # Docker volume (старый docker-compose.prod / certbot)
+  if [ -z "$SOURCE" ]; then
+    for VOL in daibilet_certbot_conf daibilet-prod_nginx_certbot_conf; do
+      if docker volume inspect "$VOL" &>/dev/null; then
+        for DOMAIN in daibilet.ru www.daibilet.ru; do
+          if docker run --rm -v "${VOL}:/v:ro" alpine test -f "/v/live/${DOMAIN}/fullchain.pem" 2>/dev/null; then
+            echo "[ssl] Извлекаю из Docker volume $VOL (live/$DOMAIN)"
+            docker run --rm -v "${VOL}:/v:ro" -v "$SSL_DIR/main:/to" alpine sh -c "cp /v/live/${DOMAIN}/fullchain.pem /to/ && cp /v/live/${DOMAIN}/privkey.pem /to/"
+            SOURCE="done"
+            break 2
+          fi
+        done
+      fi
+    done
+  fi
+  if [ -n "$SOURCE" ] && [ "$SOURCE" != "done" ]; then
     echo "[ssl] Копирую сертификаты из $SOURCE в ssl/main/"
     cp "$SOURCE/fullchain.pem" "$SSL_DIR/main/"
     cp "$SOURCE/privkey.pem" "$SSL_DIR/main/"
+  fi
+fi
+# subdomains: пробуем LE, иначе fallback на main
+if [ ! -f "$SSL_DIR/subdomains/fullchain.pem" ]; then
+  LE_SUB=$(find "$SSL_DIR/letsencrypt/live" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
+  if [ -n "$LE_SUB" ] && [ -f "$LE_SUB/fullchain.pem" ]; then
+    echo "[ssl] Копирую subdomains cert из letsencrypt"
+    cp "$LE_SUB/fullchain.pem" "$SSL_DIR/subdomains/"
+    cp "$LE_SUB/privkey.pem" "$SSL_DIR/subdomains/"
+  elif [ -f "$SSL_DIR/main/fullchain.pem" ]; then
+    echo "[ssl] subdomains/ пусто — fallback на main (запусти scripts/setup-ssl-production.sh для отдельного LE)"
+    cp "$SSL_DIR/main/fullchain.pem" "$SSL_DIR/subdomains/"
+    cp "$SSL_DIR/main/privkey.pem" "$SSL_DIR/subdomains/"
   fi
 fi
 # subdomains: если нет — используем main (временный fallback до выпуска отдельного сертификата)
@@ -59,11 +94,10 @@ if [ ! -f "$SSL_DIR/subdomains/fullchain.pem" ] && [ -f "$SSL_DIR/main/fullchain
   cp -a "$SSL_DIR/main/privkey.pem" "$SSL_DIR/subdomains/" 2>/dev/null || cp "$SSL_DIR/main/privkey.pem" "$SSL_DIR/subdomains/"
 fi
 if [ ! -f "$SSL_DIR/main/fullchain.pem" ] || [ ! -f "$SSL_DIR/main/privkey.pem" ]; then
-  echo "[ERROR] Нет SSL. Положи fullchain.pem и privkey.pem в один из путей:"
-  echo "  - deploy/production/ssl/main/"
-  echo "  - deploy/production/ssl/ (плоская структура)"
-  echo "  - deploy/nginx/certbot/conf/live/daibilet.ru/"
-  echo "  - deploy/nginx/certbot/www/"
+  echo "[ERROR] Нет SSL. Варианты:"
+  echo "  1) bash scripts/setup-ssl-production.sh  — bootstrap Timeweb + Let's Encrypt"
+  echo "  2) Положить вручную: deploy/production/ssl/main/{fullchain,privkey}.pem"
+  echo "  Или: deploy/nginx/certbot/conf/live/daibilet.ru/ | deploy/nginx/certbot/www/"
   exit 1
 fi
 

@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 
 import { FormActions, FormGrid, FormSection, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { api } from '../lib/api';
 
 export default function Settings() {
@@ -78,66 +80,59 @@ export default function Settings() {
           <FormGrid>
             <div>
               <label className="mb-1 block text-sm font-medium">Название</label>
-              <input
+              <Input
                 value={form.name || ''}
                 onChange={set('name')}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Юр. название</label>
-              <input
+              <Input
                 value={form.companyName || ''}
                 onChange={set('companyName')}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>
           </FormGrid>
           <FormGrid>
             <div>
               <label className="mb-1 block text-sm font-medium">ИНН</label>
-              <input
+              <Input
                 value={form.inn || ''}
                 onChange={set('inn')}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Телефон</label>
-              <input
+              <Input
                 value={form.contactPhone || ''}
                 onChange={set('contactPhone')}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>
           </FormGrid>
           <FormGrid>
             <div>
               <label className="mb-1 block text-sm font-medium">Email</label>
-              <input
+              <Input
                 value={form.contactEmail || ''}
                 onChange={set('contactEmail')}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Сайт</label>
-              <input
+              <Input
                 value={form.website || ''}
                 onChange={set('website')}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>
           </FormGrid>
           <FormActions
             primary={
-              <button
+              <Button
                 type="submit"
                 disabled={loading}
-                className="rounded-lg bg-blue-600 px-6 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {loading ? 'Сохранение...' : 'Сохранить'}
-              </button>
+              </Button>
             }
           />
         </FormSection>

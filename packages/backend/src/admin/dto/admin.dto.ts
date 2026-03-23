@@ -133,10 +133,9 @@ export class CreateTagDto {
   @IsString()
   code?: string;
 
-  @ApiPropertyOptional({ enum: TagKind })
-  @IsOptional()
+  @ApiProperty({ enum: TagKind })
   @IsEnum(TagKind)
-  tagKind?: TagKind;
+  tagKind!: TagKind;
 
   @ApiPropertyOptional({ enum: StructuralTagGroup })
   @IsOptional()

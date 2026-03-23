@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -136,21 +138,17 @@ export function WidgetEditPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/widgets">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {isCreate ? 'Новый виджет' : 'Редактирование виджета'}
-          </h1>
-          <p className="text-muted-foreground">
-            {isCreate ? 'Добавить виджет teplohod.info' : form.title || form.externalId || 'Редактирование'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={isCreate ? 'Новый виджет' : 'Редактирование виджета'}
+        subtitle={isCreate ? 'Добавить виджет teplohod.info' : form.title || form.externalId || 'Редактирование'}
+        actions={
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/widgets">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+        }
+      />
 
       {error && (
         <Card className="border-destructive">

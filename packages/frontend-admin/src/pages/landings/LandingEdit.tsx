@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -213,21 +215,16 @@ export function LandingEditPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {isCreate ? 'Новый лендинг' : 'Редактирование лендинга'}
-          </h1>
-          <p className="text-muted-foreground">
-            {isCreate ? 'Создайте новый лендинг для города и тега' : 'Изменения сохранятся при нажатии «Сохранить»'}
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => navigate('/landings')} className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Назад
-        </Button>
-      </div>
+      <PageHeader
+        title={isCreate ? 'Новый лендинг' : 'Редактирование лендинга'}
+        subtitle={isCreate ? 'Создайте новый лендинг для города и тега' : 'Изменения сохранятся при нажатии «Сохранить»'}
+        actions={
+          <Button variant="outline" onClick={() => navigate('/landings')} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Назад
+          </Button>
+        }
+      />
 
       {error && (
         <Card className="border-destructive">

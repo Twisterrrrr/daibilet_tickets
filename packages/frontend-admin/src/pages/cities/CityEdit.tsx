@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { FormActions, FormGrid, FormSection } from '@daibilet/shared-ui';
+import { FormActions, FormGrid, FormSection, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { SeoMetaEditor } from '@/components/SeoMetaEditor';
@@ -113,17 +113,21 @@ export function CityEditPage() {
     const doneCount = [form.name, form.slug, form.description, form.heroImage].filter((x) => typeof x === 'string' && x.trim().length > 0).length;
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/cities">
-              <ArrowLeft className="h-4 w-4 mr-1" /> Назад
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold flex-1">Новый город</h1>
-          <Button onClick={handleSave} disabled={saving} className="gap-1">
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </Button>
-        </div>
+        <PageHeader
+          title="Новый город"
+          actions={
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/cities">
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Назад
+                </Link>
+              </Button>
+              <Button onClick={handleSave} disabled={saving} className="gap-1">
+                {saving ? 'Сохранение...' : 'Сохранить'}
+              </Button>
+            </>
+          }
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
@@ -198,18 +202,17 @@ export function CityEditPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/cities">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Редактировать город</h1>
-          <p className="text-muted-foreground">{city?.name ?? ''}</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Редактировать город"
+        subtitle={city?.name ?? ''}
+        actions={
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/cities">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+        }
+      />
 
       <FormSection
         title="Основные данные"

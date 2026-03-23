@@ -43,6 +43,13 @@ function parseCsvSlugs(value?: string): string[] | undefined {
   return parts.length ? parts : undefined;
 }
 
+type LegacyTagView = {
+  id: string;
+  name: string;
+  code: string | null;
+  isLegacy: true;
+};
+
 @Injectable()
 export class CatalogService {
   constructor(
@@ -1444,6 +1451,8 @@ export class CatalogService {
           FORMAT: [],
         } as { THEME: string[]; AUDIENCE: string[]; FORMAT: string[] }),
       popularTags: (event.popularTags as string[] | undefined) ?? [],
+      legacyTags: (event.legacyTags as string[] | undefined) ?? [],
+      legacyTagItems: (event.legacyTagItems as LegacyTagView[] | undefined) ?? [],
       highlights: event.highlights ?? [],
       isOptimalChoice: event.isOptimalChoice ?? false,
       groupingKey: event.groupingKey ?? null,
@@ -1584,12 +1593,31 @@ export class CatalogService {
       FORMAT: [],
     };
     const popularTags: string[] = [];
+    const legacyTags: string[] = [];
+    const legacyTagItems: LegacyTagView[] = [];
     for (const t of tags) {
       const tag = (t as {
-        tag?: { name?: string; slug?: string; tagKind?: TagKind | null; structuralGroup?: StructuralTagGroup | null } | null;
+        tag?: {
+          id?: string;
+          code?: string | null;
+          name?: string;
+          slug?: string;
+          tagKind?: TagKind | null;
+          structuralGroup?: StructuralTagGroup | null;
+        } | null;
       }).tag;
       const name = tag?.name;
-      if (!name || !tag?.tagKind) continue;
+      if (!name) continue;
+      if (!tag?.tagKind) {
+        legacyTags.push(name);
+        legacyTagItems.push({
+          id: String(tag?.id ?? ''),
+          name,
+          code: tag?.code ?? null,
+          isLegacy: true,
+        });
+        continue;
+      }
 
       if (tag.tagKind === TagKind.STRUCTURAL) {
         const group = tag.structuralGroup;
@@ -1605,6 +1633,10 @@ export class CatalogService {
       FORMAT: Array.from(new Set(structuralTags.FORMAT)),
     };
     const uniquePopularTags = Array.from(new Set(popularTags));
+    const uniqueLegacyTags = Array.from(new Set(legacyTags));
+    const uniqueLegacyTagItems = Array.from(
+      new Map(legacyTagItems.map((item) => [item.id || `${item.name}:${item.code ?? ''}`, item])).values(),
+    );
 
     return {
       ...overridden,
@@ -1617,6 +1649,8 @@ export class CatalogService {
       refundPolicyText: overridden.refundPolicyText,
       structuralTags: uniqueStructuralTags,
       popularTags: uniquePopularTags,
+      legacyTags: uniqueLegacyTags,
+      legacyTagItems: uniqueLegacyTagItems,
       relatedEvents: relatedEvents.map((r: Record<string, unknown>) => ({
         ...r,
         address: r.address ? shortenAddressToStreet(String(r.address)) : r.address,
@@ -1988,6 +2022,8 @@ export class CatalogService {
       }
       const tags: {
         tag?: {
+          id?: string;
+          code?: string | null;
           slug?: string;
           name?: string;
           tagKind?: TagKind | null;
@@ -1995,6 +2031,8 @@ export class CatalogService {
         } | null;
       }[] = (event.tags ?? []) as {
         tag?: {
+          id?: string;
+          code?: string | null;
           slug?: string;
           name?: string;
           tagKind?: TagKind | null;
@@ -2034,10 +2072,22 @@ export class CatalogService {
         FORMAT: [],
       };
       const popularTags: string[] = [];
+      const legacyTags: string[] = [];
+      const legacyTagItems: LegacyTagView[] = [];
       for (const t of tags) {
         const tag = t?.tag;
         const name = tag?.name;
-        if (!name || !tag?.tagKind) continue;
+        if (!name) continue;
+        if (!tag?.tagKind) {
+          legacyTags.push(name);
+          legacyTagItems.push({
+            id: String(tag?.id ?? ''),
+            name,
+            code: tag?.code ?? null,
+            isLegacy: true,
+          });
+          continue;
+        }
 
         if (tag.tagKind === TagKind.STRUCTURAL) {
           const group = tag.structuralGroup;
@@ -2048,6 +2098,10 @@ export class CatalogService {
       }
 
       const uniquePopularTags = Array.from(new Set(popularTags));
+      const uniqueLegacyTags = Array.from(new Set(legacyTags));
+      const uniqueLegacyTagItems = Array.from(
+        new Map(legacyTagItems.map((item) => [item.id || `${item.name}:${item.code ?? ''}`, item])).values(),
+      );
       const uniqueStructuralTags = {
         THEME: Array.from(new Set(structuralTags.THEME)),
         AUDIENCE: Array.from(new Set(structuralTags.AUDIENCE)),
@@ -2072,6 +2126,8 @@ export class CatalogService {
         tagSlugs,
         structuralTags: uniqueStructuralTags,
         popularTags: uniquePopularTags,
+        legacyTags: uniqueLegacyTags,
+        legacyTagItems: uniqueLegacyTagItems,
         groupSize,
         sessionTimes,
         highlights: displayHighlights,

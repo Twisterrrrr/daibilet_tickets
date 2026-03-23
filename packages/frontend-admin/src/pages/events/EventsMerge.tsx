@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,12 +70,10 @@ export function EventsMergePage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">Merge дублей событий</h1>
-        <p className="text-muted-foreground mt-1">
-          Поиск похожих событий (fuzzy-matching) и ручная пометка дублей. Дубли скрываются из каталога.
-        </p>
-      </div>
+      <PageHeader
+        title="Merge дублей событий"
+        subtitle="Поиск похожих событий (fuzzy-matching) и ручная пометка дублей. Дубли скрываются из каталога."
+      />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

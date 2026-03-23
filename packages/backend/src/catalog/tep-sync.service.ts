@@ -1,12 +1,13 @@
 import { normalizeEventTitle } from '@daibilet/shared';
 import { Injectable, Logger } from '@nestjs/common';
-import { EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
+import { EventAudience, EventCategory, EventSubcategory, EventTagAssignmentSource, Prisma } from '@prisma/client';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';
 import { CategoryMappingService } from './category-mapping.service';
+import { EventTagLifecycleService } from './event-tag-lifecycle.service';
 import { TepApiService, TepCity, TepEvent } from './tep-api.service';
 
 /**
@@ -70,6 +71,7 @@ export class TepSyncService {
     private readonly prisma: PrismaService,
     private readonly tepApi: TepApiService,
     private readonly categoryMapping: CategoryMappingService,
+    private readonly tagLifecycle: EventTagLifecycleService,
   ) {}
 
   /**
@@ -653,30 +655,38 @@ export class TepSyncService {
       'Ресторан-бар': 'restoran',
     };
 
+    const requestedSlugs = new Set<string>();
     for (const feature of features) {
       const tagSlug = featureToTag[feature.title];
       if (!tagSlug) continue;
+      requestedSlugs.add(tagSlug);
+    }
+    const effectiveSlugs = await this.tagLifecycle.filterSuppressedSlugs(event.id, requestedSlugs);
+
+    for (const tagSlug of effectiveSlugs) {
+      const titleFromFeature = features.find((f) => featureToTag[f.title] === tagSlug)?.title ?? tagSlug;
 
       let tag = await this.prisma.tag.findUnique({ where: { slug: tagSlug } });
       if (!tag) {
         tag = await this.prisma.tag.create({
           data: {
             slug: tagSlug,
-            name: feature.title,
+            name: titleFromFeature,
             category: 'THEME',
             isActive: true,
           },
         });
       }
 
-      await this.prisma.eventTag
-        .upsert({
-          where: { eventId_tagId: { eventId: event.id, tagId: tag.id } },
-          update: {},
-          create: { eventId: event.id, tagId: tag.id },
+      await this.tagLifecycle
+        .upsertWithSource({
+          eventId: event.id,
+          tagId: tag.id,
+          source: EventTagAssignmentSource.IMPORT_MAPPED,
         })
         .catch((e) => this.logger.error('tag sync failed: ' + (e as Error).message));
     }
+    await this.tagLifecycle.removeSuppressedAutoAssignments(event.id);
   }
 
   /**
@@ -705,22 +715,30 @@ export class TepSyncService {
     if (isBusTour) {
       const waterTag = await this.prisma.tag.findFirst({ where: { slug: 'water', isActive: true } });
       if (waterTag) {
-        await this.prisma.eventTag.deleteMany({ where: { eventId: event.id, tagId: waterTag.id } });
+        await this.prisma.eventTag.deleteMany({
+          where: {
+            eventId: event.id,
+            tagId: waterTag.id,
+            assignmentSource: { in: [EventTagAssignmentSource.AUTO_RULE, EventTagAssignmentSource.IMPORT_MAPPED] },
+          },
+        });
       }
     }
 
-    for (const slug of slugsToLink) {
+    const effectiveSlugs = await this.tagLifecycle.filterSuppressedSlugs(event.id, slugsToLink);
+    for (const slug of effectiveSlugs) {
       const tag = await this.prisma.tag.findFirst({ where: { slug, isActive: true } });
       if (tag) {
-        await this.prisma.eventTag
-          .upsert({
-            where: { eventId_tagId: { eventId: event.id, tagId: tag.id } },
-            update: {},
-            create: { eventId: event.id, tagId: tag.id },
+        await this.tagLifecycle
+          .upsertWithSource({
+            eventId: event.id,
+            tagId: tag.id,
+            source: EventTagAssignmentSource.IMPORT_MAPPED,
           })
           .catch((e) => this.logger.error('tag sync failed: ' + (e as Error).message));
       }
     }
+    await this.tagLifecycle.removeSuppressedAutoAssignments(event.id);
   }
 
   // ========================

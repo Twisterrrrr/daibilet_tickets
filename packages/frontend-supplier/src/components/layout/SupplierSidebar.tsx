@@ -1,5 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 
+import { CountBadge } from '@daibilet/shared-ui';
+
 import { Badge } from '@/components/ui/badge';
 import { SUPPLIER_NAV_SECTIONS } from '@/config/nav';
 import {
@@ -115,9 +117,7 @@ export function SupplierSidebar({ supplier, reviewsBadge, notificationsBadge }: 
                             <span className="flex flex-1 items-center justify-between text-sm">
                               {item.label}
                               {badge !== null && badge > 0 && (
-                                <Badge variant="secondary" className="ml-2 h-5 min-w-5 justify-center px-1.5 text-[10px]">
-                                  {badge}
-                                </Badge>
+                                <CountBadge count={badge} className="ml-2" />
                               )}
                             </span>
                           )}

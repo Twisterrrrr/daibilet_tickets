@@ -285,7 +285,7 @@ function ReviewDetailView({ review, onBack, onUpdate }: { review: ReviewDetail; 
   return (
     <div className="space-y-6">
       <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-700">← К списку</button>
-      <h1 className="text-xl font-bold">Отзыв</h1>
+      <PageHeader title="Отзыв" />
 
       <div className="rounded-lg border bg-white p-5">
         <div className="flex items-center gap-2">

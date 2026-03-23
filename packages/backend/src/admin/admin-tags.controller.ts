@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { StructuralTagGroup, TagKind } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -28,6 +29,22 @@ import { CreateTagDto, UpdateTagDto } from './dto/admin.dto';
 @Controller('admin/tags')
 export class AdminTagsController {
   constructor(private readonly prisma: PrismaService) {}
+
+  private validateTagKindCombination(input: {
+    tagKind?: TagKind | null;
+    structuralGroup?: StructuralTagGroup | null;
+  }) {
+    const { tagKind, structuralGroup } = input;
+    if (!tagKind) {
+      throw new BadRequestException('tagKind обязателен');
+    }
+    if (tagKind === TagKind.STRUCTURAL && !structuralGroup) {
+      throw new BadRequestException('Для STRUCTURAL тега обязательно structuralGroup');
+    }
+    if (tagKind === TagKind.POPULAR && structuralGroup != null) {
+      throw new BadRequestException('Для POPULAR тега structuralGroup должен быть null');
+    }
+  }
 
   @Get()
   async list(
@@ -84,6 +101,10 @@ export class AdminTagsController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateTagDto) {
+    this.validateTagKindCombination({
+      tagKind: data.tagKind ?? null,
+      structuralGroup: data.structuralGroup ?? null,
+    });
     return this.prisma.tag.create({ data });
   }
 
@@ -91,6 +112,18 @@ export class AdminTagsController {
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateTagDto) {
     const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, events: _events, articleTags: _articleTags, _count, version: _version, ...clean } = data as Record<string, unknown>;
+
+    const current = await this.prisma.tag.findUnique({
+      where: { id },
+      select: { tagKind: true, structuralGroup: true },
+    });
+    if (!current) {
+      throw new BadRequestException('Тег не найден');
+    }
+    this.validateTagKindCombination({
+      tagKind: (data.tagKind ?? current.tagKind) as TagKind | null,
+      structuralGroup: (data.structuralGroup ?? current.structuralGroup) as StructuralTagGroup | null,
+    });
 
     if (data.version !== undefined) {
       const result = await this.prisma.tag.updateMany({

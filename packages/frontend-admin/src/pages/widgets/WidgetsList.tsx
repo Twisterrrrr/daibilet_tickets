@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -121,18 +123,18 @@ export function WidgetsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Виджеты Teplohod</h1>
-          <p className="text-muted-foreground">Справочник виджетов и привязок для teplohod.info</p>
-        </div>
-        <Button asChild>
-          <Link to="/widgets/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Создать
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Виджеты Teplohod"
+        subtitle="Справочник виджетов и привязок для teplohod.info"
+        actions={
+          <Button asChild>
+            <Link to="/widgets/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Создать
+            </Link>
+          </Button>
+        }
+      />
 
       {error && (
         <Card className="border-destructive">

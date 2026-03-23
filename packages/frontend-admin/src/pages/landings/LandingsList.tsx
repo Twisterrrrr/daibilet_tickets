@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -102,19 +104,18 @@ export function LandingsListPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Лендинги</h1>
-          <p className="text-muted-foreground">Управление лендинг-страницами по городам и тегам</p>
-        </div>
-        <Button asChild>
-          <Link to="/landings/new" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Создать
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Лендинги"
+        subtitle="Управление лендинг-страницами по городам и тегам"
+        actions={
+          <Button asChild>
+            <Link to="/landings/new" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Создать
+            </Link>
+          </Button>
+        }
+      />
 
       {error && (
         <Card className="border-destructive">

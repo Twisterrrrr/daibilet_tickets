@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DateMode, EventAudience, EventCategory, Prisma } from '@prisma/client';
+import { DateMode, EventAudience, EventCategory, Prisma, StructuralTagGroup, TagKind } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { isSellable } from './sellable';
@@ -33,6 +33,16 @@ export class EventQualityService {
         venue: { select: { id: true, title: true } },
         offers: true,
         sessions: { where: { isActive: true } },
+        tags: {
+          include: {
+            tag: {
+              select: {
+                tagKind: true,
+                structuralGroup: true,
+              },
+            },
+          },
+        },
         override: true,
       },
     });
@@ -157,6 +167,30 @@ export class EventQualityService {
           });
         }
       }
+    }
+
+    // SEO gate: минимальный структурный паспорт для поисковых и SEO-страниц.
+    const structuralGroups = new Set<StructuralTagGroup>();
+    for (const link of event.tags) {
+      if (link.tag?.tagKind === TagKind.STRUCTURAL && link.tag.structuralGroup) {
+        structuralGroups.add(link.tag.structuralGroup);
+      }
+    }
+    if (!structuralGroups.has('THEME')) {
+      issues.push({
+        code: 'MISSING_STRUCTURAL_THEME_TAG',
+        message: 'Для SEO и каталога у события должен быть хотя бы один STRUCTURAL тег группы THEME',
+        field: 'tags',
+        ownership: 'local',
+      });
+    }
+    if (!structuralGroups.has('FORMAT')) {
+      issues.push({
+        code: 'MISSING_STRUCTURAL_FORMAT_TAG',
+        message: 'Для SEO и каталога у события должен быть хотя бы один STRUCTURAL тег группы FORMAT',
+        field: 'tags',
+        ownership: 'local',
+      });
     }
 
     const isReady = issues.length === 0;

@@ -183,24 +183,23 @@ export default function Reports() {
             <div className="inline-block">
               <DateRangePicker value={range} onChange={setRange} />
               <div className="mt-4 flex justify-end gap-3">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setShowPicker(false)}
-                  className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Отмена
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => {
                     setShowPicker(false);
                     load();
                   }}
-                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                   disabled={loading}
                 >
                   Применить
-                </button>
+                </Button>
               </div>
             </div>
           </div>

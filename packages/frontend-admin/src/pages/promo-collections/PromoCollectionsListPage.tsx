@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { promoCollectionsApi, type PromoCollection } from '@/api/promo-collections';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -69,16 +71,16 @@ export function PromoCollectionsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Promo-коллекции</h1>
-          <p className="text-muted-foreground">Подборки событий/мест для промо-блоков главной</p>
-        </div>
-        <Button onClick={() => navigate('/promo-collections/new')}>
-          <Plus className="mr-2 h-4 w-4" />
-          Создать
-        </Button>
-      </div>
+      <PageHeader
+        title="Promo-коллекции"
+        subtitle="Подборки событий/мест для промо-блоков главной"
+        actions={
+          <Button onClick={() => navigate('/promo-collections/new')}>
+            <Plus className="mr-2 h-4 w-4" />
+            Создать
+          </Button>
+        }
+      />
 
       {error && (
         <Card className="border-destructive">

@@ -71,6 +71,20 @@ async function bootstrap() {
 
   // Персистентный лог legacy PurchaseType → AuditLog (переживает рестарты)
   const prisma = app.get(PrismaService);
+  try {
+    const [legacyKindNull, legacyStructuralNoGroup] = await Promise.all([
+      prisma.tag.count({ where: { tagKind: null } }),
+      prisma.tag.count({ where: { tagKind: 'STRUCTURAL', structuralGroup: null } }),
+    ]);
+    const legacyTotal = legacyKindNull + legacyStructuralNoGroup;
+    if (legacyTotal > 0) {
+      logger.warn(
+        `Legacy tags detected: ${legacyTotal} items (tagKind NULL=${legacyKindNull}, STRUCTURAL w/o group=${legacyStructuralNoGroup}). Run migrateLegacyTags.`,
+      );
+    }
+  } catch (e) {
+    logger.warn(`Legacy tags startup check skipped: ${(e as Error).message}`);
+  }
   setCompatLogger((raw, resolved, context) => {
     prisma.auditLog
       .create({

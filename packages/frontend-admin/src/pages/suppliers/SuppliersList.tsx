@@ -6,8 +6,10 @@ import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const TRUST_LABELS: Record<number, string> = {
   0: 'Новый',
@@ -219,86 +221,76 @@ export function SuppliersListPage() {
         />
       )}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Фильтры</CardTitle>
-          <CardDescription>Поиск, trust-уровень и активность поставщика</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && load({ page: 1, search: e.currentTarget.value })}
-              placeholder="Поиск по названию или email..."
-              className="px-3 py-1.5 border rounded-lg text-sm w-64"
-            />
-            <button
-              type="button"
-              className="px-3 py-1.5 rounded-lg border text-sm bg-primary text-primary-foreground hover:opacity-90"
-              onClick={() => load({ page: 1, search })}
-            >
-              Найти
-            </button>
-            <select
-              value={trustFilter}
-              onChange={(e) => {
-                const v = e.target.value as typeof trustFilter;
-                setTrustFilter(v);
-                load({ page: 1, trust: v });
-              }}
-              className="px-2 py-1.5 border rounded-lg text-xs text-muted-foreground"
-            >
-              <option value="all">Trust: все</option>
-              <option value="0">0 — Новый</option>
-              <option value="1">1 — Проверенный</option>
-              <option value="2">2 — Доверенный</option>
-            </select>
-            <select
-              value={activeFilter}
-              onChange={(e) => {
-                const v = e.target.value as typeof activeFilter;
-                setActiveFilter(v);
-                load({ page: 1, isActive: v });
-              }}
-              className="px-2 py-1.5 border rounded-lg text-xs text-muted-foreground"
-            >
-              <option value="all">Статус: все</option>
-              <option value="true">Активные</option>
-              <option value="false">Неактивные</option>
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Список поставщиков</CardTitle>
-          <CardDescription>
-            Стр. {page} из {pages}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {suppliers.length === 0 && !loading ? (
-            <EmptyState
-              title="Нет поставщиков"
-              description="Как только появятся поставщики или подключённые агрегаторы, они отобразятся здесь."
-            />
-          ) : (
-            <DataTable
-              columns={columns}
-              data={suppliers}
-              loading={loading}
-              emptyText="Нет поставщиков"
-              onRowClick={(item) => {
-                const isAggregator = typeof item.id === 'string' && item.id.startsWith('agg:');
-                if (!isAggregator) navigate(`/suppliers/${item.id}`);
-              }}
-              pageSize={20}
-            />
-          )}
-        </CardContent>
-      </Card>
+      {suppliers.length === 0 && !loading ? (
+        <EmptyState
+          title="Нет поставщиков"
+          description="Как только появятся поставщики или подключённые агрегаторы, они отобразятся здесь."
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={suppliers}
+          loading={loading}
+          emptyText="Нет поставщиков"
+          onRowClick={(item) => {
+            const isAggregator = typeof item.id === 'string' && item.id.startsWith('agg:');
+            if (!isAggregator) navigate(`/suppliers/${item.id}`);
+          }}
+          pageSize={20}
+          toolbar={
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && load({ page: 1, search: e.currentTarget.value })}
+                placeholder="Поиск по названию или email..."
+                className="w-64"
+              />
+              <Button type="button" variant="outline" size="sm" onClick={() => load({ page: 1, search })}>
+                Найти
+              </Button>
+              <Select
+                value={trustFilter}
+                onValueChange={(value) => {
+                  const v = value as typeof trustFilter;
+                  setTrustFilter(v);
+                  load({ page: 1, trust: v });
+                }}
+              >
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue placeholder="Trust: все" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Trust: все</SelectItem>
+                  <SelectItem value="0">0 — Новый</SelectItem>
+                  <SelectItem value="1">1 — Проверенный</SelectItem>
+                  <SelectItem value="2">2 — Доверенный</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={activeFilter}
+                onValueChange={(value) => {
+                  const v = value as typeof activeFilter;
+                  setActiveFilter(v);
+                  load({ page: 1, isActive: v });
+                }}
+              >
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue placeholder="Статус: все" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Статус: все</SelectItem>
+                  <SelectItem value="true">Активные</SelectItem>
+                  <SelectItem value="false">Неактивные</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="ml-auto text-sm text-muted-foreground">
+                Стр. {page} из {pages}
+              </span>
+            </div>
+          }
+        />
+      )}
     </div>
   );
 }

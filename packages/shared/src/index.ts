@@ -439,6 +439,10 @@ export interface EventListItem {
   structuralTags?: { THEME: string[]; AUDIENCE: string[]; FORMAT: string[] };
   /** POPULAR — для UI бейджей/выборов. */
   popularTags?: string[];
+  /** Legacy fallback (tagKind is null): временный safeguard до полной очистки данных. */
+  legacyTags?: string[];
+  /** Расширенный debug-safe fallback для legacy связей (временное поле). */
+  legacyTagItems?: Array<{ id: string; name: string; code: string | null; isLegacy: true }>;
   shortTitle?: string;
   /** Краткое описание для карточки каталога */
   shortDescription?: string | null;

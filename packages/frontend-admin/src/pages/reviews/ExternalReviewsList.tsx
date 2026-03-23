@@ -2,6 +2,8 @@ import { ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -128,21 +130,21 @@ export function ExternalReviewsListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Внешние отзывы</h1>
-          <p className="text-muted-foreground">{total} отзывов с внешних площадок</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowBatchDialog(true)}>
-            Импорт JSON
-          </Button>
-          <Button onClick={() => setShowAddDialog(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Добавить
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Внешние отзывы"
+        subtitle={`${total} отзывов с внешних площадок`}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowBatchDialog(true)}>
+              Импорт JSON
+            </Button>
+            <Button onClick={() => setShowAddDialog(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Добавить
+            </Button>
+          </div>
+        }
+      />
 
       {/* List */}
       {loading ? (

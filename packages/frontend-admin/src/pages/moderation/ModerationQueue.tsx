@@ -16,7 +16,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { EmptyState } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, LoadingState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -34,15 +34,28 @@ export function ModerationQueuePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
     const params = sortBy === 'trust_asc' ? '?sortBy=trust_asc' : '';
-    adminApi.get<{ items: unknown[]; total: number }>(`/admin/moderation/queue${params}`).then((res) => {
-      setEvents(res.items || []);
-      setTotal(res.total || 0);
-      const nextItems = (res.items as any[]) || [];
-      setSelectedId((prev) => (prev && nextItems.some((e) => e.id === prev) ? prev : nextItems[0]?.id ?? null));
-    });
+    adminApi
+      .get<{ items: unknown[]; total: number }>(`/admin/moderation/queue${params}`)
+      .then((res) => {
+        setEvents(res.items || []);
+        setTotal(res.total || 0);
+        const nextItems = (res.items as any[]) || [];
+        setSelectedId((prev) => (prev && nextItems.some((e) => e.id === prev) ? prev : nextItems[0]?.id ?? null));
+      })
+      .catch((err: unknown) => {
+        setEvents([]);
+        setTotal(0);
+        setSelectedId(null);
+        setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить очередь модерации');
+      })
+      .finally(() => setLoading(false));
   }, [sortBy]);
 
   useEffect(() => {
@@ -89,21 +102,21 @@ export function ModerationQueuePage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Модерация событий</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{total} событий ожидают проверки</p>
-        </div>
-        <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortBy)}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="created_desc">На модерации (новые)</SelectItem>
-            <SelectItem value="trust_asc">По trust (низкий приоритет)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <PageHeader
+        title="Модерация событий"
+        subtitle={loading ? 'Загружаем очередь модерации...' : `${total} событий ожидают проверки`}
+        actions={
+          <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortBy)}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_desc">На модерации (новые)</SelectItem>
+              <SelectItem value="trust_asc">По trust (низкий приоритет)</SelectItem>
+            </SelectContent>
+          </Select>
+        }
+      />
 
       {/* Reject dialog */}
       {rejectId && (
@@ -139,7 +152,19 @@ export function ModerationQueuePage() {
         </div>
       )}
 
-      {events.length === 0 ? (
+      {loadError ? (
+        <ErrorState
+          title="Не удалось загрузить модерацию"
+          description={loadError}
+          action={
+            <Button variant="outline" onClick={load}>
+              Повторить попытку
+            </Button>
+          }
+        />
+      ) : loading ? (
+        <LoadingState label="Загружаем события на модерации..." />
+      ) : events.length === 0 ? (
         <EmptyState
           title="Нет событий на модерации"
           description="Все отправленные события уже рассмотрены."

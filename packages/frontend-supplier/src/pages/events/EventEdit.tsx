@@ -194,11 +194,11 @@ export default function EventEdit() {
   };
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <PageHeader title={isNew ? 'Новое событие' : 'Редактирование события'} />
 
       {wizardDraft && (
-        <div className="space-y-4 rounded-xl border bg-white px-4 py-4 sm:px-5 sm:py-5">
+        <div className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5">
           <p className="text-xs text-slate-600">
             Новый мастер создания события. Основные шаги: базовая информация, расписание, билеты, вместимость и
             публикация. Тарифы и продвинутая настройка по‑прежнему доступны через админский интерфейс.

@@ -2,32 +2,39 @@ import { AlertTriangle, CheckCircle, Clock, Eye, EyeOff, Plus, Trash2, XCircle }
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { EmptyState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '@daibilet/shared-ui';
+
+import { Button } from '@/components/ui/button';
 
 import { api } from '../../lib/api';
 
-const STATUS_ICONS: Record<string, { icon: any; badgeClass: string; label: string }> = {
-  APPROVED: { icon: CheckCircle, badgeClass: 'bg-emerald-50 text-emerald-700', label: 'Одобрено' },
-  AUTO_APPROVED: { icon: CheckCircle, badgeClass: 'bg-blue-50 text-blue-700', label: 'Авто' },
-  PENDING_REVIEW: { icon: Clock, badgeClass: 'bg-amber-50 text-amber-800', label: 'На модерации' },
-  REJECTED: { icon: XCircle, badgeClass: 'bg-red-50 text-red-700', label: 'Отклонено' },
-  DRAFT: { icon: EyeOff, badgeClass: 'bg-slate-100 text-slate-600', label: 'Черновик' },
+const STATUS_ICONS: Record<string, { icon: any; label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+  APPROVED: { icon: CheckCircle, label: 'Одобрено', tone: 'success' },
+  AUTO_APPROVED: { icon: CheckCircle, label: 'Авто', tone: 'success' },
+  PENDING_REVIEW: { icon: Clock, label: 'На модерации', tone: 'warning' },
+  REJECTED: { icon: XCircle, label: 'Отклонено', tone: 'danger' },
+  DRAFT: { icon: EyeOff, label: 'Черновик', tone: 'neutral' },
 };
 
 export default function EventsList() {
   const [events, setEvents] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [trustInfo, setTrustInfo] = useState<{ activeEventsCount: number; activeEventsLimit: number } | null>(null);
 
   const loadEvents = () => {
     setLoading(true);
+    setLoadError(null);
     api
       .get<{ items: any[]; total: number }>('/supplier/events')
       .then((res) => {
         setEvents(res.items);
         setTotal(res.total);
+      })
+      .catch((err: unknown) => {
+        setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить события');
       })
       .finally(() => setLoading(false));
   };
@@ -76,12 +83,12 @@ export default function EventsList() {
         title="Мои события"
         subtitle={`Всего: ${total}`}
         actions={
-          <Link
-            to="/events/new"
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" /> Создать событие
-          </Link>
+          <Button asChild>
+            <Link to="/events/new">
+              <Plus className="h-4 w-4" />
+              Создать событие
+            </Link>
+          </Button>
         }
       />
 
@@ -111,11 +118,23 @@ export default function EventsList() {
 
       {loading && <LoadingState label="Загружаем ваши события..." />}
 
-      {!loading && events.length === 0 && (
+      {!loading && loadError && (
+        <ErrorState
+          title="Не удалось загрузить события"
+          description={loadError}
+          action={
+            <Button type="button" variant="outline" onClick={loadEvents}>
+              Повторить
+            </Button>
+          }
+        />
+      )}
+
+      {!loading && !loadError && events.length === 0 && (
         <EmptyState title="У вас пока нет событий" description="Создайте первое событие, чтобы начать продажи." />
       )}
 
-      {events.length > 0 && (
+      {!loadError && events.length > 0 && (
         <SectionCard>
           {events.map((event) => {
             const st = STATUS_ICONS[event.moderationStatus] || STATUS_ICONS.DRAFT;
@@ -146,24 +165,26 @@ export default function EventsList() {
                       )}
                     </p>
                   </div>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${st.badgeClass}`}>
-                    <st.icon className="h-3.5 w-3.5" />
-                    {st.label}
+                  <span className="inline-flex items-center gap-1">
+                    <st.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                    <StatusBadge tone={st.tone} label={st.label} />
                   </span>
                   {event.moderationNote && (
                     <span className="max-w-[200px] truncate text-xs text-red-500">{event.moderationNote}</span>
                   )}
                 </Link>
                 {canDelete && (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleDelete(event)}
                     disabled={deletingId === event.id}
-                    className="inline-flex items-center gap-1 rounded-lg border border-red-100 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    className="border-red-100 text-red-600 hover:bg-red-50 hover:text-red-700"
                   >
                     <Trash2 className="h-3 w-3" />
                     {deletingId === event.id ? 'Удаление…' : 'Удалить'}
-                  </button>
+                  </Button>
                 )}
               </div>
             );

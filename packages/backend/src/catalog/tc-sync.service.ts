@@ -2,11 +2,12 @@ import { normalizeEventTitle } from '@daibilet/shared';
 import { getCanonicalLandingTags } from './canonical-tag-enrichment';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { EventTagAssignmentSource, Prisma } from '@prisma/client';
 
 import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';
 import { classify } from './event-classifier';
+import { EventTagLifecycleService } from './event-tag-lifecycle.service';
 import { TcApiService } from './tc-api.service';
 import { type TcEvent, type TcTicketSet, type TcTicketSetRule, type TcVenueCity, isTcEvent } from './tc-api.types';
 import {
@@ -54,6 +55,7 @@ export class TcSyncService {
     private readonly tcApi: TcApiService,
     private readonly tcGrpc: TcGrpcService,
     private readonly config: ConfigService,
+    private readonly tagLifecycle: EventTagLifecycleService,
   ) {}
 
   // ============================================================
@@ -1252,24 +1254,36 @@ export class TcSyncService {
     if (isBusTour) {
       const waterTag = await this.prisma.tag.findFirst({ where: { slug: 'water', isActive: true } });
       if (waterTag) {
-        await this.prisma.eventTag.deleteMany({ where: { eventId, tagId: waterTag.id } });
+        await this.prisma.eventTag.deleteMany({
+          where: {
+            eventId,
+            tagId: waterTag.id,
+            assignmentSource: { in: [EventTagAssignmentSource.AUTO_RULE, EventTagAssignmentSource.IMPORT_MAPPED] },
+          },
+        });
       }
     }
 
-    if (slugsToLink.size === 0) return;
+    const effectiveSlugs = await this.tagLifecycle.filterSuppressedSlugs(eventId, slugsToLink);
+    if (effectiveSlugs.length === 0) {
+      await this.tagLifecycle.removeSuppressedAutoAssignments(eventId);
+      return;
+    }
 
-    for (const slug of slugsToLink) {
+    for (const slug of effectiveSlugs) {
       const tag = await this.prisma.tag.findFirst({ where: { slug, isActive: true } });
       if (tag) {
-        await this.prisma.eventTag
-          .upsert({
-            where: { eventId_tagId: { eventId, tagId: tag.id } },
-            update: {},
-            create: { eventId, tagId: tag.id },
+        await this.tagLifecycle
+          .upsertWithSource({
+            eventId,
+            tagId: tag.id,
+            source: EventTagAssignmentSource.IMPORT_MAPPED,
           })
           .catch((e) => this.logger.error('tag sync failed: ' + (e as Error).message));
       }
     }
+
+    await this.tagLifecycle.removeSuppressedAutoAssignments(eventId);
   }
 
   async retagAll(): Promise<{ eventsProcessed: number; tagsLinked: number }> {

@@ -1,51 +1,34 @@
-# SSL-сертификаты (Timeweb Pro, Let's Encrypt и др.)
+# SSL-сертификаты (Timeweb Pro + Let's Encrypt)
 
-Используются **два набора сертификатов**:
+**Основной домен** — Timeweb Pro (main/)  
+**Поддомены** — Let's Encrypt (subdomains/)
 
-> **Автомиграция при деплое:** deploy ищет сертификаты в `ssl/`, `deploy/nginx/certbot/conf/live/daibilet.ru/`, `deploy/nginx/certbot/www/` и копирует в `ssl/main/`.
+## Быстрый старт
 
-1. **main/** — daibilet.ru, www.daibilet.ru  
-2. **subdomains/** — admin.daibilet.ru, api.daibilet.ru, supplier.daibilet.ru  
+```bash
+# На сервере: первичная настройка
+bash scripts/setup-ssl-production.sh
+```
 
 ## Структура
 
 ```
 deploy/production/ssl/
-├── main/
-│   ├── fullchain.pem   # сертификат + цепочка
-│   └── privkey.pem     # приватный ключ
-└── subdomains/
-    ├── fullchain.pem
-    └── privkey.pem
+├── main/           # daibilet.ru, www.daibilet.ru (Timeweb Pro)
+│   ├── fullchain.pem
+│   └── privkey.pem
+├── subdomains/     # admin, api, supplier (Let's Encrypt)
+│   ├── fullchain.pem
+│   └── privkey.pem
+└── letsencrypt/    # certbot storage (для renewal)
 ```
 
-## Получение сертификатов
+## Автомиграция при deploy
 
-### Timeweb Pro
+Deploy ищет main cert в: `ssl/`, Docker volume `daibilet_certbot_conf`, `deploy/nginx/certbot/conf/live/`, `deploy/nginx/certbot/www/`  
+Subdomains: fallback на main, или `ssl/letsencrypt/live/*/`
 
-1. В панели Timeweb создай **два** сертификата:
-   - Один для daibilet.ru + www.daibilet.ru
-   - Второй для admin.daibilet.ru, api.daibilet.ru, supplier.daibilet.ru (SAN или wildcard *.daibilet.ru)
+## Вручную
 
-2. Скачай CRT и Private KEY для каждого.
-
-3. Разложи по папкам:
-   - Сертификат основного сайта → `main/`
-   - Сертификат поддоменов → `subdomains/`
-
-### Let's Encrypt (certbot)
-
-```bash
-# Основной домен
-certbot certonly --webroot -w /var/www/certbot -d daibilet.ru -d www.daibilet.ru
-cp /etc/letsencrypt/live/daibilet.ru/fullchain.pem deploy/production/ssl/main/
-cp /etc/letsencrypt/live/daibilet.ru/privkey.pem deploy/production/ssl/main/
-
-# Поддомены (admin, api, supplier)
-certbot certonly --webroot -w /var/www/certbot \
-  -d admin.daibilet.ru -d api.daibilet.ru -d supplier.daibilet.ru
-cp /etc/letsencrypt/live/admin.daibilet.ru/fullchain.pem deploy/production/ssl/subdomains/
-cp /etc/letsencrypt/live/admin.daibilet.ru/privkey.pem deploy/production/ssl/subdomains/
-```
-
-Файл CRT от Timeweb уже содержит цепочку — сохраняй как `fullchain.pem`.
+- **Timeweb Pro:** скачай CRT+KEY → `main/fullchain.pem`, `main/privkey.pem`
+- **Let's Encrypt:** `bash scripts/setup-ssl-production.sh` или см. docs/Runbook-Production-SSL-Deploy.md

@@ -129,8 +129,8 @@ export function DataTable<TData, TValue>({
     <div className="space-y-4">
       {/* Toolbar */}
       {(searchColumn || toolbar) && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-1 items-center gap-2">
+        <div className="flex flex-col gap-3 rounded-md border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             {searchColumn && (
               <Input
                 placeholder={searchPlaceholder}
@@ -140,7 +140,7 @@ export function DataTable<TData, TValue>({
               />
             )}
           </div>
-          {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
+          {toolbar && <div className="flex flex-wrap items-center justify-end gap-2">{toolbar}</div>}
         </div>
       )}
 
@@ -166,8 +166,18 @@ export function DataTable<TData, TValue>({
                     <TableRow
                       key={row.id}
                       data-state={row.getIsSelected() && 'selected'}
-                      className={cn(onRowClick && 'cursor-pointer')}
+                      className={cn(
+                        onRowClick && 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                      )}
+                      tabIndex={onRowClick ? 0 : -1}
                       onClick={() => onRowClick?.(row.original)}
+                      onKeyDown={(event) => {
+                        if (!onRowClick) return;
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onRowClick(row.original);
+                        }
+                      }}
                     >
                       {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>

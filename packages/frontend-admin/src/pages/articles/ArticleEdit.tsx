@@ -2,7 +2,7 @@ import { ArrowLeft, Eye, Monitor, Save, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { PageHeader } from '@daibilet/shared-ui';
+import { FormActions, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -476,16 +476,20 @@ export function ArticleEditPage() {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Сохранение...' : 'Сохранить'}
-            </Button>
-            {!isCreate && (
-              <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-                {deleting ? 'Удаление...' : 'Удалить'}
+          <FormActions
+            primary={
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? 'Сохранение...' : 'Сохранить'}
               </Button>
-            )}
-          </div>
+            }
+            secondary={
+              !isCreate ? (
+                <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? 'Удаление...' : 'Удалить'}
+                </Button>
+              ) : undefined
+            }
+          />
         </CardContent>
       </Card>
     </div>

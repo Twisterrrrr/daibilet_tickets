@@ -2,7 +2,7 @@ import { Building2, Calendar, Megaphone, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { EmptyState, ErrorState } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -55,13 +55,15 @@ export function CitiesListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Города</h1>
-        <Button className="gap-1" onClick={() => navigate('/cities/new')}>
-          <Plus className="h-4 w-4" />
-          Добавить
-        </Button>
-      </div>
+      <PageHeader
+        title="Города"
+        actions={
+          <Button className="gap-1" onClick={() => navigate('/cities/new')}>
+            <Plus className="h-4 w-4" />
+            Добавить
+          </Button>
+        }
+      />
 
       {error && (
         <ErrorState

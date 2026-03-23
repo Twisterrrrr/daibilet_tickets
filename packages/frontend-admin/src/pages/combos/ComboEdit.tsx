@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { adminApi } from '../../api/client';
@@ -189,7 +191,10 @@ export function ComboEditPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold text-gray-900">{isCreate ? 'Новый combo' : 'Редактирование combo'}</h1>
+      <PageHeader
+        title={isCreate ? 'Новый combo' : 'Редактирование combo'}
+        className="mb-6"
+      />
 
       {error && <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 

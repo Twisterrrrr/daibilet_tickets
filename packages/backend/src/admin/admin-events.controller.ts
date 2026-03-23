@@ -29,6 +29,7 @@ import {
   Prisma,
   PurchaseType,
   TagKind,
+  EventTagAssignmentSource,
 } from '@prisma/client';
 import type { Response } from 'express';
 
@@ -1599,7 +1600,12 @@ export class AdminEventsController {
     const newTagIds = [...structuralRows, ...popularRows].map((t) => t.id);
     if (newTagIds.length > 0) {
       await this.prisma.eventTag.createMany({
-        data: newTagIds.map((tagId) => ({ eventId: id, tagId, assignedBy })),
+        data: newTagIds.map((tagId) => ({
+          eventId: id,
+          tagId,
+          assignedBy,
+          assignmentSource: EventTagAssignmentSource.MANUAL_ADMIN,
+        })),
         skipDuplicates: true,
       });
     }

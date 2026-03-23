@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { promoCodesApi, type PromoCode } from '@/api/promo-codes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -106,18 +108,18 @@ export function PromoCodesListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Промокоды</h1>
-          <p className="text-muted-foreground">{items.length} промокодов</p>
-        </div>
-        <Button asChild>
-          <Link to="/promo-codes/new" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Добавить
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Промокоды"
+        subtitle={`${items.length} промокодов`}
+        actions={
+          <Button asChild>
+            <Link to="/promo-codes/new" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Добавить
+            </Link>
+          </Button>
+        }
+      />
       <Card>
         <CardHeader>
           <CardTitle>Список промокодов</CardTitle>

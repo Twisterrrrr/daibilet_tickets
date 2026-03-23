@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -94,10 +96,10 @@ export function UpsellEditPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{isNew ? 'Новый Upsell' : 'Редактировать Upsell'}</h1>
-        <p className="text-muted-foreground">Дополнительное предложение для бронирования</p>
-      </div>
+      <PageHeader
+        title={isNew ? 'Новый Upsell' : 'Редактировать Upsell'}
+        subtitle="Дополнительное предложение для бронирования"
+      />
 
       <Card>
         <CardHeader>

@@ -1,6 +1,8 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { useCallback, useEffect, useState } from 'react';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -136,10 +138,7 @@ export function AuditLogPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Журнал аудита</h1>
-        <p className="text-muted-foreground">История изменений, всего записей: {total}</p>
-      </div>
+      <PageHeader title="Журнал аудита" subtitle={`История изменений, всего записей: ${total}`} />
 
       <Card>
         <CardHeader>

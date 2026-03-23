@@ -1,11 +1,15 @@
+import { LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { BarChart3, Bell, Calendar, ChevronDown, CreditCard, FileText, LayoutDashboard, LogOut, MessageSquare, Plug2, Settings, Users } from 'lucide-react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 
-import { AppShell, PageContainer } from '@daibilet/shared-ui';
+import { PageContainer } from '@daibilet/shared-ui';
 
+import { Button } from '@/components/ui/button';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+
+import { SupplierSidebar } from '@/components/layout/SupplierSidebar';
 import { api, clearToken } from '../lib/api';
-import { mockNotifications } from '../lib/notifications.mock';
+import { SupplierNotification } from '../lib/notifications.mock';
 
 interface SidebarSupplierInfo {
   name: string;
@@ -14,32 +18,12 @@ interface SidebarSupplierInfo {
   verifiedAt?: string | null;
 }
 
-type NavBadgeKey = 'reviews' | 'notifications';
-
-const NAV: { to: string; icon: React.ComponentType<{ className?: string }>; label: string; badgeKey?: NavBadgeKey }[] =
-  [
-    { to: '/', icon: LayoutDashboard, label: 'Дашборд' },
-    { to: '/events', icon: Calendar, label: 'Мои события' },
-    { to: '/availability', icon: Calendar, label: 'Вместимость и квота' },
-    { to: '/orders', icon: FileText, label: 'Заказы' },
-    { to: '/reviews', icon: MessageSquare, label: 'Отзывы', badgeKey: 'reviews' },
-    { to: '/notifications', icon: Bell, label: 'Уведомления', badgeKey: 'notifications' },
-    { to: '/reports', icon: BarChart3, label: 'Отчёты' },
-    { to: '/balance', icon: CreditCard, label: 'Баланс' },
-    { to: '/settings', icon: Settings, label: 'Настройки' },
-    { to: '/team', icon: Users, label: 'Команда' },
-    { to: '/integrations', icon: Plug2, label: 'Интеграции' },
-  ];
-
 export default function Layout() {
-  const location = useLocation();
   const navigate = useNavigate();
 
   const [supplier, setSupplier] = useState<SidebarSupplierInfo | null>(null);
   const [reviewsBadge, setReviewsBadge] = useState<number | null>(null);
   const [notificationsBadge, setNotificationsBadge] = useState<number | null>(null);
-   const [showEventsGroup, setShowEventsGroup] = useState(true);
-   const [showSettingsGroup, setShowSettingsGroup] = useState(true);
 
   useEffect(() => {
     api
@@ -56,15 +40,20 @@ export default function Layout() {
         setSupplier(null);
       });
 
-    // Бейдж для отзывов: количество отзывов, требующих ответа
     api
-      .get<{ items: any[]; total: number; hasMore?: boolean }>('/supplier/reviews?tab=needs_response&page=1&limit=1')
+      .get<{ items: unknown[]; total: number; hasMore?: boolean }>(
+        '/supplier/reviews?tab=needs_response&page=1&limit=1',
+      )
       .then((res) => setReviewsBadge(res.total || 0))
       .catch(() => setReviewsBadge(null));
 
-    // Бейдж для уведомлений: количество непрочитанных в мок-данных
-    const unread = mockNotifications.filter((n) => !n.isRead).length;
-    setNotificationsBadge(unread || null);
+    api
+      .get<SupplierNotification[]>('/supplier/notifications?limit=50')
+      .then((data) => {
+        const unread = Array.isArray(data) ? data.filter((n) => !n.isRead).length : 0;
+        setNotificationsBadge(unread || null);
+      })
+      .catch(() => setNotificationsBadge(null));
   }, []);
 
   const handleLogout = () => {
@@ -72,116 +61,35 @@ export default function Layout() {
     navigate('/login');
   };
 
-  const trustLabel =
-    supplier?.trustLevel === 3
-      ? 'Надёжный'
-      : supplier?.trustLevel === 2
-        ? 'Проверенный'
-        : supplier?.trustLevel === 1
-          ? 'Базовый'
-          : supplier?.trustLevel === 0
-            ? 'Новый'
-            : undefined;
-
-  const sidebar = (
-    <div className="flex h-full flex-col">
-      <div className="border-b px-4 py-4">
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold text-white">
-            D
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-slate-900">DAIBILET</p>
-            <p className="text-[11px] text-slate-500">Кабинет поставщика</p>
-          </div>
-        </div>
-
-        {/* Supplier card */}
-        <div className="mt-4 rounded-xl bg-slate-50 px-3 py-3">
-          <p className="truncate text-sm font-semibold text-slate-900">{supplier?.name || 'Поставщик'}</p>
-          {supplier?.companyName && (
-            <p className="mt-0.5 truncate text-xs text-slate-500">{supplier.companyName}</p>
-          )}
-          {trustLabel && (
-            <span className="mt-2 inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
-              Проверен
-            </span>
-          )}
-        </div>
-      </div>
-      <nav className="flex-1 space-y-1 px-2 py-3 text-sm">
-        {NAV.map((item) => {
-          const active = item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
-          const isSubOfEvents = item.to === '/availability';
-          const isSubOfSettings = item.to === '/team' || item.to === '/integrations';
-          const isEventsParent = item.to === '/events';
-          const isSettingsParent = item.to === '/settings';
-
-          if (isSubOfEvents && !showEventsGroup) return null;
-          if (isSubOfSettings && !showSettingsGroup) return null;
-          let badge: number | null = null;
-          if (item.badgeKey === 'reviews') badge = reviewsBadge ?? null;
-          if (item.badgeKey === 'notifications') badge = notificationsBadge ?? null;
-
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors ${
-                active ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
-              } ${
-                isSubOfEvents || isSubOfSettings
-                  ? 'ml-6 text-xs'
-                  : ''
-              }`}
-            >
-              <item.icon className={`h-4 w-4 ${(isSubOfEvents || isSubOfSettings) ? 'opacity-60' : ''}`} />
-              <span className="flex-1 truncate">{item.label}</span>
-              {badge !== null && badge > 0 && (
-                <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
-                  {badge}
-                </span>
-              )}
-              {(isEventsParent || isSettingsParent) && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (isEventsParent) setShowEventsGroup((v) => !v);
-                    if (isSettingsParent) setShowSettingsGroup((v) => !v);
-                  }}
-                  className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                >
-                  <ChevronDown
-                    className={`h-3 w-3 transition-transform ${
-                      (isEventsParent && showEventsGroup) || (isSettingsParent && showSettingsGroup) ? 'rotate-180' : ''
-                    }`}
-                  />
-                </button>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="border-t px-2 py-3">
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-        >
-          <LogOut className="h-4 w-4" />
-          Выход
-        </button>
-      </div>
-    </div>
-  );
-
   return (
-    <AppShell sidebar={sidebar} sidebarAlwaysVisible>
-      <PageContainer className="py-6">
-        <Outlet />
-      </PageContainer>
-    </AppShell>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <SupplierSidebar
+          supplier={supplier}
+          reviewsBadge={reviewsBadge}
+          notificationsBadge={notificationsBadge}
+        />
+        <div className="flex flex-1 flex-col min-w-0">
+          <header className="sticky top-0 z-20 h-12 flex items-center gap-4 border-b bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-4 shrink-0">
+            <SidebarTrigger className="shrink-0" />
+            <div className="flex-1" />
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                Поставщик
+              </span>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleLogout}>
+                <LogOut className="h-4 w-4" />
+                <span className="sr-only">Выход</span>
+              </Button>
+            </div>
+          </header>
+          <main className="flex-1 overflow-auto bg-[rgb(229,231,235)]">
+            <PageContainer className="animate-in-page max-w-none px-3 py-4 sm:px-4 xl:px-6 2xl:px-8 lg:py-5">
+              <Outlet />
+            </PageContainer>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 }

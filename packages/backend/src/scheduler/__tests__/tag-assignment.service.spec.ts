@@ -17,6 +17,9 @@ const mockPrisma = {
     deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     createMany: vi.fn().mockResolvedValue({ count: 0 }),
   },
+  eventOverride: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
   $queryRaw: vi.fn().mockResolvedValue([]),
 };
 
@@ -94,7 +97,7 @@ describe('TagAssignmentService', () => {
         select: { id: true },
       });
       expect(mockPrisma.eventTag.deleteMany).toHaveBeenCalledWith({
-        where: { tagId: { in: ['tag-bv', 'tag-lm', 'tag-ta'] } },
+      where: { tagId: { in: ['tag-bv', 'tag-lm', 'tag-ta'] }, assignmentSource: 'AUTO_RULE' },
       });
     });
 
@@ -147,13 +150,15 @@ describe('TagAssignmentService', () => {
 
       await (service as any).assignBestValue();
 
-      expect(mockPrisma.eventTag.createMany).toHaveBeenCalledWith({
-        data: [
-          { eventId: 'event-1', tagId: 'tag-bv' },
-          { eventId: 'event-2', tagId: 'tag-bv' },
-        ],
-        skipDuplicates: true,
-      });
+      expect(mockPrisma.eventTag.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [
+            { eventId: 'event-1', tagId: 'tag-bv', assignmentSource: 'AUTO_RULE' },
+            { eventId: 'event-2', tagId: 'tag-bv', assignmentSource: 'AUTO_RULE' },
+          ],
+          skipDuplicates: true,
+        }),
+      );
     });
 
     it('should return count of candidates', async () => {
@@ -208,13 +213,15 @@ describe('TagAssignmentService', () => {
 
       await (service as any).assignLastMinute();
 
-      expect(mockPrisma.eventTag.createMany).toHaveBeenCalledWith({
-        data: [
-          { eventId: 'event-1', tagId: 'tag-lm' },
-          { eventId: 'event-2', tagId: 'tag-lm' },
-        ],
-        skipDuplicates: true,
-      });
+      expect(mockPrisma.eventTag.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [
+            { eventId: 'event-1', tagId: 'tag-lm', assignmentSource: 'AUTO_RULE' },
+            { eventId: 'event-2', tagId: 'tag-lm', assignmentSource: 'AUTO_RULE' },
+          ],
+          skipDuplicates: true,
+        }),
+      );
     });
 
     it('should return count of candidates', async () => {
@@ -256,13 +263,15 @@ describe('TagAssignmentService', () => {
 
       await (service as any).assignTodayAvailable();
 
-      expect(mockPrisma.eventTag.createMany).toHaveBeenCalledWith({
-        data: [
-          { eventId: 'event-1', tagId: 'tag-ta' },
-          { eventId: 'event-2', tagId: 'tag-ta' },
-        ],
-        skipDuplicates: true,
-      });
+      expect(mockPrisma.eventTag.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [
+            { eventId: 'event-1', tagId: 'tag-ta', assignmentSource: 'AUTO_RULE' },
+            { eventId: 'event-2', tagId: 'tag-ta', assignmentSource: 'AUTO_RULE' },
+          ],
+          skipDuplicates: true,
+        }),
+      );
     });
 
     it('should return count of candidates', async () => {
@@ -396,25 +405,25 @@ describe('TagAssignmentService', () => {
 
   describe('batchInsertTags', () => {
     it('should not call createMany when eventIds is empty', async () => {
-      await (service as any).batchInsertTags([], 'tag-id');
+      await (service as any).batchInsertTags([], 'tag-id', 'best-value');
 
       expect(mockPrisma.eventTag.createMany).not.toHaveBeenCalled();
     });
 
     it('should call createMany with correct data structure', async () => {
-      await (service as any).batchInsertTags(['event-1', 'event-2'], 'tag-123');
+      await (service as any).batchInsertTags(['event-1', 'event-2'], 'tag-123', 'best-value');
 
       expect(mockPrisma.eventTag.createMany).toHaveBeenCalledWith({
         data: [
-          { eventId: 'event-1', tagId: 'tag-123' },
-          { eventId: 'event-2', tagId: 'tag-123' },
+          { eventId: 'event-1', tagId: 'tag-123', assignmentSource: 'AUTO_RULE' },
+          { eventId: 'event-2', tagId: 'tag-123', assignmentSource: 'AUTO_RULE' },
         ],
         skipDuplicates: true,
       });
     });
 
     it('should use skipDuplicates flag', async () => {
-      await (service as any).batchInsertTags(['event-1'], 'tag-123');
+      await (service as any).batchInsertTags(['event-1'], 'tag-123', 'best-value');
 
       expect(mockPrisma.eventTag.createMany).toHaveBeenCalledWith(
         expect.objectContaining({

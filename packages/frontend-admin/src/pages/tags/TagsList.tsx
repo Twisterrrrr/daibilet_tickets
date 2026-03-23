@@ -3,12 +3,11 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, LoadingState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -98,6 +97,8 @@ export function TagsListPage() {
     navigate(`/tags/${item.id}`);
   };
 
+  const hasActiveFilters = Boolean(category || search.trim());
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -117,71 +118,60 @@ export function TagsListPage() {
         <ErrorState
           title="Не удалось загрузить теги"
           description={error}
-          action={
-            <Button variant="outline" onClick={() => setCategory((c) => c)}>
-              Повторить попытку
-            </Button>
-          }
+          action={<Button variant="outline" onClick={() => window.location.reload()}>Повторить попытку</Button>}
         />
       )}
 
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Фильтры</CardTitle>
-          <CardDescription>Поиск и фильтрация по категории</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <Input
-              type="text"
-              placeholder="Поиск по названию или slug..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm"
-            />
-            <Select value={category || '__all__'} onValueChange={(v) => setCategory(v === '__all__' ? '' : v)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Все категории" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Все категории</SelectItem>
-                {(Object.keys(CATEGORY_LABELS) as TagCategory[]).map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {CATEGORY_LABELS[c]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Table */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Список тегов</CardTitle>
-          <CardDescription>
-            {data.length} {data.length === 1 ? 'тег' : data.length < 5 ? 'тега' : 'тегов'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {data.length === 0 && !loading ? (
-            <EmptyState
-              title="Нет тегов"
-              description="Создайте первый тег, чтобы начать категоризацию событий и лендингов."
-            />
-          ) : (
-            <DataTable
-              columns={columns}
-              data={data}
-              onRowClick={handleRowClick}
-              loading={loading}
-              emptyText="Нет тегов"
-            />
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <LoadingState label="Загружаем теги..." />
+      ) : data.length === 0 ? (
+        <EmptyState
+          title="Нет тегов"
+          description="Создайте первый тег, чтобы начать категоризацию событий и лендингов."
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={data}
+          onRowClick={handleRowClick}
+          emptyText="Нет тегов"
+          toolbar={
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Input
+                type="text"
+                placeholder="Поиск по названию или slug..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="max-w-sm"
+              />
+              <Select value={category || '__all__'} onValueChange={(v) => setCategory(v === '__all__' ? '' : v)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Все категории" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Все категории</SelectItem>
+                  {(Object.keys(CATEGORY_LABELS) as TagCategory[]).map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {CATEGORY_LABELS[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!hasActiveFilters}
+                onClick={() => {
+                  setCategory('');
+                  setSearch('');
+                }}
+              >
+                Сбросить
+              </Button>
+            </div>
+          }
+        />
+      )}
     </div>
   );
 }

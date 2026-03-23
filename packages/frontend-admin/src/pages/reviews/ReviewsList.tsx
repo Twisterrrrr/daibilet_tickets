@@ -3,10 +3,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { CountBadge, EmptyState, ErrorState, PageHeader, StatusBadge } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -43,13 +42,6 @@ interface Review {
   event: { id: string; title: string; slug: string } | null;
   photos: ReviewPhoto[];
 }
-
-const STATUS_VARIANTS: Record<string, 'warning' | 'success' | 'destructive' | 'secondary'> = {
-  PENDING_EMAIL: 'secondary',
-  PENDING: 'warning',
-  APPROVED: 'success',
-  REJECTED: 'destructive',
-};
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING_EMAIL: 'Ждёт email',
@@ -338,12 +330,15 @@ export function ReviewsListPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold">{r.authorName}</span>
                     <span className="text-amber-500 text-sm tracking-wider">{stars(r.rating)}</span>
-                    <Badge variant={STATUS_VARIANTS[r.status] ?? 'default'}>{STATUS_LABELS[r.status]}</Badge>
+                    <StatusBadge
+                      tone={r.status === 'APPROVED' ? 'success' : r.status === 'REJECTED' ? 'danger' : r.status === 'PENDING' ? 'warning' : 'neutral'}
+                      label={STATUS_LABELS[r.status]}
+                    />
                     {r.isVerified && (
-                      <Badge variant="success" className="gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Подтверждён
-                      </Badge>
+                      <span className="inline-flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                        <StatusBadge tone="success" label="Подтвержден" />
+                      </span>
                     )}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -460,9 +455,7 @@ export function ReviewsListPage() {
           <span className="flex items-center gap-2">
             Отзывы
             {pendingCount > 0 && (
-              <Badge variant="warning" className="ml-1">
-                {pendingCount}
-              </Badge>
+              <CountBadge count={pendingCount} className="ml-1" />
             )}
           </span>
         }
@@ -559,7 +552,7 @@ export function ReviewsListPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="warning">Оспаривание</Badge>
+                          <StatusBadge tone="warning" label="Оспаривание" />
                           <span className="font-semibold">{d.review.authorName}</span>
                           <span className="text-amber-500 text-sm">{stars(d.review.rating)}</span>
                           <span className="text-xs text-muted-foreground">{DISPUTE_REASONS[d.reasonCode] || d.reasonCode}</span>
@@ -593,9 +586,7 @@ export function ReviewsListPage() {
           <TabsTrigger value="PENDING" className="gap-1.5">
             {STATUS_LABELS.PENDING}
             {pendingCount > 0 && (
-              <Badge variant="warning" className="ml-0.5 h-5 px-1.5 text-[10px]">
-                {pendingCount}
-              </Badge>
+              <CountBadge count={pendingCount} className="ml-0.5" />
             )}
           </TabsTrigger>
           <TabsTrigger value="PENDING_EMAIL">{STATUS_LABELS.PENDING_EMAIL}</TabsTrigger>

@@ -12,6 +12,23 @@ import { SeoService } from './seo.service';
 export class SeoPublicController {
   constructor(private readonly seo: SeoService) {}
 
+  @Get('routing/tag-preview/:kind/:citySlug/:tagSlug')
+  getTagRoutePreview(
+    @Param('kind') kind: 'STRUCTURAL' | 'POPULAR',
+    @Param('citySlug') citySlug: string,
+    @Param('tagSlug') tagSlug: string,
+  ) {
+    // Public preview helper for future SEO landing routing.
+    return this.seo.buildTagRoutePreview({
+      kind,
+      citySlug,
+      tagSlug,
+      // Fallback placeholders; admin tools can pass richer values later.
+      cityNameRu: citySlug,
+      tagNameRu: tagSlug,
+    });
+  }
+
   @Get(':entityType/:entityId')
   get(@Param('entityType') entityType: SeoEntityType, @Param('entityId') entityId: string) {
     return this.seo.getSeoMeta(entityType, entityId);

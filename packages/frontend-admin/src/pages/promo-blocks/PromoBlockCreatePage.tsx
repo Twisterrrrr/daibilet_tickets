@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { promoBlocksApi, type PromoBlockFormData } from '@/api/promo-blocks';
 import { promoCollectionsApi, type PromoCollection } from '@/api/promo-collections';
 import { Button } from '@/components/ui/button';
@@ -48,10 +50,7 @@ export function PromoBlockCreatePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Новый промо-блок</h1>
-        <p className="text-muted-foreground">Карточка на главной странице</p>
-      </div>
+      <PageHeader title="Новый промо-блок" subtitle="Карточка на главной странице" />
       <Card>
         <CardHeader>
           <CardTitle>Данные промо-блока</CardTitle>

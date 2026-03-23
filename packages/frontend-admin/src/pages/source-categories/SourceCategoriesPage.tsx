@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -92,15 +94,10 @@ export function SourceCategoriesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Маппинг категорий источников</h1>
-          <p className="text-muted-foreground">
-            Сопоставление внешних категорий (TicketsCloud, Teplohod и др.) с внутренним EventCategory.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Маппинг категорий источников"
+        subtitle="Сопоставление внешних категорий (TicketsCloud, Teplohod и др.) с внутренним EventCategory."
+      />
 
       {error && (
         <Card className="border-destructive">

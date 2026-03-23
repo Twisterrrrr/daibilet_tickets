@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { TagCategory } from '@prisma/client';
+import { EventTagAssignmentSource, TagCategory } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -81,7 +81,10 @@ export class TagAssignmentService implements OnModuleInit {
 
     if (tagIds.length > 0) {
       await this.prisma.eventTag.deleteMany({
-        where: { tagId: { in: tagIds } },
+        where: {
+          tagId: { in: tagIds },
+          assignmentSource: EventTagAssignmentSource.AUTO_RULE,
+        },
       });
     }
   }
@@ -124,6 +127,7 @@ export class TagAssignmentService implements OnModuleInit {
       await this.batchInsertTags(
         candidates.map((c) => c.eventId),
         tag.id,
+        'best-value',
       );
     }
     return candidates.length;
@@ -152,6 +156,7 @@ export class TagAssignmentService implements OnModuleInit {
       await this.batchInsertTags(
         candidates.map((c) => c.eventId),
         tag.id,
+        'last-minute',
       );
     }
     return candidates.length;
@@ -180,6 +185,7 @@ export class TagAssignmentService implements OnModuleInit {
       await this.batchInsertTags(
         candidates.map((c) => c.eventId),
         tag.id,
+        'today-available',
       );
     }
     return candidates.length;
@@ -188,10 +194,22 @@ export class TagAssignmentService implements OnModuleInit {
   /**
    * Batch insert event_tags with ON CONFLICT DO NOTHING via Prisma createMany.
    */
-  private async batchInsertTags(eventIds: string[], tagId: string): Promise<void> {
+  private async batchInsertTags(eventIds: string[], tagId: string, tagSlug: string): Promise<void> {
     if (eventIds.length === 0) return;
 
-    const data = eventIds.map((eventId) => ({ eventId, tagId }));
+    const suppressedRows = await this.prisma.eventOverride.findMany({
+      where: {
+        eventId: { in: eventIds },
+        tagsRemove: { has: tagSlug },
+      },
+      select: { eventId: true },
+    });
+    const suppressedEventIds = new Set(suppressedRows.map((row) => row.eventId));
+    const data = eventIds
+      .filter((eventId) => !suppressedEventIds.has(eventId))
+      .map((eventId) => ({ eventId, tagId, assignmentSource: EventTagAssignmentSource.AUTO_RULE }));
+    if (data.length === 0) return;
+
     await this.prisma.eventTag.createMany({
       data,
       skipDuplicates: true,

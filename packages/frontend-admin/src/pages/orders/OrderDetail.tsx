@@ -2,6 +2,8 @@ import { ArrowLeft, Calendar, CreditCard, ExternalLink, Users } from 'lucide-rea
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import { PageHeader } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -193,40 +195,41 @@ export function OrderDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to="/orders">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Заказ {order.code}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant={STATUS_VARIANT[order.status] || 'secondary'}>
-                {STATUS_LABELS[order.status] || order.status}
-              </Badge>
-              <span className="text-xs text-muted-foreground">{order.city?.name}</span>
-            </div>
-          </div>
-        </div>
-        {transitions.length > 0 && (
+      <PageHeader
+        title={`Заказ ${order.code}`}
+        subtitle={
           <div className="flex items-center gap-2">
-            {transitions.map((status) => (
-              <Button
-                key={status}
-                variant="outline"
-                size="sm"
-                onClick={() => handleStatusChange(status)}
-                disabled={updating}
-              >
-                {STATUS_LABELS[status] || status}
-              </Button>
-            ))}
+            <Badge variant={STATUS_VARIANT[order.status] || 'secondary'}>
+              {STATUS_LABELS[order.status] || order.status}
+            </Badge>
+            <span className="text-xs text-muted-foreground">{order.city?.name}</span>
           </div>
-        )}
-      </div>
+        }
+        actions={
+          <>
+            <Button variant="ghost" size="icon" asChild>
+              <Link to="/orders">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            {transitions.length > 0 && (
+              <div className="flex items-center gap-2">
+                {transitions.map((status) => (
+                  <Button
+                    key={status}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStatusChange(status)}
+                    disabled={updating}
+                  >
+                    {STATUS_LABELS[status] || status}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </>
+        }
+      />
 
       {error && (
         <Card className="border-destructive">

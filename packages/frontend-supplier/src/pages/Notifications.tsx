@@ -11,7 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { CountBadge, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '@daibilet/shared-ui';
+import { CountBadge, EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge, TagChip } from '@daibilet/shared-ui';
 
 import { api } from '../lib/api';
 
@@ -156,7 +156,7 @@ function NotificationsPageView({
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <CheckCircle className="h-3 w-3" />
-                        {cfg.label}
+                        <TagChip label={cfg.label} />
                       </span>
                       {n.link && (
                         <Link
