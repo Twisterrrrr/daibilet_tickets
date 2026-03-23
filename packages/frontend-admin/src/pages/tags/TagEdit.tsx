@@ -2,6 +2,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -152,23 +153,20 @@ export function TagEditPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/tags">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{isCreate ? 'Новый тег' : 'Редактирование тега'}</h1>
-          <p className="text-muted-foreground">{isCreate ? 'Создание нового тега' : form.name || 'Редактирование'}</p>
-        </div>
-      </div>
+      <PageHeader
+        title={isCreate ? 'Новый тег' : 'Редактирование тега'}
+        subtitle={isCreate ? 'Создание нового тега' : form.name || 'Редактирование'}
+        actions={
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/tags">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+        }
+      />
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState title="Ошибка загрузки тега" description={error} />
       )}
 
       <form onSubmit={handleSubmit}>

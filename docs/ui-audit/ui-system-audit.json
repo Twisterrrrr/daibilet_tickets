@@ -1,0 +1,246 @@
+[
+  {
+    "page": "admin/dashboard",
+    "file": "packages/frontend-admin/src/pages/Dashboard.tsx",
+    "screenType": "dashboard",
+    "area": "admin",
+    "contracts": {
+      "pageShell": true,
+      "listSystem": "partial",
+      "sharedStates": true,
+      "sharedBadges": false,
+      "toolbarSystem": "partial"
+    },
+    "issues": [
+      {
+        "id": "HI-02A",
+        "severity": "HIGH",
+        "message": "Status rendering uses local Badge mapping instead of shared StatusBadge."
+      }
+    ]
+  },
+  {
+    "page": "admin/events/list",
+    "file": "packages/frontend-admin/src/pages/events/EventsList.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": true, "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": true },
+    "issues": []
+  },
+  {
+    "page": "admin/events/edit",
+    "file": "packages/frontend-admin/src/pages/events/EventEdit.tsx",
+    "screenType": "edit",
+    "area": "admin",
+    "contracts": { "pageShell": false, "listSystem": "partial", "sharedStates": "partial", "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": [
+      { "id": "CR-02", "severity": "CRITICAL", "message": "Manual H1/container instead of hard PageShell/PageHeader contract." }
+    ]
+  },
+  {
+    "page": "admin/venues/list",
+    "file": "packages/frontend-admin/src/pages/venues/VenuesList.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": "partial", "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": [
+      { "id": "CR-04", "severity": "CRITICAL", "message": "List still uses low-level table, not unified ListPageLayout/DataTable pattern." }
+    ]
+  },
+  {
+    "page": "admin/venues/edit",
+    "file": "packages/frontend-admin/src/pages/venues/VenueEdit.tsx",
+    "screenType": "edit",
+    "area": "admin",
+    "contracts": { "pageShell": false, "listSystem": false, "sharedStates": "partial", "sharedBadges": "partial", "toolbarSystem": false },
+    "issues": [
+      { "id": "CR-02", "severity": "CRITICAL", "message": "Manual page shell (H1/containers) remains." }
+    ]
+  },
+  {
+    "page": "admin/suppliers/list",
+    "file": "packages/frontend-admin/src/pages/suppliers/SuppliersList.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": true, "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": true },
+    "issues": []
+  },
+  {
+    "page": "admin/suppliers/detail",
+    "file": "packages/frontend-admin/src/pages/suppliers/SupplierDetail.tsx",
+    "screenType": "detail",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": false, "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": []
+  },
+  {
+    "page": "admin/orders/list",
+    "file": "packages/frontend-admin/src/pages/orders/OrdersList.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": true, "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": true },
+    "issues": []
+  },
+  {
+    "page": "admin/moderation",
+    "file": "packages/frontend-admin/src/pages/moderation/ModerationQueue.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": "partial", "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": []
+  },
+  {
+    "page": "admin/reviews/list",
+    "file": "packages/frontend-admin/src/pages/reviews/ReviewsList.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": "partial", "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": []
+  },
+  {
+    "page": "admin/articles/list",
+    "file": "packages/frontend-admin/src/pages/articles/ArticlesList.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": "partial", "sharedStates": true, "sharedBadges": false, "toolbarSystem": "partial" },
+    "issues": [
+      { "id": "CR-04", "severity": "CRITICAL", "message": "List page uses low-level table and manual toolbar/filter wiring." },
+      { "id": "HI-02A", "severity": "HIGH", "message": "Status/Tag chips are local Badge markup instead of shared badges/chips." }
+    ]
+  },
+  {
+    "page": "admin/articles/edit",
+    "file": "packages/frontend-admin/src/pages/articles/ArticleEdit.tsx",
+    "screenType": "edit",
+    "area": "admin",
+    "contracts": { "pageShell": false, "listSystem": false, "sharedStates": "partial", "sharedBadges": "partial", "toolbarSystem": false },
+    "issues": [
+      { "id": "CR-02", "severity": "CRITICAL", "message": "Manual page shell remains." }
+    ]
+  },
+  {
+    "page": "admin/collections/list",
+    "file": "packages/frontend-admin/src/pages/collections/CollectionsList.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": true, "sharedStates": true, "sharedBadges": false, "toolbarSystem": "partial" },
+    "issues": [
+      { "id": "HI-02B", "severity": "HIGH", "message": "Collection filters and status render with ad-hoc Badge usage." }
+    ]
+  },
+  {
+    "page": "admin/collections/edit",
+    "file": "packages/frontend-admin/src/pages/collections/CollectionEdit.tsx",
+    "screenType": "edit",
+    "area": "admin",
+    "contracts": { "pageShell": false, "listSystem": false, "sharedStates": "partial", "sharedBadges": "partial", "toolbarSystem": false },
+    "issues": [
+      { "id": "CR-02", "severity": "CRITICAL", "message": "Manual page shell remains." }
+    ]
+  },
+  {
+    "page": "admin/tags/list",
+    "file": "packages/frontend-admin/src/pages/tags/TagsList.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": true, "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": true },
+    "issues": []
+  },
+  {
+    "page": "admin/tags/edit",
+    "file": "packages/frontend-admin/src/pages/tags/TagEdit.tsx",
+    "screenType": "edit",
+    "area": "admin",
+    "contracts": { "pageShell": false, "listSystem": false, "sharedStates": "partial", "sharedBadges": "partial", "toolbarSystem": false },
+    "issues": [
+      { "id": "CR-02", "severity": "CRITICAL", "message": "Manual page shell remains." }
+    ]
+  },
+  {
+    "page": "admin/seo",
+    "file": "packages/frontend-admin/src/pages/seo/SeoAuditPage.tsx",
+    "screenType": "list",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": "partial", "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": []
+  },
+  {
+    "page": "admin/settings",
+    "file": "packages/frontend-admin/src/pages/settings/SettingsPage.tsx",
+    "screenType": "settings",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": false, "sharedStates": "partial", "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": []
+  },
+  {
+    "page": "supplier/dashboard",
+    "file": "packages/frontend-supplier/src/pages/Dashboard.tsx",
+    "screenType": "dashboard",
+    "area": "supplier",
+    "contracts": { "pageShell": true, "listSystem": "partial", "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": true },
+    "issues": []
+  },
+  {
+    "page": "supplier/events/list",
+    "file": "packages/frontend-supplier/src/pages/events/EventsList.tsx",
+    "screenType": "list",
+    "area": "supplier",
+    "contracts": { "pageShell": true, "listSystem": "partial", "sharedStates": true, "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": []
+  },
+  {
+    "page": "supplier/events/edit",
+    "file": "packages/frontend-supplier/src/pages/events/EventEdit.tsx",
+    "screenType": "edit",
+    "area": "supplier",
+    "contracts": { "pageShell": true, "listSystem": false, "sharedStates": "partial", "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": []
+  },
+  {
+    "page": "supplier/reports",
+    "file": "packages/frontend-supplier/src/pages/Reports.tsx",
+    "screenType": "list",
+    "area": "supplier",
+    "contracts": { "pageShell": true, "listSystem": false, "sharedStates": true, "sharedBadges": false, "toolbarSystem": false },
+    "issues": [
+      { "id": "CR-04", "severity": "CRITICAL", "message": "Raw table and local toolbar/filter controls instead of list system pattern." },
+      { "id": "HI-01", "severity": "HIGH", "message": "Legacy and system table approaches are mixed in list scope." }
+    ]
+  },
+  {
+    "page": "supplier/notifications",
+    "file": "packages/frontend-supplier/src/pages/Notifications.tsx",
+    "screenType": "list",
+    "area": "supplier",
+    "contracts": { "pageShell": true, "listSystem": "partial", "sharedStates": true, "sharedBadges": false, "toolbarSystem": "partial" },
+    "issues": [
+      { "id": "HI-02B", "severity": "HIGH", "message": "Notification chips/labels and counters use ad-hoc markup." }
+    ]
+  },
+  {
+    "page": "supplier/settings",
+    "file": "packages/frontend-supplier/src/pages/Settings.tsx",
+    "screenType": "settings",
+    "area": "supplier",
+    "contracts": { "pageShell": true, "listSystem": false, "sharedStates": "partial", "sharedBadges": "partial", "toolbarSystem": "partial" },
+    "issues": []
+  },
+  {
+    "page": "layout/sidebar-admin",
+    "file": "packages/frontend-admin/src/components/layout/AdminSidebar.tsx",
+    "screenType": "layout",
+    "area": "admin",
+    "contracts": { "pageShell": true, "listSystem": false, "sharedStates": false, "sharedBadges": true, "toolbarSystem": false },
+    "issues": []
+  },
+  {
+    "page": "layout/sidebar-supplier",
+    "file": "packages/frontend-supplier/src/components/layout/SupplierSidebar.tsx",
+    "screenType": "layout",
+    "area": "supplier",
+    "contracts": { "pageShell": "partial", "listSystem": false, "sharedStates": false, "sharedBadges": true, "toolbarSystem": false },
+    "issues": [
+      { "id": "CR-01", "severity": "CRITICAL", "message": "Sidebar matrix differs from sectioned contract (group labels/order formalization missing)." }
+    ]
+  }
+]

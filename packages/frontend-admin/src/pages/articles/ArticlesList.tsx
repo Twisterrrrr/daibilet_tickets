@@ -1,14 +1,17 @@
+import { ColumnDef } from '@tanstack/react-table';
 import { ExternalLink, Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+
+import { ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DataTable } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface ArticleItem {
   id: string;
@@ -26,6 +29,68 @@ interface ArticlesResponse {
   page: number;
   pages: number;
 }
+
+const columns: ColumnDef<ArticleItem>[] = [
+  {
+    accessorKey: 'title',
+    header: 'Заголовок',
+    cell: ({ row }) => <span className="font-medium">{row.original.title}</span>,
+  },
+  {
+    id: 'city',
+    header: 'Город',
+    cell: ({ row }) => <span className="text-sm">{row.original.city?.name ?? '—'}</span>,
+  },
+  {
+    id: 'tags',
+    header: 'Теги',
+    cell: ({ row }) => (
+      <Badge variant="outline" className="text-[10px]">
+        тегов: {row.original._count?.articleTags ?? 0}
+      </Badge>
+    ),
+  },
+  {
+    id: 'status',
+    header: 'Статус',
+    cell: ({ row }) => (
+      <Badge variant={row.original.isPublished ? 'default' : 'secondary'}>
+        {row.original.isPublished ? 'Опубликовано' : 'Черновик'}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: 'updatedAt',
+    header: 'Обновлено',
+    cell: ({ row }) => (
+      <span className="text-sm text-muted-foreground">
+        {row.original.updatedAt
+          ? new Date(row.original.updatedAt).toLocaleDateString('ru-RU', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            })
+          : '—'}
+      </span>
+    ),
+  },
+  {
+    id: 'actions',
+    header: '',
+    cell: ({ row }) =>
+      row.original.isPublished ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          <ExternalLink className="h-4 w-4" />
+        </Button>
+      ) : null,
+  },
+];
 
 export function ArticlesListPage() {
   const navigate = useNavigate();
@@ -64,20 +129,21 @@ export function ArticlesListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Статьи</h1>
-        <Button asChild>
-          <Link to="/articles/new" className="gap-1">
-            <Plus className="h-4 w-4" />
-            Новая статья
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Статьи"
+        subtitle={loading ? 'Загружаем список статей...' : `${data?.total ?? 0} статей`}
+        actions={
+          <Button asChild>
+            <Link to="/articles/new" className="gap-1">
+              <Plus className="h-4 w-4" />
+              Новая статья
+            </Link>
+          </Button>
+        }
+      />
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState title="Не удалось загрузить статьи" description={error} />
       )}
 
       <Card>
@@ -134,68 +200,13 @@ export function ArticlesListPage() {
       </Card>
 
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Заголовок</TableHead>
-              <TableHead>Город</TableHead>
-              <TableHead>Теги</TableHead>
-              <TableHead>Статус</TableHead>
-              <TableHead>Обновлено</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {!loading && (data?.items.length ?? 0) === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                  Нет статей
-                </TableCell>
-              </TableRow>
-            ) : (
-              (data?.items ?? []).map((item) => (
-                <TableRow key={item.id} className="cursor-pointer" onClick={() => handleRowClick(item)}>
-                  <TableCell className="font-medium">{item.title}</TableCell>
-                  <TableCell className="text-sm">{item.city?.name ?? '—'}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Badge variant="outline" className="text-[10px]">
-                        тегов: {item._count?.articleTags ?? 0}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={item.isPublished ? 'default' : 'secondary'}>
-                      {item.isPublished ? 'Опубликовано' : 'Черновик'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {item.updatedAt
-                      ? new Date(item.updatedAt).toLocaleDateString('ru-RU', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })
-                      : '—'}
-                  </TableCell>
-                  <TableCell>
-                    {item.isPublished ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    ) : null}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={columns}
+          data={data?.items ?? []}
+          loading={loading}
+          onRowClick={handleRowClick}
+          emptyText="Нет статей. Попробуйте изменить фильтры или создать первую статью."
+        />
       </Card>
     </div>
   );

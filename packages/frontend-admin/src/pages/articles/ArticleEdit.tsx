@@ -2,6 +2,7 @@ import { ArrowLeft, Eye, Monitor, Save, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -168,19 +169,22 @@ export function ArticleEditPage() {
   if (isCreate) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/articles">
-              <ArrowLeft className="mr-1 h-4 w-4" /> Назад
-            </Link>
-          </Button>
-          <h1 className="flex-1 text-2xl font-bold">Новая статья</h1>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground" />
-          <Button onClick={handleSave} disabled={saving} className="gap-1">
-            <Save className="h-4 w-4" />
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </Button>
-        </div>
+        <PageHeader
+          title="Новая статья"
+          actions={
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/articles">
+                  <ArrowLeft className="mr-1 h-4 w-4" /> Назад
+                </Link>
+              </Button>
+              <Button onClick={handleSave} disabled={saving} className="gap-1">
+                <Save className="h-4 w-4" />
+                {saving ? 'Сохранение...' : 'Сохранить'}
+              </Button>
+            </div>
+          }
+        />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
@@ -318,16 +322,17 @@ export function ArticleEditPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/articles" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Назад
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-bold tracking-tight">{isCreate ? 'Новая статья' : 'Редактировать статью'}</h1>
-      </div>
+      <PageHeader
+        title={isCreate ? 'Новая статья' : 'Редактировать статью'}
+        actions={
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/articles" className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Назад
+            </Link>
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader>

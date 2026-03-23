@@ -5,7 +5,15 @@ import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { getEventTemplateSpecs } from '@daibilet/shared';
-import { EventWizard, type EventWizardDraft, mapDraftToUpdatePayload, mapEventToDraft } from '@daibilet/shared-ui';
+import {
+  EmptyState,
+  ErrorState,
+  EventWizard,
+  PageHeader,
+  type EventWizardDraft,
+  mapDraftToUpdatePayload,
+  mapEventToDraft,
+} from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { getEventAdminSummary, type EventAdminSummary } from '@/api/adminEventSummary';
@@ -667,43 +675,44 @@ export function EventEditPage() {
 
   if (!event) {
     return (
-      <Card className="p-8 text-center">
-        <p className="text-destructive">{error || 'Событие не найдено'}</p>
-        <Button variant="outline" className="mt-4" asChild>
-          <Link to="/events">Назад к списку</Link>
-        </Button>
-      </Card>
+      <EmptyState
+        title="Событие не найдено"
+        description={error || 'Запись отсутствует или недоступна.'}
+        action={
+          <Button variant="outline" asChild>
+            <Link to="/events">Назад к списку</Link>
+          </Button>
+        }
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to="/events">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">{event.title}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline">{SOURCE_LABELS[event.source] || event.source}</Badge>
-              {event.override && <Badge variant="warning">Override</Badge>}
-              {isHidden && <Badge variant="destructive">Скрыт</Badge>}
-              {isProbableDuplicate && (
-                <Link to="/events/merge" className="inline-flex">
-                  <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-muted">
-                    <Merge className="h-3 w-3" />
-                    Возможный дубль
-                  </Badge>
-                </Link>
-              )}
-            </div>
+      <PageHeader
+        title={event.title}
+        subtitle={
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="outline">{SOURCE_LABELS[event.source] || event.source}</Badge>
+            {event.override && <Badge variant="warning">Override</Badge>}
+            {isHidden && <Badge variant="destructive">Скрыт</Badge>}
+            {isProbableDuplicate && (
+              <Link to="/events/merge" className="inline-flex">
+                <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-muted">
+                  <Merge className="h-3 w-3" />
+                  Возможный дубль
+                </Badge>
+              </Link>
+            )}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" asChild>
+              <Link to="/events">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
           <Button
             variant="outline"
             size="sm"
@@ -741,14 +750,13 @@ export function EventEditPage() {
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Сохранение...' : 'Сохранить'}
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Alerts */}
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState title="Ошибка загрузки данных события" description={error} />
       )}
 
       <QualityBanner

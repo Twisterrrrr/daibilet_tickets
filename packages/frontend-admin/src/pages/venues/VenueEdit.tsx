@@ -1,5 +1,6 @@
 type VenueType = 'MUSEUM' | 'GALLERY' | 'ART_SPACE' | 'EXHIBITION_HALL' | 'THEATER' | 'PALACE' | 'PARK';
 import { getVenueTemplateSpecs } from '@daibilet/shared';
+import { ErrorState, LoadingState, PageHeader } from '@daibilet/shared-ui';
 import { ArrowLeft, ExternalLink, GripVertical, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -345,32 +346,30 @@ export function VenueEditPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
+    return <LoadingState label="Загружаем площадку..." />;
   }
 
   if (isNew) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/venues')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Назад
-          </Button>
-          <h1 className="text-2xl font-bold flex-1">Новая площадка</h1>
-          <Button onClick={handleSave} disabled={saving} className="gap-1">
-            <Save className="h-4 w-4" />
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </Button>
-        </div>
+        <PageHeader
+          title="Новая площадка"
+          actions={
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/venues')}>
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Назад
+              </Button>
+              <Button onClick={handleSave} disabled={saving} className="gap-1">
+                <Save className="h-4 w-4" />
+                {saving ? 'Сохранение...' : 'Сохранить'}
+              </Button>
+            </div>
+          }
+        />
 
         {error && (
-          <Card className="border-destructive">
-            <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-          </Card>
+          <ErrorState title="Ошибка загрузки площадки" description={error} />
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -536,65 +535,58 @@ export function VenueEditPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/venues')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Назад
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {isNew ? 'Новое место' : form.title || 'Редактирование'}
-            </h1>
-            {!isNew && <p className="text-muted-foreground text-sm">v{form.version}</p>}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {!isNew && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={saving}
-              onClick={async () => {
-                if (!id) return;
-                if (Object.keys(form).length > 0 && !saving) {
-                  const proceed = window.confirm(
-                    'Предпросмотр показывает последнюю сохранённую версию площадки. Продолжить?',
-                  );
-                  if (!proceed) return;
-                }
-                try {
-                  const res = await adminApi.post<{ previewUrl: string }>(`/admin/previews/venues/${id}`);
-                  if (res.previewUrl) {
-                    window.open(res.previewUrl, '_blank', 'noopener,noreferrer');
+      <PageHeader
+        title={isNew ? 'Новое место' : form.title || 'Редактирование'}
+        subtitle={!isNew ? `v${form.version}` : undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/venues')}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Назад
+            </Button>
+            {!isNew && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={saving}
+                onClick={async () => {
+                  if (!id) return;
+                  if (Object.keys(form).length > 0 && !saving) {
+                    const proceed = window.confirm(
+                      'Предпросмотр показывает последнюю сохранённую версию площадки. Продолжить?',
+                    );
+                    if (!proceed) return;
                   }
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : 'Не удалось открыть предпросмотр');
-                }
-              }}
-              title="Открыть предпросмотр площадки"
-            >
-              Предпросмотр
+                  try {
+                    const res = await adminApi.post<{ previewUrl: string }>(`/admin/previews/venues/${id}`);
+                    if (res.previewUrl) {
+                      window.open(res.previewUrl, '_blank', 'noopener,noreferrer');
+                    }
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : 'Не удалось открыть предпросмотр');
+                  }
+                }}
+                title="Открыть предпросмотр площадки"
+              >
+                Предпросмотр
+              </Button>
+            )}
+            {!isNew && (
+              <Button variant="destructive" size="sm" onClick={handleDelete}>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Удалить
+              </Button>
+            )}
+            <Button onClick={handleSave} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Сохранение...' : 'Сохранить'}
             </Button>
-          )}
-          {!isNew && (
-            <Button variant="destructive" size="sm" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4 mr-1" />
-              Удалить
-            </Button>
-          )}
-          <Button onClick={handleSave} disabled={saving}>
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState title="Ошибка сохранения площадки" description={error} />
       )}
 
       {!isNew && id && (

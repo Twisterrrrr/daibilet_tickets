@@ -1,6 +1,7 @@
 import { ArrowLeft, Plus, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ErrorState, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -278,36 +279,30 @@ export function CollectionEditPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/collections')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{isNew ? 'Новая подборка' : form.title || 'Подборка'}</h1>
-            <p className="text-muted-foreground">{isNew ? 'Создание тематической подборки' : `Slug: ${form.slug}`}</p>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          {!isNew && (
-            <Button variant="destructive" size="sm" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4 mr-1" />
-              Удалить
+      <PageHeader
+        title={isNew ? 'Новая подборка' : form.title || 'Подборка'}
+        subtitle={isNew ? 'Создание тематической подборки' : `Slug: ${form.slug}`}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/collections')}>
+              <ArrowLeft className="h-4 w-4" />
             </Button>
-          )}
-          <Button onClick={handleSave} disabled={saving}>
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </Button>
-        </div>
-      </div>
+            {!isNew && (
+              <Button variant="destructive" size="sm" onClick={handleDelete}>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Удалить
+              </Button>
+            )}
+            <Button onClick={handleSave} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Сохранение...' : 'Сохранить'}
+            </Button>
+          </div>
+        }
+      />
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <ErrorState title="Ошибка сохранения подборки" description={error} />
       )}
       {success && (
         <Card className="border-green-500">

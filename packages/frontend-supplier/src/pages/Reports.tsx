@@ -11,6 +11,9 @@ import {
   SectionCard,
 } from '@daibilet/shared-ui';
 
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
 import { api } from '../lib/api';
 
 function toIsoDate(d: Date | null): string {
@@ -82,12 +85,11 @@ export default function Reports() {
       <PageHeader
         title="Отчёт о продажах"
         actions={
-          <a
-            href={`/api/v1/supplier/reports/sales/export?from=${toIsoDate(range.from)}&to=${toIsoDate(range.to)}`}
-            className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-gray-50"
-          >
-            <Download className="h-4 w-4" /> Скачать CSV
-          </a>
+          <Button asChild variant="outline" size="sm">
+            <a href={`/api/v1/supplier/reports/sales/export?from=${toIsoDate(range.from)}&to=${toIsoDate(range.to)}`}>
+              <Download className="h-4 w-4" /> Скачать CSV
+            </a>
+          </Button>
         }
       />
 
@@ -96,50 +98,30 @@ export default function Reports() {
           <div className="flex-1">
             <p className="mb-1 text-xs text-gray-500">Период</p>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setPresetRange('today')}
-                  className="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
+              <div className="inline-flex rounded-lg border bg-background p-0.5">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setPresetRange('today')} className="h-8 px-3 text-xs">
                   Сегодня
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPresetRange('week')}
-                  className="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setPresetRange('week')} className="h-8 px-3 text-xs">
                   Неделя
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPresetRange('month')}
-                  className="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setPresetRange('month')} className="h-8 px-3 text-xs">
                   Месяц
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPicker(true)}
-                  className="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowPicker(true)} className="h-8 px-3 text-xs">
                   Выбрать период
-                </button>
+                </Button>
               </div>
               {formatRangeLabel() && (
-                <span className="text-xs text-gray-500">
-                  Выбрано: <span className="font-medium text-gray-700">{formatRangeLabel()}</span>
+                <span className="text-xs text-muted-foreground">
+                  Выбрано: <span className="font-medium text-foreground">{formatRangeLabel()}</span>
                 </span>
               )}
             </div>
           </div>
-          <button
-            onClick={load}
-            className="mt-2 inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 md:mt-0"
-            disabled={loading}
-          >
+          <Button onClick={load} size="sm" className="mt-2 md:mt-0" disabled={loading}>
             {loading ? 'Загрузка...' : 'Применить'}
-          </button>
+          </Button>
         </div>
       </SectionCard>
 
@@ -156,7 +138,7 @@ export default function Reports() {
             { label: 'Ваш доход', value: `${(data.summary.netRevenue / 100).toLocaleString('ru')} руб` },
           ].map((c) => (
             <SectionCard key={c.label}>
-              <p className="text-xs text-gray-500">{c.label}</p>
+              <p className="text-xs text-muted-foreground">{c.label}</p>
               <p className="text-xl font-bold mt-1">{c.value}</p>
             </SectionCard>
           ))}
@@ -164,37 +146,34 @@ export default function Reports() {
       )}
 
       <SectionCard>
-        <table className="w-full text-sm">
-          <thead className="border-b bg-gray-50">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium">Дата</th>
-              <th className="text-left px-4 py-3 font-medium">Заказ</th>
-              <th className="text-left px-4 py-3 font-medium">Клиент</th>
-              <th className="text-right px-4 py-3 font-medium">Сумма</th>
-              <th className="text-right px-4 py-3 font-medium">Комиссия</th>
-              <th className="text-right px-4 py-3 font-medium">Доход</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {data?.items?.map((item: any) => (
-              <tr key={item.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">{item.date ? new Date(item.date).toLocaleDateString('ru') : '-'}</td>
-                <td className="px-4 py-3 font-mono text-xs">{item.shortCode}</td>
-                <td className="px-4 py-3">{item.customerName || '-'}</td>
-                <td className="px-4 py-3 text-right">{((item.grossAmount || 0) / 100).toFixed(2)}</td>
-                <td className="px-4 py-3 text-right text-red-500">-{((item.platformFee || 0) / 100).toFixed(2)}</td>
-                <td className="px-4 py-3 text-right text-green-600">{((item.supplierAmount || 0) / 100).toFixed(2)}</td>
-              </tr>
-            ))}
-            {(!data?.items || data.items.length === 0) && !loading && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                  <EmptyState title="Нет данных" description="За выбранный период продаж не найдено." />
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        {!loading && (!data?.items || data.items.length === 0) ? (
+          <EmptyState title="Нет данных" description="За выбранный период продаж не найдено." />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Дата</TableHead>
+                <TableHead>Заказ</TableHead>
+                <TableHead>Клиент</TableHead>
+                <TableHead className="text-right">Сумма</TableHead>
+                <TableHead className="text-right">Комиссия</TableHead>
+                <TableHead className="text-right">Доход</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(data?.items ?? []).map((item: any) => (
+                <TableRow key={item.id}>
+                  <TableCell>{item.date ? new Date(item.date).toLocaleDateString('ru') : '-'}</TableCell>
+                  <TableCell className="font-mono text-xs">{item.shortCode}</TableCell>
+                  <TableCell>{item.customerName || '-'}</TableCell>
+                  <TableCell className="text-right">{((item.grossAmount || 0) / 100).toFixed(2)}</TableCell>
+                  <TableCell className="text-right text-red-500">-{((item.platformFee || 0) / 100).toFixed(2)}</TableCell>
+                  <TableCell className="text-right text-green-600">{((item.supplierAmount || 0) / 100).toFixed(2)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </SectionCard>
 
       {showPicker && (
