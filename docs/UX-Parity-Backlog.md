@@ -70,7 +70,7 @@
 | CR-02 | CRITICAL | PageShell hard enforcement | Admin edit/detail (`events`, `venues`, `articles`, `collections`, `tags`) | Remove manual `h1`/containers, use `PageHeader` | DONE |
 | CR-03 | CRITICAL | State UX rollout | Remaining critical pages | Shared `LoadingState`/`EmptyState`/`ErrorState` everywhere | DONE |
 | CR-04 | CRITICAL | List system enforcement | Supplier `reports`, residual list pages | Unified list layout + shared table/DataTable + toolbar | DONE |
-| HI-01 | HIGH | DataTable rollout | Remaining list pages | No legacy/new table coexistence | TODO |
+| HI-01 | HIGH | DataTable rollout | Remaining list pages | No legacy/new table coexistence | IN_PROGRESS |
 | HI-02A | HIGH | StatusBadge rollout | `admin/dashboard`, other status lists | All status badges via shared component | TODO |
 | HI-02B | HIGH | TagChip rollout | `admin/articles`, `admin/collections`, `supplier/notifications` | Tag chips via shared component | TODO |
 | HI-02C | HIGH | CountBadge rollout | Lists with counters/indicators | Unified counter badges | TODO |
