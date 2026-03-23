@@ -4,6 +4,25 @@
 
 ---
 
+## 23.03.2026 — Final cleanup manual `h1` вне scope
+
+### Наблюдения
+
+- После закрытия CRITICAL/HIGH/MEDIUM в UX parity оставался хвост ручных page-level заголовков на secondary/admin-content и supplier auth экранах.
+- Разметка и логика страниц уже были рабочими; долг был в несистемном page shell (`manual <h1>` вместо shared `PageHeader`).
+
+### Решения
+
+- Проведен единый проход по страницам вне исходного scope parity: `cities/*`, `audit/*`, `source-categories/*`, `events/EventCreate`, `events/EventsMerge`, `orders/OrderDetail`, `support/SupportDetail`, `landings/*`, `combos/*`, `promo-*`, `widgets/*`, `upsells/*`, `reviews/ExternalReviewsList`, `supplier/Reviews`, `supplier/Login`, `supplier/Register`, `supplier/InviteAccept`.
+- На всех перечисленных экранах manual page-level `h1` заменен на shared `PageHeader` без изменений бизнес-логики/API.
+- `docs/UX-Parity-Backlog.md` обновлен: добавлен итоговый блок `Manual h1 Cleanup (outside initial scope)` со статусом DONE.
+
+### Проблемы
+
+- Нет. После прохода остаток `manual <h1>` в `packages/frontend-admin/src/pages` и `packages/frontend-supplier/src/pages` равен 0.
+
+---
+
 ## 21.03.2026 — Аудит Tasktracker vs код (Gates, UA, Promo)
 
 ### Наблюдения

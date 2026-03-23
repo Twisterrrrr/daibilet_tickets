@@ -16,6 +16,22 @@
 
 ---
 
+## Tags Program — 3 Sprint Closure (23.03.2026)
+
+| Задача | Приоритет | Статус |
+|--------|-----------|--------|
+| Sprint 1: Real DB rollout finalization (`db:migrate:prod` + `migrate:legacy-tags` + `verify:tags-post-migration` + rollout artifact) | Критический | `[x]` |
+| Sprint 2: Import lifecycle hardening (`MANUAL_ADMIN/IMPORT_MAPPED/AUTO_RULE`, suppression, manual survives sync) | Высокий | `[x]` |
+| Sprint 3: Final Lovable UI parity pass (checklist, table density, hover/selected, shell/list/detail rhythm) | Средний | `[x]` |
+
+Runbook: `docs/rollout-tags-runbook.md`  
+Execution plan: `docs/Tags-3-Sprint-Plan.md`
+
+Итог UI parity: `docs/UX-Parity-Backlog.md` (CRITICAL/HIGH/MEDIUM закрыты).
+Manual `h1` cleanup вне scope: `[x]` завершён (admin + supplier auth/reviews; остаток `manual <h1>` = 0).
+
+---
+
 ## Приоритеты (prod уже в бою; ниже — развитие и качество)
 
 1. **Полный контур поставщика** — замкнуть цикл: регистрация → события → заказы → оплата → выплаты.

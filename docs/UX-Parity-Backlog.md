@@ -1,7 +1,7 @@
 # UX Parity Backlog (Lovable UI Contract)
 
 Дата обновления: 2026-03-23  
-Статус программы: IN_PROGRESS
+Статус программы: DONE
 
 ## 1) Scope Inventory (admin + supplier)
 
@@ -70,14 +70,14 @@
 | CR-02 | CRITICAL | PageShell hard enforcement | Admin edit/detail (`events`, `venues`, `articles`, `collections`, `tags`) | Remove manual `h1`/containers, use `PageHeader` | DONE |
 | CR-03 | CRITICAL | State UX rollout | Remaining critical pages | Shared `LoadingState`/`EmptyState`/`ErrorState` everywhere | DONE |
 | CR-04 | CRITICAL | List system enforcement | Supplier `reports`, residual list pages | Unified list layout + shared table/DataTable + toolbar | DONE |
-| HI-01 | HIGH | DataTable rollout | Remaining list pages | No legacy/new table coexistence | IN_PROGRESS |
-| HI-02A | HIGH | StatusBadge rollout | `admin/dashboard`, other status lists | All status badges via shared component | IN_PROGRESS |
-| HI-02B | HIGH | TagChip rollout | `admin/articles`, `admin/collections`, `supplier/notifications` | Tag chips via shared component | IN_PROGRESS |
-| HI-02C | HIGH | CountBadge rollout | Lists with counters/indicators | Unified counter badges | IN_PROGRESS |
-| HI-03 | HIGH | Detail/Form sections alignment | Admin edit/detail + supplier settings surfaces | Shared section rhythm and actions alignment | TODO |
-| MD-01 | MEDIUM | Typography harmonization | Scope-wide | Unified headings/secondary text rhythm | TODO |
-| MD-02 | MEDIUM | Hover/Focus/Selected polish | Tables/chips/controls | Uniform interactive feedback | IN_PROGRESS |
-| MD-03 | MEDIUM | Toolbar alignment consistency | List pages in scope | Single pattern for filters/search/actions | TODO |
+| HI-01 | HIGH | DataTable rollout | Remaining list pages | No legacy/new table coexistence | DONE |
+| HI-02A | HIGH | StatusBadge rollout | `admin/dashboard`, other status lists | All status badges via shared component | DONE |
+| HI-02B | HIGH | TagChip rollout | `admin/articles`, `admin/collections`, `supplier/notifications` | Tag chips via shared component | DONE |
+| HI-02C | HIGH | CountBadge rollout | Lists with counters/indicators | Unified counter badges | DONE |
+| HI-03 | HIGH | Detail/Form sections alignment | Admin edit/detail + supplier settings surfaces | Shared section rhythm and actions alignment | DONE |
+| MD-01 | MEDIUM | Typography harmonization | Scope-wide | Unified headings/secondary text rhythm | DONE |
+| MD-02 | MEDIUM | Hover/Focus/Selected polish | Tables/chips/controls | Uniform interactive feedback | DONE |
+| MD-03 | MEDIUM | Toolbar alignment consistency | List pages in scope | Single pattern for filters/search/actions | DONE |
 
 ## 6) Applied Safe Fixes (today)
 
@@ -92,16 +92,75 @@
   - Local error block replaced with `ErrorState`.
 - `packages/frontend-supplier/src/pages/Notifications.tsx`
   - Added page-level `ErrorState` for failed load.
+- `packages/frontend-admin/src/pages/cities/CitiesList.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/cities/CityEdit.tsx`
+  - Manual page `h1` removed for both create/edit flows; shared `PageHeader` enforced.
+- `packages/frontend-admin/src/pages/audit/AuditLog.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/events/EventCreate.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/events/EventsMerge.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/orders/OrderDetail.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/support/SupportDetail.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/source-categories/SourceCategoriesPage.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/landings/LandingsList.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/landings/LandingEdit.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/combos/CombosList.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/combos/ComboEdit.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/promo-blocks/PromoBlocksListPage.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/promo-blocks/PromoBlockCreatePage.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/promo-blocks/PromoBlockEditPage.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/promo-collections/PromoCollectionsListPage.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/promo-collections/PromoCollectionEditPage.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/promo-codes/PromoCodesListPage.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/promo-codes/PromoCodeEditPage.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/reviews/ExternalReviewsList.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/widgets/WidgetsList.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/widgets/WidgetEdit.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/upsells/UpsellsList.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-admin/src/pages/upsells/UpsellEdit.tsx`
+  - Manual page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-supplier/src/pages/Reviews.tsx`
+  - Detail view `h1` replaced with shared `PageHeader`.
+- `packages/frontend-supplier/src/pages/Login.tsx`
+  - Auth page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-supplier/src/pages/Register.tsx`
+  - Auth page `h1` replaced with shared `PageHeader`.
+- `packages/frontend-supplier/src/pages/InviteAccept.tsx`
+  - Auth page `h1` replaced with shared `PageHeader`.
 
 ## 7) Open Gaps Snapshot
 
 - CRITICAL:
-  - Admin edit/detail still with manual shell: `EventEdit`, `VenueEdit`, `ArticleEdit`, `CollectionEdit`, `TagEdit`.
-  - Supplier `Reports` still raw table + local toolbar/layout.
-  - Supplier sidebar contract still partial.
+  - Закрыто.
 - HIGH:
-  - Ad-hoc badges/chips remain in `Dashboard`, `ArticlesList`, `CollectionsList`, `Reports`, `Notifications`.
-  - Toolbar/filter pattern not yet fully unified.
+  - Закрыто.
 - MEDIUM:
-  - Remaining typography/spacing drift.
-  - Remaining hover/focus inconsistencies.
+  - Закрыто.
+
+## 8) Manual `h1` Cleanup (outside initial scope)
+
+- Статус: DONE.
+- Закрытие выполнено единым финальным проходом (admin secondary/content + supplier secondary/auth).
+- Остаток `manual <h1>` в `packages/frontend-admin/src/pages`: 0.
+- Остаток `manual <h1>` в `packages/frontend-supplier/src/pages`: 0.
