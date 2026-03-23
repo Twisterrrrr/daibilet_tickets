@@ -197,6 +197,48 @@ enum DateMode {
   OPEN_DATE // Билет с открытой датой (музеи)
 }
 
+enum CollectionSourceType {
+  MANUAL
+  SUGGESTED
+  HYBRID
+  ACTIVE
+  REJECTED
+  ARCHIVED
+}
+
+enum CollectionStatus {
+  DRAFT
+  SUGGESTED
+  ACTIVE
+  REJECTED
+  ARCHIVED
+}
+
+enum CollectionSelectionBasis {
+  MANUAL
+  POPULAR
+  STRUCTURAL
+  COMBINATION
+}
+
+enum LandingStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum LandingTemplateType {
+  GENERIC_CARDS
+  COMPARISON_TABLE
+  HYBRID
+  SEASONAL_EVENT
+}
+
+enum LandingSelectionMode {
+  COLLECTION
+  CUSTOM
+}
+
 // --- Мульти-офферная архитектура ---
 
 enum OfferSource {
@@ -941,11 +983,15 @@ model LandingPage {
   id                String    @id @default(uuid()) @db.Uuid
   slug              String    @unique // URL: /cities/:citySlug/:slug
   cityId            String    @db.Uuid
+  collectionId      String?   @db.Uuid
+  selectionMode     LandingSelectionMode @default(CUSTOM)
   filterTag         String // slug тега для фильтрации событий
   additionalFilters Json? // {category?, source?, minDuration?, maxDuration?, features[]?}
+  rankingJson       Json?
   title             String // H1
   subtitle          String?
   heroText          String?   @db.Text
+  templateType      LandingTemplateType @default(GENERIC_CARDS)
   howToChoose       Json? // [{title, text}]
   infoBlocks        Json? // [{title, text}]
   faq               Json? // [{question, answer}]
@@ -955,6 +1001,9 @@ model LandingPage {
   legalText         String?   @db.Text
   metaTitle         String?
   metaDescription   String?   @db.Text
+  status            LandingStatus @default(DRAFT)
+  showInCollections Boolean   @default(false)
+  isIndexable       Boolean   @default(true)
   isActive          Boolean   @default(true)
   isDeleted         Boolean   @default(false)
   deletedAt         DateTime?
@@ -963,9 +1012,13 @@ model LandingPage {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  city City @relation(fields: [cityId], references: [id])
+  city       City        @relation(fields: [cityId], references: [id])
+  collection Collection? @relation(fields: [collectionId], references: [id])
 
   @@index([cityId])
+  @@index([status, showInCollections])
+  @@index([collectionId])
+  @@unique([cityId, slug])
   @@map("landing_pages")
 }
 
@@ -984,6 +1037,8 @@ model Collection {
   filterSubcategory String? // EventSubcategory enum value
   filterAudience    String? // EventAudience enum value
   additionalFilters Json? // {maxDuration?, dateMode?, etc.}
+  rankingJson       Json?
+  semanticKey       String?
 
   // --- Ручная курация ---
   pinnedEventIds   String[] @db.Uuid // всегда показывать первыми
@@ -1002,6 +1057,11 @@ model Collection {
   metaDescription String? @db.Text
 
   // --- Состояние ---
+  sourceType         CollectionSourceType     @default(MANUAL)
+  selectionBasis     CollectionSelectionBasis @default(MANUAL)
+  status             CollectionStatus         @default(DRAFT)
+  eventCountCached   Int?
+  previewGeneratedAt DateTime?
   isActive  Boolean   @default(true)
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
@@ -1010,9 +1070,12 @@ model Collection {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  city City? @relation(fields: [cityId], references: [id])
+  city     City?         @relation(fields: [cityId], references: [id])
+  landings LandingPage[]
 
   @@index([cityId])
+  @@index([status, sourceType])
+  @@unique([cityId, slug])
   @@index([isActive, isDeleted])
   @@map("collections")
 }

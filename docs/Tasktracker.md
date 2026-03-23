@@ -32,6 +32,18 @@ Manual `h1` cleanup вне scope: `[x]` завершён (admin + supplier auth/
 
 ---
 
+## Collections + Landings Rollout (23.03.2026)
+
+| Задача | Приоритет | Статус |
+|--------|-----------|--------|
+| Phase 1: Model + selection service + suggestions workflow + admin queue | Критический | `[x]` |
+| Phase 2: Editors + catalog endpoints + showInCollections integration | Высокий | `[x]` |
+| Phase 3: Landing templates bridge + ranking presets + docs | Средний | `[x]` |
+
+Архитектура: `docs/Collections-Architecture.md`, `docs/Landings-Architecture.md`.
+
+---
+
 ## Приоритеты (prod уже в бою; ниже — развитие и качество)
 
 1. **Полный контур поставщика** — замкнуть цикл: регистрация → события → заказы → оплата → выплаты.

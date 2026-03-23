@@ -14,12 +14,14 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Prisma } from '@prisma/client';
+import { CollectionSelectionBasis, CollectionSourceType, CollectionStatus, Prisma } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import { CollectionSuggestionService } from '../collection/collection-suggestion.service';
+import { CollectionSelectionService } from '../catalog/collection-selection.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateCollectionDto, UpdateCollectionDto } from './dto/admin.dto';
 
@@ -29,7 +31,11 @@ import { CreateCollectionDto, UpdateCollectionDto } from './dto/admin.dto';
 @UseInterceptors(AuditInterceptor)
 @Controller('admin/collections')
 export class AdminCollectionsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly suggestionService: CollectionSuggestionService,
+    private readonly selectionService: CollectionSelectionService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'EDITOR', 'VIEWER')
@@ -39,6 +45,9 @@ export class AdminCollectionsController {
     @Query('limit') limit?: string,
     @Query('city') city?: string,
     @Query('search') search?: string,
+    @Query('status') status?: CollectionStatus,
+    @Query('sourceType') sourceType?: CollectionSourceType,
+    @Query('selectionBasis') selectionBasis?: CollectionSelectionBasis,
   ) {
     const pg = parsePagination({ cursor, page, limit: limit || '20' });
 
@@ -48,6 +57,9 @@ export class AdminCollectionsController {
       ...(search && {
         OR: [{ title: { contains: search, mode: 'insensitive' } }, { slug: { contains: search, mode: 'insensitive' } }],
       }),
+      ...(status && { status }),
+      ...(sourceType && { sourceType }),
+      ...(selectionBasis && { selectionBasis }),
     };
 
     const [items, total] = await Promise.all([
@@ -78,6 +90,10 @@ export class AdminCollectionsController {
         sortOrder: c.sortOrder,
         filterCategory: c.filterCategory,
         filterTags: c.filterTags,
+        sourceType: c.sourceType,
+        status: c.status,
+        selectionBasis: c.selectionBasis,
+        eventCountCached: c.eventCountCached,
         pinnedCount: c.pinnedEventIds.length,
         excludedCount: c.excludedEventIds.length,
         updatedAt: c.updatedAt,
@@ -124,12 +140,16 @@ export class AdminCollectionsController {
         filterSubcategory: body.filterSubcategory || null,
         filterAudience: body.filterAudience || null,
         additionalFilters: (body.additionalFilters as Prisma.InputJsonValue) ?? undefined,
+        rankingJson: (body.rankingJson as Prisma.InputJsonValue) ?? undefined,
         pinnedEventIds: body.pinnedEventIds || [],
         excludedEventIds: body.excludedEventIds || [],
         metaTitle: body.metaTitle || null,
         metaDescription: body.metaDescription || null,
         infoBlocks: (body.infoBlocks as Prisma.InputJsonValue) ?? undefined,
         faq: (body.faq as Prisma.InputJsonValue) ?? undefined,
+        sourceType: body.sourceType ?? CollectionSourceType.MANUAL,
+        selectionBasis: body.selectionBasis ?? CollectionSelectionBasis.MANUAL,
+        status: body.status ?? (body.isActive ? CollectionStatus.ACTIVE : CollectionStatus.DRAFT),
         isActive: body.isActive ?? true,
         sortOrder: body.sortOrder ?? 0,
       },
@@ -160,12 +180,18 @@ export class AdminCollectionsController {
         ...(body.additionalFilters !== undefined && {
           additionalFilters: body.additionalFilters as Prisma.InputJsonValue,
         }),
+        ...(body.rankingJson !== undefined && {
+          rankingJson: body.rankingJson as Prisma.InputJsonValue,
+        }),
         ...(body.pinnedEventIds !== undefined && { pinnedEventIds: body.pinnedEventIds }),
         ...(body.excludedEventIds !== undefined && { excludedEventIds: body.excludedEventIds }),
         ...(body.metaTitle !== undefined && { metaTitle: body.metaTitle || null }),
         ...(body.metaDescription !== undefined && { metaDescription: body.metaDescription || null }),
         ...(body.infoBlocks !== undefined && { infoBlocks: body.infoBlocks as Prisma.InputJsonValue }),
         ...(body.faq !== undefined && { faq: body.faq as Prisma.InputJsonValue }),
+        ...(body.sourceType !== undefined && { sourceType: body.sourceType }),
+        ...(body.selectionBasis !== undefined && { selectionBasis: body.selectionBasis }),
+        ...(body.status !== undefined && { status: body.status }),
         ...(body.isActive !== undefined && { isActive: body.isActive }),
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
         version: { increment: 1 },
@@ -191,5 +217,81 @@ export class AdminCollectionsController {
     });
 
     return { success: true };
+  }
+
+  @Post('suggestions/generate')
+  @Roles('ADMIN', 'EDITOR')
+  async generateSuggestions() {
+    return this.suggestionService.generateCollectionSuggestions();
+  }
+
+  @Post(':id/approve')
+  @Roles('ADMIN', 'EDITOR')
+  async approve(@Param('id') id: string) {
+    return this.prisma.collection.update({
+      where: { id },
+      data: {
+        status: CollectionStatus.ACTIVE,
+        sourceType: CollectionSourceType.ACTIVE,
+        isActive: true,
+      },
+    });
+  }
+
+  @Post(':id/reject')
+  @Roles('ADMIN', 'EDITOR')
+  async reject(@Param('id') id: string) {
+    return this.prisma.collection.update({
+      where: { id },
+      data: {
+        status: CollectionStatus.REJECTED,
+        isActive: false,
+      },
+    });
+  }
+
+  @Post('preview')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async previewSelection(
+    @Body()
+    body: {
+      cityId?: string;
+      filterTags?: string[];
+      filterCategory?: string | null;
+      filterSubcategory?: string | null;
+      filterAudience?: string | null;
+      additionalFilters?: Record<string, unknown>;
+      rankingJson?: { preset?: 'popularity' | 'availability' | 'balanced' };
+      pinnedEventIds?: string[];
+      excludedEventIds?: string[];
+      limit?: number;
+    },
+  ) {
+    const resolved = await this.selectionService.resolveSelection({
+      cityId: body.cityId ?? null,
+      filterTags: body.filterTags ?? [],
+      filterCategory: body.filterCategory ?? null,
+      filterSubcategory: body.filterSubcategory ?? null,
+      filterAudience: body.filterAudience ?? null,
+      additionalFilters: body.additionalFilters ?? undefined,
+      ranking: body.rankingJson ?? { preset: 'balanced' },
+      pinnedEventIds: body.pinnedEventIds ?? [],
+      excludedEventIds: body.excludedEventIds ?? [],
+      page: 1,
+      limit: Math.min(30, Math.max(1, body.limit ?? 10)),
+    });
+
+    return {
+      eventCount: resolved.preview.eventCount,
+      generatedAt: resolved.preview.generatedAt,
+      items: resolved.items.map((event) => ({
+        id: event.id,
+        title: event.title,
+        slug: event.slug,
+        city: event.city ? { slug: event.city.slug, name: event.city.name } : null,
+        rating: event.rating,
+        reviewCount: event.reviewCount,
+      })),
+    };
   }
 }

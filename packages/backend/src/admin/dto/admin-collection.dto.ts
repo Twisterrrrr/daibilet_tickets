@@ -1,8 +1,14 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  CollectionSelectionBasis,
+  CollectionSourceType,
+  CollectionStatus,
+} from '@prisma/client';
+import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -71,6 +77,11 @@ export class CreateCollectionDto {
   @IsObject()
   additionalFilters?: Record<string, unknown>;
 
+  @ApiPropertyOptional({ description: 'Ранжирование (JSON)' })
+  @IsOptional()
+  @IsObject()
+  rankingJson?: Record<string, unknown>;
+
   // --- Курация ---
 
   @ApiPropertyOptional({ description: 'ID закреплённых событий (в порядке отображения)', type: [String] })
@@ -115,6 +126,21 @@ export class CreateCollectionDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ enum: CollectionSourceType })
+  @IsOptional()
+  @IsEnum(CollectionSourceType)
+  sourceType?: CollectionSourceType;
+
+  @ApiPropertyOptional({ enum: CollectionSelectionBasis })
+  @IsOptional()
+  @IsEnum(CollectionSelectionBasis)
+  selectionBasis?: CollectionSelectionBasis;
+
+  @ApiPropertyOptional({ enum: CollectionStatus })
+  @IsOptional()
+  @IsEnum(CollectionStatus)
+  status?: CollectionStatus;
 
   @ApiPropertyOptional({ description: 'Порядок сортировки' })
   @IsOptional()

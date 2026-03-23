@@ -3,6 +3,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  LayoutTemplate,
   FolderOpen,
   HeadphonesIcon,
   LayoutDashboard,
@@ -61,6 +62,7 @@ function buildNavSections(): NavSection[] {
       items: [
         ...(show.content ? [{ to: '/articles', label: 'Статьи', icon: BookOpen, section: 'Контент' }] : []),
         ...(show.content ? [{ to: '/collections', label: 'Подборки', icon: FolderOpen, section: 'Контент' }] : []),
+        ...(show.content ? [{ to: '/landings', label: 'Лендинги', icon: LayoutTemplate, section: 'Контент' }] : []),
         { to: '/promo-blocks', label: 'Промо-блоки', icon: BarChart3, section: 'Контент' },
       ].filter(Boolean) as NavItem[],
     },

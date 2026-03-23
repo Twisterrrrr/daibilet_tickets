@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
-import type { LandingItem } from '@/lib/api.types';
+import type { FeaturedLandingItem, LandingItem } from '@/lib/api.types';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +23,16 @@ type CollectionCardVM = LandingItem & {
 
 export default async function CollectionsListPage() {
   let collections: CollectionCardVM[] = [];
+  let featuredLandings: FeaturedLandingItem[] = [];
   try {
     collections = await api.getCollections();
   } catch {
     // fallback — пустой массив
+  }
+  try {
+    featuredLandings = await api.getFeaturedLandingsForCollections('spb');
+  } catch {
+    featuredLandings = [];
   }
 
   // Группировка: кросс-городские (cityId=null) + по городам
@@ -66,6 +72,25 @@ export default async function CollectionsListPage() {
           <p className="text-lg text-slate-500">Подборки скоро появятся</p>
           <p className="mt-1 text-sm text-slate-400">Мы готовим для вас тематические коллекции событий</p>
         </div>
+      )}
+
+      {featuredLandings.length > 0 && (
+        <section className="mt-10">
+          <h2 className="mb-4 text-xl font-bold text-slate-900">Спецстраницы</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {featuredLandings.map((landing) => (
+              <Link
+                key={landing.id}
+                href={landing.cta?.href ?? `/cities/${landing.city?.slug ?? 'spb'}/${landing.slug}`}
+                className="rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-primary-300"
+              >
+                <p className="text-xs uppercase tracking-wide text-slate-500">{landing.templateType ?? 'LANDING'}</p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900">{landing.title}</h3>
+                {landing.subtitle ? <p className="mt-1 text-sm text-slate-600">{landing.subtitle}</p> : null}
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Кросс-городские подборки */}

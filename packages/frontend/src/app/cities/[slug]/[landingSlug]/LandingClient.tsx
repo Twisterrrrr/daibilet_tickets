@@ -99,9 +99,11 @@ function sortVariants(variants: Variant[], sort: string): Variant[] {
 export function LandingClient({
   variants: allVariants,
   filters: apiFilters,
+  templateType,
 }: {
   variants: Variant[];
   filters: Filters;
+  templateType: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
 }) {
   const [filterState, setFilterState] = useState<FilterState>({
     date: '',
@@ -164,9 +166,13 @@ export function LandingClient({
         )}
       </div>
 
-      {/* Desktop table / Mobile cards */}
-      <ComparisonTable variants={sorted} bestDealIdx={bestDealIdx} />
-      <VariantCards variants={sorted} bestDealIdx={bestDealIdx} />
+      {/* Template rendering */}
+      {(templateType === 'COMPARISON_TABLE' || templateType === 'HYBRID') && (
+        <ComparisonTable variants={sorted} bestDealIdx={bestDealIdx} />
+      )}
+      {(templateType === 'GENERIC_CARDS' || templateType === 'HYBRID' || templateType === 'SEASONAL_EVENT') && (
+        <VariantCards variants={sorted} bestDealIdx={bestDealIdx} />
+      )}
     </div>
   );
 }

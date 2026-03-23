@@ -39,6 +39,7 @@ interface CollectionFormData {
   filterSubcategory: string;
   filterAudience: string;
   additionalFilters: string; // JSON string
+  rankingPreset: 'popularity' | 'availability' | 'balanced';
   pinnedEventIds: string[];
   excludedEventIds: string[];
   metaTitle: string;
@@ -62,6 +63,7 @@ const defaultForm: CollectionFormData = {
   filterSubcategory: '',
   filterAudience: '',
   additionalFilters: '',
+  rankingPreset: 'balanced',
   pinnedEventIds: [],
   excludedEventIds: [],
   metaTitle: '',
@@ -89,6 +91,9 @@ export function CollectionEditPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [previewItems, setPreviewItems] = useState<Array<{ id: string; title: string; slug: string; city?: { name: string } | null }>>([]);
 
   // Для поиска событий (pinned/excluded)
   const [eventSearch, setEventSearch] = useState('');
@@ -125,6 +130,7 @@ export function CollectionEditPage() {
           filterSubcategory: data.filterSubcategory || '',
           filterAudience: data.filterAudience || '',
           additionalFilters: data.additionalFilters ? JSON.stringify(data.additionalFilters, null, 2) : '',
+          rankingPreset: (data.rankingJson?.preset as 'popularity' | 'availability' | 'balanced') || 'balanced',
           pinnedEventIds: data.pinnedEventIds || [],
           excludedEventIds: data.excludedEventIds || [],
           metaTitle: data.metaTitle || '',
@@ -183,6 +189,7 @@ export function CollectionEditPage() {
         filterSubcategory: form.filterSubcategory || undefined,
         filterAudience: form.filterAudience || undefined,
         additionalFilters,
+        rankingJson: { preset: form.rankingPreset },
         pinnedEventIds: form.pinnedEventIds,
         excludedEventIds: form.excludedEventIds,
         metaTitle: form.metaTitle || undefined,
@@ -275,6 +282,35 @@ export function CollectionEditPage() {
 
   const removeFaq = (index: number) => {
     setForm((prev) => ({ ...prev, faq: prev.faq.filter((_, i) => i !== index) }));
+  };
+
+  const refreshPreview = async () => {
+    setPreviewLoading(true);
+    try {
+      const additionalFilters = form.additionalFilters.trim() ? JSON.parse(form.additionalFilters) : undefined;
+      const data = await adminApi.post<{
+        eventCount: number;
+        items: Array<{ id: string; title: string; slug: string; city?: { name: string } | null }>;
+      }>('/admin/collections/preview', {
+        cityId: form.cityId || undefined,
+        filterTags: form.filterTags,
+        filterCategory: form.filterCategory || undefined,
+        filterSubcategory: form.filterSubcategory || undefined,
+        filterAudience: form.filterAudience || undefined,
+        additionalFilters,
+        rankingJson: { preset: form.rankingPreset },
+        pinnedEventIds: form.pinnedEventIds,
+        excludedEventIds: form.excludedEventIds,
+        limit: 8,
+      });
+      setPreviewCount(data.eventCount);
+      setPreviewItems(data.items);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Не удалось обновить preview';
+      setError(message);
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   return (
@@ -494,6 +530,25 @@ export function CollectionEditPage() {
               </div>
 
               <div className="space-y-2">
+                <Label>Ранжирование (preset)</Label>
+                <Select
+                  value={form.rankingPreset}
+                  onValueChange={(v) =>
+                    setForm((p) => ({ ...p, rankingPreset: v as CollectionFormData['rankingPreset'] }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="balanced">balanced</SelectItem>
+                    <SelectItem value="popularity">popularity</SelectItem>
+                    <SelectItem value="availability">availability</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label>Дополнительные фильтры (JSON)</Label>
                 <Textarea
                   value={form.additionalFilters}
@@ -502,6 +557,27 @@ export function CollectionEditPage() {
                   rows={3}
                   className="font-mono text-sm"
                 />
+              </div>
+
+              <div className="rounded-md border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Preview selection</p>
+                  <Button type="button" variant="outline" size="sm" onClick={refreshPreview} disabled={previewLoading}>
+                    {previewLoading ? 'Обновление...' : 'Обновить preview'}
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {previewCount === null ? 'Preview не рассчитан' : `Найдено событий: ${previewCount}`}
+                </p>
+                {previewItems.length > 0 ? (
+                  <div className="mt-2 space-y-1">
+                    {previewItems.map((item) => (
+                      <div key={item.id} className="rounded bg-muted px-2 py-1 text-xs">
+                        {item.title} ({item.slug}) {item.city?.name ? `- ${item.city.name}` : ''}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>

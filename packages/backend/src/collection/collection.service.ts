@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 import { CACHE_TTL, cacheKeys, CacheService } from '../cache/cache.service';
+import { CollectionSelectionService } from '../catalog/collection-selection.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -9,6 +10,7 @@ export class CollectionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly selectionService: CollectionSelectionService,
   ) {}
 
   /**
@@ -34,7 +36,14 @@ export class CollectionService {
       // Для каждой подборки — количество подходящих событий
       const result = await Promise.all(
         collections.map(async (c) => {
-          const eventWhere = this.buildEventFilter(c);
+          const eventWhere = this.selectionService.buildWhere({
+            cityId: c.cityId,
+            filterTags: c.filterTags,
+            filterCategory: c.filterCategory,
+            filterSubcategory: c.filterSubcategory,
+            filterAudience: c.filterAudience,
+            additionalFilters: c.additionalFilters,
+          });
           const eventCount = await this.prisma.event.count({ where: eventWhere });
           return {
             id: c.id,
@@ -121,60 +130,25 @@ export class CollectionService {
         pinnedEvents.sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999));
       }
 
-      // 2) Фильтрованные события
-      const eventWhere = this.buildEventFilter(collection, cityOverrideSlug);
-      // Исключаем уже отображённые pinned-события
-      const pinnedIds = new Set(pinnedEvents.map((e) => e.id));
+      const resolved = await this.selectionService.resolveSelection({
+        cityId: collection.cityId,
+        citySlug: cityOverrideSlug,
+        filterTags: collection.filterTags,
+        filterCategory: collection.filterCategory,
+        filterSubcategory: collection.filterSubcategory,
+        filterAudience: collection.filterAudience,
+        additionalFilters: collection.additionalFilters,
+        ranking: (collection.rankingJson as { preset?: 'balanced' | 'availability' | 'popularity' } | null) ?? {
+          preset: 'balanced',
+        },
+        pinnedEventIds: collection.pinnedEventIds,
+        excludedEventIds: collection.excludedEventIds,
+        page,
+        limit,
+      });
 
-      const skip = (page - 1) * limit;
-      // На первой странице вычитаем слоты для pinned
-      const adjustedLimit = page === 1 ? Math.max(1, limit - pinnedEvents.length) : limit;
-      const adjustedSkip = page === 1 ? 0 : skip - pinnedEvents.length;
-
-      const [filteredEvents, filteredTotal] = await Promise.all([
-        this.prisma.event.findMany({
-          where: {
-            ...eventWhere,
-            id: { notIn: [...(collection.excludedEventIds || []), ...Array.from(pinnedIds)] },
-          },
-          orderBy: { rating: 'desc' },
-          skip: Math.max(0, adjustedSkip),
-          take: adjustedLimit,
-          include: {
-            city: { select: { slug: true, name: true } },
-            tags: { include: { tag: true } },
-            offers: {
-              where: { status: 'ACTIVE', isDeleted: false },
-              orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
-              select: {
-                id: true,
-                source: true,
-                purchaseType: true,
-                priceFrom: true,
-                isPrimary: true,
-                deeplink: true,
-              },
-            },
-            sessions: {
-              where: { isActive: true, startsAt: { gte: new Date() } },
-              orderBy: { startsAt: 'asc' },
-              take: 3,
-              select: { startsAt: true, availableTickets: true },
-            },
-          },
-        }),
-        this.prisma.event.count({
-          where: {
-            ...eventWhere,
-            id: { notIn: [...(collection.excludedEventIds || []), ...Array.from(pinnedIds)] },
-          },
-        }),
-      ]);
-
-      // Объединяем: pinned first (только на первой странице), затем filtered
-      const events = page === 1 ? [...pinnedEvents, ...filteredEvents] : filteredEvents;
-
-      const total = filteredTotal + pinnedEvents.length;
+      const events = resolved.items;
+      const total = resolved.total;
 
       const enrichedEvents = events.map((event) => {
         const ev = event as unknown as { id: string; offers?: unknown[]; sessions?: { startsAt: Date }[]; tags?: { tag: unknown }[]; city?: unknown; slug: string; title: string; imageUrl?: string | null; category: string; priceFrom?: number | null; rating?: number; reviewCount: number; durationMinutes?: number | null };
@@ -183,7 +157,7 @@ export class CollectionService {
         const sessions = ev.sessions ?? [];
         const nextSessionAt = sessions.length > 0 ? sessions[0].startsAt : null;
         const tags = (ev.tags ?? []).map((t) => t.tag);
-        const isPinned = pinnedIds.has(ev.id);
+        const isPinned = collection.pinnedEventIds.includes(ev.id);
 
         return {
           id: ev.id,
@@ -242,110 +216,11 @@ export class CollectionService {
     });
   }
 
-  /**
-   * Построить Prisma where-фильтр из полей подборки.
-   * cityOverrideSlug — для кросс-городской (cityId = null): сузить по городу из query.
-   */
-  private buildEventFilter(
-    collection: {
-      cityId: string | null;
-      filterTags: string[];
-      filterCategory: string | null;
-      filterSubcategory: string | null;
-      filterAudience: string | null;
-      excludedEventIds: string[];
-      additionalFilters: unknown;
-    },
-    cityOverrideSlug?: string,
-  ): Prisma.EventWhereInput {
-    // Базовый фильтр: активные, не удалённые, не дубли
-    const where: Prisma.EventWhereInput = {
-      isActive: true,
-      isDeleted: false,
-      canonicalOfId: null,
-      // Активные: SCHEDULED с будущими сеансами ИЛИ OPEN_DATE (не истёк)
-      OR: [
-        {
-          dateMode: DateMode.SCHEDULED,
-          sessions: { some: { isActive: true, startsAt: { gte: new Date() } } },
-        },
-        {
-          dateMode: DateMode.OPEN_DATE,
-          OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
-        },
-      ],
-    };
-
-    // Фильтр по городу: из коллекции или из query (для cross-city)
-    if (collection.cityId) {
-      where.cityId = collection.cityId;
-    } else if (cityOverrideSlug) {
-      where.city = { slug: cityOverrideSlug, isActive: true };
-    }
-
-    // Фильтр по тегам (OR-логика)
-    if (collection.filterTags && collection.filterTags.length > 0) {
-      where.tags = {
-        some: { tag: { slug: { in: collection.filterTags } } },
-      };
-    }
-
-    // Фильтр по категории
-    if (collection.filterCategory) {
-      where.category = collection.filterCategory as EventCategory;
-    }
-
-    // Фильтр по подкатегории
-    if (collection.filterSubcategory) {
-      where.subcategories = { has: collection.filterSubcategory as EventSubcategory };
-    }
-
-    // Фильтр по аудитории
-    if (collection.filterAudience) {
-      if (collection.filterAudience === 'KIDS') {
-        where.audience = { in: [EventAudience.KIDS, EventAudience.FAMILY] };
-      } else {
-        where.audience = collection.filterAudience as EventAudience;
-      }
-    }
-
-    // Дополнительные фильтры из JSON
-    const additional = collection.additionalFilters as {
-      citySlugs?: string[];
-      maxDuration?: number;
-      minDuration?: number;
-      dateMode?: string;
-    } | null;
-    if (additional) {
-      // Мульти-городской фильтр (slug-и городов)
-      if (Array.isArray(additional.citySlugs) && additional.citySlugs.length > 0) {
-        where.city = { slug: { in: additional.citySlugs }, isActive: true };
-      }
-      if (additional.maxDuration) {
-        const prev = (where.durationMinutes ?? {}) as Prisma.IntFilter;
-        where.durationMinutes = { ...prev, lte: additional.maxDuration };
-      }
-      if (additional.minDuration) {
-        const prev = (where.durationMinutes ?? {}) as Prisma.IntFilter;
-        where.durationMinutes = { ...prev, gte: additional.minDuration };
-      }
-      if (additional.dateMode) {
-        // Переопределяем OR-фильтр на конкретный dateMode
-        delete where.OR;
-        if (additional.dateMode === 'OPEN_DATE') {
-          where.dateMode = DateMode.OPEN_DATE;
-        } else {
-          where.dateMode = DateMode.SCHEDULED;
-          where.sessions = { some: { isActive: true, startsAt: { gte: new Date() } } };
-        }
-      }
-    }
-
-    // Исключённые события
-    if (collection.excludedEventIds && collection.excludedEventIds.length > 0) {
-      where.id = { notIn: collection.excludedEventIds };
-    }
-
-    return where;
+  async getByCityAndSlug(citySlug: string, slug: string, page = 1, limit = 20) {
+    const item = await this.prisma.collection.findFirst({
+      where: { slug, city: { slug: citySlug }, isDeleted: false, isActive: true },
+    });
+    if (!item) throw new NotFoundException(`Подборка "${slug}" не найдена`);
+    return this.getBySlug(slug, page, limit, citySlug);
   }
 }

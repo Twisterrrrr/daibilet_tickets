@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation } from '@nestjs/swagger';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { LandingStatus, LandingTemplateType } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -51,12 +52,19 @@ export class AdminLandingsController {
   @Get()
   async list(
     @Query('city') city?: string,
+    @Query('status') status?: LandingStatus,
+    @Query('templateType') templateType?: LandingTemplateType,
+    @Query('showInCollections') showInCollections?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     const where: Record<string, unknown> = { isDeleted: false };
     if (city) where.city = { slug: city };
+    if (status) where.status = status;
+    if (templateType) where.templateType = templateType;
+    if (showInCollections === 'true') where.showInCollections = true;
+    if (showInCollections === 'false') where.showInCollections = false;
 
     const pg = parsePagination({ cursor, page, limit });
     const [rawItems, total] = await Promise.all([
@@ -86,6 +94,8 @@ export class AdminLandingsController {
     const prismaData = {
       ...data,
       additionalFilters: data.additionalFilters ? toJsonValue(data.additionalFilters) : undefined,
+      rankingJson: data.rankingJson ? toJsonValue(data.rankingJson) : undefined,
+      status: data.status ?? (data.isActive ? LandingStatus.ACTIVE : LandingStatus.DRAFT),
     };
     return this.prisma.landingPage.create({ data: prismaData as Parameters<typeof this.prisma.landingPage.create>[0]['data'] });
   }
@@ -103,7 +113,12 @@ export class AdminLandingsController {
       const [result] = await this.prisma.$transaction([
         this.prisma.landingPage.updateMany({
           where: { id, version: data.version },
-          data: { ...clean, version: { increment: 1 } },
+          data: {
+            ...clean,
+            ...(clean.rankingJson !== undefined ? { rankingJson: toJsonValue(clean.rankingJson) } : {}),
+            ...(clean.additionalFilters !== undefined ? { additionalFilters: toJsonValue(clean.additionalFilters) } : {}),
+            version: { increment: 1 },
+          },
         }),
       ]);
 

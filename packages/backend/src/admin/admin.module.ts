@@ -10,6 +10,7 @@ import { ReviewService } from '../catalog/review.service';
 import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
 import { TagAssignmentService } from '../scheduler/tag-assignment.service';
 import { LandingModule } from '../landing/landing.module';
+import { CollectionModule } from '../collection/collection.module';
 import { SupportModule } from '../support/support.module';
 import { PreviewModule } from '../preview/preview.module';
 import { PromoModule } from '../promo/promo.module';
@@ -68,6 +69,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
 @Module({
   imports: [
     AuthModule,
+    CollectionModule,
     LandingModule,
     RedisCacheModule,
     SupportModule,

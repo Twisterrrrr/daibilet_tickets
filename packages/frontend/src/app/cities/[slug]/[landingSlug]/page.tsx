@@ -40,9 +40,9 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { landingSlug } = await params;
+  const { slug, landingSlug } = await params;
   try {
-    const data = await api.getLandingBySlug(landingSlug);
+    const data = await api.getCatalogLandingByCityAndSlug(slug, landingSlug);
     const l = data.landing;
     const title = typeof l.metaTitle === 'string' ? l.metaTitle : l.title;
     const description =
@@ -69,7 +69,7 @@ export default async function LandingPage({ params }: Props) {
 
   let data;
   try {
-    data = await api.getLandingBySlug(landingSlug);
+    data = await api.getCatalogLandingByCityAndSlug(citySlug, landingSlug);
   } catch {
     notFound();
   }
@@ -174,7 +174,7 @@ export default async function LandingPage({ params }: Props) {
         {/* Filters + Table/Cards */}
         <div id="variants">
           <h2 className="mb-4 text-xl font-bold text-slate-900 sm:text-2xl">Расписание рейсов</h2>
-          <LandingClient variants={vm.variants} filters={vm.filters} />
+          <LandingClient variants={vm.variants} filters={vm.filters} templateType={vm.templateType} />
         </div>
 
         {/* Stats Badge */}

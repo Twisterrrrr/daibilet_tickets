@@ -170,6 +170,7 @@ function toRelatedLinks(x: unknown): RelatedLinkItemVM[] {
 
 export interface LandingVM {
   city: { slug: string; name: string } | null;
+  templateType: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
   title: string;
   description?: string | null;
   subtitle?: string | null;
@@ -199,6 +200,8 @@ export function toLandingVM(data: LandingPageResponse): {
     total: typeof data.total === 'number' ? data.total : 0,
     vm: {
       city,
+      templateType:
+        (landing.templateType as LandingVM['templateType'] | undefined) ?? 'GENERIC_CARDS',
       title: typeof landing.title === 'string' ? landing.title : '',
       description: typeof landing.metaDescription === 'string' ? landing.metaDescription : undefined,
       subtitle: typeof landing.subtitle === 'string' ? landing.subtitle : null,

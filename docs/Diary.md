@@ -4,6 +4,29 @@
 
 ---
 
+## 23.03.2026 — Collections + Landings engine rollout
+
+### Наблюдения
+
+- Для нового блока требовалась единая selection-база без дублирования логики между коллекциями и лендингами.
+- Нужен управляемый suggestions flow: система предлагает, админ утверждает/отклоняет.
+- Публичные маршруты уже используются клиентами, поэтому критична обратная совместимость через bridge.
+
+### Решения
+
+- Расширены Prisma-модели `Collection` и `LandingPage`: статусы, source/basis/template, selection-mode, preview/cache поля, `showInCollections`, `isIndexable`.
+- Введен `CollectionSelectionService` как единый слой отбора (`city -> eligibility -> ranking -> overrides`).
+- Реализован `CollectionSuggestionService` с ограниченным набором правил, threshold-константами и dedup через `semanticKey`.
+- Добавлены админ-endpoints: generate suggestions, approve, reject; расширены фильтры list API.
+- Добавлены каталожные endpoints `/catalog/collections/:citySlug/:slug`, `/catalog/landings/:citySlug/:slug`, `/catalog/collections/featured-landings`.
+- В админке обновлены list/edit поверхности collections/landings и навигация; на `/podborki` добавлен блок featured landings.
+
+### Проблемы
+
+- Локально недоступен `pnpm` в shell-среде, поэтому полноценный build-check выполнен через lint-диагностику IDE.
+
+---
+
 ## 23.03.2026 — Final cleanup manual `h1` вне scope
 
 ### Наблюдения

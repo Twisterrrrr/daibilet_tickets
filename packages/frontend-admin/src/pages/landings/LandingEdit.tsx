@@ -28,6 +28,12 @@ interface LandingForm {
   slug: string;
   cityId: string;
   filterTag: string;
+  collectionId: string;
+  selectionMode: 'CUSTOM' | 'COLLECTION';
+  templateType: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
+  status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+  showInCollections: boolean;
+  isIndexable: boolean;
   title: string;
   subtitle: string;
   heroText: string;
@@ -43,6 +49,7 @@ interface LandingForm {
   stats: string;
   relatedLinks: string;
   additionalFilters: string;
+  rankingJson: string;
 }
 
 const JSON_FIELDS = [
@@ -59,6 +66,12 @@ const EMPTY_FORM: LandingForm = {
   slug: '',
   cityId: '',
   filterTag: '',
+  collectionId: '',
+  selectionMode: 'CUSTOM',
+  templateType: 'GENERIC_CARDS',
+  status: 'DRAFT',
+  showInCollections: false,
+  isIndexable: true,
   title: '',
   subtitle: '',
   heroText: '',
@@ -74,6 +87,7 @@ const EMPTY_FORM: LandingForm = {
   stats: '{}',
   relatedLinks: '[]',
   additionalFilters: '{}',
+  rankingJson: '{"preset":"balanced"}',
 };
 
 function safeJsonParse<T>(str: string, fallback: T): T {
@@ -122,6 +136,12 @@ export function LandingEditPage() {
           slug: (data.slug as string) ?? '',
           cityId: (data.cityId as string) ?? '',
           filterTag: (data.filterTag as string) ?? '',
+          collectionId: (data.collectionId as string) ?? '',
+          selectionMode: ((data.selectionMode as 'CUSTOM' | 'COLLECTION') ?? 'CUSTOM'),
+          templateType: ((data.templateType as LandingForm['templateType']) ?? 'GENERIC_CARDS'),
+          status: ((data.status as LandingForm['status']) ?? 'DRAFT'),
+          showInCollections: (data.showInCollections as boolean) ?? false,
+          isIndexable: (data.isIndexable as boolean) ?? true,
           title: (data.title as string) ?? '',
           subtitle: (data.subtitle as string) ?? '',
           heroText: (data.heroText as string) ?? '',
@@ -137,6 +157,7 @@ export function LandingEditPage() {
           stats: JSON.stringify(data.stats ?? {}, null, 2),
           relatedLinks: JSON.stringify(data.relatedLinks ?? [], null, 2),
           additionalFilters: JSON.stringify(data.additionalFilters ?? {}, null, 2),
+          rankingJson: JSON.stringify(data.rankingJson ?? { preset: 'balanced' }, null, 2),
         });
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
@@ -148,6 +169,12 @@ export function LandingEditPage() {
       slug: form.slug,
       cityId: form.cityId,
       filterTag: form.filterTag,
+      collectionId: form.collectionId || null,
+      selectionMode: form.selectionMode,
+      templateType: form.templateType,
+      status: form.status,
+      showInCollections: form.showInCollections,
+      isIndexable: form.isIndexable,
       title: form.title,
       subtitle: form.subtitle || null,
       heroText: form.heroText || null,
@@ -164,6 +191,7 @@ export function LandingEditPage() {
     payload.stats = safeJsonParse(form.stats, {});
     payload.relatedLinks = safeJsonParse(form.relatedLinks, []);
     payload.additionalFilters = safeJsonParse(form.additionalFilters, {});
+    payload.rankingJson = safeJsonParse(form.rankingJson, { preset: 'balanced' });
     return payload;
   };
 
@@ -176,7 +204,7 @@ export function LandingEditPage() {
         await adminApi.post('/admin/landings', buildPayload());
         navigate('/landings');
       } else {
-        await adminApi.put(`/admin/landings/${id}`, buildPayload());
+        await adminApi.patch(`/admin/landings/${id}`, buildPayload());
         navigate('/landings');
       }
     } catch (e) {
@@ -282,6 +310,47 @@ export function LandingEditPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
+                <Label>Selection mode</Label>
+                <Select value={form.selectionMode} onValueChange={(v) => setForm((f) => ({ ...f, selectionMode: v as LandingForm['selectionMode'] }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CUSTOM">CUSTOM</SelectItem>
+                    <SelectItem value="COLLECTION">COLLECTION</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Collection ID (optional)</Label>
+                <Input value={form.collectionId} onChange={(e) => setForm((f) => ({ ...f, collectionId: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Template</Label>
+                <Select value={form.templateType} onValueChange={(v) => setForm((f) => ({ ...f, templateType: v as LandingForm['templateType'] }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GENERIC_CARDS">GENERIC_CARDS</SelectItem>
+                    <SelectItem value="COMPARISON_TABLE">COMPARISON_TABLE</SelectItem>
+                    <SelectItem value="HYBRID">HYBRID</SelectItem>
+                    <SelectItem value="SEASONAL_EVENT">SEASONAL_EVENT</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v as LandingForm['status'] }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DRAFT">DRAFT</SelectItem>
+                    <SelectItem value="ACTIVE">ACTIVE</SelectItem>
+                    <SelectItem value="ARCHIVED">ARCHIVED</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
                 <Label htmlFor="title">Заголовок (H1)</Label>
                 <Input
                   id="title"
@@ -330,6 +399,14 @@ export function LandingEditPage() {
                   value={form.sortOrder}
                   onChange={(e) => setForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))}
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" checked={form.showInCollections} onChange={(e) => setForm((f) => ({ ...f, showInCollections: e.target.checked }))} className={cn('h-4 w-4 rounded border-input accent-primary')} />
+                <Label className="font-normal">Показывать в подборках</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" checked={form.isIndexable} onChange={(e) => setForm((f) => ({ ...f, isIndexable: e.target.checked }))} className={cn('h-4 w-4 rounded border-input accent-primary')} />
+                <Label className="font-normal">Indexable</Label>
               </div>
             </div>
           </CardContent>
@@ -392,6 +469,16 @@ export function LandingEditPage() {
                 />
               </div>
             ))}
+            <div className="space-y-2">
+              <Label htmlFor="rankingJson">rankingJson</Label>
+              <Textarea
+                id="rankingJson"
+                value={form.rankingJson}
+                onChange={(e) => setForm((f) => ({ ...f, rankingJson: e.target.value }))}
+                rows={3}
+                className="font-mono text-sm"
+              />
+            </div>
           </CardContent>
         </Card>
 

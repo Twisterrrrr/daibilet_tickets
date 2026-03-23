@@ -205,6 +205,7 @@ export interface LandingItem {
 /** Landing page response (GET /landings/:slug) — landing, variants, filters, total */
 export interface LandingPageResponse {
   landing: LandingItem & {
+    templateType?: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
     metaTitle?: string | null;
     metaDescription?: string | null;
     subtitle?: string | null;
@@ -220,6 +221,17 @@ export interface LandingPageResponse {
   variants?: unknown[];
   filters?: unknown[];
   total?: number;
+}
+
+export interface FeaturedLandingItem {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle?: string | null;
+  templateType?: string;
+  hero?: string | null;
+  city?: { slug: string; name: string };
+  cta?: { label: string; href: string };
 }
 
 /** Collection detail (getCollectionBySlug) — backend возвращает { collection, items, ... } */

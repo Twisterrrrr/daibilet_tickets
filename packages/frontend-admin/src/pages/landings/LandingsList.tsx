@@ -6,8 +6,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { StatusBadge, TagChip } from '@daibilet/shared-ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,6 +19,11 @@ interface LandingItem {
   title: string;
   slug: string;
   filterTag: string;
+  status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+  templateType: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
+  showInCollections: boolean;
+  isIndexable: boolean;
+  eventCountCached?: number | null;
   isActive: boolean;
   sortOrder: number;
   city?: { name: string; slug: string };
@@ -45,16 +50,24 @@ const getColumns = (): ColumnDef<LandingItem>[] => [
     cell: ({ row }) => <span className="text-muted-foreground">{row.original.city?.name ?? '—'}</span>,
   },
   {
-    accessorKey: 'filterTag',
-    header: 'Фильтр-тег',
-    cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.filterTag}</span>,
+    accessorKey: 'templateType',
+    header: 'Шаблон',
+    cell: ({ row }) => <TagChip label={row.original.templateType} />,
   },
   {
-    accessorKey: 'isActive',
-    header: 'Активен',
-    cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Да' : 'Нет'}</Badge>
-    ),
+    accessorKey: 'status',
+    header: 'Статус',
+    cell: ({ row }) => <StatusBadge tone={row.original.status === 'ACTIVE' ? 'success' : 'neutral'} label={row.original.status} />,
+  },
+  {
+    accessorKey: 'showInCollections',
+    header: 'showInCollections',
+    cell: ({ row }) => <TagChip label={row.original.showInCollections ? 'ON' : 'OFF'} />,
+  },
+  {
+    accessorKey: 'isIndexable',
+    header: 'indexable',
+    cell: ({ row }) => <TagChip label={row.original.isIndexable ? 'YES' : 'NO'} />,
   },
   {
     accessorKey: 'sortOrder',

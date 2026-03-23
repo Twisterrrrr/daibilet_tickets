@@ -21,6 +21,7 @@ import { RefundPolicyResolutionService } from './refund-policy-resolution.servic
 import { ListingHealthService } from './listing-health.service';
 import { TepSyncService } from './tep-sync.service';
 import { EventTagLifecycleService } from './event-tag-lifecycle.service';
+import { CollectionSelectionService } from './collection-selection.service';
 
 @Module({
   imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule],
@@ -43,6 +44,7 @@ import { EventTagLifecycleService } from './event-tag-lifecycle.service';
     RefundPolicyResolutionService,
     ListingHealthService,
     EventTagLifecycleService,
+    CollectionSelectionService,
   ],
   exports: [
     CatalogService,
@@ -61,6 +63,7 @@ import { EventTagLifecycleService } from './event-tag-lifecycle.service';
     RefundPolicyResolutionService,
     ListingHealthService,
     EventTagLifecycleService,
+    CollectionSelectionService,
   ],
 })
 export class CatalogModule {}

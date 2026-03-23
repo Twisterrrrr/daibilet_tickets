@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { LandingSelectionMode, LandingStatus, LandingTemplateType } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateLandingDto {
   @ApiProperty()
@@ -67,6 +68,26 @@ export class CreateLandingDto {
   @IsObject()
   additionalFilters?: Record<string, unknown>;
 
+  @ApiPropertyOptional({ description: 'Привязка к подборке' })
+  @IsOptional()
+  @IsUUID()
+  collectionId?: string;
+
+  @ApiPropertyOptional({ enum: LandingSelectionMode })
+  @IsOptional()
+  @IsEnum(LandingSelectionMode)
+  selectionMode?: LandingSelectionMode;
+
+  @ApiPropertyOptional({ description: 'JSON: ranking config' })
+  @IsOptional()
+  @IsObject()
+  rankingJson?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ enum: LandingTemplateType })
+  @IsOptional()
+  @IsEnum(LandingTemplateType)
+  templateType?: LandingTemplateType;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -86,6 +107,21 @@ export class CreateLandingDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ enum: LandingStatus })
+  @IsOptional()
+  @IsEnum(LandingStatus)
+  status?: LandingStatus;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  showInCollections?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isIndexable?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

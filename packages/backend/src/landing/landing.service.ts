@@ -1,6 +1,6 @@
 import { getFirstPriceKopecks } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, EventCategory, EventSource, EventSubcategory, Prisma } from '@prisma/client';
+import { DateMode, EventCategory, EventSource, EventSubcategory, LandingStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -217,5 +217,50 @@ export class LandingService {
       filters,
       total: variants.length,
     };
+  }
+
+  async getCatalogByCityAndSlug(citySlug: string, slug: string) {
+    const landing = await this.prisma.landingPage.findFirst({
+      where: {
+        slug,
+        city: { slug: citySlug },
+        isDeleted: false,
+        OR: [{ status: LandingStatus.ACTIVE }, { isActive: true }],
+      },
+      include: { city: { select: { slug: true, name: true, id: true } } },
+    });
+    if (!landing) throw new NotFoundException(`Лендинг "${slug}" не найден`);
+    return this.getBySlug(landing.slug);
+  }
+
+  async getFeaturedForCollections(citySlug: string) {
+    const rows = await this.prisma.landingPage.findMany({
+      where: {
+        isDeleted: false,
+        showInCollections: true,
+        OR: [{ status: LandingStatus.ACTIVE }, { isActive: true }],
+        city: { slug: citySlug },
+      },
+      orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        subtitle: true,
+        templateType: true,
+        heroText: true,
+        city: { select: { slug: true, name: true } },
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      subtitle: row.subtitle,
+      templateType: row.templateType,
+      hero: row.heroText,
+      city: row.city,
+      cta: { label: 'Открыть', href: `/cities/${row.city.slug}/${row.slug}` },
+    }));
   }
 }

@@ -18,6 +18,7 @@ import type {
   ArticleListItem,
   CityDetail,
   CollectionDetailResponse,
+  FeaturedLandingItem,
   LandingItem,
   LandingPageResponse,
   LocationItem,
@@ -393,6 +394,9 @@ export const api = {
 
   getLandingBySlug: (slug: string) => fetchApi<LandingPageResponse>(`/landings/${slug}`),
 
+  getCatalogLandingByCityAndSlug: (citySlug: string, slug: string) =>
+    fetchApi<LandingPageResponse>(`/catalog/landings/${encodeURIComponent(citySlug)}/${encodeURIComponent(slug)}`),
+
   // Подборки (тематические посадочные страницы)
   getCollections: (city?: string) => fetchApi<LandingItem[]>(city ? `/collections?city=${city}` : '/collections'),
 
@@ -403,6 +407,16 @@ export const api = {
     const query = params.toString() ? `?${params}` : '';
     return fetchApi<CollectionDetailResponse>(`/collections/${slug}${query}`);
   },
+
+  getCatalogCollectionByCityAndSlug: (citySlug: string, slug: string, page?: number) => {
+    const params = new URLSearchParams();
+    if (page && page > 1) params.set('page', String(page));
+    const query = params.toString() ? `?${params}` : '';
+    return fetchApi<CollectionDetailResponse>(`/catalog/collections/${encodeURIComponent(citySlug)}/${encodeURIComponent(slug)}${query}`);
+  },
+
+  getFeaturedLandingsForCollections: (city: string) =>
+    fetchApi<FeaturedLandingItem[]>(`/catalog/collections/featured-landings?city=${encodeURIComponent(city)}`),
 
   // Combo-программы (готовые маршруты)
   getCombos: (city?: string) => fetchApi<LandingItem[]>(city ? `/combos?city=${city}` : '/combos'),
