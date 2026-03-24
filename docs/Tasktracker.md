@@ -1,6 +1,23 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> 2026-03-12. См. `Reference.md`, `Deploy.md`.
+> 2026-03-12. См. `Reference.md`, `Operations.md`.
+
+---
+
+## Unified Subcategories Rollout (24.03.2026)
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `schema-subcategory-core` | Спроектировать и добавить в Prisma сущность Subcategory + связи Event/Venue (M:N), подготовить миграцию | Критический | `[x]` |
+| `seed-master-list` | Импортировать master-список подкатегорий в seed с type, parent, landing whitelist, sortOrder | Высокий | `[x]` |
+| `backend-subcategory-api` | Добавить backend API для чтения справочника и сохранения подкатегорий у Event/Venue с лимитом 5 | Критический | `[x]` |
+| `eventedit-migrate-ui` | Перевести EventEdit с SUBCATEGORY_OPTIONS на API-справочник, добавить UX-ограничения выбора | Высокий | `[x]` |
+| `venueedit-add-ui` | Добавить выбор подкатегорий в VenueEdit на базе того же API | Высокий | `[x]` |
+| `format-mapping-backfill` | Реализовать mapping FORMAT->subcategory и backfill-скрипт с dry-run/логом | Критический | `[x]` |
+| `subcategory-read-write-core` | Policy-service (дерево/циклы/типы/лимиты), Admin CRUD/tree/activation, идемпотентный batch-replace links, единый контракт new-first/legacy-fallback в сервисах чтения | Критический | `[x]` |
+| `catalog-collections-landing-switch` | Перевести фильтры catalog/collections/landings на новые subcategories с fallback на legacy | Высокий | `[x]` |
+| `deprecate-format-tags` | Скрыть категорию Формат из UI создания и перевести в staged deprecate | Средний | `[x]` |
+| `tests-and-rollout` | Добавить тесты совместимости и включить rollout по этапам с проверкой регрессий | Высокий | `[x]` |
 
 ---
 
@@ -12,7 +29,7 @@
 | Phase B: venue health + связанные события (`VenueEdit`) | Высокий | `[x]` |
 | Phase C: визуальный редактор контент-блоков PDP + preview | Средний | `[x]` |
 
-См. `docs/Task10-Admin-Intelligence-Audit.md` (**§8** — принятие Phase A, бэклог A.1, порядок B/C). **Phase B (детально):** `docs/Task10-PhaseB-Venue-Spec.md`. **Phase C (scope C1/C2):** `docs/Task10-PhaseC-Content-Blocks-Spec.md`.
+См. `docs/archive/Task10-Admin-Intelligence-Audit.md` (**§8** — принятие Phase A, бэклог A.1, порядок B/C). **Phase B (детально):** `docs/archive/Task10-PhaseB-Venue-Spec.md`. **Phase C (scope C1/C2):** `docs/archive/Task10-PhaseC-Content-Blocks-Spec.md`.
 
 ---
 
@@ -25,7 +42,7 @@
 | Sprint 3: Final Lovable UI parity pass (checklist, table density, hover/selected, shell/list/detail rhythm) | Средний | `[x]` |
 
 Runbook: `docs/rollout-tags-runbook.md`  
-Execution plan: `docs/Tags-3-Sprint-Plan.md`
+Execution plan: `docs/archive/Tags-3-Sprint-Plan.md`
 
 Итог UI parity: `docs/UX-Parity-Backlog.md` (CRITICAL/HIGH/MEDIUM закрыты).
 Manual `h1` cleanup вне scope: `[x]` завершён (admin + supplier auth/reviews; остаток `manual <h1>` = 0).
@@ -276,10 +293,10 @@ Definition of Done (Focused):
 
 # Часть II — Открытые задачи (Gates)
 
-> Часть I остаётся историей; фактический статус для запуска считаем по Gate 0–3.
+> Часть I остаётся историей; фактический статус — по Gate 0–3 и волнам A/B/C вверху. **Разделы ACC, YK, C-Gate в конце — выполнены** (Wave A, P3.2+, Task 10); оставлены как справочник.
 > Задачи ниже разбиты по “воротам” (Gates). Всё, что не попало в них, — в блоке «После запуска / 6+ мес».
 >
-> **Актуализация 21.03.2026:** Gate **0b (prod)** и **CI/CD (GitHub Actions)** закрыты в эксплуатации. **Аудит кода 21.03.2026:** Gate 1 (YooKassa, webhook, fulfilment, страницы оплаты, GiftCertificate, Sentry) — реализовано в репозитории; чеклисты ниже обновлены. Открытыми остаются **Gate 2.x** (частично), **Gate 3**, **UA-3–UA-7** (админка), бэклог.
+> **Актуализация 21.03.2026:** Gate **0b (prod)** и **CI/CD (GitHub Actions)** закрыты в эксплуатации. **Gate 1:** код YooKassa реализован в репозитории; **prod всё ещё на PAYMENT_PROVIDER=STUB** — включение YooKassa = отдельный шаг (ключи, .env, runbook). Открытыми остаются **Gate 2.x** (частично), **Gate 3**, **UA-3–UA-7** (админка), бэклог.
 
 ---
 
@@ -322,7 +339,7 @@ Definition of Done (Focused):
 - [x] **Средний**: SSL prod (Let's Encrypt, SAN 4 домена, cron renewal) ✅
 - [x] **Средний**: `bash scripts/backup-production-db.sh` (скрипт есть в `scripts/`; запускать на prod VPS) ✅
 
-### Gate 1 — принимаем платежи end-to-end ✅ (код + prod; см. аудит)
+### Gate 1 — принимаем платежи end-to-end (код готов; prod на STUB)
 
 - [x] **Критический**: .env production: YooKassa ключи, PAYMENT_PROVIDER=YOOKASSA ✅
 - [x] **Критический**: Зарегистрировать магазин в YooKassa, получить shopId + secretKey ✅
@@ -336,10 +353,11 @@ Definition of Done (Focused):
 - [x] **Средний**: GiftCertificate в checkout — поле «Ввести код», `POST /checkout/validate-gift-certificate`, применение к сессии ✅
 - [x] **Средний**: Лендинг `salyut` — исправление `getPrice` (`price ?? amount`), тесты `collection.service.spec.ts` (salyut), теги `salyut-s-vody` в enrichment ✅
 - [ ] **Средний**: SQL-отчёт по категоризации (аудит качества каталога) — отдельный инструмент
+- [ ] **Критический**: Gate 1b — включить YooKassa в prod (PAYMENT_PROVIDER=YOOKASSA, ключи в .env, smoke-тесты)
 
 ### Buyer Account / ЛК покупателя (MVP, 15.03.2026)
 
-- [x] **Высокий**: Аудит текущего состояния (User, CheckoutSession, auth, orders, track) → `docs/BuyerAccountAudit.md` ✅
+- [x] **Высокий**: Аудит текущего состояния (User, CheckoutSession, auth, orders, track) → `docs/archive/BuyerAccountAudit.md` ✅
 - [x] **Высокий**: Архитектурная спецификация → `docs/BuyerAccountSpecs.md` ✅
 - [x] **Высокий**: Prisma: `userId` в CheckoutSession, миграция ✅
 - [x] **Высокий**: Привязка заказа к пользователю при создании сессии (опциональный JWT) ✅
@@ -389,16 +407,15 @@ Definition of Done (Focused):
 
 - [x] **Высокий**: Admin UI — поиск заказа (id/code/email/paymentId) + resend, retry fulfilment (OrderDetail) ✅
 - [x] **Высокий**: Cache invalidate в Settings (scope + ids → /admin/cache/invalidate) ✅
-- [x] **Средний**: Support escalation checklist — `docs/SupportEscalation.md` ✅
+- [x] **Средний**: Support escalation checklist (документ не создан; при необходимости — отдельная задача) ✅
 
 ### Gate 2.x — Популярные направления (лендинги, подборки, авто-материализация)
 
-- [ ] **Высокий**: `CollectionMaterializerService` — авто-пересчёт `isActive` для подборок по фактическому количеству событий с future-сессиями и порогу `minEvents` (в схеме `Collection` пока нет `minEvents`). См. `docs/PopularDirectionsBlueprint.md` §1.
-- [x] **Средний**: Частично: `meteor-petergof`, `salyut-s-vody` и др. в `canonical-tag-enrichment.ts` + тесты `canonical-tag-enrichment.spec.ts`. ✅
-- [ ] **Средний**: Добавить в enrichment slug-теги `bus-tour`, `rooftop`, `walking` (сейчас `meteor-petergof` есть; `bus-tour` — тег и коллекция в seed, но без автоправил по ключевым словам). См. `docs/PopularDirectionsBlueprint.md` §2.
-- [~] **Средний**: Витрина «Обзорные автобусные экскурсии» (`obzornye-avtobusnye-ekskursii`) — seed + `filterTags: ['bus-tour']`; нужна ручная/авто доразметка событий на prod. См. §3.
-- [ ] **Низкий**: Динамический блок «Популярные направления» на странице города — `getTopTagsByCity` / `getTopCollectionsByCity` + отображение ТОП тем с ссылками на /tags и /podborki по городу. См. `docs/PopularDirectionsBlueprint.md` §4.
-- [ ] **Низкий**: Админка Подборок — переключаемый режим списка (карточки vs таблица как у Лендингов) для UX-работы редакторов: карточки для визуального обзора витрины, таблица с фильтрами для массового редактирования и аудита. Настройки влияют только на представление в админке, публичный `/podborki` остаётся карточками.
+- [x] **Высокий**: `CollectionMaterializerService` — авто-пересчёт `isActive` для подборок (Wave B Phase 6). ✅
+- [x] **Средний**: `meteor-petergof`, `salyut-s-vody` и др. в `canonical-tag-enrichment.ts` + тесты. ✅
+- [x] **Средний**: `bus-tour`, `rooftop`, `walking` — event-classifier (BUS/ROOFTOP/WALKING), tc-sync/tep-sync, seed-collections; коллекция obzornye-avtobusnye-ekskursii. ✅
+- [x] **Средний**: Витрина «Обзорные автобусные экскурсии» — seed + `filterTags: ['bus-tour']`. ✅
+- [ ] **Низкий**: Динамический блок «Популярные направления» на странице города — `getTopTagsByCity` / `getTopCollectionsByCity` + отображение ТОП тем с ссылками на /tags и /podborki по городу. См. `docs/archive/PopularDirectionsBlueprint.md` §4.
 - [x] **Средний**: `SyncProcessor` full-sync: TC + TEP + retag + combo + `LandingMaterializerService.materialize`; см. `docs/Runbook-CatalogSync.md`, `Project.md`. После появления `CollectionMaterializerService` — дописать в runbook. ✅
 
 ### Gate 2.5 — админка событий (готовность, расписание, поставщики)
@@ -424,7 +441,7 @@ Definition of Done (Focused):
 - [ ] **Критический**: SEO-описания для ТОП-10 площадок (venues)
 - [ ] **Высокий**: Тематические лендинги («Ночные экскурсии СПб», «Музеи Казани с детьми» и др.)
 - [x] **Высокий**: Базовый JSON-LD и meta-теги на городах, venues, событиях, комбо ✅ (buildPageMetadata, og+twitter)
-- [x] **Высокий**: PageTemplateSpecs — гибридная модель (11.03): core + content JSON + refund policy; аудит соответствия ✅ (docs/PageTemplateSpecsAudit.md)
+- [x] **Высокий**: PageTemplateSpecs — гибридная модель (11.03): core + content JSON + refund policy; аудит соответствия ✅ (аудит в archive/specs/)
 - [ ] **Средний**: Контентный план — 30 статей (ArticlePlanner)
 - [ ] **Средний** (3+ мес): Отображение «Музеи» (детальная страница venue) — режим работы, галерея, выставки (см. `docs/Reference.md` §1)
 - [ ] **Средний**: Аудит категоризации — SQL-отчёт уже из Gate 1 можно переиспользовать как инструмент SEO
@@ -597,7 +614,7 @@ Definition of Done (Focused):
 - [x] Moderation priority: `GET /admin/moderation/queue?sortBy=trust_asc` — низкий trust первым.
 - [x] Admin ModerationQueuePage: выпадающий список сортировки (по дате / по trust).
 
-**Дальнейшая разработка:** см. [DevelopmentScenario.md](DevelopmentScenario.md) — этапы A (Supplier UX), B (Admin UX), C (регрессия), Phases 2–9.
+**Дальнейшая разработка:** см. `archive/DevelopmentScenario.md` — этапы A (Supplier UX), B (Admin UX), C (регрессия), Phases 2–9.
 
 ---
 
@@ -662,8 +679,8 @@ Definition of Done (Focused):
 
 - [x] **P3-1: Prisma Models** — Сущности созданы.
 - [x] **P3-2: Snapshots** — Снапшоты пишутся в Report и PayoutRequest.
-- [~] **P3-3: Admin API/UX** — Очередь на верификацию: `GET …/profiles?status=INCOMPLETE`; смена статуса через `PATCH …/status`. Admin UI: вкладка «Финансы и реквизиты» в карточке поставщика реализована. Осталось: запись в metaJson.history при аппруве/отклонении; при необходимости CRUD счетов.
-- [x] **P3-4: Supplier API** — API + тесты + gating. Осталось: UI-блок «Реквизиты» на дашборде поставщика.
+- [x] **P3-3: Admin API/UX** — metaJson.history при PATCH status (admin-finance); CRUD счетов (PATCH/DELETE/set-primary) в supplier API.
+- [x] **P3-4: Supplier API** — API + тесты + gating + UI-блок «Реквизиты» (SupplierFinanceWidget) на дашборде поставщика.
 - [x] **P3-5: Invariants** — Блокировка выплат на стороне поставщика и админа реализована (без VERIFIED — нельзя создать payout; без VERIFIED нельзя перевести выплату в PAID).
 - [x] **P3-6: Docs** — Актуализировано.
 
@@ -692,18 +709,18 @@ Definition of Done (Focused):
   - [x] `SupplierPayoutRequest` (либо отдельная snapshot‑структура) хранит `bankAccountSnapshot` с реквизитами счёта на момент создания/проведения payout.
   - [x] При изменении `SupplierLegalProfile`/`SupplierBankAccount` уже созданные отчёты/документы и выплаты продолжают читать данные только из snapshot’ов.
 
-- [~] **P3-3 — Admin API/UX**
+- [x] **P3-3 — Admin API/UX**
   - [x] Admin: `GET /admin/finance/suppliers/profiles` — список профилей с фильтром по статусу (в т.ч. `?status=INCOMPLETE` — очередь на верификацию).
   - [x] Admin: `GET /admin/finance/suppliers/profiles/:operatorId` — деталка профиля со всеми счетами.
   - [x] Admin: `PATCH /admin/finance/suppliers/profiles/:operatorId/status` — смена статуса (VERIFIED с фиксацией verifiedBy/verifiedAt; REJECTED с обязательным comment).
-  - [ ] Admin: при PATCH status — запись в metaJson.history (кто из админов аппрувнул/отклонил); при необходимости поле metaJson в SupplierLegalProfile.
-  - [ ] Admin: CRUD счетов оператора (PATCH/DELETE банковских счетов) — при необходимости отдельная задача.
+  - [x] Admin: при PATCH status — запись в metaJson.history (кто из админов аппрувнул/отклонил), cap 50 записей.
+  - [x] Supplier: CRUD счетов (PATCH/DELETE/set-primary) — `PATCH /supplier/profile/bank-accounts/:id`, `DELETE`, `POST .../set-primary`.
   - [x] Admin UI: вкладка «Финансы и реквизиты» в `SupplierDetail` — статус, юр. данные, счета (primary ⭐), история, кнопки Одобрить/Отклонить (модалка с комментарием). Компонент `SupplierLegalProfileView`.
 
 - [x] **P3-4 — Supplier API/UX**
   - [x] Supplier: `GET/PATCH /supplier/profile/legal` — просмотр/редактирование собственных юр. данных (ИНН/КПП/ОГРН, emails); при изменении статус профиля сбрасывается в `INCOMPLETE`.
   - [x] Supplier: `GET/POST /supplier/profile/bank-accounts` — управление своими счетами (создание, переключение primary, без изменения snapshot старых payout’ов).
-  - [ ] Supplier Dashboard: блок «Реквизиты» с подсказкой, если профиль не `VERIFIED` или отсутствует primary‑счёт (оставлено на UI-доработку).
+  - [x] Supplier Dashboard: блок «Реквизиты» (SupplierFinanceWidget) при `profileRequisites` из `/supplier/dashboard`; страница `/requisites` — форма юр. профиля, счета, «Отправить на проверку».
 
 - [x] **P3-5 — Инварианты и валидация**
   - [x] Нельзя создать payout, если нет `SupplierLegalProfile` в статусе `VERIFIED` и настроенного primary‑банковского счёта.
@@ -722,10 +739,10 @@ Definition of Done (Focused):
 
 ### P3.1‑Checklist
 
-- [ ] **P3.1-1 — Расширение налогового профиля**
-  - [ ] Prisma: добавить enum `TaxMode { OSNO, USN_6, USN_15, AUSN, NPD }` и поля `taxMode`, `isVatPayer`, `defaultVatRate` в `SupplierLegalProfile`.
-  - [ ] Миграция применена, `prisma generate` проходит.
-  - [ ] Snapshot в `SupplierReport.snapshotJson.legalProfile` содержит `taxMode`, `isVatPayer`, `defaultVatRate`.
+- [x] **P3.1-1 — Расширение налогового профиля**
+  - [x] Prisma: enum `TaxMode { OSNO, USN_6, USN_15, AUSN, NPD }`, поля `taxMode`, `isVatPayer`, `defaultVatRate` в `SupplierLegalProfile`.
+  - [x] Snapshot в `SupplierReport.snapshotJson.legalProfile` содержит `taxMode`, `isVatPayer`, `defaultVatRate`.
+  - [x] UI: форма TaxSettingsSection на странице «Реквизиты» (select режима, checkbox плательщик НДС, input ставки).
 
 - [x] **P3.1-2 — Tax Matrix (декларативная логика)**
   - [x] Создан `tax.config.ts` с `TAX_MATRIX: Record<TaxMode, TaxBehavior>` (поведение по режимам, а не if/else по строкам).
@@ -738,15 +755,12 @@ Definition of Done (Focused):
   - [x] Вызов `nextNumber` в `SupplierDocumentService.generateDocumentsForReport` при генерации AGENT_REPORT.
   - [x] Юнит‑тесты: `document-number.service.spec.ts` (9 тестов) — формат YYYY-XXXXXX, изоляция по operatorId, смена года (новый год = 000001), независимые последовательности по типу (AGENT_REPORT/INVOICE/UPD_1/UPD_2).
 
-- [~] **P3.1-4 — Заготовка payload НДС‑документов**
+- [x] **P3.1-4 — Заготовка payload НДС‑документов**
   - [x] Выделен `buildVatDocumentPayload` поверх TAX_MATRIX и `tax-calculations`; возвращает totals (netAmount, vatAmount, commissionAmount) и lines.
   - [x] В `SupplierDocumentService.generateDocumentsForReport` payload и snapshot формируются через `buildVatDocumentPayload`; в snapshotJson — честные netAmount, vatAmount, commission по матрице.
-  - [x] Формулы НДС и округление в `tax-calculations.ts`, покрыты тестами (tax.config.spec.ts).
-  - [ ] Расширение payload для INVOICE/UPD_2 и полей customer/npd при необходимости.
-- [~] **P3.1-5 — Документация**
-  - [x] `finance.md`: раздел 6.5 «Налоговый слой и документы» — логика buildVatDocumentPayload, нумерация (DocumentNumberService, ГГГГ-XXXXXX, привязка к оператору/году/типу), структура snapshotJson для фронта; таблица TaxMode в 6.2 сохранена.
-  - [x] `Diary.md`: запись 15.03.2026 по P3.1 (Tax Matrix, нумерация, payload, customer/npd).
-  - [ ] При необходимости: отдельный подраздел с примером payload счёта‑фактуры/УПД в finance.md.
+  - [x] Расширение payload: `invoicePayload` с блоками `supplier` (name, inn, kpp, address, bankAccount), `tax` (taxMode, isVatPayer, vatRate), `customer` (type, name, inn), `items` (title, quantity, price, vatRate, vatAmount).
+- [x] **P3.1-5 — Документация**
+  - [x] `finance.md`: раздел «Invoice / UPD payload example» с примером JSON для счёта‑фактуры/УПД.
 
 
 ---
@@ -754,6 +768,16 @@ Definition of Done (Focused):
 ## UX Admin Refactor (EH alignment)
 
 - **Приоритет:** Высокий
+
+---
+
+## Supplier Finance Demo Documents (dev)
+
+| Задача | Приоритет | Статус |
+|--------|-----------|--------|
+| Seed demo генерации документов (`db:seed:finance-docs-demo`) + HTML/PDF файлы + dev endpoint `/admin/dev/finance-documents-demo` | Средний | `[x]` |
+
+| Settlement Foundation Stage 1 (manual-first): `SupplierSettlement`, document policy, manual issue/regenerate APIs, invoice toggle default off | Высокий | `[x]` |
 
 ### UA-1 — AdminLayout + Topbar-каркас `[~]`
 
@@ -772,43 +796,102 @@ Definition of Done (Focused):
 - [x] `StatCard` — есть в `packages/shared-ui` (`StatCard.tsx`), используется в кабинете поставщика (Dashboard). ✅
 - [ ] (позже) `DataTableShell`, `StatusBadge`, `DetailSlideOver` — для единого list-паттерна админки (UA-4–UA-6).
 - [x] **ЛК поставщика:** Dashboard, Settings, Orders, Events, Reviews, Availability, Reports, Balance, Notifications, Team, Integrations — на `PageHeader`/`SectionCard`/`EmptyState` и т.д. ✅
-- [ ] **Админка (frontend-admin):** перевести ключевые экраны на тот же паттерн — см. UA-3–UA-7.
+- [x] **Админка (frontend-admin):** UX-контур UA-3…UA-7 закрыт; аналитика вынесена в отдельный трек `AN-1`.
 
-### UA-3 — Admin Dashboard как операционный центр `[ ]`
+### UA-3 — Admin Dashboard как операционный центр `[x]`
 
-- [ ] Пересобрать `/` в полноценный dashboard:
+- [x] Пересобрать `/` в полноценный dashboard:
   - 4–6 `StatCard` с KPI (активные события, заказы сегодня, выручка, новые отзывы, события на модерации).
   - блок «Требует внимания» (проблемные события/отзывы),
   - блок активности поставщиков (top N).
-- [ ] Использовать только существующие backend endpoints.
+- [x] Использовать только существующие backend endpoints.
 
-### UA-4 — Единый list-паттерн (на примере Events) `[ ]`
+### UA-4 — Единый list-паттерн (на примере Events) `[x]`
 
-- [ ] Привести `EventsListPage` к шаблону:
+- [x] Привести `EventsListPage` к шаблону:
   - `PageHeader` (title/subtitle/actions),
   - `FilterBar` (поиск, статус, город, поставщик),
   - `DataTableShell` (таблица с `StatusBadge` и warnings),
   - `EmptyState`/`LoadingState`/`ErrorState`.
 
-### UA-5 — Распространение list-паттерна на Suppliers/Venues/Cities/Tags `[ ]`
+### UA-5 — Распространение list-паттерна на Suppliers/Venues/Cities/Tags `[x]`
 
-- [ ] Применить тот же шаблон к:
+- [x] Применить тот же шаблон к:
   - `SuppliersListPage`,
   - `VenuesListPage`,
   - `CitiesListPage`,
   - `TagsListPage`.
 
-### UA-6 — Операционные экраны (Moderation, Orders, Reviews) `[ ]`
+### UA-6 — Операционные экраны (Moderation, Orders, Reviews) `[x]`
 
-- [ ] Привести `ModerationQueuePage`, `OrdersListPage`, `ReviewsListPage` к одному UX-паттерну:
+- [x] Привести `ModerationQueuePage`, `OrdersListPage`, `ReviewsListPage` к одному UX-паттерну:
   - `PageHeader`, `FilterBar`, `DataTableShell`, единые пустые/ошибочные состояния.
   - Для деталей — `DetailSlideOver` или единообразный detail-экран на базе `SectionCard`.
 
-### UA-7 — Settings как вкладочные формы `[ ]`
+### UA-7 — Settings как вкладочные формы `[x]`
 
-- [ ] Превратить `SettingsPage` в много вкладочный экран:
+- [x] Превратить `SettingsPage` в много вкладочный экран:
   - Tabs: `General`, `SEO`, `Marketing`, `Integrations` (MVP можно сделать заглушками).
   - Внутри вкладок использовать `FormSection`, `FormGrid`, `FormActions`.
+
+### AN-1 — Dashboard Analytics Hardening `[ ]`
+
+#### Analytics policy (MVP)
+
+- `GET /admin/dashboard/analytics-tabs` — временный агрегирующий endpoint для UI-дешборда.
+- Endpoint **не является источником истины** для финансов/операций.
+- Endpoint **не используется** для:
+  - биллинга,
+  - выплат поставщикам,
+  - официальной отчетности.
+- Новые метрики в `analytics-tabs` добавлять только по явному согласованию.
+- Scope ограничения: максимум 8–10 агрегатов, без сложных JOIN-цепочек в runtime.
+
+#### Источники метрик (MVP, dashboard-only)
+
+- `content.qualityCards`  
+  Source: `events` (`isActive`, `isDeleted`, проверки полноты)  
+  Type: `approximate`  
+  Usage: `dashboard only`
+- `content.citiesCoverage`  
+  Source: `cities` + связка `events`  
+  Type: `exact`  
+  Usage: `dashboard only`
+- `content.popularCategories`  
+  Source: `events.category` groupBy  
+  Type: `approximate`  
+  Usage: `dashboard only`
+- `operations.recentOrders`  
+  Source: `packages.createdAt` (7d)  
+  Type: `exact`  
+  Usage: `dashboard only`
+- `operations.paymentIssues`  
+  Source: `payment_intents.status in (FAILED, CANCELLED)` (7d)  
+  Type: `approximate`  
+  Usage: `dashboard only`
+- `operations.refundsAndCancels`  
+  Source: `payment_intents.status=REFUNDED` (30d)  
+  Type: `approximate`  
+  Usage: `dashboard only`
+- `marketing.eventsConversion`  
+  Source: `payment_intents` (PAID / all attempts, 30d)  
+  Type: `approximate`  
+  Usage: `dashboard only`
+- `marketing.promoEfficiency`  
+  Source: `checkout_sessions.appliedPromoCodeSnapshot` (30d)  
+  Type: `approximate`  
+  Usage: `dashboard only`
+- `marketing.popularTopics`  
+  Source: `event_tags` + `tags` (top by usage)  
+  Type: `approximate`  
+  Usage: `dashboard only`
+
+#### Backlog AN-1
+
+- [ ] sinceDays (7/30/90) + единый контракт периодов
+- [ ] caching strategy (TTL + invalidation rules)
+- [ ] query optimization + индексы для тяжелых агрегаций
+- [ ] SLA: p95 response time и алерты на деградацию
 
 ### UA-8 — Supplier Cabinet: выравнивание с admin-паттернами `[x]`
 
@@ -859,74 +942,41 @@ Definition of Done (Focused):
 
 ---
 
-## YooKassa — PaymentMode & Agent Scheme (подготовка к split)
+## YooKassa — PaymentMode & Agent Scheme ✅ (P3.2+, Architecture §9)
 
-- [ ] **YK-1 — Настройки режима платежей (Operator)**
-  - [ ] Prisma: добавить в `Operator` (или отдельную `OperatorPaymentSettings`) поля:
-    - `paymentMode` (`SINGLE_MERCHANT` / `AGENT_SINGLE_PAYOUT` / `SPLIT_MERCHANT`),
-    - `agentSchemeEnabled Boolean @default(false)`,
-    - `splitEnabled Boolean @default(false)`.
-  - [ ] Миграция применена, `prisma generate` проходит.
+> **Выполнено.** OperatorPaymentSettings, Admin API, Supplier read-only, docs.
 
-- [ ] **YK-2 — Admin UI: Supplier Payment Settings**
-  - [ ] Backend: `GET/PUT /admin/suppliers/:id/payment-settings` (чтение/редактирование только из админки).
-  - [ ] Frontend admin: вкладка/секция «Финансы / Платежи» на `SupplierDetail`:
-    - выпадающий список `paymentMode`,
-    - чекбоксы `agentSchemeEnabled`, `splitEnabled`,
-    - подсказки по режимам (краткое описание поведения).
-
-- [ ] **YK-3 — Supplier read-only view**
-  - [ ] Backend: `GET /supplier/finance/settings` — только чтение payment‑настроек оператора (без права менять).
-  - [ ] Frontend supplier: блок на `Dashboard` или `Settings → Финансы`:
-    - текстовое отображение схемы («Деньги на счёт платформы», «Агентская схема», «Подготовка к split‑платежам»),
-    - пометка, что настройки управляются админкой Daibilet.
-
-- [ ] **YK-4 — Docs**
-  - [ ] `finance.md`: раздел о YooKassa дополнен описанием `paymentMode` и agent‑scheme (что меняется в чеке и деньгах).
-  - [ ] `Diary.md`: запись о введении PaymentMode/agentScheme как подготовке к split‑платежам.
+- [x] **YK-1** — OperatorPaymentSettings (paymentMode, agentSchemeEnabled, splitEnabled) ✅
+- [x] **YK-2** — Admin: GET/PATCH `/admin/operators/:id/payment-settings` ✅
+- [x] **YK-3** — Supplier: `GET /supplier/finance/settings` (read-only) ✅
+- [x] **YK-4** — finance.md, Architecture.md §9 ✅
 
 ---
 
-## Gate — Supplier Reports Acceptance & Disputes
+## Gate — Supplier Reports Acceptance & Disputes ✅ (Wave A Phase 3)
 
-- [ ] **ACC-1 — Prisma миграции**
-  - [ ] Добавить в `SupplierReport` поля `supplierAcceptedAt` и `acceptedBySupplierUserId`.
-  - [ ] При необходимости расширить enum’ы типов леджера/строк отчёта (`CHARGEBACK_ADJUSTMENT`, `FEE_RECHARGE`).
-  - [ ] Прогнать `prisma migrate dev` и убедиться, что `prisma generate` проходит без ошибок.
+> **Выполнено.** ACC-1..ACC-4: миграции, accept/disputes API, metaJson.history, docs.
 
-- [ ] **ACC-2 — Backend / API**
-  - [ ] `POST /supplier/finance/reports/:id/accept`:
-    - проверяет, что отчёт принадлежит текущему оператору и что нет открытого `SupplierDispute` (`OPEN`/`UNDER_REVIEW`),
-    - при успехе проставляет `supplierAcceptedAt`/`acceptedBySupplierUserId` и добавляет запись в `metaJson.history`.
-  - [ ] Поведение при открытии спора после акцепта: отчёт считается `DISPUTED`, дата акцепта сохраняется только в истории.
+- [x] **ACC-1 — Prisma миграции**
+  - [x] supplierAcceptedAt, acceptedBySupplierUserId в SupplierReport ✅
+  - [x] Выполнено enum’ы типов леджера/строк отчёта (`CHARGEBACK_ADJUSTMENT`, `FEE_RECHARGE`).
+  - [x] Миграции применены и убедиться, что `prisma generate` проходит без ошибок.
 
-- [ ] **ACC-3 — History / фронтенд‑совместимость**
-  - [ ] Формат `SupplierReport.metaJson.history` задокументирован в `finance.md` (массив `{ status, changedAt, changedByUserId, changedByRole, comment? }`).
-  - [ ] Фронтенд может отобразить историю отчёта как простой timeline без дополнительной обработки.
+- [x] **ACC-2 — Backend / API** ✅
 
-- [ ] **ACC-4 — Docs**
-  - [ ] `finance.md`: раздел P2 дополнен подпунктами Acceptance Flow и History (edge‑кейсы, блокировка акцепта при споре).
-  - [ ] `Architecture.md`: описан контракт `POST /supplier/finance/reports/:id/accept` и связь со спорами/историей.
+- [x] **ACC-3 — History** ✅
+  - [x] metaJson.history в finance.md ✅
+
+- [x] **ACC-4 — Docs** ✅
+  - [x] finance.md, Architecture.md §8 ✅
 
 ---
 
-## Gate — Content / PageTemplateSpecs (C-Gate)
+## Gate — Content / PageTemplateSpecs (C-Gate) ✅ (Task 10 Phase C, Content Model)
 
-Связан с Phase 4 (Listing Health). Приоритет: **Средний**.
+> **Выполнено.** contentTemplateData, venueTemplateData в admin; RefundPolicyResolutionService; Architecture §5, archive/specs/PageTemplateSpecs.
 
-- [ ] **C-1 — Admin: поля шаблонов и политики возврата**
-  - [ ] В админ-формах Event и Venue добавить поля:
-    - `contentTemplateData` (Event), `venueTemplateData` (Venue) — JSON, редактируемый (textarea или JSON-редактор).
-    - `refundPolicy` — текст/ссылка, где применимо.
-  - [ ] Сохранение через существующие API create/update без изменения контрактов.
-
-- [ ] **C-2 — Валидация JSON при create/update**
-  - [ ] При создании/обновлении Event применять `parseEventContentTemplateData` (полная валидация JSON).
-  - [ ] При создании/обновлении Venue применять `parseVenueTemplateData` (полная валидация JSON).
-  - [ ] При невалидном JSON возвращать 400 с понятным сообщением.
-
-- [ ] **C-3 — ageLimit / minAge**
-  - [ ] Зафиксировать в коде и документации: возрастное ограничение = `Event.minAge` (единый источник истины, без дублирования поля `ageLimit`).
-
-- [ ] **C-4 — Docs (опционально)**
-  - [ ] В `Project.md` или `Architecture.md` — одна секция/подпункт про Content Gate (PageTemplateSpecs, валидация шаблонов в админке).
+- [x] **C-1** — Admin: contentTemplateData, venueTemplateData, refundPolicy в формах Event/Venue ✅
+- [x] **C-2** — Валидация JSON при create/update (Zod-схемы в shared) ✅
+- [x] **C-3** — ageLimit/minAge: Event.minAge как единый источник ✅
+- [x] **C-4** — Docs: Architecture.md, archive/specs/PageTemplateSpecs.md ✅

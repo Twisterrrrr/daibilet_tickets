@@ -46,6 +46,8 @@
 - **P2 — Disputes, Reconciliation, Summary:** добавлены споры по отчётам (`SupplierDispute` + admin/supplier API), флаг `hasConflict` и сверка отчёта с леджером (`SupplierReconciliationService`), блокировка выплат флагом `isBlockedByDispute` в `SupplierPayoutRequest`, а также `/supplier/finance/summary` для дашборда «Где мои деньги?» в кабинете поставщика.
 - **P3 — Legal profile & bank snapshot:** реализован снимок юридического профиля поставщика (`SupplierLegalProfile`) и его банковских реквизитов (`SupplierBankAccount`) в отчётах (`SupplierReport.legalProfileSnapshot`) и payout‑заявках (`SupplierPayoutRequest.bankAccountSnapshot`); любые юридически значимые операции опираются на эти snapshot’ы, а не на «живой» профиль.
 - **P3.1 — Tax & VAT Layer:** поверх snapshot‑логики введён декларативный налоговый слой (`TaxMode`, `isVatPayer`, `defaultVatRate`, `TAX_MATRIX`), расчёт НДС выполняется в слое отчётов/документов без усложнения леджера; введён `DocumentNumberService` и стратегия мягкого включения НДС (quiet numbering → shadow VAT payload → VAT‑шаблоны).
+- **Demo Documents Runtime (dev):** добавлен идемпотентный demo seed генерации `AGENT_REPORT` / `SERVICE_ACT` / `UPD` c файловым output (HTML + PDF через `pdf-lib`) в `uploads/documents/demo/...` и dev endpoint `GET /api/v1/admin/dev/finance-documents-demo` для проверки путей и предпросмотра.
+- **Settlement Foundation (Stage 1, manual-first):** добавлен базовый lifecycle `SupplierSettlement` (calculate/approve/finalize/markPaid), policy-resolver для набора документов по настройкам поставщика (`generateInvoiceDocuments`, `closingDocumentMode`) и ручной issue-flow без очередей/auto-EDO.
 - **P3.2+ — Payments & Clearing / pspFeeMode:** настройки платежей оператора (`paymentMode`, `agentSchemeEnabled`, `splitEnabled`, `pspFeeMode`) зафиксированы в `Operator` и передаются в PaymentContext/метаданные YooKassa; база для будущего разделения PSP‑комиссии по режимам `pspFeeMode` без изменения текущей экономики.
 - **Acceptance Flow & Chargebacks:** отчёты поддерживают явный акцепт поставщиком (`supplierAcceptedAt`, `acceptedBySupplierUserId`, `metaJson.history`), который блокируется при открытом споре; добавлены типы `CHARGEBACK_ADJUSTMENT` и `FEE_RECHARGE` для будущих корректировок и PSP‑fee, документ‑шаблоны версионируются без перезаписи существующих документов.
 
@@ -175,6 +177,16 @@
 - **User** — пользователь сайта (регистрация/вход). Избранное в UserFavorite (eventSlug).
 - **ApiKey** — API-ключ для Partner B2B API: SHA-256 хеш (не храним оригинал), prefix (8 символов для UI), rateLimit, ipWhitelist, expiresAt.
 - **Venue** — место (музей, галерея, арт-пространство). VenueType enum (MUSEUM/GALLERY/ART_SPACE/EXHIBITION_HALL/THEATER/PALACE/PARK). Содержит: openingHours (JSON), priceFrom, rating, galleryUrls, address/metro/lat/lng, operatorId (партнёр). Soft delete, optimistic lock.
+- **Subcategory** — новый универсальный справочник подкатегорий (`SubcategoryType`: `UNIVERSAL | EVENT_ONLY | VENUE_ONLY`) с иерархией до 2 уровней через `parentId` и флагами `isActive`/`isLandingEnabled`; используется M:N связями:
+  - `EventSubcategoryLink` (`eventId`, `subcategoryId`);
+  - `VenueSubcategoryLink` (`venueId`, `subcategoryId`).
+- **Контракт чтения/записи subcategories (обязательный):**
+  - **Источник истины**: `EventSubcategoryLink` / `VenueSubcategoryLink` + справочник `Subcategory`.
+  - **Legacy fallback (временный)**: при чтении `Event`, если нет ни одной записи в `EventSubcategoryLink`, допускается fallback к `Event.subcategories` (enum-массив) для обратной совместимости.
+  - **Запись**: новые данные пишутся только в link-таблицы; редактирование legacy-поля из UI не допускается.
+  - **Правила дерева**: максимальная глубина `root + child` (2 уровня), циклы запрещены, `slug` глобально уникален.
+  - **Совместимость типов parent-child**: `UNIVERSAL` может быть родителем для любых типов; для специализированных родителей (`EVENT_ONLY`, `VENUE_ONLY`) тип ребёнка должен совпадать с типом родителя.
+  - **Удаление**: базовый сценарий — soft deprecate через `isActive=false`; физическое удаление подкатегорий допускается только для ошибочных/мусорных записей.
 - **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate. Шаблоны страниц — `docs/Reference.md` § PageTemplateSpecs.
 - **EventOffer расширен**: venueId для прямых офферов к месту (без привязки к Event).
 - **Location** — причал, площадка, точка встречи (каркас, Фаза 2)

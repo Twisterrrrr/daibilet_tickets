@@ -30,6 +30,15 @@ import { CreateTagDto, UpdateTagDto } from './dto/admin.dto';
 export class AdminTagsController {
   constructor(private readonly prisma: PrismaService) {}
 
+  private normalizeTagPayload(input: Record<string, unknown>): Record<string, unknown> {
+    const normalized = { ...input };
+    if (typeof normalized.code === 'string') {
+      const trimmed = normalized.code.trim();
+      normalized.code = trimmed.length > 0 ? trimmed : null;
+    }
+    return normalized;
+  }
+
   private validateTagKindCombination(input: {
     tagKind?: TagKind | null;
     structuralGroup?: StructuralTagGroup | null;
@@ -101,17 +110,24 @@ export class AdminTagsController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateTagDto) {
+    if (data.tagKind === TagKind.STRUCTURAL && data.structuralGroup === StructuralTagGroup.FORMAT) {
+      throw new BadRequestException(
+        'Создание новых FORMAT-тегов отключено: используйте справочник подкатегорий (staged deprecate)',
+      );
+    }
     this.validateTagKindCombination({
       tagKind: data.tagKind ?? null,
       structuralGroup: data.structuralGroup ?? null,
     });
-    return this.prisma.tag.create({ data });
+    const normalized = this.normalizeTagPayload(data as unknown as Record<string, unknown>);
+    return this.prisma.tag.create({ data: normalized as any });
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateTagDto) {
-    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, events: _events, articleTags: _articleTags, _count, version: _version, ...clean } = data as Record<string, unknown>;
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, events: _events, articleTags: _articleTags, _count, version: _version, ...rawClean } = data as Record<string, unknown>;
+    const clean = this.normalizeTagPayload(rawClean);
 
     const current = await this.prisma.tag.findUnique({
       where: { id },

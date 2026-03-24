@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DateMode, EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
 type AdditionalFilters = {
   citySlugs?: string[];
@@ -38,7 +39,10 @@ export type SelectionInput = {
 
 @Injectable()
 export class CollectionSelectionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subcategoryPolicy: SubcategoryPolicyService,
+  ) {}
 
   getWeights(): ScoringWeights {
     return {
@@ -73,7 +77,15 @@ export class CollectionSelectionService {
       where.tags = { some: { tag: { slug: { in: input.filterTags } } } };
     }
     if (input.filterCategory) where.category = input.filterCategory as EventCategory;
-    if (input.filterSubcategory) where.subcategories = { has: input.filterSubcategory as EventSubcategory };
+    if (input.filterSubcategory) {
+      const subcategoryFilter = this.subcategoryPolicy.buildEventSubcategoryFilter(input.filterSubcategory);
+      const existingAnd = where.AND
+        ? Array.isArray(where.AND)
+          ? where.AND
+          : [where.AND]
+        : [];
+      where.AND = [...existingAnd, subcategoryFilter];
+    }
     if (input.filterAudience) {
       if (input.filterAudience === 'KIDS') where.audience = { in: [EventAudience.KIDS, EventAudience.FAMILY] };
       else where.audience = input.filterAudience as EventAudience;

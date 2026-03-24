@@ -5,6 +5,7 @@
 
 import { DateMode, EventSource, EventSubcategory, Prisma } from '@prisma/client';
 import { TagKind } from '@prisma/client';
+import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
 export interface EventWhereDto {
   city?: string;
@@ -112,15 +113,7 @@ export function buildEventWhere(
       ...(city && !cityIds?.length && { slug: city }),
     },
     ...(category && { category: category as Prisma.EnumEventCategoryFilter }),
-    ...(subcategory &&
-      (subcategory === 'RIVER'
-        ? {
-            AND: [
-              { subcategories: { has: 'RIVER' as EventSubcategory } },
-              { NOT: { subcategories: { has: 'BUS' as EventSubcategory } } },
-            ],
-          }
-        : { subcategories: { has: subcategory as EventSubcategory } })),
+    ...(subcategory ? new SubcategoryPolicyService().buildEventSubcategoryFilter(subcategory) : {}),
     ...(audience === 'KIDS'
       ? { audience: { in: ['KIDS', 'FAMILY'] } }
       : audience

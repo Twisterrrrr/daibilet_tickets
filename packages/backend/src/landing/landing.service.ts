@@ -1,12 +1,16 @@
 import { getFirstPriceKopecks } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, EventCategory, EventSource, EventSubcategory, LandingStatus, Prisma } from '@prisma/client';
+import { DateMode, EventCategory, EventSource, LandingStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
 @Injectable()
 export class LandingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subcategoryPolicy: SubcategoryPolicyService,
+  ) {}
 
   /** Список активных лендингов (для меню/перелинковки) */
   async getAll() {
@@ -62,7 +66,12 @@ export class LandingService {
     const extraWhere: Prisma.EventWhereInput = {};
     if (typeof af.category === 'string') extraWhere.category = af.category as EventCategory;
     if (Array.isArray(af.subcategories) && af.subcategories.length > 0) {
-      extraWhere.subcategories = { hasSome: af.subcategories as EventSubcategory[] };
+      const subcategoryClauses = af.subcategories
+        .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+        .map((v) => this.subcategoryPolicy.buildEventSubcategoryFilter(v));
+      if (subcategoryClauses.length > 0) {
+        extraWhere.OR = subcategoryClauses;
+      }
     }
     if (typeof af.source === 'string') extraWhere.source = af.source as EventSource;
     const minD = typeof af.minDuration === 'number' ? af.minDuration : undefined;

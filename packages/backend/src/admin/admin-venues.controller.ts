@@ -16,16 +16,18 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { paginationArgs, parsePagination } from '../common/pagination';
-import { Prisma } from '@prisma/client';
+import { Prisma, SubcategoryType } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateVenueDto, UpdateVenueDto, VenueAdminSummaryDto } from './dto/admin.dto';
 import { VenueAdminSummaryService } from './venue-admin-summary.service';
+import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -36,6 +38,7 @@ export class AdminVenuesController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly venueAdminSummary: VenueAdminSummaryService,
+    private readonly subcategoryPolicy: SubcategoryPolicyService,
   ) {}
 
   @Get()
@@ -154,6 +157,67 @@ export class AdminVenuesController {
       rating: Number(venue.rating),
       externalRating: venue.externalRating ? Number(venue.externalRating) : null,
     };
+  }
+
+  @Get(':id/subcategories')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async getVenueSubcategories(@Param('id') id: string) {
+    const venueExists = await this.prisma.venue.findUnique({ where: { id }, select: { id: true } });
+    if (!venueExists) throw new NotFoundException('Venue not found');
+
+    const links = await this.prisma.venueSubcategoryLink.findMany({
+      where: { venueId: id },
+      include: {
+        subcategory: {
+          include: {
+            parent: { select: { id: true, slug: true, nameRu: true } },
+          },
+        },
+      },
+      orderBy: [{ subcategory: { sortOrder: 'asc' } }, { subcategory: { nameRu: 'asc' } }],
+    });
+
+    return links.map((l) => l.subcategory);
+  }
+
+  @Patch(':id/subcategories')
+  @Roles('ADMIN', 'EDITOR')
+  async setVenueSubcategories(@Param('id') id: string, @Body() body: UpdateVenueSubcategoriesDto) {
+    const venueExists = await this.prisma.venue.findUnique({ where: { id }, select: { id: true } });
+    if (!venueExists) throw new NotFoundException('Venue not found');
+
+    const idsById = Array.from(new Set(body.subcategoryIds ?? []));
+    const idsBySlug = Array.from(new Set(body.subcategorySlugs ?? []));
+    if (!idsById.length && !idsBySlug.length) {
+      throw new BadRequestException('subcategoryIds or subcategorySlugs required');
+    }
+
+    const rows = await this.prisma.subcategory.findMany({
+      where: {
+        isActive: true,
+        type: { in: [SubcategoryType.UNIVERSAL, SubcategoryType.VENUE_ONLY] },
+        OR: [{ id: { in: idsById } }, { slug: { in: idsBySlug } }],
+      },
+      select: { id: true, slug: true },
+    });
+
+    const requestedCount = new Set([...idsById, ...idsBySlug]).size;
+    if (rows.length !== requestedCount) {
+      throw new BadRequestException('Some subcategories are invalid for Venue or inactive');
+    }
+    this.subcategoryPolicy.assertVenueLimit(rows.length);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.venueSubcategoryLink.deleteMany({ where: { venueId: id } });
+      if (rows.length) {
+        await tx.venueSubcategoryLink.createMany({
+          data: rows.map((r) => ({ venueId: id, subcategoryId: r.id })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    return this.getVenueSubcategories(id);
   }
 
   @Post()
@@ -373,4 +437,16 @@ export class AdminVenuesController {
       .replace(/^-|-$/g, '')
       .substring(0, 80);
   }
+}
+
+class UpdateVenueSubcategoriesDto {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  subcategoryIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  subcategorySlugs?: string[];
 }

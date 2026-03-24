@@ -11,12 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
 import { transliterate } from '@/lib/transliterate';
 
 type TagCategory = 'THEME' | 'AUDIENCE' | 'SEASON' | 'SPECIAL';
 type TagKind = 'STRUCTURAL' | 'POPULAR';
 type StructuralTagGroup = 'THEME' | 'AUDIENCE' | 'FORMAT';
+type TagUiCategory = 'THEME' | 'AUDIENCE' | 'FORMAT' | 'SEASON' | 'POPULAR';
+const NONE_VALUE = '__none__';
 
 interface TagForm {
   name: string;
@@ -35,12 +36,34 @@ interface TagForm {
   isActive: boolean;
 }
 
-const CATEGORY_OPTIONS: { value: TagCategory; label: string }[] = [
-  { value: 'THEME', label: 'Тема' },
+const ALL_CATEGORY_OPTIONS: { value: TagUiCategory; label: string }[] = [
+  { value: 'THEME', label: 'Тематика' },
   { value: 'AUDIENCE', label: 'Аудитория' },
-  { value: 'SEASON', label: 'Сезон' },
-  { value: 'SPECIAL', label: 'Специальный' },
+  { value: 'FORMAT', label: 'Формат' },
+  { value: 'SEASON', label: 'Сезонность' },
+  { value: 'POPULAR', label: 'Популярный' },
 ];
+
+function uiCategoryToInternal(ui: TagUiCategory): {
+  category: TagCategory;
+  tagKind: TagKind;
+  structuralGroup: StructuralTagGroup | null;
+} {
+  if (ui === 'THEME') return { category: 'THEME', tagKind: 'STRUCTURAL', structuralGroup: 'THEME' };
+  if (ui === 'AUDIENCE') return { category: 'AUDIENCE', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE' };
+  if (ui === 'FORMAT') return { category: 'SPECIAL', tagKind: 'STRUCTURAL', structuralGroup: 'FORMAT' };
+  if (ui === 'SEASON') return { category: 'SEASON', tagKind: 'STRUCTURAL', structuralGroup: 'THEME' };
+  return { category: 'SPECIAL', tagKind: 'POPULAR', structuralGroup: null };
+}
+
+function internalToUiCategory(form: TagForm): TagUiCategory {
+  if (form.tagKind === 'POPULAR') return 'POPULAR';
+  if (form.structuralGroup === 'FORMAT') return 'FORMAT';
+  if (form.category === 'SPECIAL') return 'FORMAT';
+  if (form.category === 'AUDIENCE') return 'AUDIENCE';
+  if (form.category === 'SEASON') return 'SEASON';
+  return 'THEME';
+}
 
 const EMPTY_FORM: TagForm = {
   name: '',
@@ -63,12 +86,17 @@ export function TagEditPage() {
   const isCreate = !id || id === 'new';
 
   const [form, setForm] = useState<TagForm>(EMPTY_FORM);
+  const [uiCategory, setUiCategory] = useState<TagUiCategory>('THEME');
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const categoryOptions = isCreate
+    ? ALL_CATEGORY_OPTIONS.filter((o) => o.value !== 'FORMAT')
+    : ALL_CATEGORY_OPTIONS;
 
   useEffect(() => {
     if (isCreate) {
+      setUiCategory('THEME');
       setLoading(false);
       return;
     }
@@ -77,7 +105,8 @@ export function TagEditPage() {
     adminApi
       .get<TagForm & { id: string }>(`/admin/tags/${id}`)
       .then((data) =>
-        setForm({
+        {
+          const nextForm = {
           name: data.name ?? '',
           slug: data.slug ?? '',
           category: data.category ?? 'THEME',
@@ -92,7 +121,10 @@ export function TagEditPage() {
           isFeatured: data.isFeatured ?? false,
           sortOrder: data.sortOrder ?? 0,
           isActive: data.isActive ?? true,
-        }),
+          };
+          setForm(nextForm);
+          setUiCategory(internalToUiCategory(nextForm));
+        }
       )
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
@@ -110,11 +142,18 @@ export function TagEditPage() {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const mapping = uiCategoryToInternal(uiCategory);
+    const payload = {
+      ...form,
+      category: mapping.category,
+      tagKind: mapping.tagKind,
+      structuralGroup: mapping.structuralGroup,
+    };
     try {
       if (isCreate) {
-        await adminApi.post('/admin/tags', form);
+        await adminApi.post('/admin/tags', payload);
       } else {
-        await adminApi.patch(`/admin/tags/${id}`, form);
+        await adminApi.patch(`/admin/tags/${id}`, payload);
       }
       navigate('/tags');
     } catch (e) {
@@ -195,108 +234,30 @@ export function TagEditPage() {
             <div className="space-y-2">
               <Label htmlFor="category">Категория</Label>
               <Select
-                value={form.category}
-                onValueChange={(v) => setForm((f) => ({ ...f, category: v as TagCategory }))}
+                value={uiCategory}
+                onValueChange={(v) => {
+                  const next = v as TagUiCategory;
+                  setUiCategory(next);
+                  const mapping = uiCategoryToInternal(next);
+                  setForm((f) => ({
+                    ...f,
+                    category: mapping.category,
+                    tagKind: mapping.tagKind,
+                    structuralGroup: mapping.structuralGroup,
+                  }));
+                }}
               >
                 <SelectTrigger id="category">
                   <SelectValue placeholder="Выберите категорию" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORY_OPTIONS.map((o) => (
+                  {categoryOptions.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
                       {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="tagKind">Слой (tagKind)</Label>
-                <Select
-                  value={form.tagKind ?? ''}
-                  onValueChange={(v) => {
-                    if (!v) {
-                      setForm((f) => ({ ...f, tagKind: undefined, structuralGroup: null }));
-                      return;
-                    }
-                    const nextKind = v as TagKind;
-                    setForm((f) => ({
-                      ...f,
-                      tagKind: nextKind,
-                      structuralGroup: nextKind === 'STRUCTURAL' ? (f.structuralGroup ?? 'THEME') : null,
-                    }));
-                  }}
-                >
-                  <SelectTrigger id="tagKind">
-                    <SelectValue placeholder="Выберите слой" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">(не задано)</SelectItem>
-                    <SelectItem value="STRUCTURAL">STRUCTURAL</SelectItem>
-                    <SelectItem value="POPULAR">POPULAR</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="structuralGroup">Группа (structuralGroup)</Label>
-                <Select
-                  value={form.structuralGroup ?? ''}
-                  onValueChange={(v) => setForm((f) => ({ ...f, structuralGroup: (v as StructuralTagGroup) || null }))}
-                  disabled={form.tagKind !== 'STRUCTURAL'}
-                >
-                  <SelectTrigger id="structuralGroup">
-                    <SelectValue placeholder="Выберите группу" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="THEME">THEME</SelectItem>
-                    <SelectItem value="AUDIENCE">AUDIENCE</SelectItem>
-                    <SelectItem value="FORMAT">FORMAT</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="code">code</Label>
-                <Input id="code" value={form.code ?? ''} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nameEn">nameEn</Label>
-                <Input
-                  id="nameEn"
-                  value={form.nameEn ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))}
-                  placeholder="необязательно"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="sortOrder">sortOrder</Label>
-                <Input
-                  id="sortOrder"
-                  type="number"
-                  value={form.sortOrder ?? 0}
-                  onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value === '' ? 0 : Number(e.target.value) }))}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isFeatured"
-                  checked={form.isFeatured ?? false}
-                  onChange={(e) => setForm((f) => ({ ...f, isFeatured: e.target.checked }))}
-                  className="h-4 w-4 rounded border-input"
-                />
-                <Label htmlFor="isFeatured" className="cursor-pointer font-normal">
-                  isFeatured
-                </Label>
-              </div>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -309,59 +270,6 @@ export function TagEditPage() {
               <Label htmlFor="isActive" className="cursor-pointer font-normal">
                 Активен
               </Label>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Контент</CardTitle>
-            <CardDescription>Описание и медиа</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="description">Описание</Label>
-              <Textarea
-                id="description"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="heroImage">Hero Image (URL)</Label>
-              <Input
-                id="heroImage"
-                type="text"
-                value={form.heroImage}
-                onChange={(e) => setForm((f) => ({ ...f, heroImage: e.target.value }))}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>SEO</CardTitle>
-            <CardDescription>Мета-теги для поисковых систем</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="metaTitle">Meta Title</Label>
-              <Input
-                id="metaTitle"
-                value={form.metaTitle}
-                onChange={(e) => setForm((f) => ({ ...f, metaTitle: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="metaDescription">Meta Description</Label>
-              <Textarea
-                id="metaDescription"
-                value={form.metaDescription}
-                onChange={(e) => setForm((f) => ({ ...f, metaDescription: e.target.value }))}
-                rows={2}
-              />
             </div>
           </CardContent>
         </Card>

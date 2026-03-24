@@ -26,6 +26,7 @@ import { PublishGateService } from './publish-gate.service';
 import { LocationNormalizerService } from './location-normalizer.service';
 import { VenueNormalizerService } from './venue-normalizer.service';
 import { OfferNormalizerService } from './offer-normalizer.service';
+import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
 @Module({
   imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule],
@@ -53,6 +54,7 @@ import { OfferNormalizerService } from './offer-normalizer.service';
     LocationNormalizerService,
     VenueNormalizerService,
     OfferNormalizerService,
+    SubcategoryPolicyService,
   ],
   exports: [
     CatalogService,
@@ -76,6 +78,7 @@ import { OfferNormalizerService } from './offer-normalizer.service';
     LocationNormalizerService,
     VenueNormalizerService,
     OfferNormalizerService,
+    SubcategoryPolicyService,
   ],
 })
 export class CatalogModule {}
