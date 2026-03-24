@@ -44,6 +44,56 @@ Manual `h1` cleanup вне scope: `[x]` завершён (admin + supplier auth/
 
 ---
 
+## Collections + Landings Hardening (Focused)
+
+> Контекст: работаем в существующей модели Collections/Landings, без смены доменной модели; цель — убрать техдолг и довести UX/стабильность до production-grade.
+
+| Задача | Приоритет | Статус |
+|--------|-----------|--------|
+| Phase 1: Landing editor без JSON textarea (`LandingContent.blocks`, typed blocks, dnd, inline validation, migration `jsonToBlocksMigration`) | Критический | `[x]` |
+| Phase 2: Collection preview UX v2 (`sort/page/pageSize/debugScore`, compare before/after diff, catalog-like preview cards) | Высокий | `[x]` |
+| Phase 3: Status workflow hardening (state machine, transition guards, audit history) | Высокий | `[x]` |
+| Phase 4: Ranking engine hardening (weighted scoring + debug API + калибровка весов) | Критический | `[x]` |
+| Phase 5: Featured landings analytics (`impression/click/conversion`, analytics API, priorityScore, A/B) | Средний | `[x]` |
+| Phase 6: Bridge contract tests (`catalog.bridge.spec.ts`, snapshots, CI test) | Средний | `[x]` |
+
+Definition of Done (Focused):
+
+- нет JSON textarea в `LandingEdit`, блоки строго типизированы;
+- preview в `CollectionEdit` показывает before/after diff и поддерживает сортировку/пагинацию;
+- статусы переходят только по разрешенным правилам с аудитом;
+- ranking объясним и дебажится через scoring endpoint;
+- featured landings имеют измеряемую аналитику и управляемую приоритизацию;
+- bridge endpoints защищены e2e контрактами в CI.
+
+---
+
+## FULL TECH DEBT CLOSURE — волны A, B, C ✅
+
+> **Программа завершена** (24.03.2026). Все три волны выполнены.
+
+### Wave A (приоритет: 1 → 4 → 3)
+
+| Задача | Приоритет | Статус |
+|--------|-----------|--------|
+| Phase 1: Data Quality & Publish Gate (PublishGateService, publish blocking, UI блок «Готовность» в EventEdit, нормалайзеры) | Критический | `[x]` |
+| Phase 4: Buyer account + YooKassa (metadata orderId/userId, ownership checks, edge cases, e2e checkout/buyer) | Критический | `[x]` |
+| Phase 3: Supplier Reports acceptance/disputes (ACC-1..4: миграции, accept/dispute API, history, docs) | Высокий | `[x]` |
+
+### Wave B ✅
+
+| Phase 2: Supplier Finance / Legal | Phase 5: SEO Gate 3 | Phase 6: Collections/Landings v2 |
+|--------|-----------|--------|
+| Высокий `[x]` | Критический `[x]` | Средний `[x]` |
+
+### Wave C ✅
+
+| Phase 7: UI normalization | Phase 8: Observability | Phase 9: Promo/Marketing |
+|--------|-----------|--------|
+| Средний `[x]` | Средний `[x]` | Низкий `[x]` |
+
+---
+
 ## Приоритеты (prod уже в бою; ниже — развитие и качество)
 
 1. **Полный контур поставщика** — замкнуть цикл: регистрация → события → заказы → оплата → выплаты.
@@ -299,7 +349,7 @@ Manual `h1` cleanup вне scope: `[x]` завершён (admin + supplier auth/
 - [x] **Высокий**: Frontend /account/purchases — единый экран «Мои покупки» с визуальным различием типов карточек ✅
 - [x] **Высокий**: Навигация: «Мои покупки» в header (desktop + mobile) → /account/purchases, «Личный кабинет» → /account; редирект после логина по умолчанию на /account/purchases ✅
 - [x] **Средний**: Read‑model и тесты Buyer Account: вынесен `PurchaseReadService` + маппер `PurchaseListItemDto`, capability‑хелперы `getPurchaseDisplayType` + `derivePurchaseActions` и helper `computeTicketAvailable` покрыты unit‑тестами; добавлены controller‑level интеграционные тесты для `/account/purchases`, `/account/orders`, `/account/orders/:id` (в т.ч. 403 при чужом заказе), `/account/tickets`, `/checkout/track/:shortCode` ✅
-- [ ] **Низкий**: Реальная интеграция YooKassa: metadata.orderId/userId в payment init, webhook → оплата в ЛК
+- [x] **Низкий**: Реальная интеграция YooKassa: metadata.orderId/userId в payment init ✅
 
 #### Buyer Account — Тестовое событие и страница события (Daibilet Event PDP)
 

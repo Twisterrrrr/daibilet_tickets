@@ -21,9 +21,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     const err = exception instanceof Error ? exception : new Error(String(exception));
+    const requestId = (req as Request & { id?: string }).id;
     if (status >= 500 && process.env.SENTRY_DSN) {
       Sentry.captureException(err, {
-        tags: { env: process.env.NODE_ENV, path: req.url },
+        tags: { env: process.env.NODE_ENV, path: req.url, ...(requestId && { requestId }) },
       });
     }
 
@@ -31,6 +32,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       message,
       path: req.url,
+      ...(requestId && { requestId }),
       ...(process.env.NODE_ENV !== 'production' && exception instanceof Error
         ? { stack: exception.stack }
         : {}),

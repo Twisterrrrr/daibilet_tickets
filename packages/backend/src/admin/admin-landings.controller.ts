@@ -151,6 +151,92 @@ export class AdminLandingsController {
     return { success: true };
   }
 
+  @Post(':id/analytics/:event')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async trackAnalytics(
+    @Param('id') id: string,
+    @Param('event') event: 'landing_impression' | 'landing_click' | 'landing_conversion',
+    @Request() req: { user?: { id?: string } },
+  ) {
+    if (!['landing_impression', 'landing_click', 'landing_conversion'].includes(event)) {
+      throw new BadRequestException('Unsupported analytics event');
+    }
+    await this.audit.log(
+      req.user?.id ?? 'system',
+      'UPDATE',
+      'LandingAnalytics',
+      id,
+      null,
+      { event, at: new Date().toISOString() },
+    );
+    return { success: true };
+  }
+
+  @Get('analytics/summary')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async getAnalytics(@Query('city') city?: string) {
+    const where: Parameters<AuditService['findMany']>[0] = { entity: 'LandingAnalytics', page: 1, limit: 5000 };
+    const { items } = await this.audit.findMany(where);
+    const grouped = new Map<
+      string,
+      { landingId: string; impressions: number; clicks: number; conversions: number; ctr: number; conversionRate: number; priorityScore: number }
+    >();
+    for (const item of items) {
+      const key = item.entityId;
+      const after = (item.after as { event?: string } | null) ?? null;
+      if (!after?.event) continue;
+      const prev = grouped.get(key) ?? {
+        landingId: key,
+        impressions: 0,
+        clicks: 0,
+        conversions: 0,
+        ctr: 0,
+        conversionRate: 0,
+        priorityScore: 0,
+      };
+      if (after.event === 'landing_impression') prev.impressions += 1;
+      if (after.event === 'landing_click') prev.clicks += 1;
+      if (after.event === 'landing_conversion') prev.conversions += 1;
+      grouped.set(key, prev);
+    }
+
+    const landingIds = [...grouped.keys()];
+    const landings = landingIds.length
+      ? await this.prisma.landingPage.findMany({
+          where: { id: { in: landingIds }, ...(city ? { city: { slug: city } } : {}) },
+          include: { city: { select: { slug: true, name: true } } },
+        })
+      : [];
+    const landingMap = new Map(landings.map((landing) => [landing.id, landing]));
+    const rows = [...grouped.values()]
+      .filter((row) => landingMap.has(row.landingId))
+      .map((row) => {
+        const ctr = row.impressions > 0 ? row.clicks / row.impressions : 0;
+        const conversionRate = row.clicks > 0 ? row.conversions / row.clicks : 0;
+        const manualBoost = 1;
+        const priorityScore = ctr * conversionRate * manualBoost;
+        const landing = landingMap.get(row.landingId)!;
+        return {
+          ...row,
+          title: landing.title,
+          slug: landing.slug,
+          city: landing.city,
+          ctr,
+          conversionRate,
+          priorityScore,
+          bucket: Math.abs(this.hash(landing.id)) % 2 === 0 ? 'A' : 'B',
+        };
+      })
+      .sort((a, b) => b.priorityScore - a.priorityScore);
+    return { items: rows };
+  }
+
+  private hash(input: string): number {
+    let hash = 0;
+    for (let i = 0; i < input.length; i += 1) hash = (hash << 5) - hash + input.charCodeAt(i);
+    return hash;
+  }
+
   private validateJsonFields(data: Record<string, unknown>) {
     try {
       if (data.faq !== undefined) validateJson(FaqSchema, data.faq, 'faq');

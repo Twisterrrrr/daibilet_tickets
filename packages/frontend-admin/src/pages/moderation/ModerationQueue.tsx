@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Eye,
   Image,
   MapPin,
   User,

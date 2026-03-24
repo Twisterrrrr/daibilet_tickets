@@ -4,11 +4,14 @@
  * Если x-request-id отсутствует → генерируем UUID.
  * Пишем в req.id и в заголовок ответа.
  * Логируем входящий запрос с requestId.
+ * PII masking: url маскируется при логировании (email/phone в query).
  */
 
 import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { NextFunction, Request, Response } from 'express';
+
+import { maskPiiInString } from './pii-mask.util';
 
 // Extend Express Request type
 /* eslint-disable @typescript-eslint/no-namespace */
@@ -28,7 +31,8 @@ export class RequestIdMiddleware implements NestMiddleware {
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();
     req.id = requestId;
     res.setHeader('x-request-id', requestId);
-    this.logger.log(`[requestId=${requestId}] ${req.method} ${req.url}`);
+    const safeUrl = maskPiiInString(req.url) || req.url;
+    this.logger.log(`[requestId=${requestId}] ${req.method} ${safeUrl}`);
     next();
   }
 }

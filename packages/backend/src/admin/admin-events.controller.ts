@@ -66,6 +66,7 @@ import {
 import { EventOverrideService } from './event-override.service';
 import { EventAdminSummaryService } from './event-admin-summary.service';
 import { EventQualityIssue, EventQualityService } from '../catalog/event-quality.service';
+import { PublishGateService } from '../catalog/publish-gate.service';
 import { AuditService } from './audit.service';
 import { toJsonValue } from '../common/typing';
 import { EventTagRulesService } from './event-tag-rules.service';
@@ -96,6 +97,7 @@ export class AdminEventsController {
     private readonly fuzzyDedupService: FuzzyDedupService,
     private readonly cacheInvalidation: CacheInvalidationService,
     private readonly eventQuality: EventQualityService,
+    private readonly publishGate: PublishGateService,
     private readonly eventAdminSummary: EventAdminSummaryService,
     private readonly audit: AuditService,
   ) {}
@@ -1044,11 +1046,9 @@ export class AdminEventsController {
     }
 
     const quality = await this.eventQuality.checkAndPersist(eventId);
-    if (!quality.isReady) {
-      return {
-        ok: false,
-        issues: quality.issues,
-      };
+    const gate = await this.publishGate.validateEventForPublish(eventId);
+    if (gate.result === 'BLOCKING' || !quality.isReady) {
+      return { ok: false, gate, issues: quality.issues } as { ok: false; gate: unknown; issues: EventQualityIssue[] };
     }
 
     await this.prisma.eventOverride.upsert({
@@ -1070,7 +1070,7 @@ export class AdminEventsController {
       editorStatus: 'PUBLISHED',
     });
 
-    return { ok: true, issues: [] };
+    return { ok: true, issues: [], gate };
   }
 
   private async getSessionWithEvent(sessionId: string) {

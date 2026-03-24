@@ -263,4 +263,21 @@ export class LandingService {
       cta: { label: 'Открыть', href: `/cities/${row.city.slug}/${row.slug}` },
     }));
   }
+
+  async trackFeaturedEvent(
+    landingId: string,
+    event: 'landing_impression' | 'landing_click' | 'landing_conversion',
+    bucket?: 'A' | 'B',
+  ) {
+    await this.prisma.auditLog.create({
+      data: {
+        userId: 'system',
+        action: 'UPDATE',
+        entity: 'LandingAnalytics',
+        entityId: landingId,
+        after: { event, bucket, at: new Date().toISOString() } as Prisma.InputJsonValue,
+      },
+    });
+    return { success: true };
+  }
 }

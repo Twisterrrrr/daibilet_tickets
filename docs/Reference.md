@@ -31,10 +31,10 @@ GET /api/v1/catalog. category=MUSEUM → Venue; EXCURSION|EVENT → Event. Catal
 
 ## 2. Observability
 
-- **RequestId:** header `x-request-id`, логи `[requestId=...]`
-- **PII masking:** email, phone, auth — маскируются в логах
-- **Sentry:** при SENTRY_DSN + production
-- **Ops:** GET /admin/ops/health, GET /admin/ops/metrics
+- **RequestId:** header `x-request-id`, логи `[requestId=...]`, в JSON error response — поле `requestId`
+- **PII masking:** email, phone, auth — маскируются в логах (url через maskPiiInString в RequestIdMiddleware)
+- **Sentry:** при SENTRY_DSN + production; requestId в tags при captureException
+- **Ops:** GET /admin/ops/health, GET /admin/ops/metrics (cache hits/misses/hitRate), GET /admin/ops/queues
 
 ---
 

@@ -13,13 +13,14 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CollectionSelectionBasis, CollectionSourceType, CollectionStatus, Prisma } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import { CollectionMaterializerService } from '../collection/collection-materializer.service';
 import { CollectionSuggestionService } from '../collection/collection-suggestion.service';
 import { CollectionSelectionService } from '../catalog/collection-selection.service';
 import { AuditInterceptor } from './audit.interceptor';
@@ -35,7 +36,19 @@ export class AdminCollectionsController {
     private readonly prisma: PrismaService,
     private readonly suggestionService: CollectionSuggestionService,
     private readonly selectionService: CollectionSelectionService,
+    private readonly materializer: CollectionMaterializerService,
   ) {}
+
+  private canTransition(from: CollectionStatus, to: CollectionStatus): boolean {
+    const transitions: Record<CollectionStatus, CollectionStatus[]> = {
+      DRAFT: [CollectionStatus.SUGGESTED, CollectionStatus.ACTIVE, CollectionStatus.ARCHIVED],
+      SUGGESTED: [CollectionStatus.ACTIVE, CollectionStatus.REJECTED, CollectionStatus.ARCHIVED],
+      ACTIVE: [CollectionStatus.ARCHIVED, CollectionStatus.REJECTED],
+      REJECTED: [CollectionStatus.SUGGESTED, CollectionStatus.ARCHIVED],
+      ARCHIVED: [],
+    };
+    return transitions[from]?.includes(to) ?? false;
+  }
 
   @Get()
   @Roles('ADMIN', 'EDITOR', 'VIEWER')
@@ -225,9 +238,21 @@ export class AdminCollectionsController {
     return this.suggestionService.generateCollectionSuggestions();
   }
 
+  @Post('materialize')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Materialize: обновить isActive коллекций по порогу событий' })
+  async materialize() {
+    return this.materializer.materialize();
+  }
+
   @Post(':id/approve')
   @Roles('ADMIN', 'EDITOR')
   async approve(@Param('id') id: string) {
+    const current = await this.prisma.collection.findUnique({ where: { id }, select: { status: true } });
+    if (!current) throw new NotFoundException('Подборка не найдена');
+    if (!this.canTransition(current.status, CollectionStatus.ACTIVE)) {
+      throw new BadRequestException(`Недопустимый переход ${current.status} -> ACTIVE`);
+    }
     return this.prisma.collection.update({
       where: { id },
       data: {
@@ -241,12 +266,31 @@ export class AdminCollectionsController {
   @Post(':id/reject')
   @Roles('ADMIN', 'EDITOR')
   async reject(@Param('id') id: string) {
+    const current = await this.prisma.collection.findUnique({ where: { id }, select: { status: true } });
+    if (!current) throw new NotFoundException('Подборка не найдена');
+    if (!this.canTransition(current.status, CollectionStatus.REJECTED)) {
+      throw new BadRequestException(`Недопустимый переход ${current.status} -> REJECTED`);
+    }
     return this.prisma.collection.update({
       where: { id },
       data: {
         status: CollectionStatus.REJECTED,
         isActive: false,
       },
+    });
+  }
+
+  @Post(':id/archive')
+  @Roles('ADMIN', 'EDITOR')
+  async archive(@Param('id') id: string) {
+    const current = await this.prisma.collection.findUnique({ where: { id }, select: { status: true } });
+    if (!current) throw new NotFoundException('Подборка не найдена');
+    if (!this.canTransition(current.status, CollectionStatus.ARCHIVED)) {
+      throw new BadRequestException(`Недопустимый переход ${current.status} -> ARCHIVED`);
+    }
+    return this.prisma.collection.update({
+      where: { id },
+      data: { status: CollectionStatus.ARCHIVED, isActive: false, sourceType: CollectionSourceType.ARCHIVED },
     });
   }
 
@@ -289,6 +333,118 @@ export class AdminCollectionsController {
         title: event.title,
         slug: event.slug,
         city: event.city ? { slug: event.city.slug, name: event.city.name } : null,
+        rating: event.rating,
+        reviewCount: event.reviewCount,
+      })),
+    };
+  }
+
+  @Get(':id/preview')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async previewById(
+    @Param('id') id: string,
+    @Query('sort') sort?: 'popularity' | 'availability' | 'balanced' | 'score',
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('debugScore') debugScore?: string,
+    @Query('compare') compare?: 'before' | 'after',
+  ) {
+    const collection = await this.prisma.collection.findUnique({ where: { id } });
+    if (!collection) throw new NotFoundException('Подборка не найдена');
+
+    const limit = Math.min(50, Math.max(1, Number(pageSize ?? 12)));
+    const pageNum = Math.max(1, Number(page ?? 1));
+    const useDebugScore = debugScore === 'true';
+    const sortMode = sort ?? 'balanced';
+
+    const before = await this.selectionService.resolveSelection({
+      cityId: collection.cityId,
+      filterTags: collection.filterTags,
+      filterCategory: collection.filterCategory,
+      filterSubcategory: collection.filterSubcategory,
+      filterAudience: collection.filterAudience,
+      additionalFilters: collection.additionalFilters as Record<string, unknown>,
+      ranking: (collection.rankingJson as { preset?: 'popularity' | 'availability' | 'balanced' }) ?? { preset: 'balanced' },
+      pinnedEventIds: [],
+      excludedEventIds: [],
+      limit,
+      page: pageNum,
+      sort: sortMode,
+      debugScore: useDebugScore,
+    });
+
+    const after = await this.selectionService.resolveSelection({
+      cityId: collection.cityId,
+      filterTags: collection.filterTags,
+      filterCategory: collection.filterCategory,
+      filterSubcategory: collection.filterSubcategory,
+      filterAudience: collection.filterAudience,
+      additionalFilters: collection.additionalFilters as Record<string, unknown>,
+      ranking: (collection.rankingJson as { preset?: 'popularity' | 'availability' | 'balanced' }) ?? { preset: 'balanced' },
+      pinnedEventIds: collection.pinnedEventIds,
+      excludedEventIds: collection.excludedEventIds,
+      limit,
+      page: pageNum,
+      sort: sortMode,
+      debugScore: useDebugScore,
+    });
+
+    const beforeIds = new Set(before.items.map((event) => event.id));
+    const afterIds = new Set(after.items.map((event) => event.id));
+    const added = after.items.filter((event) => !beforeIds.has(event.id)).map((event) => event.id);
+    const removed = before.items.filter((event) => !afterIds.has(event.id)).map((event) => event.id);
+    const beforeOrder = new Map(before.items.map((event, index) => [event.id, index]));
+    const changedOrder = after.items
+      .filter((event, index) => beforeOrder.has(event.id) && beforeOrder.get(event.id) !== index)
+      .map((event) => event.id);
+
+    const source = compare === 'before' ? before : after;
+    return {
+      mode: compare ?? 'after',
+      eventCount: source.preview.eventCount,
+      generatedAt: source.preview.generatedAt,
+      weights: source.preview.weights,
+      diff: { added, removed, changedOrder },
+      items: source.items.map((event) => ({
+        id: event.id,
+        title: event.title,
+        slug: event.slug,
+        city: event.city ? { slug: event.city.slug, name: event.city.name } : null,
+        rating: event.rating,
+        reviewCount: event.reviewCount,
+        score: '_selectionScore' in event ? event._selectionScore : undefined,
+      })),
+    };
+  }
+
+  @Get(':id/scoring')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async getScoring(@Param('id') id: string, @Query('pageSize') pageSize?: string) {
+    const collection = await this.prisma.collection.findUnique({ where: { id } });
+    if (!collection) throw new NotFoundException('Подборка не найдена');
+    const limit = Math.min(30, Math.max(1, Number(pageSize ?? 10)));
+    const resolved = await this.selectionService.resolveSelection({
+      cityId: collection.cityId,
+      filterTags: collection.filterTags,
+      filterCategory: collection.filterCategory,
+      filterSubcategory: collection.filterSubcategory,
+      filterAudience: collection.filterAudience,
+      additionalFilters: collection.additionalFilters as Record<string, unknown>,
+      ranking: (collection.rankingJson as { preset?: 'popularity' | 'availability' | 'balanced' }) ?? { preset: 'balanced' },
+      pinnedEventIds: collection.pinnedEventIds,
+      excludedEventIds: collection.excludedEventIds,
+      sort: 'score',
+      debugScore: true,
+      limit,
+      page: 1,
+    });
+    return {
+      collectionId: id,
+      weights: resolved.preview.weights,
+      items: resolved.items.map((event) => ({
+        id: event.id,
+        title: event.title,
+        score: '_selectionScore' in event ? event._selectionScore : null,
         rating: event.rating,
         reviewCount: event.reviewCount,
       })),

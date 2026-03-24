@@ -1,5 +1,5 @@
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowDown, ArrowLeft, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -15,6 +15,14 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import {
+  type LandingBlock,
+  type LandingBlockType,
+  blocksToLegacyPayload,
+  createEmptyBlock,
+  jsonToBlocksMigration,
+  validateBlocks,
+} from './landing-content';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,25 +50,8 @@ interface LandingForm {
   legalText: string;
   isActive: boolean;
   sortOrder: number;
-  howToChoose: string;
-  infoBlocks: string;
-  faq: string;
-  reviews: string;
-  stats: string;
-  relatedLinks: string;
-  additionalFilters: string;
-  rankingJson: string;
+  rankingPreset: 'balanced' | 'popularity' | 'availability';
 }
-
-const JSON_FIELDS = [
-  'howToChoose',
-  'infoBlocks',
-  'faq',
-  'reviews',
-  'stats',
-  'relatedLinks',
-  'additionalFilters',
-] as const;
 
 const EMPTY_FORM: LandingForm = {
   slug: '',
@@ -80,24 +71,8 @@ const EMPTY_FORM: LandingForm = {
   legalText: '',
   isActive: true,
   sortOrder: 0,
-  howToChoose: '[]',
-  infoBlocks: '[]',
-  faq: '[]',
-  reviews: '[]',
-  stats: '{}',
-  relatedLinks: '[]',
-  additionalFilters: '{}',
-  rankingJson: '{"preset":"balanced"}',
+  rankingPreset: 'balanced',
 };
-
-function safeJsonParse<T>(str: string, fallback: T): T {
-  try {
-    if (!str.trim()) return fallback;
-    return JSON.parse(str) as T;
-  } catch {
-    return fallback;
-  }
-}
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -111,6 +86,8 @@ export function LandingEditPage() {
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [blocks, setBlocks] = useState<LandingBlock[]>([]);
+  const [newBlockType, setNewBlockType] = useState<LandingBlockType>('FAQ');
 
   useEffect(() => {
     adminApi
@@ -150,21 +127,48 @@ export function LandingEditPage() {
           legalText: (data.legalText as string) ?? '',
           isActive: (data.isActive as boolean) ?? true,
           sortOrder: (data.sortOrder as number) ?? 0,
-          howToChoose: JSON.stringify(data.howToChoose ?? [], null, 2),
-          infoBlocks: JSON.stringify(data.infoBlocks ?? [], null, 2),
-          faq: JSON.stringify(data.faq ?? [], null, 2),
-          reviews: JSON.stringify(data.reviews ?? [], null, 2),
-          stats: JSON.stringify(data.stats ?? {}, null, 2),
-          relatedLinks: JSON.stringify(data.relatedLinks ?? [], null, 2),
-          additionalFilters: JSON.stringify(data.additionalFilters ?? {}, null, 2),
-          rankingJson: JSON.stringify(data.rankingJson ?? { preset: 'balanced' }, null, 2),
+          rankingPreset: (
+            (data.rankingJson as { preset?: LandingForm['rankingPreset'] } | null | undefined)?.preset ??
+            'balanced'
+          ) as LandingForm['rankingPreset'],
         });
+        setBlocks(
+          jsonToBlocksMigration({
+            faq: data.faq,
+            infoBlocks: data.infoBlocks,
+            reviews: data.reviews,
+            stats: data.stats,
+            relatedLinks: data.relatedLinks,
+            additionalFilters: data.additionalFilters,
+            howToChoose: data.howToChoose,
+          }),
+        );
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
   }, [id, isCreate]);
 
+  const orderedBlocks = useMemo(() => [...blocks].sort((a, b) => a.order - b.order), [blocks]);
+
+  const reindex = (next: LandingBlock[]) => next.map((block, index) => ({ ...block, order: index }));
+  const setOrderedBlocks = (next: LandingBlock[]) => setBlocks(reindex(next));
+
+  const moveBlock = (idToMove: string, direction: -1 | 1) => {
+    const current = [...orderedBlocks];
+    const index = current.findIndex((b) => b.id === idToMove);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= current.length) return;
+    const [item] = current.splice(index, 1);
+    current.splice(target, 0, item);
+    setOrderedBlocks(current);
+  };
+
+  const updateBlock = (idToUpdate: string, next: LandingBlock) =>
+    setBlocks((prev) => prev.map((block) => (block.id === idToUpdate ? next : block)));
+
   const buildPayload = () => {
+    const validationErrors = validateBlocks(orderedBlocks);
+    if (validationErrors.length) throw new Error(validationErrors.join('; '));
     const payload: Record<string, unknown> = {
       slug: form.slug,
       cityId: form.cityId,
@@ -183,15 +187,9 @@ export function LandingEditPage() {
       legalText: form.legalText || null,
       isActive: form.isActive,
       sortOrder: form.sortOrder,
+      rankingJson: { preset: form.rankingPreset },
     };
-    payload.howToChoose = safeJsonParse(form.howToChoose, []);
-    payload.infoBlocks = safeJsonParse(form.infoBlocks, []);
-    payload.faq = safeJsonParse(form.faq, []);
-    payload.reviews = safeJsonParse(form.reviews, []);
-    payload.stats = safeJsonParse(form.stats, {});
-    payload.relatedLinks = safeJsonParse(form.relatedLinks, []);
-    payload.additionalFilters = safeJsonParse(form.additionalFilters, {});
-    payload.rankingJson = safeJsonParse(form.rankingJson, { preset: 'balanced' });
+    Object.assign(payload, blocksToLegacyPayload(orderedBlocks));
     return payload;
   };
 
@@ -348,6 +346,20 @@ export function LandingEditPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Ranking preset</Label>
+                <Select
+                  value={form.rankingPreset}
+                  onValueChange={(v) => setForm((f) => ({ ...f, rankingPreset: v as LandingForm['rankingPreset'] }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="balanced">balanced</SelectItem>
+                    <SelectItem value="popularity">popularity</SelectItem>
+                    <SelectItem value="availability">availability</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -448,36 +460,121 @@ export function LandingEditPage() {
           </CardContent>
         </Card>
 
-        {/* JSON fields */}
+        {/* Typed content blocks */}
         <Card>
           <CardHeader>
-            <CardTitle>JSON-поля</CardTitle>
+            <CardTitle>Контентные блоки</CardTitle>
             <CardDescription>
-              howToChoose, infoBlocks, faq, reviews, stats, relatedLinks, additionalFilters
+              Form-based редактор без JSON textarea. Порядок влияет на рендер.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {JSON_FIELDS.map((key) => (
-              <div key={key} className="space-y-2">
-                <Label htmlFor={key}>{key}</Label>
-                <Textarea
-                  id={key}
-                  value={form[key]}
-                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                  rows={4}
-                  className="font-mono text-sm"
-                />
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="space-y-2">
+                <Label>Тип блока</Label>
+                <Select value={newBlockType} onValueChange={(v) => setNewBlockType(v as LandingBlockType)}>
+                  <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FAQ">FAQ</SelectItem>
+                    <SelectItem value="INFO_CARDS">INFO_CARDS</SelectItem>
+                    <SelectItem value="COMPARISON">COMPARISON</SelectItem>
+                    <SelectItem value="CTA">CTA</SelectItem>
+                    <SelectItem value="REVIEWS">REVIEWS</SelectItem>
+                    <SelectItem value="STATS">STATS</SelectItem>
+                    <SelectItem value="LINKS">LINKS</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            ))}
-            <div className="space-y-2">
-              <Label htmlFor="rankingJson">rankingJson</Label>
-              <Textarea
-                id="rankingJson"
-                value={form.rankingJson}
-                onChange={(e) => setForm((f) => ({ ...f, rankingJson: e.target.value }))}
-                rows={3}
-                className="font-mono text-sm"
-              />
+              <Button type="button" variant="outline" className="gap-2" onClick={() => setOrderedBlocks([...orderedBlocks, createEmptyBlock(newBlockType, orderedBlocks.length)])}>
+                <Plus className="h-4 w-4" />
+                Добавить блок
+              </Button>
+            </div>
+            {orderedBlocks.length === 0 && <p className="text-sm text-muted-foreground">Добавь хотя бы один контентный блок.</p>}
+            <div className="space-y-3">
+              {orderedBlocks.map((block) => (
+                <Card key={block.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-base">{block.type}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" size="icon" variant="ghost" onClick={() => moveBlock(block.id, -1)}>
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button type="button" size="icon" variant="ghost" onClick={() => moveBlock(block.id, 1)}>
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                        <Button type="button" size="icon" variant="ghost" onClick={() => setOrderedBlocks(orderedBlocks.filter((it) => it.id !== block.id))}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {block.type === 'FAQ' && (
+                      <div className="space-y-2">
+                        <Input
+                          placeholder="Question"
+                          value={block.payload[0]?.question ?? ''}
+                          onChange={(e) =>
+                            updateBlock(block.id, { ...block, payload: [{ question: e.target.value, answer: block.payload[0]?.answer ?? '' }] })
+                          }
+                        />
+                        <Textarea
+                          placeholder="Answer"
+                          value={block.payload[0]?.answer ?? ''}
+                          onChange={(e) =>
+                            updateBlock(block.id, { ...block, payload: [{ question: block.payload[0]?.question ?? '', answer: e.target.value }] })
+                          }
+                          rows={3}
+                        />
+                      </div>
+                    )}
+                    {block.type === 'CTA' && (
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <Input placeholder="Title" value={block.payload.title ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, title: e.target.value } })} />
+                        <Input placeholder="Button text" value={block.payload.buttonText ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, buttonText: e.target.value } })} />
+                        <Input placeholder="Link" value={block.payload.link ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, link: e.target.value } })} />
+                      </div>
+                    )}
+                    {block.type === 'INFO_CARDS' && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input placeholder="Title" value={block.payload[0]?.title ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: e.target.value, text: block.payload[0]?.text ?? '' }] })} />
+                        <Input placeholder="Text" value={block.payload[0]?.text ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: block.payload[0]?.title ?? '', text: e.target.value }] })} />
+                      </div>
+                    )}
+                    {block.type === 'REVIEWS' && (
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <Input placeholder="Author" value={block.payload[0]?.author ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ ...block.payload[0], author: e.target.value, text: block.payload[0]?.text ?? '', rating: block.payload[0]?.rating ?? 5 }] })} />
+                        <Input placeholder="Review text" value={block.payload[0]?.text ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ ...block.payload[0], text: e.target.value, author: block.payload[0]?.author ?? '', rating: block.payload[0]?.rating ?? 5 }] })} />
+                        <Input type="number" placeholder="Rating" value={block.payload[0]?.rating ?? 5} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ ...block.payload[0], rating: parseInt(e.target.value, 10) || 5, text: block.payload[0]?.text ?? '', author: block.payload[0]?.author ?? '' }] })} />
+                      </div>
+                    )}
+                    {block.type === 'STATS' && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input type="number" placeholder="Sold tickets" value={block.payload.soldTickets ?? 0} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, soldTickets: parseInt(e.target.value, 10) || 0 } })} />
+                        <Input type="number" placeholder="Avg rating" value={block.payload.avgRating ?? 5} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, avgRating: parseFloat(e.target.value) || 0 } })} />
+                      </div>
+                    )}
+                    {block.type === 'LINKS' && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input placeholder="Title" value={block.payload[0]?.title ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: e.target.value, href: block.payload[0]?.href ?? '' }] })} />
+                        <Input placeholder="Href" value={block.payload[0]?.href ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: block.payload[0]?.title ?? '', href: e.target.value }] })} />
+                      </div>
+                    )}
+                    {block.type === 'COMPARISON' && (
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <Input placeholder="Columns (comma-separated)" value={block.payload.columns.join(', ')} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, columns: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) } })} />
+                        <Input type="number" placeholder="Max rows" value={block.payload.maxRows ?? 10} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, maxRows: parseInt(e.target.value, 10) || 10 } })} />
+                        <label className="flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={Boolean(block.payload.hideIncomparable)} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, hideIncomparable: e.target.checked } })} className={cn('h-4 w-4 rounded border-input accent-primary')} />
+                          Hide incomparable
+                        </label>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </CardContent>
         </Card>

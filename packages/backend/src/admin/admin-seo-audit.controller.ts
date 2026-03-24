@@ -38,4 +38,27 @@ export class AdminSeoAuditController {
     };
     return this.seoAudit.getEventsAudit(params);
   }
+
+  @Get('cities')
+  @Roles('ADMIN', 'EDITOR')
+  @ApiOkResponse({ description: 'SEO audit for cities (Gate 3)' })
+  getCitiesAudit(
+    @Query('onlyIssues') onlyIssues?: 'true' | 'false',
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.seoAudit.getCitiesAudit({ onlyIssues, page, limit });
+  }
+
+  @Get('venues')
+  @Roles('ADMIN', 'EDITOR')
+  @ApiOkResponse({ description: 'SEO audit for venues (Gate 3)' })
+  getVenuesAudit(
+    @Query('cityId') cityId?: string,
+    @Query('onlyIssues') onlyIssues?: 'true' | 'false',
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.seoAudit.getVenuesAudit({ cityId, onlyIssues, page, limit });
+  }
 }

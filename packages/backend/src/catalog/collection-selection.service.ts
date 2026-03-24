@@ -11,6 +11,13 @@ type AdditionalFilters = {
 };
 
 export type SelectionRankingPreset = 'popularity' | 'availability' | 'balanced';
+export type SelectionSortMode = SelectionRankingPreset | 'score';
+export type ScoringWeights = {
+  popularity: number;
+  conversion: number;
+  quality: number;
+  availability: number;
+};
 
 export type SelectionInput = {
   cityId?: string | null;
@@ -21,6 +28,8 @@ export type SelectionInput = {
   filterAudience?: string | null;
   additionalFilters?: unknown;
   ranking?: { preset?: SelectionRankingPreset } | null;
+  sort?: SelectionSortMode;
+  debugScore?: boolean;
   pinnedEventIds?: string[];
   excludedEventIds?: string[];
   page?: number;
@@ -30,6 +39,15 @@ export type SelectionInput = {
 @Injectable()
 export class CollectionSelectionService {
   constructor(private readonly prisma: PrismaService) {}
+
+  getWeights(): ScoringWeights {
+    return {
+      popularity: Number(process.env.COLLECTION_WEIGHT_POPULARITY ?? 0.35),
+      conversion: Number(process.env.COLLECTION_WEIGHT_CONVERSION ?? 0.2),
+      quality: Number(process.env.COLLECTION_WEIGHT_QUALITY ?? 0.25),
+      availability: Number(process.env.COLLECTION_WEIGHT_AVAILABILITY ?? 0.2),
+    };
+  }
 
   buildWhere(input: SelectionInput): Prisma.EventWhereInput {
     const where: Prisma.EventWhereInput = {
@@ -87,8 +105,8 @@ export class CollectionSelectionService {
     return where;
   }
 
-  resolveOrderBy(ranking?: { preset?: SelectionRankingPreset } | null): Prisma.EventOrderByWithRelationInput[] {
-    const preset = ranking?.preset ?? 'balanced';
+  resolveOrderBy(ranking?: { preset?: SelectionRankingPreset } | null, sort?: SelectionSortMode): Prisma.EventOrderByWithRelationInput[] {
+    const preset = sort && sort !== 'score' ? sort : (ranking?.preset ?? 'balanced');
     if (preset === 'availability') {
       return [{ sessions: { _count: 'desc' } }, { rating: 'desc' }, { reviewCount: 'desc' }];
     }
@@ -96,6 +114,24 @@ export class CollectionSelectionService {
       return [{ reviewCount: 'desc' }, { rating: 'desc' }, { createdAt: 'desc' }];
     }
     return [{ rating: 'desc' }, { reviewCount: 'desc' }, { createdAt: 'desc' }];
+  }
+
+  scoreEvent(
+    event: { reviewCount: number; rating: unknown; sessions?: Array<{ availableTickets: number | null }> },
+    weights: ScoringWeights,
+  ): number {
+    const rating = typeof event.rating === 'number' ? event.rating : Number(event.rating ?? 0);
+    const popularity = Math.min(1, event.reviewCount / 300);
+    const conversion = Math.min(1, (rating * Math.log1p(event.reviewCount)) / 50);
+    const quality = Math.min(1, rating / 5);
+    const availabilityCount = (event.sessions ?? []).filter((session) => (session.availableTickets ?? 0) > 0).length;
+    const availability = Math.min(1, availabilityCount / 3);
+    return (
+      popularity * weights.popularity +
+      conversion * weights.conversion +
+      quality * weights.quality +
+      availability * weights.availability
+    );
   }
 
   async resolveSelection(input: SelectionInput) {
@@ -124,7 +160,7 @@ export class CollectionSelectionService {
 
     const events = await this.prisma.event.findMany({
       where: { ...where, id: { notIn: excludedIds } },
-      orderBy: this.resolveOrderBy(input.ranking),
+      orderBy: this.resolveOrderBy(input.ranking, input.sort),
       skip: adjustedSkip,
       take: adjustedLimit,
       include: {
@@ -139,7 +175,15 @@ export class CollectionSelectionService {
       },
     });
 
-    const items = page === 1 ? [...pinnedEvents, ...events] : events;
+    const weights = this.getWeights();
+    const merged = page === 1 ? [...pinnedEvents, ...events] : events;
+    const scored = merged.map((event) => ({ event, score: this.scoreEvent(event, weights) }));
+    if (input.sort === 'score') {
+      scored.sort((a, b) => b.score - a.score);
+    }
+    const items = input.debugScore
+      ? scored.map(({ event, score }) => ({ ...event, _selectionScore: score }))
+      : scored.map(({ event }) => event);
     return {
       items,
       total: totalFiltered + pinnedEvents.length,
@@ -148,6 +192,7 @@ export class CollectionSelectionService {
       preview: {
         generatedAt: new Date(),
         eventCount: totalFiltered + pinnedEvents.length,
+        weights,
       },
     };
   }

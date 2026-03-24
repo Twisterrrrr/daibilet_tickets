@@ -1,14 +1,9 @@
 import {
   BarChart3,
   ArrowRight,
-  CalendarDays,
   DollarSign,
   Eye,
-  MessageSquare,
   ShoppingCart,
-  Ticket,
-  TrendingDown,
-  TrendingUp,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -251,7 +246,7 @@ export function DashboardPage() {
 
   const filteredRevenue = stats.revenueByDay.filter((d) => new Date(d.date) >= periodStart);
   const revenueForPeriod = filteredRevenue.reduce((sum, day) => sum + day.revenue, 0);
-  const showThirtyDayTrend = period === '30d';
+  const _showThirtyDayTrend = period === '30d';
 
   const revenueChartData = filteredRevenue.map((d) => ({
     ...d,

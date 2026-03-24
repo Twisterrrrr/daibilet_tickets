@@ -4,6 +4,107 @@
 
 ---
 
+## 24.03.2026 — FULL TECH DEBT Wave C завершена
+
+### Наблюдения
+
+- Phase 7 (UI normalization): UX Parity Backlog DONE — все CRITICAL/HIGH/MEDIUM закрыты (PageHeader, DataTable, StatusBadge, etc.).
+- Phase 8 (Observability): requestId, Sentry, ops/health, ops/metrics уже были; Reference требовал PII masking в логах и requestId в error response.
+- Phase 9 (Promo/Marketing): PromoBlock, PromoCollection, PromoCode, checkout integration — уже реализованы, admin CRUD, pricing PromoCodeService.
+
+### Решения
+
+- **Phase 7:** Закрыто по UX-Parity-Backlog (все DoD выполнены ранее).
+- **Phase 8:** RequestIdMiddleware — maskPiiInString для req.url при логировании; AllExceptionsFilter — requestId в JSON error response и в Sentry tags.
+- **Phase 9:** Проверено — промо-система в порядке; отмечено как закрыто.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 24.03.2026 — FULL TECH DEBT Wave B завершена
+
+### Наблюдения
+
+- Phase 5 (SEO Gate 3): уже реализован ранее — seo-audit для cities/venues, эндпоинты, seed venues с metaTitle/metaDescription.
+- Phase 2 (Supplier Finance): в `SupplierLegalProfile` добавлено `metaJson` (миграция существовала), требовалась логика записи history при PATCH status.
+- Phase 6 (Collections/Landings v2): по аналогии с `LandingMaterializerService` нужен `CollectionMaterializerService`; расширение auto-tagging — bus-tour, rooftop в allowed suggestions.
+
+### Решения
+
+- **Phase 2:** в `AdminFinanceController.updateStatus()` при VERIFIED/REJECTED дописывается в `metaJson.history` объект `{ status, changedAt, changedByAdminId, comment? }`. Существующий metaJson сохраняется.
+- **Phase 6a:** `CollectionMaterializerService` — пересчёт `isActive` по `MIN_EVENTS_FOR_SUGGESTION` для коллекций с sourceType SUGGESTED/ACTIVE и selectionBasis POPULAR/STRUCTURAL/COMBINATION. `POST /admin/collections/materialize`.
+- **Phase 6b:** в `collection-suggestion.config.ts` добавлены `bus-tour` и `rooftop` в `ALLOWED_STRUCTURAL_SUGGESTIONS`.
+
+### Проблемы
+
+- Prisma client требовал regenerate после добавления metaJson в schema (ошибки TS при первом прогоне).
+
+---
+
+## 24.03.2026 — FULL TECH DEBT Wave A (1→4→3) завершена
+
+### Наблюдения
+
+- Wave A: Phase 1 (Publish Gate) → Phase 4 (Buyer+YooKassa) → Phase 3 (Supplier Reports ACC).
+- Phase 1: `PublishGateService` уже был; требовались правки дублей в quality-issues, возврат 200 с `ok: false` вместо 400 для совместимости с фронтом, нормалайзеры.
+- Phase 4: metadata YooKassa — добавить `orderId` и `userId` в payment init; ownership checks уже реализованы.
+- Phase 3: Supplier Reports accept/dispute, history, миграции — всё уже реализовано (supplierAcceptedAt, acceptedBySupplierUserId, metaJson.history, finance.md).
+
+### Решения
+
+- **Phase 1:** убраны дубли issues (NO_CATEGORY, WEAK_MEDIA, INVALID_LOCATION, NO_OFFERS); publish endpoint возвращает `{ ok: false, gate, issues }` при блокировке (вместо BadRequestException); добавлены `LocationNormalizerService`, `VenueNormalizerService`, `OfferNormalizerService`; PublishGate mapping упрощён.
+- **Phase 4:** в metadata YooKassa добавлены `orderId: checkoutSessionId`, `userId: session.userId ?? 'guest'` при createPaymentIntent.
+- **Phase 3:** проверено — ACC-flow реализован (POST accept/dispute, guards, history в metaJson); docs в finance.md и Project.md на месте.
+
+### Проблемы
+
+- Нет.
+
+---
+
+## 24.03.2026 — FULL TECH DEBT старт: Phase 1 Publish Gate
+
+### Наблюдения
+
+- В проекте уже есть `EventQualityService`, но publish-flow возвращал soft-fail (`ok: false`) вместо жесткой блокировки через ошибку.
+- Для унификации проверок требовался отдельный слой, чтобы использовать quality-результат как явный gate-контракт.
+
+### Решения
+
+- Добавлен `PublishGateService` с контрактом `validateEventForPublish(eventId) => { checks[], result }`.
+- `POST /admin/events/:id/publish` переведен на blocking-гейт: при `BLOCKING` возвращается `400 BadRequest` с деталями checks/issues.
+- `EventQualityService` расширен дополнительными кодами (`INVALID_LOCATION`, `INVALID_VENUE`, `NO_OFFERS`, `NO_CATEGORY`, `WEAK_MEDIA`) для совместимости с gate-проверками.
+
+### Проблемы
+
+- Нет; изменения сделаны минимально-инвазивно поверх текущей архитектуры без смены API-модели outside publish endpoint behavior.
+
+---
+
+## 23.03.2026 — Collections + Landings Hardening (Focused) фазы 1–6 выполнены
+
+### Наблюдения
+
+- Главный долг оставался в `LandingEdit` (JSON textarea) и ограниченном превью подборок без compare/debug.
+- Для ranking и workflow не хватало прозрачных backend-инвариантов (guard переходов + объяснимый score).
+- Featured landings уже показывались в каталоге, но без системного трекинга и операционного summary.
+
+### Решения
+
+- `LandingEdit` переведен на typed-block редактор (`LandingBlockType`, `jsonToBlocksMigration`, inline validation, order controls), JSON textarea удалены.
+- Для collections добавлены: `GET /admin/collections/:id/preview` (sort/page/pageSize/debugScore/compare), `GET /admin/collections/:id/scoring`, weighted scoring в `CollectionSelectionService`, transition guards и endpoint archive.
+- Для featured landings добавлены tracking/summary endpoints и расчет `priorityScore`; реализован A/B bucket split.
+- Добавлен bridge-контракт тест `catalog.bridge.e2e-spec.ts` со snapshot-проверками shape для catalog/legacy payload.
+
+### Проблемы
+
+- Трекинг featured analytics реализован через `AuditLog` как минимально-инвазивный event store; при росте нагрузки потребуется выделенная таблица агрегатов.
+
+---
+
 ## 23.03.2026 — Collections + Landings engine rollout
 
 ### Наблюдения
@@ -24,6 +125,29 @@
 ### Проблемы
 
 - Локально недоступен `pnpm` в shell-среде, поэтому полноценный build-check выполнен через lint-диагностику IDE.
+
+---
+
+## 23.03.2026 — Collections + Landings Hardening (Focused) добавлен в трекинг
+
+### Наблюдения
+
+- После базового rollout выявлен остаточный техдолг: JSON-heavy landing editor, ограниченный preview UX, неполный workflow hardening, ranking v1 и слабая наблюдаемость featured блока.
+
+### Решения
+
+- В `Tasktracker.md` добавлен отдельный трек `Collections + Landings Hardening (Focused)` с 6 фазами:
+  1) Landing editor без JSON,  
+  2) Collection preview v2,  
+  3) state machine и guards,  
+  4) ranking hardening,  
+  5) featured analytics,  
+  6) bridge contract e2e.
+- Для фокуса зафиксирован explicit DoD, чтобы закрывать техдолг по проверяемым инвариантам, а не по частичным UI-правкам.
+
+### Проблемы
+
+- Нет; блок добавлен как отдельная программа развития без изменения текущих API контрактов на этом шаге.
 
 ---
 

@@ -126,6 +126,14 @@ export class EventQualityService {
         field: 'location',
         ownership: 'source',
       });
+      if (!event.venueId) {
+        issues.push({
+          code: 'INVALID_VENUE',
+          message: 'Площадка не задана или недоступна',
+          field: 'venueId',
+          ownership: 'source',
+        });
+      }
     }
 
     const now = new Date();

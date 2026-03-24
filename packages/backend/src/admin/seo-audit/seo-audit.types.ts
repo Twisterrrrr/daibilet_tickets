@@ -96,3 +96,53 @@ export interface SeoAuditEventsResponseDto {
   pages: number;
   summary: SeoAuditSummaryDto;
 }
+
+// ─── Cities / Venues audit (Gate 3) ─────────────────────────────────────────
+
+export interface SeoAuditCityRowDto {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  updatedAt: Date;
+  issues: SeoIssueDto[];
+  issueCounts: { ERROR: number; WARN: number; INFO: number; total: number };
+}
+
+export interface SeoAuditVenueRowDto {
+  id: string;
+  slug: string;
+  title: string;
+  cityName: string;
+  description: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  updatedAt: Date;
+  issues: SeoIssueDto[];
+  issueCounts: { ERROR: number; WARN: number; INFO: number; total: number };
+}
+
+export interface SeoAuditEntitySummaryDto {
+  total: number;
+  withIssues: number;
+  issuesTotal: number;
+  issuesBySeverity: { ERROR: number; WARN: number; INFO: number };
+}
+
+export interface SeoAuditCitiesResponseDto {
+  items: SeoAuditCityRowDto[];
+  total: number;
+  page: number;
+  pages: number;
+  summary: SeoAuditEntitySummaryDto;
+}
+
+export interface SeoAuditVenuesResponseDto {
+  items: SeoAuditVenueRowDto[];
+  total: number;
+  page: number;
+  pages: number;
+  summary: SeoAuditEntitySummaryDto;
+}

@@ -7,13 +7,18 @@ import { EventSource, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
+  SeoAuditCityRowDto,
+  SeoAuditCitiesResponseDto,
   SeoAuditEventRowDto,
   SeoAuditEventsResponseDto,
   SeoAuditSummaryDto,
+  SeoAuditVenueRowDto,
+  SeoAuditVenuesResponseDto,
   SeoIssueDto,
 } from './seo-audit.types';
 import type { SeoAuditContext, SeoAuditEventInput } from './seo-audit-rules';
 import { runAllRules } from './seo-audit-rules';
+import { countEntityIssues, runCityRules, runVenueRules } from './seo-audit-entity-rules';
 
 export interface SeoAuditEventsParams {
   search?: string;
@@ -280,6 +285,170 @@ export class SeoAuditService {
     for (const r of result)
       if (r.groupingKey) map.set(r.groupingKey, r._count.id);
     return map;
+  }
+
+  async getCitiesAudit(params: {
+    onlyIssues?: 'true' | 'false';
+    page?: string;
+    limit?: string;
+  }): Promise<SeoAuditCitiesResponseDto> {
+    const page = Math.max(1, parseInt(params.page || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(params.limit || '50', 10) || 50));
+    const onlyIssues = params.onlyIssues !== 'false';
+
+    const [total, cities] = await Promise.all([
+      this.prisma.city.count({ where: { isActive: true } }),
+      this.prisma.city.findMany({
+        where: { isActive: true },
+        select: { id: true, slug: true, name: true, description: true, metaTitle: true, metaDescription: true, updatedAt: true },
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    const rows: SeoAuditCityRowDto[] = [];
+    let withIssues = 0;
+    const severityCounts = { ERROR: 0, WARN: 0, INFO: 0 };
+
+    for (const c of cities) {
+      const issues = runCityRules({
+        description: c.description,
+        metaTitle: c.metaTitle,
+        metaDescription: c.metaDescription,
+      });
+      if (onlyIssues && issues.length === 0) continue;
+
+      const issueCounts = countEntityIssues(issues);
+      rows.push({
+        id: c.id,
+        slug: c.slug,
+        name: c.name,
+        description: c.description,
+        metaTitle: c.metaTitle,
+        metaDescription: c.metaDescription,
+        updatedAt: c.updatedAt,
+        issues,
+        issueCounts,
+      });
+      if (issues.length > 0) {
+        withIssues++;
+        for (const i of issues) {
+          if (i.severity === 'ERROR') severityCounts.ERROR++;
+          else if (i.severity === 'WARN') severityCounts.WARN++;
+          else severityCounts.INFO++;
+        }
+      }
+    }
+
+    rows.sort((a, b) => {
+      if (a.issueCounts.ERROR !== b.issueCounts.ERROR) return b.issueCounts.ERROR - a.issueCounts.ERROR;
+      if (a.issueCounts.WARN !== b.issueCounts.WARN) return b.issueCounts.WARN - a.issueCounts.WARN;
+      return a.name.localeCompare(b.name);
+    });
+
+    const totalCities = await this.prisma.city.count({ where: { isActive: true } });
+    return {
+      items: rows,
+      total: onlyIssues ? rows.length : total,
+      page,
+      pages: onlyIssues ? 1 : Math.ceil(total / limit),
+      summary: {
+        total: totalCities,
+        withIssues,
+        issuesTotal: severityCounts.ERROR + severityCounts.WARN + severityCounts.INFO,
+        issuesBySeverity: severityCounts,
+      },
+    };
+  }
+
+  async getVenuesAudit(params: {
+    cityId?: string;
+    onlyIssues?: 'true' | 'false';
+    page?: string;
+    limit?: string;
+  }): Promise<SeoAuditVenuesResponseDto> {
+    const page = Math.max(1, parseInt(params.page || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(params.limit || '50', 10) || 50));
+    const onlyIssues = params.onlyIssues !== 'false';
+
+    const where = { isActive: true, isDeleted: false };
+    if (params.cityId) Object.assign(where, { cityId: params.cityId });
+
+    const [total, venues] = await Promise.all([
+      this.prisma.venue.count({ where }),
+      this.prisma.venue.findMany({
+        where,
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          description: true,
+          metaTitle: true,
+          metaDescription: true,
+          updatedAt: true,
+          city: { select: { name: true } },
+        },
+        orderBy: { title: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    const rows: SeoAuditVenueRowDto[] = [];
+    let withIssues = 0;
+    const severityCounts = { ERROR: 0, WARN: 0, INFO: 0 };
+
+    for (const v of venues) {
+      const issues = runVenueRules({
+        description: v.description,
+        metaTitle: v.metaTitle,
+        metaDescription: v.metaDescription,
+      });
+      if (onlyIssues && issues.length === 0) continue;
+
+      const issueCounts = countEntityIssues(issues);
+      rows.push({
+        id: v.id,
+        slug: v.slug,
+        title: v.title,
+        cityName: v.city?.name ?? '',
+        description: v.description,
+        metaTitle: v.metaTitle,
+        metaDescription: v.metaDescription,
+        updatedAt: v.updatedAt,
+        issues,
+        issueCounts,
+      });
+      if (issues.length > 0) {
+        withIssues++;
+        for (const i of issues) {
+          if (i.severity === 'ERROR') severityCounts.ERROR++;
+          else if (i.severity === 'WARN') severityCounts.WARN++;
+          else severityCounts.INFO++;
+        }
+      }
+    }
+
+    rows.sort((a, b) => {
+      if (a.issueCounts.ERROR !== b.issueCounts.ERROR) return b.issueCounts.ERROR - a.issueCounts.ERROR;
+      if (a.issueCounts.WARN !== b.issueCounts.WARN) return b.issueCounts.WARN - a.issueCounts.WARN;
+      return a.title.localeCompare(b.title);
+    });
+
+    const totalVenues = await this.prisma.venue.count({ where });
+    return {
+      items: rows,
+      total: onlyIssues ? rows.length : total,
+      page,
+      pages: onlyIssues ? 1 : Math.ceil(total / limit),
+      summary: {
+        total: totalVenues,
+        withIssues,
+        issuesTotal: severityCounts.ERROR + severityCounts.WARN + severityCounts.INFO,
+        issuesBySeverity: severityCounts,
+      },
+    };
   }
 }
 

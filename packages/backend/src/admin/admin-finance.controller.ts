@@ -11,6 +11,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Prisma } from '@prisma/client';
 import { SupplierLegalProfileStatus } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -99,6 +100,24 @@ export class AdminFinanceController {
       throw new BadRequestException('Профиль не найден');
     }
 
+    const existingMeta = (profile.metaJson as Prisma.JsonObject | null) ?? {};
+    const history: Prisma.InputJsonValue[] = Array.isArray(existingMeta.history)
+      ? ([...existingMeta.history] as Prisma.InputJsonValue[])
+      : [];
+
+    const historyEntry = {
+      status: body.status,
+      changedAt: new Date().toISOString(),
+      changedByAdminId: req.user.id,
+      ...(body.status === 'REJECTED' && body.comment ? { comment: body.comment.trim() } : {}),
+    } as Prisma.InputJsonValue;
+    history.push(historyEntry);
+
+    const metaJson = {
+      ...(existingMeta as Record<string, unknown>),
+      history,
+    } as Prisma.InputJsonValue;
+
     if (body.status === 'VERIFIED') {
       return this.prisma.supplierLegalProfile.update({
         where: { operatorId },
@@ -107,6 +126,7 @@ export class AdminFinanceController {
           verifiedBy: req.user.id,
           verifiedAt: new Date(),
           rejectionComment: null,
+          metaJson,
         },
         include: { operator: { select: { id: true, name: true, slug: true } }, bankAccounts: true },
       });
@@ -119,6 +139,7 @@ export class AdminFinanceController {
         verifiedBy: null,
         verifiedAt: null,
         rejectionComment: body.comment?.trim() ?? null,
+        metaJson,
       },
       include: { operator: { select: { id: true, name: true, slug: true } }, bankAccounts: true },
     });

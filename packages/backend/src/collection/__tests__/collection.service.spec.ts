@@ -21,12 +21,36 @@ const mockCache = {
   getOrSet: vi.fn(async (_key, _ttl, fn) => fn()),
 };
 
+const mockSelection = {
+  buildWhere: vi.fn((input: { cityId?: string | null; citySlug?: string; filterTags?: string[] }) => {
+    const where: Record<string, unknown> = { isActive: true, isDeleted: false };
+    if (input.cityId) where.cityId = input.cityId;
+    if (input.citySlug) where.city = { slug: input.citySlug, isActive: true };
+    if (input.filterTags?.length) where.tags = { some: { tag: { slug: { in: input.filterTags } } } };
+    return where;
+  }),
+  resolveSelection: vi.fn().mockResolvedValue({
+    items: [],
+    total: 0,
+    page: 1,
+    totalPages: 0,
+    preview: { generatedAt: new Date(), eventCount: 0, weights: {} },
+  }),
+};
+
 describe('CollectionService', () => {
   let service: CollectionService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new CollectionService(mockPrisma as any, mockCache as any);
+    mockSelection.resolveSelection.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      totalPages: 0,
+      preview: { generatedAt: new Date(), eventCount: 0, weights: {} },
+    });
+    service = new CollectionService(mockPrisma as any, mockCache as any, mockSelection as any);
   });
 
   describe('getBySlug - cross-city (cityId=null)', () => {
@@ -92,8 +116,6 @@ describe('CollectionService', () => {
 
       mockPrisma.collection.findFirst.mockResolvedValue(salyutCollection);
       mockPrisma.city.findFirst.mockResolvedValue({ id: 'city-spb' });
-      mockPrisma.event.findMany.mockResolvedValue([]);
-      mockPrisma.event.count.mockResolvedValue(0);
 
       await service.getBySlug('salyut', 1, 20, 'saint-petersburg');
 
@@ -101,9 +123,9 @@ describe('CollectionService', () => {
         where: { slug: 'saint-petersburg', isActive: true },
         select: { id: true },
       });
-      expect(mockPrisma.event.findMany).toHaveBeenCalled();
-      const where = mockPrisma.event.findMany.mock.calls[0][0].where;
-      expect(where.city).toEqual({ slug: 'saint-petersburg', isActive: true });
+      expect(mockSelection.resolveSelection).toHaveBeenCalledWith(
+        expect.objectContaining({ citySlug: 'saint-petersburg' }),
+      );
     });
 
     it('should throw BadRequestException for unknown city', async () => {
@@ -147,18 +169,18 @@ describe('CollectionService', () => {
         faq: null,
         metaTitle: null,
         metaDescription: null,
+        rankingJson: { preset: 'balanced' },
       };
 
       mockPrisma.collection.findFirst.mockResolvedValue(cityCollection);
-      mockPrisma.city.findFirst.mockResolvedValue(null); // не должен вызываться с city query для city-bound
-      mockPrisma.event.findMany.mockResolvedValue([]);
-      mockPrisma.event.count.mockResolvedValue(0);
 
       await service.getBySlug('nochnye-ekskursii-spb', 1, 20, 'moscow');
 
       expect(mockPrisma.city.findFirst).not.toHaveBeenCalled();
-      const where = mockPrisma.event.findMany.mock.calls[0][0].where;
-      expect(where.cityId).toBe('city-spb');
+      expect(mockSelection.resolveSelection).toHaveBeenCalledWith(
+        expect.objectContaining({ cityId: 'city-spb' }),
+      );
+      expect(mockSelection.resolveSelection.mock.calls[0][0].citySlug).toBeUndefined();
     });
   });
 

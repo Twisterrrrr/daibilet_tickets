@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Catalog bridge contract > matches snapshot for /catalog/collections/* bridge shape 1`] = `
+{
+  "cityName": "Санкт-Петербург",
+  "citySlug": "spb",
+  "id": "c1",
+  "slug": "walking-spb",
+  "title": "Пешие экскурсии СПб",
+}
+`;
+
+exports[`Catalog bridge contract > matches snapshot for /catalog/collections/featured-landings 1`] = `
+{
+  "id": "l1",
+  "slug": "bridge-opening",
+  "templateType": "COMPARISON_TABLE",
+  "title": "Развод мостов",
+}
+`;

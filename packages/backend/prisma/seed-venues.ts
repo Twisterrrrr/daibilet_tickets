@@ -31,7 +31,8 @@ interface VenueSeed {
   priceFrom?: number; // копейки
   openingHours?: Record<string, string | null>;
   citySlug: string;
-  // Conversion fields
+  metaTitle?: string;
+  metaDescription?: string;
   highlights?: string[];
   features?: string[];
   faq?: Array<{ q: string; a: string }>;
@@ -1261,12 +1262,18 @@ async function main() {
       continue;
     }
 
+    const metaTitle =
+      v.metaTitle ?? (v.shortTitle ? `${v.shortTitle} — билеты, часы работы | Дайбилет` : `${v.title} — билеты | Дайбилет`);
+    const metaDescription = v.metaDescription ?? v.shortDescription ?? v.description.slice(0, 160);
+
     const data = {
       title: v.title,
       shortTitle: v.shortTitle || null,
       venueType: v.venueType as any,
       description: v.description,
       shortDescription: v.shortDescription,
+      metaTitle,
+      metaDescription,
       address: v.address,
       lat: v.lat,
       lng: v.lng,

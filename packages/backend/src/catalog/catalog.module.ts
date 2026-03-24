@@ -22,6 +22,10 @@ import { ListingHealthService } from './listing-health.service';
 import { TepSyncService } from './tep-sync.service';
 import { EventTagLifecycleService } from './event-tag-lifecycle.service';
 import { CollectionSelectionService } from './collection-selection.service';
+import { PublishGateService } from './publish-gate.service';
+import { LocationNormalizerService } from './location-normalizer.service';
+import { VenueNormalizerService } from './venue-normalizer.service';
+import { OfferNormalizerService } from './offer-normalizer.service';
 
 @Module({
   imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule],
@@ -45,6 +49,10 @@ import { CollectionSelectionService } from './collection-selection.service';
     ListingHealthService,
     EventTagLifecycleService,
     CollectionSelectionService,
+    PublishGateService,
+    LocationNormalizerService,
+    VenueNormalizerService,
+    OfferNormalizerService,
   ],
   exports: [
     CatalogService,
@@ -64,6 +72,10 @@ import { CollectionSelectionService } from './collection-selection.service';
     ListingHealthService,
     EventTagLifecycleService,
     CollectionSelectionService,
+    PublishGateService,
+    LocationNormalizerService,
+    VenueNormalizerService,
+    OfferNormalizerService,
   ],
 })
 export class CatalogModule {}

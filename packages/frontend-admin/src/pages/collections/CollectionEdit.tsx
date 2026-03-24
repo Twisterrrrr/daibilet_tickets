@@ -92,8 +92,14 @@ export function CollectionEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewMode, setPreviewMode] = useState<'before' | 'after'>('after');
+  const [previewSort, setPreviewSort] = useState<'balanced' | 'popularity' | 'availability' | 'score'>('balanced');
+  const [previewPage, setPreviewPage] = useState(1);
+  const [previewPageSize, setPreviewPageSize] = useState(8);
+  const [previewDebugScore, setPreviewDebugScore] = useState(false);
+  const [previewDiff, setPreviewDiff] = useState<{ added: string[]; removed: string[]; changedOrder: string[] } | null>(null);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
-  const [previewItems, setPreviewItems] = useState<Array<{ id: string; title: string; slug: string; city?: { name: string } | null }>>([]);
+  const [previewItems, setPreviewItems] = useState<Array<{ id: string; title: string; slug: string; city?: { name: string } | null; score?: number }>>([]);
 
   // Для поиска событий (pinned/excluded)
   const [eventSearch, setEventSearch] = useState('');
@@ -287,23 +293,24 @@ export function CollectionEditPage() {
   const refreshPreview = async () => {
     setPreviewLoading(true);
     try {
-      const additionalFilters = form.additionalFilters.trim() ? JSON.parse(form.additionalFilters) : undefined;
-      const data = await adminApi.post<{
-        eventCount: number;
-        items: Array<{ id: string; title: string; slug: string; city?: { name: string } | null }>;
-      }>('/admin/collections/preview', {
-        cityId: form.cityId || undefined,
-        filterTags: form.filterTags,
-        filterCategory: form.filterCategory || undefined,
-        filterSubcategory: form.filterSubcategory || undefined,
-        filterAudience: form.filterAudience || undefined,
-        additionalFilters,
-        rankingJson: { preset: form.rankingPreset },
-        pinnedEventIds: form.pinnedEventIds,
-        excludedEventIds: form.excludedEventIds,
-        limit: 8,
+      if (!id || isNew) {
+        setError('Preview v2 доступен после создания подборки');
+        return;
+      }
+      const query = new URLSearchParams({
+        compare: previewMode,
+        sort: previewSort,
+        page: String(previewPage),
+        pageSize: String(previewPageSize),
+        debugScore: String(previewDebugScore),
       });
+      const data = await adminApi.get<{
+        eventCount: number;
+        diff: { added: string[]; removed: string[]; changedOrder: string[] };
+        items: Array<{ id: string; title: string; slug: string; city?: { name: string } | null; score?: number }>;
+      }>(`/admin/collections/${id}/preview?${query.toString()}`);
       setPreviewCount(data.eventCount);
+      setPreviewDiff(data.diff);
       setPreviewItems(data.items);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Не удалось обновить preview';
@@ -560,20 +567,50 @@ export function CollectionEditPage() {
               </div>
 
               <div className="rounded-md border p-3">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium">Preview selection</p>
                   <Button type="button" variant="outline" size="sm" onClick={refreshPreview} disabled={previewLoading}>
                     {previewLoading ? 'Обновление...' : 'Обновить preview'}
                   </Button>
                 </div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-5">
+                  <Select value={previewMode} onValueChange={(v) => setPreviewMode(v as 'before' | 'after')}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="before">BEFORE</SelectItem>
+                      <SelectItem value="after">AFTER</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={previewSort} onValueChange={(v) => setPreviewSort(v as typeof previewSort)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="balanced">balanced</SelectItem>
+                      <SelectItem value="popularity">popularity</SelectItem>
+                      <SelectItem value="availability">availability</SelectItem>
+                      <SelectItem value="score">score</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input type="number" value={previewPage} onChange={(e) => setPreviewPage(Number(e.target.value) || 1)} placeholder="page" />
+                  <Input type="number" value={previewPageSize} onChange={(e) => setPreviewPageSize(Number(e.target.value) || 8)} placeholder="pageSize" />
+                  <label className="flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={previewDebugScore} onChange={(e) => setPreviewDebugScore(e.target.checked)} />
+                    debugScore
+                  </label>
+                </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {previewCount === null ? 'Preview не рассчитан' : `Найдено событий: ${previewCount}`}
                 </p>
+                {previewDiff && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    added: {previewDiff.added.length}, removed: {previewDiff.removed.length}, changedOrder: {previewDiff.changedOrder.length}
+                  </p>
+                )}
                 {previewItems.length > 0 ? (
                   <div className="mt-2 space-y-1">
                     {previewItems.map((item) => (
                       <div key={item.id} className="rounded bg-muted px-2 py-1 text-xs">
                         {item.title} ({item.slug}) {item.city?.name ? `- ${item.city.name}` : ''}
+                        {typeof item.score === 'number' ? ` | score=${item.score.toFixed(3)}` : ''}
                       </div>
                     ))}
                   </div>

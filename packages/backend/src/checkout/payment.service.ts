@@ -241,6 +241,8 @@ export class PaymentService {
         metadata: {
           paymentIntentId: key,
           checkoutSessionId: String(checkoutSessionId),
+          orderId: String(checkoutSessionId),
+          userId: session.userId ?? 'guest',
           paymentMode: paymentMode ?? 'SINGLE_MERCHANT',
           agentSchemeEnabled: String(!!agentSchemeEnabled),
           splitEnabled: String(!!splitEnabled),
