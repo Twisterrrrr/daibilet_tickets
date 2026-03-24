@@ -11,9 +11,9 @@ export interface SectionCardProps {
 
 export function SectionCard({ title, description, headerRight, children, className }: SectionCardProps) {
   return (
-    <section className={clsx('rounded-xl border bg-white shadow-sm', className)}>
+    <section className={clsx('rounded-[10px] border border-border/80 bg-white shadow-none', className)}>
       {(title || headerRight) && (
-        <div className="flex items-start justify-between gap-4 border-b px-4 py-3">
+        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-3.5 py-2.5 sm:px-4">
           <div>
             {title ? <h2 className="text-sm font-semibold text-slate-900">{title}</h2> : null}
             {description ? <p className="mt-0.5 text-xs text-slate-500">{description}</p> : null}
@@ -21,7 +21,7 @@ export function SectionCard({ title, description, headerRight, children, classNa
           {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
         </div>
       )}
-      <div className="px-4 py-4 sm:px-5 sm:py-5">{children}</div>
+      <div className="px-3.5 py-3.5 sm:px-4 sm:py-4">{children}</div>
     </section>
   );
 }

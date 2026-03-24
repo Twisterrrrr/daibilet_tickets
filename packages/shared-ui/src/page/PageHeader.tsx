@@ -15,15 +15,15 @@ export interface PageHeaderProps {
  */
 export function PageHeader({ title, subtitle, actions, meta, breadcrumbs, className }: PageHeaderProps) {
   return (
-    <div className={clsx('mb-6 space-y-3 sm:mb-8', className)}>
+    <div className={clsx('mb-4 space-y-2.5 sm:mb-5', className)}>
       {breadcrumbs ? <div className="text-xs text-muted-foreground">{breadcrumbs}</div> : null}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h1>
-          {subtitle ? <p className="text-sm text-muted-foreground sm:text-base">{subtitle}</p> : null}
-          {meta ? <div className="pt-1 text-xs text-muted-foreground">{meta}</div> : null}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{title}</h1>
+          {subtitle ? <div className="text-sm text-muted-foreground">{subtitle}</div> : null}
+          {meta ? <div className="pt-0.5 text-xs text-muted-foreground">{meta}</div> : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div> : null}
+        {actions ? <div className="flex flex-wrap items-center justify-end gap-1.5">{actions}</div> : null}
       </div>
     </div>
   );

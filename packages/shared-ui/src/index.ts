@@ -10,6 +10,7 @@ export * from './states/EmptyState';
 export * from './states/ErrorState';
 
 export * from './actions/ActionGroup';
+export * from './filters/FilterBar';
 
 export * from './cards/SectionCard';
 export * from './cards/StatCard';
@@ -36,4 +37,5 @@ export * from './workflow/event-wizard/PublishReviewStep';
 export * from './workflow/event-wizard/EventWizard';
 
 export * from './date/DateRangePicker';
+export * from './table/DataTableShell';
 

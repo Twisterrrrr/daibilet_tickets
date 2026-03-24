@@ -11,7 +11,7 @@ export interface PageContainerProps {
  */
 export function PageContainer({ children, className }: PageContainerProps) {
   return (
-    <div className={clsx('mx-auto w-full max-w-6xl px-4 py-6 lg:px-6 lg:py-8', className)}>
+    <div className={clsx('mx-auto w-full max-w-6xl px-3 py-4 sm:px-4 lg:px-6 lg:py-5', className)}>
       {children}
     </div>
   );
