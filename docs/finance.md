@@ -424,6 +424,49 @@ P3 делает финконтур юридически чистым: всегд
 - **document** — `number` (ГГГГ-XXXXXX), `date`, `type` (AGENT_REPORT и т.д.).
 - **customer** — (опционально) реквизиты контрагента/платформы для счёта/УПД; в текущей реализации — заглушка под будущее заполнение из конфига или профиля Daibilet.
 - **npd** — (опционально) для режима NPD: `receiptUrl`, `receiptNumber` (ссылка на чек самозанятого); в TAX_MATRIX для NPD задано `needsNpdReceiptLink: true`, при расширении генерации документов для НПД этот блок заполняется.
+- **invoicePayload** (P3.1-4) — расширенная структура для INVOICE/UPD_2: `supplier`, `tax`, `customer`, `items` (см. пример ниже).
+
+#### Invoice / UPD payload example (P3.1-5)
+
+Пример структуры `invoicePayload` в `SupplierDocument.payloadJson` для счёта-фактуры и УПД:
+
+```json
+{
+  "supplier": {
+    "name": "ООО Речные прогулки",
+    "inn": "7812345678",
+    "kpp": "781201001",
+    "address": "г. Санкт-Петербург, Невский пр., д. 1",
+    "bankAccount": {
+      "bankName": "ПАО Сбербанк",
+      "bik": "044525225",
+      "account": "40702810000000000001",
+      "corrAccount": "30101810400000000225"
+    }
+  },
+  "tax": {
+    "taxMode": "OSNO",
+    "isVatPayer": true,
+    "vatRate": 20
+  },
+  "customer": {
+    "type": "LEGAL",
+    "name": "ООО Покупатель",
+    "inn": "7700000000"
+  },
+  "items": [
+    {
+      "title": "Билет на теплоход",
+      "quantity": 2,
+      "price": 1000,
+      "vatRate": 20,
+      "vatAmount": 333.33
+    }
+  ]
+}
+```
+
+Для НПД: `customer.type = "NPD"`, `tax.isVatPayer = false`, `tax.vatRate = 0`. VAT считается автоматически; при `isVatPayer = false` все суммы без НДС.
 
 Фронт может опираться на `payloadJson` (или JSON_SNAPSHOT файла документа): все суммы и НДС уже рассчитаны по матрице, номер документа уникален в разрезе оператор/год/тип.
 
@@ -466,3 +509,100 @@ P3.1 таким образом превращает P3 из «адресной �
 
 Этот файл фиксирует общую архитектуру финансового домена и текущее состояние реализаций P1–P3 (Buyer/Supplier/Admin). При изменениях в коде (новые статусы, модели или фичи) Finance‑архитектура должна обновляться здесь в первую очередь.
 
+---
+
+### Demo generation of supplier documents
+
+Для локальной проверки шаблонов и файловой генерации добавлен demo-flow.
+
+- Команда запуска: `pnpm --filter @daibilet/backend db:seed:finance-docs-demo`
+- Что создаётся:
+  - demo поставщик `demo-finance-supplier`
+  - 3 документа: `AGENT_REPORT`, `SERVICE_ACT`, `UPD`
+  - для каждого: HTML и PDF (если PDF не собрался, сохраняется HTML и причина в payload)
+- Где лежат файлы: `packages/backend/uploads/documents/demo/<operatorId>/<documentType>/...`
+- Как открыть локально:
+  - при запущенном backend: `http://localhost:4000/uploads/documents/demo/...`
+  - индекс demo документов: `GET /api/v1/admin/dev/finance-documents-demo`
+
+| Document type | Template source | Storage path | Preview method |
+|---|---|---|---|
+| AGENT_REPORT | `src/supplier-finance/templates/finance-document-templates.ts` | `uploads/documents/demo/<operatorId>/AGENT_REPORT/` | `/uploads/...` + admin dev endpoint |
+| SERVICE_ACT | `src/supplier-finance/templates/finance-document-templates.ts` | `uploads/documents/demo/<operatorId>/SERVICE_ACT/` | `/uploads/...` + admin dev endpoint |
+| UPD | `src/supplier-finance/templates/finance-document-templates.ts` | `uploads/documents/demo/<operatorId>/UPD/` | `/uploads/...` + admin dev endpoint |
+
+### Settlement lifecycle foundation (manual-first)
+
+Добавлен этап foundation без очередей и без авто-отправки в ЭДО:
+
+- `SupplierSettlement`: статусы `DRAFT -> CALCULATED -> APPROVED -> FINALIZED -> PAID`.
+- Настройки в профиле поставщика:
+  - `generateInvoiceDocuments` (default: `false`)
+  - `closingDocumentMode` (`UPD`/`ACT`)
+- Policy resolver определяет пакет:
+  - всегда `AGENT_REPORT`
+  - closing doc: `UPD` или `SERVICE_ACT`
+  - `INVOICE` и `VAT_INVOICE` — только по opt-in
+  - `VAT_INVOICE` только для валидного VAT-профиля (иначе skip c reason, без падения пакета)
+- Manual API:
+  - Supplier: `GET/PATCH /supplier/finance/document-settings`
+  - Supplier: `POST /supplier/finance/settlements/:id/issue-documents`
+  - Admin: manual settlement lifecycle + policy preview + manual issue/regenerate (`/admin/finance/...`)
+- Storage layout для production paths:
+  - `uploads/documents/{operatorId}/{year}/{month}/{type}/{documentNumber}/preview.html`
+  - `uploads/documents/{operatorId}/{year}/{month}/{type}/{documentNumber}/final.pdf`
+
+#### Smoke checklist (manual API)
+
+Примерный smoke run (локально, после авторизации admin/supplier):
+
+```bash
+# 1) Admin: calculate settlement
+curl -X POST "http://localhost:4000/api/v1/admin/finance/settlements/calculate" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"operatorId":"<OPERATOR_ID>","periodStart":"2026-03-01T00:00:00.000Z","periodEnd":"2026-04-01T00:00:00.000Z"}'
+
+# 2) Admin: approve/finalize
+curl -X POST "http://localhost:4000/api/v1/admin/finance/settlements/<SETTLEMENT_ID>/approve" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+curl -X POST "http://localhost:4000/api/v1/admin/finance/settlements/<SETTLEMENT_ID>/finalize" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+
+# 3) Admin: policy preview
+curl "http://localhost:4000/api/v1/admin/finance/settlements/<SETTLEMENT_ID>/document-policy-preview" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+
+# 4) Supplier: settings (default / opt-in)
+curl "http://localhost:4000/api/v1/supplier/finance/document-settings" \
+  -H "Authorization: Bearer <SUPPLIER_TOKEN>"
+curl -X PATCH "http://localhost:4000/api/v1/supplier/finance/document-settings" \
+  -H "Authorization: Bearer <SUPPLIER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"generateInvoiceDocuments":true,"closingDocumentMode":"UPD"}'
+
+# 5) Manual issue documents
+curl -X POST "http://localhost:4000/api/v1/admin/finance/settlements/<SETTLEMENT_ID>/issue-documents" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+Ожидаемые сценарии:
+
+- **default (toggle off):** `AGENT_REPORT` + `UPD`/`SERVICE_ACT`
+- **toggle on + VAT:** + `INVOICE` + `VAT_INVOICE`
+- **toggle on без VAT:** + `INVOICE`, а `VAT_INVOICE` в `skipped` с reason
+
+#### Endpoints quick map
+
+| Endpoint | Role | Purpose |
+|---|---|---|
+| `GET /api/v1/supplier/finance/document-settings` | Supplier OWNER | Получить настройки генерации документов |
+| `PATCH /api/v1/supplier/finance/document-settings` | Supplier OWNER | Изменить `generateInvoiceDocuments` и `closingDocumentMode` |
+| `POST /api/v1/supplier/finance/settlements/:id/issue-documents` | Supplier OWNER | Ручной выпуск пакета документов по settlement |
+| `POST /api/v1/admin/finance/settlements/calculate` | Admin | Рассчитать settlement за период |
+| `POST /api/v1/admin/finance/settlements/:id/approve` | Admin | Перевести settlement в APPROVED |
+| `POST /api/v1/admin/finance/settlements/:id/finalize` | Admin | Перевести settlement в FINALIZED |
+| `POST /api/v1/admin/finance/settlements/:id/mark-paid` | Admin | Отметить settlement как PAID |
+| `GET /api/v1/admin/finance/settlements/:id/document-policy-preview` | Admin/Editor | Предпросмотр обязательного набора документов по policy |
+| `POST /api/v1/admin/finance/settlements/:id/issue-documents` | Admin | Ручной выпуск документов |
+| `POST /api/v1/admin/finance/documents/:id/regenerate` | Admin | Регенерация документа |

@@ -10,24 +10,32 @@
 |------|------------|
 | [Project.md](Project.md) | Миссия, архитектура, модель данных |
 | [Tasktracker.md](Tasktracker.md) | Задачи, Gates, приоритеты до prod |
-| [UX-Parity-Backlog.md](UX-Parity-Backlog.md) | UI-system enforcement и статус UX parity |
-| [Architecture.md](Architecture.md) | Каталог, лендинги, topic definitions |
-| [Deploy.md](Deploy.md) | Деплой, VPS, Docker, SSL |
-| [DevOps.md](DevOps.md) | Инфраструктура |
-| [Reference.md](Reference.md) | API, DTO, кэш, observability |
-| [DevelopmentScenario.md](DevelopmentScenario.md) | Этапы A/B/C, Gates, Phases 2–9 |
-| [RegressionChecklist.md](RegressionChecklist.md) | Чек-лист перед merge |
 | [Diary.md](Diary.md) | Наблюдения, решения, проблемы |
+| [Reference.md](Reference.md) | API, DTO, кэш, observability |
+| [finance.md](finance.md) | Buyer/Supplier/Admin финансы |
+| [BuyerAccountSpecs.md](BuyerAccountSpecs.md) | ЛК покупателя |
+| [Architecture.md](Architecture.md) | Каталог, лендинги, topic definitions |
+| [Landings-Architecture.md](Landings-Architecture.md) | Архитектура лендингов |
+| [Collections-Architecture.md](Collections-Architecture.md) | Архитектура подборок |
 | [Tags-Architecture.md](Tags-Architecture.md) | Архитектура тегов и SEO-routing |
-| [Tags-3-Sprint-Plan.md](Tags-3-Sprint-Plan.md) | План закрытия tag-программы |
+| [UX-Parity-Backlog.md](UX-Parity-Backlog.md) | UI-system enforcement и статус UX parity |
+| [RegressionChecklist.md](RegressionChecklist.md) | Чек-лист перед merge |
+| [Operations.md](Operations.md) | Деплой, инфраструктура, Gates, Prisma |
+| [Runbook-Production-SSL-Deploy.md](Runbook-Production-SSL-Deploy.md) | Prod SSL/deploy runbook |
+| [Runbook-CatalogSync.md](Runbook-CatalogSync.md) | Sync каталога |
 | [rollout-tags-runbook.md](rollout-tags-runbook.md) | Runbook rollout tag-миграций |
-| [archive/rollout-tags-20260323.md](archive/rollout-tags-20260323.md) | Артефакт Tags rollout 23.03.2026 |
-| [Runbook-Production-SSL-Deploy.md](Runbook-Production-SSL-Deploy.md) | Промышленный SSL/deploy runbook |
+| [ARCHIVE-AUDIT.md](ARCHIVE-AUDIT.md) | Аудит и структура документации |
 
 ---
 
 ## Архив
 
-- **archive/specs/** — Phase-архитектуры, AdminSystem, SEO, ContentModel и др.
-- **archive/pr-specs/** — PR4.1–4.3 SEO
-- **archive/old-specs/** — исторические спецификации
+| Папка/файл | Описание |
+|------------|----------|
+| [archive/specs/](archive/specs/) | Phase-архитектуры, AdminSystem, SEO, ContentModel, PageTemplateSpecs |
+| [archive/old-specs/](archive/old-specs/) | TopicDefinition, PartitioningPlan, OpsRoadmap |
+| [archive/pr-specs/](archive/pr-specs/) | PR4.1–4.3 SEO |
+| archive/Gate0-Gate1.md | Полный чеклист Gates (объединено в Operations.md) |
+| archive/Task10-*.md | Спеки Task 10 (завершён) |
+| archive/DevelopmentScenario.md | Этапы A/B/C (выполнены) |
+| archive/PopularDirectionsBlueprint.md | Реализовано (Wave B Phase 6) |

@@ -97,7 +97,7 @@
 
 ### 5.1 Page template specs (гибридная модель)
 
-Главный документ: **[PageTemplateSpecs.md](PageTemplateSpecs.md)**.
+Главный документ: **[archive/specs/PageTemplateSpecs.md](archive/specs/PageTemplateSpecs.md)**.
 
 Принцип: не «всё в templateData», а 4 слоя:
 - **Core columns** — структурированные поля (ageLimit, meetingPoint, routeSummary, refundPolicy*)
