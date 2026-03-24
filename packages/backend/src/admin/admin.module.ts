@@ -53,11 +53,15 @@ import { AdminSourceCategoriesController } from './admin-source-categories.contr
 import { AdminReportsController } from './admin-reports.controller';
 import { AdminPayoutsController } from './admin-payouts.controller';
 import { AdminFinanceController } from './admin-finance.controller';
+import { AdminFinanceSettlementsController } from './admin-finance-settlements.controller';
+import { AdminFinanceDocumentsDemoController } from './admin-finance-documents-demo.controller';
 import { AdminSupplierDisputesController } from './admin-supplier-disputes.controller';
 import { AdminListingHealthController } from './admin-listing-health.controller';
 import { AdminAvailabilityController } from './admin-availability.controller';
 import { AdminSupplierEdoController } from './admin-supplier-edo.controller';
 import { AdminEdoDeliveryController } from './admin-edo-delivery.controller';
+import { AdminSubcategoriesController } from './admin-subcategories.controller';
+import { AdminTicketPdfDebugController } from './admin-ticket-pdf-debug.controller';
 import { AuditService } from './audit.service';
 import { EventAdminSummaryService } from './event-admin-summary.service';
 import { VenueAdminSummaryService } from './venue-admin-summary.service';
@@ -133,11 +137,15 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminReportsController,
     AdminPayoutsController,
     AdminFinanceController,
+    AdminFinanceSettlementsController,
+    AdminFinanceDocumentsDemoController,
     AdminSupplierDisputesController,
     AdminAvailabilityController,
     AdminListingHealthController,
     AdminSupplierEdoController,
     AdminEdoDeliveryController,
+    AdminSubcategoriesController,
+    AdminTicketPdfDebugController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],
 })

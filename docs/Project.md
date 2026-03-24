@@ -157,6 +157,11 @@
 - **PromoBlock** (планируется) — карточки на главной («Масленица», «Зимний город» и др.). Сейчас захардкожены в `PromoBlock.tsx`; планируется модель + раздел админки «Промо-блоки».
 - **Article** — SEO-статья с перелинковкой
 - **Package** — заказ (Trip Planner)
+- **Voucher** — публичный ваучер пакета (`shortCode`, `publicUrl`, `pdfUrl?`) с PDF-представлением:
+  - `GET /api/v1/vouchers/:shortCode/pdf` — on-demand генерация A4 PDF через Puppeteer;
+  - HTML шаблон: `packages/backend/src/voucher/templates/default-ticket.template.html`;
+  - сервис генерации: `TicketPdfService` (`packages/backend/src/voucher/ticket-pdf.service.ts`);
+  - mapper доменных данных: `mapVoucherToTicketPdfData` (`packages/backend/src/voucher/mappers/voucher-to-ticket-pdf.mapper.ts`).
 - **Review** — отзыв на событие/оператора. Поля: rating (1-5), text, authorName, authorEmail (скрыт), isVerified, voucherCode, verifyToken, helpfulCount, status (PENDING_EMAIL/PENDING/APPROVED/REJECTED/HIDDEN), adminComment, supplierId (snapshot), publishedAt. Unique: authorEmail + eventId.
   - **ReviewPhoto** — до 5 фото (url, thumbUrl, filename). WebP, 1200px + thumb 300px.
   - **ReviewVote** — голоса "Полезный отзыв" (ipHash SHA-256, isHelpful). Unique: reviewId + ipHash.

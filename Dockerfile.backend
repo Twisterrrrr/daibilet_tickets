@@ -8,6 +8,7 @@ FROM node:22-alpine AS builder
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN apk add --no-cache openssl
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 WORKDIR /app
 
@@ -54,11 +55,20 @@ RUN cd /prod/backend && npx prisma generate --schema=./prisma/schema.prisma
 # --- Stage 2: Production image ---
 FROM node:22-alpine AS runner
 
-RUN apk add --no-cache openssl curl
+RUN apk add --no-cache \
+  openssl \
+  curl \
+  chromium \
+  nss \
+  freetype \
+  harfbuzz \
+  ca-certificates \
+  ttf-freefont
 
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Deploy-бандл: dist, prisma, node_modules (все production deps)
 COPY --from=builder /prod/backend ./

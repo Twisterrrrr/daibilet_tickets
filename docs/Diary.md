@@ -4,6 +4,33 @@
 
 ---
 
+## 24.03.2026 — Ticket PDF (Puppeteer MVP) внедрён
+
+### Наблюдения
+
+- В проекте уже существовал ваучерный PDF контур через `pdf-lib`, но требовался server-side HTML-to-PDF через Puppeteer без изменения публичного контракта.
+- Для production на Linux/Docker критичен системный Chromium и безопасные runtime-флаги запуска браузера.
+
+### Решения
+
+- Сохранён entrypoint `VoucherService.generatePdf()` и публичный endpoint `GET /api/v1/vouchers/:shortCode/pdf`; внутренняя генерация переведена на `TicketPdfService` (Puppeteer).
+- Добавлены:
+  - self-contained HTML шаблон билета (`voucher/templates/default-ticket.template.html`),
+  - безопасный renderer `{{key}}` с HTML escaping,
+  - mapper `Voucher -> TicketPdfData` с fallback-правилами,
+  - admin debug endpoint `GET /api/v1/admin/debug/ticket-pdf/:shortCode` под `ADMIN` + `TICKET_PDF_DEBUG_ENABLED`.
+- Для стабильного рантайма:
+  - обновлён `Dockerfile.backend` (Chromium + зависимости),
+  - добавлены env-флаги `PUPPETEER_EXECUTABLE_PATH`, `PUPPETEER_HEADLESS`, `PUPPETEER_NO_SANDBOX`,
+  - добавлена сборка шаблона в `dist` через `nest-cli` assets.
+- Добавлены unit/smoke тесты для renderer/mapper/service; документация обновлена в `Project.md` и `Operations.md`.
+
+### Проблемы
+
+- При установке зависимостей `pnpm` показал `Ignored build scripts` для puppeteer; для контейнерного сценария с системным Chromium это допустимо, для локального окружения может потребоваться явный `PUPPETEER_EXECUTABLE_PATH`/approve-builds.
+
+---
+
 ## 24.03.2026 — Закрытие UA-3/UA-4 и старт UA-5
 
 ### Наблюдения

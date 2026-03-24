@@ -21,6 +21,16 @@
 
 ---
 
+## Ticket PDF (Puppeteer MVP) (24.03.2026)
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `ticket-pdf-puppeteer-mvp` | Встроить генерацию PDF-билета через Puppeteer в voucher flow (template + renderer + mapper + service), добавить admin debug endpoint и env/runtime настройки | Критический | `[x]` |
+| `ticket-pdf-tests` | Добавить unit/smoke тесты на renderer/mapper/service без хрупких snapshot-проверок | Высокий | `[x]` |
+| `ticket-pdf-docs` | Обновить Project/Operations и env-примеры по запуску, проверке endpoint и Docker Chromium нюансам | Высокий | `[x]` |
+
+---
+
 ## Task 10 — Admin Intelligence (витрина)
 
 | Задача | Приоритет | Статус |

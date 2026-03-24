@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Электронный билет</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: #f3f5f8;
+        color: #111827;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      }
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0 auto;
+        padding: 18mm;
+      }
+      .ticket {
+        background: #ffffff;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid #e5e7eb;
+      }
+      .header {
+        background: #111827;
+        color: #ffffff;
+        padding: 18px 22px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+      .brand {
+        font-size: 13px;
+        opacity: 0.95;
+      }
+      .status {
+        font-size: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 999px;
+        padding: 6px 10px;
+        white-space: nowrap;
+      }
+      .body {
+        padding: 22px;
+      }
+      .title {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+      }
+      .subtitle {
+        margin: 8px 0 0;
+        color: #4b5563;
+        font-size: 14px;
+      }
+      .grid {
+        margin-top: 20px;
+        display: grid;
+        grid-template-columns: 1fr 260px;
+        gap: 16px;
+      }
+      .cards {
+        display: grid;
+        gap: 10px;
+      }
+      .card {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 12px 13px;
+      }
+      .label {
+        color: #6b7280;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .value {
+        margin-top: 4px;
+        font-size: 14px;
+        color: #111827;
+        font-weight: 600;
+      }
+      .qr-panel {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 14px;
+        text-align: center;
+      }
+      .qr-title {
+        font-size: 12px;
+        color: #6b7280;
+        margin: 0 0 10px;
+      }
+      .qr-image {
+        width: 210px;
+        height: 210px;
+        object-fit: contain;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 8px;
+        background: #ffffff;
+      }
+      .qr-note {
+        margin: 10px 0 0;
+        font-size: 12px;
+        color: #4b5563;
+      }
+      .important {
+        margin-top: 16px;
+        border: 1px solid #dbeafe;
+        border-radius: 10px;
+        background: #eff6ff;
+        padding: 12px 13px;
+      }
+      .important-title {
+        margin: 0;
+        color: #1d4ed8;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .important-text {
+        margin: 8px 0 0;
+        color: #1e3a8a;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .footer {
+        border-top: 1px solid #e5e7eb;
+        padding: 12px 22px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        color: #6b7280;
+        font-size: 12px;
+      }
+      @media print {
+        body {
+          background: #ffffff;
+        }
+        .page {
+          width: auto;
+          min-height: 0;
+          margin: 0;
+          padding: 0;
+        }
+        .ticket {
+          border-radius: 0;
+          border: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="ticket">
+        <header class="header">
+          <div class="brand">{{serviceName}} • e-ticket</div>
+          <div class="status">{{statusLabel}}</div>
+        </header>
+
+        <div class="body">
+          <h1 class="title">{{eventTitle}}</h1>
+          <p class="subtitle">Покажите билет на входе (с экрана или в печатном виде).</p>
+
+          <div class="grid">
+            <div class="cards">
+              <article class="card">
+                <div class="label">Дата и время</div>
+                <div class="value">{{date}} • {{time}}</div>
+              </article>
+              <article class="card">
+                <div class="label">Площадка</div>
+                <div class="value">{{venueName}}</div>
+              </article>
+              <article class="card">
+                <div class="label">Адрес</div>
+                <div class="value">{{venueAddress}}</div>
+              </article>
+              <article class="card">
+                <div class="label">Покупатель</div>
+                <div class="value">{{customerName}}</div>
+              </article>
+              <article class="card">
+                <div class="label">Заказ / Количество / Тариф</div>
+                <div class="value">#{{orderNumber}} • {{quantity}} • {{ticketType}}</div>
+              </article>
+            </div>
+
+            <aside class="qr-panel">
+              <p class="qr-title">QR-код билета</p>
+              <img class="qr-image" src="{{qrDataUrl}}" alt="QR code" />
+              <p class="qr-note">ID билета: {{ticketId}}</p>
+            </aside>
+          </div>
+
+          <section class="important">
+            <p class="important-title">Важно</p>
+            <p class="important-text">
+              Билет действителен только для указанного сеанса. При входе может потребоваться документ,
+              подтверждающий личность. Условия возврата и обмена определяются правилами организатора.
+            </p>
+          </section>
+        </div>
+
+        <footer class="footer">
+          <span>Билет {{ticketId}}</span>
+          <span>Организатор: {{organizerName}} • Сервис: {{serviceName}}</span>
+        </footer>
+      </section>
+    </main>
+  </body>
+</html>
+
