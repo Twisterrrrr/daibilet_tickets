@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, FilterBar, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
 
 import { api } from '../lib/api';
+import { Button } from '@/components/ui/button';
 
 type SupplierOrderStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'EXPIRED';
 
@@ -50,6 +51,7 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [status, setStatus] = useState<string>('all');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -108,7 +110,17 @@ export default function OrdersPage() {
     }
   };
 
-  const hasData = orders.length > 0;
+  const filteredOrders = orders.filter((o) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (o.shortCode || '').toLowerCase().includes(q) ||
+      (o.eventTitle || '').toLowerCase().includes(q) ||
+      (o.customerName || '').toLowerCase().includes(q) ||
+      (o.customerEmail || '').toLowerCase().includes(q)
+    );
+  });
+  const hasData = filteredOrders.length > 0;
 
   return (
     <div className="space-y-4">
@@ -119,21 +131,27 @@ export default function OrdersPage() {
           title="Ошибка загрузки"
           description={error}
           action={
-            <button
-              type="button"
-              className="rounded-md border px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              onClick={() => fetchOrders()}
-            >
+            <Button type="button" variant="outline" size="sm" onClick={() => fetchOrders()}>
               Повторить
-            </button>
+            </Button>
           }
         />
       )}
 
-      <SectionCard
-        title="Фильтры"
+      <FilterBar
+        onReset={() => {
+          setStatus('all');
+          setSearch('');
+        }}
       >
-        <div className="flex flex-wrap items-center gap-3">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-9 min-w-[220px] rounded-md border px-3 text-sm"
+          placeholder="Поиск: код, событие, клиент"
+        />
+        <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Статус:</span>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
@@ -146,7 +164,7 @@ export default function OrdersPage() {
             <option value="EXPIRED">Истёк</option>
           </select>
         </div>
-      </SectionCard>
+      </FilterBar>
 
       <SectionCard title="Заявки">
         {loading && !hasData ? (
@@ -169,7 +187,7 @@ export default function OrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o) => (
+                {filteredOrders.map((o) => (
                   <tr key={o.id} className="border-b last:border-0">
                     <td className="px-2 py-2 align-top font-mono text-xs text-slate-600">{o.shortCode || '—'}</td>
                     <td className="px-2 py-2 align-top">

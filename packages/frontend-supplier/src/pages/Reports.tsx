@@ -1,11 +1,12 @@
 import { Download } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import {
   DateRangePicker,
   type DateRange,
   EmptyState,
   ErrorState,
+  FilterBar,
   LoadingState,
   PageHeader,
   SectionCard,
@@ -28,7 +29,7 @@ export default function Reports() {
   const [error, setError] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
@@ -44,12 +45,11 @@ export default function Reports() {
         setError(e.message ?? 'Ошибка загрузки отчёта');
       })
       .finally(() => setLoading(false));
-  };
+  }, [range.from, range.to]);
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
 
   const formatRangeLabel = () => {
     if (!range.from && !range.to) return '';
@@ -77,7 +77,6 @@ export default function Reports() {
 
     const newRange: DateRange = { from: start, to: end };
     setRange(newRange);
-    setTimeout(load, 0);
   };
 
   return (
@@ -85,7 +84,7 @@ export default function Reports() {
       <PageHeader
         title="Отчёт о продажах"
         actions={
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline" size="sm" disabled={loading}>
             <a href={`/api/v1/supplier/reports/sales/export?from=${toIsoDate(range.from)}&to=${toIsoDate(range.to)}`}>
               <Download className="h-4 w-4" /> Скачать CSV
             </a>
@@ -93,7 +92,7 @@ export default function Reports() {
         }
       />
 
-      <SectionCard>
+      <FilterBar>
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex-1">
             <p className="mb-1 text-xs text-gray-500">Период</p>
@@ -123,9 +122,19 @@ export default function Reports() {
             {loading ? 'Загрузка...' : 'Применить'}
           </Button>
         </div>
-      </SectionCard>
+      </FilterBar>
 
-      {error && <ErrorState title="Ошибка загрузки отчёта" description={error} />}
+      {error && (
+        <ErrorState
+          title="Ошибка загрузки отчёта"
+          description={error}
+          action={
+            <Button onClick={load} size="sm">
+              Повторить
+            </Button>
+          }
+        />
+      )}
 
       {loading && !data && <LoadingState label="Загружаем отчёт о продажах..." />}
 

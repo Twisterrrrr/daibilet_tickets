@@ -41,14 +41,6 @@ interface DashboardData {
   };
 }
 
-interface SupplierEvent {
-  id: string;
-  title: string;
-  moderationStatus?: string;
-  imageUrl?: string | null;
-  moderationNote?: string | null;
-}
-
 interface SalesReportResponse {
   items: {
     id: string;
@@ -81,6 +73,15 @@ interface ListingHealthResponse {
   byEvent: ListingHealthEvent[];
 }
 
+interface UpcomingSession {
+  sessionId: string;
+  startsAt: string;
+  title: string;
+  soldQty: number;
+  availableQty: number;
+  occupancyPct: number;
+}
+
 const TRUST_LABELS: Record<number, string> = {
   0: 'Новый',
   1: 'Базовый',
@@ -91,9 +92,9 @@ const TRUST_LABELS: Record<number, string> = {
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [attentionEvents, setAttentionEvents] = useState<SupplierEvent[] | null>(null);
   const [recentSales, setRecentSales] = useState<SalesReportResponse | null>(null);
   const [listingHealth, setListingHealth] = useState<ListingHealthResponse | null>(null);
+  const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[] | null>(null);
   const [loadingExtra, setLoadingExtra] = useState(true);
 
   useEffect(() => {
@@ -107,28 +108,13 @@ export default function Dashboard() {
         setError(e.message ?? 'Ошибка загрузки');
       });
 
-    // Дополнительные данные для блоков "Требует внимания", "Качество листингов" и "Последние продажи"
+    // Вторичные блоки грузим отдельно: падение одного не ломает весь экран.
     Promise.allSettled([
-      api.get<{ items: SupplierEvent[]; total: number }>('/supplier/events?limit=25&page=1'),
       api.get<SalesReportResponse>('/supplier/reports/sales?limit=4'),
       api.get<ListingHealthResponse>('/supplier/listing-health'),
+      api.get<UpcomingSession[]>('/supplier/reports/sessions'),
     ])
-      .then(([eventsResult, salesResult, healthResult]) => {
-        if (eventsResult.status === 'fulfilled') {
-          const rawItems = eventsResult.value.items || [];
-          const problematic = rawItems.filter((e) => {
-            const hasStatusIssue =
-              e.moderationStatus === 'PENDING_REVIEW' ||
-              e.moderationStatus === 'REJECTED' ||
-              e.moderationStatus === 'DRAFT';
-            const hasNoImage = !e.imageUrl;
-            return hasStatusIssue || hasNoImage;
-          });
-          setAttentionEvents(problematic);
-        } else {
-          setAttentionEvents(null);
-        }
-
+      .then(([salesResult, healthResult, sessionsResult]) => {
         if (salesResult.status === 'fulfilled') {
           const value = salesResult.value;
           const canRenderItems =
@@ -147,6 +133,12 @@ export default function Dashboard() {
           setListingHealth(healthResult.value);
         } else {
           setListingHealth(null);
+        }
+
+        if (sessionsResult.status === 'fulfilled') {
+          setUpcomingSessions(Array.isArray(sessionsResult.value) ? sessionsResult.value.slice(0, 5) : []);
+        } else {
+          setUpcomingSessions(null);
         }
       })
       .finally(() => setLoadingExtra(false));
@@ -179,6 +171,7 @@ export default function Dashboard() {
       color: 'text-emerald-600',
     },
   ];
+  const attentionEvents = listingHealth?.byEvent.filter((event) => event.issues.length > 0) ?? [];
 
   return (
     <div className="space-y-8">
@@ -357,7 +350,12 @@ export default function Dashboard() {
         )}
 
       {/* Качество листингов — список замечаний со ссылками «Исправить» */}
-      {listingHealth &&
+      {loadingExtra ? (
+        <SectionCard title="Качество листингов">
+          <LoadingState label="Загружаем качество листингов..." />
+        </SectionCard>
+      ) : (
+        listingHealth &&
         listingHealth.byEvent.some((e) => e.issues.length > 0) && (
           <SectionCard title="Качество листингов">
             <p className="mb-3 text-xs text-gray-500">
@@ -390,31 +388,26 @@ export default function Dashboard() {
                 ))}
             </ul>
           </SectionCard>
-        )}
+        )
+      )}
 
       {/* Требует внимания — список событий (модерация, черновики, без фото) */}
-      {attentionEvents && attentionEvents.length > 0 && (
+      {attentionEvents.length > 0 && (
         <SectionCard title="События с замечаниями">
           <div className="divide-y">
             {attentionEvents.map((event) => {
               const badges: { label: string; color: string }[] = [];
-              if (event.moderationStatus === 'PENDING_REVIEW') {
-                badges.push({ label: 'На модерации', color: 'bg-amber-50 text-amber-800' });
-              }
-              if (event.moderationStatus === 'REJECTED') {
-                badges.push({ label: 'Отклонено', color: 'bg-red-50 text-red-700' });
-              }
-              if (event.moderationStatus === 'DRAFT') {
-                badges.push({ label: 'Черновик', color: 'bg-slate-100 text-slate-700' });
-              }
-              if (!event.imageUrl) {
-                badges.push({ label: 'Без фото', color: 'bg-amber-50 text-amber-800' });
-              }
+              const issueCodes = new Set(event.issues.map((issue) => issue.code));
+              if (issueCodes.has('NO_SESSIONS')) badges.push({ label: 'Нет расписания', color: 'bg-amber-50 text-amber-800' });
+              if (issueCodes.has('NO_PHOTO')) badges.push({ label: 'Без фото', color: 'bg-amber-50 text-amber-800' });
+              if (issueCodes.has('NO_PRICE')) badges.push({ label: 'Без цены', color: 'bg-red-50 text-red-700' });
+              if (issueCodes.has('MODERATION_REJECTED')) badges.push({ label: 'Отклонено', color: 'bg-red-50 text-red-700' });
+              if (issueCodes.has('DRAFT_OR_HIDDEN')) badges.push({ label: 'Черновик/скрыто', color: 'bg-slate-100 text-slate-700' });
 
               return (
                 <Link
-                  key={event.id}
-                  to={`/events/${event.id}`}
+                  key={event.eventId}
+                  to={`/events/${event.eventId}`}
                   className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
                 >
                   <div className="min-w-0 flex-1">
@@ -422,9 +415,9 @@ export default function Dashboard() {
                       <AlertCircle className="h-4 w-4 text-amber-500" />
                       <p className="truncate text-sm font-medium text-slate-900">{event.title}</p>
                     </div>
-                    {event.moderationNote && (
-                      <p className="mt-1 line-clamp-1 text-xs text-slate-500">{event.moderationNote}</p>
-                    )}
+                    <p className="mt-1 line-clamp-1 text-xs text-slate-500">
+                      {event.issues[0]?.message ?? 'Найдены замечания по карточке'}
+                    </p>
                   </div>
                   <div className="flex flex-wrap justify-end gap-1">
                     {badges.map((b) => (
@@ -444,7 +437,11 @@ export default function Dashboard() {
       )}
 
       {/* Последние продажи */}
-      {recentSales && (
+      {loadingExtra ? (
+        <SectionCard title="Последние продажи">
+          <LoadingState label="Загружаем продажи..." />
+        </SectionCard>
+      ) : recentSales ? (
         <SectionCard
           title="Последние продажи"
           headerRight={
@@ -477,6 +474,39 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+        </SectionCard>
+      ) : (
+        <SectionCard title="Последние продажи">
+          <ErrorState title="Не удалось загрузить продажи" description="Попробуйте открыть раздел отчётов позже." />
+        </SectionCard>
+      )}
+
+      {loadingExtra ? (
+        <SectionCard title="Ближайшие сеансы">
+          <LoadingState label="Загружаем сеансы..." />
+        </SectionCard>
+      ) : upcomingSessions && upcomingSessions.length > 0 ? (
+        <SectionCard title="Ближайшие сеансы">
+          <div className="space-y-2">
+            {upcomingSessions.map((session) => (
+              <div key={session.sessionId} className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-slate-50">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{session.title}</p>
+                  <p className="text-xs text-slate-500">{new Date(session.startsAt).toLocaleString('ru-RU')}</p>
+                </div>
+                <div className="text-right text-xs text-slate-600">
+                  <p>Заполненность: {session.occupancyPct}%</p>
+                  <p>
+                    Продано {session.soldQty} / Доступно {session.availableQty}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      ) : (
+        <SectionCard title="Ближайшие сеансы">
+          <EmptyState title="Нет ближайших сеансов" description="Добавьте расписание, чтобы сеансы появились в этом блоке." />
         </SectionCard>
       )}
     </div>

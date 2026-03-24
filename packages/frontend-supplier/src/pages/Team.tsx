@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { UserPlus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { PageHeader, SectionCard, LoadingState } from '@daibilet/shared-ui';
+import { ErrorState, PageHeader, SectionCard, LoadingState } from '@daibilet/shared-ui';
+import { SupplierSettingsNav } from '@/components/layout/SupplierSettingsNav';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 import { api } from '../lib/api';
 
@@ -48,19 +51,24 @@ export default function Team() {
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [inviteForm, setInviteForm] = useState({ email: '', role: 'MANAGER' });
   const [sending, setSending] = useState(false);
 
   const load = () => {
     setLoading(true);
     setForbidden(false);
+    setError(null);
     api
       .get<TeamData>('/supplier/invitations')
       .then(setData)
       .catch((err: Error & { message?: string }) => {
         const msg = (err?.message || '').toLowerCase();
         if (msg.includes('forbidden') || msg.includes('403')) setForbidden(true);
-        else toast.error(err?.message || 'Ошибка загрузки');
+        else {
+          setError(err?.message || 'Ошибка загрузки');
+          toast.error(err?.message || 'Ошибка загрузки');
+        }
       })
       .finally(() => setLoading(false));
   };
@@ -101,10 +109,29 @@ export default function Team() {
 
   if (loading) return <LoadingState label="Загружаем команду..." />;
 
+  if (error) {
+    return (
+      <div className="max-w-2xl">
+        <PageHeader title="Команда" />
+        <SupplierSettingsNav />
+        <ErrorState
+          title="Не удалось загрузить команду"
+          description={error}
+          action={
+            <Button type="button" variant="outline" onClick={load}>
+              Повторить
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   if (forbidden) {
     return (
       <div className="max-w-2xl">
         <PageHeader title="Команда" />
+        <SupplierSettingsNav />
         <SectionCard title="Доступ ограничен">
           <p className="text-gray-600">Управлять командой может только владелец компании.</p>
         </SectionCard>
@@ -117,6 +144,7 @@ export default function Team() {
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader title="Команда" />
+      <SupplierSettingsNav />
       <SectionCard title="Участники">
         <div className="space-y-3">
           {(data?.users || []).map((u) => (
@@ -150,32 +178,27 @@ export default function Team() {
                   </p>
                 </div>
                 {!isExpired(i.expiresAt) && (
-                  <button
-                    type="button"
-                    onClick={() => handleCancel(i.id)}
-                    className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600"
-                    title="Отменить"
-                  >
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleCancel(i.id)} title="Отменить">
                     <X className="h-4 w-4" />
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
           </div>
         )}
         <form onSubmit={handleInvite} className="mt-4 flex flex-wrap gap-3">
-          <input
+          <Input
             type="email"
             placeholder="Email"
             value={inviteForm.email}
             onChange={(e) => setInviteForm((p) => ({ ...p, email: e.target.value }))}
-            className="rounded-lg border px-3 py-2 text-sm"
+            className="h-9 w-[260px]"
             required
           />
           <select
             value={inviteForm.role}
             onChange={(e) => setInviteForm((p) => ({ ...p, role: e.target.value }))}
-            className="rounded-lg border px-3 py-2 text-sm"
+            className="h-9 w-[180px] rounded-md border px-3 text-sm"
           >
             {Object.entries(ROLE_LABELS)
               .filter(([k]) => k !== 'OWNER')
@@ -185,14 +208,10 @@ export default function Team() {
                 </option>
               ))}
           </select>
-          <button
-            type="submit"
-            disabled={sending}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={sending} className="flex items-center gap-2">
             <UserPlus className="h-4 w-4" />
             {sending ? 'Отправка...' : 'Пригласить'}
-          </button>
+          </Button>
         </form>
       </SectionCard>
     </div>

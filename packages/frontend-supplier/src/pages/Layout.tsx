@@ -70,7 +70,7 @@ export default function Layout() {
           notificationsBadge={notificationsBadge}
         />
         <div className="flex flex-1 flex-col min-w-0">
-          <header className="sticky top-0 z-20 h-12 flex items-center gap-4 border-b bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-4 shrink-0">
+          <header className="sticky top-0 z-20 flex h-10 items-center gap-2.5 border-b border-border/80 bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-4 shrink-0">
             <SidebarTrigger className="shrink-0" />
             <div className="flex-1" />
             <div className="flex items-center gap-2">
@@ -83,8 +83,8 @@ export default function Layout() {
               </Button>
             </div>
           </header>
-          <main className="flex-1 overflow-auto bg-[rgb(229,231,235)]">
-            <PageContainer className="animate-in-page max-w-none px-3 py-4 sm:px-4 xl:px-6 2xl:px-8 lg:py-5">
+          <main className="flex-1 overflow-auto bg-[#e5e7eb]">
+            <PageContainer className="animate-in-page max-w-none px-3 py-3.5 sm:px-4 xl:px-6 2xl:px-8 lg:py-4">
               <Outlet />
             </PageContainer>
           </main>

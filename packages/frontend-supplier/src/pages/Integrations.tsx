@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Check, X } from 'lucide-react';
 
-import { PageHeader, SectionCard, LoadingState } from '@daibilet/shared-ui';
+import { ErrorState, PageHeader, SectionCard, LoadingState } from '@daibilet/shared-ui';
+import { SupplierSettingsNav } from '@/components/layout/SupplierSettingsNav';
 
 import { api } from '../lib/api';
 
@@ -20,19 +21,23 @@ interface IntegrationsData {
 export default function Integrations() {
   const [data, setData] = useState<IntegrationsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
       .get<IntegrationsData>('/supplier/integrations')
       .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Не удалось загрузить интеграции'))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <LoadingState label="Загружаем статус интеграций..." />;
+  if (error) return <ErrorState title="Не удалось загрузить интеграции" description={error} />;
 
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader title="Интеграции" />
+      <SupplierSettingsNav />
       <SectionCard title="Источники событий">
         <p className="mb-4 text-sm text-gray-500">
           Откуда поступают ваши события и как они подключены к платформе.

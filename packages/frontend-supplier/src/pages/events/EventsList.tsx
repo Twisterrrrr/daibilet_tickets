@@ -1,8 +1,8 @@
 import { AlertTriangle, CheckCircle, Clock, Eye, EyeOff, Plus, Trash2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
-import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatusBadge } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, FilterBar, LoadingState, PageHeader, SectionCard, StatusBadge } from '@daibilet/shared-ui';
 
 import { Button } from '@/components/ui/button';
 
@@ -17,18 +17,22 @@ const STATUS_ICONS: Record<string, { icon: any; label: string; tone: 'success' |
 };
 
 export default function EventsList() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [events, setEvents] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [trustInfo, setTrustInfo] = useState<{ activeEventsCount: number; activeEventsLimit: number } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
+  const [query, setQuery] = useState<string>(searchParams.get('q') || '');
+  const [readinessFilter, setReadinessFilter] = useState<string>(searchParams.get('readiness') || 'all');
 
-  const loadEvents = () => {
+  const loadEvents = (status = statusFilter) => {
     setLoading(true);
     setLoadError(null);
     api
-      .get<{ items: any[]; total: number }>('/supplier/events')
+      .get<{ items: any[]; total: number }>(`/supplier/events${status !== 'all' ? `?status=${encodeURIComponent(status)}` : ''}`)
       .then((res) => {
         setEvents(res.items);
         setTotal(res.total);
@@ -40,9 +44,6 @@ export default function EventsList() {
   };
 
   useEffect(() => {
-    setLoading(true);
-    loadEvents();
-
     api
       .get<{
         trust?: { activeEventsCount: number; activeEventsLimit: number };
@@ -60,6 +61,23 @@ export default function EventsList() {
       });
   }, []);
 
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (statusFilter !== 'all') next.set('status', statusFilter);
+    else next.delete('status');
+    if (readinessFilter !== 'all') next.set('readiness', readinessFilter);
+    else next.delete('readiness');
+    if (query.trim()) next.set('q', query.trim());
+    else next.delete('q');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, readinessFilter, query]);
+
+  useEffect(() => {
+    loadEvents(statusFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
   const handleDelete = async (event: any) => {
     if (!event.id) return;
     const status = event.moderationStatus as string;
@@ -76,6 +94,21 @@ export default function EventsList() {
       setDeletingId(null);
     }
   };
+
+  const visibleEvents = events.filter((event) => {
+    const q = query.trim().toLowerCase();
+    const hasReadinessIssue = !event.imageUrl || (event._count?.offers || 0) === 0;
+    const matchesReadiness =
+      readinessFilter === 'all' ||
+      (readinessFilter === 'issues' && hasReadinessIssue) ||
+      (readinessFilter === 'ready' && !hasReadinessIssue);
+    const matchesSearch =
+      !q ||
+      String(event.title || '').toLowerCase().includes(q) ||
+      String(event.city?.name || '').toLowerCase().includes(q) ||
+      String(event.slug || '').toLowerCase().includes(q);
+    return matchesSearch && matchesReadiness;
+  });
 
   return (
     <div className="space-y-4">
@@ -116,6 +149,42 @@ export default function EventsList() {
         </SectionCard>
       )}
 
+      <FilterBar
+        onReset={() => {
+          setStatusFilter('all');
+          setQuery('');
+          setReadinessFilter('all');
+        }}
+      >
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск: название, URL, город"
+          className="h-9 w-[240px] rounded-md border px-3 text-sm"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="h-9 rounded-md border px-3 text-sm"
+        >
+          <option value="all">Все статусы</option>
+          <option value="PENDING_REVIEW">На модерации</option>
+          <option value="REJECTED">Отклонено</option>
+          <option value="DRAFT">Черновик</option>
+          <option value="AUTO_APPROVED">Авто</option>
+          <option value="APPROVED">Одобрено</option>
+        </select>
+        <select
+          value={readinessFilter}
+          onChange={(e) => setReadinessFilter(e.target.value)}
+          className="h-9 rounded-md border px-3 text-sm"
+        >
+          <option value="all">Любая готовность</option>
+          <option value="issues">Есть проблемы</option>
+          <option value="ready">Готово к публикации</option>
+        </select>
+      </FilterBar>
+
       {loading && <LoadingState label="Загружаем ваши события..." />}
 
       {!loading && loadError && (
@@ -123,25 +192,26 @@ export default function EventsList() {
           title="Не удалось загрузить события"
           description={loadError}
           action={
-            <Button type="button" variant="outline" onClick={loadEvents}>
+            <Button type="button" variant="outline" onClick={() => loadEvents()}>
               Повторить
             </Button>
           }
         />
       )}
 
-      {!loading && !loadError && events.length === 0 && (
+      {!loading && !loadError && visibleEvents.length === 0 && (
         <EmptyState title="У вас пока нет событий" description="Создайте первое событие, чтобы начать продажи." />
       )}
 
-      {!loadError && events.length > 0 && (
+      {!loadError && visibleEvents.length > 0 && (
         <SectionCard>
-          {events.map((event) => {
+          {visibleEvents.map((event) => {
             const st = STATUS_ICONS[event.moderationStatus] || STATUS_ICONS.DRAFT;
             const canDelete = ['DRAFT', 'REJECTED'].includes(event.moderationStatus);
             const rating = event.rating != null ? Number(event.rating) : 0;
             const reviewsCount = typeof event.reviewCount === 'number' ? event.reviewCount : event._count?.reviews || 0;
             const hasRating = reviewsCount > 0 && rating > 0;
+            const readinessLabel = !event.imageUrl || (event._count?.offers || 0) === 0 ? 'Требует доработки' : 'Готово';
 
             return (
               <div key={event.id} className="flex items-center gap-4 p-4 transition-colors hover:bg-gray-50">
@@ -164,6 +234,7 @@ export default function EventsList() {
                         </>
                       )}
                     </p>
+                    <p className="text-xs text-muted-foreground">{readinessLabel}</p>
                   </div>
                   <span className="inline-flex items-center gap-1">
                     <st.icon className="h-3.5 w-3.5 text-muted-foreground" />

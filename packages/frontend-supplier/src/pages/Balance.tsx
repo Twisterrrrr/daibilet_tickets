@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import { EmptyState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+import { SupplierSettingsNav } from '@/components/layout/SupplierSettingsNav';
 
 import { api } from '../lib/api';
 
@@ -96,9 +97,18 @@ export default function BalancePage() {
 
   if (error && !balance) {
     return (
-      <EmptyState
+      <ErrorState
         title="Не удалось загрузить баланс"
         description={error}
+        action={
+          <button
+            type="button"
+            className="rounded-md border px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            onClick={load}
+          >
+            Повторить
+          </button>
+        }
       />
     );
   }
@@ -106,6 +116,7 @@ export default function BalancePage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Баланс и вывод средств" />
+      <SupplierSettingsNav />
 
       {balance && (
         <SectionCard>

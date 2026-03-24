@@ -14,6 +14,8 @@ import Reviews from './pages/Reviews';
 import Settings from './pages/Settings';
 import Notifications from './pages/Notifications';
 import BalancePage from './pages/Balance';
+import Requisites from './pages/Requisites';
+import FinanceDocumentsPage from './pages/FinanceDocuments';
 import Team from './pages/Team';
 import Integrations from './pages/Integrations';
 import InviteAccept from './pages/InviteAccept';
@@ -47,6 +49,8 @@ export default function App() {
         <Route path="notifications" element={<Notifications />} />
         <Route path="reports" element={<Reports />} />
         <Route path="balance" element={<BalancePage />} />
+        <Route path="requisites" element={<Requisites />} />
+        <Route path="finance-documents" element={<FinanceDocumentsPage />} />
         <Route path="settings" element={<Settings />} />
         <Route path="team" element={<Team />} />
         <Route path="integrations" element={<Integrations />} />

@@ -5,6 +5,7 @@ import { FormActions, FormGrid, FormSection, LoadingState, PageHeader, SectionCa
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SupplierSettingsNav } from '@/components/layout/SupplierSettingsNav';
 import { api } from '../lib/api';
 
 export default function Settings() {
@@ -42,6 +43,7 @@ export default function Settings() {
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader title="Настройки компании" />
+      <SupplierSettingsNav />
 
       <SectionCard title="Ваш тариф">
         <div className="grid grid-cols-2 gap-4 text-sm">
