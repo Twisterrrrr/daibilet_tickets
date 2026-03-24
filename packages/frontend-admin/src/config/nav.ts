@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Search,
   FileCheck2,
+  Gauge,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -80,6 +81,7 @@ function buildNavSections(): NavSection[] {
     {
       title: 'Система',
       items: [
+        { to: '/catalog-consistency', label: 'Каталог: согласованность', icon: Gauge, section: 'Система' },
         ...(show.content ? [{ to: '/seo-audit', label: 'SEO-аудит', icon: BarChart3, section: 'Система' }] : []),
         { to: '/users', label: 'Пользователи', icon: Users, section: 'Система' },
         { to: '/settings', label: 'Настройки', icon: Settings, section: 'Система' },

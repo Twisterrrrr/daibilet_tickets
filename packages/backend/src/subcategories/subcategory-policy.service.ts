@@ -28,7 +28,8 @@ const LEGACY_EVENT_SUBCATEGORY_TO_SLUG: Partial<Record<EventSubcategory, string>
 
 @Injectable()
 export class SubcategoryPolicyService {
-  static readonly MAX_EVENT_SUBCATEGORIES = 5;
+  /** Лимит для события (publish + API). Площадки — см. MAX_VENUE_SUBCATEGORIES. */
+  static readonly MAX_EVENT_SUBCATEGORIES = 3;
   static readonly MAX_VENUE_SUBCATEGORIES = 5;
 
   buildEventSubcategoryFilter(value: string): Prisma.EventWhereInput {

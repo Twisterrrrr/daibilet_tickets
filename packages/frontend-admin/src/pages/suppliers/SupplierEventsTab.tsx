@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
+import { DataTableShell } from '@daibilet/shared-ui';
+
 import { adminApi } from '@/api/client';
 import { InCatalogBadge } from '@/components/InCatalogBadge';
 import { computeInCatalog } from '@/lib/catalog';
@@ -90,30 +92,39 @@ export function SupplierEventsTab({ supplierId }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">События поставщика ({total})</h2>
-        <div className="flex items-center gap-2">
-          <input
-            value={search}
-            onChange={(e) => updateSearchParam({ search: e.target.value })}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                void load();
-              }
-            }}
-            placeholder="Поиск по названию…"
-            className="px-3 py-1.5 border rounded-lg text-sm w-64"
-          />
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="px-3 py-1.5 text-sm rounded-lg border bg-background hover:bg-muted"
-          >
-            Найти
-          </button>
-        </div>
-      </div>
-
+      <DataTableShell
+        loading={loading}
+        error={null}
+        isEmpty={rows.length === 0 && !loading}
+        loadingLabel="Загрузка событий…"
+        emptyTitle={search ? 'Ничего не найдено' : 'Событий нет'}
+        emptyDescription="Измените поиск или добавьте события в каталоге."
+        toolbar={
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">События поставщика ({total})</h2>
+            <div className="flex items-center gap-2">
+              <input
+                value={search}
+                onChange={(e) => updateSearchParam({ search: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    void load();
+                  }
+                }}
+                placeholder="Поиск по названию…"
+                className="w-64 rounded-lg border px-3 py-1.5 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="rounded-lg border bg-background px-3 py-1.5 text-sm hover:bg-muted"
+              >
+                Найти
+              </button>
+            </div>
+          </div>
+        }
+      >
       <div className="rounded-xl border bg-card">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/50">
@@ -198,6 +209,7 @@ export function SupplierEventsTab({ supplierId }: Props) {
           </tbody>
         </table>
       </div>
+      </DataTableShell>
 
       {!loading && pages > 1 && (
         <div className="flex items-center justify-between text-xs text-muted-foreground">

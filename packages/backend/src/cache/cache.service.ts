@@ -34,6 +34,13 @@ export const CACHE_TTL = {
   LANDINGS: parseTtlEnv('CACHE_TTL_LANDINGS', 1800), // 30m
   COMBOS: parseTtlEnv('CACHE_TTL_COMBOS', 1800), // 30m
   SEARCH: parseTtlEnv('CACHE_TTL_SEARCH', 120), // 2m (60–180s)
+  /** Админский снимок согласованности каталога (тяжёлый агрегат). TTL кламп 60–120s. */
+  CATALOG_CONSISTENCY: Math.min(
+    120,
+    Math.max(60, parseTtlEnv('CACHE_TTL_CATALOG_CONSISTENCY', 90)),
+  ),
+  /** Дашборд `GET /admin/dashboard/analytics-tabs` (AN-1). TTL кламп 60–180s. */
+  ANALYTICS_TABS: Math.min(180, Math.max(60, parseTtlEnv('CACHE_TTL_ANALYTICS_TABS', 120))),
 } as const;
 
 @Injectable()
@@ -204,6 +211,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       this.delByPrefix('landings:'),
       this.delByPrefix('combos:'),
       this.delByPrefix('search:'),
+      this.delByPrefix('analytics:'),
     ]);
     this.logger.log('Кэш инвалидирован после синхронизации');
   }

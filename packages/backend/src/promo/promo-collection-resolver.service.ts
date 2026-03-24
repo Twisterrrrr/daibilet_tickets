@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DateMode, EventCategory, Prisma, PromoSortMode } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
 export interface ResolvedEvent {
   id: string;
@@ -26,7 +27,10 @@ export interface ResolvedVenue {
 
 @Injectable()
 export class PromoCollectionResolverService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subcategoryPolicy: SubcategoryPolicyService,
+  ) {}
 
   private get activeEventWhere(): Prisma.EventWhereInput {
     const now = new Date();
@@ -97,12 +101,23 @@ export class PromoCollectionResolverService {
     const rule = collection.rule;
     if (!rule) return [];
 
+    const tagOrSubcategory =
+      rule.tagSlugs?.length
+        ? ({
+            OR: [
+              { tags: { some: { tag: { slug: { in: rule.tagSlugs } } } } },
+              {
+                OR: rule.tagSlugs.map((slug) => this.subcategoryPolicy.buildEventSubcategoryFilter(slug)),
+              },
+            ],
+          } as Prisma.EventWhereInput)
+        : {};
+
     const where: Prisma.EventWhereInput = {
       ...this.activeEventWhere,
       city: { isActive: true, ...(rule.citySlug && { slug: rule.citySlug }) },
       ...(rule.categorySlug && { category: rule.categorySlug as EventCategory }),
-      ...(rule.tagSlugs?.length &&
-        { tags: { some: { tag: { slug: { in: rule.tagSlugs } } } } }),
+      ...tagOrSubcategory,
       ...(rule.isKids === true && { audience: { in: ['KIDS', 'FAMILY'] } }),
       ...(rule.isIndoor === true && { indoor: true }),
     };
@@ -203,14 +218,24 @@ export class PromoCollectionResolverService {
     };
 
     if (rule.onlyBookable || rule.onlyActive) {
+      const tagOrSubVenueEvents =
+        rule.tagSlugs?.length
+          ? {
+              OR: [
+                { tags: { some: { tag: { slug: { in: rule.tagSlugs } } } } },
+                {
+                  OR: rule.tagSlugs.map((slug) => this.subcategoryPolicy.buildEventSubcategoryFilter(slug)),
+                },
+              ],
+            }
+          : {};
+
       const eventFilter: Prisma.EventWhereInput = {
         isActive: true,
         isDeleted: false,
         canonicalOfId: null,
         OR: [{ override: null }, { override: { editorStatus: 'PUBLISHED' } }],
-        ...(rule.tagSlugs?.length && {
-          tags: { some: { tag: { slug: { in: rule.tagSlugs } } } },
-        }),
+        ...tagOrSubVenueEvents,
         ...(rule.categorySlug && { category: rule.categorySlug as EventCategory }),
         ...(rule.isKids === true && { audience: { in: ['KIDS', 'FAMILY'] } }),
       };

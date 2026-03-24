@@ -23,6 +23,8 @@ import { EventsQueryDto } from './dto/events-query.dto';
 import { RegionService } from './region.service';
 import { buildEventWhere, buildVenueWhere } from './where-builders';
 import { RefundPolicyResolutionService } from './refund-policy-resolution.service';
+import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { CatalogGuardService, type CatalogGuardOfferSlice } from './catalog-guard.service';
 
 /** Сократить адрес до улицы и номера: "Дворцовая наб., 18, Санкт-Петербург" → "Дворцовая наб., 18" */
 function shortenAddressToStreet(addr: string | null | undefined): string {
@@ -59,6 +61,8 @@ export class CatalogService {
     private readonly regionService: RegionService,
     private readonly reviewCapability: ReviewCapabilityService,
     private readonly refundResolution: RefundPolicyResolutionService,
+    private readonly subcategoryPolicy: SubcategoryPolicyService,
+    private readonly catalogGuard: CatalogGuardService,
   ) {}
 
   private readonly logger = new Logger(CatalogService.name);
@@ -1157,7 +1161,7 @@ export class CatalogService {
     const structuralTagsList = parseCsvSlugs(structuralTags ?? tagsCsvParam);
     const popularTagsList = parseCsvSlugs(popularTags);
 
-    const where = buildEventWhere(
+    const baseWhere = buildEventWhere(
       {
         city,
         cityIds,
@@ -1181,6 +1185,11 @@ export class CatalogService {
       },
       sessionFilter,
     );
+
+    const nowGuard = new Date();
+    const where = this.catalogGuard.isCatalogStrictMode()
+      ? { AND: [baseWhere, this.catalogGuard.buildSellableWhereExtension(nowGuard)] }
+      : baseWhere;
 
     // Time of day filter: restrict events to those with sessions in the given MSK hour range.
     // startsAt stored as timestamp(3) WITHOUT timezone in UTC.
@@ -1274,6 +1283,11 @@ export class CatalogService {
               category: true,
               subcategories: true,
               audience: true,
+              dateMode: true,
+              endDate: true,
+              venueId: true,
+              address: true,
+              meetingPoint: true,
               imageUrl: true,
               galleryUrls: true,
               priceFrom: true,
@@ -1283,11 +1297,30 @@ export class CatalogService {
               venue: { select: { title: true, shortTitle: true } },
               override: { select: { manualBoost: true } },
               tags: { include: { tag: true } },
+              offers: {
+                where: { isDeleted: false },
+                orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
+                select: {
+                  id: true,
+                  source: true,
+                  purchaseType: true,
+                  externalEventId: true,
+                  metaEventId: true,
+                  deeplink: true,
+                  priceFrom: true,
+                  priceMode: true,
+                  minAmount: true,
+                  status: true,
+                  isDeleted: true,
+                  meetingPoint: true,
+                  isPrimary: true,
+                },
+              },
               sessions: {
                 where: { isActive: true, startsAt: { gte: new Date() } },
                 orderBy: { startsAt: 'asc' },
                 take: 20,
-                select: { startsAt: true, availableTickets: true },
+                select: { startsAt: true, availableTickets: true, isActive: true },
               },
             },
           })
@@ -1302,7 +1335,7 @@ export class CatalogService {
               override: { select: { manualBoost: true } },
               tags: { include: { tag: true } },
               offers: {
-                where: { status: 'ACTIVE', isDeleted: false },
+                where: { isDeleted: false },
                 orderBy: [{ isPrimary: 'desc' }, { priority: 'desc' }],
                 select: {
                   id: true,
@@ -1312,6 +1345,11 @@ export class CatalogService {
                   metaEventId: true,
                   deeplink: true,
                   priceFrom: true,
+                  priceMode: true,
+                  minAmount: true,
+                  status: true,
+                  isDeleted: true,
+                  meetingPoint: true,
                   isPrimary: true,
                 },
               },
@@ -1319,7 +1357,7 @@ export class CatalogService {
                 where: { isActive: true, startsAt: { gte: new Date() } },
                 orderBy: { startsAt: 'asc' },
                 take: 20,
-                select: { startsAt: true, availableTickets: true },
+                select: { startsAt: true, availableTickets: true, isActive: true },
               },
             },
           });
@@ -1331,6 +1369,31 @@ export class CatalogService {
     const tOv0 = Date.now();
     const overridden = await this.overrideService.applyOverrides(rawItems);
     const overrideMs = Date.now() - tOv0;
+
+    if (!this.catalogGuard.isCatalogStrictMode()) {
+      for (const ev of overridden) {
+        const row = ev as Record<string, unknown>;
+        const offers = (row.offers as Array<Record<string, unknown>>) ?? [];
+        const sessions = (row.sessions as Array<{ isActive: boolean; startsAt: Date }>) ?? [];
+        const g = this.catalogGuard.evaluateSellable(
+          {
+            category: row.category,
+            audience: row.audience,
+            dateMode: row.dateMode as DateMode,
+            endDate: row.endDate as Date | null | undefined,
+            venueId: row.venueId as string | null | undefined,
+            address: row.address as string | null | undefined,
+            meetingPoint: row.meetingPoint as string | null | undefined,
+          },
+          offers as CatalogGuardOfferSlice[],
+          sessions,
+          nowGuard,
+        );
+        if (!g.sellable) {
+          this.catalogGuard.logReject(String(row.id), g.reasons);
+        }
+      }
+    }
 
     const tBadges0 = Date.now();
     // Вычисляем смарт-бейджи: ближайший сеанс, свободные места, optimal score
@@ -1794,11 +1857,15 @@ export class CatalogService {
 
     const limit = 20;
     const pageNum = Math.max(1, parseInt(String(page || '1'), 10) || 1);
+    /** Страница тега: subcategory-first parity — событие с подкатегорией по slug тега попадает без назначенного тега. */
+    const tagByAssignment: Prisma.EventWhereInput = { tags: { some: { tagId: tag.id } } };
+    const tagBySubcategory = this.subcategoryPolicy.buildEventSubcategoryFilter(tag.slug);
     const where: Prisma.EventWhereInput = {
       isActive: true,
       isDeleted: false,
-      tags: { some: { tagId: tag.id } },
+      canonicalOfId: null,
       ...(city && { city: { slug: city } }),
+      OR: [tagByAssignment, tagBySubcategory],
     };
 
     const [events, total] = await Promise.all([
@@ -2058,8 +2125,11 @@ export class CatalogService {
       }
       const displayHighlights = highlights.slice(0, 3);
 
-      // Primary offer — первый из отсортированных (isPrimary desc, priority desc)
-      const offers: Record<string, unknown>[] = (event.offers || []) as Record<string, unknown>[];
+      // Primary offer — первый ACTIVE из отсортированных (isPrimary desc, priority desc)
+      const offersAll: Record<string, unknown>[] = (event.offers || []) as Record<string, unknown>[];
+      const offers: Record<string, unknown>[] = offersAll.filter(
+        (o) => o.status === 'ACTIVE' && o.isDeleted !== true,
+      );
       const primaryOffer = offers.length > 0 ? offers[0] : null;
 
       // Извлекаем slug-и тегов для бейджей на фронтенде (защита от null tag)

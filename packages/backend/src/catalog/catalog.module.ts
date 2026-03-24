@@ -27,6 +27,10 @@ import { LocationNormalizerService } from './location-normalizer.service';
 import { VenueNormalizerService } from './venue-normalizer.service';
 import { OfferNormalizerService } from './offer-normalizer.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { CatalogClassificationNormalizerService } from './catalog-classification-normalizer.service';
+import { CatalogConsistencyService } from './catalog-consistency.service';
+import { CatalogGuardService } from './catalog-guard.service';
+import { CatalogAuditService } from './catalog-audit.service';
 
 @Module({
   imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule],
@@ -55,6 +59,10 @@ import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.se
     VenueNormalizerService,
     OfferNormalizerService,
     SubcategoryPolicyService,
+    CatalogClassificationNormalizerService,
+    CatalogConsistencyService,
+    CatalogGuardService,
+    CatalogAuditService,
   ],
   exports: [
     CatalogService,
@@ -79,6 +87,10 @@ import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.se
     VenueNormalizerService,
     OfferNormalizerService,
     SubcategoryPolicyService,
+    CatalogClassificationNormalizerService,
+    CatalogConsistencyService,
+    CatalogGuardService,
+    CatalogAuditService,
   ],
 })
 export class CatalogModule {}

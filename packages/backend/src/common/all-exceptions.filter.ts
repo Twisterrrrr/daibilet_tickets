@@ -1,4 +1,5 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import * as Sentry from '@sentry/nestjs';
 
@@ -21,7 +22,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     const err = exception instanceof Error ? exception : new Error(String(exception));
-    const requestId = (req as Request & { id?: string }).id;
+    const requestId =
+      (req as Request & { id?: string; requestId?: string }).id ||
+      (req as Request & { requestId?: string }).requestId ||
+      randomUUID();
     if (status >= 500 && process.env.SENTRY_DSN) {
       Sentry.captureException(err, {
         tags: { env: process.env.NODE_ENV, path: req.url, ...(requestId && { requestId }) },
@@ -31,8 +35,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     res.status(status).json({
       statusCode: status,
       message,
+      error: message,
       path: req.url,
-      ...(requestId && { requestId }),
+      requestId,
       ...(process.env.NODE_ENV !== 'production' && exception instanceof Error
         ? { stack: exception.stack }
         : {}),

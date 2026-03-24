@@ -35,6 +35,9 @@ jobs:
       - name: Lint
         run: npx eslint packages/ --max-warnings=0
 
+      - name: Lint Next.js
+        run: npx pnpm lint:next:ci
+
       - name: Type check backend
         run: npx tsc --noEmit
         working-directory: packages/backend

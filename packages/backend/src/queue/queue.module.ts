@@ -9,6 +9,7 @@ import { ComboModule } from '../combo/combo.module';
 import { EmailProcessor } from './email.processor';
 import { FulfillmentProcessor } from './fulfillment.processor';
 import {
+  QUEUE_ANALYTICS_PREAGG,
   QUEUE_EMAILS,
   QUEUE_FULFILLMENT,
   QUEUE_PARTNER_WEBHOOKS,
@@ -18,7 +19,14 @@ import {
 import { ReviewTaskProcessor } from './review-task.processor';
 import { SyncProcessor } from './sync.processor';
 
-export { QUEUE_EMAILS, QUEUE_FULFILLMENT, QUEUE_PARTNER_WEBHOOKS, QUEUE_REVIEW_TASKS, QUEUE_SYNC };
+export {
+  QUEUE_ANALYTICS_PREAGG,
+  QUEUE_EMAILS,
+  QUEUE_FULFILLMENT,
+  QUEUE_PARTNER_WEBHOOKS,
+  QUEUE_REVIEW_TASKS,
+  QUEUE_SYNC,
+};
 
 @Global()
 @Module({
@@ -44,6 +52,7 @@ export { QUEUE_EMAILS, QUEUE_FULFILLMENT, QUEUE_PARTNER_WEBHOOKS, QUEUE_REVIEW_T
       { name: QUEUE_PARTNER_WEBHOOKS },
       { name: QUEUE_SYNC },
       { name: QUEUE_FULFILLMENT },
+      { name: QUEUE_ANALYTICS_PREAGG },
     ),
     CatalogModule,
     ComboModule,

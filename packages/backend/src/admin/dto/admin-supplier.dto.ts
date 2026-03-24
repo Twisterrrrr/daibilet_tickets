@@ -1,6 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { PaymentMode, PspFeeMode, SupplierRole } from '@prisma/client';
 
 export class UpdateSupplierDto {
@@ -16,13 +29,15 @@ export class UpdateSupplierDto {
   @IsNumber()
   commissionRate?: number;
 
-  @ApiPropertyOptional({ description: 'Промо-комиссия' })
+  /** @deprecated Игнорируется: при сохранении promo обнуляется, используйте только commissionRate. */
+  @ApiPropertyOptional({ description: 'Устарело: не используется', deprecated: true })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   promoRate?: number;
 
-  @ApiPropertyOptional({ description: 'Окончание промо (ISO date)' })
+  /** @deprecated Игнорируется. */
+  @ApiPropertyOptional({ description: 'Устарело: не используется', deprecated: true })
   @IsOptional()
   @IsString()
   promoUntil?: string;
@@ -105,4 +120,23 @@ export class UpdateOperatorPaymentSettingsDto {
   @IsOptional()
   @IsEnum(PspFeeMode)
   pspFeeMode?: PspFeeMode;
+}
+
+export class SetTrustOverrideDto {
+  @ApiProperty({ description: 'Сдвиг к trustScore (−100…+100)', minimum: -100, maximum: 100 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(-100)
+  @Max(100)
+  scoreDelta!: number;
+
+  @ApiProperty({ description: 'Причина override' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(4000)
+  reason!: string;
+
+  @ApiProperty({ description: 'Окончание действия (ISO 8601)' })
+  @IsDateString()
+  expiresAt!: string;
 }

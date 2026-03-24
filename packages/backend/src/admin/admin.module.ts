@@ -7,7 +7,7 @@ import { CatalogModule } from '../catalog/catalog.module';
 import { CheckoutModule } from '../checkout/checkout.module';
 import { VoucherModule } from '../voucher/voucher.module';
 import { ReviewService } from '../catalog/review.service';
-import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
+import { QUEUE_ANALYTICS_PREAGG, QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
 import { TagAssignmentService } from '../scheduler/tag-assignment.service';
 import { LandingModule } from '../landing/landing.module';
 import { CollectionModule } from '../collection/collection.module';
@@ -24,6 +24,10 @@ import { AdminCitiesController } from './admin-cities.controller';
 import { AdminCollectionsController } from './admin-collections.controller';
 import { AdminCombosController } from './admin-combos.controller';
 import { AdminDashboardController } from './admin-dashboard.controller';
+import { AdminDashboardService } from './admin-dashboard.service';
+import { AnalyticsPreaggProcessor } from './analytics-preagg.processor';
+import { AnalyticsService } from './analytics.service';
+import { AdminDiagnosticsService } from './admin-diagnostics.service';
 import { AdminEventsController } from './admin-events.controller';
 import { AdminExternalReviewsController } from './admin-external-reviews.controller';
 import { AdminLandingsController } from './admin-landings.controller';
@@ -57,6 +61,7 @@ import { AdminFinanceSettlementsController } from './admin-finance-settlements.c
 import { AdminFinanceDocumentsDemoController } from './admin-finance-documents-demo.controller';
 import { AdminSupplierDisputesController } from './admin-supplier-disputes.controller';
 import { AdminListingHealthController } from './admin-listing-health.controller';
+import { AdminCatalogConsistencyController } from './admin-catalog-consistency.controller';
 import { AdminAvailabilityController } from './admin-availability.controller';
 import { AdminSupplierEdoController } from './admin-supplier-edo.controller';
 import { AdminEdoDeliveryController } from './admin-edo-delivery.controller';
@@ -68,6 +73,7 @@ import { VenueAdminSummaryService } from './venue-admin-summary.service';
 import { EventOverrideService } from './event-override.service';
 import { EventTagRulesService } from './event-tag-rules.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
+import { OperationLatencyTrackerService } from '../common/operation-latency-tracker.service';
 import { SeoAuditService } from './seo-audit/seo-audit.service';
 
 @Module({
@@ -88,9 +94,15 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_SYNC },
+      { name: QUEUE_ANALYTICS_PREAGG },
     ),
   ],
   providers: [
+    OperationLatencyTrackerService,
+    AnalyticsService,
+    AnalyticsPreaggProcessor,
+    AdminDashboardService,
+    AdminDiagnosticsService,
     AuditService,
     EventOverrideService,
     EventTagRulesService,
@@ -142,6 +154,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminSupplierDisputesController,
     AdminAvailabilityController,
     AdminListingHealthController,
+    AdminCatalogConsistencyController,
     AdminSupplierEdoController,
     AdminEdoDeliveryController,
     AdminSubcategoriesController,

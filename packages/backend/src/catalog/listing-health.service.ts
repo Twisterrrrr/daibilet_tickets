@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Event } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { computeEffectiveTrustScore } from '../supplier/supplier-trust.service';
 
 export interface HealthIssue {
   code: string;
@@ -31,6 +32,18 @@ export class ListingHealthService {
   constructor(private readonly prisma: PrismaService) {}
 
   async computeForOperator(operatorId: string): Promise<ListingHealthResult> {
+    const operatorTrust = await this.prisma.operator.findUnique({
+      where: { id: operatorId },
+      select: {
+        trustScore: true,
+        supplierTrustOverride: { select: { scoreDelta: true, expiresAt: true } },
+      },
+    });
+    const effectiveTrustScore = computeEffectiveTrustScore(
+      operatorTrust?.trustScore ?? 0,
+      operatorTrust?.supplierTrustOverride ?? null,
+    );
+
     const events = await this.prisma.event.findMany({
       where: {
         operatorId,
@@ -67,11 +80,14 @@ export class ListingHealthService {
             address: true,
           },
         },
+        subcategoryLinks: { select: { subcategoryId: true } },
+        subcategories: true,
       },
     });
 
     if (!events.length) {
-      return { score: 100, issues: [], recommendations: [], byEvent: [] };
+      const scoreOnlyTrust = Math.min(100, Math.max(0, Math.round(100 * 0.8 + effectiveTrustScore * 0.2)));
+      return { score: scoreOnlyTrust, issues: [], recommendations: [], byEvent: [] };
     }
 
     const byEvent: EventHealth[] = [];
@@ -87,6 +103,8 @@ export class ListingHealthService {
           offers: { id: string; priceFrom: number | null }[];
           sessions: { id: string; startsAt: Date; canceledAt: Date | null; capacityTotal: number | null; isActive: boolean }[];
           venue?: { id: string; address: string | null } | null;
+          subcategoryLinks?: { subcategoryId: string }[];
+          subcategories?: unknown[];
         },
       );
       byEvent.push(health);
@@ -120,6 +138,9 @@ export class ListingHealthService {
     if (issues.some((i) => i.code === 'VENUE_GAPS')) {
       recommendations.push('Заполните адрес площадки для событий с привязанным venue.');
     }
+    if (issues.some((i) => i.code === 'SUBCATEGORY_LEGACY_ONLY')) {
+      recommendations.push('Перенесите подкатегории из legacy-поля в справочник Subcategory.');
+    }
 
     const rejectedRatio = rejectedCount / events.length;
     let adjustedScore = avgScore;
@@ -128,8 +149,11 @@ export class ListingHealthService {
       recommendations.push('Уменьшите долю отклонённых событий — улучшите качество новых листингов перед отправкой на модерацию.');
     }
 
+    // Смешение качества листинга с эффективным trust (учёт админ-override).
+    const blended = Math.round(adjustedScore * 0.8 + effectiveTrustScore * 0.2);
+
     return {
-      score: Math.round(adjustedScore),
+      score: Math.min(100, Math.max(0, blended)),
       issues,
       recommendations,
       byEvent,
@@ -141,6 +165,8 @@ export class ListingHealthService {
       offers: { id: string; priceFrom: number | null }[];
       sessions: { id: string; startsAt: Date; canceledAt: Date | null; capacityTotal: number | null; isActive: boolean }[];
       venue?: { id: string; address: string | null } | null;
+      subcategoryLinks?: { subcategoryId: string }[];
+      subcategories?: unknown[];
     },
   ): EventHealth {
     const now = new Date();
@@ -207,6 +233,19 @@ export class ListingHealthService {
         field: 'venue.address',
         eventId: event.id,
         actionUrl: `/events/${event.id}/edit#venue`,
+      });
+      penalty += 5;
+    }
+
+    const linkCount = event.subcategoryLinks?.length ?? 0;
+    const legacyCount = Array.isArray(event.subcategories) ? event.subcategories.length : 0;
+    if (legacyCount > 0 && linkCount === 0) {
+      issues.push({
+        code: 'SUBCATEGORY_LEGACY_ONLY',
+        message: 'Подкатегории заданы только в legacy-поле — привяжите записи из справочника',
+        field: 'subcategories',
+        eventId: event.id,
+        actionUrl: `/events/${event.id}/edit#classification`,
       });
       penalty += 5;
     }

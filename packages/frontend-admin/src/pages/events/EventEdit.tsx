@@ -1077,8 +1077,8 @@ export function EventEditPage() {
                             onChange={(e) => {
                               setSelectedEventSubcategoryIds((prev) => {
                                 if (e.target.checked) {
-                                  if (prev.length >= 5) {
-                                    toast.warning('Можно выбрать не более 5 подкатегорий');
+                                  if (prev.length >= 3) {
+                                    toast.warning('Можно выбрать не более 3 подкатегорий');
                                     return prev;
                                   }
                                   return [...prev, opt.id];
@@ -1097,7 +1097,7 @@ export function EventEditPage() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Выбрано: {selectedEventSubcategoryIds.length}/5. Справочник загружается из backend API.
+                    Выбрано: {selectedEventSubcategoryIds.length}/3. Справочник загружается из backend API.
                   </p>
                 </div>
                 {/* Venue & Date Mode — показываем для всех категорий (quality: MISSING_LOCATION) */}

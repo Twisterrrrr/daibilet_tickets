@@ -35,10 +35,17 @@ GET /api/v1/catalog. category=MUSEUM → Venue; EXCURSION|EVENT → Event. Catal
 
 ## 2. Observability
 
-- **RequestId:** header `x-request-id`, логи `[requestId=...]`, в JSON error response — поле `requestId`
-- **PII masking:** email, phone, auth — маскируются в логах (url через maskPiiInString в RequestIdMiddleware)
-- **Sentry:** при SENTRY_DSN + production; requestId в tags при captureException
-- **Ops:** GET /admin/ops/health, GET /admin/ops/metrics (cache hits/misses/hitRate), GET /admin/ops/queues
+- **RequestId:** header `x-request-id`, прокидывается в `req.id` / ответ `x-request-id`; в теле ошибок JSON — поля `requestId`, `error` (см. `AllExceptionsFilter`).
+- **Structured logs:** HTTP-завершения (`LoggingInterceptor`) и платёжные счётчики (`PaymentMetricsService`) — JSON с полями `level`, `type`, `message`, `requestId` (опц.), `meta`. Кэш analytics-tabs логирует `type: ANALYTICS_TABS_CACHE`, `message: hit|miss`.
+- **PII masking:** поля `email` / `phone` в объектах и вхождения в строках (`maskPii` / `maskPiiInString`); query-параметры в url-логах — `sanitizeUrlForLog` (в т.ч. `phone`).
+- **Latency (скользящее окно в памяти):** `OperationLatencyTrackerService` — для ключевых операций `p50`, `p95`, `count`, `lastUpdatedAt` (+ legacy-поля). Метрики: `admin.dashboard.analyticsTabs.compute`, `admin.catalog.consistency.compute`.
+- **GET /admin/ops/metrics** (единая реализация в `AdminOpsController`): плоские счётчики платежей (`...`), `counters`, `rates` (доля ошибок + процентные поля для алертов), `alerts`, `cache` (hits/misses/hitRate), `latency.byMetric`, `latency.analyticsTabsCompute`, `latency.catalogConsistencyCompute`, `system.uptime` / `uptimeSeconds`, `startedAt`, `timestamp`, `diagnostics` (ссылки на связанные GET).
+- **GET /admin/ops/diagnostics** (`AdminReconciliationController`): быстрые COUNT по каталогу (`catalog.*`), `collections.emptyCollections` / `landings.emptyLandings` (числа из кэша consistency, если он прогрет; иначе `null` и подсказка в `meta`).
+- **Кэш-политика (админ):**
+  - `GET /admin/dashboard/analytics-tabs`: ключ Redis `analytics:{sinceDays}:{sha256(filters)[0:16]}`, TTL 60–180s (env `CACHE_TTL_ANALYTICS_TABS` внутри клампа), успешные ответы только; обход: `nocache=1` / `ANALYTICS_TABS_DEBUG=1` / `ANALYTICS_TABS_CACHE_BYPASS=1`. `sinceDays` только 7 | 14 | 30 (иное → 7).
+  - `GET /admin/catalog/consistency`: ключ `catalog:consistency`, TTL 60–120s (env в клампе). Мягкий бюджет на тяжёлый блок selection по умолчанию **1s** (`CATALOG_CONSISTENCY_BUDGET_MS`, `0` = без таймаута); при таймауте — частичный ответ с `degraded: true`.
+- **Sentry:** при `SENTRY_DSN` и 5xx; `requestId` в tags.
+- **RBAC / security:** `docs/RBAC-Matrix.md`, чек-лист ответов `docs/Security-Test-Matrix.md`.
 
 ---
 
@@ -49,6 +56,8 @@ GET /api/v1/catalog. category=MUSEUM → Venue; EXCURSION|EVENT → Event. Catal
 | Events | events:list:*, events:detail:* | Event create/update/delete |
 | Search | search:* | Event/Venue изменение |
 | Catalog | catalog:* | Sync, EventOverride |
+| Admin analytics-tabs | analytics:{sinceDays}:{hash} | `invalidateAfterSync`, TTL 60–180s |
+| Admin catalog consistency | catalog:consistency | refresh=1, sync, TTL 60–120s |
 
 ---
 

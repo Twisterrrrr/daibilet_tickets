@@ -59,14 +59,18 @@ export class PaymentMetricsService {
   increment(metric: keyof PaymentMetrics, context?: Record<string, unknown>): void {
     this.counters[metric]++;
 
-    // Structured log (JSON-friendly)
     this.logger.log(
       JSON.stringify({
-        event: 'payment_metric',
-        metric,
-        value: this.counters[metric],
-        ...context,
-        timestamp: new Date().toISOString(),
+        level: 'log',
+        type: 'PAYMENT_METRIC',
+        message: String(metric),
+        requestId: (context?.requestId as string) ?? '',
+        meta: {
+          metric,
+          value: this.counters[metric],
+          ...context,
+          timestamp: new Date().toISOString(),
+        },
       }),
     );
   }

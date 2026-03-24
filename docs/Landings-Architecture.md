@@ -32,12 +32,18 @@ Template types (MVP):
 - `HYBRID`
 - `SEASONAL_EVENT` (reserved extension)
 
+## Subcategory-first (read-path, 2026)
+
+- Публичный отбор событий лендинга: **`buildLandingEventsWhere`** — ветка по тегу (`filterTag` → `tagId`) **OR** ветки по `additionalFilters.subcategories` (slug → `SubcategoryPolicyService.buildEventSubcategoryFilter`).
+- Совпадает с материализатором и `GET /admin/catalog/consistency` для активных лендингов.
+- Подробности: [Catalog-Classification-Policy.md](Catalog-Classification-Policy.md) §10–§11.
+
 ## Shared Selection Principle
 
 Selection remains unified:
 
-- `CollectionSelectionService` is canonical.
-- Landing runtime resolves by city + landing slug via catalog contract.
+- `CollectionSelectionService` is canonical for **collections**.
+- **Landings** use `buildLandingEventsWhere` (tag OR subcategories + сеансы/OPEN_DATE); city + `filterTag` + `additionalFilters` из `LandingPage`.
 - No duplicated independent selection engines.
 
 ## Admin Surfaces

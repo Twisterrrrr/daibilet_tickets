@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DateMode } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { buildLandingEventsWhere } from './landing-event-filter.helper';
 import { TOPIC_DEFINITIONS_CITY } from './topic-definition.config';
 
 export interface MaterializeResult {
@@ -18,7 +19,7 @@ export interface MaterializeResult {
 
 /**
  * Materializer — автоуправление видимостью лендингов по порогу событий.
- * visible = events(city, filterTag) >= minEvents
+ * visible = eligible events (тег OR подкатегории из additionalFilters) >= minEvents
  *
  * @see docs/Architecture.md
  */
@@ -26,7 +27,10 @@ export interface MaterializeResult {
 export class LandingMaterializerService {
   private readonly logger = new Logger(LandingMaterializerService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subcategoryPolicy: SubcategoryPolicyService,
+  ) {}
 
   async materialize(): Promise<MaterializeResult> {
     const now = new Date();
@@ -44,7 +48,7 @@ export class LandingMaterializerService {
           city: { slug: def.citySlug },
           isDeleted: false,
         },
-        select: { id: true, cityId: true, filterTag: true, isActive: true },
+        select: { id: true, cityId: true, filterTag: true, additionalFilters: true, isActive: true },
       });
 
       if (!landing) {
@@ -58,27 +62,19 @@ export class LandingMaterializerService {
         select: { id: true },
       });
 
-      let count = 0;
-      if (tag) {
-        count = await this.prisma.event.count({
-          where: {
-            isActive: true,
-            isDeleted: false,
-            cityId: landing.cityId,
-            tags: { some: { tagId: tag.id } },
-            OR: [
-              {
-                dateMode: DateMode.SCHEDULED,
-                sessions: { some: { isActive: true, startsAt: { gte: now } } },
-              },
-              {
-                dateMode: DateMode.OPEN_DATE,
-                OR: [{ endDate: null }, { endDate: { gte: now } }],
-              },
-            ],
-          },
-        });
-      }
+      const eventsWhere = buildLandingEventsWhere({
+        cityId: landing.cityId,
+        now,
+        tag,
+        additionalFilters: landing.additionalFilters,
+        subcategoryPolicy: this.subcategoryPolicy,
+      });
+
+      const count = eventsWhere
+        ? await this.prisma.event.count({
+            where: eventsWhere,
+          })
+        : 0;
 
       const shouldBeActive = count >= def.minEvents;
       details.push({

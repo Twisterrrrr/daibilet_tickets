@@ -3,7 +3,14 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 
 import { CatalogModule } from '../catalog/catalog.module';
-import { QUEUE_EMAILS, QUEUE_FULFILLMENT, QUEUE_REVIEW_TASKS, QUEUE_SYNC } from '../queue/queue.constants';
+import {
+  QUEUE_ANALYTICS_PREAGG,
+  QUEUE_EMAILS,
+  QUEUE_FULFILLMENT,
+  QUEUE_REVIEW_TASKS,
+  QUEUE_SYNC,
+} from '../queue/queue.constants';
+import { AnalyticsPreaggSchedulerService } from './analytics-preagg-scheduler.service';
 import { SupplierModule } from '../supplier/supplier.module';
 import { FulfillmentSchedulerService } from './fulfillment-scheduler.service';
 import { OrderExpiryService } from './order-expiry.service';
@@ -13,6 +20,7 @@ import { SchedulerService } from './scheduler.service';
 import { SessionStatsService } from './session-stats.service';
 import { SupplierDailyStatSchedulerService } from './supplier-daily-stat-scheduler.service';
 import { TagAssignmentService } from './tag-assignment.service';
+import { CatalogConsistencySnapshotSchedulerService } from './catalog-consistency-snapshot.scheduler';
 
 @Module({
   imports: [
@@ -24,9 +32,11 @@ import { TagAssignmentService } from './tag-assignment.service';
       { name: QUEUE_REVIEW_TASKS },
       { name: QUEUE_SYNC },
       { name: QUEUE_FULFILLMENT },
+      { name: QUEUE_ANALYTICS_PREAGG },
     ),
   ],
   providers: [
+    AnalyticsPreaggSchedulerService,
     SchedulerService,
     RetentionService,
     ReviewSchedulerService,
@@ -35,6 +45,7 @@ import { TagAssignmentService } from './tag-assignment.service';
     FulfillmentSchedulerService,
     SessionStatsService,
     SupplierDailyStatSchedulerService,
+    CatalogConsistencySnapshotSchedulerService,
   ],
   exports: [TagAssignmentService],
 })

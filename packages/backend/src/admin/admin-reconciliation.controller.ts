@@ -8,24 +8,27 @@
  *   POST /admin/reconciliation/:id/retry      — Ручной retry fulfillment
  *   POST /admin/reconciliation/:id/refund     — Ручной refund
  *   POST /admin/reconciliation/:id/resolve    — Пометить как решённое
- *   GET  /admin/ops/metrics                   — Payment counters + alert rates
+ *   GET  /admin/ops/metrics                   — см. AdminOpsController (единая точка)
  *   GET  /admin/ops/health                    — Operational health dashboard
  */
 
-import { Controller, Get, Post, Param, Query, UseGuards, Body, Logger } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
 
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
 import { FulfillmentService } from '../checkout/fulfillment.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
 import { RefundService } from '../checkout/refund.service';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReconciliationRefundDto, ReconciliationResolveDto } from './dto/admin.dto';
+import { AdminDiagnosticsService } from './admin-diagnostics.service';
 
 @ApiTags('admin/reconciliation')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN', 'EDITOR', 'VIEWER')
 @Controller('admin')
 export class AdminReconciliationController {
   private readonly logger = new Logger(AdminReconciliationController.name);
@@ -35,6 +38,7 @@ export class AdminReconciliationController {
     private readonly fulfillmentService: FulfillmentService,
     private readonly refundService: RefundService,
     private readonly metrics: PaymentMetricsService,
+    private readonly diagnostics: AdminDiagnosticsService,
   ) {}
 
   // ============================
@@ -227,6 +231,7 @@ export class AdminReconciliationController {
   }
 
   @Post('reconciliation/:sessionId/retry')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Ручной retry fulfillment для сессии' })
   async retryFulfillment(@Param('sessionId') sessionId: string) {
     this.logger.log(`Admin retry fulfillment: session ${sessionId}`);
@@ -248,6 +253,7 @@ export class AdminReconciliationController {
   }
 
   @Post('reconciliation/:intentId/refund')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Ручной refund для PaymentIntent' })
   async forceRefund(@Param('intentId') intentId: string, @Body() body: ReconciliationRefundDto) {
     this.logger.log(`Admin force refund: intent ${intentId}, partial=${body.partial}`);
@@ -268,6 +274,7 @@ export class AdminReconciliationController {
   }
 
   @Post('reconciliation/:itemId/resolve')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Пометить FAILED item как "решено админом" (prevents auto-refund)' })
   async resolveItem(
     @Param('itemId') itemId: string,
@@ -285,48 +292,13 @@ export class AdminReconciliationController {
   }
 
   // ============================
-  // Metrics / Ops
+  // Ops (metrics — AdminOpsController)
   // ============================
 
-  @Get('ops/metrics')
-  @ApiOperation({ summary: 'Payment metrics counters + alert rates' })
-  getMetrics() {
-    const raw = this.metrics.getMetrics();
-
-    // Calculate alert rates
-    const reserveTotal = raw.fulfillment_reserve_success + raw.fulfillment_reserve_fail;
-    const fulfillmentFailRate =
-      reserveTotal > 0 ? +((raw.fulfillment_reserve_fail / reserveTotal) * 100).toFixed(2) : 0;
-
-    const autoCompensateRate =
-      raw.payment_intent_paid > 0 ? +((raw.auto_compensate_triggered / raw.payment_intent_paid) * 100).toFixed(2) : 0;
-
-    const webhookDedupRate =
-      raw.webhook_received > 0 ? +((raw.webhook_duplicate / raw.webhook_received) * 100).toFixed(2) : 0;
-
-    // Threshold alerts
-    const alerts: { metric: string; level: 'ok' | 'warn' | 'critical'; value: number }[] = [];
-
-    const addAlert = (metric: string, rate: number, warnThreshold: number, critThreshold: number) => {
-      let level: 'ok' | 'warn' | 'critical' = 'ok';
-      if (rate >= critThreshold) level = 'critical';
-      else if (rate >= warnThreshold) level = 'warn';
-      alerts.push({ metric, level, value: rate });
-    };
-
-    addAlert('fulfillment_fail_rate', fulfillmentFailRate, 5, 15);
-    addAlert('auto_compensate_rate', autoCompensateRate, 5, 15);
-    addAlert('webhook_dedup_rate', webhookDedupRate, 10, 30);
-
-    return {
-      counters: raw,
-      rates: {
-        fulfillmentFailRate,
-        autoCompensateRate,
-        webhookDedupRate,
-      },
-      alerts,
-    };
+  @Get('ops/diagnostics')
+  @ApiOperation({ summary: 'Быстрая диагностика каталога (counts); empty* из кэша consistency при наличии' })
+  async getOpsDiagnostics() {
+    return this.diagnostics.getFastDiagnostics();
   }
 
   @Get('ops/health')

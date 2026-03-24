@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { maskAuthorization, maskEmail, maskPhone, maskPii, maskPiiInString, maskSecret } from '../pii-mask.util';
+import {
+  maskAuthorization,
+  maskEmail,
+  maskPhone,
+  maskPii,
+  maskPiiInString,
+  maskSecret,
+  sanitizeUrlForLog,
+} from '../pii-mask.util';
 
 describe('pii-mask.util', () => {
   describe('maskEmail', () => {
@@ -67,6 +75,11 @@ describe('pii-mask.util', () => {
       const out = maskPii(obj) as Record<string, unknown>;
       expect((out.user as Record<string, unknown>).password).toBe('***');
     });
+    it('masks email-like substrings in free-text string fields', () => {
+      const obj = { hint: 'Пишите на user@example.com' };
+      const out = maskPii(obj) as Record<string, unknown>;
+      expect(String(out.hint)).not.toContain('user@example.com');
+    });
   });
 
   describe('maskPiiInString', () => {
@@ -83,6 +96,23 @@ describe('pii-mask.util', () => {
     it('returns empty for null/undefined', () => {
       expect(maskPiiInString(null)).toBe('');
       expect(maskPiiInString(undefined)).toBe('');
+    });
+  });
+
+  describe('sanitizeUrlForLog', () => {
+    it('masks sensitive query param values (e.g. email)', () => {
+      const u = '/admin/support?email=user%40example.com';
+      const out = sanitizeUrlForLog(u);
+      expect(out).not.toContain('user@example.com');
+      expect(out).not.toContain('user%40example.com');
+      expect(out).toMatch(/email=\*\*\*/);
+      expect(out.startsWith('/admin/support')).toBe(true);
+    });
+    it('returns unchanged when no sensitive path segment', () => {
+      expect(sanitizeUrlForLog('/api/health')).toBe('/api/health');
+    });
+    it('returns empty for empty input', () => {
+      expect(sanitizeUrlForLog('')).toBe('');
     });
   });
 });

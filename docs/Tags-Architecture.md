@@ -1,6 +1,8 @@
 # Tags Architecture (Daibilet)
 
-Дата обновления: 2026-03-23
+Дата обновления: 2026-03-24
+
+> **Классификация и publish (2026):** основной слой выдачи и публикации — **`category` + подкатегории** (см. [Catalog-Classification-Policy.md](Catalog-Classification-Policy.md)). Теги STRUCTURAL/POPULAR остаются для обогащения, SEO-фасетов и legacy-сценариев и **не обязательны** для publish. На read-path OR с подкатегорией перечислены в политике §11.
 
 ## 1. Зачем нужны 2 слоя тегов
 

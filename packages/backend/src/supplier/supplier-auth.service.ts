@@ -52,9 +52,9 @@ export class SupplierAuthService {
           isActive: true,
           isSupplier: true,
           trustLevel: 0,
-          commissionRate: 0.25, // базовая 25% для всех
-          promoRate: 0.10, // 10% промо (включает YooKassa)
-          promoUntil: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 3 месяца
+          commissionRate: 0.25,
+          promoRate: null,
+          promoUntil: null,
           companyName: data.companyName,
           inn: data.inn || null,
           contactEmail: data.email,

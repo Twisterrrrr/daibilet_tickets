@@ -27,6 +27,7 @@ export class AdminSupportController {
 
   @Get('tickets')
   @ApiTags('admin-support')
+  @Roles('ADMIN', 'EDITOR')
   async listTickets(
     @Query('status') status?: string,
     @Query('category') category?: string,
@@ -44,6 +45,7 @@ export class AdminSupportController {
   }
 
   @Get('tickets/:id')
+  @Roles('ADMIN', 'EDITOR')
   async getTicket(@Param('id') id: string) {
     return this.supportService.getTicketById(id);
   }
@@ -69,6 +71,7 @@ export class AdminSupportController {
   }
 
   @Get('stats')
+  @Roles('ADMIN', 'EDITOR')
   async getStats() {
     return this.supportService.getStats();
   }

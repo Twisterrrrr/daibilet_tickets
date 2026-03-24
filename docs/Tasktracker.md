@@ -24,7 +24,7 @@
 |--------|-----------|-----------|--------|
 | `schema-subcategory-core` | Спроектировать и добавить в Prisma сущность Subcategory + связи Event/Venue (M:N), подготовить миграцию | Критический | `[x]` |
 | `seed-master-list` | Импортировать master-список подкатегорий в seed с type, parent, landing whitelist, sortOrder | Высокий | `[x]` |
-| `backend-subcategory-api` | Добавить backend API для чтения справочника и сохранения подкатегорий у Event/Venue с лимитом 5 | Критический | `[x]` |
+| `backend-subcategory-api` | Добавить backend API для чтения справочника и сохранения подкатегорий у Event/Venue (лимит события позже снижен до 3 — см. Epic 1) | Критический | `[x]` |
 | `eventedit-migrate-ui` | Перевести EventEdit с SUBCATEGORY_OPTIONS на API-справочник, добавить UX-ограничения выбора | Высокий | `[x]` |
 | `venueedit-add-ui` | Добавить выбор подкатегорий в VenueEdit на базе того же API | Высокий | `[x]` |
 | `format-mapping-backfill` | Реализовать mapping FORMAT->subcategory и backfill-скрипт с dry-run/логом | Критический | `[x]` |
@@ -32,6 +32,200 @@
 | `catalog-collections-landing-switch` | Перевести фильтры catalog/collections/landings на новые subcategories с fallback на legacy | Высокий | `[x]` |
 | `deprecate-format-tags` | Скрыть категорию Формат из UI создания и перевести в staged deprecate | Средний | `[x]` |
 | `tests-and-rollout` | Добавить тесты совместимости и включить rollout по этапам с проверкой регрессий | Высокий | `[x]` |
+
+> Лимит подкатегорий на **событие** снижен с 5 до **3**; publish-gate переведён на category + subcategories (см. Epic 1 ниже).
+
+---
+
+## Epic 1 — Catalog classification source of truth (24.03.2026)
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `cc-policy-doc` | `docs/Catalog-Classification-Policy.md` + ссылки в Architecture/Project | Высокий | `[x]` |
+| `cc-remove-structural-publish-block` | Убрать обязательные STRUCTURAL THEME/FORMAT из `EventQualityService` | Критический | `[x]` |
+| `cc-subcategory-publish-rules` | Мин 1 / макс 3 эффективных подкатегории; коды `MISSING_SUBCATEGORY`, `TOO_MANY_SUBCATEGORIES` | Критический | `[x]` |
+| `cc-normalizer-service` | `CatalogClassificationNormalizerService` + `PUT /admin/events/:id/subcategories` | Высокий | `[x]` |
+| `cc-publish-gate-checks` | `PublishGateService`: чек `SUBCATEGORY_VALID` | Высокий | `[x]` |
+| `cc-admin-ui-hints` | EventEdit/EventTagsEditor: лимит 3, теги не обязательны для publish | Средний | `[x]` |
+| `cc-tests` | Unit-тесты quality + publish-gate | Высокий | `[x]` |
+
+---
+
+## Epic 2 — Catalog eligibility & diagnostics (Step B/C) (24.03.2026)
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `ce-step-b-selection` | Подборки/лендинги: OR тег vs подкатегория, общий helper лендинга, materializer, listing-health hint, тесты | Критический | `[x]` |
+| `ce-step-b-consistency-api` | `GET /admin/catalog/consistency` + `CatalogConsistencyService` | Высокий | `[x]` |
+| `ce-step-c-admin-ui` | Страница админки «Каталог: согласованность» → тот же API | Высокий | `[x]` |
+| `ce-step-c-public-events-where` | `buildEventWhere`: подкатегория в AND, OR с тегами, merge `sessionFilter` | Критический | `[x]` |
+
+См. `Catalog-Classification-Policy.md` §8–§10, `Architecture.md` §3.3.
+
+**Сводка:** Epic 1 и Epic 2 по треку каталога (classification + eligibility/diagnostics) — **закрыты** (критерии приёмки и тесты — в момент записи 24.03.2026). Ниже — **пост-классификационный** бэклог (read-path parity, диагностика, платформа, доки, данные).
+
+---
+
+## Post-Classification Hardening — обзор (24.03.2026)
+
+| Эпик | Фокус | Статус (в целом) |
+|--------|--------|------------------|
+| **C1** | Read-path compatibility (subcategory-first, теги не теряют события) | `[x]` (батч 24.03.2026) |
+| **C2** | Catalog consistency & diagnostics (endpoint как продукт) | `[x]` кроме optional snapshot |
+| **D** | Analytics & observability | `[x]` Step D **ACCEPT/DONE** (AN-1, базовое расширение observability); хвост — **D-follow-up** ниже |
+| **E** | RBAC / security baseline | `[x]` Step E **ACCEPT/DONE**; follow-up — **E.1** (supplier mutation roles), **E.2** (`AuditLog.actorRole`) |
+| **F** | Docs alignment (post-rewrite) | `[x]` ключевые доки (батч 24.03.2026) |
+| **G** | Data cleanup (не блокирует релиз) | `[~]` скрипт trim links; legacy-classification — отдельно |
+
+> **Уже есть (фундамент):** Epic 2 — OR тег vs подкатегория в подборках/лендингах, `GET /admin/catalog/consistency` (MVP), `buildEventWhere` с OR и `sessionFilter`. C1/C2 дополняют это до полного DoD (страница тега, промо/виджеты, perf/cache consistency, явный реестр tag-fallback).
+
+---
+
+## EPIC C1 — Read-path Compatibility
+
+**DoD:** нет read-path’ов, где событие пропадает из‑за отсутствия тегов при валидных subcategories; subcategories — основной фильтр; tag-only либо fallback, либо осознанный legacy.
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `tag-page-parity` | Страница тега / `getEventsByTagSlug`: OR с subcategories или unified filter policy | Средний | `[x]` |
+| `buildEventWhere-parity` | Аудит и унификация `buildEventWhere` и прочих query builders: subcategory-first, теги только fallback | Высокий | `[x]` |
+| `promo-widget-audit` | Промо, виджеты, старые URL — убрать скрытую зависимость от tag-only фильтров | Средний | `[x]` |
+| `legacy-tag-fallback` | Зафиксировать в коде/доке места, где тег — fallback, не source of truth | Высокий | `[x]` |
+
+---
+
+## EPIC C2 — Catalog Consistency & Diagnostics
+
+**DoD:** endpoint не деградирует на большом каталоге; быстро видно: нет category, нет subcategories, ровно 3 subcategories, нет location/offers/sessions, пустые collections/landings.
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `catalog-consistency-endpoint` | Довести `GET /admin/catalog/consistency` (все основные категории проблем) | Высокий | `[x]` (+ listableTotal, noPrimaryImage, `?refresh=1`) |
+| `catalog-consistency-perf` | Убрать множественные COUNT в цикле (агрегации / batching) | Средний | `[x]` (батчи подборок/лендингов/consistency; список подборок публично) |
+| `catalog-consistency-cache` | Кэш ответа (TTL 30–120 с) | Средний | `[x]` |
+| `catalog-consistency-snapshot` | (Опц.) фоновый пересчёт / snapshot-таблица | Низкий | `[ ]` |
+
+---
+
+## EPIC D — Analytics & Observability
+
+**DoD:** p95 под контролем; медленные запросы логируются; типовые инциденты диагностируются через API, не только логи.
+
+**Step D (24.03.2026):** статус **ACCEPT / DONE**. Закрыто: **AN-1** (analytics-tabs), **базовое расширение observability** (latency в `OperationLatencyTrackerService`, `GET /admin/ops/metrics`, diagnostics, cache/TTL policy, structured logs для ключевых точек). Дальнейшее — не большой эпик, а хвост **D-follow-up**.
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `AN-1-analytics-tabs` | `sinceDays`, Redis cache, slow queries, latency — см. **AN-1** ниже по файлу | Критический | `[x]` |
+| `observability-expansion-core` | Базовое расширение observability (metrics shape, latency byMetric, diagnostics hints, requestId/security hygiene) | Высокий | `[x]` |
+| `analytics-query-optimization` | Оптимизация тяжёлых агрегатов (без лишних JOIN-цепочек) | Высокий | `[x]` см. **D-preagg batch (25.03.2026)** ниже |
+| `observability-metrics` | Расширение `GET /admin/ops/metrics` | Высокий | `[x]` |
+| `request-id-logging` | `requestId` во всех логах и error response | Высокий | `[x]` |
+| `pii-masking` | Маскирование PII в логах | Средний | `[x]` |
+| `incident-diagnostics` | Сигналы по каталогу / пустым подборкам и путём API | Высокий | `[x]` `GET /admin/catalog/consistency` + `GET /admin/ops/diagnostics` |
+
+### Эксплуатация: consistency budget по умолчанию (1s)
+
+Дефолтный **мягкий budget** на фазу selection в `GET /admin/catalog/consistency` может чаще давать **`degraded: true`** — это **продуктовая настройка**, не баг. Перед изменением кода смотреть в прод/staging: долю ответов с `degraded`, **p95** `catalogConsistencyCompute`, **cache hit/miss** после прогрева. Если degraded **редко** — не трогать. Если **часто** — тогда: поднять `CATALOG_CONSISTENCY_BUDGET_MS`, упростить selection, или snapshot / фоновый пересчёт.
+
+### D-follow-up (хвост, не эпик)
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `ops-health-unify` | Свести `GET /admin/ops/health` к одному handler / одному source of truth | Средний | `[ ]` |
+| `structured-logging-rollout` | Довести оставшиеся legacy-текстовые логи до JSON structured format | Средний | `[ ]` |
+| `consistency-budget-tuning` | Подкрутить budget/TTL по прод-метрикам после прогрева кэша | Низкий | `[ ]` |
+
+### D-preagg batch — analytics + trust (25.03.2026) — `[x]` закрыто
+
+**Фаза A — Analytics pre-aggregation & observability**
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `D-preagg-schema` | `DailyEventStats`, индексы (`packages.createdAt`, `package_items` composite), миграция | Высокий | `[x]` |
+| `D-preagg-job` | Очередь `analytics-preagg`, процессор, cron пересчёт «вчера» UTC | Высокий | `[x]` |
+| `D-analytics-service` | `AnalyticsService`: тайминги запросов, `popularTopics` из preagg при полном окне, fallback live | Высокий | `[x]` |
+| `D-analytics-p95` | Метрики `analytics.query.duration` (endpoint+query), срез в `GET /admin/ops/metrics` | Высокий | `[x]` |
+
+**Фаза B — Supplier trust override**
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `trust-override-schema` | `SupplierTrustOverride` (supplierId, scoreDelta, reason, expiresAt), FK на operators | Высокий | `[x]` |
+| `trust-override-service` | `getEffectiveScore`, upsert/delete, blend в `ListingHealthService` | Высокий | `[x]` |
+| `trust-override-api` | `GET/POST/DELETE /admin/suppliers/:id/trust-override`, effective в карточке и списке | Высокий | `[x]` |
+| `trust-override-admin-ui` | Карточка поставщика: Trust, диалог override; список: `DataTableShell`, бейдж OV | Средний | `[x]` |
+
+Миграции применены на dev (`prisma migrate deploy`).
+
+---
+
+## EPIC E — RBAC / Security Baseline
+
+**DoD:** роли формализованы; нет утечек между supplier’ами; критичные действия логируются.
+
+**Step E (24.03.2026):** статус **ACCEPT / DONE** — матрицы (`RBAC-Matrix.md`, `Security-Test-Matrix.md`), admin support без VIEWER + PII, явные `@Roles` где нужно, UI gating по меню (второй слой; **источник истины — backend guards**), тесты: `RolesGuard`, metadata merge, `SupplierRolesGuard`, `SupplierRbacService`, invite `accept`, `assertOperatorScope`.
+
+**Закрытые риски (Step E):** VIEWER не видит support с PII; задокументировано поведение method vs class `@Roles`; invite flow с unit-тестами; изоляция scope — явный тест на `assertOperatorScope`.
+
+**Главный оставшийся риск (поведенческий, не только документация):** часть **supplier-мутаций** может быть защищена только **supplier JWT + проверкой `operatorId`**, но **без role-level policy** (`@SupplierRoles`). Это лучший кандидат на следующий **mini-step** после бизнес-подтверждения.
+
+**Не в счёт защиты:** фильтрация пунктов меню во фронте — нормально, пока guards на API корректны; меню **не** замена RBAC.
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `rbac-matrix-doc` | `docs/RBAC-Matrix.md` + `Security-Test-Matrix.md` | Высокий | `[x]` |
+| `rbac-enforcement-audit` | Сводка по admin/supplier в матрицах; полный ручной проход — по мере изменений | Критический | `[~]` |
+| `security-tests` | guards, invite, RBAC, scope assert | Критический | `[x]` базовый набор (см. `Security-Test-Matrix.md`) |
+| `invitation-security` | reuse / expiry / accept | Высокий | `[x]` код + `supplier-invitation.service.spec.ts` |
+| `support-admin-rbac` | Support только ADMIN/EDITOR | Высокий | `[x]` |
+
+### E-follow-up (осознанный хвост)
+
+| Step | ID | Задача | Приоритет | Статус |
+|--------|-----|--------|-----------|--------|
+| **E.1** | `supplier-mutation-role-hardening` | Закрыть мутации без `@SupplierRoles`: в т.ч. `POST /supplier/orders/:id/confirm`, `reject`, write в settings/events/balance/finance — **явно** кто может (OWNER/MANAGER/CONTENT/ACCOUNTANT). Отдельный мини-PR + согласование с продуктом. | Критический | `[ ]` |
+| **E.2** | `audit-log-actor-role` | Миграция Prisma: `AuditLog` + поле **`actorRole`** (snapshot роли на момент действия, в т.ч. для support и прочих админ‑действий); обновить `AuditInterceptor` / вызовы `AuditService.log`. | Высокий | `[ ]` |
+
+**Вне эпика, но связано:** оставшиеся **документационные** хвосты по supplier (enum без VIEWER) — в `RBAC-Matrix.md`.
+
+---
+
+## EPIC F — Docs Alignment (post-rewrite)
+
+**DoD:** документы не противоречат коду; теги не как обязательный слой; subcategories как основной слой.
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `catalog-classification-policy` | Финализировать `Catalog-Classification-Policy.md` | Критический | `[x]` §11 реестр read-path |
+| `tags-architecture-rewrite` | Переписать `Tags-Architecture.md` (tags = secondary) | Высокий | `[x]` вступление + ссылка на политику |
+| `landings-architecture-update` | Обновить под subcategory-first selection | Высокий | `[x]` |
+| `collections-architecture-update` | Зафиксировать subcategory-first eligibility | Высокий | `[x]` |
+| `architecture-sync` | Синхронизировать `Architecture.md` | Средний | `[x]` актуально; точечные правки по смыслу не требовались |
+
+---
+
+## EPIC G — Data Cleanup (out of scope релиза, зафиксировано)
+
+**Инвариант:** события с **>3** subcategories не publishable — это **data issue**, не баг кода.
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `subcategory-overflow-cleanup` | Очистка событий с 4–5 подкатегориями | Средний | `[x]` `pnpm data:trim-subcategory-links` (+ `--apply`) |
+| `legacy-classification-fix` | Приведение legacy-событий к новой модели | Средний | `[ ]` (скрипты reclassify / backfill по отдельному плану) |
+
+---
+
+## STEP B.1 — Build hygiene (Vite + Next lint) (24.03.2026)
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `bh-vite-chunks` | `manualChunks` + `chunkSizeWarningLimit` в `frontend-admin` / `frontend-supplier` (`vite.config.ts`) | Средний | `[x]` |
+| `bh-vite-lazy` | Lazy + `Suspense` в layout: тяжёлые страницы (дашборд, отчёты, крупные формы, finance) | Средний | `[x]` |
+| `bh-next-lint-ci` | Скрипты `lint:next` / `lint:next:ci` в корне; шаг в `.github/workflows/ci.yml` | Высокий | `[x]` |
+
+> `typecheck` в корне по-прежнему: backend + Next (`pnpm typecheck`). При необходимости расширить на admin/supplier — отдельной задачей.
+
+> **Примечание:** прежний короткий «Epic 3» разбит на **C1–G** выше; отдельные строки `ep3-*` сняты во избежание дубля.
 
 ---
 
@@ -376,7 +570,7 @@ Definition of Done (Focused):
 - [x] **Высокий**: Sentry: `PAYMENT_FAILED` в `payment.service`, `all-exceptions.filter` для 5xx ✅
 - [x] **Средний**: GiftCertificate в checkout — поле «Ввести код», `POST /checkout/validate-gift-certificate`, применение к сессии ✅
 - [x] **Средний**: Лендинг `salyut` — исправление `getPrice` (`price ?? amount`), тесты `collection.service.spec.ts` (salyut), теги `salyut-s-vody` в enrichment ✅
-- [ ] **Средний**: SQL-отчёт по категоризации (аудит качества каталога) — отдельный инструмент
+- [ ] **Средний**: SQL-отчёт по категоризации (аудит качества каталога) — отдельный инструмент; тем же отчётом можно пользоваться во входе SEO/Gate 3
 - [ ] **Критический**: Gate 1b — включить YooKassa в prod (PAYMENT_PROVIDER=YOOKASSA, ключи в .env, smoke-тесты)
 
 ### Buyer Account / ЛК покупателя (MVP, 15.03.2026)
@@ -468,7 +662,6 @@ Definition of Done (Focused):
 - [x] **Высокий**: PageTemplateSpecs — гибридная модель (11.03): core + content JSON + refund policy; аудит соответствия ✅ (аудит в archive/specs/)
 - [ ] **Средний**: Контентный план — 30 статей (ArticlePlanner)
 - [ ] **Средний** (3+ мес): Отображение «Музеи» (детальная страница venue) — режим работы, галерея, выставки (см. `docs/Reference.md` §1)
-- [ ] **Средний**: Аудит категоризации — SQL-отчёт уже из Gate 1 можно переиспользовать как инструмент SEO
 - [x] **Высокий**: Event Quality Gate — `EventQualityService.validateForPublish` + `/admin/events/:id/publish` ✅ (+ NO_VALID_PRICE для офферов без цены)
 - [x] **Высокий**: EventOverride.subcategories — явная семантика INHERIT/OVERRIDE/CLEAR + subcategoriesOverride (SubcategoriesMode enum + Prisma migration)
 - [~] **Средний**: Нормализация категорий/аудиторий после импорта (детерминированный маппинг TC/TEP → EventCategory/EventSubcategory). **TEPLOHOD E2E готов:** mapping first → register unknown + classifier → EVENT; `findMappedCategory` + `registerUnknownCategory` в импортёре.
@@ -554,14 +747,9 @@ Definition of Done (Focused):
 #### Phase 9 — Team / Roles / Support (Invitations & RBAC)
 
 - **Verdict:** ACCEPT WITH NOTES
-- **Notes (security‑sensitive):**
-  - Обязательно покрыть security‑тестами:
-    - `non-OWNER` create invitation → 403;
-    - истёкший токен → reject;
-    - повторное использование токена → reject;
-    - accept invitation создаёт SupplierUser с корректными `operatorId` и `role`;
-    - invite token не может быть переиспользован.
-  - Пока это не покрыто тестами, invitations/RBAC в `main` считать **условно боевыми**, rollout делать осторожно.
+- **Notes:**
+  - Базовые security‑сценарии приглашений/RBAC — в **`Security-Test-Matrix.md`**, строки **`security-tests` / `invitation-security`** в **EPIC E**.
+  - Осознанный хвост по поведению API поставщика — **E.1** (`@SupplierRoles` на мутациях).
 
 #### Buyer Account V2 (спец‑блок)
 
@@ -690,8 +878,6 @@ Definition of Done (Focused):
 - [x] SupplierInvitation model, API
 - [x] Invitations CRUD: POST/GET/DELETE /supplier/invitations, accept
 - [x] Supplier UI: страница «Команда», приглашение по ссылке /invite/:token
-- [ ] RBAC permissions matrix (документация)
-- [ ] Support link, audit
 
 ---
 
@@ -858,7 +1044,9 @@ Definition of Done (Focused):
   - Tabs: `General`, `SEO`, `Marketing`, `Integrations` (MVP можно сделать заглушками).
   - Внутри вкладок использовать `FormSection`, `FormGrid`, `FormActions`.
 
-### AN-1 — Dashboard Analytics Hardening `[ ]`
+### AN-1 — Dashboard Analytics Hardening `[x]`
+
+Закрыто в **EPIC D** (`AN-1-analytics-tabs`: sinceDays, кэш, latency/slow-query, ops/metrics). Открытый хвост по запросам — **`analytics-query-optimization`** в той же таблице; опциональные алерты p95 — через **`GET /admin/ops/metrics`** (см. **D-follow-up** при необходимости).
 
 #### Analytics policy (MVP)
 
@@ -909,13 +1097,6 @@ Definition of Done (Focused):
   Source: `event_tags` + `tags` (top by usage)  
   Type: `approximate`  
   Usage: `dashboard only`
-
-#### Backlog AN-1
-
-- [ ] sinceDays (7/30/90) + единый контракт периодов
-- [ ] caching strategy (TTL + invalidation rules)
-- [ ] query optimization + индексы для тяжелых агрегаций
-- [ ] SLA: p95 response time и алерты на деградацию
 
 ### UA-8 — Supplier Cabinet: выравнивание с admin-паттернами `[x]`
 

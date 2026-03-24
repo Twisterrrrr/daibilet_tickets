@@ -2,7 +2,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { DataTableShell, PageHeader, StatusBadge } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -30,13 +30,15 @@ interface SupplierItem {
   companyName: string | null;
   contactEmail: string | null;
   trustLevel: number;
+  trustScore?: number;
+  effectiveTrustScore?: number;
   commissionRate: number;
-  promoRate: number | null;
   _count?: { events?: number; offers?: number; supplierUsers?: number };
   successfulSales: number;
   isActive: boolean;
   inn?: string | null;
   createdAt: string | null;
+  trustOverrideActive?: boolean;
 }
 
 const columns: ColumnDef<SupplierItem>[] = [
@@ -82,11 +84,24 @@ const columns: ColumnDef<SupplierItem>[] = [
   {
     accessorKey: 'trustLevel',
     header: 'Trust',
-    cell: ({ row }) => (
-      <Badge variant={TRUST_VARIANTS[row.original.trustLevel] ?? 'secondary'}>
-        {TRUST_LABELS[row.original.trustLevel] ?? row.original.trustLevel}
-      </Badge>
-    ),
+    cell: ({ row }) => {
+      const s = row.original;
+      const isAgg = typeof s.id === 'string' && s.id.startsWith('agg:');
+      const eff = typeof s.effectiveTrustScore === 'number' ? s.effectiveTrustScore : null;
+      return (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant={TRUST_VARIANTS[s.trustLevel] ?? 'secondary'}>
+            {TRUST_LABELS[s.trustLevel] ?? s.trustLevel}
+          </Badge>
+          {!isAgg && eff !== null && (
+            <span className="text-xs tabular-nums text-muted-foreground">{eff}</span>
+          )}
+          {!isAgg && s.trustOverrideActive && (
+            <StatusBadge tone="warning" label="OV" />
+          )}
+        </div>
+      );
+    },
   },
   {
     id: 'commission',
@@ -96,14 +111,7 @@ const columns: ColumnDef<SupplierItem>[] = [
       const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
       if (isAggregator) return <span className="text-sm text-muted-foreground">—</span>;
       return (
-        <span className="text-sm tabular-nums">
-          {(Number(s.commissionRate) * 100).toFixed(0)}%
-          {s.promoRate && (
-            <span className="text-xs text-green-600 ml-1">
-              ({(Number(s.promoRate) * 100).toFixed(0)}% промо)
-            </span>
-          )}
-        </span>
+        <span className="text-sm tabular-nums">{(Number(s.commissionRate) * 100).toFixed(0)}%</span>
       );
     },
   },
@@ -164,7 +172,6 @@ export function SuppliersListPage() {
             contactEmail: '',
             trustLevel: 2,
             commissionRate: 0,
-            promoRate: null,
             _count: { events: tcEvents, offers: 0, supplierUsers: 0 },
             successfulSales: 0,
             isActive: true,
@@ -177,7 +184,6 @@ export function SuppliersListPage() {
             contactEmail: '',
             trustLevel: 1,
             commissionRate: 0,
-            promoRate: null,
             _count: { events: teplohodEvents, offers: 0, supplierUsers: 0 },
             successfulSales: 0,
             isActive: true,
@@ -205,94 +211,86 @@ export function SuppliersListPage() {
     <div className="space-y-4">
       <PageHeader title="Поставщики" subtitle={`Всего: ${total}`} />
 
-      {error && (
-        <ErrorState
-          title="Не удалось загрузить поставщиков"
-          description={error}
-          action={
-            <button
-              type="button"
-              className="rounded-lg border px-3 py-1.5 text-sm"
-              onClick={() => load({ page: 1 })}
+      <DataTableShell
+        loading={loading}
+        error={error}
+        isEmpty={suppliers.length === 0 && !loading && !error}
+        loadingLabel="Загрузка списка поставщиков..."
+        errorTitle="Не удалось загрузить поставщиков"
+        errorAction={
+          <Button type="button" variant="outline" size="sm" onClick={() => load({ page: 1 })}>
+            Повторить попытку
+          </Button>
+        }
+        emptyTitle="Нет поставщиков"
+        emptyDescription="Как только появятся поставщики или подключённые агрегаторы, они отобразятся здесь."
+        toolbar={
+          <div className="flex w-full flex-wrap items-center gap-1.5 py-0.5">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && load({ page: 1, search: e.currentTarget.value })}
+              placeholder="Поиск по названию или email..."
+              className="w-72"
+            />
+            <Button type="button" variant="outline" size="sm" onClick={() => load({ page: 1, search })}>
+              Найти
+            </Button>
+            <Select
+              value={trustFilter}
+              onValueChange={(value) => {
+                const v = value as typeof trustFilter;
+                setTrustFilter(v);
+                load({ page: 1, trust: v });
+              }}
             >
-              Повторить попытку
-            </button>
-          }
-        />
-      )}
-
-      {suppliers.length === 0 && !loading ? (
-        <EmptyState
-          title="Нет поставщиков"
-          description="Как только появятся поставщики или подключённые агрегаторы, они отобразятся здесь."
-        />
-      ) : (
+              <SelectTrigger className="w-[170px]">
+                <SelectValue placeholder="Trust: все" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Trust: все</SelectItem>
+                <SelectItem value="0">0 — Новый</SelectItem>
+                <SelectItem value="1">1 — Проверенный</SelectItem>
+                <SelectItem value="2">2 — Доверенный</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={activeFilter}
+              onValueChange={(value) => {
+                const v = value as typeof activeFilter;
+                setActiveFilter(v);
+                load({ page: 1, isActive: v });
+              }}
+            >
+              <SelectTrigger className="w-[170px]">
+                <SelectValue placeholder="Статус: все" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Статус: все</SelectItem>
+                <SelectItem value="true">Активные</SelectItem>
+                <SelectItem value="false">Неактивные</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="ml-auto text-sm text-muted-foreground">
+              Стр. {page} из {pages}
+            </span>
+          </div>
+        }
+      >
         <div className="overflow-hidden rounded-[10px] border border-border/80 bg-white shadow-none">
           <DataTable
             columns={columns}
             data={suppliers}
-            loading={loading}
+            loading={false}
             emptyText="Нет поставщиков"
             onRowClick={(item) => {
               const isAggregator = typeof item.id === 'string' && item.id.startsWith('agg:');
               if (!isAggregator) navigate(`/suppliers/${item.id}`);
             }}
             pageSize={20}
-            toolbar={
-              <div className="flex w-full flex-wrap items-center gap-1.5 py-0.5">
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && load({ page: 1, search: e.currentTarget.value })}
-                  placeholder="Поиск по названию или email..."
-                  className="w-72"
-                />
-                <Button type="button" variant="outline" size="sm" onClick={() => load({ page: 1, search })}>
-                  Найти
-                </Button>
-                <Select
-                  value={trustFilter}
-                  onValueChange={(value) => {
-                    const v = value as typeof trustFilter;
-                    setTrustFilter(v);
-                    load({ page: 1, trust: v });
-                  }}
-                >
-                  <SelectTrigger className="w-[170px]">
-                    <SelectValue placeholder="Trust: все" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Trust: все</SelectItem>
-                    <SelectItem value="0">0 — Новый</SelectItem>
-                    <SelectItem value="1">1 — Проверенный</SelectItem>
-                    <SelectItem value="2">2 — Доверенный</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={activeFilter}
-                  onValueChange={(value) => {
-                    const v = value as typeof activeFilter;
-                    setActiveFilter(v);
-                    load({ page: 1, isActive: v });
-                  }}
-                >
-                  <SelectTrigger className="w-[170px]">
-                    <SelectValue placeholder="Статус: все" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Статус: все</SelectItem>
-                    <SelectItem value="true">Активные</SelectItem>
-                    <SelectItem value="false">Неактивные</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span className="ml-auto text-sm text-muted-foreground">
-                  Стр. {page} из {pages}
-                </span>
-              </div>
-            }
           />
         </div>
-      )}
+      </DataTableShell>
     </div>
   );
 }

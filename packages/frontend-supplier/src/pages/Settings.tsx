@@ -53,18 +53,6 @@ export default function Settings() {
               {form.commissionRate ? `${(Number(form.commissionRate) * 100).toFixed(0)}%` : '-'}
             </span>
           </div>
-          {form.promoRate && (
-            <div>
-              <span className="text-gray-500">Промо-ставка:</span>{' '}
-              <span className="font-medium text-green-600">{(Number(form.promoRate) * 100).toFixed(0)}%</span>
-              {form.promoUntil && (
-                <span className="text-xs text-gray-400">
-                  {' '}
-                  до {new Date(form.promoUntil).toLocaleDateString('ru')}
-                </span>
-              )}
-            </div>
-          )}
           <div>
             <span className="text-gray-500">Trust Level:</span> <span className="font-medium">{form.trustLevel}</span>
           </div>

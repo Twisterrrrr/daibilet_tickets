@@ -203,12 +203,16 @@ export function EventTagsEditor({ eventId, disabled }: { eventId: string; disabl
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Теги события</CardTitle>
+        <p className="text-xs text-muted-foreground pt-1">
+          Для публикации важны категория и подкатегории (отдельный блок выше). Теги — дополнительный слой
+          (обогащение / маркетинг / совместимость); отсутствие тегов не блокирует публикацию.
+        </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Structural layer */}
+        {/* Structural layer (optional) */}
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2 items-center">
-            <Label className="text-sm">STRUCTURAL</Label>
+            <Label className="text-sm">Структурные теги (необязательно)</Label>
           </div>
           {(Object.keys(GROUP_LABELS) as StructuralTagGroup[]).map((group) => {
             const selected = draftStructural[group];

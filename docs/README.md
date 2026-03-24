@@ -15,6 +15,7 @@
 | [finance.md](finance.md) | Buyer/Supplier/Admin финансы |
 | [BuyerAccountSpecs.md](BuyerAccountSpecs.md) | ЛК покупателя |
 | [Architecture.md](Architecture.md) | Каталог, лендинги, topic definitions |
+| [Catalog-Classification-Policy.md](Catalog-Classification-Policy.md) | Классификация событий, publish-gate (category + subcategories) |
 | [Landings-Architecture.md](Landings-Architecture.md) | Архитектура лендингов |
 | [Collections-Architecture.md](Collections-Architecture.md) | Архитектура подборок |
 | [Tags-Architecture.md](Tags-Architecture.md) | Архитектура тегов и SEO-routing |

@@ -1,6 +1,7 @@
 'use client';
 
 import { CheckCircle, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
@@ -13,12 +14,12 @@ function VerifiedContent() {
       <CheckCircle className="mx-auto h-16 w-16 text-emerald-500" />
       <h1 className="mt-6 text-2xl font-bold text-slate-900">Спасибо!</h1>
       <p className="mt-3 text-sm text-slate-600">{message}</p>
-      <a
+      <Link
         href="/"
         className="mt-8 inline-block rounded-lg bg-primary-600 px-6 py-3 text-sm font-medium text-white hover:bg-primary-700 transition"
       >
         На главную
-      </a>
+      </Link>
     </div>
   );
 }

@@ -21,6 +21,7 @@
 ## Центральные документы
 
 - **Архитектура проекта**: `Project.md` (этот файл).
+- **Классификация каталога / publish-gate (category + subcategories)**: `Catalog-Classification-Policy.md`.
 - **Финансы (Buyer + Supplier + Admin)**: `finance.md`.
 - **Личный кабинет покупателя / Buyer Account**: `BuyerAccountSpecs.md`.
 - **Система доверия поставщикам / Supplier Trust System**: `archive/specs/SupplierTrustSpec.md`.

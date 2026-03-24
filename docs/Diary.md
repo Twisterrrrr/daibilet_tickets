@@ -4,6 +4,72 @@
 
 ---
 
+## 25.03.2026 — D-preagg batch: analytics pre-aggregation + supplier trust override
+
+### Наблюдения
+
+- Тяжёлые агрегаты analytics-tabs требовали таймингов, индексов и среза по подзапросам (p95 в ops).
+- Для `popularTopics` за 30 дней полезна дневная агрегация продаж по событиям с пересчётом по job.
+- Trust score на `Operator` нужна отдельная админская дельта с TTL, без смешения с `trustManual*`.
+
+### Решения
+
+- **Analytics:** таблица `daily_event_stats`, `AnalyticsService` с `timePromise`/`timePromiseFn`, ветка preagg для топа тем при полном UTC-окне; очередь BullMQ `analytics-preagg`, процессор, cron; `analytics.query.duration` + `latency.analyticsQueryDuration` в ops.
+- **Индексы:** в составе миграции analytics — `packages("createdAt")`, `package_items("eventId","status")` (и пр. по миграции).
+- **Trust override:** `SupplierTrustOverride`, `computeEffectiveTrustScore` / `getEffectiveScore`, API `GET/POST/DELETE .../trust-override`, список поставщиков отдаёт `effectiveTrustScore` и `trustOverrideActive`; **ListingHealth:** смешение 80% среднего health событий + 20% эффективного trust.
+- **Админ UI:** Trust-блок и диалог на `SupplierDetail`, `DataTableShell` на списках поставщиков и событий поставщика, `StatusBadge` для override.
+
+### Проблемы
+
+- На пустом каталоге событий listing health опирается только на trust-смешение — осознанный компромисс до появления листингов.
+
+---
+
+## 24.03.2026 — Step E: RBAC / security baseline
+
+### Наблюдения
+
+- В Prisma нет `SUPERUSER` (верхняя админ-роль — `ADMIN`) и нет `SupplierRole.VIEWER`.
+- Поддержка админки ранее позволяла **VIEWER** читать тикеты без `@Roles` на GET — риск утечки PII.
+- Аудит `AuditLog` не хранит `actorRole` отдельным полем — для полного security/audit контура нужна отдельная миграция.
+
+### Решения
+
+- **Step E — статус ACCEPT / DONE** (зафиксировано в `docs/Tasktracker.md`): матрицы, support, тесты guards/invite/scope, UI-гейтинг по меню.
+- `docs/RBAC-Matrix.md` + `docs/Security-Test-Matrix.md`.
+- `AdminSupportController`: все GET/PATCH/POST — `@Roles('ADMIN', 'EDITOR')`.
+- `AdminCatalogConsistencyController`: явный `@Roles('ADMIN', 'EDITOR', 'VIEWER')` на `GET consistency`.
+- UI: `frontend-admin` / `frontend-supplier` — фильтрация навигации по роли из JWT; **это второй слой**, не замена guards (источник истины — API).
+- Тесты: metadata merge `@Roles`, `SupplierRolesGuard`, `SupplierRbacService`, `SupplierInvitationService.accept`, `assertOperatorScope`.
+
+### Проблемы / осознанный follow-up (не закрыто в Step E)
+
+- **E.1 — Supplier mutation role hardening:** часть мутаций (`orders/confirm`, `reject`, др.) может опираться только на JWT + `operatorId`, **без** `@SupplierRoles`; это **поведенческий** риск — отдельный мини-PR после бизнес-подтверждения (см. `Tasktracker` → E-follow-up).
+- **E.2 — AuditLog `actorRole`:** schema upgrade + interceptor/service.
+- Обход прямого URL во фронте возможен; отсечение только на бэкенде — ожидаемо.
+
+---
+
+## 24.03.2026 — Epic 1: классификация каталога (subcategories-first, теги вторичны)
+
+### Наблюдения
+
+- Публикация в админке отклонялась при `!quality.isReady`; в `EventQualityService` обязательные STRUCTURAL THEME/FORMAT дублировали таксономию и блокировали события без этих тегов даже при заполненных подкатегориях.
+- Лимит подкатегорий на событие был 5; политика продукта: минимум 1, максимум 3.
+
+### Решения
+
+- Источник истины для publish: **category** + **эффективные subcategories** (new-first по `EventSubcategoryLink`, иначе legacy `Event.subcategories` enum). Теги не блокируют publish.
+- Введены issue-коды `MISSING_SUBCATEGORY`, `TOO_MANY_SUBCATEGORIES`; сняты `MISSING_STRUCTURAL_THEME_TAG` / `MISSING_STRUCTURAL_FORMAT_TAG`.
+- `SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES = 3`; нормализация выбора в `CatalogClassificationNormalizerService` для `PUT .../subcategories`.
+- Документ политики: `docs/Catalog-Classification-Policy.md`.
+
+### Проблемы
+
+- События с уже сохранёнными 4–5 связями не пройдут publish до ручного уменьшения списка (или отдельного data-fix вне Epic 1).
+
+---
+
 ## 24.03.2026 — Публичный Venue PDP: template-driven MVP (MUSEUM / ART_SPACE / GALLERY)
 
 ### Наблюдения

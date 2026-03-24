@@ -9,7 +9,8 @@ export type PublishGateCheckCode =
   | 'HAS_FUTURE_SESSIONS'
   | 'HAS_PRICE'
   | 'CATEGORY_VALID'
-  | 'MEDIA_VALID';
+  | 'MEDIA_VALID'
+  | 'SUBCATEGORY_VALID';
 
 export type PublishGateCheck = {
   code: PublishGateCheckCode;
@@ -36,6 +37,12 @@ export class PublishGateService {
       this.fromIssues('HAS_FUTURE_SESSIONS', issueCodes, ['NO_FUTURE_SESSIONS'], 'Наличие будущих сеансов'),
       this.fromIssues('HAS_PRICE', issueCodes, ['NO_VALID_PRICE'], 'Наличие валидной цены'),
       this.fromIssues('CATEGORY_VALID', issueCodes, ['MISSING_CATEGORY'], 'Проверка категории'),
+      this.fromIssues(
+        'SUBCATEGORY_VALID',
+        issueCodes,
+        ['MISSING_SUBCATEGORY', 'TOO_MANY_SUBCATEGORIES'],
+        'Подкатегории (1–3)',
+      ),
       this.fromIssues('MEDIA_VALID', issueCodes, ['MISSING_IMAGE'], 'Проверка медиа'),
     ];
 

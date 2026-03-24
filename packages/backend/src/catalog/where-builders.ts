@@ -1,9 +1,12 @@
 /**
  * T10 — типобезопасные Prisma where builders.
  * Вместо where: any в сервисах.
+ *
+ * Tag-fallback (read-path): при одновременном `subcategory` и фильтрах по тегам условия объединяются OR —
+ * см. `Catalog-Classification-Policy.md` §11. Для страницы тега — `CatalogService.getTagBySlug`.
  */
 
-import { DateMode, EventSource, EventSubcategory, Prisma } from '@prisma/client';
+import { EventSource, Prisma } from '@prisma/client';
 import { TagKind } from '@prisma/client';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
@@ -35,33 +38,10 @@ export interface VenueWhereDto {
   q?: string;
 }
 
-/** Базовый фильтр сессий: SCHEDULED с будущими сеансами ИЛИ OPEN_DATE. */
-function _sessionFilter(isOpenDateOnly?: boolean): Prisma.EventWhereInput {
-  const now = new Date();
-  if (isOpenDateOnly) {
-    return {
-      dateMode: DateMode.OPEN_DATE,
-      OR: [{ endDate: null }, { endDate: { gte: now } }],
-    };
-  }
-  return {
-    OR: [
-      {
-        dateMode: DateMode.SCHEDULED,
-        sessions: { some: { isActive: true, startsAt: { gte: now } } },
-      },
-      {
-        dateMode: DateMode.OPEN_DATE,
-        OR: [{ endDate: null }, { endDate: { gte: now } }],
-      },
-    ],
-  };
-}
-
-/** T10: Собрать EventWhereInput из DTO. sessionFilterOverride — для date-aware фильтров (dateFrom, dateTo, departing_soon). */
+/** T10: Собрать EventWhereInput из DTO. sessionFilter — дата/сеансы из catalog.fetchEvents (обязателен для выдачи). */
 export function buildEventWhere(
   dto: EventWhereDto,
-  _sessionFilterOverride?: Prisma.EventWhereInput,
+  sessionFilter?: Prisma.EventWhereInput,
 ): Prisma.EventWhereInput {
   const {
     city,
@@ -82,7 +62,7 @@ export function buildEventWhere(
     hasPhoto,
     slugs,
     timeOfDay: _timeOfDay,
-    dateMode,
+    dateMode: _dateMode,
     isOpenDateOnly: _isOpenDateOnly,
   } = dto;
 
@@ -92,8 +72,6 @@ export function buildEventWhere(
     isActive: true,
     isDeleted: false,
     canonicalOfId: null,
-    // В прод-каталоге: MANUAL — всегда, TC/TEPLOHOD — только с override.editorStatus=PUBLISHED.
-    // IMPORT_SOURCES_ENABLED=0 — скрыть импорт полностью (только MANUAL).
     ...(process.env.NODE_ENV === 'production'
       ? importsEnabled
         ? {
@@ -113,14 +91,11 @@ export function buildEventWhere(
       ...(city && !cityIds?.length && { slug: city }),
     },
     ...(category && { category: category as Prisma.EnumEventCategoryFilter }),
-    ...(subcategory ? new SubcategoryPolicyService().buildEventSubcategoryFilter(subcategory) : {}),
     ...(audience === 'KIDS'
       ? { audience: { in: ['KIDS', 'FAMILY'] } }
       : audience
         ? { audience: audience as Prisma.EnumEventAudienceFilter }
         : {}),
-    ...(tag && { tags: { some: { tag: { slug: tag } } } }),
-    // NOTE: структурные/популярные теги обрабатываются ниже через AND-логику
     ...(pier && { startLocationId: pier }),
     ...(maxDuration != null || minDuration != null
       ? {
@@ -140,9 +115,6 @@ export function buildEventWhere(
           },
         }
       : {}),
-    ...(hasPhoto === true
-      ? { AND: [{ imageUrl: { not: null } }, { imageUrl: { not: '' } }] }
-      : {}),
     ...(slugs?.trim()
       ? {
           slug: {
@@ -155,38 +127,49 @@ export function buildEventWhere(
       : {}),
   };
 
-  if (dateMode === 'OPEN_DATE') {
-    (where as Record<string, unknown>).dateMode = DateMode.OPEN_DATE;
-    (where as Record<string, unknown>).OR = [{ endDate: null }, { endDate: { gte: new Date() } }];
-  } else if (dateMode === 'SCHEDULED') {
-    (where as Record<string, unknown>).dateMode = DateMode.SCHEDULED;
-    (where as Record<string, unknown>).sessions = {
-      some: { isActive: true, startsAt: { gte: new Date() } },
-    };
+  const andParts: Prisma.EventWhereInput[] = [];
+
+  if (hasPhoto === true) {
+    andParts.push({ AND: [{ imageUrl: { not: null } }, { imageUrl: { not: '' } }] });
   }
 
-  // timeOfDay требует raw SQL (EXTRACT HOUR) — обрабатывается отдельно в catalog.service
+  const subcategoryPolicy = new SubcategoryPolicyService();
+  const subFilter: Prisma.EventWhereInput | null = subcategory
+    ? subcategoryPolicy.buildEventSubcategoryFilter(subcategory)
+    : null;
 
-  // structuralTags/popularTags: AND по всем тегам внутри списка,
-  // и AND между structuralTags и popularTags.
-  const andFilters: Prisma.EventWhereInput[] = [];
+  const tagClauses: Prisma.EventWhereInput[] = [];
+  if (tag?.trim()) {
+    tagClauses.push({ tags: { some: { tag: { slug: tag.trim() } } } });
+  }
   if (structuralTags?.length) {
     for (const slug of structuralTags) {
-      andFilters.push({ tags: { some: { tag: { slug, tagKind: TagKind.STRUCTURAL } } } });
+      tagClauses.push({ tags: { some: { tag: { slug, tagKind: TagKind.STRUCTURAL } } } });
     }
   }
   if (popularTags?.length) {
     for (const slug of popularTags) {
-      andFilters.push({ tags: { some: { tag: { slug, tagKind: TagKind.POPULAR } } } });
+      tagClauses.push({ tags: { some: { tag: { slug, tagKind: TagKind.POPULAR } } } });
     }
   }
-  if (andFilters.length) {
-    const existingAnd = where.AND
-      ? Array.isArray(where.AND)
-        ? where.AND
-        : [where.AND]
-      : [];
-    where.AND = [...existingAnd, ...andFilters];
+
+  const tagBlob: Prisma.EventWhereInput | null =
+    tagClauses.length === 0 ? null : tagClauses.length === 1 ? tagClauses[0]! : { AND: tagClauses };
+
+  if (subFilter && tagBlob) {
+    andParts.push({ OR: [subFilter, tagBlob] });
+  } else if (subFilter) {
+    andParts.push(subFilter);
+  } else if (tagBlob) {
+    andParts.push(tagBlob);
+  }
+
+  if (sessionFilter && Object.keys(sessionFilter).length > 0) {
+    andParts.push(sessionFilter);
+  }
+
+  if (andParts.length) {
+    where.AND = andParts;
   }
 
   return where;

@@ -1,6 +1,17 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import type { Operator, SupplierTrustOverride } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
+
+/** Без DI: ListingHealthService и др. */
+export function computeEffectiveTrustScore(
+  baseTrustScore: number,
+  override: Pick<SupplierTrustOverride, 'scoreDelta' | 'expiresAt'> | null | undefined,
+  now: Date = new Date(),
+): number {
+  if (!override || override.expiresAt <= now) return baseTrustScore;
+  return Math.max(0, Math.min(100, baseTrustScore + override.scoreDelta));
+}
 
 export interface SupplierTrustBreakdown {
   profile: number;
@@ -21,6 +32,97 @@ export interface SupplierNextLevelRequirement {
 @Injectable()
 export class SupplierTrustService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Итоговый trust score: базовый trustScore плюс активный админ-override (если не истёк).
+   */
+  getEffectiveScore(
+    supplier: Pick<Operator, 'trustScore'> & { supplierTrustOverride?: SupplierTrustOverride | null },
+  ): number {
+    return computeEffectiveTrustScore(supplier.trustScore, supplier.supplierTrustOverride ?? null);
+  }
+
+  async upsertTrustOverride(
+    supplierId: string,
+    dto: { scoreDelta: number; reason: string; expiresAt: Date },
+  ): Promise<SupplierTrustOverride> {
+    const op = await this.prisma.operator.findUnique({
+      where: { id: supplierId, isSupplier: true },
+      select: { id: true },
+    });
+    if (!op) throw new NotFoundException('Поставщик не найден');
+
+    return this.prisma.supplierTrustOverride.upsert({
+      where: { supplierId },
+      create: {
+        supplierId,
+        scoreDelta: dto.scoreDelta,
+        reason: dto.reason,
+        expiresAt: dto.expiresAt,
+      },
+      update: {
+        scoreDelta: dto.scoreDelta,
+        reason: dto.reason,
+        expiresAt: dto.expiresAt,
+      },
+    });
+  }
+
+  async deleteTrustOverride(supplierId: string): Promise<{ deleted: boolean }> {
+    const op = await this.prisma.operator.findUnique({
+      where: { id: supplierId, isSupplier: true },
+      select: { id: true },
+    });
+    if (!op) throw new NotFoundException('Поставщик не найден');
+
+    const res = await this.prisma.supplierTrustOverride.deleteMany({ where: { supplierId } });
+    return { deleted: res.count > 0 };
+  }
+
+  async getTrustOverridePayload(supplierId: string): Promise<{
+    baseScore: number;
+    effectiveScore: number;
+    override: null | {
+      id: string;
+      scoreDelta: number;
+      reason: string;
+      expiresAt: string;
+      createdAt: string;
+      active: boolean;
+    };
+  }> {
+    const op = await this.prisma.operator.findUnique({
+      where: { id: supplierId, isSupplier: true },
+      select: {
+        trustScore: true,
+        supplierTrustOverride: true,
+      },
+    });
+    if (!op) throw new NotFoundException('Поставщик не найден');
+
+    const now = new Date();
+    const ovr = op.supplierTrustOverride;
+    const effectiveScore = this.getEffectiveScore({
+      trustScore: op.trustScore,
+      supplierTrustOverride: ovr,
+    });
+
+    return {
+      baseScore: op.trustScore,
+      effectiveScore,
+      override:
+        ovr == null
+          ? null
+          : {
+              id: ovr.id,
+              scoreDelta: ovr.scoreDelta,
+              reason: ovr.reason,
+              expiresAt: ovr.expiresAt.toISOString(),
+              createdAt: ovr.createdAt.toISOString(),
+              active: ovr.expiresAt > now,
+            },
+    };
+  }
 
   getActiveEventsLimitByTrustLevel(level: number): number {
     if (level >= 3) return 50;

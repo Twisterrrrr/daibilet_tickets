@@ -54,7 +54,7 @@ export function maskAuthorization(s: string | null | undefined): string {
  */
 export function maskPii(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
-  if (typeof obj === 'string') return maskSecret(obj);
+  if (typeof obj === 'string') return maskPiiInString(obj);
 
   if (typeof obj !== 'object') return obj;
 
@@ -83,6 +83,8 @@ export function maskPii(obj: unknown): unknown {
       else out[k] = MASK;
     } else if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
       out[k] = maskPii(v) as object;
+    } else if (typeof v === 'string') {
+      out[k] = maskPiiInString(v);
     } else {
       out[k] = v;
     }
@@ -93,6 +95,24 @@ export function maskPii(obj: unknown): unknown {
 /**
  * Маскирует строку сообщения: ищет паттерны email, phone и подставляет маски
  */
+/** Секреты в query-string для access-логов (не подменяет path). */
+export function sanitizeUrlForLog(url: string): string {
+  const q = url.indexOf('?');
+  if (q < 0) return url;
+  const base = url.slice(0, q);
+  try {
+    const params = new URLSearchParams(url.slice(q + 1));
+    const sensitive = ['email', 'phone', 'password', 'token', 'accessToken', 'refreshToken', 'code'];
+    for (const key of sensitive) {
+      if (params.has(key)) params.set(key, '***');
+    }
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+  } catch {
+    return `${base}?${MASK}`;
+  }
+}
+
 export function maskPiiInString(s: string | null | undefined): string {
   if (!s || typeof s !== 'string') return '';
   // Email: простой паттерн

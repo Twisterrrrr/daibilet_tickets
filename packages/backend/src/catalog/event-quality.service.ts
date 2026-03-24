@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DateMode, EventAudience, EventCategory, Prisma, StructuralTagGroup, TagKind } from '@prisma/client';
+import { DateMode, EventAudience, EventCategory, Prisma } from '@prisma/client';
+
+import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { isSellable } from './sellable';
@@ -23,7 +25,8 @@ export class EventQualityService {
 
   /**
    * Валидация события перед публикацией.
-   * Проверяет минимальный набор полей и возвращает список проблем.
+   * Источник истины классификации для publish: category + эффективные подкатегории (M:N links, иначе legacy enum).
+   * Теги (STRUCTURAL/POPULAR) не блокируют публикацию.
    */
   async validateForPublish(eventId: string): Promise<EventQualityResult> {
     const event = await this.prisma.event.findUnique({
@@ -33,15 +36,9 @@ export class EventQualityService {
         venue: { select: { id: true, title: true } },
         offers: true,
         sessions: { where: { isActive: true } },
-        tags: {
-          include: {
-            tag: {
-              select: {
-                tagKind: true,
-                structuralGroup: true,
-              },
-            },
-          },
+        subcategoryLinks: {
+          where: { subcategory: { isActive: true } },
+          select: { subcategoryId: true },
         },
         override: true,
       },
@@ -81,6 +78,27 @@ export class EventQualityService {
         message: 'Не указана категория события',
         field: 'category',
         ownership: event.override?.category !== undefined ? 'local' : 'source',
+      });
+    }
+
+    const linkCount = event.subcategoryLinks.length;
+    const legacyEnumCount = Array.isArray(event.subcategories) ? event.subcategories.length : 0;
+    const effectiveSubcategoryCount = linkCount > 0 ? linkCount : legacyEnumCount;
+    const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
+
+    if (effectiveSubcategoryCount === 0) {
+      issues.push({
+        code: 'MISSING_SUBCATEGORY',
+        message: 'Выберите хотя бы одну подкатегорию (справочник Subcategory или legacy-поле до миграции)',
+        field: 'subcategories',
+        ownership: linkCount > 0 ? 'local' : 'source',
+      });
+    } else if (effectiveSubcategoryCount > maxSub) {
+      issues.push({
+        code: 'TOO_MANY_SUBCATEGORIES',
+        message: `Слишком много подкатегорий (максимум ${maxSub}). Удалите лишние связи или enum-значения.`,
+        field: 'subcategories',
+        ownership: 'local',
       });
     }
 
@@ -175,30 +193,6 @@ export class EventQualityService {
           });
         }
       }
-    }
-
-    // SEO gate: минимальный структурный паспорт для поисковых и SEO-страниц.
-    const structuralGroups = new Set<StructuralTagGroup>();
-    for (const link of event.tags) {
-      if (link.tag?.tagKind === TagKind.STRUCTURAL && link.tag.structuralGroup) {
-        structuralGroups.add(link.tag.structuralGroup);
-      }
-    }
-    if (!structuralGroups.has('THEME')) {
-      issues.push({
-        code: 'MISSING_STRUCTURAL_THEME_TAG',
-        message: 'Для SEO и каталога у события должен быть хотя бы один STRUCTURAL тег группы THEME',
-        field: 'tags',
-        ownership: 'local',
-      });
-    }
-    if (!structuralGroups.has('FORMAT')) {
-      issues.push({
-        code: 'MISSING_STRUCTURAL_FORMAT_TAG',
-        message: 'Для SEO и каталога у события должен быть хотя бы один STRUCTURAL тег группы FORMAT',
-        field: 'tags',
-        ownership: 'local',
-      });
     }
 
     const isReady = issues.length === 0;

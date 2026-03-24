@@ -2,11 +2,28 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { EmptyState, ErrorState, FormActions, FormGrid, FormSection, LoadingState, PageHeader } from '@daibilet/shared-ui';
+import {
+  EmptyState,
+  ErrorState,
+  FormActions,
+  FormGrid,
+  FormSection,
+  LoadingState,
+  PageHeader,
+  StatusBadge,
+} from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SupplierEventsTab } from './SupplierEventsTab';
 import { SupplierLegalProfileView } from './SupplierLegalProfileView';
@@ -24,6 +41,12 @@ export function SupplierDetailPage() {
   const [newKeyName, setNewKeyName] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [loading, setLoading] = useState(true);
+  const [trustOverrideOpen, setTrustOverrideOpen] = useState(false);
+  const [trustOverrideForm, setTrustOverrideForm] = useState({
+    scoreDelta: 0,
+    reason: '',
+    expiresAt: '',
+  });
 
   const SUPPLIER_ROLES = ['OWNER', 'MANAGER', 'CONTENT', 'ACCOUNTANT'] as const;
 
@@ -41,12 +64,19 @@ export function SupplierDetailPage() {
         setForm({
           trustLevel: data.trustLevel,
           commissionRate: data.commissionRate,
-          promoRate: data.promoRate || '',
-          promoUntil: data.promoUntil ? new Date(data.promoUntil).toISOString().split('T')[0] : '',
           isActive: data.isActive,
           yookassaAccountId: data.yookassaAccountId || '',
         });
         setWebhookUrl(data.webhookUrl || '');
+        const o = data.trust?.trustOverride;
+        const exp = o?.expiresAt
+          ? new Date(o.expiresAt)
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        setTrustOverrideForm({
+          scoreDelta: o?.scoreDelta ?? 0,
+          reason: o?.reason ?? '',
+          expiresAt: exp.toISOString().slice(0, 16),
+        });
       })
       .catch((err: unknown) => {
         setSupplier(null);
@@ -69,12 +99,37 @@ export function SupplierDetailPage() {
 
   const save = async () => {
     try {
-      await adminApi.patch(`/admin/suppliers/${id}`, {
-        ...form,
-        promoRate: form.promoRate ? Number(form.promoRate) : null,
-        promoUntil: form.promoUntil || null,
-      });
+      await adminApi.patch(`/admin/suppliers/${id}`, { ...form });
       toast.success('Сохранено');
+      load();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const saveTrustOverride = async () => {
+    if (!id) return;
+    try {
+      const expiresIso = new Date(trustOverrideForm.expiresAt).toISOString();
+      await adminApi.post(`/admin/suppliers/${id}/trust-override`, {
+        scoreDelta: Number(trustOverrideForm.scoreDelta),
+        reason: trustOverrideForm.reason.trim(),
+        expiresAt: expiresIso,
+      });
+      toast.success('Trust override сохранён');
+      setTrustOverrideOpen(false);
+      load();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const removeTrustOverride = async () => {
+    if (!id) return;
+    try {
+      await adminApi.delete(`/admin/suppliers/${id}/trust-override`);
+      toast.success('Override снят');
+      setTrustOverrideOpen(false);
       load();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -171,11 +226,26 @@ export function SupplierDetailPage() {
         <Card>
           <CardContent className="grid gap-4 border-0 bg-transparent p-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase text-muted-foreground">Уровень доверия</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Trust</p>
+                {supplier.trust.trustOverride?.active && (
+                  <StatusBadge tone="warning" label={`Override ${supplier.trust.trustOverride.scoreDelta >= 0 ? '+' : ''}${supplier.trust.trustOverride.scoreDelta}`} />
+                )}
+                {supplier.trust.trustOverride && !supplier.trust.trustOverride.active && (
+                  <StatusBadge tone="neutral" label="Override истёк" />
+                )}
+                <Button type="button" variant="outline" size="sm" onClick={() => setTrustOverrideOpen(true)}>
+                  Override
+                </Button>
+              </div>
               <p className="text-2xl font-bold">
                 {supplier.trust.level} уровень{' '}
                 <span className="text-sm font-medium text-muted-foreground">
-                  ({supplier.trust.score}/100)
+                  (база {supplier.trust.score}/100
+                  {typeof supplier.trust.effectiveScore === 'number' && (
+                    <> → эффект. {supplier.trust.effectiveScore}/100</>
+                  )}
+                  )
                 </span>
               </p>
               <p className="text-xs text-muted-foreground">
@@ -204,9 +274,61 @@ export function SupplierDetailPage() {
                 <li>Штрафы: {supplier.trust.penalties}</li>
               </ul>
             </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
       )}
+
+      <Dialog open={trustOverrideOpen} onOpenChange={setTrustOverrideOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Trust override</DialogTitle>
+            <DialogDescription>
+              Дельта к базовому trust score (−100…+100). Действует до указанной даты.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Δ score</label>
+              <input
+                type="number"
+                min={-100}
+                max={100}
+                value={trustOverrideForm.scoreDelta}
+                onChange={(e) =>
+                  setTrustOverrideForm((f) => ({ ...f, scoreDelta: Number(e.target.value) }))
+                }
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Причина</label>
+              <textarea
+                value={trustOverrideForm.reason}
+                onChange={(e) => setTrustOverrideForm((f) => ({ ...f, reason: e.target.value }))}
+                rows={3}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Истекает</label>
+              <input
+                type="datetime-local"
+                value={trustOverrideForm.expiresAt}
+                onChange={(e) => setTrustOverrideForm((f) => ({ ...f, expiresAt: e.target.value }))}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button type="button" variant="destructive" onClick={() => void removeTrustOverride()}>
+              Снять override
+            </Button>
+            <Button type="button" onClick={() => void saveTrustOverride()}>
+              Сохранить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs
         value={currentTab}
@@ -231,7 +353,7 @@ export function SupplierDetailPage() {
         <TabsContent value="general" className="space-y-6">
           <FormSection
             title="Настройки поставщика"
-            description="Комиссия, trust-уровень и статус поставщика"
+            description="Фиксированная комиссия по договорённости (ставка в долях от 1), trust-уровень и статус"
           >
             <FormGrid>
               <div>
@@ -254,26 +376,6 @@ export function SupplierDetailPage() {
                   step="0.01"
                   value={(Number(form.commissionRate) * 100).toFixed(0)}
                   onChange={(e) => setForm({ ...form, commissionRate: Number(e.target.value) / 100 })}
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Промо ставка (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={form.promoRate ? (Number(form.promoRate) * 100).toFixed(0) : ''}
-                  onChange={(e) => setForm({ ...form, promoRate: e.target.value ? Number(e.target.value) / 100 : '' })}
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                  placeholder="Пусто = нет промо"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Промо до</label>
-                <input
-                  type="date"
-                  value={form.promoUntil}
-                  onChange={(e) => setForm({ ...form, promoUntil: e.target.value })}
                   className="w-full rounded-lg border px-3 py-2 text-sm"
                 />
               </div>

@@ -25,6 +25,14 @@ const mockRegionService = {
   getRegionPreviewByHubCity: vi.fn().mockResolvedValue(null),
 };
 
+const mockReviewCapability = {};
+
+const mockRefundResolution = {};
+
+const mockSubcategoryPolicy = {
+  buildEventSubcategoryFilter: vi.fn().mockReturnValue({ OR: [{ subcategoryLinks: { some: { subcategory: { slug: 'museum' } } } }] }),
+};
+
 // ---------------------
 // Tests
 // ---------------------
@@ -39,6 +47,9 @@ describe('CatalogService', () => {
       mockCache as any,
       mockOverrideService as any,
       mockRegionService as any,
+      mockReviewCapability as any,
+      mockRefundResolution as any,
+      mockSubcategoryPolicy as any,
     );
   });
 
@@ -291,6 +302,29 @@ describe('CatalogService', () => {
       const result = await service.getEvents({ page: 1, limit: 20 } as any);
 
       expect(result.totalPages).toBe(3); // ceil(45/20) = 3
+    });
+  });
+
+  describe('getTagBySlug', () => {
+    it('combines tag assignment with subcategory slug parity (OR)', async () => {
+      mockPrisma.tag.findUnique.mockResolvedValue({
+        id: 'tag-1',
+        slug: 'museum',
+        name: 'Музеи',
+      });
+      mockPrisma.event.findMany.mockResolvedValue([]);
+      mockPrisma.event.count.mockResolvedValue(0);
+
+      await service.getTagBySlug('museum', undefined, 1);
+
+      expect(mockSubcategoryPolicy.buildEventSubcategoryFilter).toHaveBeenCalledWith('museum');
+      const where = mockPrisma.event.findMany.mock.calls[0][0].where as {
+        OR?: unknown[];
+        canonicalOfId?: null;
+      };
+      expect(where.canonicalOfId).toBe(null);
+      expect(Array.isArray(where.OR)).toBe(true);
+      expect(where.OR).toHaveLength(2);
     });
   });
 });

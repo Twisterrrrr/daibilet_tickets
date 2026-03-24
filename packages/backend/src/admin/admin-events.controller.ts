@@ -24,7 +24,6 @@ import {
   EventCategory,
   EventSource,
   EventSubcategory,
-  SubcategoryType,
   OfferSource,
   OfferStatus,
   Prisma,
@@ -72,6 +71,7 @@ import { AuditService } from './audit.service';
 import { toJsonValue } from '../common/typing';
 import { EventTagRulesService } from './event-tag-rules.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { CatalogClassificationNormalizerService } from '../catalog/catalog-classification-normalizer.service';
 
 class UpdateEventTagsDto {
   @IsOptional()
@@ -115,6 +115,7 @@ export class AdminEventsController {
     private readonly eventAdminSummary: EventAdminSummaryService,
     private readonly audit: AuditService,
     private readonly subcategoryPolicy: SubcategoryPolicyService,
+    private readonly catalogClassificationNormalizer: CatalogClassificationNormalizerService,
   ) {}
 
   @Get()
@@ -1567,29 +1568,12 @@ export class AdminEventsController {
     const eventExists = await this.prisma.event.findUnique({ where: { id }, select: { id: true } });
     if (!eventExists) throw new NotFoundException('Событие не найдено');
 
-    const idsById = Array.from(new Set(dto.subcategoryIds ?? []));
-    const idsBySlug = Array.from(new Set(dto.subcategorySlugs ?? []));
-    if (!idsById.length && !idsBySlug.length) {
-      throw new BadRequestException('Необходимо передать subcategoryIds и/или subcategorySlugs');
-    }
-
-    const where: Prisma.SubcategoryWhereInput = {
-      isActive: true,
-      type: { in: [SubcategoryType.UNIVERSAL, SubcategoryType.EVENT_ONLY] },
-      OR: [{ id: { in: idsById } }, { slug: { in: idsBySlug } }],
-    };
-    const rows = await this.prisma.subcategory.findMany({
-      where,
-      select: { id: true, slug: true },
-    });
-
-    const requestedCount = new Set([...idsById, ...idsBySlug]).size;
-    if (rows.length !== requestedCount) {
-      throw new BadRequestException('Некоторые подкатегории не найдены, неактивны или недоступны для Event');
-    }
-    this.subcategoryPolicy.assertEventLimit(rows.length);
-
     await this.prisma.$transaction(async (tx) => {
+      const rows = await this.catalogClassificationNormalizer.resolveActiveEventSubcategories(
+        dto.subcategoryIds,
+        dto.subcategorySlugs,
+        tx,
+      );
       await tx.eventSubcategoryLink.deleteMany({ where: { eventId: id } });
       if (rows.length) {
         await tx.eventSubcategoryLink.createMany({

@@ -3,7 +3,10 @@ import { Prisma } from '@prisma/client';
 
 import { CACHE_TTL, cacheKeys, CacheService } from '../cache/cache.service';
 import { CollectionSelectionService } from '../catalog/collection-selection.service';
+import { mapBatchedParallel } from '../common/map-batched-parallel';
 import { PrismaService } from '../prisma/prisma.service';
+
+const COLLECTION_LIST_COUNT_BATCH = 12;
 
 @Injectable()
 export class CollectionService {
@@ -33,29 +36,26 @@ export class CollectionService {
         },
       });
 
-      // Для каждой подборки — количество подходящих событий
-      const result = await Promise.all(
-        collections.map(async (c) => {
-          const eventWhere = this.selectionService.buildWhere({
-            cityId: c.cityId,
-            filterTags: c.filterTags,
-            filterCategory: c.filterCategory,
-            filterSubcategory: c.filterSubcategory,
-            filterAudience: c.filterAudience,
-            additionalFilters: c.additionalFilters,
-          });
-          const eventCount = await this.prisma.event.count({ where: eventWhere });
-          return {
-            id: c.id,
-            slug: c.slug,
-            title: c.title,
-            subtitle: c.subtitle,
-            heroImage: c.heroImage,
-            city: c.city,
-            eventCount,
-          };
-        }),
-      );
+      const result = await mapBatchedParallel(collections, COLLECTION_LIST_COUNT_BATCH, async (c) => {
+        const eventWhere = this.selectionService.buildWhere({
+          cityId: c.cityId,
+          filterTags: c.filterTags,
+          filterCategory: c.filterCategory,
+          filterSubcategory: c.filterSubcategory,
+          filterAudience: c.filterAudience,
+          additionalFilters: c.additionalFilters,
+        });
+        const eventCount = await this.prisma.event.count({ where: eventWhere });
+        return {
+          id: c.id,
+          slug: c.slug,
+          title: c.title,
+          subtitle: c.subtitle,
+          heroImage: c.heroImage,
+          city: c.city,
+          eventCount,
+        };
+      });
 
       return result;
     });

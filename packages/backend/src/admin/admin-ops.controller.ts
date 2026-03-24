@@ -1,12 +1,18 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Controller, Get, Logger, Post, UseGuards, UseInterceptors } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Queue } from 'bullmq';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { CacheService } from '../cache/cache.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
+import {
+  ADMIN_ANALYTICS_TABS_COMPUTE_METRIC,
+  ADMIN_CATALOG_CONSISTENCY_COMPUTE_METRIC,
+  ANALYTICS_QUERY_DURATION_PREFIX,
+  OperationLatencyTrackerService,
+} from '../common/operation-latency-tracker.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QUEUE_EMAILS, QUEUE_SYNC } from '../queue/queue.constants';
 import { TagAssignmentService } from '../scheduler/tag-assignment.service';
@@ -27,6 +33,7 @@ export class AdminOpsController {
     private readonly metrics: PaymentMetricsService,
     private readonly cache: CacheService,
     private readonly tagAssignment: TagAssignmentService,
+    private readonly latency: OperationLatencyTrackerService,
   ) {}
 
   /**
@@ -67,10 +74,12 @@ export class AdminOpsController {
   }
 
   /**
-   * Payment metrics — rates (fulfillment_fail, webhook_dedup, auto_compensate) и thresholds.
+   * Payment metrics — счётчики, доли ошибок, алерты, latency (скользящее окно), cache stats, system/uptime.
+   * Контракт расширяемый: сохраняются плоские поля счётчиков (`...m`), `rates`, `thresholds`.
    */
   @Get('metrics')
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Ops: payment counters, rates, alerts, cache, latency, system' })
   async getMetrics() {
     const m = this.metrics.getMetrics();
     const fulfillmentTotal =
@@ -82,19 +91,68 @@ export class AdminOpsController {
       fulfillmentTotal > 0 ? (m.fulfillment_reserve_fail + m.fulfillment_confirm_fail) / fulfillmentTotal : 0;
     const webhookDedupRate = m.webhook_received > 0 ? m.webhook_duplicate / m.webhook_received : 0;
 
+    const reserveTotal = m.fulfillment_reserve_success + m.fulfillment_reserve_fail;
+    const fulfillmentReserveFailRatePct =
+      reserveTotal > 0 ? +((m.fulfillment_reserve_fail / reserveTotal) * 100).toFixed(2) : 0;
+    const autoCompensateRatePct =
+      m.payment_intent_paid > 0 ? +((m.auto_compensate_triggered / m.payment_intent_paid) * 100).toFixed(2) : 0;
+    const webhookDedupRatePct =
+      m.webhook_received > 0 ? +((m.webhook_duplicate / m.webhook_received) * 100).toFixed(2) : 0;
+
+    const alerts: { metric: string; level: 'ok' | 'warn' | 'critical'; value: number }[] = [];
+    const addAlert = (metric: string, rate: number, warnThreshold: number, critThreshold: number) => {
+      let level: 'ok' | 'warn' | 'critical' = 'ok';
+      if (rate >= critThreshold) level = 'critical';
+      else if (rate >= warnThreshold) level = 'warn';
+      alerts.push({ metric, level, value: rate });
+    };
+    addAlert('fulfillment_fail_rate', fulfillmentReserveFailRatePct, 5, 15);
+    addAlert('auto_compensate_rate', autoCompensateRatePct, 5, 15);
+    addAlert('webhook_dedup_rate', webhookDedupRatePct, 10, 30);
+
     const cacheStats = this.cache.getCacheStats();
+
+    const byMetric = this.latency.getAllSnapshots();
+    const analyticsQueryDuration: Record<string, (typeof byMetric)[string]> = {};
+    for (const [k, v] of Object.entries(byMetric)) {
+      if (k.startsWith(ANALYTICS_QUERY_DURATION_PREFIX)) {
+        analyticsQueryDuration[k] = v;
+      }
+    }
 
     return {
       ...m,
+      counters: m,
       cache: cacheStats,
       rates: {
         fulfillment_fail_rate: Math.round(fulfillmentFailRate * 10000) / 10000,
         webhook_dedup_rate: Math.round(webhookDedupRate * 10000) / 10000,
         auto_compensate_count: m.auto_compensate_triggered,
+        fulfillmentFailRate: fulfillmentReserveFailRatePct,
+        autoCompensateRate: autoCompensateRatePct,
+        webhookDedupRate: webhookDedupRatePct,
       },
+      alerts,
       thresholds: {
         fulfillment_fail_rate_max: 0.1,
         webhook_dedup_rate_max: 0.5,
+      },
+      diagnostics: {
+        catalogConsistency: 'GET /admin/catalog/consistency',
+        analyticsTabs: 'GET /admin/dashboard/analytics-tabs?sinceDays=7',
+        opsDiagnostics: 'GET /admin/ops/diagnostics',
+      },
+      latency: {
+        byMetric,
+        analyticsQueryDuration,
+        analyticsTabsCompute: this.latency.getSnapshot(ADMIN_ANALYTICS_TABS_COMPUTE_METRIC),
+        catalogConsistencyCompute: this.latency.getSnapshot(ADMIN_CATALOG_CONSISTENCY_COMPUTE_METRIC),
+      },
+      system: {
+        uptimeSeconds: m.uptime_seconds,
+        uptime: m.uptime_seconds,
+        startedAt: m.started_at,
+        timestamp: new Date().toISOString(),
       },
     };
   }

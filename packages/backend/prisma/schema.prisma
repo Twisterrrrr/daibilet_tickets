@@ -568,6 +568,7 @@ model Event {
   promoCollectionItems PromoCollectionItem[]
   promoCodes           PromoCode[]
   subcategoryLinks     EventSubcategoryLink[]
+  dailyStats           DailyEventStats[]
 
   @@unique([source, tcEventId])
   @@index([source, tcEventId])
@@ -578,6 +579,8 @@ model Event {
   @@index([tcMetaEventId])
   @@index([canonicalOfId])
   @@index([venueId])
+  @@index([isActive, category])
+  @@index([venueId, cityId])
   @@index([operatorId])
   @@index([supplierId])
   @@index([startLocationId])
@@ -599,6 +602,18 @@ model EventGroup {
 
   @@index([slug])
   @@map("event_groups")
+}
+
+/// Ежедневный снимок sellability (cron + диагностика).
+model CatalogConsistencySnapshot {
+  id              String   @id @default(uuid()) @db.Uuid
+  snapshotDate    DateTime @db.Date
+  sellablePercent Float
+  issuesJson      Json
+  createdAt       DateTime @default(now())
+
+  @@unique([snapshotDate])
+  @@map("catalog_consistency_snapshots")
 }
 
 model EventSession {
@@ -844,6 +859,7 @@ model Package {
   @@index([email])
   @@index([status])
   @@index([cityId])
+  @@index([createdAt])
   @@map("packages")
 }
 
@@ -870,8 +886,26 @@ model PackageItem {
 
   @@index([packageId])
   @@index([eventId])
+  @@index([eventId, status])
   @@index([sessionId])
   @@map("package_items")
+}
+
+/// Дневная агрегация продаж по событию (BullMQ analytics-preagg).
+model DailyEventStats {
+  id        String   @id @default(uuid()) @db.Uuid
+  statDate  DateTime @db.Date
+  eventId   String   @db.Uuid
+  soldCount Int
+  revenue   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([statDate, eventId])
+  @@index([eventId, statDate])
+  @@map("daily_event_stats")
 }
 
 // ========================
@@ -1532,8 +1566,8 @@ model Operator {
   trustManualReason        String?   @db.Text
   trustManualExpiresAt     DateTime?
   commissionRate           Decimal   @default(0.25) @db.Decimal(5, 4) // Базовая ставка 25% для всех (включает YooKassa)
-  promoRate                Decimal?  @default(0.10) @db.Decimal(5, 4) // Промо-ставка 10% до promoUntil
-  promoUntil               DateTime? // Окончание промо
+  promoRate                Decimal?  @db.Decimal(5, 4) // Устарело: чек-аут не использует; очищать при сохранении в админке
+  promoUntil               DateTime?
   yookassaAccountId        String? // Sub-merchant ID в YooKassa
   companyName              String?
   inn                      String?
@@ -1580,7 +1614,24 @@ model Operator {
   promoCodes          PromoCode[]
   supplierInvitations SupplierInvitation[]
 
+  /// Ручной дельта-коррект trust score (админ); не путать с trustManual* на Operator.
+  supplierTrustOverride SupplierTrustOverride?
+
   @@map("operators")
+}
+
+/// Ручной override trust score (дельта к базовому trustScore), срок действия.
+model SupplierTrustOverride {
+  id         String   @id @default(uuid()) @db.Uuid
+  supplierId String   @unique @db.Uuid
+  scoreDelta Int
+  reason     String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  operator Operator @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@map("supplier_trust_overrides")
 }
 
 model SupplierLegalProfile {

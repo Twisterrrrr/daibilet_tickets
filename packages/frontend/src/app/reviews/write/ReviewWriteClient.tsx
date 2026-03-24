@@ -1,6 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
@@ -55,12 +56,12 @@ function ReviewWriteContent() {
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
         <p className="text-lg font-medium text-slate-900">{error || 'Ссылка недействительна'}</p>
         <p className="mt-2 text-sm text-slate-500">Попробуйте оставить отзыв на странице мероприятия.</p>
-        <a
+        <Link
           href="/"
           className="mt-6 inline-block rounded-lg bg-primary-600 px-6 py-3 text-sm font-medium text-white hover:bg-primary-700 transition"
         >
           На главную
-        </a>
+        </Link>
       </div>
     );
   }

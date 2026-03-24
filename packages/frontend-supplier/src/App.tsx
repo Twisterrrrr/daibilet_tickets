@@ -1,24 +1,26 @@
+import { lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { isAuthenticated } from './lib/api';
-import Dashboard from './pages/Dashboard';
-import EventEdit from './pages/events/EventEdit';
 import Availability from './pages/Availability';
 import EventsList from './pages/events/EventsList';
 import Layout from './pages/Layout';
 import OrdersPage from './pages/Orders';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Reports from './pages/Reports';
 import Reviews from './pages/Reviews';
-import Settings from './pages/Settings';
 import Notifications from './pages/Notifications';
-import BalancePage from './pages/Balance';
 import Requisites from './pages/Requisites';
-import FinanceDocumentsPage from './pages/FinanceDocuments';
 import Team from './pages/Team';
-import Integrations from './pages/Integrations';
 import InviteAccept from './pages/InviteAccept';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const EventEdit = lazy(() => import('./pages/events/EventEdit'));
+const Reports = lazy(() => import('./pages/Reports'));
+const BalancePage = lazy(() => import('./pages/Balance'));
+const FinanceDocumentsPage = lazy(() => import('./pages/FinanceDocuments'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Integrations = lazy(() => import('./pages/Integrations'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated() ? <>{children}</> : <Navigate to="/login" />;

@@ -189,11 +189,16 @@ bash scripts/bootstrap-staging.sh
 - **Cache:** Redis; namespace flush через POST /admin/settings/ops/cache/flush.
 - **Sync:** BullMQ; full/incremental jobs; progress через GET /admin/settings/ops/sync/progress.
 
+### Observability (production)
+
+- **GET /admin/ops/metrics** — счётчики платежей, `rates`, алерты по порогам, статистика Redis-кэша (`hits`/`misses`/`hitRate`), блок `latency` (в т.ч. `byMetric` и отдельно analytics-tabs / catalog-consistency), `system.uptime` и `timestamp`.
+- **GET /admin/ops/diagnostics** — лёгкие агрегаты по событиям и пустым подборкам/лендингам (без тяжёлых обходов; `empty*` могут заполняться из кэша consistency после `GET /admin/catalog/consistency`).
+- **Env (опционально):** `CATALOG_CONSISTENCY_BUDGET_MS` — по умолчанию 1000 ms на «тяжёлую» фазу selection; `0` отключает таймаут (полный пересчёт). `CACHE_TTL_CATALOG_CONSISTENCY`, `CACHE_TTL_ANALYTICS_TABS` — TTL с клампом в диапазонах 60–120s и 60–180s соответственно.
+
 ### Ops Roadmap
 
 Улучшения, **не обязательные для MVP**:
 
-- Catalog observability: latency p50/p95
 - Admin ops audit: история flush и sync jobs
 - Partitioning rollout (см. §6)
 - Maintenance jobs: ensure-partitions (cron 1-го числа)

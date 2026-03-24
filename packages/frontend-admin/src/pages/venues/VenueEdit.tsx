@@ -32,51 +32,34 @@ const VENUE_TYPES = [
 
 type VenueTypeValue = (typeof VENUE_TYPES)[number]['value'];
 
-const VENUE_COMMISSION_DEFAULTS: Record<
-  VenueTypeValue,
-  { defaultRate: number; promoRate: number; promoMonths: number; label: string }
-> = {
+const VENUE_COMMISSION_DEFAULTS: Record<VenueTypeValue, { defaultRate: number; label: string }> = {
   MUSEUM: {
     defaultRate: 15,
-    promoRate: 10,
-    promoMonths: 3,
-    label: '15% базовая комиссия, 10% промо на 3 месяца',
+    label: 'Ориентир 15% — фиксированная ставка задаётся вручную под договор',
   },
   GALLERY: {
     defaultRate: 15,
-    promoRate: 10,
-    promoMonths: 3,
-    label: '15% базовая комиссия, 10% промо на 3 месяца',
+    label: 'Ориентир 15% — фиксированная ставка задаётся вручную под договор',
   },
   ART_SPACE: {
     defaultRate: 15,
-    promoRate: 10,
-    promoMonths: 3,
-    label: '15% базовая комиссия, 10% промо на 3 месяца',
+    label: 'Ориентир 15% — фиксированная ставка задаётся вручную под договор',
   },
   EXHIBITION_HALL: {
     defaultRate: 15,
-    promoRate: 10,
-    promoMonths: 3,
-    label: '15% базовая комиссия, 10% промо на 3 месяца',
+    label: 'Ориентир 15% — фиксированная ставка задаётся вручную под договор',
   },
   THEATER: {
     defaultRate: 15,
-    promoRate: 10,
-    promoMonths: 3,
-    label: '15% базовая комиссия, 10% промо на 3 месяца',
+    label: 'Ориентир 15% — фиксированная ставка задаётся вручную под договор',
   },
   PALACE: {
     defaultRate: 15,
-    promoRate: 10,
-    promoMonths: 3,
-    label: '15% базовая комиссия, 10% промо на 3 месяца',
+    label: 'Ориентир 15% — фиксированная ставка задаётся вручную под договор',
   },
   PARK: {
     defaultRate: 15,
-    promoRate: 10,
-    promoMonths: 3,
-    label: '15% базовая комиссия, 10% промо на 3 месяца',
+    label: 'Ориентир 15% — фиксированная ставка задаётся вручную под договор',
   },
 };
 

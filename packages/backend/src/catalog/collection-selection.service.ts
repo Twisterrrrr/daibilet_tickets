@@ -73,18 +73,24 @@ export class CollectionSelectionService {
     if (input.cityId) where.cityId = input.cityId;
     else if (input.citySlug) where.city = { slug: input.citySlug, isActive: true };
 
-    if (input.filterTags && input.filterTags.length > 0) {
-      where.tags = { some: { tag: { slug: { in: input.filterTags } } } };
-    }
+    const hasTags = Boolean(input.filterTags && input.filterTags.length > 0);
+    const tagWhere: Prisma.EventWhereInput | null = hasTags
+      ? { tags: { some: { tag: { slug: { in: input.filterTags! } } } } }
+      : null;
     if (input.filterCategory) where.category = input.filterCategory as EventCategory;
-    if (input.filterSubcategory) {
-      const subcategoryFilter = this.subcategoryPolicy.buildEventSubcategoryFilter(input.filterSubcategory);
-      const existingAnd = where.AND
-        ? Array.isArray(where.AND)
-          ? where.AND
-          : [where.AND]
-        : [];
-      where.AND = [...existingAnd, subcategoryFilter];
+
+    const subWhere: Prisma.EventWhereInput | null = input.filterSubcategory
+      ? this.subcategoryPolicy.buildEventSubcategoryFilter(input.filterSubcategory)
+      : null;
+
+    if (tagWhere && subWhere) {
+      const existingAnd = where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : [];
+      where.AND = [...existingAnd, { OR: [tagWhere, subWhere] }];
+    } else if (tagWhere && input.filterTags?.length) {
+      where.tags = { some: { tag: { slug: { in: input.filterTags } } } };
+    } else if (subWhere) {
+      const existingAnd = where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : [];
+      where.AND = [...existingAnd, subWhere];
     }
     if (input.filterAudience) {
       if (input.filterAudience === 'KIDS') where.audience = { in: [EventAudience.KIDS, EventAudience.FAMILY] };

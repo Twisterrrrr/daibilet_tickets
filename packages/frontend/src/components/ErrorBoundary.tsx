@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Component, ErrorInfo, ReactNode } from 'react';
 
 import { devWarn } from '@/lib/devlog';
@@ -57,16 +58,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             >
               Обновить страницу
             </button>
-            <a
+            <Link
               href="/"
               className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
             >
               На главную
-            </a>
+            </Link>
           </div>
-          <a href="/help" className="mt-4 text-sm text-slate-400 underline hover:text-slate-600">
+          <Link href="/help" className="mt-4 text-sm text-slate-400 underline hover:text-slate-600">
             Связаться с поддержкой
-          </a>
+          </Link>
         </div>
       );
     }

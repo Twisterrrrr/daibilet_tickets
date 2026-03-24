@@ -30,6 +30,11 @@ Statuses:
 
 Shared service: `CollectionSelectionService`.
 
+### Subcategory-first vs tags (2026)
+
+- Если заданы **и** `filterTags`, **и** subcategory (`filterSubcategory` или subcategories в `additionalFilters`), условия по тегам и по подкатегории объединяются **OR** (событие не пропадает из выдачи только из‑за отсутствия тега при подходящей подкатегории).
+- Только теги без subcategory — допустимо (legacy/маркетинг); источник истины для publish по-прежнему **не** теги — см. [Catalog-Classification-Policy.md](Catalog-Classification-Policy.md).
+
 Pipeline:
 
 1. City filter (`cityId` or `citySlug`)

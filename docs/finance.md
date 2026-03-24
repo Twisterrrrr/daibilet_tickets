@@ -511,9 +511,7 @@ P3.1 таким образом превращает P3 из «адресной �
 
 ---
 
-### Demo generation of supplier documents
-
-Для локальной проверки шаблонов и файловой генерации добавлен demo-flow.
+### Demo generation of supplier documentsДля локальной проверки шаблонов и файловой генерации добавлен demo-flow.
 
 - Команда запуска: `pnpm --filter @daibilet/backend db:seed:finance-docs-demo`
 - Что создаётся:
@@ -533,9 +531,7 @@ P3.1 таким образом превращает P3 из «адресной �
 
 ### Settlement lifecycle foundation (manual-first)
 
-Добавлен этап foundation без очередей и без авто-отправки в ЭДО:
-
-- `SupplierSettlement`: статусы `DRAFT -> CALCULATED -> APPROVED -> FINALIZED -> PAID`.
+Добавлен этап foundation без очередей и без авто-отправки в ЭДО:- `SupplierSettlement`: статусы `DRAFT -> CALCULATED -> APPROVED -> FINALIZED -> PAID`.
 - Настройки в профиле поставщика:
   - `generateInvoiceDocuments` (default: `false`)
   - `closingDocumentMode` (`UPD`/`ACT`)

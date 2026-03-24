@@ -22,6 +22,14 @@
 
 См. §5 (Event Catalog Index).
 
+### 2.3 Классификация события и publish-gate
+
+Источник истины для **публикации**: `category` + подкатегории (активные `EventSubcategoryLink`, при отсутствии связей — legacy enum `Event.subcategories`), минимум 1 и максимум 3 подкатегории на событие. Теги (STRUCTURAL/POPULAR) — вторичный слой, **не** блокируют publish. Подробнее: **[Catalog-Classification-Policy.md](Catalog-Classification-Policy.md)**.
+
+### 2.4 Публичная выдача `/events` (фильтры query)
+
+Сборка `where`: `packages/backend/src/catalog/where-builders.ts` — подкатегория и теги не перетирают верхнеуровневые `OR` (например, правила импорта в production); при совместном запросе `subcategory` + теги применяется **OR** между блоком подкатегории и блоком тегов (внутри тегов — AND по списку). Фильтр сеансов/OPEN_DATE передаётся вторым аргументом и попадает в `AND`.
+
 ---
 
 ## 3. Landing Engine
@@ -39,7 +47,7 @@
 
 ### 3.3 Materializer
 
-- **Правило:** `visible = events(city, filterTag) >= minEvents`
+- **Правило:** `visible = eligibleEvents(city, filterTag, additionalFilters.subcategories, …) >= minEvents` — отбор совпадает с публичным лендингом: тег **или** подкатегории из `LandingPage.additionalFilters`, плюс даты/сеансы (см. `landing-event-filter.helper.ts`).
 - **LandingMaterializerService** — пересчитывает `isActive` по TopicDefinition.
 - **Эндпоинты:** `POST /admin/landings/materialize`, `POST /admin/settings/ops/retag-and-materialize`.
 - **Автоматически:** sync → retag → materialize (CatalogController, SyncProcessor).

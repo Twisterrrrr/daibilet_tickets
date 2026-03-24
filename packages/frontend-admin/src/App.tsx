@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { Layout } from './components/layout/Layout';
@@ -13,11 +14,7 @@ import { CollectionEditPage } from './pages/collections/CollectionEdit';
 import { CollectionsListPage } from './pages/collections/CollectionsList';
 import { ComboEditPage } from './pages/combos/ComboEdit';
 import { CombosListPage } from './pages/combos/CombosList';
-import { DashboardPage } from './pages/Dashboard';
-import { EventCreatePage } from './pages/events/EventCreate';
-import { EventEditPage } from './pages/events/EventEdit';
 import { EventsListPage } from './pages/events/EventsList';
-import { EventsMergePage } from './pages/events/EventsMerge';
 import { FailedJobsPage } from './pages/jobs/FailedJobsPage';
 import { LandingEditPage } from './pages/landings/LandingEdit';
 import { LandingsListPage } from './pages/landings/LandingsList';
@@ -25,11 +22,10 @@ import { LoginPage } from './pages/Login';
 import { ModerationQueuePage } from './pages/moderation/ModerationQueue';
 import { OrderDetailPage } from './pages/orders/OrderDetail';
 import { OrdersListPage } from './pages/orders/OrdersList';
-import ReconciliationPage from './pages/reconciliation/ReconciliationPage';
 import { ExternalReviewsListPage } from './pages/reviews/ExternalReviewsList';
 import { ReviewsListPage } from './pages/reviews/ReviewsList';
+import { CatalogConsistencyPage } from './pages/catalog/CatalogConsistencyPage';
 import { SeoAuditPage } from './pages/seo/SeoAuditPage';
-import { SettingsPage } from './pages/settings/SettingsPage';
 import { WidgetEditPage } from './pages/widgets/WidgetEdit';
 import { WidgetsListPage } from './pages/widgets/WidgetsList';
 import { SupplierDetailPage } from './pages/suppliers/SupplierDetail';
@@ -52,7 +48,28 @@ import { PayoutsListPage } from './pages/payouts/PayoutsListPage';
 import { PromoCodesListPage } from './pages/promo-codes/PromoCodesListPage';
 import { PromoCodeEditPage } from './pages/promo-codes/PromoCodeEditPage';
 import { UsersStubPage } from './pages/users/UsersStubPage';
-import { FinanceDocumentsAdminPage } from './pages/finance/FinanceDocumentsAdminPage';
+const DashboardPage = lazy(() =>
+  import('./pages/Dashboard').then((m) => ({ default: m.DashboardPage })),
+);
+const EventCreatePage = lazy(() =>
+  import('./pages/events/EventCreate').then((m) => ({ default: m.EventCreatePage })),
+);
+const EventEditPage = lazy(() =>
+  import('./pages/events/EventEdit').then((m) => ({ default: m.EventEditPage })),
+);
+const EventsMergePage = lazy(() =>
+  import('./pages/events/EventsMerge').then((m) => ({ default: m.EventsMergePage })),
+);
+const ReconciliationPage = lazy(() => import('./pages/reconciliation/ReconciliationPage'));
+const SettingsPage = lazy(() =>
+  import('./pages/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
+const FinanceDocumentsAdminPage = lazy(() =>
+  import('./pages/finance/FinanceDocumentsAdminPage').then((m) => ({
+    default: m.FinanceDocumentsAdminPage,
+  })),
+);
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
@@ -130,6 +147,7 @@ export default function App() {
           <Route path="jobs/failed" element={flags.showOps ? <FailedJobsPage /> : <DisabledRoute />} />
           <Route path="reconciliation" element={<ReconciliationPage />} />
           <Route path="audit" element={flags.showOps ? <AuditLogPage /> : <DisabledRoute />} />
+          <Route path="catalog-consistency" element={<CatalogConsistencyPage />} />
           <Route path="seo-audit" element={flags.showContent ? <SeoAuditPage /> : <DisabledRoute />} />
           <Route path="source-categories" element={flags.showContent ? <SourceCategoriesPage /> : <DisabledRoute />} />
           <Route path="widgets" element={<WidgetsListPage />} />

@@ -11,6 +11,8 @@
     "dev": "concurrently -n backend,frontend,admin,supplier -c blue,green,magenta,cyan \"pnpm dev:backend\" \"pnpm dev:frontend\" \"pnpm dev:admin\" \"pnpm dev:supplier\"",
     "build": "pnpm --filter @daibilet/shared build && pnpm --filter @daibilet/backend build && pnpm --filter @daibilet/frontend build",
     "lint": "npx eslint packages/",
+    "lint:next": "pnpm --filter @daibilet/frontend run lint",
+    "lint:next:ci": "pnpm --filter @daibilet/frontend run lint:ci",
     "lint:fix": "npx eslint packages/ --fix",
     "format": "npx prettier --write \"packages/**/*.{ts,tsx,json}\"",
     "format:check": "npx prettier --check \"packages/**/*.{ts,tsx,json}\"",

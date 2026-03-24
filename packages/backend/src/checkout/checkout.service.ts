@@ -510,8 +510,6 @@ export class CheckoutService {
             name: true,
             isSupplier: true,
             commissionRate: true,
-            promoRate: true,
-            promoUntil: true,
           },
         },
         venue: { select: { id: true, commissionRate: true } },
@@ -535,20 +533,17 @@ export class CheckoutService {
       const purchaseFlow = resolvePaymentFlow(o.purchaseType);
 
       // Commission snapshot (для PLATFORM split)
-      // Правила: promoRate 10% до promoUntil; базовая 25% для всех; Venue/Operator override (госмузеи) через админку
+      // Правила: фиксированная ставка оператора (админ); при оффере площадки — override commissionRate venue (госмузеи).
       let commissionRateSnapshot: number | null = null;
       let platformFeeSnapshot: number | null = null;
       let supplierAmountSnapshot: number | null = null;
       const isVenueOffer = !!o.venueId;
       if (purchaseFlow === PaymentFlowType.PLATFORM && o.operator?.isSupplier) {
-        const inPromo = o.operator.promoUntil && now < o.operator.promoUntil;
         let effectiveRate: number;
-        if (inPromo && o.operator.promoRate != null) {
-          effectiveRate = Number(o.operator.promoRate); // 10% промо
-        } else if (isVenueOffer && o.venue?.commissionRate != null) {
-          effectiveRate = Number(o.venue.commissionRate); // индивидуальная для venue (госмузеи)
+        if (isVenueOffer && o.venue?.commissionRate != null) {
+          effectiveRate = Number(o.venue.commissionRate);
         } else {
-          effectiveRate = Number(o.operator.commissionRate); // базовая 25% для всех
+          effectiveRate = Number(o.operator.commissionRate);
         }
         commissionRateSnapshot = effectiveRate;
         platformFeeSnapshot = Math.round(lineTotal * effectiveRate);
@@ -1204,7 +1199,7 @@ export class CheckoutService {
         operator: {
           select: {
             id: true, name: true, isSupplier: true,
-            commissionRate: true, promoRate: true, promoUntil: true,
+            commissionRate: true,
           },
         },
         venue: { select: { id: true, commissionRate: true } },
@@ -1224,14 +1219,11 @@ export class CheckoutService {
       let supplierAmountSnapshot: number | null = null;
       const isVenueOffer = !!o.venueId;
       if (purchaseFlow === PaymentFlowType.PLATFORM && o.operator?.isSupplier) {
-        const inPromo = o.operator.promoUntil && now < o.operator.promoUntil;
         let effectiveRate: number;
-        if (inPromo && o.operator.promoRate != null) {
-          effectiveRate = Number(o.operator.promoRate); // 10% промо
-        } else if (isVenueOffer && o.venue?.commissionRate != null) {
-          effectiveRate = Number(o.venue.commissionRate); // индивидуальная для venue (госмузеи)
+        if (isVenueOffer && o.venue?.commissionRate != null) {
+          effectiveRate = Number(o.venue.commissionRate);
         } else {
-          effectiveRate = Number(o.operator.commissionRate); // базовая 25% для всех
+          effectiveRate = Number(o.operator.commissionRate);
         }
         commissionRateSnapshot = effectiveRate;
         platformFeeSnapshot = Math.round(lineTotal * effectiveRate);

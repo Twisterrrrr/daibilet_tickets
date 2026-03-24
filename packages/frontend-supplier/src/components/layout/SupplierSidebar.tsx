@@ -4,6 +4,7 @@ import { CountBadge } from '@daibilet/shared-ui';
 
 import { Badge } from '@/components/ui/badge';
 import { SUPPLIER_NAV_SECTIONS } from '@/config/nav';
+import { getSupplierRoleFromToken, supplierNavPathAllowedForRole } from '@/lib/jwtRole';
 import {
   Sidebar,
   SidebarContent,
@@ -47,6 +48,8 @@ export function SupplierSidebar({ supplier, reviewsBadge, notificationsBadge }: 
   const collapsed = state === 'collapsed';
   const location = useLocation();
 
+  const supplierRole = getSupplierRoleFromToken();
+
   const trustLevel = supplier?.trustLevel;
   const showTrustBadge = supplier != null && typeof trustLevel === 'number';
   const trustClass = showTrustBadge ? (trustColors[trustLevel] ?? trustColors[0]) : '';
@@ -85,8 +88,11 @@ export function SupplierSidebar({ supplier, reviewsBadge, notificationsBadge }: 
         )}
       </SidebarHeader>
       <SidebarContent>
-        {SUPPLIER_NAV_SECTIONS.map((section) => (
-          <SidebarGroup key={section.title}>
+        {SUPPLIER_NAV_SECTIONS.map((section) => {
+          const items = section.items.filter((item) => supplierNavPathAllowedForRole(item.to, supplierRole));
+          if (items.length === 0) return null;
+          return (
+            <SidebarGroup key={section.title}>
             {section.title !== 'Главное' && (
               <SidebarGroupLabel className="px-2 text-xs font-medium text-[rgba(3,7,17,0.7)]">
                 {section.title}
@@ -94,7 +100,7 @@ export function SupplierSidebar({ supplier, reviewsBadge, notificationsBadge }: 
             )}
             <SidebarGroupContent>
               <SidebarMenu>
-                {section.items.map((item) => {
+                {items.map((item) => {
                   const isActive =
                     item.to === '/'
                       ? location.pathname === '/'
@@ -129,7 +135,8 @@ export function SupplierSidebar({ supplier, reviewsBadge, notificationsBadge }: 
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        ))}
+          );
+        })}
       </SidebarContent>
       <SidebarFooter className="p-4">
         {!collapsed && <div className="text-xs text-muted-foreground">Кабинет поставщика</div>}

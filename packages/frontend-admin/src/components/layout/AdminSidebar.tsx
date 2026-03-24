@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { NAV_SECTIONS } from '@/config/nav';
+import { adminNavItemAllowedForRole, getAdminRoleFromToken } from '@/lib/jwtRole';
 import { Badge } from '@/components/ui/badge';
 import {
   Sidebar,
@@ -20,6 +21,7 @@ export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
+  const adminRole = getAdminRoleFromToken();
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border/80 bg-sidebar">
@@ -41,8 +43,11 @@ export function AdminSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {NAV_SECTIONS.map((section) => (
-          <SidebarGroup key={section.title}>
+        {NAV_SECTIONS.map((section) => {
+          const items = section.items.filter((item) => adminNavItemAllowedForRole(item.to, adminRole));
+          if (items.length === 0) return null;
+          return (
+            <SidebarGroup key={section.title}>
             {section.title !== 'Главное' && (
               <SidebarGroupLabel className="px-2 text-xs font-medium text-[rgba(3,7,17,0.7)]">
                 {section.title}
@@ -50,7 +55,7 @@ export function AdminSidebar() {
             )}
             <SidebarGroupContent>
               <SidebarMenu>
-                {section.items.map((item) => {
+                {items.map((item) => {
                   const isActive =
                     item.to === '/'
                       ? location.pathname === '/'
@@ -84,7 +89,8 @@ export function AdminSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        ))}
+          );
+        })}
       </SidebarContent>
 
       <SidebarFooter className="px-3 py-3">

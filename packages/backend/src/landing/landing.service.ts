@@ -1,9 +1,10 @@
 import { getFirstPriceKopecks } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, EventCategory, EventSource, LandingStatus, Prisma } from '@prisma/client';
+import { DateMode, LandingStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { buildLandingEventsWhere } from './landing-event-filter.helper';
 
 @Injectable()
 export class LandingService {
@@ -61,39 +62,17 @@ export class LandingService {
     // Получаем события с сессиями
     const now = new Date();
 
-    // Применяем additionalFilters из настроек лендинга (JSON из БД)
-    const af = (landing.additionalFilters ?? {}) as Record<string, unknown>;
-    const extraWhere: Prisma.EventWhereInput = {};
-    if (typeof af.category === 'string') extraWhere.category = af.category as EventCategory;
-    if (Array.isArray(af.subcategories) && af.subcategories.length > 0) {
-      const subcategoryClauses = af.subcategories
-        .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
-        .map((v) => this.subcategoryPolicy.buildEventSubcategoryFilter(v));
-      if (subcategoryClauses.length > 0) {
-        extraWhere.OR = subcategoryClauses;
-      }
-    }
-    if (typeof af.source === 'string') extraWhere.source = af.source as EventSource;
-    const minD = typeof af.minDuration === 'number' ? af.minDuration : undefined;
-    const maxD = typeof af.maxDuration === 'number' ? af.maxDuration : undefined;
-    if (minD !== undefined || maxD !== undefined) {
-      extraWhere.durationMinutes = { ...(minD !== undefined && { gte: minD }), ...(maxD !== undefined && { lte: maxD }) };
-    }
+    const eventsWhere = buildLandingEventsWhere({
+      cityId: landing.cityId,
+      now,
+      tag,
+      additionalFilters: landing.additionalFilters,
+      subcategoryPolicy: this.subcategoryPolicy,
+    });
 
-    const events = tag
+    const events = eventsWhere
       ? await this.prisma.event.findMany({
-          where: {
-            isActive: true,
-            isDeleted: false,
-            cityId: landing.cityId,
-            tags: { some: { tagId: tag.id } },
-            // Поддержка OPEN_DATE: показываем и без сеансов
-            OR: [
-              { dateMode: DateMode.SCHEDULED, sessions: { some: { isActive: true, startsAt: { gte: now } } } },
-              { dateMode: DateMode.OPEN_DATE, OR: [{ endDate: null }, { endDate: { gte: now } }] },
-            ],
-            ...extraWhere,
-          },
+          where: eventsWhere,
           include: {
             sessions: {
               where: { isActive: true, startsAt: { gte: now } },

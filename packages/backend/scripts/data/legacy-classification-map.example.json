@@ -1,0 +1,7 @@
+{
+  "_comment": "Ключ — slug тега; category — EventCategory; subcategoryId — UUID из subcategories",
+  "bus-tour": {
+    "category": "EXCURSION",
+    "subcategoryId": "00000000-0000-0000-0000-000000000001"
+  }
+}

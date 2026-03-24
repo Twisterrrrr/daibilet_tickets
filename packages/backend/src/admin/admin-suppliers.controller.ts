@@ -29,7 +29,9 @@ import {
   UpdateSupplierUserRoleDto,
   UpdateOperatorPaymentSettingsDto,
 } from './dto/admin.dto';
+import { SetTrustOverrideDto } from './dto/admin-supplier.dto';
 import { AuditService } from './audit.service';
+import { SupplierTrustService } from '../supplier/supplier-trust.service';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -40,6 +42,7 @@ export class AdminSuppliersController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly supplierTrust: SupplierTrustService,
   ) {}
 
   /**
@@ -82,6 +85,7 @@ export class AdminSuppliersController {
         where,
         include: {
           _count: { select: { events: true, offers: true, supplierUsers: true } },
+          supplierTrustOverride: true,
         },
         orderBy: { createdAt: 'desc' },
         ...paginationArgs(pg),
@@ -102,10 +106,50 @@ export class AdminSuppliersController {
       {} as Record<string, number>,
     );
 
+    const now = new Date();
+    const itemsForPage = rawItems.map((r) => {
+      const { supplierTrustOverride, ...rest } = r;
+      return {
+        ...rest,
+        effectiveTrustScore: this.supplierTrust.getEffectiveScore(r),
+        trustOverrideActive: !!(supplierTrustOverride && supplierTrustOverride.expiresAt > now),
+      };
+    });
+
     return {
-      ...buildPaginatedResult(rawItems, total, pg.limit),
+      ...buildPaginatedResult(itemsForPage, total, pg.limit),
       eventCountsBySource,
     };
+  }
+
+  /**
+   * Админ-override trust score (дельта к базовому trustScore).
+   */
+  @Get(':id/trust-override')
+  @Roles('ADMIN')
+  async getTrustOverride(@Param('id') id: string) {
+    return this.supplierTrust.getTrustOverridePayload(id);
+  }
+
+  @Post(':id/trust-override')
+  @Roles('ADMIN')
+  async setTrustOverride(@Param('id') id: string, @Body() body: SetTrustOverrideDto) {
+    const expiresAt = new Date(body.expiresAt);
+    if (Number.isNaN(expiresAt.getTime())) {
+      throw new BadRequestException('Некорректная дата expiresAt');
+    }
+    await this.supplierTrust.upsertTrustOverride(id, {
+      scoreDelta: body.scoreDelta,
+      reason: body.reason.trim(),
+      expiresAt,
+    });
+    return this.supplierTrust.getTrustOverridePayload(id);
+  }
+
+  @Delete(':id/trust-override')
+  @Roles('ADMIN')
+  async removeTrustOverride(@Param('id') id: string) {
+    return this.supplierTrust.deleteTrustOverride(id);
   }
 
   /**
@@ -116,6 +160,7 @@ export class AdminSuppliersController {
     const supplier = await this.prisma.operator.findUnique({
       where: { id },
       include: {
+        supplierTrustOverride: true,
         supplierUsers: { select: { id: true, email: true, name: true, role: true, isActive: true, lastLoginAt: true } },
         _count: { select: { events: true, offers: true } },
       },
@@ -139,6 +184,7 @@ export class AdminSuppliersController {
       },
       trust: {
         score: supplier.trustScore,
+        effectiveScore: this.supplierTrust.getEffectiveScore(supplier),
         level: supplier.trustLevel,
         profile: supplier.trustProfileScore,
         catalog: supplier.trustCatalogScore,
@@ -150,6 +196,15 @@ export class AdminSuppliersController {
         manualOverrideScore: supplier.trustManualOverrideScore,
         manualOverrideExpiresAt: supplier.trustManualExpiresAt,
         lastCalculatedAt: supplier.trustLastCalculatedAt,
+        trustOverride: supplier.supplierTrustOverride
+          ? {
+              scoreDelta: supplier.supplierTrustOverride.scoreDelta,
+              reason: supplier.supplierTrustOverride.reason,
+              expiresAt: supplier.supplierTrustOverride.expiresAt.toISOString(),
+              createdAt: supplier.supplierTrustOverride.createdAt.toISOString(),
+              active: supplier.supplierTrustOverride.expiresAt > new Date(),
+            }
+          : null,
       },
     };
   }
@@ -319,7 +374,7 @@ export class AdminSuppliersController {
   }
 
   /**
-   * Обновить поставщика (комиссия, trust level, промо).
+   * Обновить поставщика (комиссия, trust level). Промо-поля в БД обнуляются: действует только фиксированная commissionRate.
    */
   @Patch(':id')
   @Roles('ADMIN')
@@ -330,8 +385,8 @@ export class AdminSuppliersController {
     const updateData: Prisma.OperatorUpdateInput = {};
     if (data.trustLevel !== undefined) updateData.trustLevel = Number(data.trustLevel);
     if (data.commissionRate !== undefined) updateData.commissionRate = Number(data.commissionRate);
-    if (data.promoRate !== undefined) updateData.promoRate = data.promoRate ? Number(data.promoRate) : null;
-    if (data.promoUntil !== undefined) updateData.promoUntil = data.promoUntil ? new Date(data.promoUntil) : null;
+    updateData.promoRate = null;
+    updateData.promoUntil = null;
     if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
     if (data.yookassaAccountId !== undefined) updateData.yookassaAccountId = data.yookassaAccountId || null;
     if (data.verifiedAt !== undefined) updateData.verifiedAt = data.verifiedAt ? new Date() : null;

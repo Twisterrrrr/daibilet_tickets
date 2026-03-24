@@ -1,5 +1,5 @@
 import { LogOut } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 
 import { PageContainer } from '@daibilet/shared-ui';
@@ -85,7 +85,9 @@ export default function Layout() {
           </header>
           <main className="flex-1 overflow-auto bg-[#e5e7eb]">
             <PageContainer className="animate-in-page max-w-none px-3 py-3.5 sm:px-4 xl:px-6 2xl:px-8 lg:py-4">
-              <Outlet />
+              <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Загрузка…</div>}>
+                <Outlet />
+              </Suspense>
             </PageContainer>
           </main>
         </div>

@@ -298,12 +298,8 @@ export const DATE_MODE_LABELS: Record<DateMode, string> = {
 // Используется как рекомендация при создании venue, если нет индивидуальной ставки
 
 export interface VenueCommissionConfig {
-  /** Комиссия по умолчанию, % */
+  /** Рекомендуемая ставка по типу площадки, % (итоговая задаётся админом в договорённостях). */
   defaultRate: number;
-  /** Промо-ставка для новых партнёров, % */
-  promoRate: number;
-  /** Длительность промо, месяцев */
-  promoMonths: number;
   /** Описание для админки */
   label: string;
 }
@@ -311,66 +307,47 @@ export interface VenueCommissionConfig {
 export const VENUE_COMMISSION_DEFAULTS: Record<VenueType, VenueCommissionConfig> = {
   [VenueType.MUSEUM]: {
     defaultRate: 10,
-    promoRate: 7,
-    promoMonths: 6,
-    label: 'Государственный музей — 10% (промо 7% / 6 мес)',
+    label: 'Государственный музей — ориентир 10%',
   },
   [VenueType.GALLERY]: {
     defaultRate: 15,
-    promoRate: 7,
-    promoMonths: 6,
-    label: 'Галерея — 15% (промо 7% / 6 мес)',
+    label: 'Галерея — ориентир 15%',
   },
   [VenueType.ART_SPACE]: {
     defaultRate: 20,
-    promoRate: 7,
-    promoMonths: 3,
-    label: 'Арт-пространство — 20% (промо 7% / 3 мес)',
+    label: 'Арт-пространство — ориентир 20%',
   },
   [VenueType.EXHIBITION_HALL]: {
     defaultRate: 15,
-    promoRate: 7,
-    promoMonths: 6,
-    label: 'Выставочный зал — 15% (промо 7% / 6 мес)',
+    label: 'Выставочный зал — ориентир 15%',
   },
   [VenueType.THEATER]: {
     defaultRate: 12,
-    promoRate: 7,
-    promoMonths: 6,
-    label: 'Театр — 12% (промо 7% / 6 мес)',
+    label: 'Театр — ориентир 12%',
   },
   [VenueType.PALACE]: {
     defaultRate: 10,
-    promoRate: 7,
-    promoMonths: 6,
-    label: 'Дворец — 10% (промо 7% / 6 мес)',
+    label: 'Дворец — ориентир 10%',
   },
   [VenueType.PARK]: {
     defaultRate: 15,
-    promoRate: 7,
-    promoMonths: 3,
-    label: 'Парк — 15% (промо 7% / 3 мес)',
+    label: 'Парк — ориентир 15%',
   },
 };
 
-/** Получить эффективную комиссию для venue (учитывая индивидуальную и промо) */
+/**
+ * Ориентир комиссии для venue: индивидуальная ставка из админки или default по типу.
+ * Параметр `createdAt` оставлен для обратной совместимости вызовов, не используется.
+ */
 export function getEffectiveCommission(
   venueType: VenueType,
   customRate?: number | null,
-  createdAt?: Date | string | null,
+  _createdAt?: Date | string | null,
 ): number {
   if (customRate != null && customRate > 0) return customRate;
 
   const config = VENUE_COMMISSION_DEFAULTS[venueType];
   if (!config) return 15; // fallback
-
-  // Проверяем, попадает ли venue в промо-период
-  if (createdAt) {
-    const created = new Date(createdAt);
-    const promoEnd = new Date(created);
-    promoEnd.setMonth(promoEnd.getMonth() + config.promoMonths);
-    if (new Date() < promoEnd) return config.promoRate;
-  }
 
   return config.defaultRate;
 }

@@ -8,6 +8,8 @@ import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
+import { sanitizeUrlForLog } from './pii-mask.util';
+
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger(LoggingInterceptor.name);
@@ -15,7 +17,8 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const ctx = context.switchToHttp();
     const req = ctx.getRequest<Request>();
-    const { method, url } = req;
+    const { method } = req;
+    const url = sanitizeUrlForLog(req.url);
     const requestId = req.id ?? 'n/a';
     const start = Date.now();
 
@@ -25,7 +28,15 @@ export class LoggingInterceptor implements NestInterceptor {
           const duration = Date.now() - start;
           const res = ctx.getResponse();
           const status = res.statusCode;
-          this.logger.log(`[requestId=${requestId}] ${method} ${url} ${status} ${duration}ms`);
+          this.logger.log(
+            JSON.stringify({
+              level: 'log',
+              type: 'HTTP_REQUEST',
+              message: `${method} completed`,
+              requestId,
+              meta: { method, url, statusCode: status, durationMs: duration },
+            }),
+          );
         },
       }),
     );

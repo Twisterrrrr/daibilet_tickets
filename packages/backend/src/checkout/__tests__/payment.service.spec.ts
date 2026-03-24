@@ -310,16 +310,14 @@ describe('PaymentService', () => {
       });
     });
 
-    it('should use snapshot commission (promoRate already baked in at snapshot time)', async () => {
-      // Commission is calculated at snapshot time and frozen.
-      // promoRate is reflected in commissionRateSnapshot already.
+    it('should use frozen commissionRateSnapshot from offers snapshot', async () => {
       const session = {
         id: checkoutSessionId,
         status: 'CONFIRMED',
         totalPrice: 5000,
         offersSnapshot: makeSnapshot(5000, {
           supplierId: 'op-1',
-          commissionRateSnapshot: 0.1, // promoRate was applied at snapshot time
+          commissionRateSnapshot: 0.1,
           platformFeeSnapshot: 500,
           supplierAmountSnapshot: 4500,
         }),

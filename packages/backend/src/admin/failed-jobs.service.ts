@@ -4,6 +4,7 @@ import { Queue } from 'bullmq';
 import { Job } from 'bullmq';
 
 import {
+  QUEUE_ANALYTICS_PREAGG,
   QUEUE_EMAILS,
   QUEUE_FULFILLMENT,
   QUEUE_PARTNER_WEBHOOKS,
@@ -18,6 +19,7 @@ export const QUEUE_NAMES = [
   QUEUE_EMAILS,
   QUEUE_REVIEW_TASKS,
   QUEUE_PARTNER_WEBHOOKS,
+  QUEUE_ANALYTICS_PREAGG,
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
@@ -53,6 +55,7 @@ export class FailedJobsService {
     @InjectQueue(QUEUE_EMAILS) emailQueue: Queue,
     @InjectQueue(QUEUE_REVIEW_TASKS) reviewQueue: Queue,
     @InjectQueue(QUEUE_PARTNER_WEBHOOKS) partnerQueue: Queue,
+    @InjectQueue(QUEUE_ANALYTICS_PREAGG) analyticsPreaggQueue: Queue,
     private readonly audit: AuditService,
   ) {
     this.queues = new Map([
@@ -61,6 +64,7 @@ export class FailedJobsService {
       [QUEUE_EMAILS, emailQueue],
       [QUEUE_REVIEW_TASKS, reviewQueue],
       [QUEUE_PARTNER_WEBHOOKS, partnerQueue],
+      [QUEUE_ANALYTICS_PREAGG, analyticsPreaggQueue],
     ]);
   }
 
