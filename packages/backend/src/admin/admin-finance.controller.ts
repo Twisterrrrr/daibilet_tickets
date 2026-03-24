@@ -112,6 +112,9 @@ export class AdminFinanceController {
       ...(body.status === 'REJECTED' && body.comment ? { comment: body.comment.trim() } : {}),
     } as Prisma.InputJsonValue;
     history.push(historyEntry);
+    if (history.length > 50) {
+      history.splice(0, history.length - 50);
+    }
 
     const metaJson = {
       ...(existingMeta as Record<string, unknown>),
@@ -144,4 +147,5 @@ export class AdminFinanceController {
       include: { operator: { select: { id: true, name: true, slug: true } }, bankAccounts: true },
     });
   }
+
 }

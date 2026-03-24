@@ -1,9 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ApiProperty } from '@nestjs/swagger';
 import { OmitType, PartialType } from '@nestjs/swagger';
-import { EventAudience, EventCategory, OfferStatus, PurchaseType } from '@prisma/client';
+import { ClosingDocumentMode, EventAudience, EventCategory, OfferStatus, PurchaseType, TaxMode } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsEnum, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, Matches, MaxLength, Min } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 
 // ============================
 // Settings
@@ -90,6 +90,24 @@ export class UpdateSupplierLegalProfileDto {
   @IsOptional()
   @IsEmail()
   docsEmail?: string;
+
+  @ApiPropertyOptional({ enum: ['OSNO', 'USN_6', 'USN_15', 'AUSN', 'NPD'], description: 'Режим налогообложения' })
+  @IsOptional()
+  @IsEnum(TaxMode)
+  taxMode?: TaxMode;
+
+  @ApiPropertyOptional({ description: 'Плательщик НДС' })
+  @IsOptional()
+  @Type(() => Boolean)
+  isVatPayer?: boolean;
+
+  @ApiPropertyOptional({ description: 'Ставка НДС (%)', minimum: 0, maximum: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  defaultVatRate?: number;
 }
 
 export class CreateSupplierBankAccountDto {
@@ -119,6 +137,49 @@ export class CreateSupplierBankAccountDto {
   @IsOptional()
   @Type(() => Boolean)
   isPrimary?: boolean;
+}
+
+export class UpdateSupplierBankAccountDto {
+  @ApiPropertyOptional({ description: 'Наименование банка' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  bankName?: string;
+
+  @ApiPropertyOptional({ description: 'БИК (9 цифр)' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{9}$/, { message: 'БИК должен содержать 9 цифр' })
+  bik?: string;
+
+  @ApiPropertyOptional({ description: 'Расчётный счёт (20 цифр)' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{20}$/, { message: 'Расчётный счёт должен содержать 20 цифр' })
+  accountNumber?: string;
+
+  @ApiPropertyOptional({ description: 'Корреспондентский счёт (20 цифр)' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{20}$/, { message: 'Корреспондентский счёт должен содержать 20 цифр' })
+  correspondentAccount?: string;
+
+  @ApiPropertyOptional({ description: 'Сделать счёт основным' })
+  @IsOptional()
+  @Type(() => Boolean)
+  isPrimary?: boolean;
+}
+
+export class UpdateSupplierDocumentSettingsDto {
+  @ApiPropertyOptional({ description: 'Включить формирование INVOICE/VAT_INVOICE' })
+  @IsOptional()
+  @Type(() => Boolean)
+  generateInvoiceDocuments?: boolean;
+
+  @ApiPropertyOptional({ enum: ClosingDocumentMode, description: 'Закрывающий документ: UPD или ACT' })
+  @IsOptional()
+  @IsEnum(ClosingDocumentMode)
+  closingDocumentMode?: ClosingDocumentMode;
 }
 
 // ============================

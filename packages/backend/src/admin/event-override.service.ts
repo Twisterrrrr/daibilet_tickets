@@ -20,10 +20,20 @@ export class EventOverrideService {
    */
   async upsert(eventId: string, data: Record<string, unknown>, updatedBy: string) {
     const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, event: _event, ...clean } = data;
+    const createPayload = {
+      tagsAdd: [],
+      tagsRemove: [],
+      subcategories: [],
+      subcategoriesOverride: [],
+      subcategoriesMode: 'INHERIT' as const,
+      ...clean,
+      eventId,
+      updatedBy,
+    };
 
     return this.prisma.eventOverride.upsert({
       where: { eventId },
-      create: { ...clean, eventId, updatedBy },
+      create: createPayload,
       update: { ...clean, updatedBy },
     });
   }
@@ -43,7 +53,16 @@ export class EventOverrideService {
   async toggleHidden(eventId: string, isHidden: boolean, updatedBy: string) {
     return this.prisma.eventOverride.upsert({
       where: { eventId },
-      create: { eventId, isHidden, updatedBy },
+      create: {
+        eventId,
+        isHidden,
+        updatedBy,
+        tagsAdd: [],
+        tagsRemove: [],
+        subcategories: [],
+        subcategoriesOverride: [],
+        subcategoriesMode: 'INHERIT' as const,
+      },
       update: { isHidden, updatedBy },
     });
   }

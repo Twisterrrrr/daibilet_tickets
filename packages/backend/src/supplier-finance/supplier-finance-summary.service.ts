@@ -32,6 +32,24 @@ export class SupplierFinanceSummaryService {
       },
     });
 
+    const profile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId },
+      include: { bankAccounts: true },
+    });
+
+    const hasPrimaryAccount = (profile?.bankAccounts ?? []).some((a) => a.isPrimary);
+    const issues: string[] = [];
+    if (!profile) {
+      issues.push('Нет юридического профиля');
+    } else {
+      if (profile.status !== 'VERIFIED') {
+        issues.push(`Профиль не верифицирован (статус: ${profile.status})`);
+      }
+      if (!hasPrimaryAccount) {
+        issues.push('Нет основного банковского счёта');
+      }
+    }
+
     return {
       currentBalance: balance,
       pendingPayoutsAmount: pendingPayouts._sum.amount ?? 0,
@@ -43,6 +61,11 @@ export class SupplierFinanceSummaryService {
         hasConflict: r.hasConflict,
         documents: r.documents,
       })),
+      profileRequisites: {
+        status: (profile?.status ?? 'DRAFT') as 'DRAFT' | 'INCOMPLETE' | 'VERIFIED' | 'REJECTED',
+        hasPrimaryAccount,
+        issues,
+      },
     };
   }
 }

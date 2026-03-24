@@ -109,6 +109,52 @@ export class SupplierDocumentService {
       legalProfile,
     });
 
+    const legSnap = (snapshot.legalProfile ?? report.legalProfileSnapshot) as Record<string, unknown> | null | undefined;
+    const vatRate = legalProfile?.isVatPayer && legalProfile?.defaultVatRate != null ? Number(legalProfile.defaultVatRate) : 0;
+    const primaryBank = await this.prisma.supplierBankAccount.findFirst({
+      where: {
+        legalProfile: { operatorId: report.operatorId },
+        isPrimary: true,
+      },
+    });
+
+    const supplierBlock = {
+      name: (legSnap?.legalName as string) ?? report.operator.name ?? '',
+      inn: (legSnap?.inn as string) ?? report.operator.inn ?? null,
+      kpp: (legSnap?.kpp as string) ?? null,
+      address: (legSnap?.legalAddress as string) ?? null,
+      bankAccount: primaryBank
+        ? {
+            bankName: primaryBank.bankName ?? null,
+            bik: primaryBank.bik ?? null,
+            account: primaryBank.accountNumber ?? null,
+            corrAccount: primaryBank.correspondentAccount ?? null,
+          }
+        : null,
+    };
+
+    const taxBlock = {
+      taxMode: legalProfile?.taxMode ?? 'OSNO',
+      isVatPayer: legalProfile?.isVatPayer ?? false,
+      vatRate,
+    };
+
+    const customerBlock: { type: string; name?: string; inn?: string } = {
+      type: 'LEGAL',
+      name: 'Daibilet',
+    };
+    if (legalProfile?.taxMode === 'NPD') {
+      customerBlock.type = 'NPD';
+    }
+
+    const itemsBlock = vatLines.map((line) => ({
+      title: line.description,
+      quantity: line.quantity,
+      price: line.price,
+      vatRate: line.vatRate ?? 0,
+      vatAmount: line.vatAmount,
+    }));
+
     const payload = {
       supplier: (snapshot.operator as Record<string, unknown>) ?? {
         id: report.operatorId,
@@ -116,7 +162,7 @@ export class SupplierDocumentService {
         inn: report.operator.inn,
         commissionRate: report.operator.commissionRate,
       },
-      legalProfile: (snapshot.legalProfile as Record<string, unknown> | null | undefined) ?? report.legalProfileSnapshot ?? null,
+      legalProfile: legSnap ?? null,
       period: {
         start: report.periodStart.toISOString(),
         end: report.periodEnd.toISOString(),
@@ -141,7 +187,13 @@ export class SupplierDocumentService {
         lines: vatLines,
         totals: vatTotals,
       },
-      customer: null as Record<string, unknown> | null,
+      invoicePayload: {
+        supplier: supplierBlock,
+        tax: taxBlock,
+        customer: customerBlock,
+        items: itemsBlock,
+      },
+      customer: customerBlock,
       npd: (legalProfile && TAX_MATRIX[legalProfile.taxMode ?? 'OSNO']?.needsNpdReceiptLink)
         ? ({ receiptUrl: null, receiptNumber: null } as { receiptUrl: string | null; receiptNumber: string | null })
         : null,

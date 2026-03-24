@@ -58,7 +58,7 @@ export class AdminCitiesController {
     const [rawItems, total] = await Promise.all([
       this.prisma.city.findMany({
         where,
-        include: { _count: { select: { events: true, landingPages: true, comboPages: true } } },
+        include: { _count: { select: { events: true, venues: true, landingPages: true, comboPages: true } } },
         orderBy: [{ isFeatured: 'desc' }, { name: 'asc' }],
         ...paginationArgs(pg),
       }),
@@ -71,7 +71,7 @@ export class AdminCitiesController {
   async get(@Param('id') id: string) {
     return this.prisma.city.findUniqueOrThrow({
       where: { id },
-      include: { _count: { select: { events: true, landingPages: true, comboPages: true, packages: true } } },
+      include: { _count: { select: { events: true, venues: true, landingPages: true, comboPages: true, packages: true } } },
     });
   }
 

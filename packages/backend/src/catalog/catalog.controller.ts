@@ -37,6 +37,21 @@ import { TcSyncService } from './tc-sync.service';
 import { TepApiService } from './tep-api.service';
 import { TepSyncService } from './tep-sync.service';
 
+class CatalogTagsQueryDto {
+  @IsOptional()
+  @IsEnum(TagKind)
+  kind?: TagKind;
+
+  @IsOptional()
+  @IsEnum(StructuralTagGroup)
+  group?: StructuralTagGroup;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  activeOnly?: boolean;
+}
+
 @ApiTags('catalog')
 @Controller()
 /** Публичный каталог: лимит 150 req/min (главная: getCities + getEvents x4 + Header/Footer). */
@@ -408,19 +423,4 @@ export class CatalogController {
     const materialize = await this.materializer.materialize();
     return { ticketscloud: tc, teplohod: tep, retag, postEditQueue, materialize };
   }
-}
-
-class CatalogTagsQueryDto {
-  @IsOptional()
-  @IsEnum(TagKind)
-  kind?: TagKind;
-
-  @IsOptional()
-  @IsEnum(StructuralTagGroup)
-  group?: StructuralTagGroup;
-
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  activeOnly?: boolean;
 }

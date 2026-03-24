@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 import {
   PrismaClient,
   TagCategory,
+  SubcategoryType,
   ReviewStatus,
   ReviewSupplierResponseStatus,
   ReviewDisputeStatus,
@@ -871,6 +872,311 @@ async function main() {
   }
 
   console.log(`  ✓ ${tags.length} тегов`);
+
+  // --- Единый справочник подкатегорий (master list) ---
+  const subcategoriesMaster: Array<{
+    slug: string;
+    nameRu: string;
+    type: SubcategoryType;
+    parentSlug: string | null;
+    isLandingEnabled: boolean;
+    sortOrder: number;
+  }> = [
+    // Универсальные корни
+    {
+      slug: 'water',
+      nameRu: 'На воде',
+      type: SubcategoryType.UNIVERSAL,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 10,
+    },
+    {
+      slug: 'indoor',
+      nameRu: 'В помещении',
+      type: SubcategoryType.UNIVERSAL,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 20,
+    },
+    {
+      slug: 'outdoor',
+      nameRu: 'На открытом воздухе',
+      type: SubcategoryType.UNIVERSAL,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 30,
+    },
+    {
+      slug: 'family-friendly',
+      nameRu: 'Для всей семьи',
+      type: SubcategoryType.UNIVERSAL,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 40,
+    },
+
+    // Event-only корни (наследуют legacy EventSubcategory)
+    {
+      slug: 'river-excursion',
+      nameRu: 'Речная экскурсия',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'water',
+      isLandingEnabled: true,
+      sortOrder: 100,
+    },
+    {
+      slug: 'walking-excursion',
+      nameRu: 'Пешеходная экскурсия',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'outdoor',
+      isLandingEnabled: true,
+      sortOrder: 110,
+    },
+    {
+      slug: 'bus-excursion',
+      nameRu: 'Автобусная экскурсия',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 120,
+    },
+    {
+      slug: 'combined-excursion',
+      nameRu: 'Комбинированная экскурсия',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: null,
+      isLandingEnabled: false,
+      sortOrder: 130,
+    },
+    {
+      slug: 'quest-excursion',
+      nameRu: 'Квест-экскурсия',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'family-friendly',
+      isLandingEnabled: true,
+      sortOrder: 140,
+    },
+    {
+      slug: 'gastro-excursion',
+      nameRu: 'Гастро-экскурсия',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 150,
+    },
+    {
+      slug: 'rooftop',
+      nameRu: 'Крыши',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'outdoor',
+      isLandingEnabled: true,
+      sortOrder: 160,
+    },
+    {
+      slug: 'extreme',
+      nameRu: 'Экстрим',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'outdoor',
+      isLandingEnabled: false,
+      sortOrder: 170,
+    },
+    {
+      slug: 'museum',
+      nameRu: 'Музей',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 200,
+    },
+    {
+      slug: 'exhibition',
+      nameRu: 'Выставка',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 210,
+    },
+    {
+      slug: 'gallery',
+      nameRu: 'Галерея',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 220,
+    },
+    {
+      slug: 'palace-estate',
+      nameRu: 'Дворец / Усадьба',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 230,
+    },
+    {
+      slug: 'park-reserve',
+      nameRu: 'Парк / Заповедник',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'outdoor',
+      isLandingEnabled: true,
+      sortOrder: 240,
+    },
+    {
+      slug: 'art-space',
+      nameRu: 'Арт-пространство',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 250,
+    },
+    {
+      slug: 'concert',
+      nameRu: 'Концерт',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 300,
+    },
+    {
+      slug: 'show',
+      nameRu: 'Шоу / Представление',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 310,
+    },
+    {
+      slug: 'standup',
+      nameRu: 'Стендап',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 320,
+    },
+    {
+      slug: 'theater',
+      nameRu: 'Театр / Спектакль',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 330,
+    },
+    {
+      slug: 'sport',
+      nameRu: 'Спорт',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 340,
+    },
+    {
+      slug: 'festival',
+      nameRu: 'Фестиваль',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 350,
+    },
+    {
+      slug: 'masterclass',
+      nameRu: 'Мастер-класс',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: null,
+      isLandingEnabled: true,
+      sortOrder: 360,
+    },
+    {
+      slug: 'party',
+      nameRu: 'Вечеринка',
+      type: SubcategoryType.EVENT_ONLY,
+      parentSlug: null,
+      isLandingEnabled: false,
+      sortOrder: 370,
+    },
+
+    // Venue-only (для площадок)
+    {
+      slug: 'museum-venue',
+      nameRu: 'Музейная площадка',
+      type: SubcategoryType.VENUE_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 400,
+    },
+    {
+      slug: 'gallery-venue',
+      nameRu: 'Галерея',
+      type: SubcategoryType.VENUE_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 410,
+    },
+    {
+      slug: 'theater-venue',
+      nameRu: 'Театральная площадка',
+      type: SubcategoryType.VENUE_ONLY,
+      parentSlug: 'indoor',
+      isLandingEnabled: true,
+      sortOrder: 420,
+    },
+  ];
+
+  // Сначала upsert корней и всех узлов без parentId.
+  for (const item of subcategoriesMaster.filter((x) => x.parentSlug === null)) {
+    await prisma.subcategory.upsert({
+      where: { slug: item.slug },
+      update: {
+        nameRu: item.nameRu,
+        type: item.type,
+        parentId: null,
+        isActive: true,
+        isLandingEnabled: item.isLandingEnabled,
+        sortOrder: item.sortOrder,
+      },
+      create: {
+        slug: item.slug,
+        nameRu: item.nameRu,
+        type: item.type,
+        isActive: true,
+        isLandingEnabled: item.isLandingEnabled,
+        sortOrder: item.sortOrder,
+      },
+    });
+  }
+
+  // Затем upsert дочерних узлов с привязкой к родителю.
+  for (const item of subcategoriesMaster.filter((x) => x.parentSlug !== null)) {
+    const parent = await prisma.subcategory.findUnique({
+      where: { slug: item.parentSlug! },
+      select: { id: true },
+    });
+    if (!parent) {
+      throw new Error(`Subcategory parent not found for "${item.slug}": ${item.parentSlug}`);
+    }
+
+    await prisma.subcategory.upsert({
+      where: { slug: item.slug },
+      update: {
+        nameRu: item.nameRu,
+        type: item.type,
+        parentId: parent.id,
+        isActive: true,
+        isLandingEnabled: item.isLandingEnabled,
+        sortOrder: item.sortOrder,
+      },
+      create: {
+        slug: item.slug,
+        nameRu: item.nameRu,
+        type: item.type,
+        parentId: parent.id,
+        isActive: true,
+        isLandingEnabled: item.isLandingEnabled,
+        sortOrder: item.sortOrder,
+      },
+    });
+  }
+
+  console.log(`  ✓ ${subcategoriesMaster.length} subcategories (master list)`);
 
   // --- Посадочные страницы (лендинги) ---
 

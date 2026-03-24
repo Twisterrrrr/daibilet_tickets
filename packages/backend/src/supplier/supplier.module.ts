@@ -11,6 +11,12 @@ import { SupplierLedgerService } from '../ledger/supplier-ledger.service';
 import { SupplierDisputeService } from '../supplier-finance/supplier-dispute.service';
 import { SupplierReconciliationService } from '../supplier-finance/supplier-reconciliation.service';
 import { SupplierFinanceSummaryService } from '../supplier-finance/supplier-finance-summary.service';
+import { SupplierSettlementService } from '../supplier-finance/supplier-settlement.service';
+import { SupplierDocumentPolicyService } from '../supplier-finance/supplier-document-policy.service';
+import { SupplierDocumentIssueService } from '../supplier-finance/supplier-document-issue.service';
+import { FinanceDocumentStorageService } from '../supplier-finance/finance-document-storage.service';
+import { FinanceDocumentRenderService } from '../supplier-finance/finance-document-render.service';
+import { DocumentNumberService } from '../supplier-finance/document-number.service';
 import { ReportsModule } from '../reports/reports.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { SupplierRbacService } from './supplier-rbac.service';
@@ -57,6 +63,12 @@ import { SupplierDailyStatService } from './supplier-daily-stat.service';
     SupplierDisputeService,
     SupplierReconciliationService,
     SupplierFinanceSummaryService,
+    SupplierSettlementService,
+    SupplierDocumentPolicyService,
+    SupplierDocumentIssueService,
+    FinanceDocumentStorageService,
+    FinanceDocumentRenderService,
+    DocumentNumberService,
     SupplierDailyStatService,
     ReviewCapabilityService,
     OperatorScopeGuard,
@@ -71,6 +83,12 @@ import { SupplierDailyStatService } from './supplier-daily-stat.service';
     SupplierDisputeService,
     SupplierReconciliationService,
     SupplierFinanceSummaryService,
+    SupplierSettlementService,
+    SupplierDocumentPolicyService,
+    SupplierDocumentIssueService,
+    FinanceDocumentStorageService,
+    FinanceDocumentRenderService,
+    DocumentNumberService,
     SupplierDailyStatService,
   ],
 })

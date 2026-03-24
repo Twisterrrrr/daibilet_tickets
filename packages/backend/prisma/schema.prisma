@@ -162,6 +162,12 @@ enum SubcategoriesMode {
   CLEAR
 }
 
+enum SubcategoryType {
+  UNIVERSAL
+  EVENT_ONLY
+  VENUE_ONLY
+}
+
 /// Режим наследования правил возврата/обмена (Venue)
 enum VenueRefundPolicyMode {
   INHERIT_SUPPLIER
@@ -561,6 +567,7 @@ model Event {
   promoBlockEvents     PromoBlockEvent[]
   promoCollectionItems PromoCollectionItem[]
   promoCodes           PromoCode[]
+  subcategoryLinks     EventSubcategoryLink[]
 
   @@unique([source, tcEventId])
   @@index([source, tcEventId])
@@ -1223,12 +1230,62 @@ model Venue {
   reviews              Review[]
   promoBlockVenues     PromoBlockVenue[]
   promoCollectionItems PromoCollectionItem[]
+  subcategoryLinks     VenueSubcategoryLink[]
 
   @@index([cityId])
   @@index([venueType])
   @@index([slug])
   @@index([operatorId])
   @@map("venues")
+}
+
+model Subcategory {
+  id               String          @id @default(uuid()) @db.Uuid
+  slug             String          @unique
+  nameRu           String
+  type             SubcategoryType @default(UNIVERSAL)
+  parentId         String?         @db.Uuid
+  isActive         Boolean         @default(true)
+  isLandingEnabled Boolean         @default(false)
+  sortOrder        Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  parent     Subcategory?          @relation("SubcategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Subcategory[]         @relation("SubcategoryTree")
+  eventLinks EventSubcategoryLink[]
+  venueLinks VenueSubcategoryLink[]
+
+  @@index([type, isActive])
+  @@index([parentId])
+  @@index([isLandingEnabled])
+  @@map("subcategories")
+}
+
+model EventSubcategoryLink {
+  eventId       String   @db.Uuid
+  subcategoryId String   @db.Uuid
+  createdAt     DateTime @default(now())
+
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  subcategory Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, subcategoryId])
+  @@index([subcategoryId])
+  @@map("event_subcategory_links")
+}
+
+model VenueSubcategoryLink {
+  venueId       String   @db.Uuid
+  subcategoryId String   @db.Uuid
+  createdAt     DateTime @default(now())
+
+  venue       Venue       @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  subcategory Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, subcategoryId])
+  @@index([subcategoryId])
+  @@map("venue_subcategory_links")
 }
 
 // ========================
@@ -1512,6 +1569,7 @@ model Operator {
   supplierPayoutRequests  SupplierPayoutRequest[]
 
   supplierReports    SupplierReport[]
+  supplierSettlements SupplierSettlement[]
   supplierDocuments  SupplierDocument[]
   supplierDisputes   SupplierDispute[]
   supplierDailyStats SupplierDailyStat[]
@@ -1541,6 +1599,8 @@ model SupplierLegalProfile {
   signerPosition String?
   financeEmail   String?
   docsEmail      String?
+  generateInvoiceDocuments Boolean                  @default(false)
+  closingDocumentMode      ClosingDocumentMode      @default(UPD)
   status         SupplierLegalProfileStatus @default(DRAFT)
 
   verifiedBy       String?   @db.Uuid
@@ -2446,6 +2506,10 @@ enum SupplierReportLineType {
 
 enum SupplierDocumentType {
   AGENT_REPORT
+  SERVICE_ACT
+  UPD
+  INVOICE
+  VAT_INVOICE
   COMMISSION_ACT
   PAYOUT_STATEMENT
 }
@@ -2453,6 +2517,26 @@ enum SupplierDocumentType {
 enum SupplierDocumentStatus {
   DRAFT
   GENERATED
+  ISSUED
+  SENT
+  DELIVERED
+  SIGNED
+  FAILED
+  CANCELED
+}
+
+enum ClosingDocumentMode {
+  UPD
+  ACT
+}
+
+enum SettlementStatus {
+  DRAFT
+  CALCULATED
+  APPROVED
+  FINALIZED
+  PAID
+  CANCELED
 }
 
 enum SupplierDocumentFileKind {
@@ -2635,6 +2719,7 @@ model SupplierDocument {
   id         String                 @id @default(cuid())
   operatorId String                 @db.Uuid
   reportId   String?
+  settlementId String?
   type       SupplierDocumentType
   status     SupplierDocumentStatus @default(DRAFT)
 
@@ -2649,6 +2734,7 @@ model SupplierDocument {
 
   operator Operator        @relation(fields: [operatorId], references: [id])
   report   SupplierReport? @relation(fields: [reportId], references: [id])
+  settlement SupplierSettlement? @relation(fields: [settlementId], references: [id])
 
   template        SupplierDocumentTemplate?        @relation(fields: [templateId], references: [id])
   templateVersion SupplierDocumentTemplateVersion? @relation(fields: [templateVersionId], references: [id])
@@ -2658,7 +2744,34 @@ model SupplierDocument {
 
   @@index([operatorId])
   @@index([reportId])
+  @@index([settlementId])
   @@map("supplier_documents")
+}
+
+model SupplierSettlement {
+  id               String           @id @default(cuid())
+  operatorId       String           @db.Uuid
+  periodStart      DateTime
+  periodEnd        DateTime
+  grossAmount      Decimal          @db.Decimal(14, 2)
+  commissionAmount Decimal          @db.Decimal(14, 2)
+  adjustmentAmount Decimal          @default(0) @db.Decimal(14, 2)
+  netAmount        Decimal          @db.Decimal(14, 2)
+  currency         String           @default("RUB")
+  status           SettlementStatus @default(DRAFT)
+  payoutId         String?
+  approvedAt       DateTime?
+  finalizedAt      DateTime?
+  paidAt           DateTime?
+  metaJson         Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  operator  Operator           @relation(fields: [operatorId], references: [id])
+  documents SupplierDocument[]
+
+  @@index([operatorId, periodStart, periodEnd])
+  @@map("supplier_settlements")
 }
 
 /// P4: Профиль поставщика в ЭДО (привязка к оператору и провайдеру).

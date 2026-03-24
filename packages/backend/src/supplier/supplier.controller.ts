@@ -27,6 +27,7 @@ import {
   SupplierDisputeReasonCategory,
   SupplierLegalProfileStatus,
   SupplierRole,
+  TaxMode,
 } from '@prisma/client';
 import { Request, Response } from 'express';
 
@@ -44,6 +45,8 @@ import {
   CreateSupplierEventDto,
   CreateSupplierOfferDto,
   CreateSupplierBankAccountDto,
+  UpdateSupplierDocumentSettingsDto,
+  UpdateSupplierBankAccountDto,
   UpdateSupplierLegalProfileDto,
   UpdateSupplierEventDto,
   UpdateSupplierOfferDto,
@@ -67,6 +70,8 @@ import { ListingHealthService } from '../catalog/listing-health.service';
 import { tryTransitionCheckout, tryTransitionOrderRequest } from '../checkout/checkout-state-machine';
 import { SupplierFinanceSummaryService } from '../supplier-finance/supplier-finance-summary.service';
 import { SupplierDisputeService } from '../supplier-finance/supplier-dispute.service';
+import { SupplierSettlementService } from '../supplier-finance/supplier-settlement.service';
+import { SupplierDocumentIssueService } from '../supplier-finance/supplier-document-issue.service';
 import type { FinanceMetaJson } from '../common/finance.types';
 import { SupplierDailyStatService } from './supplier-daily-stat.service';
 
@@ -87,6 +92,8 @@ export class SupplierController {
     private readonly integrationsService: SupplierIntegrationsService,
     private readonly financeSummary: SupplierFinanceSummaryService,
     private readonly disputes: SupplierDisputeService,
+    private readonly settlements: SupplierSettlementService,
+    private readonly docIssue: SupplierDocumentIssueService,
     private readonly dailyStat: SupplierDailyStatService,
   ) {}
 
@@ -246,6 +253,24 @@ export class SupplierController {
       e.issues.some((i) => i.code === 'NO_PHOTO'),
     ).length;
 
+    const profile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId },
+      include: { bankAccounts: true },
+    });
+    const hasPrimaryAccount = !!profile?.bankAccounts.some((a) => a.isPrimary);
+    const profileRequisitesIssues: string[] = [];
+    if (!profile) {
+      profileRequisitesIssues.push('Нет юридического профиля');
+    } else {
+      if (profile.status !== 'VERIFIED') {
+        profileRequisitesIssues.push(`Профиль не верифицирован (${profile.status})`);
+      }
+      if (!hasPrimaryAccount) {
+        profileRequisitesIssues.push('Нет основного банковского счёта');
+      }
+    }
+    const showRequisitesWidget = profileRequisitesIssues.length > 0;
+
     return {
       operator,
       events: { total: totalEvents, active: activeEvents, pending: pendingEvents },
@@ -276,6 +301,13 @@ export class SupplierController {
         eventsWithoutPhoto,
         reviewsWithoutResponse,
       },
+      profileRequisites: showRequisitesWidget
+        ? {
+            status: (profile?.status ?? 'DRAFT') as string,
+            hasPrimaryAccount,
+            issues: profileRequisitesIssues,
+          }
+        : undefined,
     };
   }
 
@@ -367,11 +399,18 @@ export class SupplierController {
   @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
   @SupplierRoles('OWNER')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Обновить юридический профиль (ИНН/КПП/ОГРН и реквизиты)' })
+  @ApiOperation({ summary: 'Обновить юридический профиль (ИНН/КПП/ОГРН, tax/VAT, реквизиты)' })
   async updateLegalProfile(
     @CurrentSupplierUser() user: SupplierAuthUser,
     @Body() data: UpdateSupplierLegalProfileDto,
   ) {
+    if (data.taxMode === TaxMode.NPD && data.isVatPayer === true) {
+      throw new BadRequestException('При режиме НПД плательщик НДС должен быть false');
+    }
+    if (data.isVatPayer === true && data.defaultVatRate == null) {
+      throw new BadRequestException('При isVatPayer=true ставка НДС (defaultVatRate) обязательна');
+    }
+
     const existing = await this.prisma.supplierLegalProfile.findUnique({
       where: { operatorId: user.operatorId },
     });
@@ -387,24 +426,99 @@ export class SupplierController {
           ogrn: data.ogrn ?? null,
           financeEmail: data.financeEmail ?? null,
           docsEmail: data.docsEmail ?? null,
+          taxMode: data.taxMode ?? TaxMode.OSNO,
+          isVatPayer: data.isVatPayer ?? false,
+          defaultVatRate: data.defaultVatRate ?? null,
           status: SupplierLegalProfileStatus.INCOMPLETE,
         },
       });
     }
 
+    const updateData: Prisma.SupplierLegalProfileUpdateInput = {
+      legalName: data.legalName ?? existing.legalName,
+      legalAddress: data.legalAddress ?? existing.legalAddress,
+      inn: data.inn ?? existing.inn,
+      kpp: data.kpp ?? existing.kpp,
+      ogrn: data.ogrn ?? existing.ogrn,
+      financeEmail: data.financeEmail ?? existing.financeEmail,
+      docsEmail: data.docsEmail ?? existing.docsEmail,
+      taxMode: data.taxMode ?? existing.taxMode,
+      isVatPayer: data.isVatPayer ?? existing.isVatPayer,
+      defaultVatRate: data.defaultVatRate !== undefined ? data.defaultVatRate : existing.defaultVatRate,
+      status: SupplierLegalProfileStatus.INCOMPLETE,
+    };
+
+    const changes: string[] = [];
+    (['legalName', 'legalAddress', 'inn', 'kpp', 'ogrn', 'financeEmail', 'docsEmail', 'taxMode', 'isVatPayer', 'defaultVatRate'] as const).forEach((key) => {
+      if (data[key] !== undefined && String(data[key]) !== String((existing as Record<string, unknown>)[key])) {
+        changes.push(key);
+      }
+    });
+
+    if (changes.length > 0) {
+      const existingMeta = (existing.metaJson as Prisma.JsonObject | null) ?? {};
+      const history: Prisma.InputJsonValue[] = Array.isArray(existingMeta.history)
+        ? ([...existingMeta.history] as Prisma.InputJsonValue[])
+        : [];
+      history.push({
+        at: new Date().toISOString(),
+        userId: user.id,
+        changes,
+      } as Prisma.InputJsonValue);
+      if (history.length > 50) {
+        history.splice(0, history.length - 50);
+      }
+      (updateData as Prisma.SupplierLegalProfileUpdateInput & { metaJson?: Prisma.InputJsonValue }).metaJson = {
+        ...(existingMeta as Record<string, unknown>),
+        history,
+      } as Prisma.InputJsonValue;
+    }
+
     return this.prisma.supplierLegalProfile.update({
       where: { operatorId: user.operatorId },
-      data: {
-        legalName: data.legalName ?? existing.legalName,
-        legalAddress: data.legalAddress ?? existing.legalAddress,
-        inn: data.inn ?? existing.inn,
-        kpp: data.kpp ?? existing.kpp,
-        ogrn: data.ogrn ?? existing.ogrn,
-        financeEmail: data.financeEmail ?? existing.financeEmail,
-        docsEmail: data.docsEmail ?? existing.docsEmail,
-        status: SupplierLegalProfileStatus.INCOMPLETE,
-      },
+      data: updateData,
     });
+  }
+
+  @Post('profile/submit')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Отправить профиль на проверку' })
+  async submitLegalProfile(@CurrentSupplierUser() user: SupplierAuthUser) {
+    const profile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId: user.operatorId },
+      include: { bankAccounts: true },
+    });
+    if (!profile) {
+      throw new BadRequestException('Сначала заполните юридический профиль');
+    }
+    const hasPrimary = profile.bankAccounts.some((a) => a.isPrimary);
+    if (!hasPrimary) {
+      throw new BadRequestException('Добавьте хотя бы один банковский счёт');
+    }
+    if (!profile.legalName?.trim()) {
+      throw new BadRequestException('Укажите юридическое наименование');
+    }
+    if (!profile.inn?.trim()) {
+      throw new BadRequestException('Укажите ИНН');
+    }
+    if (profile.taxMode === TaxMode.NPD && profile.isVatPayer) {
+      throw new BadRequestException('При режиме НПД плательщик НДС должен быть false');
+    }
+    if (profile.isVatPayer && (profile.defaultVatRate == null || Number(profile.defaultVatRate) <= 0)) {
+      throw new BadRequestException('При isVatPayer=true укажите ставку НДС');
+    }
+    const existingMeta = (profile.metaJson as Prisma.JsonObject | null) ?? {};
+    const metaJson = {
+      ...(existingMeta as Record<string, unknown>),
+      submittedForReviewAt: new Date().toISOString(),
+    } as Prisma.InputJsonValue;
+    await this.prisma.supplierLegalProfile.update({
+      where: { operatorId: user.operatorId },
+      data: { status: SupplierLegalProfileStatus.INCOMPLETE, metaJson },
+    });
+    return { success: true };
   }
 
   @Get('profile/bank-accounts')
@@ -480,6 +594,104 @@ export class SupplierController {
     });
   }
 
+  @Patch('profile/bank-accounts/:id')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Редактировать банковский счёт' })
+  async updateBankAccount(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Param('id') id: string,
+    @Body() data: UpdateSupplierBankAccountDto,
+  ) {
+    const profile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId: user.operatorId },
+      include: { bankAccounts: true },
+    });
+    if (!profile) throw new NotFoundException('Профиль не найден');
+    const account = profile.bankAccounts.find((a) => a.id === id);
+    if (!account) throw new NotFoundException('Счёт не найден');
+
+    if (data.isPrimary) {
+      await this.prisma.supplierBankAccount.updateMany({
+        where: { supplierLegalProfileId: profile.id, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
+    return this.prisma.supplierBankAccount.update({
+      where: { id },
+      data: {
+        ...(data.bankName !== undefined && { bankName: data.bankName }),
+        ...(data.bik !== undefined && { bik: data.bik }),
+        ...(data.accountNumber !== undefined && { accountNumber: data.accountNumber }),
+        ...(data.correspondentAccount !== undefined && { correspondentAccount: data.correspondentAccount }),
+        ...(data.isPrimary !== undefined && { isPrimary: data.isPrimary }),
+      },
+    });
+  }
+
+  @Delete('profile/bank-accounts/:id')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Удалить банковский счёт' })
+  async deleteBankAccount(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Param('id') id: string,
+  ) {
+    const profile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId: user.operatorId },
+      include: { bankAccounts: true },
+    });
+    if (!profile) throw new NotFoundException('Профиль не найден');
+    const account = profile.bankAccounts.find((a) => a.id === id);
+    if (!account) throw new NotFoundException('Счёт не найден');
+
+    await this.prisma.supplierBankAccount.delete({ where: { id } });
+
+    if (account.isPrimary && profile.bankAccounts.length > 1) {
+      const next = profile.bankAccounts.find((a) => a.id !== id);
+      if (next) {
+        await this.prisma.supplierBankAccount.update({
+          where: { id: next.id },
+          data: { isPrimary: true },
+        });
+      }
+    }
+
+    return { success: true };
+  }
+
+  @Post('profile/bank-accounts/:id/set-primary')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Сделать счёт основным' })
+  async setPrimaryBankAccount(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Param('id') id: string,
+  ) {
+    const profile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId: user.operatorId },
+      include: { bankAccounts: true },
+    });
+    if (!profile) throw new NotFoundException('Профиль не найден');
+    const account = profile.bankAccounts.find((a) => a.id === id);
+    if (!account) throw new NotFoundException('Счёт не найден');
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.supplierBankAccount.updateMany({
+        where: { supplierLegalProfileId: profile.id },
+        data: { isPrimary: false },
+      });
+      return tx.supplierBankAccount.update({
+        where: { id },
+        data: { isPrimary: true },
+      });
+    });
+  }
+
   @Get('finance/settings')
   @UseGuards(SupplierJwtGuard)
   @ApiBearerAuth()
@@ -509,6 +721,115 @@ export class SupplierController {
       splitEnabled: operator.splitEnabled,
       description: modeText[operator.paymentMode],
     };
+  }
+
+  @Get('finance/document-settings')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Настройки генерации документов поставщика' })
+  async getDocumentSettings(@CurrentSupplierUser() user: SupplierAuthUser) {
+    const profile = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId: user.operatorId },
+      select: {
+        generateInvoiceDocuments: true,
+        closingDocumentMode: true,
+        isVatPayer: true,
+        taxMode: true,
+        defaultVatRate: true,
+      },
+    });
+    return profile ?? {
+      generateInvoiceDocuments: false,
+      closingDocumentMode: 'UPD',
+      isVatPayer: false,
+      taxMode: 'OSNO',
+      defaultVatRate: null,
+    };
+  }
+
+  @Patch('finance/document-settings')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Обновить настройки генерации документов поставщика' })
+  async updateDocumentSettings(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Body() body: UpdateSupplierDocumentSettingsDto,
+  ) {
+    const existing = await this.prisma.supplierLegalProfile.findUnique({
+      where: { operatorId: user.operatorId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Профиль не найден');
+    }
+    return this.prisma.supplierLegalProfile.update({
+      where: { operatorId: user.operatorId },
+      data: {
+        ...(body.generateInvoiceDocuments !== undefined
+          ? { generateInvoiceDocuments: body.generateInvoiceDocuments }
+          : {}),
+        ...(body.closingDocumentMode !== undefined
+          ? { closingDocumentMode: body.closingDocumentMode }
+          : {}),
+      },
+    });
+  }
+
+  @Post('finance/settlements/:id/issue-documents')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Ручной выпуск документов для settlement' })
+  async issueSettlementDocuments(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Param('id') settlementId: string,
+  ) {
+    const settlement = await this.prisma.supplierSettlement.findUnique({
+      where: { id: settlementId },
+      select: { operatorId: true },
+    });
+    if (!settlement || settlement.operatorId !== user.operatorId) {
+      throw new NotFoundException('Settlement не найден');
+    }
+    return this.docIssue.issueDocumentsForSettlement(settlementId);
+  }
+
+  @Get('finance/settlements')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Список settlement поставщика' })
+  async listSettlements(@CurrentSupplierUser() user: SupplierAuthUser) {
+    return this.prisma.supplierSettlement.findMany({
+      where: { operatorId: user.operatorId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+  }
+
+  @Get('finance/documents')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Список документов поставщика' })
+  async listFinanceDocuments(@CurrentSupplierUser() user: SupplierAuthUser) {
+    const docs = await this.prisma.supplierDocument.findMany({
+      where: { operatorId: user.operatorId },
+      include: { files: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return docs.map((d) => ({
+      id: d.id,
+      settlementId: d.settlementId ?? null,
+      type: d.type,
+      status: d.status,
+      title: d.title,
+      createdAt: d.createdAt,
+      htmlPath: d.files.find((f) => f.mimeType === 'text/html')?.storageKey ?? null,
+      pdfPath: d.files.find((f) => f.kind === 'PDF')?.storageKey ?? null,
+    }));
   }
 
   @Get('balance')

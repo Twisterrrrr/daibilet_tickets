@@ -3,7 +3,13 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** Типы документов с отдельной нумерацией в разрезе оператор/год. */
-export type DocumentSequenceType = 'INVOICE' | 'UPD_1' | 'UPD_2' | 'AGENT_REPORT';
+export type DocumentSequenceType =
+  | 'INVOICE'
+  | 'UPD_1'
+  | 'UPD_2'
+  | 'AGENT_REPORT'
+  | 'SERVICE_ACT'
+  | 'VAT_INVOICE';
 
 @Injectable()
 export class DocumentNumberService {
