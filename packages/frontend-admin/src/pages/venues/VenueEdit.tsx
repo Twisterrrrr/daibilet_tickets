@@ -1,11 +1,12 @@
 type VenueType = 'MUSEUM' | 'GALLERY' | 'ART_SPACE' | 'EXHIBITION_HALL' | 'THEATER' | 'PALACE' | 'PARK';
-import { getVenueTemplateSpecs } from '@daibilet/shared';
-import { ErrorState, LoadingState, PageHeader } from '@daibilet/shared-ui';
-import { ArrowLeft, ExternalLink, GripVertical, Plus, Save, Trash2 } from 'lucide-react';
+import { galleryItemsToUrls, legacyUrlToItem, getVenueTemplateSpecs } from '@daibilet/shared';
+import { ErrorState, ImageGalleryManager, LoadingState, PageHeader } from '@daibilet/shared-ui';
+import { ArrowLeft, ExternalLink, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { adminApi } from '@/api/client';
+import { deleteAdminMediaImages, uploadAdminMediaImages } from '@/api/media';
 import { getVenueAdminSummary, type VenueAdminSummary } from '@/api/adminVenueSummary';
 import { ContentBlocksPanel } from '@/components/content/ContentBlocksPanel';
 import { VenueAdminSummaryPanel } from '@/components/venues/VenueAdminSummaryPanel';
@@ -178,7 +179,6 @@ export function VenueEditPage() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [galleryInput, setGalleryInput] = useState('');
   const [venueSummary, setVenueSummary] = useState<VenueAdminSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -321,27 +321,6 @@ export function VenueEditPage() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  };
-
-  const addGalleryUrl = () => {
-    if (galleryInput.trim()) {
-      setForm((f) => ({ ...f, galleryUrls: [...f.galleryUrls, galleryInput.trim()] }));
-      setGalleryInput('');
-    }
-  };
-
-  const removeGalleryUrl = (index: number) => {
-    setForm((f) => ({ ...f, galleryUrls: f.galleryUrls.filter((_, i) => i !== index) }));
-  };
-
-  const moveGalleryUrl = (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return;
-    setForm((f) => {
-      const urls = [...f.galleryUrls];
-      const [removed] = urls.splice(fromIndex, 1);
-      urls.splice(toIndex, 0, removed);
-      return { ...f, galleryUrls: urls };
-    });
   };
 
   const updateField = (key: keyof VenueFormData, value: any) => {
@@ -936,57 +915,19 @@ export function VenueEditPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Фотогалерея</CardTitle>
-              <CardDescription>{form.galleryUrls.length} фото</CardDescription>
+              <CardDescription>Загрузка в Cloudinary, порядок — перетаскиванием.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={galleryInput}
-                  onChange={(e) => setGalleryInput(e.target.value)}
-                  placeholder="URL изображения"
-                  onKeyDown={(e) => e.key === 'Enter' && addGalleryUrl()}
-                />
-                <Button onClick={addGalleryUrl} size="sm">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Перетащите строку за иконку для изменения порядка (local-owned).
-              </p>
-              {form.galleryUrls.map((url, i) => (
-                <div
-                  key={i}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('text/plain', String(i));
-                    e.dataTransfer.effectAllowed = 'move';
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const from = Number(e.dataTransfer.getData('text/plain'));
-                    if (!Number.isNaN(from) && from !== i) moveGalleryUrl(from, i);
-                  }}
-                  className="flex items-center gap-2 p-2 border rounded-lg cursor-grab active:cursor-grabbing bg-card hover:bg-muted/50 transition-colors"
-                >
-                  <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <img
-                    src={url}
-                    alt=""
-                    className="h-12 w-16 object-cover rounded shrink-0"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                  <span className="text-sm truncate flex-1 min-w-0">{url}</span>
-                  <Button variant="ghost" size="sm" onClick={() => removeGalleryUrl(i)}>
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
-                </div>
-              ))}
+            <CardContent>
+              <ImageGalleryManager
+                title="Галерея площадки"
+                description={`Сейчас ${form.galleryUrls.length} фото. Обложка задаётся на вкладке «Основное».`}
+                items={form.galleryUrls.map((url, i) => legacyUrlToItem(url, i))}
+                onChange={(items) => updateField('galleryUrls', galleryItemsToUrls(items))}
+                uploadFiles={uploadAdminMediaImages}
+                deleteByPublicIds={deleteAdminMediaImages}
+                maxImages={40}
+                disabled={saving}
+              />
             </CardContent>
           </Card>
         </TabsContent>

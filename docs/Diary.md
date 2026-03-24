@@ -4,6 +4,28 @@
 
 ---
 
+## 24.03.2026 — Media MVP: Cloudinary + единые эндпоинты и UI (admin/supplier)
+
+### Наблюдения
+
+- Локальный `UploadService` (Sharp + диск) уже использовался для админки/поставщика и отзывов; для прод-UX нужен облачный pipeline с предсказуемыми URL и метаданными.
+- Vite (supplier) при сборке не подхватывал re-export из CJS `@daibilet/shared` без `build.commonjsOptions.include` для workspace-пакета.
+
+### Решения
+
+- Backend: модуль `MediaModule`, `POST/DELETE .../admin/media/images` и `.../supplier/media/images`, Multer memory + `cloudinary` SDK, ответ с `publicId` для destroy.
+- Shared: типы `MediaImageItem`, `MediaUploadAdapter`, мапперы URL ↔ галерея.
+- Shared-ui: `ImageDropzone`, `SingleImageUploader`, `ImageGalleryManager` (dnd-kit reorder).
+- Интеграции: `ImageUploadField` и `VenueEdit` (галерея), `EventWizard` + `EventBasicsStep` с опциональным `mediaUpload`; supplier `EventEdit` передаёт адаптер, `ImageUploadInput` переведён на новый путь.
+- Документация: `docs/media-upload.md`, переменные в `.env.production.example`.
+
+### Проблемы
+
+- Без `CLOUDINARY_*` новые эндпоинты недоступны (503) — ожидаемо до настройки окружения.
+- Старые URL без `publicId` не удаляются из Cloudinary при редактировании формы — только запись в БД обновляется.
+
+---
+
 ## 25.03.2026 — D-preagg batch: analytics pre-aggregation + supplier trust override
 
 ### Наблюдения

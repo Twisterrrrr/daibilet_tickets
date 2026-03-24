@@ -32,6 +32,7 @@ import { SupplierModule } from './supplier/supplier.module';
 import { SupportModule } from './support/support.module';
 import { WidgetsModule } from './widgets/widgets.module';
 import { UploadModule } from './upload/upload.module';
+import { MediaModule } from './media/media.module';
 import { UserModule } from './user/user.module';
 import { VenueModule } from './venue/venue.module';
 import { PreviewModule } from './preview/preview.module';
@@ -65,6 +66,7 @@ import { VoucherModule } from './voucher/voucher.module';
     RedisCacheModule,
     MailModule,
     UploadModule,
+    MediaModule,
     QueueModule,
     PricingModule,
     CatalogModule,

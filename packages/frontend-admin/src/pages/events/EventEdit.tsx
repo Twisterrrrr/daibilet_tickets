@@ -1,5 +1,5 @@
 import { ArrowLeft, Copy, Eye, EyeOff, Merge, Pencil, Plus, RotateCcw, Save, Star, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import {
 } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
+import { createAdminMediaUploadAdapter } from '@/api/media';
 import { getEventAdminSummary, type EventAdminSummary } from '@/api/adminEventSummary';
 import { getEventQuality, type EventQuality, type EventQualityIssue, type QualityTabKey } from '@/api/adminEventsQuality';
 import { EventStatusLine } from '@/components/events/EventStatusLine';
@@ -137,6 +138,9 @@ interface EventOverride {
   contentTemplateData?: Record<string, unknown> | null;
   manualBoost?: number | null;
   suppressLowQuality?: boolean | null;
+  showInVenueProgram?: boolean;
+  isFeaturedInVenue?: boolean;
+  venueProgramSortOrder?: number | null;
 }
 
 interface VenueOption {
@@ -247,6 +251,9 @@ export function EventEditPage() {
     contentTemplateData?: Record<string, unknown>;
     manualBoost?: number | null;
     suppressLowQuality?: boolean;
+    showInVenueProgram?: boolean;
+    isFeaturedInVenue?: boolean;
+    venueProgramSortOrder?: number | null;
   }>({});
 
   const [wizardDraft, setWizardDraft] = useState<EventWizardDraft | null>(null);
@@ -262,6 +269,8 @@ export function EventEditPage() {
 
   // Anti-duplicates: показывает бейдж, если событие в списке кандидатов на дедупликацию
   const [isProbableDuplicate, setIsProbableDuplicate] = useState(false);
+
+  const adminMediaUpload = useMemo(() => createAdminMediaUploadAdapter(), []);
 
   // Load venues for MUSEUM category linking
   useEffect(() => {
@@ -370,6 +379,9 @@ export function EventEditPage() {
               | undefined) ?? {},
           manualBoost: ov?.manualBoost ?? null,
           suppressLowQuality: ov?.suppressLowQuality ?? false,
+          showInVenueProgram: ov?.showInVenueProgram ?? true,
+          isFeaturedInVenue: ov?.isFeaturedInVenue ?? false,
+          venueProgramSortOrder: ov?.venueProgramSortOrder ?? null,
         });
         setWizardDraft(mapEventToDraft(data));
 
@@ -450,6 +462,11 @@ export function EventEditPage() {
         description: form.description,
         templateData: form.templateData ?? {},
         contentTemplateData: form.contentTemplateData ?? {},
+        manualBoost: form.manualBoost,
+        suppressLowQuality: form.suppressLowQuality,
+        showInVenueProgram: form.showInVenueProgram ?? true,
+        isFeaturedInVenue: form.isFeaturedInVenue ?? false,
+        venueProgramSortOrder: form.venueProgramSortOrder ?? null,
       });
       setEvent((prev) => (prev ? { ...prev, override: ov } : null));
 
@@ -512,6 +529,9 @@ export function EventEditPage() {
               | undefined) ?? {},
           manualBoost: ov?.manualBoost ?? null,
           suppressLowQuality: ov?.suppressLowQuality ?? false,
+          showInVenueProgram: ov?.showInVenueProgram ?? true,
+          isFeaturedInVenue: ov?.isFeaturedInVenue ?? false,
+          venueProgramSortOrder: ov?.venueProgramSortOrder ?? null,
         });
         toast.success('Переопределения сброшены');
         refreshQuality(id);
@@ -900,6 +920,7 @@ export function EventEditPage() {
                     onDraftChange={setWizardDraft}
                     onSubmit={(d) => handleWizardSubmit(d)}
                     citiesOptions={cities}
+                    mediaUpload={adminMediaUpload}
                   />
                 </CardContent>
               </Card>
@@ -1332,6 +1353,45 @@ export function EventEditPage() {
                     <p className="text-xs text-muted-foreground">
                       При включении событие исключается из клиентского каталога без удаления.
                     </p>
+                  </div>
+                </div>
+                <Separator className="my-4" />
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">Программа площадки (страница Venue)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Для выставок с подкатегорией EXHIBITION и привязкой к площадке: порядок и блок на странице музея.
+                  </p>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={form.showInVenueProgram ?? true}
+                      onChange={(e) => setForm((f) => ({ ...f, showInVenueProgram: e.target.checked }))}
+                    />
+                    Показывать в блоке программы площадки
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={form.isFeaturedInVenue ?? false}
+                      onChange={(e) => setForm((f) => ({ ...f, isFeaturedInVenue: e.target.checked }))}
+                    />
+                    Главная выставка (hero) на странице площадки
+                  </label>
+                  <div className="space-y-2">
+                    <Label>Порядок в программе (меньше — выше)</Label>
+                    <Input
+                      type="number"
+                      value={form.venueProgramSortOrder ?? ''}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          venueProgramSortOrder: e.target.value === '' ? null : Number(e.target.value),
+                        }))
+                      }
+                      placeholder="пусто = по умолчанию"
+                    />
                   </div>
                 </div>
               </CardContent>

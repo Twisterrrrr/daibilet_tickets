@@ -21,6 +21,9 @@ export default defineConfig({
     rollupOptions: {
       output: { manualChunks },
     },
+    commonjsOptions: {
+      include: [/node_modules/, /packages\/shared/],
+    },
   },
   resolve: {
     alias: {

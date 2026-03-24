@@ -1,5 +1,10 @@
 import type { ChangeEvent } from 'react';
 
+import type { MediaUploadAdapter } from '@daibilet/shared';
+import { galleryItemsToUrls, legacyUrlToItem } from '@daibilet/shared';
+
+import { ImageGalleryManager } from '../../media/ImageGalleryManager';
+import { SingleImageUploader } from '../../media/SingleImageUploader';
 import type { EventWizardBasicsDraft, EventWizardSourceMetaDraft } from './EventWizard.types';
 
 export interface EventBasicsStepProps {
@@ -7,9 +12,11 @@ export interface EventBasicsStepProps {
   onChange: (next: EventWizardBasicsDraft) => void;
   sourceMeta: EventWizardSourceMetaDraft;
   cities?: { id: string; name: string }[];
+  /** Если задан — обложка/галерея через Cloudinary upload pipeline. */
+  mediaUpload?: MediaUploadAdapter;
 }
 
-export function EventBasicsStep({ value, onChange, sourceMeta, cities }: EventBasicsStepProps) {
+export function EventBasicsStep({ value, onChange, sourceMeta, cities, mediaUpload }: EventBasicsStepProps) {
   const handleChange =
     (key: keyof EventWizardBasicsDraft) =>
     (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -34,7 +41,7 @@ export function EventBasicsStep({ value, onChange, sourceMeta, cities }: EventBa
         lockedFields={sourceMeta.lockedFields}
         cities={cities}
       />
-      <MediaEditor value={value} onChange={onChange} />
+      <MediaEditor value={value} onChange={onChange} mediaUpload={mediaUpload} />
     </div>
   );
 }
@@ -156,9 +163,46 @@ export function BasicsForm({ value, onChange, handleChange, lockedFields, cities
 export interface MediaEditorProps {
   value: EventWizardBasicsDraft;
   onChange: (next: EventWizardBasicsDraft) => void;
+  mediaUpload?: MediaUploadAdapter;
 }
 
-export function MediaEditor({ value, onChange }: MediaEditorProps) {
+export function MediaEditor({ value, onChange, mediaUpload }: MediaEditorProps) {
+  if (mediaUpload) {
+    const uploadOne = async (file: File) => {
+      const r = await mediaUpload.uploadFiles([file]);
+      if (!r[0]) throw new Error('Пустой ответ загрузки');
+      return r[0];
+    };
+    const galleryItems = value.gallery.map((url, i) => legacyUrlToItem(url, i));
+
+    return (
+      <div className="rounded-xl border bg-white px-4 py-4 sm:px-6 sm:py-5">
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold text-slate-900">Медиа</h2>
+          <p className="mt-1 text-xs text-slate-500">Обложка и галерея (загрузка в облако).</p>
+        </div>
+        <div className="space-y-6">
+          <SingleImageUploader
+            label="Обложка"
+            value={value.coverImageUrl}
+            onChange={(url) => onChange({ ...value, coverImageUrl: url })}
+            uploadOne={uploadOne}
+            hint="Перетащите файл или выберите с диска."
+          />
+          <ImageGalleryManager
+            title="Галерея"
+            description="Дополнительные фото. Можно менять порядок перетаскиванием."
+            items={galleryItems}
+            onChange={(next) => onChange({ ...value, gallery: galleryItemsToUrls(next) })}
+            uploadFiles={mediaUpload.uploadFiles}
+            deleteByPublicIds={mediaUpload.deleteByPublicIds}
+            maxImages={30}
+          />
+        </div>
+      </div>
+    );
+  }
+
   const handleCoverChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...value, coverImageUrl: e.target.value });
   };

@@ -40,6 +40,19 @@ export {
 
 // (дополнительные re-export ниже удалены, чтобы избежать дублирования)
 
+export type {
+  MediaImageItem,
+  MediaImageItemStatus,
+  MediaImageUploadResult,
+  MediaUploadAdapter,
+} from './media/media-image.types';
+export {
+  galleryItemsToUrls,
+  legacyUrlToItem,
+  mapUploadResultToItem,
+  pickPrimaryUrl,
+} from './media/media-image.types';
+
 // --- Content model (PageTemplateSpecs) ---
 export {
   EventContentTemplateDataSchema,
@@ -932,6 +945,35 @@ export interface VenuePublicTemplate {
   venueType: string;
   supportedTemplateType: boolean;
   sections: VenuePublicTemplateSections;
+}
+
+/** Состояние выставки на странице площадки (read-model). */
+export type VenueProgramState = 'CURRENT' | 'UPCOMING' | 'PAST';
+
+/** Элемент программы площадки (публичный API). */
+export interface VenueProgramItemDto {
+  id: string;
+  slug: string;
+  title: string;
+  imageUrl: string | null;
+  shortDescription: string | null;
+  priceFrom: number | null;
+  dateMode: string;
+  isPermanent: boolean;
+  startsAt: string;
+  endsAt: string;
+  programState: VenueProgramState;
+}
+
+/** Ответ GET /venues/:slug/program */
+export interface VenueProgramResponse {
+  current: VenueProgramItemDto[];
+  upcoming: VenueProgramItemDto[];
+  past: VenueProgramItemDto[];
+  totalCurrent: number;
+  totalUpcoming: number;
+  totalPast: number;
+  featuredId: string | null;
 }
 
 /** Интенсивность → описание */

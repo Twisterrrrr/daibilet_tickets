@@ -16,10 +16,10 @@ export function ImageUploadInput({ label, value, onChange, placeholder, helperTe
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('files', file);
 
       // Используем тот же базовый URL и авторизацию, что и остальные supplier-запросы.
-      const res = await fetch('/api/v1/supplier/upload/image', {
+      const res = await fetch('/api/v1/supplier/media/images', {
         method: 'POST',
         body: formData,
         // Токен добавится через middleware proxy (Authorization у нас в api.ts),
@@ -32,9 +32,12 @@ export function ImageUploadInput({ label, value, onChange, placeholder, helperTe
         throw new Error(text || `Upload failed: ${res.status}`);
       }
 
-      const data = (await res.json()) as { url: string; thumbUrl?: string };
-      if (data.url) {
-        onChange(data.url);
+      const data = (await res.json()) as unknown;
+      const row = Array.isArray(data) ? data[0] : data;
+      const url =
+        row && typeof row === 'object' && 'url' in row ? (row as { url: string }).url : undefined;
+      if (url) {
+        onChange(url);
       }
     } catch (e) {
       console.error('Supplier image upload failed', e);

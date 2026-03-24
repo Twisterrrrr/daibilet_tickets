@@ -72,7 +72,7 @@ export function ImageUploadField({ label, value, onChange, disabled }: ImageUplo
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('files', file);
 
       const token = getToken();
       const headers: Record<string, string> = {};
@@ -80,7 +80,7 @@ export function ImageUploadField({ label, value, onChange, disabled }: ImageUplo
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const res = await fetch('/api/v1/admin/upload/image', {
+      const res = await fetch('/api/v1/admin/media/images', {
         method: 'POST',
         body: formData,
         headers,
@@ -93,8 +93,10 @@ export function ImageUploadField({ label, value, onChange, disabled }: ImageUplo
         return;
       }
 
-      const data = (await res.json()) as { url?: string | null };
-      if (!data.url) {
+      const data = (await res.json()) as unknown;
+      const row = Array.isArray(data) ? data[0] : data;
+      const url = row && typeof row === 'object' && 'url' in row ? (row as { url: string }).url : null;
+      if (!url) {
         setStatus('error');
         setError('Ответ сервера не содержит URL изображения');
         return;
@@ -102,9 +104,9 @@ export function ImageUploadField({ label, value, onChange, disabled }: ImageUplo
 
       setStatus('idle');
       setError(null);
-      setUrlInput(data.url);
-      setPreviewUrl(data.url);
-      onChange(data.url);
+      setUrlInput(url);
+      setPreviewUrl(url);
+      onChange(url);
     } catch {
       setStatus('error');
       setError('Не удалось загрузить изображение');

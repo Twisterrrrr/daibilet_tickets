@@ -39,3 +39,7 @@ export * from './workflow/event-wizard/EventWizard';
 export * from './date/DateRangePicker';
 export * from './table/DataTableShell';
 
+export * from './media/ImageDropzone';
+export * from './media/SingleImageUploader';
+export * from './media/ImageGalleryManager';
+

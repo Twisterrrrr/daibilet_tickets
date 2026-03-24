@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -14,7 +14,7 @@ import {
   mapDraftTiersToSupplierOffers,
 } from '../../adapters/supplier-event-wizard.adapter';
 import { api } from '../../lib/api';
-import { ImageUploadInput } from '../../components/ImageUploadInput';
+import { createSupplierMediaUploadAdapter } from '../../lib/media-api';
 
 export default function EventEdit() {
   const { id } = useParams();
@@ -27,6 +27,8 @@ export default function EventEdit() {
   const [originalSessions, setOriginalSessions] = useState<any[]>([]);
   const [savingStage, setSavingStage] = useState<'idle' | 'event' | 'offers' | 'sessions' | 'done'>('idle');
   const isSaving = savingStage !== 'idle' && savingStage !== 'done';
+
+  const supplierMediaUpload = useMemo(() => createSupplierMediaUploadAdapter(), []);
 
   useEffect(() => {
     api
@@ -211,20 +213,10 @@ export default function EventEdit() {
             onSubmit={(d: EventWizardDraft, opts) => handleWizardSubmit(d, opts)}
             citiesOptions={cities.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
             stepOrderOverride={isNew ? undefined : ['basics']}
+            mediaUpload={supplierMediaUpload}
           />
 
           <div className="mt-4 space-y-4">
-            <ImageUploadInput
-              label="Обложка события"
-              value={wizardDraft.basics.coverImageUrl}
-              onChange={(url) =>
-                setWizardDraft({
-                  ...wizardDraft,
-                  basics: { ...wizardDraft.basics, coverImageUrl: url },
-                })
-              }
-              helperText="Файл будет загружен и URL автоматически подставится в обложку."
-            />
             {isSaving && (
               <p className="text-xs text-slate-500">
                 {savingStage === 'event' && 'Обновляем карточку события…'}

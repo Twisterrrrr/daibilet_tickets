@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 
+import type { MediaUploadAdapter } from '@daibilet/shared';
+
 import type {
   EventWizardDraft,
   EventWizardMode,
@@ -35,6 +37,8 @@ export interface EventWizardProps {
   onSubmit?: (draft: EventWizardDraft, options?: { action?: 'create' | 'saveDraft' | 'update' }) => void;
   citiesOptions?: { id: string; name: string }[];
   stepOrderOverride?: EventWizardStepKey[];
+  /** Загрузка обложки/галереи в Cloudinary (admin или supplier API). */
+  mediaUpload?: MediaUploadAdapter;
 }
 
 export function EventWizard({
@@ -44,6 +48,7 @@ export function EventWizard({
   onSubmit,
   citiesOptions,
   stepOrderOverride,
+  mediaUpload,
 }: EventWizardProps) {
   const [draft, setDraft] = useState<EventWizardDraft>(initialDraft);
   const [currentStep, setCurrentStep] = useState<EventWizardStepKey>('basics');
@@ -135,6 +140,7 @@ export function EventWizard({
             onChange={(nextBasics) => updateDraft({ ...draft, basics: nextBasics })}
             sourceMeta={draft.sourceMeta}
             cities={citiesOptions}
+            mediaUpload={mediaUpload}
           />
         );
       case 'schedule':
