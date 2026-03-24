@@ -27,6 +27,10 @@ GET /api/v1/catalog. category=MUSEUM → Venue; EXCURSION|EVENT → Event. Catal
 
 **Музеи:** venueId, isPermanent, endDate, openingHours. **EVENT:** program, cast, hall. **EXCURSION:** маршрут, меню, теплоход (RIVER).
 
+### Venue PDP — поле `template` в публичной деталке (24.03.2026)
+
+**Эндпоинты:** `GET /api/v1/venues/:slug`, предпросмотр `GET /api/v1/preview/venues/:id` (тот же shape `VenueDetail`). **Доп. поле:** опциональный объект **`template`** (`VenuePublicTemplate` в `@daibilet/shared`): нормализованные секции из `venueTemplateData` + fallback на legacy (`description`, `galleryUrls`, `openingHours`, `faq`). **Типы площадок с template-aware витриной (MVP):** `MUSEUM`, `ART_SPACE`, `GALLERY`. Подробнее: `Project.md` (модель Venue), `Diary.md` за 24.03.2026.
+
 ---
 
 ## 2. Observability

@@ -891,8 +891,61 @@ export interface VenueDetail extends VenueListItem {
   externalSource?: string | null;
   metaTitle?: string | null;
   metaDescription?: string | null;
+  template?: VenuePublicTemplate | null;
   relatedArticles?: unknown[];
   relatedVenues?: VenueListItem[];
+}
+
+export interface VenueTemplateIntroSection {
+  title?: string | null;
+  lead?: string | null;
+  longDescription?: string | null;
+}
+
+export interface VenueTemplateGallerySection {
+  images?: string[] | null;
+}
+
+export interface VenueTemplateVisitInfoSection {
+  openingHours?: Record<string, string | null> | null;
+  visitingRules?: string | null;
+}
+
+export interface VenueTemplateCollectionsSection {
+  items?: string[] | null;
+  text?: string | null;
+}
+
+export interface VenueTemplateAccessibilitySection {
+  audioGuide?: boolean | null;
+  interactive?: boolean | null;
+  notes?: string | null;
+}
+
+export interface VenueTemplateFaqSection {
+  items?: { q: string; a: string }[] | null;
+}
+
+export interface VenueTemplateEventsCopySection {
+  title?: string | null;
+  intro?: string | null;
+}
+
+export interface VenuePublicTemplateSections {
+  intro?: VenueTemplateIntroSection | null;
+  gallery?: VenueTemplateGallerySection | null;
+  visitInfo?: VenueTemplateVisitInfoSection | null;
+  collections?: VenueTemplateCollectionsSection | null;
+  permanentExposition?: VenueTemplateCollectionsSection | null;
+  accessibility?: VenueTemplateAccessibilitySection | null;
+  faq?: VenueTemplateFaqSection | null;
+  eventsCopy?: VenueTemplateEventsCopySection | null;
+}
+
+export interface VenuePublicTemplate {
+  venueType: string;
+  supportedTemplateType: boolean;
+  sections: VenuePublicTemplateSections;
 }
 
 /** Интенсивность → описание */

@@ -4,6 +4,27 @@
 
 ---
 
+## 24.03.2026 — Публичный Venue PDP: template-driven MVP (MUSEUM / ART_SPACE / GALLERY)
+
+### Наблюдения
+
+- `venueTemplateData` уже хранился в Prisma и редактировался в админке (`VenueEdit`, «Контент PDP»), но публичный API отдавал только legacy-поля; витрина `/venues/[slug]` не использовала шаблон как единый контракт.
+- Парсер и реестр полей уже есть в `@daibilet/shared`: `parseVenueTemplateData`, `getVenueTemplateSpecs`.
+
+### Решения
+
+- В `VenueService.buildVenuePublicDto` добавлена нормализация в опциональное поле ответа `template` (`venueType`, `supportedTemplateType`, предсказуемые `sections`: intro, gallery, visitInfo, collections, permanentExposition, accessibility, faq, eventsCopy). Типы объявлены в `packages/shared/src/index.ts` как `VenuePublicTemplate` / `VenueDetail.template`.
+- Приоритет данных: значения из template (включая расширенные ключи в сыром JSON, где нужно) → fallback на legacy (`description`, `shortDescription`, `galleryUrls`, `openingHours`, `faq`) → пустые секции не отдаются в UI-логике как отдельные блоки.
+- Ограничение MVP по типу площадки: `MUSEUM`, `ART_SPACE`, `GALLERY`; для остальных типов без заполненного template объект `template` может быть `null` (legacy-only).
+- Фронт: helper `packages/frontend/src/lib/venues/buildVenueTemplateSections.ts`, подключение в `VenuePageView` и в `generateMetadata` страницы venue для description (без ломки цепочки `getSeoMeta`).
+- Тесты: `packages/backend/src/venue/__tests__/venue-template-public.contract.spec.ts` (Vitest), 5 сценариев: normalize, fallback, priority, type gating, пустые секции.
+
+### Проблемы
+
+- Расширение набора ключей `venueTemplateData` в админке потребует точечного дополнения маппера в `VenueService`, без смены публичного shape `template.sections` по возможности.
+
+---
+
 ## 24.03.2026 — Ticket PDF (Puppeteer MVP) внедрён
 
 ### Наблюдения

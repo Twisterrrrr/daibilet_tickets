@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, VenueType } from '@prisma/client';
+import type { VenuePublicTemplate, VenueTemplateData } from '@daibilet/shared';
+import { parseVenueTemplateData } from '@daibilet/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -194,6 +196,7 @@ export class VenueService {
       highlights: Prisma.JsonValue | null;
       faq: Prisma.JsonValue | null;
       features: Prisma.JsonValue | null;
+      venueTemplateData: Prisma.JsonValue | null;
       isFeatured: boolean;
       metaTitle: string | null;
       metaDescription: string | null;
@@ -296,12 +299,189 @@ export class VenueService {
       isFeatured: venue.isFeatured,
       metaTitle: venue.metaTitle,
       metaDescription: venue.metaDescription,
+      template: this.buildVenuePublicTemplate({
+        venueType: venue.venueType,
+        venueTemplateData: venue.venueTemplateData,
+        legacyDescription: venue.description,
+        legacyShortDescription: venue.shortDescription,
+        legacyGalleryUrls: venue.galleryUrls,
+        legacyOpeningHours: venue.openingHours,
+        legacyFaq: (venue.faq as Array<{ q: string; a: string }> | null) ?? null,
+      }),
       city: venue.city,
       operator: venue.operator,
       offers: venue.offers,
       exhibitions: venue.events,
       reviews,
     };
+  }
+
+  private buildVenuePublicTemplate(input: {
+    venueType: VenueType;
+    venueTemplateData: Prisma.JsonValue | null;
+    legacyDescription: string | null;
+    legacyShortDescription: string | null;
+    legacyGalleryUrls: string[] | null;
+    legacyOpeningHours: Prisma.JsonValue | null;
+    legacyFaq: Array<{ q: string; a: string }> | null;
+  }): VenuePublicTemplate | null {
+    const parsed = parseVenueTemplateData(input.venueTemplateData) as VenueTemplateData | null;
+    const raw = this.asRecord(input.venueTemplateData);
+    const supportedTemplateType = this.isTemplateAwareVenueType(input.venueType);
+
+    if (!parsed && !supportedTemplateType) return null;
+
+    const introLead = this.pickFirstNonEmptyString(
+      this.readString(raw, 'lead'),
+      this.readString(raw, 'introLead'),
+      input.legacyShortDescription,
+    );
+    const introLongDescription = this.pickFirstNonEmptyString(
+      this.readString(raw, 'longDescription'),
+      this.readString(raw, 'introDescription'),
+      input.legacyDescription,
+    );
+    const introTitle = this.pickFirstNonEmptyString(this.readString(raw, 'introTitle'));
+
+    const galleryImages = this.pickFirstNonEmptyStringArray(
+      this.readStringArray(raw, 'gallery'),
+      this.readStringArray(raw, 'galleryUrls'),
+      input.legacyGalleryUrls ?? null,
+    );
+    const visitHours = (this.pickFirstNonEmptyRecord(
+      this.readHoursRecord(raw, 'visitHours'),
+      this.readHoursRecord(raw, 'openingHours'),
+      (input.legacyOpeningHours as Record<string, string | null> | null) ?? null,
+    ) ?? null) as Record<string, string | null> | null;
+    const visitingRules = this.pickFirstNonEmptyString(
+      this.readString(raw, 'visitingRules'),
+      this.readString(raw, 'visitRules'),
+    );
+
+    const collectionsItems = this.pickFirstNonEmptyStringArray(parsed?.collections ?? null);
+    const currentExhibitions = this.pickFirstNonEmptyString(
+      parsed?.currentExhibitions ?? null,
+      this.readString(raw, 'currentExhibitionsIntro'),
+    );
+    const permanentExpositionText = this.pickFirstNonEmptyString(parsed?.permanentExhibitions ?? null);
+    const accessibilityNotes = this.pickFirstNonEmptyString(parsed?.accessibilityNotes ?? null);
+    const faqItems = this.pickFirstNonEmptyFaqArray(
+      this.readFaqArray(raw, 'faq'),
+      input.legacyFaq,
+    );
+    const eventsTitle = this.pickFirstNonEmptyString(this.readString(raw, 'eventsTitle'));
+    const eventsIntro = this.pickFirstNonEmptyString(this.readString(raw, 'eventsIntro'));
+
+    const sections: VenuePublicTemplate['sections'] = {};
+    if (introTitle || introLead || introLongDescription) {
+      sections.intro = { title: introTitle, lead: introLead, longDescription: introLongDescription };
+    }
+    if (galleryImages) sections.gallery = { images: galleryImages };
+    if (visitHours || visitingRules) sections.visitInfo = { openingHours: visitHours, visitingRules };
+    if (collectionsItems || currentExhibitions) {
+      sections.collections = { items: collectionsItems, text: currentExhibitions };
+    }
+    if (permanentExpositionText) sections.permanentExposition = { text: permanentExpositionText };
+    if (parsed?.audioGuide !== undefined || parsed?.interactive !== undefined || accessibilityNotes) {
+      sections.accessibility = {
+        audioGuide: parsed?.audioGuide ?? null,
+        interactive: parsed?.interactive ?? null,
+        notes: accessibilityNotes,
+      };
+    }
+    if (faqItems) sections.faq = { items: faqItems };
+    if (eventsTitle || eventsIntro) sections.eventsCopy = { title: eventsTitle, intro: eventsIntro };
+
+    const hasAnySection = Object.keys(sections).length > 0;
+    if (!hasAnySection && !supportedTemplateType) return null;
+    return {
+      venueType: input.venueType,
+      supportedTemplateType,
+      sections,
+    };
+  }
+
+  private isTemplateAwareVenueType(venueType: VenueType): boolean {
+    return venueType === 'MUSEUM' || venueType === 'ART_SPACE' || venueType === 'GALLERY';
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as Record<string, unknown>;
+  }
+
+  private readString(record: Record<string, unknown> | null, key: string): string | null {
+    if (!record) return null;
+    const value = record[key];
+    return typeof value === 'string' ? value : null;
+  }
+
+  private readStringArray(record: Record<string, unknown> | null, key: string): string[] | null {
+    if (!record) return null;
+    const value = record[key];
+    if (!Array.isArray(value)) return null;
+    const items = value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean);
+    return items.length > 0 ? items : null;
+  }
+
+  private readHoursRecord(record: Record<string, unknown> | null, key: string): Record<string, string | null> | null {
+    if (!record) return null;
+    const value = record[key];
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const entries = Object.entries(value as Record<string, unknown>).map(([day, hours]) => [
+      day,
+      typeof hours === 'string' ? hours : hours == null ? null : String(hours),
+    ]);
+    return entries.length > 0 ? Object.fromEntries(entries) : null;
+  }
+
+  private readFaqArray(record: Record<string, unknown> | null, key: string): Array<{ q: string; a: string }> | null {
+    if (!record) return null;
+    const value = record[key];
+    if (!Array.isArray(value)) return null;
+    const items = value
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const q = typeof (item as { q?: unknown }).q === 'string' ? (item as { q: string }).q.trim() : '';
+        const a = typeof (item as { a?: unknown }).a === 'string' ? (item as { a: string }).a.trim() : '';
+        if (!q || !a) return null;
+        return { q, a };
+      })
+      .filter((item): item is { q: string; a: string } => Boolean(item));
+    return items.length > 0 ? items : null;
+  }
+
+  private pickFirstNonEmptyString(...values: Array<string | null | undefined>): string | null {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return null;
+  }
+
+  private pickFirstNonEmptyStringArray(...values: Array<string[] | null | undefined>): string[] | null {
+    for (const value of values) {
+      if (Array.isArray(value)) {
+        const normalized = value.map((item) => item.trim()).filter(Boolean);
+        if (normalized.length > 0) return normalized;
+      }
+    }
+    return null;
+  }
+
+  private pickFirstNonEmptyRecord<T extends Record<string, unknown>>(...values: Array<T | null | undefined>): T | null {
+    for (const value of values) {
+      if (value && Object.keys(value).length > 0) return value;
+    }
+    return null;
+  }
+
+  private pickFirstNonEmptyFaqArray(
+    ...values: Array<Array<{ q: string; a: string }> | null | undefined>
+  ): Array<{ q: string; a: string }> | null {
+    for (const value of values) {
+      if (Array.isArray(value) && value.length > 0) return value;
+    }
+    return null;
   }
 
   /** Похожие места: тот же город, тот же тип, исключая текущее */

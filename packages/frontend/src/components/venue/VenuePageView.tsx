@@ -24,6 +24,7 @@ import { VenueCard } from '@/components/ui/VenueCard';
 import { MobileStickyBar } from '@/components/venue/MobileStickyBar';
 import { TicketsBlock } from '@/components/venue/TicketsBlock';
 import { VenueReviewsBlock } from '@/components/venue/VenueReviewsBlock';
+import { buildVenueTemplateSections } from '@/lib/venues/buildVenueTemplateSections';
 
 export type VenuePageViewProps = {
   venue: VenueDetail;
@@ -93,7 +94,8 @@ const FEATURE_LABELS: Record<string, { label: string; icon: string }> = {
 };
 
 export function VenuePageView({ venue }: VenuePageViewProps) {
-  const hours = normalizeHours(venue.openingHours);
+  const templateSections = buildVenueTemplateSections(venue);
+  const hours = normalizeHours(templateSections.openingHours);
   const todayKey = getTodayKey();
   const todayHours = hours[todayKey] ?? null;
   const typeLabel = VENUE_TYPE_LABELS[venue.venueType as VenueType] || venue.venueType;
@@ -104,7 +106,7 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
   const permanentExhibitions = allExhibitions.filter((e) => e.isPermanent);
   const temporaryExhibitions = allExhibitions.filter((e) => !e.isPermanent);
   const highlights: string[] = venue.highlights || [];
-  const faq: { q: string; a: string }[] = venue.faq || [];
+  const faq: { q: string; a: string }[] = templateSections.faq;
   const features: string[] = venue.features || [];
   const primaryOffer = venue.offers?.[0] as VenueOffer | undefined;
 
@@ -138,7 +140,7 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
               ? 'Park'
               : 'TouristAttraction',
     name: venue.title,
-    description: venue.shortDescription || stripHtml(venue.description || ''),
+    description: templateSections.introLead || stripHtml(templateSections.descriptionHtml || ''),
     image: venue.imageUrl,
     address: venue.address
       ? {
@@ -274,6 +276,8 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
                 </div>
               )}
 
+              {templateSections.introLead && <p className="mt-3 text-white/80 text-sm md:text-base">{templateSections.introLead}</p>}
+
               {/* Quick facts */}
               {displayFacts.length > 0 && (
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-sm text-white/70">
@@ -387,19 +391,19 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
                   })}
                 </div>
               )}
-              {venue.description && (
+              {templateSections.descriptionHtml && (
                 <div
                   className="prose prose-sm max-w-none text-gray-600 line-clamp-6"
-                  dangerouslySetInnerHTML={{ __html: venue.description }}
+                  dangerouslySetInnerHTML={{ __html: templateSections.descriptionHtml }}
                 />
               )}
             </section>
 
             {/* Gallery */}
-            {venue.galleryUrls && venue.galleryUrls.length > 0 && (
+            {templateSections.galleryUrls.length > 0 && (
               <section>
                 <div className="flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 snap-x snap-mandatory scrollbar-hide">
-                  {venue.galleryUrls.map((url: string, i: number) => (
+                  {templateSections.galleryUrls.map((url: string, i: number) => (
                     <div key={i} className="flex-shrink-0 w-64 h-44 rounded-xl overflow-hidden snap-start">
                       <Image
                         src={url}
@@ -473,13 +477,64 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
                     </p>
                   )}
                 </div>
+                {templateSections.visitingRules && (
+                  <div className="sm:col-span-2 bg-blue-50 border border-blue-100 rounded-xl p-4">
+                    <h3 className="font-semibold text-sm text-gray-900 mb-2">Правила посещения</h3>
+                    <p className="text-sm text-gray-700">{templateSections.visitingRules}</p>
+                  </div>
+                )}
               </div>
             </section>
+
+            {(templateSections.collections.length > 0 ||
+              templateSections.collectionsText ||
+              templateSections.permanentExposition ||
+              templateSections.accessibility) && (
+              <section>
+                <h2 className="text-xl font-bold mb-4">Экспозиции и особенности</h2>
+                <div className="space-y-4">
+                  {(templateSections.collections.length > 0 || templateSections.collectionsText) && (
+                    <div className="bg-white rounded-xl border border-gray-200 p-4">
+                      <h3 className="font-semibold text-sm text-gray-900 mb-2">Коллекции</h3>
+                      {templateSections.collectionsText && (
+                        <p className="text-sm text-gray-700 mb-2">{templateSections.collectionsText}</p>
+                      )}
+                      {templateSections.collections.length > 0 && (
+                        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                          {templateSections.collections.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                  {templateSections.permanentExposition && (
+                    <div className="bg-white rounded-xl border border-gray-200 p-4">
+                      <h3 className="font-semibold text-sm text-gray-900 mb-2">Постоянная экспозиция</h3>
+                      <p className="text-sm text-gray-700">{templateSections.permanentExposition}</p>
+                    </div>
+                  )}
+                  {templateSections.accessibility && (
+                    <div className="bg-white rounded-xl border border-gray-200 p-4">
+                      <h3 className="font-semibold text-sm text-gray-900 mb-2">Доступность и удобства</h3>
+                      <div className="space-y-1.5 text-sm text-gray-700">
+                        {templateSections.accessibility.audioGuide && <p>Есть аудиогид</p>}
+                        {templateSections.accessibility.interactive && <p>Есть интерактивные экспонаты</p>}
+                        {templateSections.accessibility.notes && <p>{templateSections.accessibility.notes}</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
 
             {/* ═══ 6. ВЫСТАВКИ И СОБЫТИЯ ═══ */}
             {(permanentExhibitions.length > 0 || temporaryExhibitions.length > 0) && (
               <section>
-                <h2 className="text-xl font-bold mb-4">Выставки и события</h2>
+                <h2 className="text-xl font-bold mb-4">{templateSections.eventsCopy?.title || 'Выставки и события'}</h2>
+                {templateSections.eventsCopy?.intro && (
+                  <p className="text-sm text-gray-600 mb-3">{templateSections.eventsCopy.intro}</p>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[...temporaryExhibitions, ...permanentExhibitions].map((e) => (
                     <Link

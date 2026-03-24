@@ -6,6 +6,7 @@ import type { VenueListItem, VenueDetail } from '@daibilet/shared';
 import { VenuePageView } from '@/components/venue/VenuePageView';
 import { api } from '@/lib/api';
 import { getSeoMeta } from '@/lib/seo/getSeoMeta';
+import { buildVenueTemplateSections } from '@/lib/venues/buildVenueTemplateSections';
 
 export const revalidate = 3600;
 
@@ -27,12 +28,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const venue = await api.getVenueBySlug(slug);
     const seo = await getSeoMeta('VENUE', venue.id);
+    const templateSections = buildVenueTemplateSections(venue);
     const title = seo?.title ?? venue.metaTitle ?? `${venue.title} — билеты, часы работы, адрес | Дайбилет`;
     const description =
       seo?.description ??
       venue.metaDescription ??
-      venue.shortDescription ??
-      stripHtml(venue.description || '').slice(0, 160);
+      templateSections.introLead ??
+      stripHtml(templateSections.descriptionHtml || '').slice(0, 160);
     const robots = seo?.robots ?? 'index,follow';
     const canonical = seo?.canonicalUrl ?? undefined;
     return {

@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-03-19
+> Последнее обновление: 2026-03-24
 
 ## Миссия
 
@@ -181,7 +181,8 @@
 - **SupplierUser** — аккаунт поставщика (Operator 1—N SupplierUser). Роли: OWNER, MANAGER, CONTENT, ACCOUNTANT.
 - **User** — пользователь сайта (регистрация/вход). Избранное в UserFavorite (eventSlug).
 - **ApiKey** — API-ключ для Partner B2B API: SHA-256 хеш (не храним оригинал), prefix (8 символов для UI), rateLimit, ipWhitelist, expiresAt.
-- **Venue** — место (музей, галерея, арт-пространство). VenueType enum (MUSEUM/GALLERY/ART_SPACE/EXHIBITION_HALL/THEATER/PALACE/PARK). Содержит: openingHours (JSON), priceFrom, rating, galleryUrls, address/metro/lat/lng, operatorId (партнёр). Soft delete, optimistic lock.
+- **Venue** — место (музей, галерея, арт-пространство). VenueType enum (MUSEUM/GALLERY/ART_SPACE/EXHIBITION_HALL/THEATER/PALACE/PARK). Содержит: openingHours (JSON), priceFrom, rating, galleryUrls, address/metro/lat/lng, operatorId (партнёр), опционально **venueTemplateData** (JSON контента PDP из админки). Soft delete, optimistic lock.
+  - **Публичный PDP (template MVP):** ответ детальной площадки (`GET /api/v1/venues/:slug`, preview по id) дополняется нормализованным полем **`template`** типа `VenuePublicTemplate` в `VenueDetail` (`@daibilet/shared`): `parseVenueTemplateData` + маппинг в секции (`intro`, `gallery`, `visitInfo`, `collections`, `permanentExposition`, `accessibility`, `faq`, `eventsCopy`). Для типов **MUSEUM**, **ART_SPACE**, **GALLERY** включён template-aware рендер на витрине с fallback на legacy-поля; остальные типы — legacy-only, если template не задан. Реализация: `VenueService.buildVenuePublicDto`, фронт `buildVenueTemplateSections` + `VenuePageView`, meta description в `app/venues/[slug]/page.tsx`. Тесты контракта: `packages/backend/src/venue/__tests__/venue-template-public.contract.spec.ts`.
 - **Subcategory** — новый универсальный справочник подкатегорий (`SubcategoryType`: `UNIVERSAL | EVENT_ONLY | VENUE_ONLY`) с иерархией до 2 уровней через `parentId` и флагами `isActive`/`isLandingEnabled`; используется M:N связями:
   - `EventSubcategoryLink` (`eventId`, `subcategoryId`);
   - `VenueSubcategoryLink` (`venueId`, `subcategoryId`).

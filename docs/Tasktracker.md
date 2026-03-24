@@ -4,6 +4,20 @@
 
 ---
 
+## Venue PDP — template-driven публичный рендер (24.03.2026)
+
+| ID | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `venue-pdp-public-template-contract` | Нормализованный блок `VenueDetail.template` в публичном ответе (`buildVenuePublicDto`), parse через `parseVenueTemplateData` | Высокий | `[x]` |
+| `venue-pdp-frontend-sections` | Helper `buildVenueTemplateSections` + интеграция в `VenuePageView` (hero, gallery, часы, коллекции/экспозиция, accessibility, FAQ, copy для блока событий) | Высокий | `[x]` |
+| `venue-pdp-fallback-rules` | Единый fallback template → legacy → скрытие пустых секций | Критический | `[x]` |
+| `venue-pdp-seo-copy` | Template-aware источник для meta `description` в `venues/[slug]/page.tsx` без ломки JSON-LD | Средний | `[x]` |
+| `venue-pdp-tests` | Vitest: normalize, fallback, priority, type gating, empty sections | Высокий | `[x]` |
+
+Код: `packages/backend/src/venue/venue.service.ts`, `packages/shared/src/index.ts`, `packages/frontend/src/lib/venues/buildVenueTemplateSections.ts`, `VenuePageView`, `app/venues/[slug]/page.tsx`, `packages/backend/src/venue/__tests__/venue-template-public.contract.spec.ts`. Документация: `Project.md`, эта запись.
+
+---
+
 ## Unified Subcategories Rollout (24.03.2026)
 
 | ID | Задача | Приоритет | Статус |
