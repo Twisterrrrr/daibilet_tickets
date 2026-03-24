@@ -22,17 +22,17 @@ function tierBadge(tier: EventAdminSummary['promotion']['tier']) {
     return (
       <Badge className="bg-violet-600 hover:bg-violet-600">
         <Sparkles className="mr-1 h-3 w-3" />
-        TOP
+        Топ
       </Badge>
     );
   if (tier === 'POPULAR')
     return (
       <Badge className="bg-primary hover:bg-primary">
         <Sparkles className="mr-1 h-3 w-3" />
-        POPULAR
+        Популярное
       </Badge>
     );
-  return <Badge variant="outline">NONE</Badge>;
+  return <Badge variant="outline">Нет</Badge>;
 }
 
 type Props = {
@@ -79,7 +79,7 @@ export function EventAdminSummaryPanel({ summary, loading, error }: Props) {
             </CardTitle>
             <ReadinessBadge status={readiness.status} />
           </div>
-          <CardDescription>Данные с сервера (EventQuality + чеклист)</CardDescription>
+          <CardDescription>Данные с сервера (качество события + чеклист)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
@@ -118,11 +118,11 @@ export function EventAdminSummaryPanel({ summary, loading, error }: Props) {
             </CardTitle>
             {tierBadge(promotion.tier)}
           </div>
-          <CardDescription>manualBoost → уровень (без дублирования логики на фронте)</CardDescription>
+          <CardDescription>Ручное усиление → уровень (без дублирования логики на фронте)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p>
-            <span className="text-muted-foreground">manualBoost:</span>{' '}
+            <span className="text-muted-foreground">Ручное усиление:</span>{' '}
             <span className="font-mono font-medium">{promotion.manualBoost}</span>
           </p>
           {promotion.helpText && <p className="text-xs text-muted-foreground">{promotion.helpText}</p>}
@@ -173,7 +173,7 @@ export function EventAdminSummaryPanel({ summary, loading, error }: Props) {
         </CardHeader>
         <CardContent className="text-sm">
           <p>
-            Заявок (OrderRequest): <span className="font-medium">{commercial.last30dOrders}</span>
+            Заявок (заказов): <span className="font-medium">{commercial.last30dOrders}</span>
           </p>
           <p className="text-muted-foreground text-xs mt-1">
             Конверсия и возвраты: пока не считаются на сервере (null).
@@ -194,7 +194,7 @@ export function EventAdminSummaryPanel({ summary, loading, error }: Props) {
             <p className="font-mono font-medium">{integration.source}</p>
           </div>
           <div>
-            <span className="text-muted-foreground">Последний sync</span>
+            <span className="text-muted-foreground">Последняя синхронизация</span>
             <p className="font-medium">
               {integration.lastSyncAt ? new Date(integration.lastSyncAt).toLocaleString('ru-RU') : '—'}
             </p>
@@ -204,7 +204,7 @@ export function EventAdminSummaryPanel({ summary, loading, error }: Props) {
             <p className="font-medium">{integration.syncStatus}</p>
           </div>
           <div>
-            <span className="text-muted-foreground">Группа дублей (groupingKey)</span>
+            <span className="text-muted-foreground">Группа дублей</span>
             <p className="font-medium">{integration.hasDuplicates ? 'Да' : 'Нет'}</p>
           </div>
         </CardContent>

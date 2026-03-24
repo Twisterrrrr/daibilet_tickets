@@ -1,9 +1,20 @@
 import {
+  AlertCircle,
   BarChart3,
   ArrowRight,
+  Clock3,
   DollarSign,
   Eye,
+  Layers3,
+  MapPinned,
+  ShoppingBag,
   ShoppingCart,
+  TicketX,
+  TrendingUp,
+  Undo2,
+  FileWarning,
+  ShieldAlert,
+  XCircle,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -20,13 +31,13 @@ import {
   YAxis,
 } from 'recharts';
 
-import { ErrorState, PageHeader, StatusBadge } from '@daibilet/shared-ui';
+import { ErrorState, LoadingState, PageHeader, SectionCard, StatCard, StatusBadge } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -66,6 +77,46 @@ interface DashboardStats {
     paidAt: string | null;
     city: string;
   }[];
+}
+
+interface SupplierActivityItem {
+  id: string;
+  name: string;
+  companyName: string | null;
+  _count?: { events?: number };
+}
+
+interface DashboardAttentionSummary {
+  noSessions: number;
+  noPrice: number;
+  rejectedModeration: number;
+  pendingModeration: number;
+  draftOrHidden: number;
+  lowListingHealth: number;
+}
+
+interface DashboardTabMetric {
+  value: number;
+  suffix: string;
+  hint: string;
+}
+
+interface DashboardAnalyticsTabs {
+  content: {
+    qualityCards: DashboardTabMetric;
+    citiesCoverage: DashboardTabMetric;
+    popularCategories: DashboardTabMetric;
+  };
+  operations: {
+    recentOrders: DashboardTabMetric;
+    paymentIssues: DashboardTabMetric;
+    refundsAndCancels: DashboardTabMetric;
+  };
+  marketing: {
+    eventsConversion: DashboardTabMetric;
+    promoEfficiency: DashboardTabMetric;
+    popularTopics: DashboardTabMetric;
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -138,47 +189,6 @@ function formatShortDate(iso: string): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-// ─── Loading Skeleton ────────────────────────────────────────────────────────
-
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-7 w-32 mb-1" />
-              <Skeleton className="h-3 w-20" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      <div className="grid gap-4 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
-          <CardHeader>
-            <Skeleton className="h-5 w-40" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-[300px] w-full" />
-          </CardContent>
-        </Card>
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <Skeleton className="h-5 w-40" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-[300px] w-full" />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
 // ─── Custom Tooltip for Charts ───────────────────────────────────────────────
 
 function RevenueTooltipContent({ active, payload, label }: any) {
@@ -201,23 +211,92 @@ function CategoryTooltipContent({ active, payload }: any) {
   );
 }
 
+function DashboardCompactEmpty({ text }: { text: string }) {
+  return (
+    <div className="flex h-[96px] items-center justify-center rounded-lg border border-dashed bg-muted/20 px-3 text-center text-sm text-muted-foreground">
+      {text}
+    </div>
+  );
+}
+
 // ─── Main Dashboard ──────────────────────────────────────────────────────────
 
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [suppliers, setSuppliers] = useState<SupplierActivityItem[]>([]);
+  const [attention, setAttention] = useState<DashboardAttentionSummary>({
+    noSessions: 0,
+    noPrice: 0,
+    rejectedModeration: 0,
+    pendingModeration: 0,
+    draftOrHidden: 0,
+    lowListingHealth: 0,
+  });
+  const [analyticsTabs, setAnalyticsTabs] = useState<DashboardAnalyticsTabs | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<PeriodFilter>('30d');
 
   useEffect(() => {
-    adminApi
-      .get<DashboardStats>('/admin/dashboard/stats')
-      .then(setStats)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const [statsRes, suppliersRes, diagnosticsRes, analyticsTabsRes] = await Promise.allSettled([
+          adminApi.get<DashboardStats>('/admin/dashboard/stats'),
+          adminApi.get<{ items: SupplierActivityItem[] }>('/admin/suppliers?limit=5'),
+          adminApi.get<DashboardAttentionSummary>('/admin/dashboard/attention'),
+          adminApi.get<DashboardAnalyticsTabs>('/admin/dashboard/analytics-tabs'),
+        ]);
+
+        if (cancelled) return;
+
+        if (statsRes.status === 'rejected') {
+          setError(statsRes.reason?.message ?? 'Ошибка загрузки дашборда');
+          return;
+        }
+
+        setStats(statsRes.value);
+
+        if (suppliersRes.status === 'fulfilled') {
+          setSuppliers(Array.isArray(suppliersRes.value.items) ? suppliersRes.value.items : []);
+        } else {
+          setSuppliers([]);
+        }
+
+        if (diagnosticsRes.status === 'fulfilled') {
+          setAttention(diagnosticsRes.value);
+        } else {
+          setAttention({
+            noSessions: 0,
+            noPrice: 0,
+            rejectedModeration: 0,
+            pendingModeration: 0,
+            draftOrHidden: 0,
+            lowListingHealth: 0,
+          });
+        }
+
+        if (analyticsTabsRes.status === 'fulfilled') {
+          setAnalyticsTabs(analyticsTabsRes.value);
+        } else {
+          setAnalyticsTabs(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Ошибка загрузки дашборда');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <LoadingState label="Загрузка дашборда..." className="rounded-xl border" />;
   if (error || !stats) {
     return (
       <ErrorState
@@ -260,11 +339,78 @@ export function DashboardPage() {
 
   // If topEvents max salesCount for progress bar
   const maxSales = stats.topEvents.length > 0 ? stats.topEvents[0].salesCount : 1;
+  const totalAttentionProblems =
+    attention.noSessions +
+    attention.noPrice +
+    attention.rejectedModeration +
+    attention.pendingModeration +
+    attention.draftOrHidden +
+    attention.lowListingHealth;
+  const attentionItems = [
+    {
+      key: 'noSessions',
+      title: 'Без сеансов',
+      description: 'Активные события без доступных будущих сеансов',
+      value: attention.noSessions,
+      to: '/availability',
+      icon: AlertCircle,
+      iconClassName: 'text-amber-600',
+    },
+    {
+      key: 'noPrice',
+      title: 'Без цены',
+      description: 'События без валидной стоимости оффера',
+      value: attention.noPrice,
+      to: '/events',
+      icon: TicketX,
+      iconClassName: 'text-rose-600',
+    },
+    {
+      key: 'rejectedModeration',
+      title: 'Отклонены модерацией',
+      description: 'Карточки, отклоненные и требующие доработки',
+      value: attention.rejectedModeration,
+      to: '/moderation',
+      icon: XCircle,
+      iconClassName: 'text-red-600',
+    },
+    {
+      key: 'pendingModeration',
+      title: 'Очередь модерации',
+      description: 'События, ожидающие решения модератора',
+      value: attention.pendingModeration,
+      to: '/moderation',
+      icon: Clock3,
+      iconClassName: 'text-blue-600',
+    },
+    {
+      key: 'draftOrHidden',
+      title: 'Черновики и скрытые',
+      description: 'Неактивные карточки, не попадающие в витрину',
+      value: attention.draftOrHidden,
+      to: '/events',
+      icon: FileWarning,
+      iconClassName: 'text-orange-600',
+    },
+    {
+      key: 'lowListingHealth',
+      title: 'Низкое качество карточек',
+      description: 'Проблемы с контентом, ценой или доступностью',
+      value: attention.lowListingHealth,
+      to: '/events',
+      icon: ShieldAlert,
+      iconClassName: 'text-amber-700',
+    },
+  ] as const;
+  const contentMetrics = analyticsTabs?.content;
+  const operationsMetrics = analyticsTabs?.operations;
+  const marketingMetrics = analyticsTabs?.marketing;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Дашборд"
+        subtitle="Операционная сводка по ключевым метрикам и зонам внимания"
         actions={
           <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
             {(['today', '7d', '30d'] as const).map((key) => (
@@ -287,51 +433,229 @@ export function DashboardPage() {
 
       {/* Stat cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Заказы</p>
-                <p className="text-2xl font-bold">{stats.orders.total}</p>
-              </div>
-              <ShoppingCart className="h-8 w-8 text-primary/30" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Выручка</p>
-                <p className="text-2xl font-bold">{formatCurrency(revenueForPeriod)}</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-success/30" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Активных событий</p>
-                <p className="text-2xl font-bold">{stats.activeEvents}</p>
-              </div>
-              <Eye className="h-8 w-8 text-info/30" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">CTR промо</p>
-                <p className="text-2xl font-bold">—</p>
-              </div>
-              <BarChart3 className="h-8 w-8 text-accent/30" />
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Заказы"
+          value={stats.orders.total}
+          icon={<ShoppingCart className="h-8 w-8 text-primary/30" />}
+          description={`Всего заказов • тренд ${stats.ticketsSoldTrend > 0 ? '+' : ''}${stats.ticketsSoldTrend}%`}
+        />
+        <StatCard
+          label="Выручка"
+          value={formatCurrency(revenueForPeriod)}
+          icon={<DollarSign className="h-8 w-8 text-success/30" />}
+          description={`За ${PERIOD_LABELS[period].toLowerCase()} • тренд ${stats.revenueTrend > 0 ? '+' : ''}${stats.revenueTrend}%`}
+        />
+        <StatCard
+          label="Активные события"
+          value={stats.activeEvents}
+          icon={<Eye className="h-8 w-8 text-info/30" />}
+          description={`Всего событий: ${stats.events.total} • тренд ${stats.activeEventsTrend > 0 ? '+' : ''}${stats.activeEventsTrend}%`}
+        />
+        <StatCard
+          label="Ожидают модерации"
+          value={stats.pendingReviews}
+          icon={<BarChart3 className="h-8 w-8 text-accent/30" />}
+          description="Карточки в очереди, требуют внимания команды"
+        />
       </div>
+
+      <div className="grid gap-4">
+        <SectionCard
+          title="Требует внимания"
+          description="Ключевые блокеры по каталогу и модерации"
+          headerRight={
+            <div className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-destructive px-2 text-xs font-semibold text-white">
+              {totalAttentionProblems}
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {attentionItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.key}
+                  to={item.to}
+                  className="group flex items-center justify-between rounded-xl border border-border/80 bg-white p-3 transition-colors hover:bg-muted/30"
+                >
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${item.iconClassName}`} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{item.title}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+                    </div>
+                  </div>
+                  <span className="ml-3 inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-muted px-2 text-xs font-semibold">
+                    {item.value}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        <Tabs defaultValue="content" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="content">Контент</TabsTrigger>
+            <TabsTrigger value="operations">Операции</TabsTrigger>
+            <TabsTrigger value="marketing">Маркетинг</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="content" className="mt-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <SectionCard title="Качество карточек">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Layers3 className="h-4 w-4" />
+                    Полнота контента и готовность к публикации
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {contentMetrics?.qualityCards.value ?? 0}
+                    {contentMetrics?.qualityCards.suffix ?? ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{contentMetrics?.qualityCards.hint ?? 'Нет данных'}</p>
+                </div>
+              </SectionCard>
+              <SectionCard title="Покрытие по городам">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPinned className="h-4 w-4" />
+                    География активных предложений
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {contentMetrics?.citiesCoverage.value ?? 0}
+                    {contentMetrics?.citiesCoverage.suffix ?? ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{contentMetrics?.citiesCoverage.hint ?? 'Нет данных'}</p>
+                </div>
+              </SectionCard>
+              <SectionCard title="Популярные категории">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <BarChart3 className="h-4 w-4" />
+                    Категории с наибольшей активностью
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {contentMetrics?.popularCategories.value ?? 0}
+                    {contentMetrics?.popularCategories.suffix ?? ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{contentMetrics?.popularCategories.hint ?? 'Нет данных'}</p>
+                </div>
+              </SectionCard>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="operations" className="mt-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <SectionCard title="Последние заказы">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <ShoppingBag className="h-4 w-4" />
+                    Оперативная лента новых заказов
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {operationsMetrics?.recentOrders.value ?? 0}
+                    {operationsMetrics?.recentOrders.suffix ?? ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{operationsMetrics?.recentOrders.hint ?? 'Нет данных'}</p>
+                </div>
+              </SectionCard>
+              <SectionCard title="Проблемы оплат">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <TicketX className="h-4 w-4" />
+                    Ошибки платежей и зависшие транзакции
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {operationsMetrics?.paymentIssues.value ?? 0}
+                    {operationsMetrics?.paymentIssues.suffix ?? ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{operationsMetrics?.paymentIssues.hint ?? 'Нет данных'}</p>
+                </div>
+              </SectionCard>
+              <SectionCard title="Возвраты и отмены">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Undo2 className="h-4 w-4" />
+                    Динамика спорных и отмененных заказов
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {operationsMetrics?.refundsAndCancels.value ?? 0}
+                    {operationsMetrics?.refundsAndCancels.suffix ?? ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {operationsMetrics?.refundsAndCancels.hint ?? 'Нет данных'}
+                  </p>
+                </div>
+              </SectionCard>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="marketing" className="mt-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <SectionCard title="Конверсия событий">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <TrendingUp className="h-4 w-4" />
+                    Переходы в покупку по карточкам событий
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {marketingMetrics?.eventsConversion.value ?? 0}
+                    {marketingMetrics?.eventsConversion.suffix ?? ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{marketingMetrics?.eventsConversion.hint ?? 'Нет данных'}</p>
+                </div>
+              </SectionCard>
+              <SectionCard title="Промо эффективность">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <DollarSign className="h-4 w-4" />
+                    Вклад промо-механик в продажи
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {marketingMetrics?.promoEfficiency.value ?? 0}
+                    {marketingMetrics?.promoEfficiency.suffix ?? ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{marketingMetrics?.promoEfficiency.hint ?? 'Нет данных'}</p>
+                </div>
+              </SectionCard>
+              <SectionCard title="Популярные темы">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Eye className="h-4 w-4" />
+                    Темы с максимальным интересом аудитории
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {marketingMetrics?.popularTopics.value ?? 0}
+                    {marketingMetrics?.popularTopics.suffix ?? ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{marketingMetrics?.popularTopics.hint ?? 'Нет данных'}</p>
+                </div>
+              </SectionCard>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <SectionCard title="Активность поставщиков" description="Короткий список по последним поставщикам">
+        {suppliers.length ? (
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {suppliers.map((supplier) => (
+              <Link
+                key={supplier.id}
+                to={`/suppliers/${supplier.id}`}
+                className="rounded-[10px] border border-border/80 bg-white p-3 transition-colors hover:bg-muted/30"
+              >
+                <p className="truncate text-sm font-medium">{supplier.companyName || supplier.name}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{supplier.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Событий: {supplier._count?.events ?? 0}</p>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="py-6 text-center text-sm text-muted-foreground">Нет данных по поставщикам</p>
+        )}
+      </SectionCard>
 
       {/* Charts row */}
       <div className="grid gap-4 lg:grid-cols-7">
@@ -370,7 +694,7 @@ export function DashboardPage() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+              <div className="flex h-[140px] items-center justify-center text-muted-foreground">
                 Нет данных за этот период
               </div>
             )}
@@ -399,7 +723,7 @@ export function DashboardPage() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+              <div className="flex h-[140px] items-center justify-center text-muted-foreground">
                 Нет данных о продажах
               </div>
             )}
@@ -441,7 +765,7 @@ export function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-sm text-muted-foreground py-8">Нет продаж за период</p>
+              <DashboardCompactEmpty text="Нет продаж за выбранный период" />
             )}
           </CardContent>
         </Card>
@@ -500,7 +824,7 @@ export function DashboardPage() {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-center text-sm text-muted-foreground py-8">Заказов пока нет</p>
+              <DashboardCompactEmpty text="Заказов пока нет" />
             )}
           </CardContent>
         </Card>

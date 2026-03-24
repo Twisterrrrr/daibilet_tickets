@@ -1,7 +1,7 @@
 import { ArrowLeft, Copy, Eye, EyeOff, Merge, Pencil, Plus, RotateCcw, Save, Star, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { getEventTemplateSpecs } from '@daibilet/shared';
@@ -55,44 +55,19 @@ import { EventTagsEditor } from '@/components/events/EventTagsEditor';
 
 type EventCategory = 'EXCURSION' | 'MUSEUM' | 'EVENT';
 type EventSubcategory = string;
+type AdminSubcategory = {
+  id: string;
+  slug: string;
+  nameRu: string;
+  type: 'UNIVERSAL' | 'EVENT_ONLY' | 'VENUE_ONLY';
+  parent?: { id: string; slug: string; nameRu: string } | null;
+};
 
 const CATEGORY_OPTIONS = [
   { value: 'EXCURSION', label: 'Экскурсии' },
   { value: 'MUSEUM', label: 'Музеи и Арт' },
   { value: 'EVENT', label: 'Мероприятия' },
 ];
-
-const SUBCATEGORY_OPTIONS: Record<string, { value: string; label: string }[]> = {
-  EXCURSION: [
-    { value: 'RIVER', label: 'Речная' },
-    { value: 'WALKING', label: 'Пешеходная' },
-    { value: 'BUS', label: 'Автобусная' },
-    { value: 'COMBINED', label: 'Комбинированная' },
-    { value: 'QUEST', label: 'Квест' },
-    { value: 'GASTRO', label: 'Гастро' },
-    { value: 'ROOFTOP', label: 'Крыши' },
-  ],
-  MUSEUM: [
-    { value: 'MUSEUM_CLASSIC', label: 'Музей' },
-    { value: 'EXHIBITION', label: 'Выставка' },
-    { value: 'GALLERY', label: 'Галерея' },
-    { value: 'PALACE', label: 'Дворец' },
-    { value: 'PARK', label: 'Парк' },
-    { value: 'ART_SPACE', label: 'Арт-пространство' },
-    { value: 'SCULPTURE', label: 'Скульптура' },
-    { value: 'CONTEMPORARY', label: 'Совр. искусство' },
-  ],
-  EVENT: [
-    { value: 'CONCERT', label: 'Концерт' },
-    { value: 'SHOW', label: 'Шоу' },
-    { value: 'STANDUP', label: 'Стендап' },
-    { value: 'THEATER', label: 'Театр' },
-    { value: 'SPORT', label: 'Спорт' },
-    { value: 'FESTIVAL', label: 'Фестиваль' },
-    { value: 'MASTERCLASS', label: 'Мастер-класс' },
-    { value: 'PARTY', label: 'Вечеринка' },
-  ],
-};
 
 interface Session {
   id: string;
@@ -200,6 +175,7 @@ interface EventDetail {
 }
 
 type UiTab = 'general' | 'seo' | 'offers' | 'sessions' | 'rating' | 'group';
+type EventEditSectionTab = 'overview' | 'wizard' | 'editor';
 
 const SOURCE_LABELS: Record<string, string> = {
   TC: 'TicketsCloud',
@@ -220,6 +196,7 @@ function formatPrice(kopecks: number | null): string {
 
 export function EventEditPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const qc = useQueryClient();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -228,6 +205,17 @@ export function EventEditPage() {
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<UiTab>('general');
+  const initialSection = searchParams.get('section');
+  const [sectionTab, setSectionTab] = useState<EventEditSectionTab>(
+    initialSection === 'wizard' || initialSection === 'editor' ? initialSection : 'overview',
+  );
+
+  useEffect(() => {
+    const section = searchParams.get('section');
+    const normalized: EventEditSectionTab =
+      section === 'wizard' || section === 'editor' ? section : 'overview';
+    setSectionTab((prev) => (prev === normalized ? prev : normalized));
+  }, [searchParams]);
 
   const [quality, setQuality] = useState<EventQuality | null>(null);
   const [qualityLoading, setQualityLoading] = useState(false);
@@ -269,6 +257,8 @@ export function EventEditPage() {
   // Venues list for museum linking
   const [venues, setVenues] = useState<VenueOption[]>([]);
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [eventSubcategoryOptions, setEventSubcategoryOptions] = useState<AdminSubcategory[]>([]);
+  const [selectedEventSubcategoryIds, setSelectedEventSubcategoryIds] = useState<string[]>([]);
 
   // Anti-duplicates: показывает бейдж, если событие в списке кандидатов на дедупликацию
   const [isProbableDuplicate, setIsProbableDuplicate] = useState(false);
@@ -283,6 +273,13 @@ export function EventEditPage() {
         else setVenues([]);
       })
       .catch(() => setVenues([]));
+  }, []);
+
+  useEffect(() => {
+    adminApi
+      .get<AdminSubcategory[]>('/admin/subcategories?forEntity=event')
+      .then((res) => setEventSubcategoryOptions(Array.isArray(res) ? res : []))
+      .catch(() => setEventSubcategoryOptions([]));
   }, []);
 
   useEffect(() => {
@@ -346,7 +343,7 @@ export function EventEditPage() {
     refreshSummary(id);
     adminApi
       .get<EventDetail>(`/admin/events/${id}`)
-      .then((data) => {
+      .then(async (data) => {
         setEvent(data);
         setSlug(data.slug);
         setSlugTouched(false);
@@ -375,6 +372,11 @@ export function EventEditPage() {
           suppressLowQuality: ov?.suppressLowQuality ?? false,
         });
         setWizardDraft(mapEventToDraft(data));
+
+        const selected = await adminApi
+          .get<AdminSubcategory[]>(`/admin/events/${id}/subcategories`)
+          .catch(() => []);
+        setSelectedEventSubcategoryIds(selected.map((item) => item.id));
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
@@ -442,7 +444,6 @@ export function EventEditPage() {
         title: form.title,
         category: form.category,
         audience: form.audience,
-        subcategories: form.subcategories,
         imageUrl: form.imageUrl,
         manualRating: form.manualRating,
         minAge: form.minAge,
@@ -451,6 +452,10 @@ export function EventEditPage() {
         contentTemplateData: form.contentTemplateData ?? {},
       });
       setEvent((prev) => (prev ? { ...prev, override: ov } : null));
+
+      await adminApi.put(`/admin/events/${id}/subcategories`, {
+        subcategoryIds: selectedEventSubcategoryIds,
+      });
 
       // Save venue/location-specific fields (прямо на Event, не в override)
       if (form.category === 'MUSEUM' || form.venueId || form.dateMode === 'OPEN_DATE' || form.address !== undefined) {
@@ -476,7 +481,7 @@ export function EventEditPage() {
 
   const handleResetOverride = () => {
     if (!id || !event?.override) return;
-    if (!window.confirm('Сбросить все override? Данные вернутся к оригиналу из sync.')) return;
+    if (!window.confirm('Сбросить все переопределения? Данные вернутся к исходным из источника.')) return;
     setSaving(true);
     setError(null);
     adminApi
@@ -508,7 +513,7 @@ export function EventEditPage() {
           manualBoost: ov?.manualBoost ?? null,
           suppressLowQuality: ov?.suppressLowQuality ?? false,
         });
-        toast.success('Override сброшен');
+        toast.success('Переопределения сброшены');
         refreshQuality(id);
         refreshSummary(id);
       })
@@ -645,6 +650,10 @@ export function EventEditPage() {
       : undefined;
 
   const handleIssueClick = (tabKey: QualityTabKey, issue: EventQualityIssue) => {
+    setSectionTab('editor');
+    const next = new URLSearchParams(searchParams);
+    next.set('section', 'editor');
+    setSearchParams(next, { replace: true });
     const uiTab: UiTab =
       tabKey === 'offers' ? 'offers' : tabKey === 'schedule' ? 'sessions' : tabKey === 'location' ? 'general' : 'general';
     setActiveTab(uiTab);
@@ -688,13 +697,13 @@ export function EventEditPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 rounded-xl bg-white p-4">
       <PageHeader
         title={event.title}
         subtitle={
           <div className="flex items-center gap-2 mt-1">
             <Badge variant="outline">{SOURCE_LABELS[event.source] || event.source}</Badge>
-            {event.override && <Badge variant="warning">Override</Badge>}
+            {event.override && <Badge variant="warning">Отредактировано</Badge>}
             {isHidden && <Badge variant="destructive">Скрыт</Badge>}
             {isProbableDuplicate && (
               <Link to="/events/merge" className="inline-flex">
@@ -759,128 +768,153 @@ export function EventEditPage() {
         <ErrorState title="Ошибка загрузки данных события" description={error} />
       )}
 
-      <QualityBanner
-        quality={quality}
-        loading={qualityLoading}
-        error={qualityError}
-        isImported={event.source !== 'MANUAL'}
-        onIssueClick={handleIssueClick}
-      />
+      <Tabs
+        value={sectionTab}
+        onValueChange={(v) => {
+          const nextTab = v as EventEditSectionTab;
+          setSectionTab(nextTab);
+          const next = new URLSearchParams(searchParams);
+          next.set('section', nextTab);
+          setSearchParams(next, { replace: true });
+        }}
+        className="space-y-4"
+      >
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">Сводка</TabsTrigger>
+          <TabsTrigger value="wizard">Мастер</TabsTrigger>
+          <TabsTrigger value="editor">Редактор</TabsTrigger>
+        </TabsList>
 
-      <EventStatusLine
-        isActive={event.isActive}
-        isHidden={isHidden}
-        issuesCount={quality?.issues?.length ?? 0}
-        quality={quality}
-        supplierIsActive={supplierIsActive}
-        editorStatus={event.override?.editorStatus}
-        hasOverride={!!event.override}
-        onPublish={handlePublish}
-        publishing={publishing}
-      />
+        <TabsContent value="overview" className="space-y-4">
+          <QualityBanner
+            quality={quality}
+            loading={qualityLoading}
+            error={qualityError}
+            isImported={event.source !== 'MANUAL'}
+            onIssueClick={handleIssueClick}
+          />
 
-      <EventAdminSummaryPanel summary={adminSummary} loading={summaryLoading} error={summaryError} />
+          <EventStatusLine
+            isActive={event.isActive}
+            isHidden={isHidden}
+            issuesCount={quality?.issues?.length ?? 0}
+            quality={quality}
+            supplierIsActive={supplierIsActive}
+            editorStatus={event.override?.editorStatus}
+            hasOverride={!!event.override}
+            onPublish={handlePublish}
+            publishing={publishing}
+          />
 
-      <ScheduleSummary
-        draft={wizardDraft}
-        onOpenCalendar={() => setActiveTab('sessions')}
-      />
+          <EventAdminSummaryPanel summary={adminSummary} loading={summaryLoading} error={summaryError} />
 
-      {wizardDraft && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Синхронизация расписания (визард → сеансы)</CardTitle>
-            <CardDescription>
-              Dry-run адаптера: показывает, какие старты будут созданы на основе мастера и какие существующие сеансы
-              являются лишними. Применение плана использует только безопасные операции (создать новые, остановить
-              лишние).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-sm">
-            {schedulePlanLoading && <p className="text-muted-foreground">Пересчёт плана…</p>}
-            {schedulePlanError && <p className="text-destructive">{schedulePlanError}</p>}
-            {schedulePlan && !schedulePlanLoading && (
-              <div className="grid gap-2 text-xs sm:text-sm sm:grid-cols-2">
-                <div>
-                  <span className="text-slate-500">Будет создано по мастеру:</span>{' '}
-                  <span className="font-medium">{schedulePlan.summary.createCount}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Уже совпадает (keep):</span>{' '}
-                  <span className="font-medium">{schedulePlan.summary.keepCount}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Защищённые (sold/imported/manual):</span>{' '}
-                  <span className="font-medium">{schedulePlan.summary.preserveCount}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Лишние сеансы (кандидаты на стоп):</span>{' '}
-                  <span className="font-medium">{schedulePlan.summary.stopCandidatesCount}</span>
-                </div>
-              </div>
-            )}
-            {!schedulePlan && !schedulePlanLoading && !schedulePlanError && (
-              <p className="text-xs text-muted-foreground">
-                План ещё не построен. Нажмите «Пересчитать план», чтобы увидеть dry‑run синхронизации сессий.
-              </p>
-            )}
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={reloadSchedulePlan}
-                disabled={!wizardDraft || schedulePlanLoading}
-              >
-                Пересчитать план
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleApplySchedulePlan}
-                disabled={
-                  !wizardDraft ||
-                  schedulePlanLoading ||
-                  !schedulePlan ||
-                  (schedulePlan.summary.createCount + schedulePlan.summary.stopCandidatesCount === 0)
-                }
-              >
-                Применить план
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          <ScheduleSummary
+            draft={wizardDraft}
+            onOpenCalendar={() => {
+              setSectionTab('editor');
+              const next = new URLSearchParams(searchParams);
+              next.set('section', 'editor');
+              setSearchParams(next, { replace: true });
+              setActiveTab('sessions');
+            }}
+          />
+        </TabsContent>
 
-      {wizardDraft && (
-        <div className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Мастер события (основной UX)</CardTitle>
-              <CardDescription>
-                Основной способ править контент, расписание, билеты и вместимость. Детальные ручные инструменты ниже.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EventWizard
-                initialDraft={wizardDraft}
-                mode="edit"
-                onDraftChange={setWizardDraft}
-                onSubmit={(d) => handleWizardSubmit(d)}
-                citiesOptions={cities}
-              />
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        <TabsContent value="wizard" className="space-y-4">
+          {wizardDraft && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Синхронизация расписания (визард → сеансы)</CardTitle>
+                  <CardDescription>
+                    Предпросмотр синхронизации: показывает, какие старты будут созданы на основе мастера и какие существующие
+                    сеансы являются лишними.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 text-sm">
+                  {schedulePlanLoading && <p className="text-muted-foreground">Пересчёт плана…</p>}
+                  {schedulePlanError && <p className="text-destructive">{schedulePlanError}</p>}
+                  {schedulePlan && !schedulePlanLoading && (
+                    <div className="grid gap-2 text-xs sm:text-sm sm:grid-cols-2">
+                      <div>
+                        <span className="text-slate-500">Будет создано по мастеру:</span>{' '}
+                        <span className="font-medium">{schedulePlan.summary.createCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Уже совпадает (оставить):</span>{' '}
+                        <span className="font-medium">{schedulePlan.summary.keepCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Защищённые (продано/импорт/ручные):</span>{' '}
+                        <span className="font-medium">{schedulePlan.summary.preserveCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Лишние сеансы (кандидаты на стоп):</span>{' '}
+                        <span className="font-medium">{schedulePlan.summary.stopCandidatesCount}</span>
+                      </div>
+                    </div>
+                  )}
+                  {!schedulePlan && !schedulePlanLoading && !schedulePlanError && (
+                    <p className="text-xs text-muted-foreground">
+                      План ещё не построен. Нажмите «Пересчитать план», чтобы увидеть предпросмотр синхронизации сеансов.
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={reloadSchedulePlan}
+                      disabled={!wizardDraft || schedulePlanLoading}
+                    >
+                      Пересчитать план
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleApplySchedulePlan}
+                      disabled={
+                        !wizardDraft ||
+                        schedulePlanLoading ||
+                        !schedulePlan ||
+                        (schedulePlan.summary.createCount + schedulePlan.summary.stopCandidatesCount === 0)
+                      }
+                    >
+                      Применить план
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as UiTab)} className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Мастер события (основной режим)</CardTitle>
+                  <CardDescription>
+                    Основной способ править контент, расписание, билеты и вместимость.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <EventWizard
+                    initialDraft={wizardDraft}
+                    mode="edit"
+                    onDraftChange={setWizardDraft}
+                    onSubmit={(d) => handleWizardSubmit(d)}
+                    citiesOptions={cities}
+                  />
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="editor" className="space-y-4">
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as UiTab)} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="general">Основное (override)</TabsTrigger>
+          <TabsTrigger value="general">Основное</TabsTrigger>
           <TabsTrigger value="seo">SEO</TabsTrigger>
           <TabsTrigger value="offers">Способы покупки ({event.offers?.length || 0})</TabsTrigger>
-          <TabsTrigger value="sessions">Расписание (ручное, advanced) ({event.sessions?.length || 0})</TabsTrigger>
+          <TabsTrigger value="sessions">Расписание ({event.sessions?.length || 0})</TabsTrigger>
           <TabsTrigger value="rating">Рейтинг</TabsTrigger>
           <TabsTrigger value="group">Группа</TabsTrigger>
         </TabsList>
@@ -891,7 +925,7 @@ export function EventEditPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Данные события</CardTitle>
-              <CardDescription>Override значения из синхронизации</CardDescription>
+              <CardDescription>Переопределяемые значения из синхронизации</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -905,7 +939,7 @@ export function EventEditPage() {
                         {(form.title ?? event.override?.title) && (form.title ?? event.override?.title) !== event.title && (
                           <>
                             {' · '}
-                            <span title="Показывается на сайте">Для Daibilet:</span>{' '}
+                            <span title="Показывается на сайте">Для сайта:</span>{' '}
                             <span className="font-medium">{form.title ?? event.override?.title}</span>
                           </>
                         )}
@@ -940,7 +974,6 @@ export function EventEditPage() {
                           try {
                             await adminApi.patch(`/admin/events/${id}/override`, {
                               category: null,
-                              subcategories: [],
                             });
                             const data = await adminApi.get<EventDetail>(`/admin/events/${id}`);
                             setEvent(data);
@@ -950,7 +983,7 @@ export function EventEditPage() {
                               category: ov?.category ?? data.category,
                               subcategories: ov?.subcategories?.length ? ov.subcategories : data.subcategories || [],
                             }));
-                            toast.success('Категория сброшена к значениям из sync');
+                            toast.success('Категория сброшена к значениям из источника');
                           } catch (e) {
                             toast.error(e instanceof Error ? e.message : 'Ошибка');
                           } finally {
@@ -958,7 +991,7 @@ export function EventEditPage() {
                           }
                         }}
                       >
-                        Сбросить к sync
+                        Сбросить к источнику
                       </Button>
                     )}
                   </div>
@@ -980,7 +1013,7 @@ export function EventEditPage() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <Label>Slug</Label>
+                    <Label>URL</Label>
                     <Button
                       type="button"
                       variant="ghost"
@@ -996,7 +1029,7 @@ export function EventEditPage() {
                         setSlugTouched(true);
                       }}
                     >
-                      Сгенерировать из названия
+                      Сгенерировать URL
                     </Button>
                   </div>
                   <Input
@@ -1005,7 +1038,7 @@ export function EventEditPage() {
                       setSlug(e.target.value);
                       setSlugTouched(true);
                     }}
-                    placeholder={event?.slug ? `Оригинал: ${event.slug}` : 'my-event-slug'}
+                    placeholder={event?.slug ? `Оригинал: ${event.slug}` : 'primer-url-sobytiya'}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1027,11 +1060,11 @@ export function EventEditPage() {
                 <div className="sm:col-span-2 space-y-2">
                   <Label>Подкатегории</Label>
                   <div className="flex flex-wrap gap-2 rounded-md border p-3">
-                    {(SUBCATEGORY_OPTIONS[form.category || ''] || []).map((opt) => {
-                      const isChecked = (form.subcategories || []).includes(opt.value);
+                    {eventSubcategoryOptions.map((opt) => {
+                      const isChecked = selectedEventSubcategoryIds.includes(opt.id);
                       return (
                         <label
-                          key={opt.value}
+                          key={opt.id}
                           className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                             isChecked
                               ? 'bg-primary text-primary-foreground'
@@ -1042,30 +1075,34 @@ export function EventEditPage() {
                             type="checkbox"
                             checked={isChecked}
                             onChange={(e) => {
-                              setForm((f) => {
-                                const curr = f.subcategories || [];
-                                return {
-                                  ...f,
-                                  subcategories: e.target.checked
-                                    ? [...curr, opt.value]
-                                    : curr.filter((s) => s !== opt.value),
-                                };
+                              setSelectedEventSubcategoryIds((prev) => {
+                                if (e.target.checked) {
+                                  if (prev.length >= 5) {
+                                    toast.warning('Можно выбрать не более 5 подкатегорий');
+                                    return prev;
+                                  }
+                                  return [...prev, opt.id];
+                                }
+                                return prev.filter((id) => id !== opt.id);
                               });
                             }}
                             className="sr-only"
                           />
-                          {opt.label}
+                          {opt.nameRu}
                         </label>
                       );
                     })}
-                    {(SUBCATEGORY_OPTIONS[form.category || ''] || []).length === 0 && (
-                      <span className="text-xs text-muted-foreground">Выберите категорию</span>
+                    {eventSubcategoryOptions.length === 0 && (
+                      <span className="text-xs text-muted-foreground">Справочник подкатегорий пока пуст</span>
                     )}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Выбрано: {selectedEventSubcategoryIds.length}/5. Справочник загружается из backend API.
+                  </p>
                 </div>
                 {/* Venue & Date Mode — показываем для всех категорий (quality: MISSING_LOCATION) */}
                     <div className="space-y-2" data-quality-field="location">
-                      <Label>Карточка места (Venue, опционально)</Label>
+                      <Label>Карточка места (площадка, опционально)</Label>
                       <Select
                         value={form.venueId || '__none__'}
                         onValueChange={(v) => setForm((f) => ({ ...f, venueId: v === '__none__' ? null : v }))}
@@ -1130,7 +1167,7 @@ export function EventEditPage() {
                         type="text"
                         value={form.address ?? ''}
                         onChange={(e) => setForm((f) => ({ ...f, address: e.target.value || null }))}
-                        placeholder="Адрес или точка встречи (если нет Venue)"
+                        placeholder="Адрес или точка встречи (если не выбрана площадка)"
                       />
                     </div>
                 <ImageUploadField
@@ -1173,8 +1210,8 @@ export function EventEditPage() {
               />
 
               <ContentBlocksPanel
-                cardTitle="Контент PDP (contentTemplateData)"
-                cardDescription="Типизированные блоки для страницы события. Старый блок «Шаблон» выше — отдельное поле templateData (legacy)."
+                cardTitle="Контент страницы события (contentTemplateData)"
+                cardDescription="Типизированные блоки для страницы события. Старый блок «Шаблон» выше — отдельное поле templateData (устаревшее)."
                 fieldSpecs={getEventTemplateSpecs(
                   form.category ?? event.category,
                   form.subcategories ?? event.subcategories ?? [],
@@ -1247,7 +1284,7 @@ export function EventEditPage() {
                 </div>
                 <Separator className="my-4" />
                 <div className="space-y-2">
-                  <Label>Рейтинг (override)</Label>
+                  <Label>Рейтинг</Label>
                   <Input
                     type="number"
                     step="0.1"
@@ -1261,7 +1298,7 @@ export function EventEditPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
-                      Ручной boost в выдаче
+                      Ручное усиление в выдаче
                       {(form.manualBoost ?? 0) > 0 && (
                         <Badge variant="secondary" className="text-xs">Продвижение</Badge>
                       )}
@@ -1307,6 +1344,8 @@ export function EventEditPage() {
 
         <TabsContent value="group">
           {id && <EventGroupTab eventId={id} />}
+        </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>
@@ -1378,7 +1417,7 @@ function ExternalRatingSection({ eventId, event }: { eventId: string; event: Eve
                 <SelectItem value="yandex_maps">Яндекс.Карты</SelectItem>
                 <SelectItem value="2gis">2GIS</SelectItem>
                 <SelectItem value="tripadvisor">Tripadvisor</SelectItem>
-                <SelectItem value="google_maps">Google Maps</SelectItem>
+                <SelectItem value="google_maps">Google Карты</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1794,7 +1833,7 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
             {/* URL / External IDs */}
             {(formData.purchaseType === 'REDIRECT' || formData.purchaseType === 'REQUEST') && (
               <div className="space-y-2">
-                <Label>URL / Deep Link</Label>
+                <Label>URL / Прямая ссылка</Label>
                 <Input
                   value={formData.deeplink}
                   onChange={(e) => updateField('deeplink', e.target.value)}
@@ -1805,7 +1844,7 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
             {formData.purchaseType === 'WIDGET' && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>External Event ID</Label>
+                  <Label>ID события у провайдера</Label>
                   <Input
                     value={formData.externalEventId}
                     onChange={(e) => updateField('externalEventId', e.target.value)}
@@ -1813,7 +1852,7 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Meta Event ID</Label>
+                  <Label>ID мета-события</Label>
                   <Input
                     value={formData.metaEventId}
                     onChange={(e) => updateField('metaEventId', e.target.value)}
@@ -1867,9 +1906,9 @@ function OffersSection({ eventId, offers: initialOffers }: { eventId: string; of
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ACTIVE">Active</SelectItem>
-                    <SelectItem value="HIDDEN">Hidden</SelectItem>
-                    <SelectItem value="DISABLED">Disabled</SelectItem>
+                    <SelectItem value="ACTIVE">Активен</SelectItem>
+                    <SelectItem value="HIDDEN">Скрыт</SelectItem>
+                    <SelectItem value="DISABLED">Отключен</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

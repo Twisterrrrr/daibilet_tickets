@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { PackageItemStatus, PackageStatus } from '@prisma/client';
+import { PackageItemStatus, PackageStatus, PaymentStatus } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -12,6 +12,256 @@ import { PrismaService } from '../prisma/prisma.service';
 @Controller('admin/dashboard')
 export class AdminDashboardController {
   constructor(private readonly prisma: PrismaService) {}
+
+  @Get('analytics-tabs')
+  async getAnalyticsTabs() {
+    const now = new Date();
+    const d7 = new Date(now);
+    d7.setDate(d7.getDate() - 7);
+    const d30 = new Date(now);
+    d30.setDate(d30.getDate() - 30);
+
+    const paidStatuses: PackageStatus[] = [
+      PackageStatus.PAID,
+      PackageStatus.FULFILLING,
+      PackageStatus.FULFILLED,
+      PackageStatus.PARTIALLY_FULFILLED,
+    ];
+
+    const [activeEvents, qualityIssues, activeCities, categoriesAgg, recentOrdersCount, paymentIssuesCount, refundedCount] =
+      await Promise.all([
+        this.prisma.event.count({ where: { isActive: true, isDeleted: false } }),
+        this.prisma.event.count({
+          where: {
+            isActive: true,
+            isDeleted: false,
+            OR: [
+              { imageUrl: null },
+              { shortDescription: null },
+              { shortDescription: '' },
+              { offers: { none: {} } },
+              {
+                sessions: {
+                  none: {
+                    startsAt: { gte: now },
+                    canceledAt: null,
+                  },
+                },
+              },
+            ],
+          },
+        }),
+        this.prisma.city.count({
+          where: {
+            events: {
+              some: {
+                isActive: true,
+                isDeleted: false,
+              },
+            },
+          },
+        }),
+        this.prisma.event.groupBy({
+          by: ['category'],
+          where: { isActive: true, isDeleted: false },
+          _count: { category: true },
+          orderBy: { _count: { category: 'desc' } },
+          take: 3,
+        }),
+        this.prisma.package.count({ where: { createdAt: { gte: d7 } } }),
+        this.prisma.paymentIntent.count({
+          where: {
+            createdAt: { gte: d7 },
+            status: { in: [PaymentStatus.FAILED, PaymentStatus.CANCELLED] },
+          },
+        }),
+        this.prisma.paymentIntent.count({
+          where: {
+            createdAt: { gte: d30 },
+            status: PaymentStatus.REFUNDED,
+          },
+        }),
+      ]);
+
+    const paidIntents30d = await this.prisma.paymentIntent.count({
+      where: { createdAt: { gte: d30 }, status: PaymentStatus.PAID },
+    });
+    const conversionBase30d = await this.prisma.paymentIntent.count({ where: { createdAt: { gte: d30 } } });
+    const promoIntentsRow = await this.prisma.$queryRaw<{ cnt: bigint }[]>`
+      SELECT COUNT(*)::bigint AS cnt
+      FROM "checkout_sessions"
+      WHERE "createdAt" >= ${d30}
+        AND "appliedPromoCodeSnapshot" IS NOT NULL
+    `;
+    const promoIntents30d = Number(promoIntentsRow[0]?.cnt ?? 0n);
+    const topTopics30d = await this.prisma.eventTag.groupBy({
+      by: ['tagId'],
+      _count: { tagId: true },
+      orderBy: { _count: { tagId: 'desc' } },
+      take: 3,
+    });
+    const topTopicIds = topTopics30d.map((x) => x.tagId);
+    const topTopicNames =
+      topTopicIds.length > 0
+        ? await this.prisma.tag.findMany({ where: { id: { in: topTopicIds } }, select: { id: true, name: true } })
+        : [];
+
+    const readyCards = Math.max(activeEvents - qualityIssues, 0);
+    const qualityPercent = activeEvents > 0 ? Math.round((readyCards / activeEvents) * 100) : 0;
+    const conversionPercent = conversionBase30d > 0 ? Math.round((paidIntents30d / conversionBase30d) * 100) : 0;
+    const promoPercent = paidIntents30d > 0 ? Math.round((promoIntents30d / paidIntents30d) * 100) : 0;
+    const topCategoriesLabel = categoriesAgg
+      .map((row) => `${row.category} (${row._count.category})`)
+      .join(', ');
+    const topTopicsLabel = topTopics30d
+      .map((row) => {
+        const tag = topTopicNames.find((t) => t.id === row.tagId);
+        return `${tag?.name ?? 'Тег'} (${row._count.tagId})`;
+      })
+      .join(', ');
+
+    return {
+      content: {
+        qualityCards: {
+          value: qualityPercent,
+          suffix: '%',
+          hint: `${readyCards} из ${activeEvents} карточек готовы к публикации`,
+        },
+        citiesCoverage: {
+          value: activeCities,
+          suffix: '',
+          hint: 'Городов с активными предложениями',
+        },
+        popularCategories: {
+          value: categoriesAgg.length,
+          suffix: '',
+          hint: topCategoriesLabel || 'Недостаточно данных',
+        },
+      },
+      operations: {
+        recentOrders: {
+          value: recentOrdersCount,
+          suffix: '',
+          hint: 'Новых заказов за 7 дней',
+        },
+        paymentIssues: {
+          value: paymentIssuesCount,
+          suffix: '',
+          hint: 'Ошибки и отмены платежей за 7 дней',
+        },
+        refundsAndCancels: {
+          value: refundedCount,
+          suffix: '',
+          hint: 'Возвратов за 30 дней',
+        },
+      },
+      marketing: {
+        eventsConversion: {
+          value: conversionPercent,
+          suffix: '%',
+          hint: `${paidIntents30d} оплаченных из ${conversionBase30d} платежных попыток`,
+        },
+        promoEfficiency: {
+          value: promoPercent,
+          suffix: '%',
+          hint: 'Доля оплаченных заказов с промокодом за 30 дней',
+        },
+        popularTopics: {
+          value: topTopics30d.length,
+          suffix: '',
+          hint: topTopicsLabel || 'Недостаточно данных',
+        },
+      },
+    };
+  }
+
+  @Get('attention')
+  async getAttentionSummary() {
+    const now = new Date();
+
+    const activeEventsWhere = {
+      isActive: true,
+      isDeleted: false,
+    } as const;
+
+    const [
+      noSessions,
+      noPrice,
+      rejectedModeration,
+      pendingModeration,
+      draftOrHidden,
+      lowListingHealth,
+    ] = await Promise.all([
+      this.prisma.event.count({
+        where: {
+          ...activeEventsWhere,
+          dateMode: 'SCHEDULED',
+          sessions: {
+            none: {
+              startsAt: { gte: now },
+              canceledAt: null,
+            },
+          },
+        },
+      }),
+      this.prisma.event.count({
+        where: {
+          ...activeEventsWhere,
+          OR: [
+            { offers: { none: {} } },
+            {
+              offers: {
+                every: {
+                  OR: [{ priceFrom: null }, { priceFrom: { lte: 0 } }],
+                },
+              },
+            },
+          ],
+        },
+      }),
+      this.prisma.event.count({ where: { moderationStatus: 'REJECTED', isDeleted: false } }),
+      this.prisma.event.count({
+        where: {
+          moderationStatus: { in: ['PENDING_REVIEW', 'AUTO_APPROVED'] },
+          isDeleted: false,
+        },
+      }),
+      this.prisma.event.count({
+        where: {
+          isDeleted: false,
+          OR: [{ moderationStatus: 'DRAFT' }, { isActive: false }],
+        },
+      }),
+      this.prisma.event.count({
+        where: {
+          ...activeEventsWhere,
+          OR: [
+            { imageUrl: null },
+            { shortDescription: null },
+            { shortDescription: '' },
+            { offers: { none: {} } },
+            {
+              sessions: {
+                none: {
+                  startsAt: { gte: now },
+                  canceledAt: null,
+                },
+              },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    return {
+      noSessions,
+      noPrice,
+      rejectedModeration,
+      pendingModeration,
+      draftOrHidden,
+      lowListingHealth,
+    };
+  }
 
   @Get('stats')
   async getStats() {

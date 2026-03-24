@@ -1,4 +1,5 @@
 import { AlertCircle, Calendar, CheckCircle, ChevronRight, TrendingUp } from 'lucide-react';
+import { SupplierFinanceWidget } from '@/components/SupplierFinanceWidget';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -32,6 +33,11 @@ interface DashboardData {
     eventsWithoutSchedule: number;
     eventsWithoutPhoto: number;
     reviewsWithoutResponse: number;
+  };
+  profileRequisites?: {
+    status: string;
+    hasPrimaryAccount: boolean;
+    issues: string[];
   };
 }
 
@@ -187,7 +193,7 @@ export default function Dashboard() {
         <SectionCard>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Уровень доверия</p>
+              <p className="text-xs text-gray-500">Уровень доверия</p>
               <p className="mt-1 text-sm font-semibold text-gray-900">
                 {trustLabel} · {trustScore} из 100
               </p>
@@ -225,13 +231,13 @@ export default function Dashboard() {
         </SectionCard>
 
         <SectionCard>
-          <p className="text-xs uppercase tracking-wide text-gray-500">Комиссия платформы</p>
+          <p className="text-xs text-gray-500">Комиссия платформы</p>
           <p className="mt-2 text-2xl font-bold">{commissionPct}%</p>
           <p className="mt-1 text-xs text-gray-500">Списывается с каждой успешной продажи.</p>
         </SectionCard>
 
         <SectionCard>
-          <p className="text-xs uppercase tracking-wide text-gray-500">Лимит активных событий</p>
+          <p className="text-xs text-gray-500">Лимит активных событий</p>
           <div className="mt-3 space-y-1 text-sm text-gray-600">
             <p>
               Активных сейчас:{' '}
@@ -274,6 +280,11 @@ export default function Dashboard() {
           />
         ))}
       </div>
+
+      {/* Реквизиты — если профиль не верифицирован или нет основного счёта */}
+      {data.profileRequisites && (
+        <SupplierFinanceWidget profileRequisites={data.profileRequisites} />
+      )}
 
       {/* Financial summary */}
       <SectionCard title="Финансовая сводка">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { PageHeader } from '@daibilet/shared-ui';
@@ -135,8 +135,44 @@ const ALERT_COLORS: Record<string, string> = {
   critical: 'text-red-700 font-bold',
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Ожидает',
+  PROCESSING: 'Обрабатывается',
+  PAID: 'Оплачен',
+  FAILED: 'Ошибка',
+  CANCELLED: 'Отменен',
+  REFUNDED: 'Возврат',
+  CONFIRMED: 'Подтвержден',
+  COMPLETED: 'Завершен',
+  RESERVING: 'Резервирование',
+  RESERVED: 'Зарезервирован',
+  EXPIRED: 'Истек',
+};
+
+const HEALTH_LABELS: Record<HealthResponse['status'], string> = {
+  healthy: 'Норма',
+  degraded: 'Деградация',
+  critical: 'Критично',
+};
+
+function humanizeMetricKey(key: string): string {
+  const map: Record<string, string> = {
+    pending_stale: 'Зависшие платежи',
+    failed_unresolved: 'Ошибки без решения',
+    escalated_open: 'Открытые эскалации',
+    total_active_intents: 'Активные платежи',
+    payment_fail_rate: 'Доля ошибок платежей',
+    webhook_dedup_rate: 'Доля дедупликации вебхуков',
+  };
+  return map[key] ?? key.replace(/_/g, ' ');
+}
+
 const formatRub = (kopecks: number) => `${(kopecks / 100).toFixed(2)} \u20BD`;
-const formatDate = (d: string) => new Date(d).toLocaleString('ru-RU');
+const formatDate = (d: string) => {
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return 'Дата не указана';
+  return date.toLocaleString('ru-RU');
+};
 
 // ============================================================
 // Component
@@ -210,7 +246,7 @@ export default function ReconciliationPage() {
         setIntentsCursor(res.nextCursor);
         setIntentsHasMore(res.hasMore);
       } catch {
-        toast.error('Ошибка загрузки PaymentIntents');
+        toast.error('Ошибка загрузки платежей');
       }
       setIntentsLoading(false);
     },
@@ -254,7 +290,7 @@ export default function ReconciliationPage() {
         setWebhooksHasMore(res.hasMore);
         setWebhookDedupStats(res.dedupStats);
       } catch {
-        toast.error('Ошибка загрузки webhooks');
+        toast.error('Ошибка загрузки вебхуков');
       }
       setWebhooksLoading(false);
     },
@@ -288,7 +324,7 @@ export default function ReconciliationPage() {
   const handleRetry = async (sessionId: string) => {
     try {
       await adminApi.post(`/admin/reconciliation/${sessionId}/retry`);
-      toast.success('Retry запущен');
+      toast.success('Повторный запуск отправлен');
       loadMismatches();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Ошибка');
@@ -298,7 +334,10 @@ export default function ReconciliationPage() {
   const handleRefund = async (intentId: string, partial: boolean) => {
     if (!confirm(`Вы уверены? ${partial ? 'Частичный' : 'Полный'} возврат.`)) return;
     try {
-      await adminApi.post(`/admin/reconciliation/${intentId}/refund`, { partial, reason: 'Admin manual refund' });
+      await adminApi.post(`/admin/reconciliation/${intentId}/refund`, {
+        partial,
+        reason: 'Ручной возврат из админки',
+      });
       toast.success('Возврат выполнен');
       if (tab === 'mismatches') loadMismatches();
       else loadIntents();
@@ -309,7 +348,9 @@ export default function ReconciliationPage() {
 
   const handleResolve = async (itemId: string) => {
     try {
-      await adminApi.post(`/admin/reconciliation/${itemId}/resolve`, { note: 'Resolved by admin' });
+      await adminApi.post(`/admin/reconciliation/${itemId}/resolve`, {
+        note: 'Отмечено как решенное администратором',
+      });
       toast.success('Отмечено как решённое');
       loadMismatches();
     } catch (e) {
@@ -324,7 +365,7 @@ export default function ReconciliationPage() {
   const tabItems: { key: Tab; label: string; badge?: number }[] = [
     { key: 'intents', label: 'Платежи', badge: intentsTotal },
     { key: 'mismatches', label: 'Расхождения', badge: mismatches.length },
-    { key: 'webhooks', label: 'Webhooks', badge: webhooksTotal },
+    { key: 'webhooks', label: 'Вебхуки', badge: webhooksTotal },
     { key: 'metrics', label: 'Мониторинг' },
   ];
 
@@ -367,7 +408,7 @@ export default function ReconciliationPage() {
                 <option value="">Все</option>
                 {['PENDING', 'PROCESSING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED'].map((s) => (
                   <option key={s} value={s}>
-                    {s}
+                    {STATUS_LABELS[s] ?? s}
                   </option>
                 ))}
               </select>
@@ -385,7 +426,7 @@ export default function ReconciliationPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Provider Payment ID</label>
+              <label className="text-xs text-muted-foreground block mb-1">ID платежа провайдера</label>
               <input
                 type="text"
                 value={filterProviderPmtId}
@@ -423,7 +464,7 @@ export default function ReconciliationPage() {
           {/* Table */}
           {intentsLoading && intents.length === 0 && <p className="text-muted-foreground">Загрузка...</p>}
 
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-hidden bg-white">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50 text-left text-muted-foreground">
@@ -438,9 +479,8 @@ export default function ReconciliationPage() {
               </thead>
               <tbody>
                 {intents.map((intent) => (
-                  <>
+                  <Fragment key={intent.id}>
                     <tr
-                      key={intent.id}
                       className="border-b hover:bg-muted/30 cursor-pointer"
                       onClick={() => setExpandedIntent(expandedIntent === intent.id ? null : intent.id)}
                     >
@@ -450,7 +490,7 @@ export default function ReconciliationPage() {
                         <span
                           className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[intent.status] || 'bg-gray-100'}`}
                         >
-                          {intent.status}
+                          {STATUS_LABELS[intent.status] ?? intent.status}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-xs">{intent.provider}</td>
@@ -469,7 +509,7 @@ export default function ReconciliationPage() {
                                 }}
                                 className="text-xs text-blue-600 hover:underline"
                               >
-                                Retry
+                                Повторить
                               </button>
                               <button
                                 onClick={(e) => {
@@ -478,7 +518,7 @@ export default function ReconciliationPage() {
                                 }}
                                 className="text-xs text-red-600 hover:underline"
                               >
-                                Refund
+                                Возврат
                               </button>
                             </>
                           )}
@@ -487,26 +527,26 @@ export default function ReconciliationPage() {
                     </tr>
                     {/* Expanded: fulfillment items */}
                     {expandedIntent === intent.id && intent.checkoutSession?.fulfillmentItems && (
-                      <tr key={`${intent.id}-details`}>
+                      <tr>
                         <td colSpan={7} className="bg-muted/20 px-6 py-3">
                           <div className="text-xs text-muted-foreground mb-2">
-                            {intent.checkoutSession.customerEmail} | {intent.checkoutSession.customerName} | Сессия:{' '}
-                            {intent.checkoutSession.status}
+                            {intent.checkoutSession.customerEmail} | {intent.checkoutSession.customerName} | Статус:{' '}
+                            {STATUS_LABELS[intent.checkoutSession.status] ?? intent.checkoutSession.status}
                           </div>
                           {intent.checkoutSession.fulfillmentItems.length === 0 ? (
-                            <div className="text-xs text-muted-foreground">Нет fulfillment items</div>
+                            <div className="text-xs text-muted-foreground">Нет данных по шагам исполнения</div>
                           ) : (
                             <table className="w-full text-xs">
                               <thead>
                                 <tr className="text-left text-muted-foreground border-b">
                                   <th className="py-1">#</th>
-                                  <th>Provider</th>
-                                  <th>Flow</th>
-                                  <th>Status</th>
-                                  <th>Amount</th>
-                                  <th>Attempts</th>
-                                  <th>Error</th>
-                                  <th>Actions</th>
+                                  <th>Провайдер</th>
+                                  <th>Поток</th>
+                                  <th>Статус</th>
+                                  <th>Сумма</th>
+                                  <th>Попытки</th>
+                                  <th>Ошибка</th>
+                                  <th>Действия</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -517,7 +557,7 @@ export default function ReconciliationPage() {
                                     <td>{fi.purchaseFlow}</td>
                                     <td>
                                       <span className={`px-1.5 py-0.5 rounded ${STATUS_COLORS[fi.status] || ''}`}>
-                                        {fi.status}
+                                        {STATUS_LABELS[fi.status] ?? fi.status}
                                       </span>
                                     </td>
                                     <td>{formatRub(fi.amount)}</td>
@@ -529,7 +569,7 @@ export default function ReconciliationPage() {
                                           onClick={() => handleResolve(fi.id)}
                                           className="text-blue-600 hover:underline"
                                         >
-                                          Resolve
+                                          Решить
                                         </button>
                                       )}
                                     </td>
@@ -541,14 +581,14 @@ export default function ReconciliationPage() {
                           {/* Split info */}
                           {intent.grossAmount && (
                             <div className="mt-2 text-xs text-muted-foreground">
-                              Gross: {formatRub(intent.grossAmount)} | Platform fee:{' '}
-                              {formatRub(intent.platformFee || 0)} | Supplier: {formatRub(intent.supplierAmount || 0)}
+                              Сумма заказа: {formatRub(intent.grossAmount)} | Комиссия платформы:{' '}
+                              {formatRub(intent.platformFee || 0)} | Поставщику: {formatRub(intent.supplierAmount || 0)}
                             </div>
                           )}
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -580,12 +620,12 @@ export default function ReconciliationPage() {
             </div>
           )}
           {mismatches.map((m) => (
-            <div key={m.sessionId} className="border rounded-lg p-4 space-y-3">
+            <div key={m.sessionId} className="border rounded-lg p-4 space-y-3 bg-white">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-mono font-bold">{m.shortCode}</span>
                   <span className={`ml-2 px-2 py-0.5 text-xs rounded ${STATUS_COLORS[m.status] || 'bg-gray-100'}`}>
-                    {m.status}
+                    {STATUS_LABELS[m.status] ?? m.status}
                   </span>
                 </div>
                 <span className="text-sm text-muted-foreground">{m.customerEmail}</span>
@@ -606,11 +646,11 @@ export default function ReconciliationPage() {
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="py-1">#</th>
-                    <th>Provider</th>
-                    <th>Status</th>
-                    <th>Amount</th>
-                    <th>Error</th>
-                    <th>Actions</th>
+                    <th>Провайдер</th>
+                    <th>Статус</th>
+                    <th>Сумма</th>
+                    <th>Ошибка</th>
+                    <th>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -620,7 +660,7 @@ export default function ReconciliationPage() {
                       <td>{fi.provider}</td>
                       <td>
                         <span className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[fi.status] || ''}`}>
-                          {fi.status}
+                          {STATUS_LABELS[fi.status] ?? fi.status}
                         </span>
                       </td>
                       <td>{formatRub(fi.amount)}</td>
@@ -645,7 +685,7 @@ export default function ReconciliationPage() {
                   onClick={() => handleRetry(m.sessionId)}
                   className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
-                  Retry All
+                  Повторить все
                 </button>
                 {m.paymentIntents.map((pi) => (
                   <div key={pi.id} className="flex gap-1">
@@ -684,7 +724,7 @@ export default function ReconciliationPage() {
                 <div className="font-bold">{webhookDedupStats.duplicatesSkipped}</div>
               </div>
               <div className="border rounded px-3 py-2">
-                <div className="text-xs text-muted-foreground">Dedup rate</div>
+                <div className="text-xs text-muted-foreground">Доля дублей</div>
                 <div className="font-bold">{webhookDedupStats.dedupRate}%</div>
               </div>
             </div>
@@ -692,16 +732,16 @@ export default function ReconciliationPage() {
 
           {webhooksLoading && webhooks.length === 0 && <p className="text-muted-foreground">Загрузка...</p>}
 
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-hidden bg-white">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50 text-left text-muted-foreground">
                   <th className="px-3 py-2">Дата</th>
-                  <th className="px-3 py-2">Provider</th>
-                  <th className="px-3 py-2">Event Type</th>
+                  <th className="px-3 py-2">Провайдер</th>
+                  <th className="px-3 py-2">Тип события</th>
                   <th className="px-3 py-2">Event ID</th>
-                  <th className="px-3 py-2">Result</th>
-                  <th className="px-3 py-2">Intent</th>
+                  <th className="px-3 py-2">Результат</th>
+                  <th className="px-3 py-2">Платеж</th>
                 </tr>
               </thead>
               <tbody>
@@ -715,7 +755,7 @@ export default function ReconciliationPage() {
                       <span
                         className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[wh.result || ''] || 'bg-gray-100'}`}
                       >
-                        {wh.result || '—'}
+                        {wh.result ? STATUS_LABELS[wh.result] ?? wh.result : '—'}
                       </span>
                     </td>
                     <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
@@ -751,26 +791,26 @@ export default function ReconciliationPage() {
             <div className={`border rounded-lg p-4 ${HEALTH_COLORS[health.status] || ''}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-lg font-bold uppercase">{health.status}</span>
+                  <span className="text-lg font-bold">{HEALTH_LABELS[health.status] ?? health.status}</span>
                   <span className="ml-2 text-sm">{formatDate(health.timestamp)}</span>
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                 <div>
-                  <div className="text-xs opacity-70">Зависшие (PENDING &gt;1h)</div>
-                  <div className="text-xl font-bold">{health.counts.pendingStale}</div>
+                  <div className="text-xs opacity-70">Зависшие (в ожидании более 1 часа)</div>
+                  <div className="text-xl font-bold">{health.counts?.pendingStale ?? 0}</div>
                 </div>
                 <div>
-                  <div className="text-xs opacity-70">FAILED без решения</div>
-                  <div className="text-xl font-bold">{health.counts.failedUnresolved}</div>
+                  <div className="text-xs opacity-70">Ошибки без решения</div>
+                  <div className="text-xl font-bold">{health.counts?.failedUnresolved ?? 0}</div>
                 </div>
                 <div>
                   <div className="text-xs opacity-70">Эскалированные</div>
-                  <div className="text-xl font-bold">{health.counts.escalatedOpen}</div>
+                  <div className="text-xl font-bold">{health.counts?.escalatedOpen ?? 0}</div>
                 </div>
                 <div>
                   <div className="text-xs opacity-70">Активные интенты</div>
-                  <div className="text-xl font-bold">{health.counts.totalActiveIntents}</div>
+                  <div className="text-xl font-bold">{health.counts?.totalActiveIntents ?? 0}</div>
                 </div>
               </div>
             </div>
@@ -779,12 +819,12 @@ export default function ReconciliationPage() {
           {/* Alerts */}
           {metrics?.alerts && metrics.alerts.length > 0 && (
             <div className="border rounded-lg p-4 space-y-2">
-              <h3 className="font-semibold text-sm">Алерты</h3>
+              <h3 className="font-semibold text-sm">Оповещения</h3>
               {metrics.alerts.map((a) => (
                 <div key={a.metric} className={`flex items-center justify-between text-sm ${ALERT_COLORS[a.level]}`}>
-                  <span>{a.metric.replace(/_/g, ' ')}</span>
+                  <span>{humanizeMetricKey(a.metric)}</span>
                   <span>
-                    {a.value}% ({a.level.toUpperCase()})
+                    {a.value}% ({a.level === 'critical' ? 'критично' : a.level === 'warn' ? 'предупреждение' : 'норма'})
                   </span>
                 </div>
               ))}
@@ -795,15 +835,15 @@ export default function ReconciliationPage() {
           {metrics?.rates && (
             <div className="grid grid-cols-3 gap-4">
               <div className="border rounded-lg p-4">
-                <div className="text-xs text-muted-foreground">Fulfillment Fail Rate</div>
+                <div className="text-xs text-muted-foreground">Доля ошибок исполнения</div>
                 <div className="text-2xl font-bold">{metrics.rates.fulfillmentFailRate}%</div>
               </div>
               <div className="border rounded-lg p-4">
-                <div className="text-xs text-muted-foreground">Auto-compensate Rate</div>
+                <div className="text-xs text-muted-foreground">Доля авто-компенсаций</div>
                 <div className="text-2xl font-bold">{metrics.rates.autoCompensateRate}%</div>
               </div>
               <div className="border rounded-lg p-4">
-                <div className="text-xs text-muted-foreground">Webhook Dedup Rate</div>
+                <div className="text-xs text-muted-foreground">Доля дедупликации вебхуков</div>
                 <div className="text-2xl font-bold">{metrics.rates.webhookDedupRate}%</div>
               </div>
             </div>
@@ -816,7 +856,7 @@ export default function ReconciliationPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Object.entries(metrics.counters).map(([key, value]) => (
                   <div key={key} className="border rounded-lg p-3">
-                    <div className="text-xs text-muted-foreground">{key.replace(/_/g, ' ')}</div>
+                    <div className="text-xs text-muted-foreground">{humanizeMetricKey(key)}</div>
                     <div className="text-xl font-bold">{typeof value === 'number' ? value : String(value)}</div>
                   </div>
                 ))}
