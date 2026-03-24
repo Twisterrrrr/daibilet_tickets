@@ -317,14 +317,14 @@ export function EventGroupTab({ eventId }: Props) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
-            <Label>Поиск событий (название или slug)</Label>
+            <Label>Поиск событий (название или URL)</Label>
             <Input
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setSelectedSearch(null);
               }}
-              placeholder="Начните вводить название или slug…"
+              placeholder="Начните вводить название или URL…"
             />
             {searchTerm.trim().length > 0 && searchTerm.trim().length < 2 && (
               <p className="text-[11px] text-muted-foreground">Введите минимум 2 символа для поиска.</p>

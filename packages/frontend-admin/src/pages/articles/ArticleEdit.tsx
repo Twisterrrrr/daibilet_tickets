@@ -62,8 +62,14 @@ export function ArticleEditPage() {
 
   useEffect(() => {
     adminApi
-      .get<City[]>('/admin/cities')
-      .then(setCities)
+      .get<City[] | { items?: City[] }>('/admin/cities')
+      .then((res) => {
+        if (Array.isArray(res)) {
+          setCities(res);
+          return;
+        }
+        setCities(Array.isArray(res.items) ? res.items : []);
+      })
       .catch(() => setCities([]));
   }, []);
 

@@ -99,12 +99,12 @@ export function validateBlocks(blocks: LandingBlock[]): string[] {
   for (const block of blocks) {
     if (block.type === 'FAQ') {
       for (const item of block.payload) {
-        if (!item.question?.trim() || !item.answer?.trim()) errors.push('FAQ: question и answer обязательны');
+        if (!item.question?.trim() || !item.answer?.trim()) errors.push('FAQ: поля "Вопрос" и "Ответ" обязательны');
       }
     }
     if (block.type === 'CTA') {
       if (!block.payload.buttonText?.trim() || !block.payload.link?.trim()) {
-        errors.push('CTA: buttonText и link обязательны');
+        errors.push('CTA: поля "Текст кнопки" и "Ссылка" обязательны');
       }
     }
   }

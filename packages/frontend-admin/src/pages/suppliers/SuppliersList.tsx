@@ -227,69 +227,71 @@ export function SuppliersListPage() {
           description="Как только появятся поставщики или подключённые агрегаторы, они отобразятся здесь."
         />
       ) : (
-        <DataTable
-          columns={columns}
-          data={suppliers}
-          loading={loading}
-          emptyText="Нет поставщиков"
-          onRowClick={(item) => {
-            const isAggregator = typeof item.id === 'string' && item.id.startsWith('agg:');
-            if (!isAggregator) navigate(`/suppliers/${item.id}`);
-          }}
-          pageSize={20}
-          toolbar={
-            <div className="flex w-full flex-wrap items-center gap-2">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && load({ page: 1, search: e.currentTarget.value })}
-                placeholder="Поиск по названию или email..."
-                className="w-64"
-              />
-              <Button type="button" variant="outline" size="sm" onClick={() => load({ page: 1, search })}>
-                Найти
-              </Button>
-              <Select
-                value={trustFilter}
-                onValueChange={(value) => {
-                  const v = value as typeof trustFilter;
-                  setTrustFilter(v);
-                  load({ page: 1, trust: v });
-                }}
-              >
-                <SelectTrigger className="w-[170px]">
-                  <SelectValue placeholder="Trust: все" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Trust: все</SelectItem>
-                  <SelectItem value="0">0 — Новый</SelectItem>
-                  <SelectItem value="1">1 — Проверенный</SelectItem>
-                  <SelectItem value="2">2 — Доверенный</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={activeFilter}
-                onValueChange={(value) => {
-                  const v = value as typeof activeFilter;
-                  setActiveFilter(v);
-                  load({ page: 1, isActive: v });
-                }}
-              >
-                <SelectTrigger className="w-[170px]">
-                  <SelectValue placeholder="Статус: все" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Статус: все</SelectItem>
-                  <SelectItem value="true">Активные</SelectItem>
-                  <SelectItem value="false">Неактивные</SelectItem>
-                </SelectContent>
-              </Select>
-              <span className="ml-auto text-sm text-muted-foreground">
-                Стр. {page} из {pages}
-              </span>
-            </div>
-          }
-        />
+        <div className="overflow-hidden rounded-[10px] border border-border/80 bg-white shadow-none">
+          <DataTable
+            columns={columns}
+            data={suppliers}
+            loading={loading}
+            emptyText="Нет поставщиков"
+            onRowClick={(item) => {
+              const isAggregator = typeof item.id === 'string' && item.id.startsWith('agg:');
+              if (!isAggregator) navigate(`/suppliers/${item.id}`);
+            }}
+            pageSize={20}
+            toolbar={
+              <div className="flex w-full flex-wrap items-center gap-1.5 py-0.5">
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && load({ page: 1, search: e.currentTarget.value })}
+                  placeholder="Поиск по названию или email..."
+                  className="w-72"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => load({ page: 1, search })}>
+                  Найти
+                </Button>
+                <Select
+                  value={trustFilter}
+                  onValueChange={(value) => {
+                    const v = value as typeof trustFilter;
+                    setTrustFilter(v);
+                    load({ page: 1, trust: v });
+                  }}
+                >
+                  <SelectTrigger className="w-[170px]">
+                    <SelectValue placeholder="Trust: все" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Trust: все</SelectItem>
+                    <SelectItem value="0">0 — Новый</SelectItem>
+                    <SelectItem value="1">1 — Проверенный</SelectItem>
+                    <SelectItem value="2">2 — Доверенный</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={activeFilter}
+                  onValueChange={(value) => {
+                    const v = value as typeof activeFilter;
+                    setActiveFilter(v);
+                    load({ page: 1, isActive: v });
+                  }}
+                >
+                  <SelectTrigger className="w-[170px]">
+                    <SelectValue placeholder="Статус: все" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Статус: все</SelectItem>
+                    <SelectItem value="true">Активные</SelectItem>
+                    <SelectItem value="false">Неактивные</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="ml-auto text-sm text-muted-foreground">
+                  Стр. {page} из {pages}
+                </span>
+              </div>
+            }
+          />
+        </div>
       )}
     </div>
   );

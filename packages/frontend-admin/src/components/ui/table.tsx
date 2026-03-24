@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
+    <div className="relative w-full overflow-auto rounded-[10px]">
       <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   ),
@@ -35,7 +35,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
     <tr
       ref={ref}
       className={cn(
-        'border-b transition-colors hover:bg-muted/40 data-[state=selected]:bg-primary/10 focus-within:bg-primary/5 focus-within:outline-none focus-within:ring-1 focus-within:ring-primary/30',
+        'border-b border-border/70 transition-colors hover:bg-muted/30 data-[state=selected]:bg-primary/[0.08] focus-within:bg-primary/[0.05] focus-within:outline-none focus-within:ring-1 focus-within:ring-primary/20',
         className,
       )}
       {...props}
@@ -49,7 +49,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
     <th
       ref={ref}
       className={cn(
-        'h-10 px-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground [&:has([role=checkbox])]:pr-0',
+        'h-9 px-3 text-left align-middle text-sm font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0',
         className,
       )}
       {...props}
@@ -60,7 +60,7 @@ TableHead.displayName = 'TableHead';
 
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn('px-3 py-2.5 align-middle [&:has([role=checkbox])]:pr-0', className)} {...props} />
+    <td ref={ref} className={cn('px-3 py-2 align-middle [&:has([role=checkbox])]:pr-0', className)} {...props} />
   ),
 );
 TableCell.displayName = 'TableCell';

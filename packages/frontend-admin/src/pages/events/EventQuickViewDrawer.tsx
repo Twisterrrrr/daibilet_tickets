@@ -287,7 +287,7 @@ export function EventQuickViewDrawer({
                   kind={event.override?.title !== undefined && event.override?.title !== null ? 'L' : 'S'}
                 />
               </div>
-              <p className="text-xs text-muted-foreground break-all">{event.slug}</p>
+              <p className="text-xs text-muted-foreground break-all">URL: {event.slug}</p>
               <div className="flex flex-wrap items-center gap-1">
                 <Badge variant="secondary">
                   {CATEGORY_LABELS[event.category] ?? event.category}
@@ -489,7 +489,7 @@ export function EventQuickViewDrawer({
                     }
                   />
                 </li>
-                <li>Slug: {event.slug || '—'}</li>
+                <li>URL: {event.slug || '—'}</li>
               </ul>
             </div>
 

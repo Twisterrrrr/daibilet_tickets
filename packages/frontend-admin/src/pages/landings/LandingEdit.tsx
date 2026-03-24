@@ -53,6 +53,35 @@ interface LandingForm {
   rankingPreset: 'balanced' | 'popularity' | 'availability';
 }
 
+const TEMPLATE_LABELS: Record<LandingForm['templateType'], string> = {
+  GENERIC_CARDS: 'Карточки',
+  COMPARISON_TABLE: 'Таблица сравнения',
+  HYBRID: 'Гибрид',
+  SEASONAL_EVENT: 'Сезонный',
+};
+
+const STATUS_LABELS: Record<LandingForm['status'], string> = {
+  DRAFT: 'Черновик',
+  ACTIVE: 'Активен',
+  ARCHIVED: 'В архиве',
+};
+
+const RANKING_PRESET_LABELS: Record<LandingForm['rankingPreset'], string> = {
+  balanced: 'Сбалансированный',
+  popularity: 'По популярности',
+  availability: 'По доступности',
+};
+
+const BLOCK_TYPE_LABELS: Record<LandingBlockType, string> = {
+  FAQ: 'FAQ',
+  INFO_CARDS: 'Инфо-карточки',
+  COMPARISON: 'Сравнение',
+  CTA: 'Призыв к действию',
+  REVIEWS: 'Отзывы',
+  STATS: 'Статистика',
+  LINKS: 'Ссылки',
+};
+
 const EMPTY_FORM: LandingForm = {
   slug: '',
   cityId: '',
@@ -268,7 +297,7 @@ export function LandingEditPage() {
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="slug">Slug</Label>
+                <Label htmlFor="slug">Слаг</Label>
                 <Input
                   id="slug"
                   value={form.slug}
@@ -308,55 +337,55 @@ export function LandingEditPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Selection mode</Label>
+                <Label>Режим подбора</Label>
                 <Select value={form.selectionMode} onValueChange={(v) => setForm((f) => ({ ...f, selectionMode: v as LandingForm['selectionMode'] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="CUSTOM">CUSTOM</SelectItem>
-                    <SelectItem value="COLLECTION">COLLECTION</SelectItem>
+                    <SelectItem value="CUSTOM">Ручной</SelectItem>
+                    <SelectItem value="COLLECTION">Из подборки</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Collection ID (optional)</Label>
+                <Label>ID подборки (необязательно)</Label>
                 <Input value={form.collectionId} onChange={(e) => setForm((f) => ({ ...f, collectionId: e.target.value }))} />
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label>Template</Label>
+                <Label>Шаблон</Label>
                 <Select value={form.templateType} onValueChange={(v) => setForm((f) => ({ ...f, templateType: v as LandingForm['templateType'] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="GENERIC_CARDS">GENERIC_CARDS</SelectItem>
-                    <SelectItem value="COMPARISON_TABLE">COMPARISON_TABLE</SelectItem>
-                    <SelectItem value="HYBRID">HYBRID</SelectItem>
-                    <SelectItem value="SEASONAL_EVENT">SEASONAL_EVENT</SelectItem>
+                    <SelectItem value="GENERIC_CARDS">{TEMPLATE_LABELS.GENERIC_CARDS}</SelectItem>
+                    <SelectItem value="COMPARISON_TABLE">{TEMPLATE_LABELS.COMPARISON_TABLE}</SelectItem>
+                    <SelectItem value="HYBRID">{TEMPLATE_LABELS.HYBRID}</SelectItem>
+                    <SelectItem value="SEASONAL_EVENT">{TEMPLATE_LABELS.SEASONAL_EVENT}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Status</Label>
+                <Label>Статус</Label>
                 <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v as LandingForm['status'] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="DRAFT">DRAFT</SelectItem>
-                    <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                    <SelectItem value="ARCHIVED">ARCHIVED</SelectItem>
+                    <SelectItem value="DRAFT">{STATUS_LABELS.DRAFT}</SelectItem>
+                    <SelectItem value="ACTIVE">{STATUS_LABELS.ACTIVE}</SelectItem>
+                    <SelectItem value="ARCHIVED">{STATUS_LABELS.ARCHIVED}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Ranking preset</Label>
+                <Label>Пресет ранжирования</Label>
                 <Select
                   value={form.rankingPreset}
                   onValueChange={(v) => setForm((f) => ({ ...f, rankingPreset: v as LandingForm['rankingPreset'] }))}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="balanced">balanced</SelectItem>
-                    <SelectItem value="popularity">popularity</SelectItem>
-                    <SelectItem value="availability">availability</SelectItem>
+                    <SelectItem value="balanced">{RANKING_PRESET_LABELS.balanced}</SelectItem>
+                    <SelectItem value="popularity">{RANKING_PRESET_LABELS.popularity}</SelectItem>
+                    <SelectItem value="availability">{RANKING_PRESET_LABELS.availability}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -418,7 +447,7 @@ export function LandingEditPage() {
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={form.isIndexable} onChange={(e) => setForm((f) => ({ ...f, isIndexable: e.target.checked }))} className={cn('h-4 w-4 rounded border-input accent-primary')} />
-                <Label className="font-normal">Indexable</Label>
+                <Label className="font-normal">Разрешена индексация</Label>
               </div>
             </div>
           </CardContent>
@@ -432,7 +461,7 @@ export function LandingEditPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="metaTitle">Meta Title</Label>
+              <Label htmlFor="metaTitle">Мета-заголовок (Title)</Label>
               <Input
                 id="metaTitle"
                 value={form.metaTitle}
@@ -440,7 +469,7 @@ export function LandingEditPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="metaDescription">Meta Description</Label>
+              <Label htmlFor="metaDescription">Мета-описание (Description)</Label>
               <Textarea
                 id="metaDescription"
                 value={form.metaDescription}
@@ -465,7 +494,7 @@ export function LandingEditPage() {
           <CardHeader>
             <CardTitle>Контентные блоки</CardTitle>
             <CardDescription>
-              Form-based редактор без JSON textarea. Порядок влияет на рендер.
+              Формовый редактор без JSON-текстового поля. Порядок блоков влияет на рендер.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -475,13 +504,13 @@ export function LandingEditPage() {
                 <Select value={newBlockType} onValueChange={(v) => setNewBlockType(v as LandingBlockType)}>
                   <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FAQ">FAQ</SelectItem>
-                    <SelectItem value="INFO_CARDS">INFO_CARDS</SelectItem>
-                    <SelectItem value="COMPARISON">COMPARISON</SelectItem>
-                    <SelectItem value="CTA">CTA</SelectItem>
-                    <SelectItem value="REVIEWS">REVIEWS</SelectItem>
-                    <SelectItem value="STATS">STATS</SelectItem>
-                    <SelectItem value="LINKS">LINKS</SelectItem>
+                    <SelectItem value="FAQ">{BLOCK_TYPE_LABELS.FAQ}</SelectItem>
+                    <SelectItem value="INFO_CARDS">{BLOCK_TYPE_LABELS.INFO_CARDS}</SelectItem>
+                    <SelectItem value="COMPARISON">{BLOCK_TYPE_LABELS.COMPARISON}</SelectItem>
+                    <SelectItem value="CTA">{BLOCK_TYPE_LABELS.CTA}</SelectItem>
+                    <SelectItem value="REVIEWS">{BLOCK_TYPE_LABELS.REVIEWS}</SelectItem>
+                    <SelectItem value="STATS">{BLOCK_TYPE_LABELS.STATS}</SelectItem>
+                    <SelectItem value="LINKS">{BLOCK_TYPE_LABELS.LINKS}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -490,13 +519,13 @@ export function LandingEditPage() {
                 Добавить блок
               </Button>
             </div>
-            {orderedBlocks.length === 0 && <p className="text-sm text-muted-foreground">Добавь хотя бы один контентный блок.</p>}
+            {orderedBlocks.length === 0 && <p className="text-sm text-muted-foreground">Добавьте хотя бы один контентный блок.</p>}
             <div className="space-y-3">
               {orderedBlocks.map((block) => (
                 <Card key={block.id}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-base">{block.type}</CardTitle>
+                      <CardTitle className="text-base">{BLOCK_TYPE_LABELS[block.type] ?? block.type}</CardTitle>
                       <div className="flex items-center gap-2">
                         <Button type="button" size="icon" variant="ghost" onClick={() => moveBlock(block.id, -1)}>
                           <ArrowUp className="h-4 w-4" />
@@ -514,14 +543,14 @@ export function LandingEditPage() {
                     {block.type === 'FAQ' && (
                       <div className="space-y-2">
                         <Input
-                          placeholder="Question"
+                          placeholder="Вопрос"
                           value={block.payload[0]?.question ?? ''}
                           onChange={(e) =>
                             updateBlock(block.id, { ...block, payload: [{ question: e.target.value, answer: block.payload[0]?.answer ?? '' }] })
                           }
                         />
                         <Textarea
-                          placeholder="Answer"
+                          placeholder="Ответ"
                           value={block.payload[0]?.answer ?? ''}
                           onChange={(e) =>
                             updateBlock(block.id, { ...block, payload: [{ question: block.payload[0]?.question ?? '', answer: e.target.value }] })
@@ -532,43 +561,43 @@ export function LandingEditPage() {
                     )}
                     {block.type === 'CTA' && (
                       <div className="grid gap-2 sm:grid-cols-3">
-                        <Input placeholder="Title" value={block.payload.title ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, title: e.target.value } })} />
-                        <Input placeholder="Button text" value={block.payload.buttonText ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, buttonText: e.target.value } })} />
-                        <Input placeholder="Link" value={block.payload.link ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, link: e.target.value } })} />
+                        <Input placeholder="Заголовок" value={block.payload.title ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, title: e.target.value } })} />
+                        <Input placeholder="Текст кнопки" value={block.payload.buttonText ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, buttonText: e.target.value } })} />
+                        <Input placeholder="Ссылка" value={block.payload.link ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, link: e.target.value } })} />
                       </div>
                     )}
                     {block.type === 'INFO_CARDS' && (
                       <div className="grid gap-2 sm:grid-cols-2">
-                        <Input placeholder="Title" value={block.payload[0]?.title ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: e.target.value, text: block.payload[0]?.text ?? '' }] })} />
-                        <Input placeholder="Text" value={block.payload[0]?.text ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: block.payload[0]?.title ?? '', text: e.target.value }] })} />
+                        <Input placeholder="Заголовок" value={block.payload[0]?.title ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: e.target.value, text: block.payload[0]?.text ?? '' }] })} />
+                        <Input placeholder="Текст" value={block.payload[0]?.text ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: block.payload[0]?.title ?? '', text: e.target.value }] })} />
                       </div>
                     )}
                     {block.type === 'REVIEWS' && (
                       <div className="grid gap-2 sm:grid-cols-3">
-                        <Input placeholder="Author" value={block.payload[0]?.author ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ ...block.payload[0], author: e.target.value, text: block.payload[0]?.text ?? '', rating: block.payload[0]?.rating ?? 5 }] })} />
-                        <Input placeholder="Review text" value={block.payload[0]?.text ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ ...block.payload[0], text: e.target.value, author: block.payload[0]?.author ?? '', rating: block.payload[0]?.rating ?? 5 }] })} />
-                        <Input type="number" placeholder="Rating" value={block.payload[0]?.rating ?? 5} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ ...block.payload[0], rating: parseInt(e.target.value, 10) || 5, text: block.payload[0]?.text ?? '', author: block.payload[0]?.author ?? '' }] })} />
+                        <Input placeholder="Автор" value={block.payload[0]?.author ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ ...block.payload[0], author: e.target.value, text: block.payload[0]?.text ?? '', rating: block.payload[0]?.rating ?? 5 }] })} />
+                        <Input placeholder="Текст отзыва" value={block.payload[0]?.text ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ ...block.payload[0], text: e.target.value, author: block.payload[0]?.author ?? '', rating: block.payload[0]?.rating ?? 5 }] })} />
+                        <Input type="number" placeholder="Оценка" value={block.payload[0]?.rating ?? 5} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ ...block.payload[0], rating: parseInt(e.target.value, 10) || 5, text: block.payload[0]?.text ?? '', author: block.payload[0]?.author ?? '' }] })} />
                       </div>
                     )}
                     {block.type === 'STATS' && (
                       <div className="grid gap-2 sm:grid-cols-2">
-                        <Input type="number" placeholder="Sold tickets" value={block.payload.soldTickets ?? 0} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, soldTickets: parseInt(e.target.value, 10) || 0 } })} />
-                        <Input type="number" placeholder="Avg rating" value={block.payload.avgRating ?? 5} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, avgRating: parseFloat(e.target.value) || 0 } })} />
+                        <Input type="number" placeholder="Продано билетов" value={block.payload.soldTickets ?? 0} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, soldTickets: parseInt(e.target.value, 10) || 0 } })} />
+                        <Input type="number" placeholder="Средняя оценка" value={block.payload.avgRating ?? 5} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, avgRating: parseFloat(e.target.value) || 0 } })} />
                       </div>
                     )}
                     {block.type === 'LINKS' && (
                       <div className="grid gap-2 sm:grid-cols-2">
-                        <Input placeholder="Title" value={block.payload[0]?.title ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: e.target.value, href: block.payload[0]?.href ?? '' }] })} />
-                        <Input placeholder="Href" value={block.payload[0]?.href ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: block.payload[0]?.title ?? '', href: e.target.value }] })} />
+                        <Input placeholder="Заголовок" value={block.payload[0]?.title ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: e.target.value, href: block.payload[0]?.href ?? '' }] })} />
+                        <Input placeholder="Ссылка (URL)" value={block.payload[0]?.href ?? ''} onChange={(e) => updateBlock(block.id, { ...block, payload: [{ title: block.payload[0]?.title ?? '', href: e.target.value }] })} />
                       </div>
                     )}
                     {block.type === 'COMPARISON' && (
                       <div className="grid gap-2 sm:grid-cols-3">
-                        <Input placeholder="Columns (comma-separated)" value={block.payload.columns.join(', ')} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, columns: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) } })} />
-                        <Input type="number" placeholder="Max rows" value={block.payload.maxRows ?? 10} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, maxRows: parseInt(e.target.value, 10) || 10 } })} />
+                        <Input placeholder="Колонки (через запятую)" value={block.payload.columns.join(', ')} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, columns: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) } })} />
+                        <Input type="number" placeholder="Макс. строк" value={block.payload.maxRows ?? 10} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, maxRows: parseInt(e.target.value, 10) || 10 } })} />
                         <label className="flex items-center gap-2 text-sm">
                           <input type="checkbox" checked={Boolean(block.payload.hideIncomparable)} onChange={(e) => updateBlock(block.id, { ...block, payload: { ...block.payload, hideIncomparable: e.target.checked } })} className={cn('h-4 w-4 rounded border-input accent-primary')} />
-                          Hide incomparable
+                          Скрывать несравнимые
                         </label>
                       </div>
                     )}

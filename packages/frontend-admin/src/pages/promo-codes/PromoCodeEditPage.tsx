@@ -167,9 +167,7 @@ export function PromoCodeEditPage() {
                 }
                 min={1}
               />
-              <p className="text-xs text-muted-foreground">
-                {isPercent ? 'Проценты (0–100)' : 'Сумма в копейках'}
-              </p>
+              <p className="text-xs text-muted-foreground">{isPercent ? 'Проценты (0–100)' : 'Сумма в рублях'}</p>
             </div>
           </div>
 

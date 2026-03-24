@@ -57,7 +57,7 @@ export function SortableHeader({ column, children }: { column: any; children: Re
 
 function TableSkeleton({ columns, rows = 5 }: { columns: number; rows?: number }) {
   return (
-    <div className="rounded-md border">
+    <div className="rounded-[10px] border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -126,26 +126,26 @@ export function DataTable<TData, TValue>({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Toolbar */}
       {(searchColumn || toolbar) && (
-        <div className="flex flex-col gap-3 rounded-md border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2.5 rounded-[10px] border border-border/80 bg-white p-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {searchColumn && (
               <Input
                 placeholder={searchPlaceholder}
                 value={(table.getColumn(searchColumn)?.getFilterValue() as string) ?? ''}
                 onChange={(event) => table.getColumn(searchColumn)?.setFilterValue(event.target.value)}
-                className="max-w-sm"
+                className="h-8 max-w-sm"
               />
             )}
           </div>
-          {toolbar && <div className="flex flex-wrap items-center justify-end gap-2">{toolbar}</div>}
+          {toolbar && <div className="flex flex-wrap items-center justify-end gap-1.5">{toolbar}</div>}
         </div>
       )}
 
       {/* Table */}
-      <ScrollAreaPrimitive.Root className="relative overflow-hidden rounded-md border">
+      <ScrollAreaPrimitive.Root className="relative overflow-hidden rounded-[10px] border">
         <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
           <div className="min-w-max">
             <Table>
@@ -153,7 +153,7 @@ export function DataTable<TData, TValue>({
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
+                      <TableHead key={header.id} style={{ width: header.getSize() }}>
                         {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     ))}
@@ -180,7 +180,9 @@ export function DataTable<TData, TValue>({
                       }}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                        <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
                       ))}
                     </TableRow>
                   ))

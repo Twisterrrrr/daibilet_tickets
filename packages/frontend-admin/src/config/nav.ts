@@ -15,6 +15,7 @@ import {
   Users,
   MessageSquare,
   Search,
+  FileCheck2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -70,6 +71,7 @@ function buildNavSections(): NavSection[] {
       title: 'Операции',
       items: [
         ...(show.orders ? [{ to: '/orders', label: 'Заказы', icon: ShoppingCart, section: 'Операции' }] : []),
+        { to: '/finance-documents', label: 'Фин. документы', icon: FileCheck2, section: 'Операции' },
         { to: '/reviews', label: 'Отзывы', icon: MessageSquare, section: 'Операции' },
         { to: '/reconciliation', label: 'Сверка', icon: Search, section: 'Операции' },
         { to: '/support', label: 'Поддержка', icon: HeadphonesIcon, section: 'Операции' },

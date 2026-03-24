@@ -236,15 +236,15 @@ export function EventTagsEditor({ eventId, disabled }: { eventId: string; disabl
                   )}
                 </div>
                 <Select
-                  value={selected ?? ''}
-                  onValueChange={(v) => setDraftStructural((d) => ({ ...d, [group]: v || null }))}
+                  value={selected ?? '__none__'}
+                  onValueChange={(v) => setDraftStructural((d) => ({ ...d, [group]: v === '__none__' ? null : v }))}
                   disabled={saving || disabled}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Выберите тег" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Без тега</SelectItem>
+                    <SelectItem value="__none__">Без тега</SelectItem>
                     {options
                       .slice()
                       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
@@ -291,12 +291,12 @@ export function EventTagsEditor({ eventId, disabled }: { eventId: string; disabl
           <div className="space-y-2">
             <Label className="text-sm">Добавить popular тег</Label>
             <div className="flex items-center gap-3">
-              <Select value={popularAddSlug} onValueChange={setPopularAddSlug} disabled={saving || disabled}>
+              <Select value={popularAddSlug || '__none__'} onValueChange={setPopularAddSlug} disabled={saving || disabled}>
                 <SelectTrigger className="w-[320px]">
                   <SelectValue placeholder="Выберите популярный тег" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{'— Выберите —'}</SelectItem>
+                  <SelectItem value="__none__">{'— Выберите —'}</SelectItem>
                   {popularOptions.map((t) => (
                     <SelectItem key={t.id} value={t.slug} disabled={draftPopular.includes(t.slug)}>
                       {t.name}
@@ -306,9 +306,9 @@ export function EventTagsEditor({ eventId, disabled }: { eventId: string; disabl
               </Select>
               <Button
                 type="button"
-                disabled={!popularAddSlug || saving || disabled}
+                disabled={!popularAddSlug || popularAddSlug === '__none__' || saving || disabled}
                 onClick={() => {
-                  if (!popularAddSlug) return;
+                  if (!popularAddSlug || popularAddSlug === '__none__') return;
                   setDraftPopular((p) => (p.includes(popularAddSlug) ? p : [...p, popularAddSlug]));
                   setPopularAddSlug('');
                 }}

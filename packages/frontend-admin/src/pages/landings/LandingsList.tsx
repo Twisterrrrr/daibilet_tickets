@@ -1,4 +1,3 @@
-import { ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,10 +6,11 @@ import { PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
-import { StatusBadge, TagChip } from '@daibilet/shared-ui';
+import { TagChip } from '@daibilet/shared-ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,46 +35,11 @@ interface CityItem {
   slug: string;
 }
 
-// ─── Columns ─────────────────────────────────────────────────────────────────
-
-const getColumns = (): ColumnDef<LandingItem>[] => [
-  {
-    accessorKey: 'title',
-    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
-    cell: ({ row }) => <div className="font-medium">{row.original.title}</div>,
-  },
-  {
-    id: 'city',
-    accessorFn: (row) => row.city?.name ?? '',
-    header: 'Город',
-    cell: ({ row }) => <span className="text-muted-foreground">{row.original.city?.name ?? '—'}</span>,
-  },
-  {
-    accessorKey: 'templateType',
-    header: 'Шаблон',
-    cell: ({ row }) => <TagChip label={row.original.templateType} />,
-  },
-  {
-    accessorKey: 'status',
-    header: 'Статус',
-    cell: ({ row }) => <StatusBadge tone={row.original.status === 'ACTIVE' ? 'success' : 'neutral'} label={row.original.status} />,
-  },
-  {
-    accessorKey: 'showInCollections',
-    header: 'showInCollections',
-    cell: ({ row }) => <TagChip label={row.original.showInCollections ? 'ON' : 'OFF'} />,
-  },
-  {
-    accessorKey: 'isIndexable',
-    header: 'indexable',
-    cell: ({ row }) => <TagChip label={row.original.isIndexable ? 'YES' : 'NO'} />,
-  },
-  {
-    accessorKey: 'sortOrder',
-    header: ({ column }) => <SortableHeader column={column}>Порядок</SortableHeader>,
-    cell: ({ row }) => <span className="tabular-nums text-sm">{row.original.sortOrder}</span>,
-  },
-];
+const STATUS_LABELS: Record<LandingItem['status'], string> = {
+  DRAFT: 'Черновик',
+  ACTIVE: 'Активен',
+  ARCHIVED: 'В архиве',
+};
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -109,11 +74,17 @@ export function LandingsListPage() {
       .catch((e) => console.error('Load cities failed:', e));
   }, []);
 
-  const handleRowClick = (item: LandingItem) => {
-    navigate(`/landings/${item.id}`);
+  const handleToggleActive = async (item: LandingItem, next: boolean) => {
+    // Guard: черновик нельзя включить
+    if (item.status === 'DRAFT' && next) return;
+    const prev = data;
+    setData((curr) => curr.map((x) => (x.id === item.id ? { ...x, isActive: next } : x)));
+    try {
+      await adminApi.patch(`/admin/landings/${item.id}`, { isActive: next });
+    } catch {
+      setData(prev);
+    }
   };
-
-  const columns = getColumns();
 
   return (
     <div className="space-y-6">
@@ -159,13 +130,72 @@ export function LandingsListPage() {
             </Select>
           </div>
 
-          <DataTable
-            columns={columns}
-            data={data}
-            onRowClick={handleRowClick}
-            loading={loading}
-            emptyText="Нет лендингов"
-          />
+          <div className="overflow-hidden rounded-[10px] border border-border/80">
+            <Table className="w-full table-fixed">
+              <colgroup>
+                <col style={{ width: '40%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '15%' }} />
+              </colgroup>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Название</TableHead>
+                  <TableHead>Город</TableHead>
+                  <TableHead>В подборках</TableHead>
+                  <TableHead>Порядок</TableHead>
+                  <TableHead>Статус</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                      Загрузка...
+                    </TableCell>
+                  </TableRow>
+                ) : data.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                      Нет лендингов
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  data.map((item) => (
+                    <TableRow key={item.id} className="cursor-pointer" onClick={() => navigate(`/landings/${item.id}`)}>
+                      <TableCell>
+                        <div className="font-medium">{item.title}</div>
+                        <div className="text-xs text-muted-foreground">/{item.slug}</div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">{item.city?.name ?? '—'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <TagChip label={item.showInCollections ? 'Да' : 'Нет'} />
+                      </TableCell>
+                      <TableCell>
+                        <span className="tabular-nums text-sm">{item.sortOrder}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
+                          <Switch
+                            checked={item.isActive}
+                            disabled={item.status === 'DRAFT' && !item.isActive}
+                            onCheckedChange={(checked) => void handleToggleActive(item, checked)}
+                          />
+                          <span className="text-xs text-muted-foreground">{item.isActive ? 'Вкл' : 'Выкл'}</span>
+                          {item.status === 'DRAFT' && !item.isActive && (
+                            <span className="text-[10px] text-amber-700">Черновик</span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -37,7 +37,7 @@ function AdminTopbar({ onOpenCommandPalette }: { onOpenCommandPalette: () => voi
   };
 
   return (
-    <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:h-12 sm:px-4">
+    <header className="sticky top-0 z-20 flex h-10 items-center gap-2.5 border-b border-border/80 bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-4">
       {/* Sidebar toggle: на mobile открывает Sheet, на desktop сворачивает */}
       <SidebarTrigger className="shrink-0" />
 
@@ -109,13 +109,13 @@ export function Layout() {
     <SidebarProvider>
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
 
-      <div className="flex min-h-screen w-full bg-[rgb(229,231,235)]">
+      <div className="flex min-h-screen w-full bg-[#e5e7eb]">
         <AdminSidebar />
-        <div className="flex min-w-0 flex-1 flex-col bg-background">
+        <div className="flex min-w-0 flex-1 flex-col bg-[#e5e7eb]">
           <AdminTopbar onOpenCommandPalette={() => setCommandOpen(true)} />
 
-          <main className="flex-1 overflow-auto bg-[rgb(229,231,235)]">
-            <PageContainer className="animate-in-page max-w-none px-3 py-4 sm:px-4 xl:px-6 2xl:px-8 lg:py-5">
+          <main className="flex-1 overflow-auto bg-[#e5e7eb]">
+            <PageContainer className="animate-in-page max-w-none px-3 py-3.5 sm:px-4 xl:px-6 2xl:px-8 lg:py-4">
               <Outlet />
             </PageContainer>
           </main>

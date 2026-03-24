@@ -191,56 +191,58 @@ export function OrdersListPage() {
           description="Как только появятся оформленные заказы, они отобразятся здесь."
         />
       ) : (
-        <DataTable
-          columns={columns}
-          data={data?.items ?? []}
-          loading={loading}
-          emptyText="Нет заказов"
-          onRowClick={(item) => navigate(`/orders/${item.id}`)}
-          toolbar={
-            <div className="flex w-full flex-wrap items-center gap-2">
-              <Input
-                placeholder="Поиск (код, email, имя)..."
-                value={filters.search}
-                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
-                className="max-w-[250px]"
-              />
-              <Select
-                value={filters.status || '__all__'}
-                onValueChange={(v) => setFilters((f) => ({ ...f, status: v === '__all__' ? '' : v, page: 1 }))}
-              >
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Все статусы" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Все статусы</SelectItem>
-                  {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={filters.city || '__all__'}
-                onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
-              >
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Все города" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Все города</SelectItem>
-                  <SelectItem value="moscow">Москва</SelectItem>
-                  <SelectItem value="spb">Санкт-Петербург</SelectItem>
-                  <SelectItem value="kazan">Казань</SelectItem>
-                  <SelectItem value="kaliningrad">Калининград</SelectItem>
-                  <SelectItem value="vladimir">Владимир</SelectItem>
-                  <SelectItem value="yaroslavl">Ярославль</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          }
-        />
+        <div className="overflow-hidden rounded-[10px] border border-border/80 bg-white shadow-none">
+          <DataTable
+            columns={columns}
+            data={data?.items ?? []}
+            loading={loading}
+            emptyText="Нет заказов"
+            onRowClick={(item) => navigate(`/orders/${item.id}`)}
+            toolbar={
+              <div className="flex w-full flex-wrap items-center gap-1.5 py-0.5">
+                <Input
+                  placeholder="Поиск (код, email, имя)..."
+                  value={filters.search}
+                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
+                  className="max-w-[320px]"
+                />
+                <Select
+                  value={filters.status || '__all__'}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, status: v === '__all__' ? '' : v, page: 1 }))}
+                >
+                  <SelectTrigger className="w-[170px]">
+                    <SelectValue placeholder="Все статусы" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Все статусы</SelectItem>
+                    {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filters.city || '__all__'}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
+                >
+                  <SelectTrigger className="w-[170px]">
+                    <SelectValue placeholder="Все города" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Все города</SelectItem>
+                    <SelectItem value="moscow">Москва</SelectItem>
+                    <SelectItem value="spb">Санкт-Петербург</SelectItem>
+                    <SelectItem value="kazan">Казань</SelectItem>
+                    <SelectItem value="kaliningrad">Калининград</SelectItem>
+                    <SelectItem value="vladimir">Владимир</SelectItem>
+                    <SelectItem value="yaroslavl">Ярославль</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            }
+          />
+        </div>
       )}
 
       {data && data.pages > 1 && (

@@ -95,10 +95,7 @@ export function SeoAuditPage() {
 
   return (
     <div className="space-y-4 p-4">
-      <PageHeader
-        title="SEO Audit"
-        subtitle="Аудит событий: мета, индексируемость, качество контента"
-      />
+      <PageHeader title="SEO-аудит" subtitle="Аудит событий: мета, индексируемость, качество контента" />
 
       <Card>
         <CardHeader>
@@ -108,7 +105,7 @@ export function SeoAuditPage() {
         <CardContent className="flex flex-wrap items-end gap-3">
           <div className="flex gap-2">
             <Input
-              placeholder="Поиск по названию или slug"
+              placeholder="Поиск по названию или URL"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -196,11 +193,11 @@ export function SeoAuditPage() {
         <div className="flex gap-4 text-sm">
           <span className="text-muted-foreground">Событий: {summary.totalEvents}</span>
           <span className="text-muted-foreground">С проблемами: {summary.eventsWithIssues}</span>
-          <Badge variant="destructive">ERROR: {summary.issuesBySeverity.ERROR}</Badge>
+          <Badge variant="destructive">Ошибки: {summary.issuesBySeverity.ERROR}</Badge>
           <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-            WARN: {summary.issuesBySeverity.WARN}
+            Предупреждения: {summary.issuesBySeverity.WARN}
           </Badge>
-          <Badge variant="outline">INFO: {summary.issuesBySeverity.INFO}</Badge>
+          <Badge variant="outline">Инфо: {summary.issuesBySeverity.INFO}</Badge>
         </div>
       )}
 
@@ -242,7 +239,7 @@ export function SeoAuditPage() {
                       </Link>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {row.slug} · обновлено {formatRelative(row.updatedAt)}
+                      URL: {row.slug} · обновлено {formatRelative(row.updatedAt)}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -255,13 +252,13 @@ export function SeoAuditPage() {
                     )}
                     <span className="text-sm">Сеансы: {row.sessionsFutureCount}</span>
                     {row.issueCounts.ERROR > 0 && (
-                      <Badge variant="destructive">ERROR {row.issueCounts.ERROR}</Badge>
+                      <Badge variant="destructive">Ошибки {row.issueCounts.ERROR}</Badge>
                     )}
                     {row.issueCounts.WARN > 0 && (
-                      <Badge className="bg-amber-100 text-amber-800">WARN {row.issueCounts.WARN}</Badge>
+                      <Badge className="bg-amber-100 text-amber-800">Предупреждения {row.issueCounts.WARN}</Badge>
                     )}
                     {row.issueCounts.INFO > 0 && (
-                      <Badge variant="outline">INFO {row.issueCounts.INFO}</Badge>
+                      <Badge variant="outline">Инфо {row.issueCounts.INFO}</Badge>
                     )}
                     <Button asChild size="sm">
                       <Link to={`/events/${row.id}`}>Открыть</Link>

@@ -1,17 +1,18 @@
 import { ColumnDef } from '@tanstack/react-table';
-import { Check, Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ErrorState, PageHeader } from '@daibilet/shared-ui';
 
-import { StatusBadge, TagChip } from '@daibilet/shared-ui';
+import { TagChip } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface CollectionItem {
   id: string;
@@ -32,79 +33,21 @@ interface CollectionItem {
   updatedAt: string;
 }
 
-const statusTone: Record<string, 'success' | 'warning' | 'neutral' | 'danger'> = {
-  ACTIVE: 'success',
-  SUGGESTED: 'warning',
-  DRAFT: 'neutral',
-  REJECTED: 'danger',
-  ARCHIVED: 'neutral',
+const _baseColumns: ColumnDef<CollectionItem>[] = [];
+const STATUS_LABELS: Record<CollectionItem['status'], string> = {
+  DRAFT: 'Черновик',
+  SUGGESTED: 'Предложено',
+  ACTIVE: 'Активна',
+  REJECTED: 'Отклонена',
+  ARCHIVED: 'В архиве',
 };
 
-const baseColumns: ColumnDef<CollectionItem>[] = [
-  {
-    accessorKey: 'title',
-    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
-    cell: ({ row }) => (
-      <div>
-        <span className="font-medium">{row.original.title}</span>
-        {row.original.subtitle && <p className="text-xs text-muted-foreground mt-0.5">{row.original.subtitle}</p>}
-      </div>
-    ),
-  },
-  {
-    accessorKey: 'slug',
-    header: 'Slug',
-    cell: ({ row }) => <code className="text-xs text-muted-foreground">{row.original.slug}</code>,
-  },
-  {
-    id: 'city',
-    header: 'Город',
-    cell: ({ row }) => <span>{row.original.city?.name || <TagChip label="Кросс-город" />}</span>,
-  },
-  {
-    id: 'filters',
-    header: 'Фильтры',
-    cell: ({ row }) => (
-      <div className="flex flex-wrap gap-1">
-        {row.original.filterCategory && (
-          <TagChip label={row.original.filterCategory} />
-        )}
-        {row.original.filterTags.map((t) => (
-          <TagChip key={t} label={t} />
-        ))}
-      </div>
-    ),
-  },
-  {
-    id: 'curation',
-    header: 'Курация',
-    cell: ({ row }) => (
-      <span className="text-xs tabular-nums">
-        📌 {row.original.pinnedCount} / 🚫 {row.original.excludedCount}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'isActive',
-    header: 'Статус',
-    cell: ({ row }) => <StatusBadge tone={statusTone[row.original.status] ?? 'neutral'} label={row.original.status} />,
-  },
-  {
-    accessorKey: 'sourceType',
-    header: 'Источник',
-    cell: ({ row }) => <TagChip label={row.original.sourceType} />,
-  },
-  {
-    accessorKey: 'selectionBasis',
-    header: 'Basis',
-    cell: ({ row }) => <TagChip label={row.original.selectionBasis} />,
-  },
-  {
-    accessorKey: 'eventCountCached',
-    header: 'Events',
-    cell: ({ row }) => <span className="tabular-nums text-sm">{row.original.eventCountCached ?? '—'}</span>,
-  },
-];
+const SOURCE_LABELS: Record<CollectionItem['sourceType'], string> = {
+  MANUAL: 'Ручной',
+  SUGGESTED: 'Предложенный',
+  HYBRID: 'Гибридный',
+  ACTIVE: 'Активный',
+};
 
 export function CollectionsListPage() {
   const navigate = useNavigate();
@@ -137,15 +80,17 @@ export function CollectionsListPage() {
       .finally(() => setLoading(false));
   }, [query]);
 
-  const onApprove = useCallback(async (id: string) => {
-    await adminApi.post(`/admin/collections/${id}/approve`);
-    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, status: 'ACTIVE', sourceType: 'ACTIVE' } : item)));
-  }, []);
-
-  const onReject = useCallback(async (id: string) => {
-    await adminApi.post(`/admin/collections/${id}/reject`);
-    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, status: 'REJECTED' } : item)));
-  }, []);
+  const onToggleActive = useCallback(async (item: CollectionItem, next: boolean) => {
+    // Guard: черновик нельзя включить
+    if (item.status === 'DRAFT' && next) return;
+    const prev = items;
+    setItems((curr) => curr.map((x) => (x.id === item.id ? { ...x, isActive: next } : x)));
+    try {
+      await adminApi.patch(`/admin/collections/${item.id}`, { isActive: next });
+    } catch {
+      setItems(prev);
+    }
+  }, [items]);
 
   const onGenerate = async () => {
     setLoading(true);
@@ -155,47 +100,7 @@ export function CollectionsListPage() {
     setLoading(false);
   };
 
-  const columns = useMemo<ColumnDef<CollectionItem>[]>(() => {
-    return [
-      ...baseColumns,
-      {
-        accessorKey: 'sortOrder',
-        header: ({ column }) => <SortableHeader column={column}>Порядок</SortableHeader>,
-        cell: ({ row }) => <span className="tabular-nums">{row.original.sortOrder}</span>,
-      },
-      {
-        id: 'actions',
-        header: 'Действия',
-        cell: ({ row }) =>
-          row.original.status === 'SUGGESTED' ? (
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void onApprove(row.original.id);
-                }}
-              >
-                <Check className="mr-1 h-3 w-3" />
-                Approve
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void onReject(row.original.id);
-                }}
-              >
-                <X className="mr-1 h-3 w-3" />
-                Reject
-              </Button>
-            </div>
-          ) : null,
-      },
-    ];
-  }, [onApprove, onReject]);
+  const columns = useMemo<ColumnDef<CollectionItem>[]>(() => [], [onToggleActive]);
 
   return (
     <div className="space-y-6">
@@ -204,7 +109,7 @@ export function CollectionsListPage() {
         subtitle="Тематические посадочные страницы с курированным контентом"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={onGenerate}>Сгенерировать suggestions</Button>
+            <Button variant="outline" onClick={onGenerate}>Сгенерировать предложения</Button>
             <Button onClick={() => navigate('/collections/new')}>
               <Plus className="h-4 w-4 mr-2" />
               Создать подборку
@@ -217,44 +122,121 @@ export function CollectionsListPage() {
         <ErrorState title="Не удалось загрузить подборки" description={error} />
       )}
 
-      <DataTable
-        columns={columns}
-        data={items}
-        onRowClick={(item) => navigate(`/collections/${item.id}`)}
-        loading={loading}
-        emptyText="Нет подборок. Создайте первую!"
-        toolbar={
+      <div className="rounded-[10px] border border-border/80 bg-white">
+        <div className="m-[10px] space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-          <Input
-            type="text"
-            placeholder="Поиск по названию или slug..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
+            <Input
+              type="text"
+              placeholder="Поиск по названию или URL..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
             <Select value={status || '__all__'} onValueChange={(v) => setStatus(v === '__all__' ? '' : v)}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="Статус" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Все статусы</SelectItem>
-                {['SUGGESTED', 'ACTIVE', 'DRAFT', 'REJECTED', 'ARCHIVED'].map((x) => <SelectItem key={x} value={x}>{x}</SelectItem>)}
+                  {(['SUGGESTED', 'ACTIVE', 'DRAFT', 'REJECTED', 'ARCHIVED'] as CollectionItem['status'][]).map((x) => (
+                    <SelectItem key={x} value={x}>{STATUS_LABELS[x]}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Select value={sourceType || '__all__'} onValueChange={(v) => setSourceType(v === '__all__' ? '' : v)}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="Источник" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Все источники</SelectItem>
-                {['SUGGESTED', 'MANUAL', 'ACTIVE', 'HYBRID'].map((x) => <SelectItem key={x} value={x}>{x}</SelectItem>)}
+                  {(['SUGGESTED', 'MANUAL', 'ACTIVE', 'HYBRID'] as CollectionItem['sourceType'][]).map((x) => (
+                    <SelectItem key={x} value={x}>{SOURCE_LABELS[x]}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <Input
-              placeholder="city slug (spb)"
+              placeholder="city URL (spb)"
               value={city}
               onChange={(e) => setCity(e.target.value)}
               className="w-[180px]"
             />
           </div>
-        }
-      />
+
+          <div className="overflow-hidden rounded-[10px] border border-border/80">
+            <Table className="w-full table-fixed">
+              <colgroup>
+                <col style={{ width: '40%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '12%' }} />
+              </colgroup>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Название</TableHead>
+                  <TableHead>Город</TableHead>
+                  <TableHead>Фильтры</TableHead>
+                  <TableHead>Курация</TableHead>
+                  <TableHead>Порядок</TableHead>
+                  <TableHead>Вкл/Выкл</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      Загрузка...
+                    </TableCell>
+                  </TableRow>
+                ) : items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      Нет подборок. Создайте первую!
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  items.map((item) => (
+                    <TableRow key={item.id} className="cursor-pointer" onClick={() => navigate(`/collections/${item.id}`)}>
+                      <TableCell>
+                        <div>
+                          <span className="font-medium">{item.title}</span>
+                          {item.subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{item.subtitle}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell>{item.city?.name || <TagChip label="Кросс-город" />}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {item.filterCategory && <TagChip label={item.filterCategory} />}
+                          {item.filterTags.map((t) => (
+                            <TagChip key={t} label={t} />
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs tabular-nums">📌 {item.pinnedCount} / 🚫 {item.excludedCount}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="tabular-nums">{item.sortOrder}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={item.isActive}
+                              disabled={item.status === 'DRAFT' && !item.isActive}
+                              onCheckedChange={(checked) => void onToggleActive(item, checked)}
+                            />
+                            {item.status === 'DRAFT' && !item.isActive && (
+                              <span className="text-[10px] text-amber-700">Черновик</span>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

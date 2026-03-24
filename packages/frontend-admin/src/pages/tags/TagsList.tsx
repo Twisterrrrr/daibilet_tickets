@@ -1,4 +1,3 @@
-import { ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -8,68 +7,51 @@ import { EmptyState, ErrorState, LoadingState, PageHeader } from '@daibilet/shar
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 type TagCategory = 'THEME' | 'AUDIENCE' | 'SEASON' | 'SPECIAL';
+type TagKind = 'STRUCTURAL' | 'POPULAR';
+type StructuralTagGroup = 'THEME' | 'AUDIENCE' | 'FORMAT';
+type TagUiCategory = 'THEME' | 'AUDIENCE' | 'FORMAT' | 'SEASON' | 'POPULAR';
 
 interface TagItem {
   id: string;
   name: string;
   slug: string;
   category: TagCategory;
+  tagKind?: TagKind | null;
+  structuralGroup?: StructuralTagGroup | null;
   isActive: boolean;
   _count?: { events?: number };
 }
 
-const CATEGORY_VARIANTS: Record<TagCategory, 'success' | 'warning' | 'secondary' | 'default'> = {
+const CATEGORY_VARIANTS: Record<TagUiCategory, 'success' | 'warning' | 'secondary' | 'default'> = {
   THEME: 'secondary',
   AUDIENCE: 'success',
+  FORMAT: 'default',
   SEASON: 'warning',
-  SPECIAL: 'default',
+  POPULAR: 'default',
 };
 
-const CATEGORY_LABELS: Record<TagCategory, string> = {
+const CATEGORY_LABELS: Record<TagUiCategory, string> = {
   THEME: 'Тема',
   AUDIENCE: 'Аудитория',
-  SEASON: 'Сезон',
-  SPECIAL: 'Специальный',
+  FORMAT: 'Формат',
+  SEASON: 'Сезонность',
+  POPULAR: 'Популярный',
 };
 
-const columns: ColumnDef<TagItem>[] = [
-  {
-    accessorKey: 'name',
-    header: ({ column }) => <SortableHeader column={column}>Название</SortableHeader>,
-    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-  },
-  {
-    accessorKey: 'slug',
-    header: ({ column }) => <SortableHeader column={column}>Slug</SortableHeader>,
-    cell: ({ row }) => <span className="text-muted-foreground font-mono text-sm">{row.original.slug}</span>,
-  },
-  {
-    accessorKey: 'category',
-    header: 'Категория',
-    cell: ({ row }) => (
-      <Badge variant={CATEGORY_VARIANTS[row.original.category] ?? 'default'}>
-        {CATEGORY_LABELS[row.original.category] ?? row.original.category}
-      </Badge>
-    ),
-  },
-  {
-    id: 'eventsCount',
-    header: 'Событий',
-    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.events ?? 0}</span>,
-  },
-  {
-    accessorKey: 'isActive',
-    header: 'Активен',
-    cell: ({ row }) => (
-      <Badge variant={row.original.isActive ? 'success' : 'secondary'}>{row.original.isActive ? 'Да' : 'Нет'}</Badge>
-    ),
-  },
-];
+function toUiCategory(tag: TagItem): TagUiCategory {
+  if (tag.tagKind === 'POPULAR') return 'POPULAR';
+  if (tag.structuralGroup === 'FORMAT') return 'FORMAT';
+  if (tag.category === 'SPECIAL') return 'FORMAT';
+  if (tag.category === 'AUDIENCE') return 'AUDIENCE';
+  if (tag.category === 'SEASON') return 'SEASON';
+  return 'THEME';
+}
 
 export function TagsListPage() {
   const navigate = useNavigate();
@@ -78,12 +60,17 @@ export function TagsListPage() {
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<string>('');
   const [search, setSearch] = useState('');
+  const [busyTagId, setBusyTagId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
-    if (category) params.set('category', category);
+    if (category === 'THEME' || category === 'AUDIENCE' || category === 'SEASON') {
+      params.set('category', category);
+    } else if (category === 'FORMAT' || category === 'POPULAR') {
+      params.set('category', 'SPECIAL');
+    }
     if (search) params.set('search', search);
 
     adminApi
@@ -97,10 +84,29 @@ export function TagsListPage() {
     navigate(`/tags/${item.id}`);
   };
 
+  const handleToggleActive = async (tag: TagItem, nextActive: boolean) => {
+    setBusyTagId(tag.id);
+    const prevData = data;
+    setData((curr) => curr.map((x) => (x.id === tag.id ? { ...x, isActive: nextActive } : x)));
+    try {
+      await adminApi.patch(`/admin/tags/${tag.id}`, { isActive: nextActive });
+    } catch (e) {
+      setData(prevData);
+      setError(e instanceof Error ? e.message : 'Ошибка обновления статуса тега');
+    } finally {
+      setBusyTagId(null);
+    }
+  };
+
+  const visibleData = data.filter((item) => {
+    if (!category) return true;
+    return toUiCategory(item) === category;
+  });
+
   const hasActiveFilters = Boolean(category || search.trim());
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Теги"
         subtitle="Управление тегами для категоризации событий"
@@ -124,25 +130,21 @@ export function TagsListPage() {
 
       {loading ? (
         <LoadingState label="Загружаем теги..." />
-      ) : data.length === 0 ? (
+      ) : visibleData.length === 0 ? (
         <EmptyState
           title="Нет тегов"
           description="Создайте первый тег, чтобы начать категоризацию событий и лендингов."
         />
       ) : (
-        <DataTable
-          columns={columns}
-          data={data}
-          onRowClick={handleRowClick}
-          emptyText="Нет тегов"
-          toolbar={
-            <div className="flex w-full flex-wrap items-center gap-2">
+        <div className="overflow-hidden rounded-[10px] border border-border/80 bg-white shadow-none [&_tbody_tr:focus-within]:!bg-transparent [&_tbody_tr:focus-within]:!ring-0">
+          <div className="m-[10px] space-y-3">
+            <div className="flex w-full flex-wrap items-center gap-1.5 py-0.5">
               <Input
                 type="text"
-                placeholder="Поиск по названию или slug..."
+                placeholder="Поиск по названию или URL..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="max-w-sm"
+                className="max-w-md"
               />
               <Select value={category || '__all__'} onValueChange={(v) => setCategory(v === '__all__' ? '' : v)}>
                 <SelectTrigger className="w-[180px]">
@@ -150,7 +152,7 @@ export function TagsListPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">Все категории</SelectItem>
-                  {(Object.keys(CATEGORY_LABELS) as TagCategory[]).map((c) => (
+                  {(Object.keys(CATEGORY_LABELS) as TagUiCategory[]).map((c) => (
                     <SelectItem key={c} value={c}>
                       {CATEGORY_LABELS[c]}
                     </SelectItem>
@@ -169,8 +171,71 @@ export function TagsListPage() {
                 Сбросить
               </Button>
             </div>
-          }
-        />
+
+            <div className="overflow-hidden rounded-[10px] border border-border/80">
+              <Table className="w-full table-fixed">
+                <colgroup>
+                  <col style={{ width: '40%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '15%' }} />
+                </colgroup>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Название</TableHead>
+                    <TableHead>URL</TableHead>
+                    <TableHead>Категория</TableHead>
+                    <TableHead>Событий</TableHead>
+                    <TableHead>Активен</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibleData.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                        Нет тегов
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    visibleData.map((item) => (
+                      <TableRow key={item.id} className="cursor-pointer" onClick={() => handleRowClick(item)}>
+                        <TableCell>
+                          <span className="font-medium">{item.name}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-sm text-muted-foreground">{item.slug}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={CATEGORY_VARIANTS[toUiCategory(item)] ?? 'default'}>
+                            {CATEGORY_LABELS[toUiCategory(item)] ?? toUiCategory(item)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="tabular-nums">{item._count?.events ?? 0}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div
+                            className="flex items-center gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            <Switch
+                              checked={item.isActive}
+                              disabled={busyTagId === item.id}
+                              onCheckedChange={(checked) => void handleToggleActive(item, checked)}
+                            />
+                            <span className="text-xs text-muted-foreground">{item.isActive ? 'Вкл' : 'Выкл'}</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

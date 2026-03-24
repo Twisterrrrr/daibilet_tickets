@@ -3,12 +3,11 @@ import { Eye, EyeOff, MoreHorizontal, Plus, RefreshCw, Search, Star } from 'luci
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { EmptyState, ErrorState, PageHeader } from '@daibilet/shared-ui';
+import { DataTableShell, FilterBar, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { DataTable, SortableHeader } from '@/components/ui/DataTable';
 import {
   DropdownMenu,
@@ -19,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 
 import { EventQuickViewDrawer } from './EventQuickViewDrawer';
 
@@ -35,7 +34,7 @@ interface EventItem {
   updatedAt: string;
   city?: { name: string };
   _count?: { sessions?: number };
-  override?: { isHidden?: boolean } | null;
+  override?: { isHidden?: boolean; editorStatus?: string | null } | null;
 }
 
 interface EventsResponse {
@@ -71,6 +70,7 @@ export function EventsListPage() {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [quickViewOpen, setQuickViewOpen] = useState(false);
   const [quickViewEventId, setQuickViewEventId] = useState<string | null>(null);
+  const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [cities, setCities] = useState<Array<{ slug: string; name: string }>>([]);
   const [citiesLoaded, setCitiesLoaded] = useState(false);
 
@@ -192,24 +192,27 @@ export function EventsListPage() {
   const columns: ColumnDef<EventItem>[] = [
     {
       id: 'select',
+      size: 30,
       header: () => null,
       cell: ({ row }) => {
         const event = row.original;
         const rowId = event.id;
         const checked = !!rowSelection[rowId];
         return (
-          <input
-            type="checkbox"
-            aria-label="Выбрать событие"
-            checked={checked}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) =>
-              setRowSelection((prev) => ({
-                ...prev,
-                [rowId]: e.target.checked,
-              }))
-            }
-          />
+          <div className="flex w-[30px] justify-center">
+            <input
+              type="checkbox"
+              aria-label="Выбрать событие"
+              checked={checked}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) =>
+                setRowSelection((prev) => ({
+                  ...prev,
+                  [rowId]: e.target.checked,
+                }))
+              }
+            />
+          </div>
         );
       },
       enableSorting: false,
@@ -256,24 +259,32 @@ export function EventsListPage() {
     },
     {
       id: 'status',
-      header: 'Статус',
+      header: 'Вкл/Выкл',
       cell: ({ row }) => {
         const isHidden = row.original.override?.isHidden ?? false;
-        if (isHidden) {
-          return (
-            <Badge variant="destructive">
-              <EyeOff className="mr-1 h-3 w-3" />
-              Скрыт
-            </Badge>
-          );
-        }
-        return row.original.isActive ? (
-          <Badge variant="success">
-            <Eye className="mr-1 h-3 w-3" />
-            Активен
-          </Badge>
-        ) : (
-          <Badge variant="secondary">Неактивен</Badge>
+        const inCatalog = row.original.isActive && !isHidden;
+        const editorStatus = row.original.override?.editorStatus ?? null;
+        const canToggle = editorStatus ? editorStatus === 'PUBLISHED' : true;
+        return (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <Switch
+              checked={inCatalog}
+              disabled={!canToggle || statusBusyId === row.original.id}
+              onCheckedChange={async (checked) => {
+                setStatusBusyId(row.original.id);
+                try {
+                  // checked=true => в каталог => isHidden=false
+                  await adminApi.patch(`/admin/events/${row.original.id}/hide`, { isHidden: !checked });
+                  fetchEvents();
+                } catch (e) {
+                  console.error('Toggle catalog status failed', e);
+                } finally {
+                  setStatusBusyId(null);
+                }
+              }}
+            />
+            <span className="text-xs text-muted-foreground">{inCatalog ? 'Вкл' : 'Выкл'}</span>
+          </div>
         );
       },
     },
@@ -351,31 +362,11 @@ export function EventsListPage() {
     },
   ];
 
-  if (error) {
-    return (
-      <ErrorState
-        title="Не удалось загрузить список событий"
-        description={error}
-        action={
-          <Button variant="outline" onClick={fetchEvents}>
-            Повторить попытку
-          </Button>
-        }
-      />
-    );
-  }
-
   return (
     <div className="space-y-4">
       <PageHeader
         title="События"
-        subtitle={
-          data ? (
-            `${data.items.length} из ${data.total}`
-          ) : (
-            <Skeleton className="h-4 w-24 inline-block" />
-          )
-        }
+        subtitle={data ? `${data.items.length} из ${data.total}` : 'Загрузка списка событий...'}
         actions={
           <div className="flex items-center gap-2">
             <Button asChild>
@@ -384,7 +375,7 @@ export function EventsListPage() {
                 Создать событие
               </Link>
             </Button>
-            <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
+            <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-1.5">
               <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
               Синхронизация
             </Button>
@@ -392,165 +383,184 @@ export function EventsListPage() {
         }
       />
 
-      {/* Table */}
-      {data && data.items.length === 0 && !loading ? (
-        <EmptyState
-          title="Нет событий, соответствующих фильтрам"
-          description="Попробуйте изменить условия поиска или снять часть фильтров."
-        />
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-          <DataTable
-            columns={columns}
-            data={data?.items ?? []}
-            loading={loading}
-            emptyText="Нет событий, соответствующих фильтрам"
-            onRowClick={(item) => navigate(`/events/${item.id}`)}
-            toolbar={
-              <div className="flex w-full flex-wrap items-center gap-2">
-                <div className="relative min-w-48 flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Поиск по названию..."
-                    value={filters.search}
-                    onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
-                    className="pl-9"
-                  />
-                </div>
+      <DataTableShell
+        loading={loading}
+        error={error}
+        isEmpty={(data?.items.length ?? 0) === 0}
+        loadingLabel="Загрузка списка событий..."
+        errorTitle="Не удалось загрузить список событий"
+        errorAction={
+          <Button variant="outline" onClick={fetchEvents}>
+            Повторить попытку
+          </Button>
+        }
+        emptyTitle="Нет событий, соответствующих фильтрам"
+        emptyDescription="Попробуйте изменить условия поиска или снять часть фильтров."
+        toolbar={
+          <FilterBar
+            onReset={() =>
+              setFilters({
+                city: '',
+                category: '',
+                source: '',
+                active: '',
+                hidden: '',
+                search: '',
+                page: 1,
+                limit: filters.limit,
+              })
+            }
+          >
+            <div className="relative min-w-56 flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Поиск по названию..."
+                value={filters.search}
+                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
+                className="pl-9"
+              />
+            </div>
+            <Select
+              value={filters.city || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Все города" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все города</SelectItem>
+                {citiesLoaded && cities.length === 0 && (
+                  <>
+                    <SelectItem value="moscow">Москва</SelectItem>
+                    <SelectItem value="saint-petersburg">Санкт-Петербург</SelectItem>
+                    <SelectItem value="kazan">Казань</SelectItem>
+                    <SelectItem value="kaliningrad">Калининград</SelectItem>
+                    <SelectItem value="vladimir">Владимир</SelectItem>
+                    <SelectItem value="yaroslavl">Ярославль</SelectItem>
+                  </>
+                )}
+                {cities.map((city) => (
+                  <SelectItem key={city.slug} value={city.slug}>
+                    {city.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.category || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, category: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Все категории" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все категории</SelectItem>
+                <SelectItem value="EXCURSION">Экскурсии</SelectItem>
+                <SelectItem value="MUSEUM">Музеи</SelectItem>
+                <SelectItem value="EVENT">Мероприятия</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.source || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, source: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Все" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все источники</SelectItem>
+                <SelectItem value="TC">TicketsCloud</SelectItem>
+                <SelectItem value="TEPLOHOD">Теплоход</SelectItem>
+                <SelectItem value="MANUAL">Ручной ввод</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.active || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, active: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Статус" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все статусы</SelectItem>
+                <SelectItem value="true">Активные</SelectItem>
+                <SelectItem value="false">Неактивные</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasSelection && (
+              <>
+                <span className="ml-1 text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
+                <Button size="sm" variant="outline" onClick={() => callBulkUpdate({ ids: selectedIds, isActive: true })}>
+                  Опубликовать
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => callBulkUpdate({ ids: selectedIds, isActive: false })}>
+                  Снять с публикации
+                </Button>
                 <Select
-                  value={filters.city || '__all__'}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, city: v === '__all__' ? '' : v, page: 1 }))}
+                  onValueChange={(value) => {
+                    if (value === '__none__') return;
+                    void callBulkUpdate({ ids: selectedIds, category: value });
+                  }}
                 >
-                  <SelectTrigger className="w-44">
-                    <SelectValue placeholder="Все города" />
+                  <SelectTrigger className="h-8 w-[180px]">
+                    <SelectValue placeholder="Сменить категорию" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">Все города</SelectItem>
-                    {citiesLoaded && cities.length === 0 && (
-                      <>
-                        <SelectItem value="moscow">Москва</SelectItem>
-                        <SelectItem value="saint-petersburg">Санкт-Петербург</SelectItem>
-                        <SelectItem value="kazan">Казань</SelectItem>
-                        <SelectItem value="kaliningrad">Калининград</SelectItem>
-                        <SelectItem value="vladimir">Владимир</SelectItem>
-                        <SelectItem value="yaroslavl">Ярославль</SelectItem>
-                      </>
-                    )}
-                    {cities.map((city) => (
-                      <SelectItem key={city.slug} value={city.slug}>
-                        {city.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={filters.category || '__all__'}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, category: v === '__all__' ? '' : v, page: 1 }))}
-                >
-                  <SelectTrigger className="w-44">
-                    <SelectValue placeholder="Все категории" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Все категории</SelectItem>
+                    <SelectItem value="__none__">Не изменять</SelectItem>
                     <SelectItem value="EXCURSION">Экскурсии</SelectItem>
                     <SelectItem value="MUSEUM">Музеи</SelectItem>
                     <SelectItem value="EVENT">Мероприятия</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select
-                  value={filters.source || '__all__'}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, source: v === '__all__' ? '' : v, page: 1 }))}
+                <Button size="sm" variant="destructive" onClick={() => callBulkUpdate({ ids: selectedIds, softDelete: true })}>
+                  Удалить (soft-delete)
+                </Button>
+              </>
+            )}
+          </FilterBar>
+        }
+        pagination={
+          data && (data.pages ?? Math.ceil(data.total / filters.limit)) > 1 ? (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Показано {data.items.length} из {data.total}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
+                  disabled={filters.page <= 1}
                 >
-                  <SelectTrigger className="w-36">
-                    <SelectValue placeholder="Все" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Все источники</SelectItem>
-                    <SelectItem value="TC">TicketsCloud</SelectItem>
-                    <SelectItem value="TEPLOHOD">Теплоход</SelectItem>
-                    <SelectItem value="MANUAL">Ручной ввод</SelectItem>
-                  </SelectContent>
-                </Select>
-                {hasSelection && (
-                  <>
-                    <span className="ml-1 text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => callBulkUpdate({ ids: selectedIds, isActive: true })}
-                    >
-                      Опубликовать
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => callBulkUpdate({ ids: selectedIds, isActive: false })}
-                    >
-                      Снять с публикации
-                    </Button>
-                    <Select
-                      onValueChange={(value) => {
-                        if (value === '__none__') return;
-                        void callBulkUpdate({ ids: selectedIds, category: value });
-                      }}
-                    >
-                      <SelectTrigger className="h-8 w-[180px]">
-                        <SelectValue placeholder="Сменить категорию" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Не изменять</SelectItem>
-                        <SelectItem value="EXCURSION">Экскурсии</SelectItem>
-                        <SelectItem value="MUSEUM">Музеи</SelectItem>
-                        <SelectItem value="EVENT">Мероприятия</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => callBulkUpdate({ ids: selectedIds, softDelete: true })}
-                    >
-                      Удалить (soft-delete)
-                    </Button>
-                  </>
-                )}
+                  Назад
+                </Button>
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {filters.page} / {data.pages ?? Math.ceil(data.total / filters.limit)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
+                  disabled={filters.page >= (data.pages ?? Math.ceil(data.total / filters.limit))}
+                >
+                  Вперёд
+                </Button>
               </div>
-            }
+            </div>
+          ) : null
+        }
+      >
+        <div className="overflow-hidden rounded-[10px] border border-border/80 bg-white shadow-none">
+          <DataTable
+            columns={columns}
+            data={data?.items ?? []}
+            loading={false}
+            emptyText="Нет событий, соответствующих фильтрам"
+            onRowClick={(item) => navigate(`/events/${item.id}`)}
           />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Server pagination */}
-      {data && (data.pages ?? Math.ceil(data.total / filters.limit)) > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Показано {data.items.length} из {data.total}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
-              disabled={filters.page <= 1}
-            >
-              Назад
-            </Button>
-            <span className="text-sm tabular-nums text-muted-foreground">
-              {filters.page} / {data.pages ?? Math.ceil(data.total / filters.limit)}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
-              disabled={filters.page >= (data.pages ?? Math.ceil(data.total / filters.limit))}
-            >
-              Вперёд
-            </Button>
-          </div>
         </div>
-      )}
+      </DataTableShell>
 
       <EventQuickViewDrawer
         eventId={quickViewEventId}

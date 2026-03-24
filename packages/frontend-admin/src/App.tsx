@@ -52,6 +52,7 @@ import { PayoutsListPage } from './pages/payouts/PayoutsListPage';
 import { PromoCodesListPage } from './pages/promo-codes/PromoCodesListPage';
 import { PromoCodeEditPage } from './pages/promo-codes/PromoCodeEditPage';
 import { UsersStubPage } from './pages/users/UsersStubPage';
+import { FinanceDocumentsAdminPage } from './pages/finance/FinanceDocumentsAdminPage';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="orders/:id" element={<OrderDetailPage />} />
           <Route path="checkout" element={<CheckoutSessionsListPage />} />
           <Route path="payouts" element={<PayoutsListPage />} />
+          <Route path="finance-documents" element={<FinanceDocumentsAdminPage />} />
           <Route path="upsells" element={<UpsellsListPage />} />
           <Route path="upsells/new" element={<UpsellEditPage />} />
           <Route path="upsells/:id" element={<UpsellEditPage />} />

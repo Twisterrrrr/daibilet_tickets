@@ -91,6 +91,14 @@ const DAY_LABELS: Record<string, string> = {
   sun: 'Вс',
 };
 
+type AdminSubcategory = {
+  id: string;
+  slug: string;
+  nameRu: string;
+  type: 'UNIVERSAL' | 'EVENT_ONLY' | 'VENUE_ONLY';
+  parent?: { id: string; slug: string; nameRu: string } | null;
+};
+
 interface VenueFormData {
   title: string;
   shortTitle: string;
@@ -191,6 +199,8 @@ export function VenueEditPage() {
   const [venueSummary, setVenueSummary] = useState<VenueAdminSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [venueSubcategoryOptions, setVenueSubcategoryOptions] = useState<AdminSubcategory[]>([]);
+  const [selectedVenueSubcategoryIds, setSelectedVenueSubcategoryIds] = useState<string[]>([]);
 
   useEffect(() => {
     // Load cities
@@ -211,6 +221,11 @@ export function VenueEditPage() {
       })
       .catch((e) => console.error('Load operators failed:', e));
 
+    adminApi
+      .get<AdminSubcategory[]>('/admin/subcategories?forEntity=venue')
+      .then((data) => setVenueSubcategoryOptions(Array.isArray(data) ? data : []))
+      .catch(() => setVenueSubcategoryOptions([]));
+
     if (!isNew && id) {
       setLoading(true);
       setSummaryLoading(true);
@@ -220,7 +235,7 @@ export function VenueEditPage() {
         .finally(() => setSummaryLoading(false));
       adminApi
         .get<any>(`/admin/venues/${id}`)
-        .then((venue) => {
+        .then(async (venue) => {
           setForm({
             title: venue.title || '',
             shortTitle: venue.shortTitle || '',
@@ -240,7 +255,7 @@ export function VenueEditPage() {
             email: venue.email || '',
             website: venue.website || '',
             openingHours: venue.openingHours || defaultForm.openingHours,
-            priceFrom: venue.priceFrom?.toString() || '',
+            priceFrom: venue.priceFrom != null ? String(venue.priceFrom / 100) : '',
             operatorId: venue.operator?.id || venue.operatorId || '',
             isActive: venue.isActive ?? true,
             isFeatured: venue.isFeatured ?? false,
@@ -260,6 +275,11 @@ export function VenueEditPage() {
           });
           setEvents(venue.events || []);
           setOffers(venue.offers || []);
+
+          const selected = await adminApi
+            .get<AdminSubcategory[]>(`/admin/venues/${id}/subcategories`)
+            .catch(() => []);
+          setSelectedVenueSubcategoryIds(selected.map((item) => item.id));
         })
         .catch((e) => setError(e.message))
         .finally(() => setLoading(false));
@@ -272,7 +292,8 @@ export function VenueEditPage() {
     try {
       const payload: any = {
         ...form,
-        priceFrom: form.priceFrom ? Number(form.priceFrom) : null,
+        // UI работает в рублях, в API отправляем в копейках
+        priceFrom: form.priceFrom ? Math.round(Number(form.priceFrom) * 100) : null,
         lat: form.lat ? Number(form.lat) : null,
         lng: form.lng ? Number(form.lng) : null,
         externalRating: form.externalRating ? Number(form.externalRating) : null,
@@ -290,6 +311,9 @@ export function VenueEditPage() {
         navigate(`/venues/${result.id}`, { replace: true });
       } else {
         await adminApi.patch(`/admin/venues/${id}`, payload);
+        await adminApi.patch(`/admin/venues/${id}/subcategories`, {
+          subcategoryIds: selectedVenueSubcategoryIds,
+        });
         setForm((f) => ({ ...f, version: f.version + 1 }));
         if (id) {
           setSummaryLoading(true);
@@ -676,6 +700,53 @@ export function VenueEditPage() {
                 </div>
               </div>
 
+              {!isNew && (
+                <div className="space-y-2">
+                  <Label>Подкатегории площадки</Label>
+                  <div className="flex flex-wrap gap-2 rounded-md border p-3">
+                    {venueSubcategoryOptions.map((opt) => {
+                      const isChecked = selectedVenueSubcategoryIds.includes(opt.id);
+                      const limitReached = !isChecked && selectedVenueSubcategoryIds.length >= 5;
+                      return (
+                        <label
+                          key={opt.id}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                            isChecked
+                              ? 'bg-primary text-primary-foreground'
+                              : limitReached
+                                ? 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
+                                : 'bg-muted text-muted-foreground hover:bg-accent cursor-pointer'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={limitReached}
+                            onChange={(e) => {
+                              setSelectedVenueSubcategoryIds((prev) => {
+                                if (e.target.checked) {
+                                  if (prev.length >= 5) return prev;
+                                  return [...prev, opt.id];
+                                }
+                                return prev.filter((id) => id !== opt.id);
+                              });
+                            }}
+                            className="sr-only"
+                          />
+                          {opt.nameRu}
+                        </label>
+                      );
+                    })}
+                    {venueSubcategoryOptions.length === 0 && (
+                      <span className="text-xs text-muted-foreground">Справочник подкатегорий пока пуст</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Выбрано: {selectedVenueSubcategoryIds.length}/5. Сохраняется вместе с площадкой.
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Краткое описание</Label>
                 <Textarea
@@ -701,12 +772,12 @@ export function VenueEditPage() {
                   disabled={saving}
                 />
                 <div className="space-y-2">
-                  <Label>Цена от (копейки)</Label>
+                  <Label>Цена от (руб.)</Label>
                   <Input
                     type="number"
                     value={form.priceFrom}
                     onChange={(e) => updateField('priceFrom', e.target.value)}
-                    placeholder="50000"
+                    placeholder="500"
                   />
                 </div>
                 <div className="space-y-2">
