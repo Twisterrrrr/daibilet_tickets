@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { VenueService } from '../venue.service';
 
 type BuildTemplateInput = {
-  venueType: 'MUSEUM' | 'ART_SPACE' | 'GALLERY' | 'THEATER';
+  venueType: 'MUSEUM' | 'ART_SPACE' | 'GALLERY' | 'EXHIBITION_HALL' | 'THEATER';
   venueTemplateData: unknown;
   legacyDescription: string | null;
   legacyShortDescription: string | null;
   legacyGalleryUrls: string[] | null;
   legacyOpeningHours: Record<string, string | null> | null;
   legacyFaq: Array<{ q: string; a: string }> | null;
+  legacyHighlights?: string[] | null;
 };
 
 type TemplateBuilderLike = {
@@ -35,6 +36,7 @@ describe('VenueService template public contract', () => {
       legacyGalleryUrls: ['legacy-1.jpg'],
       legacyOpeningHours: { mon: '10:00-18:00' },
       legacyFaq: [{ q: 'q1', a: 'a1' }],
+      legacyHighlights: null,
     });
 
     expect(result).not.toBeNull();
@@ -42,6 +44,22 @@ describe('VenueService template public contract', () => {
     expect(result?.sections.collections).toBeTruthy();
     expect(result?.sections.permanentExposition).toBeTruthy();
     expect(result?.sections.accessibility).toBeTruthy();
+  });
+
+  it('EXHIBITION_HALL: template-aware тип даже при пустом JSON', () => {
+    const result = builder.buildVenuePublicTemplate({
+      venueType: 'EXHIBITION_HALL',
+      venueTemplateData: null,
+      legacyDescription: null,
+      legacyShortDescription: null,
+      legacyGalleryUrls: null,
+      legacyOpeningHours: null,
+      legacyFaq: null,
+      legacyHighlights: null,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.supportedTemplateType).toBe(true);
+    expect(Object.keys(result?.sections ?? {})).toHaveLength(0);
   });
 
   it('fallback: при пустом template использует legacy поля', () => {
@@ -53,12 +71,14 @@ describe('VenueService template public contract', () => {
       legacyGalleryUrls: ['legacy-1.jpg'],
       legacyOpeningHours: { mon: '10:00-18:00' },
       legacyFaq: [{ q: 'q1', a: 'a1' }],
+      legacyHighlights: ['Легаси хайлайт'],
     });
 
     expect(result?.sections.intro).toEqual({
       title: null,
       lead: 'Legacy short',
       longDescription: '<p>Legacy description</p>',
+      highlights: ['Легаси хайлайт'],
     });
     expect(result?.sections.gallery).toEqual({ images: ['legacy-1.jpg'] });
     expect(result?.sections.visitInfo).toEqual({
@@ -72,22 +92,32 @@ describe('VenueService template public contract', () => {
     const result = builder.buildVenuePublicTemplate({
       venueType: 'GALLERY',
       venueTemplateData: {
+        introTitle: 'Подзаголовок для PDP',
         lead: 'Template lead',
         longDescription: '<p>Template long</p>',
         gallery: ['template-1.jpg'],
         faq: [{ q: 'template-q', a: 'template-a' }],
+        highlights: ['Из шаблона'],
+        amenities: 'Кафе и гардероб',
+        amenitiesList: ['Wi‑Fi для гостей'],
       },
       legacyDescription: '<p>Legacy description</p>',
       legacyShortDescription: 'Legacy short',
       legacyGalleryUrls: ['legacy-1.jpg'],
       legacyOpeningHours: { mon: '10:00-18:00' },
       legacyFaq: [{ q: 'legacy-q', a: 'legacy-a' }],
+      legacyHighlights: ['Старый буллет'],
     });
 
     expect(result?.sections.intro).toEqual({
-      title: null,
+      title: 'Подзаголовок для PDP',
       lead: 'Template lead',
       longDescription: '<p>Template long</p>',
+      highlights: ['Из шаблона'],
+    });
+    expect(result?.sections.amenities).toEqual({
+      items: ['Wi‑Fi для гостей'],
+      text: 'Кафе и гардероб',
     });
     expect(result?.sections.gallery).toEqual({ images: ['template-1.jpg'] });
     expect(result?.sections.faq).toEqual({ items: [{ q: 'template-q', a: 'template-a' }] });
@@ -102,6 +132,7 @@ describe('VenueService template public contract', () => {
       legacyGalleryUrls: null,
       legacyOpeningHours: null,
       legacyFaq: null,
+      legacyHighlights: null,
     });
 
     expect(result).toBeNull();
@@ -121,6 +152,7 @@ describe('VenueService template public contract', () => {
       legacyGalleryUrls: null,
       legacyOpeningHours: null,
       legacyFaq: null,
+      legacyHighlights: null,
     });
 
     expect(result).not.toBeNull();

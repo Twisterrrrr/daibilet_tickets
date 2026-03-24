@@ -307,6 +307,7 @@ export class VenueService {
         legacyGalleryUrls: venue.galleryUrls,
         legacyOpeningHours: venue.openingHours,
         legacyFaq: (venue.faq as Array<{ q: string; a: string }> | null) ?? null,
+        legacyHighlights: (venue.highlights as string[] | null) ?? null,
       }),
       city: venue.city,
       operator: venue.operator,
@@ -324,6 +325,7 @@ export class VenueService {
     legacyGalleryUrls: string[] | null;
     legacyOpeningHours: Prisma.JsonValue | null;
     legacyFaq: Array<{ q: string; a: string }> | null;
+    legacyHighlights: string[] | null;
   }): VenuePublicTemplate | null {
     const parsed = parseVenueTemplateData(input.venueTemplateData) as VenueTemplateData | null;
     const raw = this.asRecord(input.venueTemplateData);
@@ -372,9 +374,29 @@ export class VenueService {
     const eventsTitle = this.pickFirstNonEmptyString(this.readString(raw, 'eventsTitle'));
     const eventsIntro = this.pickFirstNonEmptyString(this.readString(raw, 'eventsIntro'));
 
+    const mergedHighlights = this.pickFirstNonEmptyStringArray(
+      this.readStringArray(raw, 'highlights'),
+      this.readStringArray(raw, 'templateHighlights'),
+      input.legacyHighlights ?? null,
+    );
+
+    const amenitiesItems = this.pickFirstNonEmptyStringArray(
+      this.readStringArray(raw, 'amenitiesList'),
+      this.readStringArray(raw, 'amenityList'),
+    );
+    const amenitiesText = this.pickFirstNonEmptyString(
+      this.readString(raw, 'amenities'),
+      this.readString(raw, 'amenitiesNote'),
+    );
+
     const sections: VenuePublicTemplate['sections'] = {};
-    if (introTitle || introLead || introLongDescription) {
-      sections.intro = { title: introTitle, lead: introLead, longDescription: introLongDescription };
+    if (introTitle || introLead || introLongDescription || mergedHighlights) {
+      sections.intro = {
+        title: introTitle,
+        lead: introLead,
+        longDescription: introLongDescription,
+        ...(mergedHighlights ? { highlights: mergedHighlights } : {}),
+      };
     }
     if (galleryImages) sections.gallery = { images: galleryImages };
     if (visitHours || visitingRules) sections.visitInfo = { openingHours: visitHours, visitingRules };
@@ -391,6 +413,12 @@ export class VenueService {
     }
     if (faqItems) sections.faq = { items: faqItems };
     if (eventsTitle || eventsIntro) sections.eventsCopy = { title: eventsTitle, intro: eventsIntro };
+    if (amenitiesItems || amenitiesText) {
+      sections.amenities = {
+        ...(amenitiesItems ? { items: amenitiesItems } : {}),
+        ...(amenitiesText ? { text: amenitiesText } : {}),
+      };
+    }
 
     const hasAnySection = Object.keys(sections).length > 0;
     if (!hasAnySection && !supportedTemplateType) return null;
@@ -402,7 +430,12 @@ export class VenueService {
   }
 
   private isTemplateAwareVenueType(venueType: VenueType): boolean {
-    return venueType === 'MUSEUM' || venueType === 'ART_SPACE' || venueType === 'GALLERY';
+    return (
+      venueType === 'MUSEUM' ||
+      venueType === 'ART_SPACE' ||
+      venueType === 'GALLERY' ||
+      venueType === 'EXHIBITION_HALL'
+    );
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {

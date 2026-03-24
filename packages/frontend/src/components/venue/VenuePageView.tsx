@@ -105,7 +105,8 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
   const allExhibitions = (venue.exhibitions ?? []) as VenueExhibition[];
   const permanentExhibitions = allExhibitions.filter((e) => e.isPermanent);
   const temporaryExhibitions = allExhibitions.filter((e) => !e.isPermanent);
-  const highlights: string[] = venue.highlights || [];
+  const highlights: string[] = templateSections.highlights;
+  const displayTitle = templateSections.heroTitle || venue.title;
   const faq: { q: string; a: string }[] = templateSections.faq;
   const features: string[] = venue.features || [];
   const primaryOffer = venue.offers?.[0] as VenueOffer | undefined;
@@ -249,7 +250,10 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
                 )}
               </div>
 
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight">{venue.title}</h1>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight">{displayTitle}</h1>
+              {templateSections.heroTitle && templateSections.heroTitle !== venue.title && (
+                <p className="mt-1 text-xs text-white/50">{venue.title}</p>
+              )}
 
               {/* Rating */}
               {venue.rating > 0 && (
@@ -347,7 +351,7 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
             <TicketsBlock
               offers={(venue.offers || []) as Parameters<typeof TicketsBlock>[0]['offers']}
               isOpenDate={isOpenDate}
-              venueName={venue.title}
+              venueName={displayTitle}
               website={venue.website}
             />
 
@@ -489,7 +493,8 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
             {(templateSections.collections.length > 0 ||
               templateSections.collectionsText ||
               templateSections.permanentExposition ||
-              templateSections.accessibility) && (
+              templateSections.accessibility ||
+              templateSections.amenities) && (
               <section>
                 <h2 className="text-xl font-bold mb-4">Экспозиции и особенности</h2>
                 <div className="space-y-4">
@@ -516,12 +521,27 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
                   )}
                   {templateSections.accessibility && (
                     <div className="bg-white rounded-xl border border-gray-200 p-4">
-                      <h3 className="font-semibold text-sm text-gray-900 mb-2">Доступность и удобства</h3>
+                      <h3 className="font-semibold text-sm text-gray-900 mb-2">Доступность</h3>
                       <div className="space-y-1.5 text-sm text-gray-700">
                         {templateSections.accessibility.audioGuide && <p>Есть аудиогид</p>}
                         {templateSections.accessibility.interactive && <p>Есть интерактивные экспонаты</p>}
                         {templateSections.accessibility.notes && <p>{templateSections.accessibility.notes}</p>}
                       </div>
+                    </div>
+                  )}
+                  {templateSections.amenities && (
+                    <div className="bg-white rounded-xl border border-gray-200 p-4">
+                      <h3 className="font-semibold text-sm text-gray-900 mb-2">Удобства</h3>
+                      {templateSections.amenities.text && (
+                        <p className="text-sm text-gray-700 mb-3 whitespace-pre-line">{templateSections.amenities.text}</p>
+                      )}
+                      {templateSections.amenities.items.length > 0 && (
+                        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                          {templateSections.amenities.items.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   )}
                 </div>

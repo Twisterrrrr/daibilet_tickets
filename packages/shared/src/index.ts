@@ -900,6 +900,8 @@ export interface VenueTemplateIntroSection {
   title?: string | null;
   lead?: string | null;
   longDescription?: string | null;
+  /** Bullet highlights: template JSON (`highlights` / `templateHighlights`) приоритетнее legacy `venue.highlights`. */
+  highlights?: string[] | null;
 }
 
 export interface VenueTemplateGallerySection {
@@ -931,6 +933,12 @@ export interface VenueTemplateEventsCopySection {
   intro?: string | null;
 }
 
+/** Удобства на PDP: сырой JSON `amenities` (текст) и/или `amenitiesList` / `amenityList` (массив строк). */
+export interface VenueTemplateAmenitiesSection {
+  items?: string[] | null;
+  text?: string | null;
+}
+
 export interface VenuePublicTemplateSections {
   intro?: VenueTemplateIntroSection | null;
   gallery?: VenueTemplateGallerySection | null;
@@ -938,6 +946,7 @@ export interface VenuePublicTemplateSections {
   collections?: VenueTemplateCollectionsSection | null;
   permanentExposition?: VenueTemplateCollectionsSection | null;
   accessibility?: VenueTemplateAccessibilitySection | null;
+  amenities?: VenueTemplateAmenitiesSection | null;
   faq?: VenueTemplateFaqSection | null;
   eventsCopy?: VenueTemplateEventsCopySection | null;
 }

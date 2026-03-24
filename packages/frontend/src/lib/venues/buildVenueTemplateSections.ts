@@ -4,8 +4,12 @@ type FaqItem = { q: string; a: string };
 type HoursMap = Record<string, string | null>;
 
 export type BuiltVenueTemplateSections = {
+  /** Подзаголовок H1 в hero: `template.intro.title` без замены официального названия в JSON-LD. */
+  heroTitle: string | null;
   introLead: string | null;
   descriptionHtml: string | null;
+  /** Буллеты «О месте»: приоритет `template.intro.highlights`, иначе legacy `venue.highlights`. */
+  highlights: string[];
   galleryUrls: string[];
   openingHours: HoursMap | null;
   visitingRules: string | null;
@@ -16,6 +20,10 @@ export type BuiltVenueTemplateSections = {
     audioGuide: boolean;
     interactive: boolean;
     notes: string | null;
+  } | null;
+  amenities: {
+    items: string[];
+    text: string | null;
   } | null;
   faq: FaqItem[];
   eventsCopy: {
@@ -28,8 +36,13 @@ export function buildVenueTemplateSections(venue: VenueDetail): BuiltVenueTempla
   const template = venue.template;
   const sections = template?.sections;
 
+  const heroTitle = firstNonEmptyString(sections?.intro?.title ?? null);
   const introLead = firstNonEmptyString(sections?.intro?.lead, venue.shortDescription ?? null);
   const descriptionHtml = firstNonEmptyString(sections?.intro?.longDescription, venue.description ?? null);
+  const highlights = firstNonEmptyStringArray(
+    sections?.intro?.highlights ?? null,
+    Array.isArray(venue.highlights) ? venue.highlights : null,
+  );
 
   const galleryUrls = firstNonEmptyStringArray(sections?.gallery?.images ?? null, venue.galleryUrls ?? null);
   const openingHours = firstNonEmptyHours(sections?.visitInfo?.openingHours ?? null, venue.openingHours ?? null);
@@ -40,12 +53,15 @@ export function buildVenueTemplateSections(venue: VenueDetail): BuiltVenueTempla
   const permanentExposition = firstNonEmptyString(sections?.permanentExposition?.text ?? null);
 
   const accessibility = buildAccessibility(sections?.accessibility);
+  const amenities = buildAmenities(sections?.amenities);
   const faq = firstNonEmptyFaq(sections?.faq?.items ?? null, venue.faq ?? null);
   const eventsCopy = buildEventsCopy(sections?.eventsCopy?.title ?? null, sections?.eventsCopy?.intro ?? null);
 
   return {
+    heroTitle,
     introLead,
     descriptionHtml,
+    highlights,
     galleryUrls,
     openingHours,
     visitingRules,
@@ -53,9 +69,19 @@ export function buildVenueTemplateSections(venue: VenueDetail): BuiltVenueTempla
     collectionsText,
     permanentExposition,
     accessibility,
+    amenities,
     faq,
     eventsCopy,
   };
+}
+
+function buildAmenities(
+  section: { items?: string[] | null; text?: string | null } | null | undefined,
+): { items: string[]; text: string | null } | null {
+  const items = firstNonEmptyStringArray(section?.items ?? null);
+  const text = firstNonEmptyString(section?.text ?? null);
+  if (items.length === 0 && !text) return null;
+  return { items, text };
 }
 
 function buildEventsCopy(title: string | null, intro: string | null): { title: string | null; intro: string | null } | null {
