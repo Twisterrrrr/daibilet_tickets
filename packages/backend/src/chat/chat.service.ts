@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { ChatAuthorType, ChatConversationStatus, Prisma } from '@prisma/client';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 function sha256Hex(input: string): string {
@@ -19,7 +20,10 @@ function safeEqualHex(a: string, b: string): boolean {
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+  ) {}
 
   private assertHoneypot(honey?: string) {
     if (typeof honey === 'string' && honey.trim().length > 0) {
@@ -50,7 +54,15 @@ export class ChatService {
           },
         },
       },
-      select: { id: true, createdAt: true },
+      select: { id: true, guestName: true, guestEmail: true },
+    });
+
+    // Fire-and-forget: email support about a new chat that needs reply.
+    void this.mail.notifyAdminChatNeedsReply({
+      conversationId: conversation.id,
+      guestName: conversation.guestName,
+      guestEmail: conversation.guestEmail,
+      message: data.message,
     });
 
     return {
@@ -110,7 +122,7 @@ export class ChatService {
     await this.assertConversationOwner(conversationId, guestToken);
 
     const now = new Date();
-    await this.prisma.chatConversation.update({
+    const conv = await this.prisma.chatConversation.update({
       where: { id: conversationId },
       data: {
         lastCustomerMessageAt: now,
@@ -122,6 +134,14 @@ export class ChatService {
           },
         },
       },
+      select: { id: true, guestName: true, guestEmail: true },
+    });
+
+    void this.mail.notifyAdminChatNeedsReply({
+      conversationId: conv.id,
+      guestName: conv.guestName,
+      guestEmail: conv.guestEmail,
+      message: data.text,
     });
 
     return { status: 'ok' };

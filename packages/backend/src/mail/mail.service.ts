@@ -376,6 +376,43 @@ export class MailService {
   }
 
   /**
+   * Уведомить поддержку о сообщении в чате (нужен ответ).
+   */
+  async notifyAdminChatNeedsReply(data: {
+    conversationId: string;
+    guestName: string | null;
+    guestEmail: string | null;
+    message: string;
+  }): Promise<void> {
+    const who = data.guestEmail || data.guestName || 'Гость';
+    const snippet = data.message.substring(0, 500) + (data.message.length > 500 ? '...' : '');
+    const chatUrl = `${this.appUrl}/admin/#/chat/${data.conversationId}`;
+
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Admin: chat needs reply ${data.conversationId} (${who})`);
+      return;
+    }
+
+    try {
+      await this.mailer.sendMail({
+        to: this.adminEmail,
+        subject: `Чат: требуется ответ (${who})`,
+        html: `
+          <h3>Чат поддержки: требуется ответ</h3>
+          <p><b>Диалог:</b> ${data.conversationId}</p>
+          <p><b>Клиент:</b> ${who}</p>
+          ${data.guestEmail ? `<p><b>Email:</b> ${data.guestEmail}</p>` : ''}
+          <p><b>Сообщение:</b> ${snippet}</p>
+          <p><a href="${chatUrl}">Открыть чат в админке →</a></p>
+        `,
+      });
+      this.logger.log(`Admin notified about chat needs reply ${data.conversationId}`);
+    } catch (err: unknown) {
+      this.logger.error(`Failed to notify admin about chat: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /**
    * Ответ на тикет поддержки — уведомление клиента.
    */
   async sendTicketReply(
