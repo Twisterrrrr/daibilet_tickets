@@ -183,5 +183,33 @@ export class ChatService {
     });
     return { status: 'ok' };
   }
+
+  async adminListMessages(conversationId: string, after?: string) {
+    let afterDate: Date | undefined;
+    if (after) {
+      const d = new Date(after);
+      if (!Number.isNaN(d.getTime())) afterDate = d;
+    }
+
+    const where: Prisma.ChatMessageWhereInput = {
+      conversationId,
+      ...(afterDate ? { createdAt: { gt: afterDate } } : {}),
+    };
+
+    const items = await this.prisma.chatMessage.findMany({
+      where,
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+      select: {
+        id: true,
+        authorType: true,
+        authorName: true,
+        text: true,
+        createdAt: true,
+      },
+    });
+
+    return { items };
+  }
 }
 

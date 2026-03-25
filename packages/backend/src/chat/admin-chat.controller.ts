@@ -45,6 +45,13 @@ export class AdminChatController {
     return this.chat.adminListConversations({ status, needsReply, search, limit });
   }
 
+  @Get('conversations/:id/messages')
+  @ApiTags('admin-chat')
+  @Roles('ADMIN', 'EDITOR')
+  async listMessages(@Param('id') id: string, @Query('after') after?: string) {
+    return this.chat.adminListMessages(id, after);
+  }
+
   @Post('conversations/:id/messages')
   @ApiTags('admin-chat')
   @Roles('ADMIN', 'EDITOR')
