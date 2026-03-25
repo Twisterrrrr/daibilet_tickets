@@ -2388,6 +2388,66 @@ model QueryFilter {
 // SUPPORT TICKETS
 // ════════════════════════════════════════════
 
+enum ChatConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum ChatAuthorType {
+  CUSTOMER
+  ADMIN
+  SYSTEM
+}
+
+model ChatConversation {
+  id        String                 @id @default(uuid()) @db.Uuid
+  status    ChatConversationStatus @default(OPEN)
+
+  // Guest info (optional). For authenticated users use userId.
+  guestName  String?
+  guestEmail String?
+
+  // If user is authenticated we can bind conversation to userId.
+  userId String? @db.Uuid
+
+  // Opaque token that identifies guest conversation ownership (no email/SMS verification).
+  // Store hash only.
+  guestTokenHash String?
+
+  // When did each side write last message (for “needs reply”)
+  lastCustomerMessageAt DateTime?
+  lastAdminMessageAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@index([status])
+  @@index([guestEmail])
+  @@index([userId])
+  @@index([lastCustomerMessageAt])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             String        @id @default(uuid()) @db.Uuid
+  conversationId String        @db.Uuid
+  authorType     ChatAuthorType
+  authorName     String?
+  // for admin messages (optional)
+  authorAdminId String? @db.Uuid
+
+  text      String   @db.Text
+  createdAt DateTime @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("chat_messages")
+}
+
 enum TicketStatus {
   OPEN
   IN_PROGRESS
