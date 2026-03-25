@@ -1,4 +1,4 @@
-import { DateMode, EventSubcategory, Prisma } from '@prisma/client';
+import { EventSubcategory, Prisma } from '@prisma/client';
 
 import { buildCatalogPublishableCoreWhere } from '../catalog/where-builders';
 

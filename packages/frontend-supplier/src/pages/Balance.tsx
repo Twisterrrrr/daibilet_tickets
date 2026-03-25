@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
+import { ErrorState, LoadingState, PageHeader, SectionCard } from '@daibilet/shared-ui';
 import { SupplierSettingsNav } from '@/components/layout/SupplierSettingsNav';
 
 import { api } from '../lib/api';

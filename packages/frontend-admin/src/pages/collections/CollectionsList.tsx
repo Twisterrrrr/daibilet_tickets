@@ -100,8 +100,6 @@ export function CollectionsListPage() {
     setLoading(false);
   };
 
-  const columns = useMemo<ColumnDef<CollectionItem>[]>(() => [], [onToggleActive]);
-
   return (
     <div className="space-y-6">
       <PageHeader

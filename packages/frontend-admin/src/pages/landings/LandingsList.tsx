@@ -35,12 +35,6 @@ interface CityItem {
   slug: string;
 }
 
-const STATUS_LABELS: Record<LandingItem['status'], string> = {
-  DRAFT: 'Черновик',
-  ACTIVE: 'Активен',
-  ARCHIVED: 'В архиве',
-};
-
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export function LandingsListPage() {

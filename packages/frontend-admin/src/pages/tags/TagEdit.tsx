@@ -17,7 +17,6 @@ type TagCategory = 'THEME' | 'AUDIENCE' | 'SEASON' | 'SPECIAL';
 type TagKind = 'STRUCTURAL' | 'POPULAR';
 type StructuralTagGroup = 'THEME' | 'AUDIENCE' | 'FORMAT';
 type TagUiCategory = 'THEME' | 'AUDIENCE' | 'FORMAT' | 'SEASON' | 'POPULAR';
-const NONE_VALUE = '__none__';
 
 interface TagForm {
   name: string;

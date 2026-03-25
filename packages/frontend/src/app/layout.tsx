@@ -79,7 +79,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Script>
             <noscript>
               <div>
-                {/* eslint-disable-next-line @next/next/no-img-element -- пиксель Я.Метрики в noscript; Image не применим */}
                 <img
                   src={`https://mc.yandex.ru/watch/${process.env.NEXT_PUBLIC_YM_ID}`}
                   style={{ position: 'absolute', left: '-9999px' }}

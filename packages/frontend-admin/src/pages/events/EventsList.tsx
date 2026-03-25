@@ -1,5 +1,5 @@
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
-import { Eye, EyeOff, MoreHorizontal, Plus, RefreshCw, Search, Star } from 'lucide-react';
+import { MoreHorizontal, Plus, RefreshCw, Search, Star } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 

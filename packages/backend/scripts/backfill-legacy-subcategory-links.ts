@@ -157,8 +157,3 @@ main()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
-</think>
-
-
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-StrReplace

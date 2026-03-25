@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DateMode, EventAudience, EventCategory, EventSubcategory, Prisma } from '@prisma/client';
+import { DateMode, EventAudience, EventCategory, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
