@@ -37,6 +37,7 @@ import { UserModule } from './user/user.module';
 import { VenueModule } from './venue/venue.module';
 import { PreviewModule } from './preview/preview.module';
 import { VoucherModule } from './voucher/voucher.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { VoucherModule } from './voucher/voucher.module';
     MailModule,
     UploadModule,
     MediaModule,
+    ChatModule,
     QueueModule,
     PricingModule,
     CatalogModule,
