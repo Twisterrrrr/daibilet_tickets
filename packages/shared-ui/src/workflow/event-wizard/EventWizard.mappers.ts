@@ -26,8 +26,9 @@ interface AdminEventDetailLite {
   imageUrl?: string | null;
   // sessions / offers и прочие поля подтягиваются по мере надобности.
   sessions?: Array<{ startsAt: string }>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  offers?: any[];
+  // При необходимости offers будут подтягиваться, но сейчас контракты не используются в рантайме.
+  // Используем unknown[] вместо any[]: безопаснее и соответствует lint.
+  offers?: unknown[];
   // source/meta
   source?: string;
   externalId?: string | null;
