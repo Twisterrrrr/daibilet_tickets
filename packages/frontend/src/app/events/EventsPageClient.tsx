@@ -187,6 +187,8 @@ function filtersFromParams(sp: URLSearchParams) {
     limit,
     qf: sp.get('qf') || '',
     q: sp.get('q') || '',
+    venueId: sp.get('venueId') || '',
+    subcategory: sp.get('subcategory') || '',
   };
 }
 
@@ -419,8 +421,11 @@ export function EventsPageClient() {
     const pageFromUrl = f.page;
     const limitFromUrl = f.limit;
     const isMuseumFromUrl = categoryFromUrl === 'MUSEUM';
+    const venueIdFromUrl = f.venueId?.trim() || '';
+    const subcategoryFromUrl = f.subcategory?.trim() || '';
+    const useMuseumCatalogApi = isMuseumFromUrl && !venueIdFromUrl && !subcategoryFromUrl;
 
-    if (isMuseumFromUrl) {
+    if (useMuseumCatalogApi) {
       const params: Record<string, string | number> = {
         category: 'MUSEUM',
         page: pageFromUrl,
@@ -469,6 +474,8 @@ export function EventsPageClient() {
     if (timeOfDayFromUrl) params.timeOfDay = timeOfDayFromUrl;
     if (f.pier) params.pier = f.pier;
     if (f.priceMax) params.priceMax = parseInt(f.priceMax, 10) * 100;
+    if (venueIdFromUrl) params.venueId = venueIdFromUrl;
+    if (subcategoryFromUrl) params.subcategory = subcategoryFromUrl;
     for (const [k, v] of Object.entries(quickFilterParams)) {
       params[k] = v;
     }

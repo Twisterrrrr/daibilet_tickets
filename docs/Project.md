@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-03-24
+> Последнее обновление: 2026-03-25
 
 ## Миссия
 
@@ -27,6 +27,14 @@
 - **Система доверия поставщикам / Supplier Trust System**: `archive/specs/SupplierTrustSpec.md`.
 
 Эти 3–4 файла считаются “центром тяжести” документации; остальные спецификации рассматриваются как детализация или архив и должны ссылаться на них при изменениях.
+
+## Venue PDP (template-driven + venue program)
+
+- **Публичный контракт:** `VenueDetail` включает нормализованный `template` (разделы `intro`, `gallery`, `visitInfo`, `collections`, `permanentExposition`, `accessibility`, `amenities`, `faq`, `eventsCopy`), формируемый в `VenueService.buildVenuePublicTemplate`.
+- **Пайплайн данных:** `venueTemplateData` (Prisma) -> `parseVenueTemplateData` (`@daibilet/shared`) -> normalized `template.sections` (backend) -> `buildVenueTemplateSections` (frontend helper) -> `VenuePageView`.
+- **Fallback-контракт:** template value -> legacy field -> section hidden; это гарантирует отсутствие регрессий для старых venue без template.
+- **Блок программы площадки:** используется read-model `GET /venues/:slug/program`; presentation-layer группирует элементы в `featured/current/upcoming` через helper `buildVenueProgramGroups` без изменения domain/read-model.
+- **SEO-ready основа:** описание для метаданных venue выбирается через template-aware `buildVenueTemplateSections` с fallback на legacy и существующий `getSeoMeta`.
 
 ## Архитектура
 

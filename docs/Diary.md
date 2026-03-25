@@ -4,6 +4,28 @@
 
 ---
 
+## 25.03.2026 — Venue Program + template-driven PDP: production-ready MVP
+
+### Наблюдения
+
+- `venueTemplateData` уже существовал в data/admin контуре, но публичный рендер Venue PDP использовал его не полностью как единый контракт.
+- Для UX блока программы площадки критична иерархия отображения: один главный объект + разделение текущих и будущих.
+- Нельзя ломать существующие страницы venue без template и текущую архитектуру каталога/read-model.
+
+### Решения
+
+- Backend: добавлен read endpoint `GET /venues/:slug/program` с классификацией выставок `CURRENT/UPCOMING/PAST`, сортировкой и `featuredId`; в `EventOverride` добавлены MVP-поля управления (`showInVenueProgram`, `isFeaturedInVenue`, `venueProgramSortOrder`).
+- Frontend: добавлены компоненты `VenueProgramSection`, `VenueFeaturedExhibitionCard`, `VenueExhibitionCard`, `VenuePastExhibitionsAccordion` и helper presentation-layer `buildVenueProgramGroups` (`featured/current/upcoming` без изменения domain layer).
+- Template-driven рендер: `eventsCopy` (`title`/`intro`) проброшен в блок программы, сохранён fallback `template -> legacy -> hidden`.
+- Контракт и приёмка зафиксированы в `docs/Venue-Program-UX.md` и `docs/Tasktracker.md`; расширены unit-тесты `venue-template-public.contract.spec.ts` + добавлены тесты `venue-program.logic.spec.ts`.
+
+### Проблемы
+
+- В `packages/frontend` нет локального test-runner (`vitest`) как зависимости, поэтому UI helper-тесты не добавлялись в frontend-пакет, чтобы не вносить изменения в зависимости в рамках текущего MVP.
+- Архив (`past`) пока остаётся легковесным в UI и может требовать отдельной итерации по UX/пагинации на больших объёмах.
+
+---
+
 ## 24.03.2026 — Media MVP: Cloudinary + единые эндпоинты и UI (admin/supplier)
 
 ### Наблюдения

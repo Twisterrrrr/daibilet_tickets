@@ -160,4 +160,45 @@ describe('VenueService template public contract', () => {
     expect(result?.sections.permanentExposition).toBeUndefined();
     expect(result?.sections.faq).toBeUndefined();
   });
+
+  it('eventsCopy: прокидывает title/intro секции программы из template', () => {
+    const result = builder.buildVenuePublicTemplate({
+      venueType: 'MUSEUM',
+      venueTemplateData: {
+        eventsTitle: 'Программа музея',
+        eventsIntro: 'Ключевые выставки сезона',
+      },
+      legacyDescription: null,
+      legacyShortDescription: null,
+      legacyGalleryUrls: null,
+      legacyOpeningHours: null,
+      legacyFaq: null,
+      legacyHighlights: null,
+    });
+
+    expect(result?.sections.eventsCopy).toEqual({
+      title: 'Программа музея',
+      intro: 'Ключевые выставки сезона',
+    });
+  });
+
+  it('visitInfo: приоритет template.visitHours над legacy openingHours', () => {
+    const result = builder.buildVenuePublicTemplate({
+      venueType: 'ART_SPACE',
+      venueTemplateData: {
+        visitHours: { tue: '12:00-20:00' },
+      },
+      legacyDescription: null,
+      legacyShortDescription: null,
+      legacyGalleryUrls: null,
+      legacyOpeningHours: { mon: '10:00-18:00' },
+      legacyFaq: null,
+      legacyHighlights: null,
+    });
+
+    expect(result?.sections.visitInfo).toEqual({
+      openingHours: { tue: '12:00-20:00' },
+      visitingRules: null,
+    });
+  });
 });

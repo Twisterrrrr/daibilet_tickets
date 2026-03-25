@@ -1,9 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, VenueType } from '@prisma/client';
-import type { VenuePublicTemplate, VenueTemplateData } from '@daibilet/shared';
+import { DateMode, Prisma, VenueType } from '@prisma/client';
+import type { VenueProgramItemDto, VenueProgramResponse, VenuePublicTemplate, VenueTemplateData } from '@daibilet/shared';
 import { parseVenueTemplateData } from '@daibilet/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  buildSortMeta,
+  buildVenueProgramEventWhere,
+  classifyProgramState,
+  compareCurrent,
+  comparePast,
+  compareUpcoming,
+  computeWindowOpenDate,
+} from './venue-program.logic';
 
 @Injectable()
 export class VenueService {
@@ -114,6 +123,147 @@ export class VenueService {
     if (!venue) throw new NotFoundException('Venue not found');
 
     return this.buildVenuePublicDto(venue, true);
+  }
+
+  /** Публичная программа площадки: выставки (EXHIBITION) с классификацией по времени. */
+  async getVenueProgramBySlug(slug: string): Promise<VenueProgramResponse> {
+    const venue = await this.prisma.venue.findFirst({
+      where: { slug, isActive: true, isDeleted: false },
+      select: { id: true },
+    });
+    if (!venue) throw new NotFoundException('Venue not found');
+
+    const where = buildVenueProgramEventWhere(venue.id);
+    const events = await this.prisma.event.findMany({
+      where,
+      take: 200,
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        shortDescription: true,
+        imageUrl: true,
+        priceFrom: true,
+        dateMode: true,
+        isPermanent: true,
+        endDate: true,
+        createdAt: true,
+        override: {
+          select: {
+            title: true,
+            imageUrl: true,
+            isFeaturedInVenue: true,
+            venueProgramSortOrder: true,
+            manualBoost: true,
+          },
+        },
+      },
+    });
+
+    const eventIds = events.map((e) => e.id);
+    const aggMap = new Map<string, { min_start: Date; max_end: Date }>();
+    if (eventIds.length > 0) {
+      const rows = await this.prisma.$queryRaw<Array<{ eventId: string; min_start: Date; max_end: Date }>>(
+        Prisma.sql`
+        SELECT "eventId",
+          MIN("startsAt") AS min_start,
+          MAX(COALESCE("endsAt", "startsAt")) AS max_end
+        FROM event_sessions
+        WHERE "isActive" = true AND "canceledAt" IS NULL
+          AND "eventId" IN (${Prisma.join(eventIds)})
+        GROUP BY "eventId"
+      `,
+      );
+      for (const r of rows) {
+        aggMap.set(r.eventId, { min_start: r.min_start, max_end: r.max_end });
+      }
+    }
+
+    const now = new Date();
+    type Row = { dto: VenueProgramItemDto; meta: ReturnType<typeof buildSortMeta> };
+    const current: Row[] = [];
+    const upcoming: Row[] = [];
+    const past: Row[] = [];
+
+    for (const e of events) {
+      const ov = e.override;
+      const title = (ov?.title?.trim() ? ov.title : e.title) ?? e.title;
+      const imageUrl = ov?.imageUrl?.trim() ? ov.imageUrl : e.imageUrl;
+
+      let startsAtMin: Date;
+      let endsAtMax: Date;
+
+      if (e.dateMode === DateMode.SCHEDULED) {
+        const agg = aggMap.get(e.id);
+        if (!agg) continue;
+        startsAtMin = agg.min_start;
+        endsAtMax = agg.max_end;
+      } else {
+        const agg = aggMap.get(e.id);
+        const sessionStarts = agg ? [agg.min_start] : [];
+        const w = computeWindowOpenDate(
+          { createdAt: e.createdAt, endDate: e.endDate, isPermanent: e.isPermanent },
+          sessionStarts,
+        );
+        startsAtMin = w.startsAtMin;
+        endsAtMax = w.endsAtMax;
+      }
+
+      const programState = classifyProgramState(now, startsAtMin, endsAtMax);
+      const dto: VenueProgramItemDto = {
+        id: e.id,
+        slug: e.slug,
+        title,
+        imageUrl: imageUrl ?? null,
+        shortDescription: e.shortDescription ?? null,
+        priceFrom: e.priceFrom ?? null,
+        dateMode: e.dateMode,
+        isPermanent: e.isPermanent,
+        startsAt: startsAtMin.toISOString(),
+        endsAt: endsAtMax.toISOString(),
+        programState,
+      };
+
+      const meta = buildSortMeta({
+        startsAtMin,
+        endsAtMax,
+        override: ov
+          ? {
+              isFeaturedInVenue: ov.isFeaturedInVenue,
+              venueProgramSortOrder: ov.venueProgramSortOrder,
+              manualBoost: ov.manualBoost,
+            }
+          : null,
+      });
+
+      const row: Row = { dto, meta };
+      if (programState === 'CURRENT') current.push(row);
+      else if (programState === 'UPCOMING') upcoming.push(row);
+      else past.push(row);
+    }
+
+    current.sort((a, b) => compareCurrent(a.meta, b.meta));
+    upcoming.sort((a, b) => compareUpcoming(a.meta, b.meta));
+    past.sort((a, b) => comparePast(a.meta, b.meta));
+
+    const featuredId =
+      current.find((r) => {
+        const ev = events.find((x) => x.id === r.dto.id);
+        return ev?.override?.isFeaturedInVenue === true;
+      })?.dto.id ??
+      current[0]?.dto.id ??
+      null;
+
+    return {
+      current: current.map((r) => r.dto),
+      upcoming: upcoming.map((r) => r.dto),
+      past: past.map((r) => r.dto),
+      totalCurrent: current.length,
+      totalUpcoming: upcoming.length,
+      totalPast: past.length,
+      featuredId,
+    };
   }
 
   /** Preview: детальная страница venue по ID, допускает неактивные (isActive=false) сущности. */

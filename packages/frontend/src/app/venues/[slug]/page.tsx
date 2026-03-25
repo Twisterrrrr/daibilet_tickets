@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import type { VenueListItem, VenueDetail } from '@daibilet/shared';
+import type { VenueListItem, VenueDetail, VenueProgramResponse } from '@daibilet/shared';
 
 import { VenuePageView } from '@/components/venue/VenuePageView';
 import { api } from '@/lib/api';
@@ -80,6 +80,13 @@ export default async function VenuePage({ params }: Props) {
     );
   }
 
-  return <VenuePageView venue={venue} mode="public" />;
+  let program: VenueProgramResponse | null = null;
+  try {
+    program = await api.getVenueProgram(slug);
+  } catch {
+    program = null;
+  }
+
+  return <VenuePageView venue={venue} mode="public" program={program} />;
 }
 

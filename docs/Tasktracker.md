@@ -68,6 +68,12 @@
 - [x] **MEDIA-1 — Cloudinary + единый upload UX (admin/supplier):** эндпоинты `*/media/images`, shared-ui галерея/обложка, интеграция EventWizard и VenueEdit — см. `docs/media-upload.md` (**24.03.2026**).
 - [x] ~~`(позже) DataTableShell, StatusBadge`~~ — используются в list-паттернах (в т.ч. поставщики/события поставщика); пункт снят как выполненный **25.03.2026**.
 - Прочие UA-1…UA-8 — **закрыты**; см. архив.
+- [x] **Template-driven Venue PDP (MUSEUM / ART_SPACE):**
+  - `venueTemplateData` подключен в public DTO;
+  - template sections используются в `VenuePageView`;
+  - `eventsCopy` (`title`/`intro`) прокинут в `VenueProgramSection`;
+  - fallback: template -> legacy -> hidden.
+  - **Acceptance:** venue MUSEUM/ART_SPACE с template рендерит кастомные заголовок+intro блока программы; venue без template отображается как раньше без регрессий.
 
 ### Медиа (follow-up)
 
@@ -84,6 +90,26 @@
 ### Риски из приёмки фаз (follow-up по тестам)
 
 См. блок **«Acceptance статус фаз 2–9»** в архиве ниже: интеграционные тесты supplier orders, smoke diagnostics sessions, PromoCode high-risk инварианты, ranking checks, Buyer Account v2 read-layer — зафиксированы как заметки, не дублируются здесь построчно.
+
+### Smoke-check — блок «Программа площадки» на Venue (ручная приёмка)
+
+> Реализация: `GET /venues/:slug/program`, UI `VenueProgramSection` (+ карточки, архив). Классификация `current/upcoming/past` покрыта unit-тестами `packages/backend/src/venue/__tests__/venue-program.logic.spec.ts`. Ниже — что проверить руками на витрине и в каталоге.
+
+| Сценарий | Как подготовить (кратко) | Ожидание на `/venues/:slug` |
+|----------|---------------------------|-------------------------------|
+| **0 выставок** | У площадки нет `Event` с `subcategories` ⊃ `EXHIBITION`, `venueId`, публикацией как в каталоге | Секция программы **не рендерится** (нет блока «Выставки…»). Страница без ошибки. |
+| **1 текущая** | Одна выставка в окне `CURRENT` | Один **hero** (`VenueFeaturedExhibitionCard`), **без** сетки из одной второй карточки как «secondary». |
+| **2–3 текущие** | 2–3 в `CURRENT` после сортировки | Hero + **secondary** (компактные карточки). |
+| **4+ текущих/будущих** (суммарно активное будущее) | ≥4 в `current` или много `upcoming` | Hero + ограниченные secondary/upcoming; есть **«Смотреть все выставки площадки»** при `current+upcoming ≥ 4`. |
+| **Только upcoming** | Нет `current`, есть `upcoming` | Нет hero-блока текущих; секция **«Скоро откроются»**; до 3 карточек + «Все предстоящие» при большем числе. |
+| **Только past** | Нет `current`/`upcoming`, есть `past` | Компактный empty-state «нет активных» + **аккордеон** прошедших. |
+| **current + upcoming** | Смесь | Сначала блок текущих (hero + secondary), затем «Скоро откроются». |
+| **Скрыто / не опубликовано** | У события `override.isHidden`, или `editorStatus` ≠ `PUBLISHED`, или `showInVenueProgram: false` | Событие **не попадает** в ответ программы; страница площадки без 500. |
+| **Черновик / дубль** | `moderationStatus` не `APPROVED`, или `canonicalOfId` задан | Не в программе (те же правила, что у публичного каталога по базовому фильтру). |
+
+**Каталог (CTA):** по ссылке «Смотреть все…» открывается `/events?city=…&venueId=…&category=MUSEUM&subcategory=EXHIBITION`; запрос уходит в **`/events` (getEvents)**, не в смешанный museum-catalog, если в URL есть `venueId` или `subcategory`.
+
+**Чеклист быстрого прогона:** `[ ]` 0 выставок → `[ ]` 1 current → `[ ]` 2 current → `[ ]` 5+ current → `[ ]` only upcoming → `[ ]` only past → `[ ]` mixed + скрытая выставка не видна.
 
 ---
 

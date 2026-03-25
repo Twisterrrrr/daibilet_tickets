@@ -740,6 +740,12 @@ model EventOverride {
   manualBoost           Int?
   /// Подавление низкокачественных событий (не показывать в каталоге без жёсткого удаления)
   suppressLowQuality    Boolean?               @default(false)
+  /// Показывать событие в блоке «Программа площадки» на странице Venue (выставки)
+  showInVenueProgram    Boolean                @default(true)
+  /// Приоритетная выставка в блоке программы площадки (hero)
+  isFeaturedInVenue     Boolean                @default(false)
+  /// Ручной порядок в блоке программы (меньше — выше)
+  venueProgramSortOrder Int?
   tagsAdd               String[] // tag slugs to add
   tagsRemove            String[] // tag slugs to remove
   templateData          Json? // legacy: route, menu, shipName (EXCURSION); program, cast, hall (EVENT)

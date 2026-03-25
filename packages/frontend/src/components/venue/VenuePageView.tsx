@@ -1,8 +1,14 @@
-import { formatPrice, VENUE_TYPE_LABELS, type VenueType, type VenueListItem, type VenueDetail } from '@daibilet/shared';
+import {
+  formatPrice,
+  VENUE_TYPE_LABELS,
+  type VenueType,
+  type VenueListItem,
+  type VenueDetail,
+  type VenueProgramResponse,
+} from '@daibilet/shared';
 import {
   Accessibility,
   Baby,
-  Calendar,
   CheckCircle,
   ChevronDown,
   ChevronRight,
@@ -23,12 +29,16 @@ import Link from 'next/link';
 import { VenueCard } from '@/components/ui/VenueCard';
 import { MobileStickyBar } from '@/components/venue/MobileStickyBar';
 import { TicketsBlock } from '@/components/venue/TicketsBlock';
+import { VenueProgramSection } from '@/components/venue/VenueProgramSection';
 import { VenueReviewsBlock } from '@/components/venue/VenueReviewsBlock';
+import { buildVenueProgramGroups } from '@/lib/venues/buildVenueProgramGroups';
 import { buildVenueTemplateSections } from '@/lib/venues/buildVenueTemplateSections';
 
 export type VenuePageViewProps = {
   venue: VenueDetail;
   mode?: 'public' | 'preview';
+  /** Программа площадки (выставки); при ошибке загрузки — null, блок не показываем */
+  program?: VenueProgramResponse | null;
 };
 
 const DAY_MAP_RU: Record<string, string> = {
@@ -93,7 +103,7 @@ const FEATURE_LABELS: Record<string, { label: string; icon: string }> = {
   gift_shop: { label: 'Сувенирный магазин', icon: 'check' },
 };
 
-export function VenuePageView({ venue }: VenuePageViewProps) {
+export function VenuePageView({ venue, program = null }: VenuePageViewProps) {
   const templateSections = buildVenueTemplateSections(venue);
   const hours = normalizeHours(templateSections.openingHours);
   const todayKey = getTodayKey();
@@ -103,8 +113,6 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
   const hasNoQueue = (venue.features || []).includes('no_queue');
 
   const allExhibitions = (venue.exhibitions ?? []) as VenueExhibition[];
-  const permanentExhibitions = allExhibitions.filter((e) => e.isPermanent);
-  const temporaryExhibitions = allExhibitions.filter((e) => !e.isPermanent);
   const highlights: string[] = templateSections.highlights;
   const displayTitle = templateSections.heroTitle || venue.title;
   const faq: { q: string; a: string }[] = templateSections.faq;
@@ -195,6 +203,9 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
   const stickyIsExternal = primaryOffer?.purchaseType === 'REDIRECT' && !!primaryOffer?.deeplink;
 
   const isOpenDate = allExhibitions.some((e) => e.dateMode === 'OPEN_DATE') || false;
+  const programGroups = program
+    ? buildVenueProgramGroups([...(program.current ?? []), ...(program.upcoming ?? [])])
+    : null;
 
   return (
     <>
@@ -548,53 +559,18 @@ export function VenuePageView({ venue }: VenuePageViewProps) {
               </section>
             )}
 
-            {/* ═══ 6. ВЫСТАВКИ И СОБЫТИЯ ═══ */}
-            {(permanentExhibitions.length > 0 || temporaryExhibitions.length > 0) && (
-              <section>
-                <h2 className="text-xl font-bold mb-4">{templateSections.eventsCopy?.title || 'Выставки и события'}</h2>
-                {templateSections.eventsCopy?.intro && (
-                  <p className="text-sm text-gray-600 mb-3">{templateSections.eventsCopy.intro}</p>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[...temporaryExhibitions, ...permanentExhibitions].map((e) => (
-                    <Link
-                      key={e.id}
-                      href={`/events/${e.slug}`}
-                      className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow group"
-                    >
-                      {e.imageUrl && (
-                        <div className="relative h-32 overflow-hidden">
-                          <Image
-                            src={e.imageUrl}
-                            alt={e.title}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform"
-                          />
-                          {e.isPermanent && (
-                            <span className="absolute top-2 left-2 px-2 py-0.5 bg-white/90 rounded text-[10px] font-bold text-gray-700">
-                              Постоянная
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      <div className="p-3">
-                        <h3 className="font-semibold text-sm text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2">
-                          {e.title}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-500">
-                          {e.endDate && !e.isPermanent && (
-                            <span className="flex items-center gap-1">
-                              <Calendar size={11} />
-                              до {new Date(e.endDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
-                            </span>
-                          )}
-                          {e.priceFrom && <span>от {formatPrice(e.priceFrom)}</span>}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </section>
+            {/* ═══ 6. ПРОГРАММА ПЛОЩАДКИ (выставки) ═══ */}
+            {program && (
+              <VenueProgramSection
+                program={program}
+                venueId={venue.id}
+                citySlug={venue.city?.slug ?? null}
+                title={templateSections.eventsCopy?.title ?? null}
+                intro={templateSections.eventsCopy?.intro ?? null}
+                featured={programGroups?.featured ?? null}
+                current={programGroups?.current ?? []}
+                upcoming={programGroups?.upcoming ?? []}
+              />
             )}
 
             {/* ═══ 7. FAQ ═══ */}

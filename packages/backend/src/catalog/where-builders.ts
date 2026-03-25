@@ -38,6 +38,32 @@ export interface VenueWhereDto {
   q?: string;
 }
 
+/**
+ * Базовые условия публичной витрины для Event (как в каталоге): активность, не дубль, правила импорта.
+ * Без фильтров по городу/сеансам — для переиспользования (venue program и т.д.).
+ */
+export function buildCatalogPublishableCoreWhere(): Prisma.EventWhereInput {
+  const importsEnabled = process.env.IMPORT_SOURCES_ENABLED !== '0';
+  return {
+    isActive: true,
+    isDeleted: false,
+    canonicalOfId: null,
+    ...(process.env.NODE_ENV === 'production'
+      ? importsEnabled
+        ? {
+            OR: [
+              { source: EventSource.MANUAL },
+              {
+                source: { in: [EventSource.TC, EventSource.TEPLOHOD] },
+                override: { editorStatus: 'PUBLISHED', suppressLowQuality: { not: true } },
+              },
+            ],
+          }
+        : { source: EventSource.MANUAL }
+      : {}),
+  };
+}
+
 /** T10: Собрать EventWhereInput из DTO. sessionFilter — дата/сеансы из catalog.fetchEvents (обязателен для выдачи). */
 export function buildEventWhere(
   dto: EventWhereDto,
@@ -66,25 +92,8 @@ export function buildEventWhere(
     isOpenDateOnly: _isOpenDateOnly,
   } = dto;
 
-  const importsEnabled = process.env.IMPORT_SOURCES_ENABLED !== '0';
-
   const where: Prisma.EventWhereInput = {
-    isActive: true,
-    isDeleted: false,
-    canonicalOfId: null,
-    ...(process.env.NODE_ENV === 'production'
-      ? importsEnabled
-        ? {
-            OR: [
-              { source: EventSource.MANUAL },
-              {
-                source: { in: [EventSource.TC, EventSource.TEPLOHOD] },
-                override: { editorStatus: 'PUBLISHED', suppressLowQuality: { not: true } },
-              },
-            ],
-          }
-        : { source: EventSource.MANUAL }
-      : {}),
+    ...buildCatalogPublishableCoreWhere(),
     ...(cityIds?.length ? { cityId: { in: cityIds } } : {}),
     city: {
       isActive: true,

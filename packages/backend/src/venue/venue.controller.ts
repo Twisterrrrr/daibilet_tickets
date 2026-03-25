@@ -38,6 +38,12 @@ export class VenueController {
     });
   }
 
+  @Get(':slug/program')
+  @ApiOperation({ summary: 'Программа площадки: выставки (current / upcoming / past)' })
+  getVenueProgram(@Param('slug') slug: string) {
+    return this.venueService.getVenueProgramBySlug(slug);
+  }
+
   @Get(':slug')
   @ApiOperation({ summary: 'Детальная страница места' })
   async getVenueBySlug(@Param('slug') slug: string) {

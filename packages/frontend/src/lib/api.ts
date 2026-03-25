@@ -10,6 +10,7 @@ import type {
   UpsellItem,
   VenueDetail,
   VenueListItem,
+  VenueProgramResponse,
   VoucherData,
 } from '@daibilet/shared';
 
@@ -381,6 +382,9 @@ export const api = {
   },
 
   getVenueBySlug: (slug: string) => fetchApi<VenueDetail>(`/venues/${slug}`),
+
+  getVenueProgram: (slug: string) =>
+    fetchApi<VenueProgramResponse>(`/venues/${encodeURIComponent(slug)}/program`),
 
   // Preview (unpublished entities)
   getEventPreview: (id: string, token: string) =>
