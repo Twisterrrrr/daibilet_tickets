@@ -49,6 +49,7 @@ describe('FailedJobsService', () => {
     const emailQueue = createMockQueue([]);
     const reviewQueue = createMockQueue([]);
     const partnerQueue = createMockQueue([]);
+    const analyticsPreaggQueue = createMockQueue([]);
 
     mockQueues = new Map([
       ['sync', syncQueue],
@@ -56,6 +57,7 @@ describe('FailedJobsService', () => {
       ['emails', emailQueue],
       ['review-tasks', reviewQueue],
       ['partner-webhooks', partnerQueue],
+      ['analytics-preagg', analyticsPreaggQueue],
     ]);
 
     auditLog = vi.fn().mockResolvedValue(undefined);
@@ -66,6 +68,7 @@ describe('FailedJobsService', () => {
       emailQueue as any,
       reviewQueue as any,
       partnerQueue as any,
+      analyticsPreaggQueue as any,
       { log: auditLog } as unknown as AuditService,
     );
   });

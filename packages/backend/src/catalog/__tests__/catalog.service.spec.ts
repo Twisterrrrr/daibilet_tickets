@@ -33,6 +33,12 @@ const mockSubcategoryPolicy = {
   buildEventSubcategoryFilter: vi.fn().mockReturnValue({ OR: [{ subcategoryLinks: { some: { subcategory: { slug: 'museum' } } } }] }),
 };
 
+const mockCatalogGuard = {
+  isCatalogStrictMode: vi.fn().mockReturnValue(false),
+  buildSellableWhereExtension: vi.fn().mockReturnValue({}),
+  evaluateSellable: vi.fn().mockReturnValue({ sellable: true, reasons: [] }),
+};
+
 // ---------------------
 // Tests
 // ---------------------
@@ -50,6 +56,7 @@ describe('CatalogService', () => {
       mockReviewCapability as any,
       mockRefundResolution as any,
       mockSubcategoryPolicy as any,
+      mockCatalogGuard as any,
     );
   });
 
