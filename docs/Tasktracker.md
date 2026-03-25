@@ -143,6 +143,7 @@
 | C-Gate Content / PageTemplateSpecs | ✅ |
 | EDO Foundation P4 | ✅ см. Part I внизу |
 | Phases 2–5 Orders/Availability/Listing Health/Витрина | ✅ |
+| Support Chat (site) + Support Inbox PWA (admin) | ✅ 25.03.2026 |
 | **Часть I — Закрытые задачи (расширенная история)** | см. раздел ниже |
 
 ### EPIC D — закрытые строки (справочно)
