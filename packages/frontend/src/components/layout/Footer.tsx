@@ -29,7 +29,6 @@ const staticFooterLinks = {
     { name: 'О сервисе', href: '/about' },
     { name: 'Правовая информация', href: '/legal' },
     { name: 'Стать партнёром', href: '/partner' },
-    { name: 'Подарочный сертификат', href: '/gift-certificate' },
     { name: 'Блог', href: '/blog' },
     { name: 'Помощь', href: '/help' },
     { name: 'Контакты', href: '/contacts' },

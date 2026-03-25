@@ -11,7 +11,6 @@ export async function GET() {
     { loc: `${SITE_URL}/events`, changefreq: 'daily' as const, priority: 0.9 },
     { loc: `${SITE_URL}/venues`, changefreq: 'daily' as const, priority: 0.9 },
     { loc: `${SITE_URL}/partner`, changefreq: 'monthly' as const, priority: 0.7 },
-    { loc: `${SITE_URL}/gift-certificate`, changefreq: 'monthly' as const, priority: 0.7 },
     { loc: `${SITE_URL}/blog`, changefreq: 'weekly' as const, priority: 0.6 },
     { loc: `${SITE_URL}/providers`, changefreq: 'monthly' as const, priority: 0.4 },
     { loc: `${SITE_URL}/offer`, changefreq: 'yearly' as const, priority: 0.2 },
