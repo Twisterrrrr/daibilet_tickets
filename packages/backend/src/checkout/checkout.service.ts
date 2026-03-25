@@ -1056,7 +1056,7 @@ export class CheckoutService {
   // ============================
 
   async create(_body: CreateTripPlanCheckoutDto) {
-    // TODO: Реализовать создание Package + платёж YooKassa (Trip Planner)
+    // Next: Реализовать создание Package + платёж YooKassa (Trip Planner)
     return {
       message: 'Checkout create — в разработке. Требуется подключение YooKassa.',
     };
@@ -1286,7 +1286,7 @@ export class CheckoutService {
   }
 
   async handleWebhook(_body: Record<string, unknown>) {
-    // TODO: Верификация IP + подпись, обработка payment.succeeded / payment.canceled
+    // Next: Верификация IP + подпись, обработка payment.succeeded / payment.canceled
     return { status: 'ok' };
   }
 

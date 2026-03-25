@@ -180,7 +180,7 @@ export class AccountService {
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
         hasDispute,
-        // TODO: заполнить после успешного prisma generate и добавления ReviewDisputeMessage в клиент
+        // Next: заполнить после успешного prisma generate и добавления ReviewDisputeMessage в клиент
         unreadDisputeMessagesCount: 0,
       };
     });

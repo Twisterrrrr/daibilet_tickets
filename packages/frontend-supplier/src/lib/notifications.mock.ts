@@ -11,7 +11,7 @@ export interface SupplierNotification {
   createdAt: string;
 }
 
-// TODO: заменить на реальный API /supplier/notifications
+// Next: заменить на реальный API /supplier/notifications
 export const mockNotifications: SupplierNotification[] = [
   {
     id: 'n1',

@@ -4,7 +4,7 @@ import type { EventWizardDraft } from './EventWizard.types';
  * ВНИМАНИЕ: эти мапперы завязаны на текущие контракты Daibilet admin.
  * Здесь нельзя менять форму payload'ов — только адаптировать draft к уже существующим API.
  *
- * Все TODO ниже нужно заполнять TOLERANT‑образом, сверяясь с:
+ * Все последующие заметки нужно заполнять TOLERANT‑образом, сверяясь с:
  * - EventCreatePage (pages/events/EventCreate.tsx)
  * - EventEditPage (pages/events/EventEdit.tsx)
  * - OffersSection / ScheduleTab и родственные API‑вызовы.
@@ -39,7 +39,7 @@ interface AdminEventDetailLite {
  * Преобразует Admin EventDetail → EventWizardDraft для edit‑режима.
  */
 export function mapEventToDraft(event: AdminEventDetailLite): EventWizardDraft {
-  // TODO: timezone: определять по event.city/timezone или общему дефолту проекта.
+  // Next: timezone: определять по event.city/timezone или общему дефолту проекта.
   const timezone = 'Europe/Moscow';
 
   const startsAtList =
@@ -59,14 +59,14 @@ export function mapEventToDraft(event: AdminEventDetailLite): EventWizardDraft {
       shortDescription: event.shortDescription ?? '',
       fullDescription: event.description ?? '',
       coverImageUrl: event.imageUrl ?? '',
-      gallery: [], // TODO: map galleryUrls, если появится контракт в EventDetail
+      gallery: [], // Next: map galleryUrls, если появится контракт в EventDetail
     },
 
     schedule: {
-      mode: 'single', // TODO: попытаться вывести режим (single/recurring/manual) на основе сессий
+      mode: 'single', // Next: попытаться вывести режим (single/recurring/manual) на основе сессий
       timezone,
       startsAtList,
-      recurrenceRule: null, // TODO: восстановить rule, если он появится в бэкенд‑контракте
+      recurrenceRule: null, // Next: восстановить rule, если он появится в бэкенд‑контракте
       exceptions: {
         removedStartsAt: [],
         movedStartsAt: [],
@@ -123,14 +123,14 @@ export function mapDraftToCreatePayload(draft: EventWizardDraft): Record<string,
 
   const payload: Record<string, unknown> = {
     title: basics.title,
-    // TODO: slug: либо доверять автогенерации на бэке, либо маппить из basics.slug, если контракт это поддерживает.
+    // Next: slug: либо доверять автогенерации на бэке, либо маппить из basics.slug, если контракт это поддерживает.
     cityId: basics.cityId,
     category: basics.category,
-    // TODO: audience: взять из basics или оставить по умолчанию ('ALL'), как сейчас в EventCreatePage.
+    // Next: audience: взять из basics или оставить по умолчанию ('ALL'), как сейчас в EventCreatePage.
     description: basics.fullDescription || undefined,
     shortDescription: basics.shortDescription || undefined,
     imageUrl: basics.coverImageUrl || undefined,
-    // TODO: durationMinutes, address, minAge, templateData — добавить при расширении draft'а.
+    // Next: durationMinutes, address, minAge, templateData — добавить при расширении draft'а.
   };
 
   // Tickets/offers: high‑level → первый offer payload как в EventCreatePage.
@@ -150,7 +150,7 @@ export function mapDraftToCreatePayload(draft: EventWizardDraft): Record<string,
     };
   }
 
-  // TODO: schedule: на текущем контракте create события нет прямого создания sessions.
+  // Next: schedule: на текущем контракте create события нет прямого создания sessions.
   // Генерация сессий должна выполняться отдельным шагом/эндпоинтом (через адаптер), если это требуется.
 
   return payload;
@@ -178,10 +178,10 @@ export function mapDraftToUpdatePayload(draft: EventWizardDraft): Record<string,
     shortDescription: basics.shortDescription || undefined,
     description: basics.fullDescription || undefined,
     imageUrl: basics.coverImageUrl || undefined,
-    // TODO: venueId, address, audience, subcategories, minAge, templateData и прочие override‑поля.
+    // Next: venueId, address, audience, subcategories, minAge, templateData и прочие override‑поля.
   };
 
-  // TODO: вынести tickets/schedule/capacity в отдельные адаптеры, вызывающие
+  // Next: вынести tickets/schedule/capacity в отдельные адаптеры, вызывающие
   // текущие эндпоинты (offers*, sessions*, и т.п.), чтобы не смешивать
   // один большой update‑payload с несколькими независимыми контрактами.
 

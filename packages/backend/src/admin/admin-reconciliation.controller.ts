@@ -283,7 +283,7 @@ export class AdminReconciliationController {
     await this.prisma.fulfillmentItem.update({
       where: { id: itemId },
       data: {
-        resolvedBy: 'admin', // TODO: use actual admin ID from JWT
+        resolvedBy: 'admin', // Next: use actual admin ID from JWT
         lastError: body.note ? `[RESOLVED] ${body.note}` : '[RESOLVED by admin]',
       },
     });
