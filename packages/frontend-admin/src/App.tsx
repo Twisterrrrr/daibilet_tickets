@@ -6,7 +6,6 @@ import { flags } from './config/flags';
 import { isAuthenticated } from './lib/auth';
 import { ArticleEditPage } from './pages/articles/ArticleEdit';
 import { ArticlesListPage } from './pages/articles/ArticlesList';
-import { AuditLogPage } from './pages/audit/AuditLog';
 import { CheckoutSessionsListPage } from './pages/checkout/CheckoutSessionsList';
 import { CitiesListPage } from './pages/cities/CitiesList';
 import { CityEditPage } from './pages/cities/CityEdit';
@@ -14,7 +13,6 @@ import { CollectionEditPage } from './pages/collections/CollectionEdit';
 import { CollectionsListPage } from './pages/collections/CollectionsList';
 import { ComboEditPage } from './pages/combos/ComboEdit';
 import { CombosListPage } from './pages/combos/CombosList';
-import { EventsListPage } from './pages/events/EventsList';
 import { FailedJobsPage } from './pages/jobs/FailedJobsPage';
 import { LandingEditPage } from './pages/landings/LandingEdit';
 import { LandingsListPage } from './pages/landings/LandingsList';
@@ -29,8 +27,6 @@ import { SeoAuditPage } from './pages/seo/SeoAuditPage';
 import { WidgetEditPage } from './pages/widgets/WidgetEdit';
 import { WidgetsListPage } from './pages/widgets/WidgetsList';
 import { SupplierDetailPage } from './pages/suppliers/SupplierDetail';
-import { SuppliersListPage } from './pages/suppliers/SuppliersList';
-import { SupportDetailPage } from './pages/support/SupportDetail';
 import { SourceCategoriesPage } from './pages/source-categories/SourceCategoriesPage';
 import { VenuesListPage } from './pages/venues/VenuesList';
 import { VenueEditPage } from './pages/venues/VenueEdit';
@@ -68,6 +64,18 @@ const FinanceDocumentsAdminPage = lazy(() =>
   import('./pages/finance/FinanceDocumentsAdminPage').then((m) => ({
     default: m.FinanceDocumentsAdminPage,
   })),
+);
+const EventsListPage = lazy(() =>
+  import('./pages/events/EventsList').then((m) => ({ default: m.EventsListPage })),
+);
+const SuppliersListPage = lazy(() =>
+  import('./pages/suppliers/SuppliersList').then((m) => ({ default: m.SuppliersListPage })),
+);
+const AuditLogPage = lazy(() =>
+  import('./pages/audit/AuditLog').then((m) => ({ default: m.AuditLogPage })),
+);
+const SupportDetailPage = lazy(() =>
+  import('./pages/support/SupportDetail').then((m) => ({ default: m.SupportDetailPage })),
 );
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
