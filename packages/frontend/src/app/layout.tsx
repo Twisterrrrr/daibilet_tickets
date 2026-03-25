@@ -7,9 +7,9 @@ import { Suspense } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Footer } from '@/components/layout/Footer';
 import { CookieConsent } from '@/components/ui/CookieConsent';
+import { ChatWidget } from '@/components/ui/ChatWidget';
 import { Header } from '@/components/layout/Header';
 import { ScrollProgress } from '@/components/ui/ScrollProgress';
-import { SupportWidget } from '@/components/ui/SupportWidget';
 import { WebVitalsReporter } from '@/components/WebVitalsReporter';
 import { UserAuthProvider } from '@/hooks/useUserAuth';
 import { CartProvider } from '@/lib/cart';
@@ -46,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ErrorBoundary>{children}</ErrorBoundary>
             </main>
             <Footer />
-            <SupportWidget />
+            <ChatWidget />
             <CookieConsent />
           </UserAuthProvider>
         </CartProvider>
