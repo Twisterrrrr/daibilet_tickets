@@ -2729,7 +2729,7 @@ Dual-mode:
 Все списковые admin-эндпоинты переведены с `take: 500` на пагинацию:
 - Добавлены `@Query('limit')` и `@Query('skip')` параметры
 - Лимит ограничен `Math.min(limit || 200, 200)`
-- CSV-экспорты оставлены с `take: 1000` + TODO на cursor-based стриминг
+- CSV-экспорты переведены на cursor-based стриминг (`streamCsv`): фиксированного `take: 1000` больше нет (batch=500, safety net hard limit=50k)
 
 Затронутые контроллеры: tags, cities, upsells, landings, combos, checkout (SLA metrics).
 
