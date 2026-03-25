@@ -59,6 +59,8 @@ describe('RequestId E2E', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
+    // В e2e тестах отключаем Nest logger ради снижения шума в консоли.
+    app.useLogger(false);
     await app.init();
     await app.listen(0);
 

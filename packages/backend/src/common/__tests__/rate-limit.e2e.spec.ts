@@ -62,6 +62,8 @@ describe('Rate Limit E2E', () => {
     }).compile();
 
     const nestApp = moduleRef.createNestApplication();
+    // В e2e тестах отключаем Nest logger, чтобы не засорять вывод WARN/ERROR.
+    nestApp.useLogger(false);
     await nestApp.init();
     await nestApp.listen(0);
 
