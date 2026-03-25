@@ -11,6 +11,15 @@ import App from './App';
 
 const queryClient = new QueryClient();
 
+if ('serviceWorker' in navigator) {
+  // PWA installability for Android Chrome. No offline caching yet.
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // ignore
+    });
+  });
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider defaultTheme="light" storageKey="daibilet-admin-theme">

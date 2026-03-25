@@ -32,6 +32,8 @@ import { VenuesListPage } from './pages/venues/VenuesList';
 import { VenueEditPage } from './pages/venues/VenueEdit';
 import { TagsListPage } from './pages/tags/TagsList';
 import { TagEditPage } from './pages/tags/TagEdit';
+import { ChatInboxPage } from './pages/chat/ChatInbox';
+import { ChatConversationPage } from './pages/chat/ChatConversation';
 import { UpsellsListPage } from './pages/upsells/UpsellsList';
 import { PromoBlocksListPage } from './pages/promo-blocks/PromoBlocksListPage';
 import { PromoBlockCreatePage } from './pages/promo-blocks/PromoBlockCreatePage';
@@ -152,6 +154,8 @@ export default function App() {
           <Route path="moderation" element={<ModerationQueuePage />} />
           <Route path="support" element={<SupportListPage />} />
           <Route path="support/:id" element={<SupportDetailPage />} />
+          <Route path="chat" element={<ChatInboxPage />} />
+          <Route path="chat/:id" element={<ChatConversationPage />} />
           <Route path="jobs/failed" element={flags.showOps ? <FailedJobsPage /> : <DisabledRoute />} />
           <Route path="reconciliation" element={<ReconciliationPage />} />
           <Route path="audit" element={flags.showOps ? <AuditLogPage /> : <DisabledRoute />} />

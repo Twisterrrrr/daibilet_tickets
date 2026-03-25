@@ -76,6 +76,7 @@ function buildNavSections(): NavSection[] {
         { to: '/reviews', label: 'Отзывы', icon: MessageSquare, section: 'Операции' },
         { to: '/reconciliation', label: 'Сверка', icon: Search, section: 'Операции' },
         { to: '/support', label: 'Поддержка', icon: HeadphonesIcon, section: 'Операции' },
+        { to: '/chat', label: 'Чат', icon: MessageSquare, section: 'Операции' },
       ].filter(Boolean) as NavItem[],
     },
     {

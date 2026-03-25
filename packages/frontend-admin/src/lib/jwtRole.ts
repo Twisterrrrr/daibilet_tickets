@@ -27,6 +27,7 @@ export function getAdminRoleFromToken(): AdminJwtRole | null {
 /** Пути навигации, которые для VIEWER дают 403 или не предназначены для read-only (см. Security-Test-Matrix). */
 export const ADMIN_VIEWER_NAV_DENYLIST = new Set([
   '/support',
+  '/chat',
   '/finance-documents',
   '/seo-audit',
   '/payouts',
