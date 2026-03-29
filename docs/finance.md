@@ -93,6 +93,7 @@ Ledger — источник истины для supplier‑баланса, от�
   - `SINGLE_MERCHANT` — стартовый режим: деньги проходят через счёт платформы, чек от Daibilet как продавца.
   - `AGENT_SINGLE_PAYOUT` — следующий шаг: деньги по‑прежнему на счёт платформы, но в чеке ставится признак агента (Daibilet как агент, оператор как принципал; реквизиты принципала берутся из snapshot `SupplierLegalProfile`).
   - `SPLIT_MERCHANT` — целевой режим: split‑платежи (разделение суммы между счётом платформы и счётом поставщика через возможности YooKassa).
+- **Текущее состояние (фискализация и clearing):** при действующей модели **split не реализован и не используется**: весь объём оплат от покупателя **проходит через платформу** (единый ручей на счёт Daibilet / единая фискализация по выбранному `paymentMode`), **затем** платформа отражает удержание комиссии и **перечисление принципалу (поставщику)** по отчётам и выплатам. Режим `SPLIT_MERCHANT` в таблице выше — **целевой на будущее**; на леджер и отчёты это намерение уже заложено инвариантом ниже, но фактический PSP‑split не задействован.
 - **Инвариант леджера (Clearing):**
   - `SupplierLedgerEntry` и расчёт `SupplierReport` **не зависят** от того, использует ли YooKassa split или нет:
     - ledger всегда отражает фактические движения между платформой и оператором в одной и той же модели (`SALE`/`COMMISSION`/`PAYOUT` и т.д.),
@@ -511,9 +512,7 @@ P3.1 таким образом превращает P3 из «адресной �
 
 ---
 
-### Demo generation of supplier documentsДля локальной проверки шаблонов и файловой генерации добавлен demo-flow.
-
-- Команда запуска: `pnpm --filter @daibilet/backend db:seed:finance-docs-demo`
+### Demo generation of supplier documentsДля локальной проверки шаблонов и файловой генерации добавлен demo-flow.- Команда запуска: `pnpm --filter @daibilet/backend db:seed:finance-docs-demo`
 - Что создаётся:
   - demo поставщик `demo-finance-supplier`
   - 3 документа: `AGENT_REPORT`, `SERVICE_ACT`, `UPD`
@@ -527,9 +526,7 @@ P3.1 таким образом превращает P3 из «адресной �
 |---|---|---|---|
 | AGENT_REPORT | `src/supplier-finance/templates/finance-document-templates.ts` | `uploads/documents/demo/<operatorId>/AGENT_REPORT/` | `/uploads/...` + admin dev endpoint |
 | SERVICE_ACT | `src/supplier-finance/templates/finance-document-templates.ts` | `uploads/documents/demo/<operatorId>/SERVICE_ACT/` | `/uploads/...` + admin dev endpoint |
-| UPD | `src/supplier-finance/templates/finance-document-templates.ts` | `uploads/documents/demo/<operatorId>/UPD/` | `/uploads/...` + admin dev endpoint |
-
-### Settlement lifecycle foundation (manual-first)
+| UPD | `src/supplier-finance/templates/finance-document-templates.ts` | `uploads/documents/demo/<operatorId>/UPD/` | `/uploads/...` + admin dev endpoint |### Settlement lifecycle foundation (manual-first)
 
 Добавлен этап foundation без очередей и без авто-отправки в ЭДО:- `SupplierSettlement`: статусы `DRAFT -> CALCULATED -> APPROVED -> FINALIZED -> PAID`.
 - Настройки в профиле поставщика:
@@ -547,6 +544,15 @@ P3.1 таким образом превращает P3 из «адресной �
 - Storage layout для production paths:
   - `uploads/documents/{operatorId}/{year}/{month}/{type}/{documentNumber}/preview.html`
   - `uploads/documents/{operatorId}/{year}/{month}/{type}/{documentNumber}/final.pdf`
+
+#### Печатные формы, HTML и PDF (MVP, 29.03.2026)
+
+- **Слои:** `buildFinanceDocumentPayload` (`finance-document-payload.builder.ts`) из `SupplierSettlement` → плоский `DemoFinancePayload` для шаблонов → `finance-document-templates.ts` (отчёт агента, акт, УПД, счёт, счёт-фактура) → `injectPrintCss` (`finance-print-styles.ts` + `finance-html-shell.ts`) → `FinanceHtmlPdfService` (Puppeteer, A4, кириллица, без CDN).
+- **Статические формулировки форм (ПП № 1137 и т.п.):** `finance-document-form-boilerplate.ts` — неизменяемый юридический текст; в шаблонах подставляются данные из payload.
+- **Локальные образцы HTML/PDF:** каталог `docs/finance-print-samples/` (пять форм на демо-данных). Пересборка: из `packages/backend` выполнить `pnpm run finance:print-samples` (нужен Chrome или `PUPPETEER_EXECUTABLE_PATH`). Описание файлов — `docs/finance-print-samples/README.txt`.
+- **Валидация перед выпуском:** `finance-document-validation.ts` — обязательные реквизиты по типу (счёт: банк; УПД/счёт-фактура: ИНН покупателя и т.д.); блокирующие ошибки — `BadRequestException` с `{ error: 'FINANCE_PAYLOAD_INVALID', issues: [...] }`; проверка всего пакета документов до создания записей в БД.
+- **Превью и скачивание:** `GET /supplier/finance/documents/:id/html`, `GET /supplier/finance/documents/:id/pdf`; админ: `GET /admin/finance/documents/:id/html`, `GET /admin/finance/documents/:id/pdf`. Файлы читаются через `FinanceDocumentStorageService.readBinaryRelative`.
+- **Ограничения MVP:** УПД/счёт-фактура ориентированы на структуру ПП № 1137 (в т.ч. таблица с маркерами граф); колонки прослеживаемости и коды ОКПД2 при необходимости расширяются отдельно. Строки отчёта агента по settlement пока агрегированы одной позицией (не детализация по заказам до интеграции с биллингом). Legacy `SupplierDocumentService.generateDocumentsForReport` по-прежнему stub — основной поток settlement → `SupplierDocumentIssueService`.
 
 #### Smoke checklist (manual API)
 

@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Logger, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, NotFoundException, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
+import { FinanceDocumentStorageService } from '../supplier-finance/finance-document-storage.service';
 import { SupplierDocumentIssueService } from '../supplier-finance/supplier-document-issue.service';
 import { SupplierDocumentPolicyService } from '../supplier-finance/supplier-document-policy.service';
 import { SupplierSettlementService } from '../supplier-finance/supplier-settlement.service';
@@ -20,6 +22,7 @@ export class AdminFinanceSettlementsController {
     private readonly settlements: SupplierSettlementService,
     private readonly docPolicy: SupplierDocumentPolicyService,
     private readonly docIssue: SupplierDocumentIssueService,
+    private readonly financeDocStorage: FinanceDocumentStorageService,
   ) {}
 
   @Get('settlements')
@@ -119,6 +122,39 @@ export class AdminFinanceSettlementsController {
   @ApiOperation({ summary: 'Manual document regeneration' })
   async regenerateDocument(@Param('id') id: string) {
     return this.docIssue.regenerateDocument(id);
+  }
+
+  @Get('documents/:id/html')
+  @Roles('ADMIN', 'EDITOR')
+  @ApiOperation({ summary: 'HTML превью финансового документа' })
+  async getDocumentHtml(@Param('id') id: string, @Res() res: Response) {
+    const doc = await this.prisma.supplierDocument.findUnique({
+      where: { id },
+      include: { files: true },
+    });
+    if (!doc) throw new NotFoundException('Document not found');
+    const file = doc.files.find((f) => f.mimeType === 'text/html');
+    if (!file?.storageKey) throw new NotFoundException('HTML not available');
+    const buf = await this.financeDocStorage.readBinaryRelative(file.storageKey);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(buf);
+  }
+
+  @Get('documents/:id/pdf')
+  @Roles('ADMIN', 'EDITOR')
+  @ApiOperation({ summary: 'Скачать PDF финансового документа' })
+  async getDocumentPdf(@Param('id') id: string, @Res() res: Response) {
+    const doc = await this.prisma.supplierDocument.findUnique({
+      where: { id },
+      include: { files: true },
+    });
+    if (!doc) throw new NotFoundException('Document not found');
+    const file = doc.files.find((f) => f.kind === 'PDF');
+    if (!file?.storageKey) throw new NotFoundException('PDF not available');
+    const buf = await this.financeDocStorage.readBinaryRelative(file.storageKey);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="admin-${doc.type}-${id.slice(0, 8)}.pdf"`);
+    res.send(buf);
   }
 }
 

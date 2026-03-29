@@ -3,32 +3,12 @@ import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentNumberService } from './document-number.service';
-import { FinanceDocumentRenderService } from './finance-document-render.service';
+import { buildFinanceDocumentPayload, type SettlementWithProfile } from './finance-document-payload.builder';
+import { FinanceDocumentRenderService, type DemoDocType } from './finance-document-render.service';
+import { getBlockingFinanceIssues, validateFinanceDocumentPayload } from './finance-document-validation';
 import { SupplierDocumentPolicyService } from './supplier-document-policy.service';
 
-type SettlementWithProfile = {
-  operator: {
-    name: string;
-    legalProfile: {
-      legalName: string | null;
-      inn: string | null;
-      kpp: string | null;
-      defaultVatRate: Prisma.Decimal | null;
-      bankAccounts: Array<{ isPrimary: boolean }>;
-      status: string;
-    } | null;
-  };
-  operatorId: string;
-  id: string;
-  status: string;
-  periodStart: Date;
-  periodEnd: Date;
-  grossAmount: Prisma.Decimal;
-  commissionAmount: Prisma.Decimal;
-  netAmount: Prisma.Decimal;
-};
-
-type IssueDocType = 'AGENT_REPORT' | 'SERVICE_ACT' | 'UPD' | 'INVOICE' | 'VAT_INVOICE';
+type IssueDocType = DemoDocType;
 
 @Injectable()
 export class SupplierDocumentIssueService {
@@ -68,6 +48,8 @@ export class SupplierDocumentIssueService {
     const year = now.getUTCFullYear();
     const results: Array<{ type: IssueDocType; status: string; number: string; reason?: string }> = [];
 
+    type PlannedDoc = { type: IssueDocType; number: string; payload: ReturnType<typeof buildFinanceDocumentPayload> };
+    const planned: PlannedDoc[] = [];
     for (const type of policy.required) {
       const prefix = this.getPrefix(type);
       const numberType = this.getNumberType(type);
@@ -76,8 +58,22 @@ export class SupplierDocumentIssueService {
         year,
         type: numberType,
       })}`;
-      const payload = this.buildPayload(settlementData, number, type);
+      const payload = buildFinanceDocumentPayload(settlementData, number, type);
+      planned.push({ type, number, payload });
+    }
 
+    for (const { type, payload } of planned) {
+      const blocking = getBlockingFinanceIssues(validateFinanceDocumentPayload(type, payload));
+      if (blocking.length) {
+        throw new BadRequestException({
+          error: 'FINANCE_PAYLOAD_INVALID',
+          message: 'Недостаточно реквизитов для формирования документа',
+          issues: blocking,
+        });
+      }
+    }
+
+    for (const { type, number, payload } of planned) {
       const doc = await this.prisma.supplierDocument.create({
         data: {
           operatorId: settlementData.operatorId,
@@ -94,7 +90,7 @@ export class SupplierDocumentIssueService {
         type,
         documentNumber: number,
         documentDate: now,
-        payload: payload,
+        payload,
       });
 
       await this.prisma.supplierDocument.update({
@@ -182,42 +178,4 @@ export class SupplierDocumentIssueService {
     if (type === 'VAT_INVOICE') return 'UPD_1';
     return 'INVOICE';
   }
-
-  private buildPayload(settlement: SettlementWithProfile, number: string, type: IssueDocType) {
-    const profile = settlement.operator.legalProfile;
-    if (!profile) {
-      throw new BadRequestException('Tax profile is required');
-    }
-    const grossAmount = Number(settlement.grossAmount);
-    const commissionAmount = Number(settlement.commissionAmount);
-    const netAmount = Number(settlement.netAmount);
-    const vatRate = profile.defaultVatRate ? Number(profile.defaultVatRate) : 0;
-    const vatAmount = vatRate > 0 ? Number((grossAmount * vatRate / (100 + vatRate)).toFixed(2)) : 0;
-    return {
-      number,
-      date: new Date().toISOString().slice(0, 10),
-      periodStart: settlement.periodStart.toISOString().slice(0, 10),
-      periodEnd: settlement.periodEnd.toISOString().slice(0, 10),
-      supplierName: profile.legalName || settlement.operator.name,
-      supplierInn: profile.inn || '',
-      supplierKpp: profile.kpp || null,
-      customerName: 'ООО Daibilet',
-      customerInn: '7700000000',
-      items: [
-        {
-          title: `${type} за расчетный период`,
-          quantity: 1,
-          price: grossAmount,
-          vatRate,
-          vatAmount,
-        },
-      ],
-      grossAmount,
-      commissionAmount,
-      netAmount,
-      vatRate,
-      vatAmount,
-    };
-  }
 }
-

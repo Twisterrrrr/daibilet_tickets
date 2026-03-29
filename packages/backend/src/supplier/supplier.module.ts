@@ -16,6 +16,7 @@ import { SupplierDocumentPolicyService } from '../supplier-finance/supplier-docu
 import { SupplierDocumentIssueService } from '../supplier-finance/supplier-document-issue.service';
 import { FinanceDocumentStorageService } from '../supplier-finance/finance-document-storage.service';
 import { FinanceDocumentRenderService } from '../supplier-finance/finance-document-render.service';
+import { FinanceHtmlPdfService } from '../supplier-finance/finance-html-pdf.service';
 import { DocumentNumberService } from '../supplier-finance/document-number.service';
 import { ReportsModule } from '../reports/reports.module';
 import { CatalogModule } from '../catalog/catalog.module';
@@ -67,6 +68,7 @@ import { SupplierDailyStatService } from './supplier-daily-stat.service';
     SupplierDocumentPolicyService,
     SupplierDocumentIssueService,
     FinanceDocumentStorageService,
+    FinanceHtmlPdfService,
     FinanceDocumentRenderService,
     DocumentNumberService,
     SupplierDailyStatService,

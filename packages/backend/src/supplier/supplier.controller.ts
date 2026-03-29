@@ -72,6 +72,9 @@ import { SupplierFinanceSummaryService } from '../supplier-finance/supplier-fina
 import { SupplierDisputeService } from '../supplier-finance/supplier-dispute.service';
 import { SupplierSettlementService } from '../supplier-finance/supplier-settlement.service';
 import { SupplierDocumentIssueService } from '../supplier-finance/supplier-document-issue.service';
+import type { DemoDocType } from '../supplier-finance/finance-document-render.service';
+import { FinanceDocumentRenderService } from '../supplier-finance/finance-document-render.service';
+import { FinanceDocumentStorageService } from '../supplier-finance/finance-document-storage.service';
 import type { FinanceMetaJson } from '../common/finance.types';
 import { SupplierDailyStatService } from './supplier-daily-stat.service';
 
@@ -94,6 +97,8 @@ export class SupplierController {
     private readonly disputes: SupplierDisputeService,
     private readonly settlements: SupplierSettlementService,
     private readonly docIssue: SupplierDocumentIssueService,
+    private readonly financeRender: FinanceDocumentRenderService,
+    private readonly financeDocStorage: FinanceDocumentStorageService,
     private readonly dailyStat: SupplierDailyStatService,
   ) {}
 
@@ -241,7 +246,7 @@ export class SupplierController {
         where: {
           supplierId: operatorId,
           status: 'APPROVED',
-          supplierResponse: null,
+          supplierResponse: { is: null },
         },
       }),
     ]);
@@ -723,6 +728,39 @@ export class SupplierController {
     };
   }
 
+  @Get('finance/sample-documents-preview')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Образцы HTML документов (демо-данные, для просмотра в ЛК)' })
+  getFinanceSampleDocumentsPreview() {
+    return { items: this.financeRender.getSampleDocumentsForSupplierPreview() };
+  }
+
+  private static readonly SAMPLE_PDF_KINDS = new Set<string>([
+    'INVOICE',
+    'VAT_INVOICE',
+    'AGENT_REPORT',
+    'SERVICE_ACT',
+    'UPD',
+  ]);
+
+  @Get('finance/sample-documents-preview/:kind/pdf')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Скачать образец PDF (демо-данные, тот же пайплайн что у выпуска)' })
+  async getFinanceSamplePdf(@Param('kind') kindRaw: string, @Res() res: Response) {
+    const kind = kindRaw.trim().toUpperCase();
+    if (!SupplierController.SAMPLE_PDF_KINDS.has(kind)) {
+      throw new BadRequestException('Недопустимый тип документа');
+    }
+    const pdf = await this.financeRender.getSampleDocumentPdf(kind as DemoDocType);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="obrazets-${kind}.pdf"`);
+    res.send(Buffer.from(pdf));
+  }
+
   @Get('finance/document-settings')
   @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
   @SupplierRoles('OWNER')
@@ -799,7 +837,7 @@ export class SupplierController {
   @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
   @SupplierRoles('OWNER')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Список settlement поставщика' })
+  @ApiOperation({ summary: 'Список расчётных периодов (settlements) поставщика' })
   async listSettlements(@CurrentSupplierUser() user: SupplierAuthUser) {
     return this.prisma.supplierSettlement.findMany({
       where: { operatorId: user.operatorId },
@@ -830,6 +868,51 @@ export class SupplierController {
       htmlPath: d.files.find((f) => f.mimeType === 'text/html')?.storageKey ?? null,
       pdfPath: d.files.find((f) => f.kind === 'PDF')?.storageKey ?? null,
     }));
+  }
+
+  @Get('finance/documents/:id/html')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'HTML превью сохранённого финансового документа' })
+  async getFinanceDocumentHtml(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const doc = await this.prisma.supplierDocument.findFirst({
+      where: { id, operatorId: user.operatorId },
+      include: { files: true },
+    });
+    if (!doc) throw new NotFoundException('Документ не найден');
+    const file = doc.files.find((f) => f.mimeType === 'text/html');
+    if (!file?.storageKey) throw new NotFoundException('HTML не сформирован');
+    const buf = await this.financeDocStorage.readBinaryRelative(file.storageKey);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(buf);
+  }
+
+  @Get('finance/documents/:id/pdf')
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Скачать PDF финансового документа' })
+  async getFinanceDocumentPdf(
+    @CurrentSupplierUser() user: SupplierAuthUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const doc = await this.prisma.supplierDocument.findFirst({
+      where: { id, operatorId: user.operatorId },
+      include: { files: true },
+    });
+    if (!doc) throw new NotFoundException('Документ не найден');
+    const file = doc.files.find((f) => f.kind === 'PDF');
+    if (!file?.storageKey) throw new NotFoundException('PDF не сформирован');
+    const buf = await this.financeDocStorage.readBinaryRelative(file.storageKey);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${doc.type}-${doc.id.slice(0, 8)}.pdf"`);
+    res.send(buf);
   }
 
   @Get('balance')

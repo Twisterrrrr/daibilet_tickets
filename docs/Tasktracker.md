@@ -419,6 +419,8 @@
 ## Supplier Finance — P3, P3.1, Settlement demo ✅
 
 - P3, P3.1 Tax Matrix, документы, Settlement Foundation Stage 1 — ✅ (см. `finance.md`).
+- **29.03.2026 — Печатные формы (MVP+):** HTML + `finance-print-styles`, шаблоны по структуре ПП № 1137 (ред. 1096) для УПД и счёт-фактуры, типовые счёт и акт, `finance-document-form-boilerplate.ts`, Puppeteer PDF, `finance-document-validation`, GET html/pdf (supplier/admin), скрипт `finance:print-samples` → `docs/finance-print-samples/`. **Остаётся:** детализация строк отчёта агента из заказов; отдельный `SupplierDocumentFileKind` для превью HTML; UI кнопок в ЛК; при необходимости — колонки прослеживаемости/ОКПД2 в payload.
+
 
 ---
 

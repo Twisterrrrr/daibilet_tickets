@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { mkdir, writeFile } from 'fs/promises';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 @Injectable()
@@ -37,6 +37,22 @@ export class FinanceDocumentStorageService {
     const absPath = join(baseDir, fileName);
     await writeFile(absPath, content);
     return this.toRelative(absPath);
+  }
+
+  /**
+   * Чтение файла по относительному ключу из БД (путь вида documents/... от корня UPLOAD_DIR).
+   */
+  async readBinaryRelative(storageKey: string): Promise<Buffer> {
+    const normalized = storageKey.replace(/\\/g, '/').replace(/^\/?uploads\//, '');
+    if (normalized.includes('..')) {
+      throw new NotFoundException('Invalid storage key');
+    }
+    const absPath = join(this.root, normalized);
+    try {
+      return await readFile(absPath);
+    } catch {
+      throw new NotFoundException('File not found');
+    }
   }
 
   private toRelative(absPath: string): string {

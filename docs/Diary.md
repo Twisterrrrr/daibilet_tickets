@@ -4,6 +4,32 @@
 
 ---
 
+## 29.03.2026 — Финдокументы: печатный MVP (HTML + Puppeteer PDF)
+
+### Наблюдения
+
+- Уже были `SupplierSettlement`, `SupplierDocument`, `FinanceDocumentRenderService` с HTML-шаблонами в одном файле и PDF через pdf-lib (латиница/заглушка).
+- Для «бухгалтерского» вида нужны единый print CSS, реальная кириллица в PDF и контроль реквизитов до рендера.
+
+### Решения
+
+- Вынесен билдер payload: `finance-document-payload.builder.ts`; валидация `finance-document-validation.ts`; единые стили `finance-print-styles.ts` + `injectPrintCss`; PDF через `FinanceHtmlPdfService` (Puppeteer, как билеты).
+- Отчёт агента: колонки доли комиссии и «к перечислению» по строкам; счёт-фактура — табличный макет; эндпоинты HTML/PDF для supplier и admin.
+- Тесты: `finance-document-validation.spec.ts`, `finance-html-shell.spec.ts`.
+- Доработка печатной верстки (ориентир 1С): счёт, акт, УПД, отчёт агента в единой системе классов `fn-*`; счёт-фактура переведена с встроенного «вебового» CSS на те же `fn-doc` / `fn-req-table` / `fn-table` / `fn-total-box` / `fn-signatures`, чтобы HTML и PDF оставались одним шаблоном.
+- Smoke-тесты рендера: `finance-document-templates.spec.ts` (ключевые заголовки, таблицы, итоги, вложенный `injectPrintCss`).
+- В `finance.md` зафиксировано **текущее** поведение clearing: split при фискализации **не задействован**, весь объём идёт через платформу, затем перечисление поставщику; `SPLIT_MERCHANT` остаётся целевым режимом на будущее.
+- Образцы печати: `docs/finance-print-samples/` пересобраны (`pnpm run finance:print-samples`); `README.txt` и раздел в `finance.md` описывают состав файлов и привязку к ПП № 1137; `index.html` генерируется тем же скриптом с пояснением пересборки.
+
+### Проблемы / сознательно не трогали
+
+- Prisma enum `SupplierDocumentFileKind` (HTML по-прежнему с kind `JSON_SNAPSHOT` — только mimeType различает превью).
+- Полная детализация операций в отчёте агента из заказов — отдельная задача.
+- UI ЛК поставщика: только API; подключение кнопок preview — при следующей итерации.
+- Интеграционный тест «PDF непустой» не добавлялся (Puppeteer/Chromium в CI не гарантирован); при необходимости — флаг среды и отдельный job.
+
+---
+
 ## 25.03.2026 — Venue Program + template-driven PDP: production-ready MVP
 
 ### Наблюдения

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Акт об оказании услуг № DEMO-0001</title>
+<style id="finance-print-global">
+@page {
+  size: A4;
+  margin: 10mm 12mm;
+}
+html {
+  background: #fff;
+}
+body {
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  color: #000;
+  font-family: Arial, Helvetica, "DejaVu Sans", sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.3;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.fn-doc {
+  max-width: 190mm;
+  margin: 0 auto;
+}
+.fn-doc-title {
+  text-align: center;
+  font-weight: bold;
+  font-size: 13pt;
+  letter-spacing: 0.03em;
+  margin: 0 0 6px 0;
+  text-transform: uppercase;
+}
+.fn-doc-sub {
+  text-align: center;
+  font-size: 10.5pt;
+  font-weight: bold;
+  margin: 0 0 14px 0;
+}
+.fn-meta-two {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+  font-size: 9.5pt;
+}
+.fn-meta-two td {
+  border: 1px solid #000;
+  padding: 6px 10px;
+  vertical-align: middle;
+}
+.fn-meta-two td:first-child {
+  width: 50%;
+  background: #ebebeb;
+  font-weight: bold;
+}
+.fn-section-title {
+  font-weight: bold;
+  font-size: 10pt;
+  margin: 14px 0 6px 0;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #000;
+}
+.fn-req-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 14px 0;
+  font-size: 9.5pt;
+}
+.fn-req-table td {
+  border: 1px solid #000;
+  padding: 5px 8px;
+  vertical-align: top;
+}
+.fn-req-table td:first-child {
+  width: 30%;
+  background: #ebebeb;
+  font-weight: bold;
+}
+.fn-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 12px 0;
+  font-size: 9.5pt;
+}
+.fn-table th {
+  border: 1px solid #000;
+  padding: 7px 5px;
+  background: #d9d9d9;
+  font-weight: bold;
+  text-align: center;
+  vertical-align: middle;
+}
+.fn-table td {
+  border: 1px solid #000;
+  padding: 5px 6px;
+  vertical-align: top;
+}
+.fn-table td.numeric,
+.fn-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.fn-table tfoot td {
+  font-weight: bold;
+  background: #e8e8e8;
+}
+.fn-bank {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 14px;
+  font-size: 9.5pt;
+}
+.fn-bank td {
+  border: 1px solid #000;
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+.fn-total-box {
+  margin-top: 6px;
+  margin-left: auto;
+  width: 100%;
+  max-width: 95mm;
+  border-collapse: collapse;
+  border: 2px solid #000;
+  font-size: 10pt;
+}
+.fn-total-box td {
+  padding: 6px 10px;
+  border: 1px solid #000;
+}
+.fn-total-box td:first-child {
+  font-weight: bold;
+  background: #ebebeb;
+  width: 62%;
+}
+.fn-total-box td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.fn-total-box tr.fn-total-pay td {
+  font-weight: bold;
+  font-size: 11pt;
+  background: #f5f5f5;
+}
+.fn-total-box tr.fn-total-pay td.numeric {
+  border-top: double 3px #000;
+}
+.fn-signatures {
+  margin-top: 26px;
+  page-break-inside: avoid;
+  font-size: 9.5pt;
+}
+.fn-sig-pair {
+  display: table;
+  width: 100%;
+  margin-top: 18px;
+}
+.fn-sig-pair > div {
+  display: table-cell;
+  width: 50%;
+  vertical-align: top;
+  padding-right: 12px;
+}
+.fn-sig-line {
+  border-bottom: 1px solid #000;
+  min-height: 26px;
+  margin: 10px 0 4px 0;
+}
+.fn-small-note {
+  font-size: 8.5pt;
+  margin-top: 14px;
+  color: #000;
+}
+.fn-upd-top {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+.fn-upd-top td {
+  vertical-align: top;
+}
+.fn-upd-status {
+  border: 2px solid #000;
+  padding: 8px;
+  text-align: center;
+  width: 68px;
+  font-size: 8.5pt;
+}
+.fn-upd-head-main {
+  padding-left: 12px;
+  font-size: 10.5pt;
+}
+.fn-upd-head-main .fn-upd-name {
+  font-weight: bold;
+  font-size: 11pt;
+  margin-bottom: 4px;
+}
+table {
+  border-collapse: collapse;
+}
+th, td {
+  vertical-align: top;
+}
+.num, .td-num, td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+thead {
+  display: table-header-group;
+}
+tfoot {
+  display: table-footer-group;
+}
+tbody tr {
+  page-break-inside: auto;
+}
+.signatures,
+.sign-block,
+.footer-table {
+  page-break-inside: avoid;
+}
+.fn-avoid-break {
+  page-break-inside: avoid;
+}
+h1, h2, .header, .header-title {
+  page-break-after: avoid;
+}
+@media print {
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+}
+.fn-pp1137-appendix {
+  font-size: 8.2pt;
+  line-height: 1.25;
+  text-align: center;
+  margin: 0 0 8px 0;
+}
+.fn-sf-correction {
+  font-size: 9.5pt;
+  margin: 0 0 10px 0;
+}
+.fn-sf-doc-line {
+  font-size: 10.5pt;
+  font-weight: bold;
+  margin: 0 0 4px 0;
+  text-align: center;
+}
+.fn-sf-num-mark {
+  font-size: 8.5pt;
+  font-weight: normal;
+}
+.fn-table-1137 {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 12px 0;
+  font-size: 7.4pt;
+  table-layout: fixed;
+}
+.fn-table-1137 th,
+.fn-table-1137 td {
+  border: 1px solid #000;
+  padding: 3px 2px;
+  vertical-align: middle;
+  word-wrap: break-word;
+}
+.fn-table-1137 th {
+  background: #d9d9d9;
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.15;
+}
+.fn-table-1137 .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.fn-table-1137 tfoot td {
+  font-weight: bold;
+  background: #e8e8e8;
+}
+.fn-std-disclaimer {
+  font-size: 8pt;
+  line-height: 1.3;
+  margin: 6px 0 0 0;
+  text-align: justify;
+}
+.fn-upd-two-col {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 10px 0;
+  font-size: 9.2pt;
+}
+.fn-upd-two-col td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  vertical-align: top;
+  width: 50%;
+}
+.fn-upd-two-col .fn-ud-label {
+  width: 38%;
+  background: #ebebeb;
+  font-weight: bold;
+}
+.fn-upd-four {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 12px 0;
+  font-size: 9pt;
+}
+.fn-upd-four td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  vertical-align: top;
+}
+.fn-upd-four .fn-ud-label {
+  width: 18%;
+  background: #ebebeb;
+  font-weight: bold;
+}
+.fn-page-footer {
+  font-size: 8.5pt;
+  text-align: right;
+  margin-top: 10px;
+}
+.fn-act-signed-row {
+  margin-top: 22px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+.fn-act-signed-row td {
+  width: 50%;
+  vertical-align: top;
+  font-weight: bold;
+  text-transform: uppercase;
+  padding: 8px 6px 0 0;
+}
+</style></head>
+<body>
+<div class="fn-doc">
+    <div class="fn-doc-title" style="margin-bottom:2px">Акт № DEMO-0001 от 29 марта 2026 г.</div>
+    <div class="fn-doc-sub" style="font-size:10pt;font-weight:normal;margin-bottom:12px">об оказании услуг</div>
+
+    <table class="fn-req-table">
+        <tr>
+            <td>Исполнитель:</td>
+            <td><b>ООО «Пример Поставщик», ИНН 7700000000, 123456, г. Москва, ул. Примерная, д. 1</b></td>
+        </tr>
+        <tr>
+            <td>Заказчик:</td>
+            <td><b>ООО «Daibilet», ИНН 7800000000, 190000, г. Санкт-Петербург, пр. Тестовый, д. 2</b></td>
+        </tr>
+        <tr>
+            <td>Основание:</td>
+            <td>Агентский договор №123 от 01.01.2026; период: с 01.03.2026 по 31.03.2026</td>
+        </tr>
+    </table>
+
+    <table class="fn-table" style="margin-top:10px">
+        <thead>
+            <tr>
+                <th style="width:5%">№</th>
+                <th>Наименование работ, услуг</th>
+                <th style="width:9%">Кол-во</th>
+                <th style="width:8%">Ед.</th>
+                <th style="width:13%">Цена без НДС</th>
+                <th style="width:13%">Сумма без НДС</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="text-align:center">1</td>
+                <td>Агентское вознаграждение по отчету № DEMO-0001 от 29.03.2026</td>
+                <td style="text-align:center">1</td>
+                <td style="text-align:center">усл.</td>
+                <td class="numeric">6 666,67</td>
+                <td class="numeric">6 666,67</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <table class="fn-total-box" style="max-width:100%;margin-top:12px">
+        <tr>
+            <td>Всего без НДС</td>
+            <td class="numeric">6 666,67</td>
+        </tr>
+        <tr>
+            <td>В том числе НДС (20%)</td>
+            <td class="numeric">1 333,33</td>
+        </tr>
+        <tr class="fn-total-pay">
+            <td>Всего с НДС</td>
+            <td class="numeric">8 000,00</td>
+        </tr>
+    </table>
+
+    <p style="font-size:9.5pt;margin:14px 0 4px">Всего оказано услуг на сумму <b>8 000,00</b> руб.</p>
+    <p style="font-size:9.5pt;margin:0 0 14px"><b>Восемь тысяч рублей 00 копеек</b>, в т.ч. НДС — 1 333,33 руб.</p>
+
+    <p class="fn-avoid-break" style="font-size:9.5pt;line-height:1.35;margin:12px 0;text-align:justify">
+        Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объёму, качеству и срокам оказания услуг не имеет.
+    </p>
+
+    <table class="fn-act-signed-row">
+        <tr>
+            <td>Исполнитель</td>
+            <td>Заказчик</td>
+        </tr>
+    </table>
+    <div class="fn-sig-pair" style="margin-top:6px">
+        <div>
+            <div class="fn-sig-line"></div>
+            <span style="font-size:8.5pt">(подпись / расшифровка) М.П.</span>
+        </div>
+        <div>
+            <div class="fn-sig-line"></div>
+            <span style="font-size:8.5pt">(подпись / расшифровка) М.П.</span>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>УПД № DEMO-0001</title>
+<style id="finance-print-global">
+@page {
+  size: A4;
+  margin: 10mm 12mm;
+}
+html {
+  background: #fff;
+}
+body {
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  color: #000;
+  font-family: Arial, Helvetica, "DejaVu Sans", sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.3;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.fn-doc {
+  max-width: 190mm;
+  margin: 0 auto;
+}
+.fn-doc-title {
+  text-align: center;
+  font-weight: bold;
+  font-size: 13pt;
+  letter-spacing: 0.03em;
+  margin: 0 0 6px 0;
+  text-transform: uppercase;
+}
+.fn-doc-sub {
+  text-align: center;
+  font-size: 10.5pt;
+  font-weight: bold;
+  margin: 0 0 14px 0;
+}
+.fn-meta-two {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+  font-size: 9.5pt;
+}
+.fn-meta-two td {
+  border: 1px solid #000;
+  padding: 6px 10px;
+  vertical-align: middle;
+}
+.fn-meta-two td:first-child {
+  width: 50%;
+  background: #ebebeb;
+  font-weight: bold;
+}
+.fn-section-title {
+  font-weight: bold;
+  font-size: 10pt;
+  margin: 14px 0 6px 0;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #000;
+}
+.fn-req-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 14px 0;
+  font-size: 9.5pt;
+}
+.fn-req-table td {
+  border: 1px solid #000;
+  padding: 5px 8px;
+  vertical-align: top;
+}
+.fn-req-table td:first-child {
+  width: 30%;
+  background: #ebebeb;
+  font-weight: bold;
+}
+.fn-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 12px 0;
+  font-size: 9.5pt;
+}
+.fn-table th {
+  border: 1px solid #000;
+  padding: 7px 5px;
+  background: #d9d9d9;
+  font-weight: bold;
+  text-align: center;
+  vertical-align: middle;
+}
+.fn-table td {
+  border: 1px solid #000;
+  padding: 5px 6px;
+  vertical-align: top;
+}
+.fn-table td.numeric,
+.fn-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.fn-table tfoot td {
+  font-weight: bold;
+  background: #e8e8e8;
+}
+.fn-bank {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 14px;
+  font-size: 9.5pt;
+}
+.fn-bank td {
+  border: 1px solid #000;
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+.fn-total-box {
+  margin-top: 6px;
+  margin-left: auto;
+  width: 100%;
+  max-width: 95mm;
+  border-collapse: collapse;
+  border: 2px solid #000;
+  font-size: 10pt;
+}
+.fn-total-box td {
+  padding: 6px 10px;
+  border: 1px solid #000;
+}
+.fn-total-box td:first-child {
+  font-weight: bold;
+  background: #ebebeb;
+  width: 62%;
+}
+.fn-total-box td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.fn-total-box tr.fn-total-pay td {
+  font-weight: bold;
+  font-size: 11pt;
+  background: #f5f5f5;
+}
+.fn-total-box tr.fn-total-pay td.numeric {
+  border-top: double 3px #000;
+}
+.fn-signatures {
+  margin-top: 26px;
+  page-break-inside: avoid;
+  font-size: 9.5pt;
+}
+.fn-sig-pair {
+  display: table;
+  width: 100%;
+  margin-top: 18px;
+}
+.fn-sig-pair > div {
+  display: table-cell;
+  width: 50%;
+  vertical-align: top;
+  padding-right: 12px;
+}
+.fn-sig-line {
+  border-bottom: 1px solid #000;
+  min-height: 26px;
+  margin: 10px 0 4px 0;
+}
+.fn-small-note {
+  font-size: 8.5pt;
+  margin-top: 14px;
+  color: #000;
+}
+.fn-upd-top {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+.fn-upd-top td {
+  vertical-align: top;
+}
+.fn-upd-status {
+  border: 2px solid #000;
+  padding: 8px;
+  text-align: center;
+  width: 68px;
+  font-size: 8.5pt;
+}
+.fn-upd-head-main {
+  padding-left: 12px;
+  font-size: 10.5pt;
+}
+.fn-upd-head-main .fn-upd-name {
+  font-weight: bold;
+  font-size: 11pt;
+  margin-bottom: 4px;
+}
+table {
+  border-collapse: collapse;
+}
+th, td {
+  vertical-align: top;
+}
+.num, .td-num, td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+thead {
+  display: table-header-group;
+}
+tfoot {
+  display: table-footer-group;
+}
+tbody tr {
+  page-break-inside: auto;
+}
+.signatures,
+.sign-block,
+.footer-table {
+  page-break-inside: avoid;
+}
+.fn-avoid-break {
+  page-break-inside: avoid;
+}
+h1, h2, .header, .header-title {
+  page-break-after: avoid;
+}
+@media print {
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+}
+.fn-pp1137-appendix {
+  font-size: 8.2pt;
+  line-height: 1.25;
+  text-align: center;
+  margin: 0 0 8px 0;
+}
+.fn-sf-correction {
+  font-size: 9.5pt;
+  margin: 0 0 10px 0;
+}
+.fn-sf-doc-line {
+  font-size: 10.5pt;
+  font-weight: bold;
+  margin: 0 0 4px 0;
+  text-align: center;
+}
+.fn-sf-num-mark {
+  font-size: 8.5pt;
+  font-weight: normal;
+}
+.fn-table-1137 {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 12px 0;
+  font-size: 7.4pt;
+  table-layout: fixed;
+}
+.fn-table-1137 th,
+.fn-table-1137 td {
+  border: 1px solid #000;
+  padding: 3px 2px;
+  vertical-align: middle;
+  word-wrap: break-word;
+}
+.fn-table-1137 th {
+  background: #d9d9d9;
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.15;
+}
+.fn-table-1137 .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.fn-table-1137 tfoot td {
+  font-weight: bold;
+  background: #e8e8e8;
+}
+.fn-std-disclaimer {
+  font-size: 8pt;
+  line-height: 1.3;
+  margin: 6px 0 0 0;
+  text-align: justify;
+}
+.fn-upd-two-col {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 10px 0;
+  font-size: 9.2pt;
+}
+.fn-upd-two-col td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  vertical-align: top;
+  width: 50%;
+}
+.fn-upd-two-col .fn-ud-label {
+  width: 38%;
+  background: #ebebeb;
+  font-weight: bold;
+}
+.fn-upd-four {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 12px 0;
+  font-size: 9pt;
+}
+.fn-upd-four td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  vertical-align: top;
+}
+.fn-upd-four .fn-ud-label {
+  width: 18%;
+  background: #ebebeb;
+  font-weight: bold;
+}
+.fn-page-footer {
+  font-size: 8.5pt;
+  text-align: right;
+  margin-top: 10px;
+}
+.fn-act-signed-row {
+  margin-top: 22px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+.fn-act-signed-row td {
+  width: 50%;
+  vertical-align: top;
+  font-weight: bold;
+  text-transform: uppercase;
+  padding: 8px 6px 0 0;
+}
+</style></head>
+<body>
+<div class="fn-doc">
+    <table class="fn-upd-top fn-avoid-break">
+        <tr>
+            <td class="fn-upd-status">
+                <div style="font-weight:bold;margin-bottom:4px">Статус</div>
+                <div style="font-size:14pt;font-weight:bold">1</div>
+                <div style="margin-top:6px;font-size:7.5pt;line-height:1.15">1 — счёт-фактура<br>и передаточный<br>документ (акт)<br>2 — передаточный<br>документ (акт)</div>
+            </td>
+            <td class="fn-upd-head-main">
+                <div class="fn-upd-name">Универсальный передаточный документ</div>
+                <div class="fn-sf-doc-line">Счёт-фактура № <b>DEMO-0001</b> от <b>29 марта 2026 г.</b> <span class="fn-sf-num-mark">(1)</span></div>
+                <p class="fn-pp1137-appendix">Приложение № 1 к постановлению Правительства Российской Федерации от 26 декабря 2011 г. № 1137 (в редакции постановления Правительства Российской Федерации от 16 августа 2024 г. № 1096).</p>
+                <div class="fn-sf-correction">Исправление № — от — <span class="fn-sf-num-mark">(1а)</span></div>
+                <div style="font-size:10.5pt;margin-top:6px">УПД № <b>DEMO-0001</b> от <b>29.03.2026</b></div>
+            </td>
+        </tr>
+    </table>
+
+    <table class="fn-upd-four fn-avoid-break">
+        <tr>
+            <td class="fn-ud-label">Продавец (2)</td>
+            <td><b>ООО «Пример Поставщик»</b></td>
+            <td class="fn-ud-label">Покупатель (6)</td>
+            <td><b>ООО «Daibilet»</b></td>
+        </tr>
+        <tr>
+            <td class="fn-ud-label">Адрес (2а)</td>
+            <td>123456, г. Москва, ул. Примерная, д. 1</td>
+            <td class="fn-ud-label">Адрес (6а)</td>
+            <td>190000, г. Санкт-Петербург, пр. Тестовый, д. 2</td>
+        </tr>
+        <tr>
+            <td class="fn-ud-label">ИНН/КПП продавца (2б)</td>
+            <td><b>7700000000 / 770001001</b></td>
+            <td class="fn-ud-label">ИНН/КПП покупателя (6б)</td>
+            <td><b>7800000000 / 780101001</b></td>
+        </tr>
+        <tr>
+            <td class="fn-ud-label">Грузоотправитель и адрес (3)</td>
+            <td>он же</td>
+            <td class="fn-ud-label">Валюта: наименование, код (7)</td>
+            <td>Российский рубль, 643</td>
+        </tr>
+        <tr>
+            <td class="fn-ud-label">Грузополучатель и адрес (4)</td>
+            <td>ООО «Daibilet», 190000, г. Санкт-Петербург, пр. Тестовый, д. 2</td>
+            <td class="fn-ud-label">Идентификатор госконтракта (8)</td>
+            <td>—</td>
+        </tr>
+        <tr>
+            <td class="fn-ud-label">К платежно-расчётному документу (5)</td>
+            <td colspan="3">№ — от —</td>
+        </tr>
+        <tr>
+            <td class="fn-ud-label">Документ об отгрузке (5а)</td>
+            <td colspan="3">Универсальный передаточный документ, № DEMO-0001 от 29 марта 2026 г.</td>
+        </tr>
+    </table>
+
+    <table class="fn-table-1137">
+    <thead>
+      <tr>
+        <th style="width:4.2%">Код товара/ работ, услуг (А)</th>
+        <th style="width:2.6%">№ п/п<br>(1)</th>
+        <th>Наименование товара (описание выполненных работ, оказанных услуг), имущественного права</th>
+        <th style="width:5.5%">Код вида товара (1а)<br><span style="font-weight:normal">(1б)</span></th>
+        <th style="width:5.2%">Ед. изм.<br>(2)(2а)</th>
+        <th style="width:4.8%">Кол-во<br>(3)</th>
+        <th style="width:6.5%">Цена<br>(4)</th>
+        <th style="width:7.2%">Стоимость без НДС<br>(5)</th>
+        <th style="width:5.5%">Акциз<br>(6)</th>
+        <th style="width:4.5%">Ставка<br>(7)</th>
+        <th style="width:6.5%">Сумма НДС<br>(8)</th>
+        <th style="width:7%">Всего с НДС<br>(9)</th>
+        <th style="width:5.8%">Страна /<br>прослеж.<br>(10)(10а)(11)</th>
+      </tr>
+    </thead>
+    <tbody><tr>
+        <td style="text-align:center">—</td>
+        <td style="text-align:center">1</td>
+        <td>Агентское вознаграждение за Март 2026</td>
+        <td style="text-align:center">—</td>
+        <td style="text-align:center">796<br>усл.</td>
+        <td class="numeric">1</td>
+        <td class="numeric">6 666,67</td>
+        <td class="numeric">6 666,67</td>
+        <td style="text-align:center;font-size:6.7pt;line-height:1.1">без<br>акциза</td>
+        <td style="text-align:center">20%</td>
+        <td class="numeric">1 333,33</td>
+        <td class="numeric">8 000,00</td>
+        <td style="text-align:center">—</td>
+      </tr></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="7" style="text-align:right">Всего к оплате (9)</td>
+        <td class="numeric">6 666,67</td>
+        <td style="text-align:center">Х</td>
+        <td style="text-align:center">Х</td>
+        <td class="numeric">1 333,33</td>
+        <td class="numeric">8 000,00</td>
+        <td style="text-align:center">—</td>
+      </tr>
+    </tfoot>
+  </table>
+
+    <div class="fn-section-title" style="margin-top:10px">Документ составлен на 1 листе. Ответственные лица</div>
+    <table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin-top:4px" class="fn-avoid-break">
+        <tr>
+            <td style="width:33%;vertical-align:top;padding:6px 5px;border:1px solid #000">
+                Руководитель организации<br>или иное уполномоченное лицо<br><br>
+                <div style="border-bottom:1px solid #000;min-height:18px"></div>
+                <span style="font-size:7.5pt">(подпись) (ф.и.о.)</span>
+            </td>
+            <td style="width:33%;vertical-align:top;padding:6px 5px;border:1px solid #000">
+                Главный бухгалтер<br>или иное уполномоченное лицо<br><br>
+                <div style="border-bottom:1px solid #000;min-height:18px"></div>
+                <span style="font-size:7.5pt">(подпись) (ф.и.о.)</span>
+            </td>
+            <td style="width:34%;vertical-align:top;padding:6px 5px;border:1px solid #000">
+                Индивидуальный предприниматель<br>или иное уполномоченное лицо<br><br>
+                <div style="border-bottom:1px solid #000;min-height:18px"></div>
+                <span style="font-size:7.5pt">(подпись) (ф.и.о.) / реквизиты свидетельства о гос. регистрации ИП</span>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding:6px 5px;border:1px solid #000;vertical-align:top">
+                <b>Товар (груз) передал / услуги, результаты работ, права сдал.</b><br>
+                Дата отгрузки, передачи (сдачи): <b>29 марта 2026 г.</b>
+            </td>
+            <td style="padding:6px 5px;border:1px solid #000;vertical-align:top">
+                <b>Товар (груз) получил / услуги, результаты работ, права принял</b><br><br>
+                <div style="border-bottom:1px solid #000;min-height:18px"></div>
+                <span style="font-size:7.5pt">(должность) (подпись) (ф.и.о.)</span>
+            </td>
+        </tr>
+    </table>
+    <table class="fn-req-table" style="margin-top:8px;font-size:8.5pt">
+        <tr><td style="width:22%">Наименование экономического субъекта — составителя документа (14)</td><td><b>ООО «Пример Поставщик»</b></td></tr>
+        <tr><td>Покупатель (для сверки)</td><td><b>ООО «Daibilet»</b>, ИНН 7800000000</td></tr>
+    </table>
+    <p class="fn-page-footer">Страница 1 из 1</p>
+</div>
+</body>
+</html>
