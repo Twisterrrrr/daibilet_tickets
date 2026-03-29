@@ -77,7 +77,7 @@ export function BasicsForm({ value, onChange, handleChange, lockedFields, cities
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-800">Slug</label>
+            <label className="mb-1 block text-sm font-medium text-slate-800">Адрес страницы (URL)</label>
             <input
               value={value.slug}
               onChange={handleChange('slug')}
@@ -85,6 +85,9 @@ export function BasicsForm({ value, onChange, handleChange, lockedFields, cities
               placeholder="progulka-po-neve"
               disabled={locked.has('slug')}
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Фрагмент ссылки на сайте (после /events/), латиницей и без пробелов.
+            </p>
           </div>
         </div>
 

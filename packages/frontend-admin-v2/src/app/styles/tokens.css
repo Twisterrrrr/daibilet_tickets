@@ -1,0 +1,63 @@
+/**
+ * Design tokens — Дайбилет Admin V2
+ * Spacing scale (reference, use Tailwind spacing aligned: 1=4px, 2=8px, 3=12px, 4=16px, 5=20px, 6=24px, 8=32px, 10=40px)
+ */
+:root {
+  /* Surface & background */
+  --bg-page: 220 24% 97%;
+  --bg-surface: 0 0% 100%;
+  --bg-surface-alt: 220 18% 99%;
+
+  /* Text */
+  --text-primary: 220 16% 26%;
+  --text-secondary: 220 10% 44%;
+  --text-muted: 220 8% 58%;
+
+  /* Borders */
+  --border-soft: 220 14% 91%;
+  --border-default: 220 12% 86%;
+
+  /* Accent — умеренный холодный синий */
+  --accent: 217 78% 52%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 217 78% 52%;
+
+  /* Semantic */
+  --success: 152 56% 38%;
+  --success-soft: 152 45% 94%;
+  --warning: 38 92% 44%;
+  --warning-soft: 38 90% 94%;
+  --danger: 0 72% 48%;
+  --danger-soft: 0 70% 96%;
+  --danger-foreground: 0 72% 42%;
+
+  /* Elevation */
+  --shadow-soft: 0 1px 2px hsl(220 20% 40% / 0.05), 0 10px 30px -18px hsl(220 24% 35% / 0.07);
+
+  --radius-control: 10px;
+  --radius-card: 14px;
+
+  --content-max-width: 1180px;
+  --control-height: 40px;
+  --sidebar-width: 248px;
+  /* Рельс иконок: достаточная ширина, чтобы 16px иконка + отступы не клипались */
+  --sidebar-width-icon: 72px;
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --content-max-width: 1320px;
+  }
+}
+
+@media (min-width: 1536px) {
+  :root {
+    --content-max-width: 1460px;
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --content-max-width: min(1720px, 92vw);
+  }
+}

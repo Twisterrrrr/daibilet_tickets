@@ -29,6 +29,18 @@ import { CreateVenueDto, UpdateVenueDto, VenueAdminSummaryDto } from './dto/admi
 import { VenueAdminSummaryService } from './venue-admin-summary.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
+class UpdateVenueSubcategoriesDto {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  subcategoryIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  subcategorySlugs?: string[];
+}
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -437,16 +449,4 @@ export class AdminVenuesController {
       .replace(/^-|-$/g, '')
       .substring(0, 80);
   }
-}
-
-class UpdateVenueSubcategoriesDto {
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  subcategoryIds?: string[];
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  subcategorySlugs?: string[];
 }

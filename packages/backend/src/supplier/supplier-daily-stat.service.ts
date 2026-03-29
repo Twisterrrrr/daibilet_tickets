@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -24,6 +24,8 @@ export interface SupplierDailyStatRow {
  */
 @Injectable()
 export class SupplierDailyStatService {
+  private readonly logger = new Logger(SupplierDailyStatService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -31,36 +33,43 @@ export class SupplierDailyStatService {
    * Возвращает null, если в витрине нет ни одной строки — тогда дашборд может использовать fallback на PaymentIntent.
    */
   async getTotalsForOperator(operatorId: string): Promise<SupplierSalesTotals | null> {
-    const result = await this.prisma.$queryRaw<
-      { total_orders: bigint; gross_revenue: number; platform_fee: number; net_revenue: number }[]
-    >`
-      SELECT
-        COALESCE(SUM("ordersCount"), 0)::bigint AS total_orders,
-        COALESCE(SUM("grossAmountCents"), 0)::int AS gross_revenue,
-        COALESCE(SUM("platformFeeCents"), 0)::int AS platform_fee,
-        COALESCE(SUM("supplierAmountCents"), 0)::int AS net_revenue
-      FROM supplier_daily_stats
-      WHERE "operatorId" = ${operatorId}::uuid
-    `;
+    try {
+      const result = await this.prisma.$queryRaw<
+        { total_orders: bigint; gross_revenue: number; platform_fee: number; net_revenue: number }[]
+      >`
+        SELECT
+          COALESCE(SUM("ordersCount"), 0)::bigint AS total_orders,
+          COALESCE(SUM("grossAmountCents"), 0)::int AS gross_revenue,
+          COALESCE(SUM("platformFeeCents"), 0)::int AS platform_fee,
+          COALESCE(SUM("supplierAmountCents"), 0)::int AS net_revenue
+        FROM supplier_daily_stats
+        WHERE "operatorId" = ${operatorId}::uuid
+      `;
 
-    const row = result[0];
-    if (!row) return null;
+      const row = result[0];
+      if (!row) return null;
 
-    const totalOrders = Number(row.total_orders ?? 0);
-    const grossRevenue = Number(row.gross_revenue ?? 0);
-    const platformFee = Number(row.platform_fee ?? 0);
-    const netRevenue = Number(row.net_revenue ?? 0);
+      const totalOrders = Number(row.total_orders ?? 0);
+      const grossRevenue = Number(row.gross_revenue ?? 0);
+      const platformFee = Number(row.platform_fee ?? 0);
+      const netRevenue = Number(row.net_revenue ?? 0);
 
-    if (totalOrders === 0 && grossRevenue === 0 && platformFee === 0 && netRevenue === 0) {
+      if (totalOrders === 0 && grossRevenue === 0 && platformFee === 0 && netRevenue === 0) {
+        return null;
+      }
+
+      return {
+        totalOrders,
+        grossRevenue,
+        platformFee,
+        netRevenue,
+      };
+    } catch (e) {
+      this.logger.warn(
+        `supplier_daily_stats totals unavailable (${e instanceof Error ? e.message : String(e)}); using PaymentIntent fallback`,
+      );
       return null;
     }
-
-    return {
-      totalOrders,
-      grossRevenue,
-      platformFee,
-      netRevenue,
-    };
   }
 
   /**

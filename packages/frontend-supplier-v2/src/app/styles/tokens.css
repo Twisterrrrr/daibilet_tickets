@@ -1,0 +1,55 @@
+/**
+ * Токены оболочки — синхрон с admin-v2 (легковесный кабинет поставщика).
+ */
+:root {
+  --bg-page: 220 24% 97%;
+  --bg-surface: 0 0% 100%;
+  --bg-surface-alt: 220 18% 99%;
+
+  --text-primary: 220 16% 26%;
+  --text-secondary: 220 10% 44%;
+  --text-muted: 220 8% 58%;
+
+  --border-soft: 220 14% 91%;
+  --border-default: 220 12% 86%;
+
+  --accent: 217 78% 52%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 217 78% 52%;
+
+  --success: 152 56% 38%;
+  --success-soft: 152 45% 94%;
+  --warning: 38 92% 44%;
+  --warning-soft: 38 90% 94%;
+  --danger: 0 72% 48%;
+  --danger-soft: 0 70% 96%;
+  --danger-foreground: 0 72% 42%;
+
+  --shadow-soft: 0 1px 2px hsl(220 20% 40% / 0.05), 0 10px 30px -18px hsl(220 24% 35% / 0.07);
+
+  --radius-control: 10px;
+  --radius-card: 14px;
+
+  --content-max-width: 1180px;
+  --control-height: 40px;
+  --sidebar-width: 248px;
+  --sidebar-width-icon: 72px;
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --content-max-width: 1320px;
+  }
+}
+
+@media (min-width: 1536px) {
+  :root {
+    --content-max-width: 1460px;
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --content-max-width: min(1720px, 92vw);
+  }
+}

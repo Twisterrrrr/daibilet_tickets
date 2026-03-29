@@ -324,7 +324,7 @@ export function CollectionEditPage() {
     <div className="space-y-6">
       <PageHeader
         title={isNew ? 'Новая подборка' : form.title || 'Подборка'}
-        subtitle={isNew ? 'Создание тематической подборки' : `Slug: ${form.slug}`}
+        subtitle={isNew ? 'Создание тематической подборки' : `URL: ${form.slug}`}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => navigate('/collections')}>
@@ -371,7 +371,7 @@ export function CollectionEditPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Slug *</Label>
+                  <Label>Адрес подборки (URL) *</Label>
                   <Input
                     value={form.slug}
                     onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value }))}
@@ -510,7 +510,7 @@ export function CollectionEditPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Теги (slug, OR-логика)</Label>
+                <Label>Теги (имя в URL, логика ИЛИ)</Label>
                 <div className="flex gap-2">
                   <Input
                     value={tagInput}
