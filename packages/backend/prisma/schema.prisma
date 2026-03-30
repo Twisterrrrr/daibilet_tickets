@@ -1028,7 +1028,8 @@ model ComboPage {
 
 model LandingPage {
   id                String    @id @default(uuid()) @db.Uuid
-  slug              String    @unique // URL: /cities/:citySlug/:slug
+  /** Сегмент URL; уникальность только в паре с городом (@@unique([cityId, slug])). */
+  slug              String
   cityId            String    @db.Uuid
   collectionId      String?   @db.Uuid
   selectionMode     LandingSelectionMode @default(CUSTOM)

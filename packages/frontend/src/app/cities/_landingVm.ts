@@ -223,3 +223,25 @@ export function getLandingCitySlug(item: { city?: unknown; slug: string }): stri
   const c = toCity(item.city);
   return c?.slug ?? null;
 }
+
+/** Режим чипов времени в фильтрах: ночные мосты / вечерние круизы / скрыть (дневные экскурсии). */
+export type LandingTimeSlotMode = 'night' | 'evening' | 'hidden';
+
+const NIGHT_BRIDGE_LANDING_SLUGS = new Set(['nochnye-mosty']);
+
+const HIDE_TIME_SLOT_LANDING_SLUGS = new Set([
+  'meteory',
+  'sviyazhsk',
+  'kurshskaya-kosa',
+  'zolotye-vorota',
+  'strelka-i-volga',
+  'nizhegorodskij-kreml',
+  'kanatnaya-doroga',
+  'progulki-po-volge',
+]);
+
+export function landingTimeSlotMode(landingSlug: string): LandingTimeSlotMode {
+  if (NIGHT_BRIDGE_LANDING_SLUGS.has(landingSlug)) return 'night';
+  if (HIDE_TIME_SLOT_LANDING_SLUGS.has(landingSlug)) return 'hidden';
+  return 'evening';
+}

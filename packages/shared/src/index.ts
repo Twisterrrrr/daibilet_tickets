@@ -10,6 +10,12 @@ export { getScarcityState, type ScarcityLevel, type ScarcityState } from './sess
 declare var console: { warn: (...args: unknown[]) => void; log: (...args: unknown[]) => void; error: (...args: unknown[]) => void };
 
 // --- Widget Payload Validation ---
+export {
+  dateToMoscowISO,
+  getMoscowTodayISO,
+  getMoscowTomorrowISO,
+  moscowCalendarDayFromIso,
+} from './moscow-calendar';
 export { shortenAddressToStreet } from './address-utils';
 export { cityToPrepositional } from './city-declension';
 export { normalizeEventTitle } from './normalize-title';

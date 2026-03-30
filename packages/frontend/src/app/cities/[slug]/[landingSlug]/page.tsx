@@ -1,7 +1,10 @@
 import { ArrowDown, ChevronRight, Shield, Star, TrendingUp } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+
+import { matchesBusToursCanonicalLanding } from '@/app/bus-tours/bus-tours-routing';
+import { matchesRiverCruiseCanonicalLanding } from '@/app/river-cruises/river-cruises-routing';
 
 import {
   HowToChoose,
@@ -13,7 +16,7 @@ import {
 } from '@/components/landing/ContentSections';
 import { FaqSection } from '@/components/landing/FaqSection';
 import { api } from '@/lib/api';
-import { getLandingCitySlug, toLandingVM } from '../../_landingVm';
+import { getLandingCitySlug, landingTimeSlotMode, toLandingVM } from '../../_landingVm';
 
 import { LandingClient } from './LandingClient';
 
@@ -51,6 +54,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       undefined;
     return { title, description };
   } catch {
+    if (
+      matchesRiverCruiseCanonicalLanding(slug, landingSlug) ||
+      matchesBusToursCanonicalLanding(slug, landingSlug)
+    ) {
+      redirect(`/cities/${slug}`);
+    }
     return { title: 'Страница не найдена' };
   }
 }
@@ -71,6 +80,12 @@ export default async function LandingPage({ params }: Props) {
   try {
     data = await api.getCatalogLandingByCityAndSlug(citySlug, landingSlug);
   } catch {
+    if (
+      matchesRiverCruiseCanonicalLanding(citySlug, landingSlug) ||
+      matchesBusToursCanonicalLanding(citySlug, landingSlug)
+    ) {
+      redirect(`/cities/${citySlug}`);
+    }
     notFound();
   }
 
@@ -174,7 +189,12 @@ export default async function LandingPage({ params }: Props) {
         {/* Filters + Table/Cards */}
         <div id="variants">
           <h2 className="mb-4 text-xl font-bold text-slate-900 sm:text-2xl">Расписание рейсов</h2>
-          <LandingClient variants={vm.variants} filters={vm.filters} templateType={vm.templateType} />
+          <LandingClient
+            variants={vm.variants}
+            filters={vm.filters}
+            templateType={vm.templateType}
+            timeSlotMode={landingTimeSlotMode(landingSlug)}
+          />
         </div>
 
         {/* Stats Badge */}

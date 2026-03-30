@@ -72,7 +72,12 @@ export default async function NochnyeMostyLabPage() {
           </div>
 
           <div id="variants-list">
-            <LandingClient variants={vm.variants} filters={vm.filters} templateType={vm.templateType} />
+            <LandingClient
+              variants={vm.variants}
+              filters={vm.filters}
+              templateType={vm.templateType}
+              timeSlotMode="night"
+            />
           </div>
         </section>
       </main>

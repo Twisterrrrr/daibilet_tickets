@@ -135,6 +135,7 @@
 | Task 10 Admin Intelligence A–C | ✅ |
 | Tags 3 Sprint | ✅ |
 | Collections + Landings rollout & hardening | ✅ |
+| Лендинги: хабы river-cruises / bus-tours, салют 9 мая, shared MSK-даты, табы сортировки FilterBar | ✅ 30.03.2026 |
 | FULL TECH DEBT волны A/B/C | ✅ 24.03.2026 |
 | Supplier Trust ST-1…ST-4, ST-7 частично | ✅ |
 | P3 / P3.1 Legal & Tax layer | ✅ |

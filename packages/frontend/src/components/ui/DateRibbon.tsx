@@ -124,10 +124,14 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
   const isOtherDateSelected =
     selected && !days.some((d) => d.iso === selected) && selected !== `${weekendSat}..${weekendSun}`;
 
-  // При открытии календаря показывать месяц выбранной даты или текущий
+  /** Подсветка в попапе — только для даты, выбранной через «Другая дата», не с ленты Сегодня/Завтра */
+  const calendarSelectedIso =
+    isOtherDateSelected && selected && selected.length === 10 && !selected.includes('..') ? selected : null;
+
+  // Месяц в календаре: только если выбрана кастомная дата (иначе текущий месяц при открытии)
   useEffect(() => {
-    if (calendarOpen && selected && selected.length === 10) {
-      const [y, m] = selected.split('-').map(Number);
+    if (calendarOpen && calendarSelectedIso) {
+      const [y, m] = calendarSelectedIso.split('-').map(Number);
       setDisplayMonth((prev) => {
         const next = new Date(prev);
         next.setFullYear(y, m - 1, 1);
@@ -135,7 +139,7 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
         return next;
       });
     }
-  }, [calendarOpen, selected]);
+  }, [calendarOpen, calendarSelectedIso]);
 
   // Клик снаружи — закрыть календарь
   useEffect(() => {
@@ -318,7 +322,7 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
                   className={`min-w-[32px] rounded-lg py-1.5 text-sm transition-colors ${
                     !cell.iso || cell.isPast
                       ? 'cursor-default text-slate-300'
-                      : cell.iso === selected
+                      : calendarSelectedIso && cell.iso === calendarSelectedIso
                         ? 'bg-primary-600 text-white hover:bg-primary-700'
                         : 'text-slate-700 hover:bg-slate-100'
                   }`}

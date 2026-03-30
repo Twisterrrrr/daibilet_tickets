@@ -1,7 +1,9 @@
 'use client';
 
+import { moscowCalendarDayFromIso } from '@daibilet/shared';
 import { useMemo, useState } from 'react';
 
+import type { LandingTimeSlotMode } from '@/app/cities/_landingVm';
 import { ComparisonTable } from '@/components/landing/ComparisonTable';
 import { FilterBar, type FilterState } from '@/components/landing/FilterBar';
 import { VariantCards } from '@/components/landing/VariantCard';
@@ -23,27 +25,50 @@ function getHourMinute(iso: string): { h: number; m: number } {
   return { h: moscow.getHours(), m: moscow.getMinutes() };
 }
 
-function matchTimeSlot(iso: string, slot: string): boolean {
-  if (!slot) return true;
+function matchTimeSlot(iso: string, slot: string, mode: LandingTimeSlotMode): boolean {
+  if (!slot || mode === 'hidden') return true;
   const { h, m } = getHourMinute(iso);
   const time = h * 60 + m;
+  if (mode === 'evening') {
+    if (slot === 'ev-17-19') return time >= 17 * 60 && time < 19 * 60;
+    if (slot === 'ev-19-21') return time >= 19 * 60 && time < 21 * 60;
+    if (slot === 'ev-21-plus') return time >= 21 * 60 || time < 3 * 60;
+    return true;
+  }
   if (slot === 'before-23:30') return time < 1410 && time >= 360;
   if (slot === '23:30-00:30') return time >= 1410 || time <= 30;
   if (slot === 'after-00:30') return time > 30 && time < 360;
   return true;
 }
 
+const FILTER_BAR_COPY: Record<
+  LandingTimeSlotMode,
+  { title?: string; subtitle?: string }
+> = {
+  night: {},
+  evening: {
+    title: 'Подберите день и время',
+    subtitle:
+      'Сначала выберите дату (чипы или календарь), затем при необходимости сузьте интервал отправления — строки таблицы соответствуют фильтрам.',
+  },
+  hidden: {
+    title: 'Подберите вариант',
+    subtitle:
+      'Выберите день с сеансами, при необходимости причал и цену — список ниже обновляется так же, как на лендинге ночных мостов.',
+  },
+};
+
 /** Оценка варианта для «Оптимального выбора» */
 function scoreOffer(v: Variant, allPrices: number[]): number {
   const price = getPrice(v);
-  const { h, m } = getHourMinute(v.startsAt);
-  const timeMin = h * 60 + m;
-  // Нормализация: ночные рейсы после полуночи → +1440
-  const normTime = timeMin < 720 ? timeMin + 1440 : timeMin;
-
-  // Близость к полуночи (0:00 = 1440 нормализовано)
-  const distToMid = Math.abs(normTime - 1440);
-  const timeScore = 1 - Math.min(distToMid / 120, 1);
+  let timeScore = 0.5;
+  if (v.startsAt) {
+    const { h, m } = getHourMinute(v.startsAt);
+    const timeMin = h * 60 + m;
+    const normTime = timeMin < 720 ? timeMin + 1440 : timeMin;
+    const distToMid = Math.abs(normTime - 1440);
+    timeScore = 1 - Math.min(distToMid / 120, 1);
+  }
 
   // Цена
   const minP = Math.min(...allPrices);
@@ -88,9 +113,10 @@ function sortVariants(variants: Variant[], sort: string): Variant[] {
   } else {
     // По времени (default), с нормализацией полуночи
     out.sort((a, b) => {
-      const ta = new Date(a.startsAt).getTime();
-      const tb = new Date(b.startsAt).getTime();
-      return ta - tb;
+      if (!a.startsAt && !b.startsAt) return 0;
+      if (!a.startsAt) return 1;
+      if (!b.startsAt) return -1;
+      return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
     });
   }
   return out;
@@ -100,10 +126,12 @@ export function LandingClient({
   variants: allVariants,
   filters: apiFilters,
   templateType,
+  timeSlotMode = 'night',
 }: {
   variants: Variant[];
   filters: Filters;
   templateType: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
+  timeSlotMode?: LandingTimeSlotMode;
 }) {
   const [filterState, setFilterState] = useState<FilterState>({
     date: '',
@@ -120,12 +148,13 @@ export function LandingClient({
       if (!filterState.showSoldOut && v.availableTickets <= 0) return false;
       // Date
       if (filterState.date) {
-        const vDate = new Date(v.startsAt).toISOString().slice(0, 10);
-        if (vDate !== filterState.date) return false;
+        if (!v.startsAt) return false;
+        if (moscowCalendarDayFromIso(v.startsAt) !== filterState.date) return false;
       }
       // Time slot
       if (filterState.timeSlot) {
-        if (!matchTimeSlot(v.startsAt, filterState.timeSlot)) return false;
+        if (!v.startsAt) return false;
+        if (!matchTimeSlot(v.startsAt, filterState.timeSlot, timeSlotMode)) return false;
       }
       // Pier
       if (filterState.pier) {
@@ -137,11 +166,13 @@ export function LandingClient({
       }
       return true;
     });
-  }, [allVariants, filterState]);
+  }, [allVariants, filterState, timeSlotMode]);
 
   const sorted = useMemo(() => sortVariants(filtered, filterState.sort), [filtered, filterState.sort]);
 
   const bestDealIdx = useMemo(() => pickOptimal(sorted), [sorted]);
+
+  const filterCopy = FILTER_BAR_COPY[timeSlotMode];
 
   return (
     <div className="space-y-4">
@@ -149,7 +180,10 @@ export function LandingClient({
         piers={apiFilters.piers}
         priceRange={apiFilters.priceRange as [number, number]}
         dates={apiFilters.dates}
+        timeSlotMode={timeSlotMode}
         onFilterChange={setFilterState}
+        filterTitle={filterCopy.title}
+        filterSubtitle={filterCopy.subtitle}
       />
 
       {/* Количество и подсказка */}
@@ -166,11 +200,12 @@ export function LandingClient({
         )}
       </div>
 
-      {/* Template rendering */}
+      {/* Таблица: COMPARISON_TABLE и HYBRID — на всех ширинах (горизонтальный скролл на телефоне) */}
       {(templateType === 'COMPARISON_TABLE' || templateType === 'HYBRID') && (
         <ComparisonTable variants={sorted} bestDealIdx={bestDealIdx} />
       )}
-      {(templateType === 'GENERIC_CARDS' || templateType === 'HYBRID' || templateType === 'SEASONAL_EVENT') && (
+      {/* Карточки: только GENERIC / SEASONAL (без дубля с таблицей в HYBRID) */}
+      {(templateType === 'GENERIC_CARDS' || templateType === 'SEASONAL_EVENT') && (
         <VariantCards variants={sorted} bestDealIdx={bestDealIdx} />
       )}
     </div>

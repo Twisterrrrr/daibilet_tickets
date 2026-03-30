@@ -1,10 +1,14 @@
-import { getFirstPriceKopecks } from '@daibilet/shared';
+import { getFirstPriceKopecks, moscowCalendarDayFromIso } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DateMode, LandingStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 import { buildLandingEventsWhere } from './landing-event-filter.helper';
+
+type LandingWithCity = Prisma.LandingPageGetPayload<{
+  include: { city: { select: { slug: true; name: true; id: true } } };
+}>;
 
 @Injectable()
 export class LandingService {
@@ -41,10 +45,14 @@ export class LandingService {
     });
   }
 
-  /** Полный лендинг + варианты (сессии событий) + фильтры */
+  /**
+   * Legacy: GET /landings/:slug без города.
+   * При нескольких лендингах с одним slug выбирается самая ранняя запись по createdAt (обычно Москва для rechnye-progulki).
+   */
   async getBySlug(slug: string) {
-    const landing = await this.prisma.landingPage.findUnique({
-      where: { slug },
+    const landing = await this.prisma.landingPage.findFirst({
+      where: { slug, isDeleted: false },
+      orderBy: { createdAt: 'asc' },
       include: {
         city: { select: { slug: true, name: true, id: true } },
       },
@@ -54,6 +62,10 @@ export class LandingService {
       throw new NotFoundException(`Лендинг "${slug}" не найден`);
     }
 
+    return this.buildLandingPayload(landing);
+  }
+
+  private async buildLandingPayload(landing: LandingWithCity) {
     // Находим тег для фильтрации
     const tag = await this.prisma.tag.findFirst({
       where: { slug: landing.filterTag, isActive: true },
@@ -173,8 +185,8 @@ export class LandingService {
 
     const allDates = variants
       .filter((v) => v.startsAt != null)
-      .map((v) => new Date(v.startsAt!).toISOString().slice(0, 10));
-    const uniqueDates = [...new Set(allDates)].sort();
+      .map((v) => moscowCalendarDayFromIso((v.startsAt as Date).toISOString()));
+    const uniqueDates = [...new Set(allDates)].filter((d): d is string => Boolean(d)).sort();
 
     const filters = {
       piers,
@@ -187,6 +199,7 @@ export class LandingService {
       landing: {
         id: landing.id,
         slug: landing.slug,
+        templateType: landing.templateType,
         title: landing.title,
         subtitle: landing.subtitle,
         heroText: landing.heroText,
@@ -218,7 +231,7 @@ export class LandingService {
       include: { city: { select: { slug: true, name: true, id: true } } },
     });
     if (!landing) throw new NotFoundException(`Лендинг "${slug}" не найден`);
-    return this.getBySlug(landing.slug);
+    return this.buildLandingPayload(landing);
   }
 
   async getFeaturedForCollections(citySlug: string) {

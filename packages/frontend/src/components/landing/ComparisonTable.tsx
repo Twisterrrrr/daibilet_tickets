@@ -6,7 +6,7 @@ import { TcWidgetButton } from '@/components/ui/TcWidget';
 
 interface Variant {
   sessionId: string;
-  startsAt: string;
+  startsAt?: string;
   endsAt?: string;
   availableTickets: number;
   prices: Array<{ type: string; amount?: number; price?: number }>;
@@ -29,7 +29,8 @@ interface ComparisonTableProps {
   bestDealIdx: number | null;
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string | undefined): string {
+  if (!iso) return '—';
   return new Date(iso).toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
@@ -37,7 +38,8 @@ function formatTime(iso: string): string {
   });
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | undefined): string {
+  if (!iso) return '—';
   return new Date(iso).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'short',
@@ -92,7 +94,7 @@ function Pill({ children, className = '' }: { children: React.ReactNode; classNa
 export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps) {
   if (variants.length === 0) {
     return (
-      <div className="hidden rounded-2xl border border-slate-200 bg-white p-12 text-center md:block">
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center sm:p-12">
         <Ship className="mx-auto h-12 w-12 text-slate-300" />
         <p className="mt-3 text-lg font-semibold text-slate-500">Нет рейсов по выбранным фильтрам</p>
         <p className="mt-1 text-sm text-slate-400">Попробуйте сбросить фильтры или выбрать другую дату</p>
@@ -101,8 +103,8 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
   }
 
   return (
-    <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
-      <table className="w-full text-sm">
+    <div className="w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm [-webkit-overflow-scrolling:touch]">
+      <table className="w-full min-w-[680px] text-sm">
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
             <th className="w-[110px] px-4 py-3">Время</th>
@@ -117,10 +119,11 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
             const price = getPrice(v);
             const isBest = idx === bestDealIdx;
             const isSoldOut = v.availableTickets <= 0;
+            const rowKey = v.sessionId ?? `${v.event.id}-${idx}`;
 
             return (
               <tr
-                key={v.sessionId}
+                key={rowKey}
                 className={`transition-colors ${
                   isBest ? 'bg-gradient-to-r from-primary-50/60 to-transparent' : 'hover:bg-slate-50/50'
                 } ${isSoldOut ? 'opacity-50' : ''}`}

@@ -11,6 +11,7 @@ import { ChatWidget } from '@/components/ui/ChatWidget';
 import { Header } from '@/components/layout/Header';
 import { ScrollProgress } from '@/components/ui/ScrollProgress';
 import { WebVitalsReporter } from '@/components/WebVitalsReporter';
+import { FavoritesProvider } from '@/hooks/useFavorites';
 import { UserAuthProvider } from '@/hooks/useUserAuth';
 import { CartProvider } from '@/lib/cart';
 
@@ -33,21 +34,23 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru">
+    <html lang="ru" data-scroll-behavior="smooth">
       <body className="flex min-h-screen min-w-0 flex-col">
         <ScrollProgress />
         <WebVitalsReporter />
         <CartProvider>
           <UserAuthProvider>
-            <Suspense fallback={<header className="sticky top-0 z-50 h-16 border-b border-slate-200 bg-white" />}>
-              <Header />
-            </Suspense>
-            <main className="min-w-0 flex-1">
-              <ErrorBoundary>{children}</ErrorBoundary>
-            </main>
-            <Footer />
-            <ChatWidget />
-            <CookieConsent />
+            <FavoritesProvider>
+              <Suspense fallback={<header className="sticky top-0 z-50 h-16 border-b border-slate-200 bg-white" />}>
+                <Header />
+              </Suspense>
+              <main className="min-w-0 flex-1">
+                <ErrorBoundary>{children}</ErrorBoundary>
+              </main>
+              <Footer />
+              <ChatWidget />
+              <CookieConsent />
+            </FavoritesProvider>
           </UserAuthProvider>
         </CartProvider>
 

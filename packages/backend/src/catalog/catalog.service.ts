@@ -812,7 +812,8 @@ export class CatalogService {
       .update(JSON.stringify({ ...query, nocache: undefined }))
       .digest('hex')
       .slice(0, 16);
-    const cacheKey = cacheKeys.catalog.list(`${query.city || 'all'}:${paramsHash}`);
+    const cityKey = query.cityId || query.city || 'all';
+    const cacheKey = cacheKeys.catalog.list(`${cityKey}:${paramsHash}`);
 
     if (!nocache) {
       const cached = await this.cache.getOrSet(cacheKey, CACHE_TTL.EVENT_LIST, () => this.fetchEvents(query));
@@ -1070,6 +1071,7 @@ export class CatalogService {
   private async fetchEvents(query: EventsQueryDto & { cityIds?: string[] }) {
     const {
       city,
+      cityId,
       cityIds,
       category,
       subcategory,
@@ -1161,10 +1163,14 @@ export class CatalogService {
     const structuralTagsList = parseCsvSlugs(structuralTags ?? tagsCsvParam);
     const popularTagsList = parseCsvSlugs(popularTags);
 
+    // Для новых SEO-лендингов предпочитаем фильтр по cityId.
+    // Публичный контракт (city=slug) не ломаем: если задан city — работает как раньше.
+    const effectiveCityIds = cityIds?.length ? cityIds : cityId ? [cityId] : undefined;
+
     const baseWhere = buildEventWhere(
       {
-        city,
-        cityIds,
+        city: cityId ? undefined : city,
+        cityIds: effectiveCityIds,
         category,
         subcategory,
         audience,

@@ -9,6 +9,11 @@ export class EventsQueryDto {
   @IsString()
   city?: string;
 
+  @ApiPropertyOptional({ description: 'UUID города (предпочтительно для внутренних SEO-лендингов)' })
+  @IsOptional()
+  @IsString()
+  cityId?: string;
+
   @ApiPropertyOptional({ enum: EventCategory })
   @IsOptional()
   @IsEnum(EventCategory)
