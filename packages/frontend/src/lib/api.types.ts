@@ -217,6 +217,8 @@ export interface LandingPageResponse {
     reviews?: unknown[];
     relatedLinks?: unknown[];
     legalText?: string | null;
+    /** Сезонный лендинг: точки обзора, советы */
+    seasonalPayload?: { viewpoints?: unknown[]; tips?: string[] } | null;
   };
   variants?: unknown[];
   filters?: unknown[];

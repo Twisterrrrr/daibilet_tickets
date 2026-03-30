@@ -35,6 +35,14 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  /** Салют: хаб остаётся /salute-9-may; городские страницы — канон в /cities */
+  async redirects() {
+    return [
+      { source: '/salute-9-may/spb', destination: '/cities/saint-petersburg/salute-9-may', permanent: true },
+      { source: '/salute-9-may/:citySlug', destination: '/cities/:citySlug/salute-9-may', permanent: true },
+    ];
+  },
+
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 86400, // 24h — кэш картинок (api.teplohod.info иногда даёт 504, кэш снижает нагрузку)

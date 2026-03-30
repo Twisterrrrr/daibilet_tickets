@@ -28,6 +28,7 @@ import { LandingMaterializerService } from '../landing/landing-materializer.serv
 import { CreateLandingDto, UpdateLandingDto } from './dto/admin.dto';
 import {
   AdditionalFiltersSchema,
+  SeasonalPayloadSchema,
   FaqSchema,
   HowToChooseSchema,
   InfoBlockSchema,
@@ -95,6 +96,7 @@ export class AdminLandingsController {
       ...data,
       additionalFilters: data.additionalFilters ? toJsonValue(data.additionalFilters) : undefined,
       rankingJson: data.rankingJson ? toJsonValue(data.rankingJson) : undefined,
+      seasonalPayload: data.seasonalPayload ? toJsonValue(data.seasonalPayload) : undefined,
       status: data.status ?? (data.isActive ? LandingStatus.ACTIVE : LandingStatus.DRAFT),
     };
     return this.prisma.landingPage.create({ data: prismaData as Parameters<typeof this.prisma.landingPage.create>[0]['data'] });
@@ -117,6 +119,7 @@ export class AdminLandingsController {
             ...clean,
             ...(clean.rankingJson !== undefined ? { rankingJson: toJsonValue(clean.rankingJson) } : {}),
             ...(clean.additionalFilters !== undefined ? { additionalFilters: toJsonValue(clean.additionalFilters) } : {}),
+            ...(clean.seasonalPayload !== undefined ? { seasonalPayload: toJsonValue(clean.seasonalPayload) } : {}),
             version: { increment: 1 },
           },
         }),
@@ -247,6 +250,8 @@ export class AdminLandingsController {
       if (data.infoBlocks !== undefined) validateJson(InfoBlockSchema, data.infoBlocks, 'infoBlocks');
       if (data.additionalFilters !== undefined)
         validateJson(AdditionalFiltersSchema, data.additionalFilters, 'additionalFilters');
+      if (data.seasonalPayload !== undefined && data.seasonalPayload !== null)
+        validateJson(SeasonalPayloadSchema, data.seasonalPayload, 'seasonalPayload');
     } catch (e: unknown) {
       throw new BadRequestException(e instanceof Error ? e.message : String(e));
     }

@@ -6,10 +6,13 @@ export const SALUTE_TAG = 'salyut-9-maya';
  * SEO и тексты городов синхронизированы с эталоном в репозитории
  * https://github.com/Twisterrrrr/city-landing-enhancer (src/data/salute-landings.ts).
  * Slug города — как в API Дайбилет (например saint-petersburg, не spb).
+ * Канон страницы города: /cities/:citySlug/salute-9-may (данные лендинга в БД);
+ * этот модуль — fallback, если в API нет seasonalPayload / полей.
  */
 export function saluteContentForCity(citySlug?: string): SaluteLandingContent {
   if (citySlug === 'moscow') {
     return {
+      heroTitle: 'Салют 9 мая в Москве сегодня — лучшие точки обзора и экскурсии',
       seoTitle: 'Салют 9 мая в Москве — лучшие точки обзора и экскурсии | Дайбилет',
       seoDescription:
         'Где смотреть салют 9 мая в Москве: речные прогулки, автобусные туры и платные форматы с комфортом. Сравните предложения на Дайбилет.',
@@ -73,6 +76,7 @@ export function saluteContentForCity(citySlug?: string): SaluteLandingContent {
 
   if (citySlug === 'saint-petersburg') {
     return {
+      heroTitle: 'Салют 9 мая в Санкт-Петербурге сегодня — экскурсии и теплоходы',
       seoTitle: 'Салют 9 мая в Санкт-Петербурге — с Невы, теплоходы и билеты | Дайбилет',
       seoDescription:
         'Салют 9 мая в Петербурге с борта теплохода на Неве: разводные мосты, панорама Петропавловки. Сравните речные и другие форматы на Дайбилет.',
@@ -142,6 +146,7 @@ export function saluteContentForCity(citySlug?: string): SaluteLandingContent {
 
   if (citySlug === 'kazan') {
     return {
+      heroTitle: 'Салют 9 мая в Казани сегодня — смотровые точки и экскурсии',
       seoTitle: 'Салют 9 мая в Казани — набережная, Кремль и речные прогулки | Дайбилет',
       seoDescription:
         'Где смотреть салют 9 мая в Казани: набережная Казанки, Кремль, речные прогулки. Сравните предложения на Дайбилет.',
@@ -173,6 +178,7 @@ export function saluteContentForCity(citySlug?: string): SaluteLandingContent {
 
   if (citySlug === 'nizhny-novgorod') {
     return {
+      heroTitle: 'Салют 9 мая в Нижнем Новгороде сегодня — точки обзора и экскурсии',
       seoTitle: 'Салют 9 мая в Нижнем Новгороде — Ока, Волга и точки обзора | Дайбилет',
       seoDescription:
         'Салют 9 мая в Нижнем Новгороде: слияние Оки и Волги, Чкаловская лестница. Речные и другие форматы на Дайбилет.',
@@ -203,6 +209,7 @@ export function saluteContentForCity(citySlug?: string): SaluteLandingContent {
   }
 
   return {
+    heroTitle: 'Салют 9 мая — лучшие точки обзора и экскурсии',
     seoTitle: 'Салют 9 мая 2026 — где смотреть по городам России | Дайбилет',
     seoDescription: 'Выберите город и сравните варианты: теплоходы, рестораны, крыши и обзорные точки.',
     introText:

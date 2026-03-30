@@ -35,6 +35,7 @@ export const RelatedLinkSchema = z.array(
   z.object({
     title: z.string().min(1),
     href: z.string().min(1),
+    description: z.string().optional(),
   }),
 );
 
@@ -98,6 +99,34 @@ export const AdditionalFiltersSchema = z
     features: z.array(z.string()).optional(),
   })
   .optional();
+
+// ========================
+// Seasonal landing (салют 9 мая и др.)
+// ========================
+export const SeasonalPayloadSchema = z
+  .object({
+    viewpoints: z
+      .array(
+        z.object({
+          name: z.string().min(1),
+          description: z.string().min(1),
+          isFree: z.boolean(),
+        }),
+      )
+      .optional(),
+    tips: z.array(z.string()).optional(),
+    seasonWindow: z
+      .object({
+        startMonthDay: z
+          .string()
+          .regex(/^[0-1]\d-[0-3]\d$/, 'Формат MM-DD, например 03-01'),
+        endMonthDay: z
+          .string()
+          .regex(/^[0-1]\d-[0-3]\d$/, 'Формат MM-DD, например 05-09'),
+      })
+      .optional(),
+  })
+  .strict();
 
 // ========================
 // Peak Ranges (PricingConfig)

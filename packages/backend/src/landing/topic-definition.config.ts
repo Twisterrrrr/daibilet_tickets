@@ -31,14 +31,18 @@ export const TOPIC_DEFINITIONS_CITY: TopicDefinitionCity[] = [
   { citySlug: 'saint-petersburg', slug: 'avtobusnye-ekskursii', filterTag: 'bus-tours-saint-petersburg', minEvents: 3 },
   { citySlug: 'saint-petersburg', slug: 'meteory', filterTag: 'meteor-petergof', minEvents: 3 },
   { citySlug: 'saint-petersburg', slug: 'salyut', filterTag: 'salyut-s-vody', minEvents: 2 },
+  { citySlug: 'saint-petersburg', slug: 'salute-9-may', filterTag: 'salyut-9-maya', minEvents: 0 },
   // Москва
   { citySlug: 'moscow', slug: 'rechnye-progulki', filterTag: 'rechnye-progulki-msk', minEvents: 3 },
   { citySlug: 'moscow', slug: 'avtobusnye-ekskursii', filterTag: 'bus-tours-moscow', minEvents: 3 },
+  { citySlug: 'moscow', slug: 'salute-9-may', filterTag: 'salyut-9-maya', minEvents: 0 },
   // Казань
   { citySlug: 'kazan', slug: 'rechnye-progulki', filterTag: 'river-cruises-kazan', minEvents: 0 },
+  { citySlug: 'kazan', slug: 'salute-9-may', filterTag: 'salyut-9-maya', minEvents: 0 },
   { citySlug: 'kazan', slug: 'sviyazhsk', filterTag: 'sviyazhsk', minEvents: 2 },
   // Нижний Новгород
   { citySlug: 'nizhny-novgorod', slug: 'rechnye-progulki', filterTag: 'river-cruises-nizhny-novgorod', minEvents: 0 },
+  { citySlug: 'nizhny-novgorod', slug: 'salute-9-may', filterTag: 'salyut-9-maya', minEvents: 0 },
   { citySlug: 'nizhny-novgorod', slug: 'progulki-po-volge', filterTag: 'progulki-volga-nn', minEvents: 3 },
   { citySlug: 'nizhny-novgorod', slug: 'nizhegorodskij-kreml', filterTag: 'kreml-nn', minEvents: 2 },
   { citySlug: 'nizhny-novgorod', slug: 'kanatnaya-doroga', filterTag: 'kanatka-nn', minEvents: 2 },

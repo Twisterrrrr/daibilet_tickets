@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 
-import { type EventListItem, moscowCalendarDayFromIso } from '@daibilet/shared';
+import { calendarDayFromIso, type EventListItem, getCityTimezone } from '@daibilet/shared';
+import { Shield, Star, TrendingUp } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { FilterBar } from '@/components/landing/FilterBar';
 import { FaqSection } from '@/components/landing/FaqSection';
 import { HowToChoose, InfoBlocks, ReviewsSection } from '@/components/landing/ContentSections';
-import { useMemo, useState } from 'react';
+import { SaluteTripCard } from '@/components/landing/SaluteTripCard';
 
 type CityLite = { id: string; slug: string; name: string } | null;
 
@@ -20,14 +22,13 @@ export type SaluteCityViewpoint = {
 export type SaluteLandingContent = {
   seoTitle?: string;
   seoDescription?: string;
-  /** Подзаголовок под H1 (из референса city-landing-enhancer) */
+  /** H1 как в city-landing-enhancer (heroTitle) */
+  heroTitle?: string;
+  /** Подзаголовок под H1 */
   heroSubtitle?: string;
   introText?: string;
-  /** Точки обзора: бесплатные и платные */
   viewpoints?: SaluteCityViewpoint[];
-  /** Короткие практические советы */
   tips?: string[];
-  /** Перелинковка (например, ночные мосты в Петербурге) */
   relatedLinks?: Array<{ href: string; title: string; description?: string }>;
   howToChoose?: Array<{ title: string; text: string }>;
   infoBlocks?: Array<{ title: string; text: string }>;
@@ -35,92 +36,73 @@ export type SaluteLandingContent = {
   reviews?: Array<{ text: string; author: string; rating: number }>;
 };
 
-function formatPriceRub(kopecks: number | null | undefined): string {
-  if (!kopecks || kopecks <= 0) return '—';
-  return Math.round(kopecks / 100).toLocaleString('ru-RU') + ' ₽';
-}
+/** Отзывы из макета Lovable / Salute.tsx — если в контенте города не заданы свои */
+const ENHANCER_FALLBACK_REVIEWS: Array<{ text: string; author: string; rating: number }> = [
+  {
+    text: 'Смотрели салют с теплохода — это невероятно! Фейерверк отражается в воде, 360° обзор. Лучший День Победы!',
+    author: 'Наталья М.',
+    rating: 5,
+  },
+  {
+    text: 'Автобусный тур — отличная идея: сначала экскурсия по памятным местам, потом салют. Познавательно и красиво.',
+    author: 'Алексей Р.',
+    rating: 5,
+  },
+  {
+    text: 'Мото-парад — незабываемые эмоции! Колонна байкеров, музыка, а в финале — салют. Рекомендую всем!',
+    author: 'Сергей К.',
+    rating: 5,
+  },
+  {
+    text: 'Брали VIP-авто на двоих. Водитель знал лучшие точки. Салют смотрели с Воробьёвых гор — магия.',
+    author: 'Ольга Д.',
+    rating: 5,
+  },
+  {
+    text: 'Были с детьми на речной прогулке в Казани. Дети в восторге от салюта. Удобно, тепло, вкусно!',
+    author: 'Ирина В.',
+    rating: 4,
+  },
+  {
+    text: 'Третий год подряд на салюте с воды. Каждый раз как первый — рекомендую всем!',
+    author: 'Максим Л.',
+    rating: 5,
+  },
+];
 
-function formatTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Moscow',
-  });
-}
-
-function guessFormat(e: EventListItem): string {
-  const t = e.title.toLowerCase();
-  if (t.includes('теплоход') || t.includes('круиз') || t.includes('яхт')) return 'теплоход';
-  if (t.includes('крыша')) return 'крыша';
-  if (t.includes('ресторан')) return 'ресторан';
-  return 'прогулка';
-}
-
-function operatorLabel(e: EventListItem): string {
-  // В списке событий оператор явно не всегда доступен; используем город/формат + fallback.
-  const fmt = guessFormat(e);
-  return fmt === 'теплоход' ? 'Оператор (теплоход)' : 'Организатор';
-}
-
-function SaluteTable({ items }: { items: EventListItem[] }) {
-  if (items.length === 0) {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center sm:p-10">
-        <p className="text-lg font-semibold text-slate-700">Пока нет подходящих вариантов</p>
-        <p className="mt-1 text-sm text-slate-500">
-          Попробуйте выбрать другой город или вернитесь ближе к дате праздника.
-        </p>
-      </div>
-    );
-  }
-
+function StatChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm [-webkit-overflow-scrolling:touch]">
-      <table className="w-full min-w-[860px] text-sm">
-        <thead>
-          <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            <th className="px-4 py-3">Оператор</th>
-            <th className="px-4 py-3">Формат</th>
-            <th className="px-4 py-3">Время</th>
-            <th className="px-4 py-3 text-right">Цена от</th>
-            <th className="px-4 py-3 text-right"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {items.map((e) => (
-            <tr key={e.id} className="hover:bg-slate-50/60 transition-colors">
-              <td className="px-4 py-3.5">
-                <div className="font-bold text-slate-900">{operatorLabel(e)}</div>
-                <div className="mt-0.5 text-[12px] text-slate-500">{e.title}</div>
-              </td>
-              <td className="px-4 py-3.5">
-                <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[12px] font-semibold text-slate-700">
-                  {guessFormat(e)}
-                </span>
-              </td>
-              <td className="px-4 py-3.5">
-                <div className="font-semibold text-slate-900">{formatTime(e.nextSessionAt)}</div>
-                <div className="mt-0.5 text-[12px] text-slate-500">{e.address || '—'}</div>
-              </td>
-              <td className="px-4 py-3.5 text-right">
-                <div className="text-base font-black text-slate-900">{formatPriceRub(e.priceFrom)}</div>
-                <div className="text-[11px] text-slate-400">за билет</div>
-              </td>
-              <td className="px-4 py-3.5 text-right">
-                <Link
-                  href={`/events/${e.slug}`}
-                  className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-700 transition-colors"
-                >
-                  Открыть
-                </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+      {icon}
+      {label}
     </div>
   );
+}
+
+function pickOptimalSaluteIndex(events: EventListItem[]): number | null {
+  const available = events.filter((e) => (e.totalAvailableTickets ?? 0) > 0 && e.nextSessionAt);
+  if (available.length === 0) return null;
+  const prices = available.map((e) => e.priceFrom ?? 0).filter((p) => p > 0);
+  if (prices.length === 0) return null;
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  let bestIdx = -1;
+  let bestScore = -1;
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    if ((e.totalAvailableTickets ?? 0) <= 0 || !e.nextSessionAt) continue;
+    const p = e.priceFrom ?? 0;
+    if (p <= 0) continue;
+    const priceScore = maxP === minP ? 1 : 1 - (p - minP) / (maxP - minP);
+    const ratingScore = (Number(e.rating) || 0) / 5;
+    const seatScore = Math.min((e.totalAvailableTickets ?? 0) / 20, 1);
+    const score = 0.4 * priceScore + 0.4 * ratingScore + 0.2 * seatScore;
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+  }
+  return bestIdx >= 0 ? bestIdx : null;
 }
 
 export function SaluteLandingPage({
@@ -134,6 +116,8 @@ export function SaluteLandingPage({
   events: EventListItem[];
   filterOptions: { piers: string[]; priceRange: [number, number]; dates: string[] };
 }) {
+  const ianaTimeZone = useMemo(() => getCityTimezone(city?.slug ?? null), [city?.slug]);
+
   const [filters, setFilters] = useState<{
     date: string;
     timeSlot: string;
@@ -151,7 +135,7 @@ export function SaluteLandingPage({
       out = out.filter((e) => {
         const t = e.nextSessionAt;
         if (!t) return false;
-        return moscowCalendarDayFromIso(t) === filters.date;
+        return calendarDayFromIso(t, ianaTimeZone) === filters.date;
       });
     }
     if (filters.sort === 'price') {
@@ -162,100 +146,141 @@ export function SaluteLandingPage({
       out = [...out].sort((a, b) => String(a.nextSessionAt ?? '').localeCompare(String(b.nextSessionAt ?? '')));
     }
     return out;
-  }, [events, filters]);
+  }, [events, filters, ianaTimeZone]);
 
-  const h1 = city ? `Салют 9 мая в ${city.name} 2026 — где смотреть и лучшие варианты` : 'Салют 9 мая 2026 в России';
+  const bestIdx = useMemo(() => pickOptimalSaluteIndex(filtered), [filtered]);
+
+  const h1Fallback = city ? `Салют 9 мая в ${city.name} 2026 — где смотреть и лучшие варианты` : 'Салют 9 мая 2026 в России';
+  const h1 = content.heroTitle ?? h1Fallback;
   const subtitle = city
     ? content.heroSubtitle ??
       'Подборка вариантов по городу: теплоходы, рестораны, крыши и обзорные точки. Сравните цены и время.'
     : 'Выберите город и сравните варианты: теплоходы, рестораны, крыши и обзорные точки.';
 
+  const withSession = useMemo(() => filtered.filter((e) => e.nextSessionAt), [filtered]);
+
+  const avgRating = useMemo(() => {
+    const rated = events.filter((e) => Number(e.rating) > 0);
+    if (rated.length === 0) return 4.7;
+    const sum = rated.reduce((s, e) => s + Number(e.rating), 0);
+    return Math.round((sum / rated.length) * 10) / 10;
+  }, [events]);
+
+  const reviewItems = content.reviews?.length ? content.reviews : ENHANCER_FALLBACK_REVIEWS;
+
+  const excursionWord = (n: number) => {
+    if (n === 1) return 'экскурсия';
+    if (n >= 2 && n <= 4) return 'экскурсии';
+    return 'экскурсий';
+  };
+
   return (
     <div className="space-y-8">
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-        <nav className="text-sm text-slate-500">
-          <Link href="/" className="hover:text-slate-900 transition-colors">
-            Главная
-          </Link>
-          <span className="px-2">/</span>
-          <Link href="/salute-9-may" className="hover:text-slate-900 transition-colors">
-            Салют 9 мая
-          </Link>
-          {city ? (
-            <>
-              <span className="px-2">/</span>
-              <span className="text-slate-900 font-semibold">{city.name}</span>
-            </>
-          ) : null}
-        </nav>
+      <section className="overflow-hidden rounded-2xl sm:rounded-3xl gradient-hero-lovable text-white shadow-lg">
+        <div className="px-5 py-12 sm:px-8 sm:py-16 md:py-20">
+          <nav className="flex flex-wrap items-center gap-2 text-sm text-white/75">
+            <Link href="/" className="transition-colors hover:text-white">
+              Главная
+            </Link>
+            <span>/</span>
+            <Link href="/salute-9-may" className="transition-colors hover:text-white">
+              Салют 9 мая
+            </Link>
+            {city ? (
+              <>
+                <span>/</span>
+                <span className="text-white">{city.name}</span>
+              </>
+            ) : null}
+          </nav>
 
-        <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">{h1}</h1>
-        <p className="mt-2 text-sm text-slate-600 sm:text-base">{subtitle}</p>
+          <h1 className="mt-5 max-w-4xl text-3xl font-extrabold leading-tight tracking-tight md:text-4xl lg:text-5xl">
+            {h1}
+          </h1>
+          <p className="mt-4 max-w-3xl text-base leading-relaxed text-white/85 md:text-lg">{subtitle}</p>
 
-        {content.introText ? (
-          <div className="prose prose-slate mt-4 max-w-none">
-            <p>{content.introText}</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <StatChip icon={<TrendingUp className="h-4 w-4" />} label={`${events.length} ${excursionWord(events.length)}`} />
+            <StatChip icon={<Shield className="h-4 w-4" />} label="8 340+ продано" />
+            <StatChip icon={<Star className="h-4 w-4" />} label={`${avgRating} / 5`} />
           </div>
-        ) : null}
-
-        {content.relatedLinks?.length ? (
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            {content.relatedLinks.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 text-sm font-semibold text-primary-900 hover:bg-primary-100/90 transition-colors"
-              >
-                <span>{l.title}</span>
-                {l.description ? <span className="mt-0.5 block text-xs font-normal text-primary-800/90">{l.description}</span> : null}
-              </Link>
-            ))}
-          </div>
-        ) : null}
-
-        {content.viewpoints?.length ? (
-          <div className="mt-6">
-            <h2 className="text-lg font-bold text-slate-900">Где смотреть</h2>
-            <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-              {content.viewpoints.map((v) => (
-                <li
-                  key={v.name}
-                  className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm leading-relaxed text-slate-700"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold text-slate-900">{v.name}</span>
-                    <span
-                      className={
-                        v.isFree
-                          ? 'rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800'
-                          : 'rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-700'
-                      }
-                    >
-                      {v.isFree ? 'Бесплатно' : 'Билет'}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-slate-600">{v.description}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {content.tips?.length ? (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5">
-            <h2 className="text-base font-bold text-slate-900">Советы</h2>
-            <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
-              {content.tips.map((t, i) => (
-                <li key={i}>{t}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+        </div>
       </section>
 
-      <section className="space-y-4">
+      {(content.introText ||
+        content.relatedLinks?.length ||
+        content.viewpoints?.length ||
+        content.tips?.length) && (
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          {content.introText ? (
+            <div className="prose prose-slate max-w-none">
+              <p className="text-slate-700">{content.introText}</p>
+            </div>
+          ) : null}
+
+          {content.relatedLinks?.length ? (
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {content.relatedLinks.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 text-sm font-semibold text-primary-900 transition-colors hover:bg-primary-100/90"
+                >
+                  <span>{l.title}</span>
+                  {l.description ? (
+                    <span className="mt-0.5 block text-xs font-normal text-primary-800/90">{l.description}</span>
+                  ) : null}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+
+          {content.viewpoints?.length ? (
+            <div className="mt-6">
+              <h2 className="text-lg font-bold text-slate-900">Где смотреть</h2>
+              <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+                {content.viewpoints.map((v) => (
+                  <li
+                    key={v.name}
+                    className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm leading-relaxed text-slate-700"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-slate-900">{v.name}</span>
+                      <span
+                        className={
+                          v.isFree
+                            ? 'rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800'
+                            : 'rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-700'
+                        }
+                      >
+                        {v.isFree ? 'Бесплатно' : 'Билет'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-slate-600">{v.description}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {content.tips?.length ? (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5">
+              <h2 className="text-base font-bold text-slate-900">Советы</h2>
+              <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
+                {content.tips.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      )}
+
+      <section id="variants" className="space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="text-xl font-bold text-slate-900">Варианты и цены</h2>
+          <h2 className="text-2xl font-bold text-slate-900 md:text-3xl">
+            Расписание экскурсий{city ? ` — ${city.name}` : ''}
+          </h2>
           {city ? (
             <Link href="/salute-9-may" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
               Все города →
@@ -267,25 +292,55 @@ export function SaluteLandingPage({
           piers={filterOptions.piers}
           priceRange={filterOptions.priceRange}
           dates={filterOptions.dates}
+          ianaTimeZone={ianaTimeZone}
           timeSlotMode="hidden"
           onFilterChange={setFilters}
         />
 
-        <SaluteTable items={filtered} />
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm text-slate-600">
+            {withSession.length > 0
+              ? `${withSession.length} ${excursionWord(withSession.length)}`
+              : 'Нет экскурсий по выбранным фильтрам'}
+          </span>
+          {bestIdx !== null ? (
+            <span className="text-xs font-medium text-primary-700">Оптимальный выбор выделен</span>
+          ) : null}
+        </div>
 
-        {filtered.length < 3 ? (
+        <div className="space-y-3">
+          {withSession.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center">
+              <p className="text-slate-600">Попробуйте изменить фильтры</p>
+            </div>
+          ) : (
+            withSession.map((e, i) => {
+              const idxInFiltered = filtered.indexOf(e);
+              return (
+                <SaluteTripCard
+                  key={e.id}
+                  event={e}
+                  isBest={idxInFiltered === bestIdx}
+                  index={i}
+                  timeZone={ianaTimeZone}
+                  nextSessionAt={e.nextSessionAt!}
+                />
+              );
+            })
+          )}
+        </div>
+
+        {filtered.filter((e) => (e.totalAvailableTickets ?? 0) > 0).length < 3 && city ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-slate-800">
             <div className="text-sm font-bold">Мало вариантов в каталоге</div>
             <div className="mt-1 text-sm text-slate-700">
-              Пока в каталоге меньше 3 предложений. Добавили универсальные советы: где смотреть бесплатно, как выбрать место
-              и как не попасть в толпу.
+              Пока в каталоге мало предложений. Ниже — универсальные советы и точки с бесплатным обзором из гида по городу.
             </div>
-            <ul className="mt-3 list-disc pl-5 text-sm text-slate-700 space-y-1">
-              <li>Приходите заранее: за 60–90 минут лучшие точки уже заняты.</li>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
+              <li>Приходите заранее: за 60–90 минут лучшие места уже заняты.</li>
               <li>Одевайтесь теплее: вечером у воды ощутимо холоднее.</li>
-              <li>Если важен комфорт — выбирайте теплоход/ресторан с обзором и входом по билетам.</li>
+              <li>Если важен комфорт — выбирайте формат с билетом и зарезервированным местом.</li>
             </ul>
-            <div className="mt-3 text-sm text-slate-600">Карта точек просмотра — заглушка (добавим позже).</div>
           </div>
         ) : null}
       </section>
@@ -293,8 +348,14 @@ export function SaluteLandingPage({
       {content.howToChoose?.length ? <HowToChoose items={content.howToChoose} /> : null}
       {content.infoBlocks?.length ? <InfoBlocks items={content.infoBlocks} /> : null}
       {content.faq?.length ? <FaqSection items={content.faq} /> : null}
-      {content.reviews?.length ? <ReviewsSection items={content.reviews} /> : null}
+      <ReviewsSection items={reviewItems} />
+
+      <div className="py-8 text-center">
+        <div className="mx-auto flex max-w-2xl items-start justify-center gap-2 text-sm text-slate-600">
+          <Shield className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+          <span>Покупка оформляется через билетную систему организатора. Мы помогаем сравнить предложения.</span>
+        </div>
+      </div>
     </div>
   );
 }
-

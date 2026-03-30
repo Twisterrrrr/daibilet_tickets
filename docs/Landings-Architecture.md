@@ -30,7 +30,7 @@ Template types (MVP):
 - `GENERIC_CARDS`
 - `COMPARISON_TABLE`
 - `HYBRID`
-- `SEASONAL_EVENT` (reserved extension)
+- `SEASONAL_EVENT` — сезонные событийные лендинги (например, салют 9 мая, Новый год) с дополнительным JSON `seasonalPayload`.
 
 ## Subcategory-first (read-path, 2026)
 
@@ -85,11 +85,18 @@ If `showInCollections = true` and landing is active:
 |--------|------------|
 | `/river-cruises`, `/river-cruises/[citySlug]` | Обзор городов с подборками речных/водных прогулок, ссылки на канонические лендинги |
 | `/bus-tours`, `/bus-tours/[citySlug]` | То же для автобусных/обзорных экскурсий |
-| `/salute-9-may`, `/salute-9-may/[citySlug]` | Витрина к 9 мая: теговый фильтр, `SaluteLandingPage` |
+| `/salute-9-may` | Хаб «Салют 9 мая»: список городов с лендингами `/cities/:citySlug/salute-9-may` |
 | `/labs/nochnye-mosty` | Лабораторный UI на тех же данных, что прод-лендинг «ночные мосты» |
 
 ### Даты и фильтры (shared + UI)
 
-- `@daibilet/shared`: модуль `moscow-calendar` — `moscowCalendarDayFromIso`, `dateToMoscowISO`, `getMoscowTodayISO`, `getMoscowTomorrowISO` (опора на `Europe/Moscow`, «завтра» через сдвиг +24 ч по UTC-времени).
+- `@daibilet/shared`: модуль `moscow-calendar` — **`CITY_TIMEZONES`**, **`getCityTimezone(slug)`**, **`calendarDayFromIso`**, **`dateToISO`**, **`getTodayISO`/`getTomorrowISO`** по IANA-зоне города; алиасы `moscow*` и `dateToMoscowISO` — по умолчанию `Europe/Moscow`. Бэкенд формирует `filters.dates` в TZ города лендинга; `LandingClient`/`FilterBar`/таблица и карточки получают ту же зону от `citySlug` (как `timezone` в [city-landing-enhancer](https://github.com/Twisterrrrr/city-landing-enhancer) `DateFilter`).
 - `FilterBar`: чипы дат/времени/причала/цены; **сортировка — табы с нижним подчёркиванием** активного варианта.
 - `DateRibbon` (каталог событий): в попапе «Другая дата» подсветка выбранного дня только если выбрана **кастомная** дата (не день с ленты «Сегодня»/«Завтра» и не диапазон выходных).
+
+### Seasonal landings / seasonWindow
+
+- Для `templateType = SEASONAL_EVENT` допускается дополнительное поле `seasonalPayload` с ключом `seasonWindow: { startMonthDay: 'MM-DD', endMonthDay: 'MM-DD' }`.
+- `LandingMaterializerService` при проходе по `TOPIC_DEFINITIONS_CITY` учитывает сезон: лендинг активен только если **количество релевантных событий ≥ minEvents** и **текущая дата попадает в окно**.
+- Поддерживаются интервалы внутри года (`03-01`–`05-09`) и «через год» (`12-01`–`01-10`).
+- «Салют 9 мая» в Москве, Петербурге, Казани и Нижнем Новгороде настроен как `SEASONAL_EVENT` с окном `03-01`–`05-09`; вне этого периода лендинги автоматически скрываются материализатором.

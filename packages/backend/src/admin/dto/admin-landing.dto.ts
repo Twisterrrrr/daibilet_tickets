@@ -83,6 +83,13 @@ export class CreateLandingDto {
   @IsObject()
   rankingJson?: Record<string, unknown>;
 
+  @ApiPropertyOptional({
+    description: 'JSON для SEASONAL_EVENT: viewpoints[], tips[] (салют и др.)',
+  })
+  @IsOptional()
+  @IsObject()
+  seasonalPayload?: Record<string, unknown>;
+
   @ApiPropertyOptional({ enum: LandingTemplateType })
   @IsOptional()
   @IsEnum(LandingTemplateType)

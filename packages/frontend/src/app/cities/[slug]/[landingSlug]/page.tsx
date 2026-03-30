@@ -15,7 +15,14 @@ import {
   StatsBadge,
 } from '@/components/landing/ContentSections';
 import { FaqSection } from '@/components/landing/FaqSection';
+import { ClusterHubLinks } from '@/components/landing/ClusterHubLinks';
+import { SaluteLandingPage } from '@/components/landing/SaluteLandingPage';
 import { api } from '@/lib/api';
+import {
+  buildSaluteFilterOptionsFromEvents,
+  catalogLandingToSaluteContent,
+  variantsToSaluteEventListItems,
+} from '@/lib/salute-landing-mapper';
 import { getLandingCitySlug, landingTimeSlotMode, toLandingVM } from '../../_landingVm';
 
 import { LandingClient } from './LandingClient';
@@ -96,10 +103,28 @@ export default async function LandingPage({ params }: Props) {
     notFound();
   }
 
-  const heroTitle =
-    city.slug === 'saint-petersburg' && landingSlug === 'nochnye-mosty'
-      ? 'Ночные прогулки на развод мостов в Санкт-Петербурге сегодня — расписание и билеты'
-      : landing.title;
+  const heroTitle = landing.title;
+
+  if (landingSlug === 'salute-9-may') {
+    const content = catalogLandingToSaluteContent(data.landing, citySlug);
+    const events = variantsToSaluteEventListItems(vm.variants, city);
+    const filterOptions = buildSaluteFilterOptionsFromEvents(events, citySlug);
+    const lc = data.landing.city as { id?: string; slug?: string; name?: string } | undefined;
+    return (
+      <div className="container-page py-8 sm:py-10">
+        <SaluteLandingPage
+          city={{ id: typeof lc?.id === 'string' ? lc.id : '', slug: city.slug, name: city.name }}
+          content={content}
+          events={events}
+          filterOptions={filterOptions}
+        />
+        <div className="mt-10 border-t border-slate-200 pt-6">
+          <h2 className="text-base font-semibold text-slate-900">Смотрите также</h2>
+          <ClusterHubLinks citySlug={citySlug} variant="chips" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -190,6 +215,7 @@ export default async function LandingPage({ params }: Props) {
         <div id="variants">
           <h2 className="mb-4 text-xl font-bold text-slate-900 sm:text-2xl">Расписание рейсов</h2>
           <LandingClient
+            citySlug={citySlug}
             variants={vm.variants}
             filters={vm.filters}
             templateType={vm.templateType}
@@ -221,6 +247,12 @@ export default async function LandingPage({ params }: Props) {
 
         {/* Legal */}
         <LegalDisclaimer text={vm.legalText ?? undefined} />
+
+        {/* Cluster hubs (соседние подборки) */}
+        <div className="mt-10 border-t border-slate-200 pt-6">
+          <h2 className="text-base font-semibold text-slate-900">Смотрите также</h2>
+          <ClusterHubLinks citySlug={citySlug} variant="chips" />
+        </div>
       </div>
     </>
   );

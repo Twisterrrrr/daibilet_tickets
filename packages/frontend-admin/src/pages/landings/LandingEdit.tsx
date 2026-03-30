@@ -51,6 +51,8 @@ interface LandingForm {
   isActive: boolean;
   sortOrder: number;
   rankingPreset: 'balanced' | 'popularity' | 'availability';
+  /** raw JSON для seasonalPayload (SEASONAL_EVENT / салют) */
+  seasonalPayloadJson: string;
 }
 
 const TEMPLATE_LABELS: Record<LandingForm['templateType'], string> = {
@@ -101,6 +103,7 @@ const EMPTY_FORM: LandingForm = {
   isActive: true,
   sortOrder: 0,
   rankingPreset: 'balanced',
+  seasonalPayloadJson: '',
 };
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -160,6 +163,9 @@ export function LandingEditPage() {
             (data.rankingJson as { preset?: LandingForm['rankingPreset'] } | null | undefined)?.preset ??
             'balanced'
           ) as LandingForm['rankingPreset'],
+          seasonalPayloadJson: data.seasonalPayload
+            ? JSON.stringify(data.seasonalPayload, null, 2)
+            : '',
         });
         setBlocks(
           jsonToBlocksMigration({
@@ -218,6 +224,14 @@ export function LandingEditPage() {
       sortOrder: form.sortOrder,
       rankingJson: { preset: form.rankingPreset },
     };
+    const spTrim = form.seasonalPayloadJson.trim();
+    if (spTrim) {
+      try {
+        payload.seasonalPayload = JSON.parse(spTrim) as Record<string, unknown>;
+      } catch {
+        throw new Error('Поле «сезонный JSON»: невалидный JSON');
+      }
+    }
     Object.assign(payload, blocksToLegacyPayload(orderedBlocks));
     return payload;
   };
@@ -417,6 +431,20 @@ export function LandingEditPage() {
                 onChange={(e) => setForm((f) => ({ ...f, heroText: e.target.value }))}
                 rows={3}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="seasonalPayloadJson">Сезонный контент (JSON): viewpoints, tips</Label>
+              <Textarea
+                id="seasonalPayloadJson"
+                value={form.seasonalPayloadJson}
+                onChange={(e) => setForm((f) => ({ ...f, seasonalPayloadJson: e.target.value }))}
+                rows={8}
+                className="font-mono text-xs"
+                placeholder='{"viewpoints":[{"name":"…","description":"…","isFree":true}],"tips":["…"]}'
+              />
+              <p className="text-xs text-muted-foreground">
+                Для шаблона «Сезонный» (салют 9 мая): точки обзора и советы. Пустое поле при сохранении не меняет уже записанный JSON в БД.
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-6">
               <div className="flex items-center gap-2">

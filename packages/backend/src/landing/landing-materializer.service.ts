@@ -17,6 +17,34 @@ export interface MaterializeResult {
   details: { slug: string; citySlug: string; count: number; minEvents: number; isActive: boolean }[];
 }
 
+function isWithinSeasonWindow(now: Date, payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return true;
+  const p = payload as { seasonWindow?: { startMonthDay?: string; endMonthDay?: string } };
+  const win = p.seasonWindow;
+  if (!win || typeof win.startMonthDay !== 'string' || typeof win.endMonthDay !== 'string') return true;
+
+  const parse = (mmdd: string): number | null => {
+    const [mmStr, ddStr] = mmdd.split('-');
+    const mm = Number(mmStr);
+    const dd = Number(ddStr);
+    if (!Number.isFinite(mm) || !Number.isFinite(dd)) return null;
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+    return mm * 100 + dd;
+  };
+
+  const start = parse(win.startMonthDay);
+  const end = parse(win.endMonthDay);
+  if (start === null || end === null) return true;
+
+  const cur = (now.getUTCMonth() + 1) * 100 + now.getUTCDate();
+
+  if (start <= end) {
+    return cur >= start && cur <= end;
+  }
+  // Окно через границу года (например, 12-01 — 01-10)
+  return cur >= start || cur <= end;
+}
+
 /**
  * Materializer — автоуправление видимостью лендингов по порогу событий.
  * visible = eligible events (тег OR подкатегории из additionalFilters) >= minEvents
@@ -48,7 +76,14 @@ export class LandingMaterializerService {
           city: { slug: def.citySlug },
           isDeleted: false,
         },
-        select: { id: true, cityId: true, filterTag: true, additionalFilters: true, isActive: true },
+        select: {
+          id: true,
+          cityId: true,
+          filterTag: true,
+          additionalFilters: true,
+          isActive: true,
+          seasonalPayload: true,
+        },
       });
 
       if (!landing) {
@@ -76,7 +111,8 @@ export class LandingMaterializerService {
           })
         : 0;
 
-      const shouldBeActive = count >= def.minEvents;
+      const seasonOk = isWithinSeasonWindow(now, landing.seasonalPayload as unknown);
+      const shouldBeActive = count >= def.minEvents && seasonOk;
       details.push({
         slug: def.slug,
         citySlug: def.citySlug,

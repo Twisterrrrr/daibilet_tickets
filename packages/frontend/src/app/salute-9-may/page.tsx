@@ -15,7 +15,18 @@ export const metadata: Metadata = {
 
 export default async function Salute9MayRootPage() {
   const content = saluteContentForCity();
-  const cities = await api.getCities(true).catch(() => api.getCities().catch(() => []));
+  const landings = await api.getLandings().catch(() => []);
+  const saluteLandings = landings.filter((l) => l.slug === 'salute-9-may');
+  const saluteHub = saluteLandings
+    .map((l) => {
+      const c = l.city as { slug?: string; name?: string } | undefined;
+      if (!c?.slug || !c.name) return null;
+      return { id: l.id, citySlug: c.slug, cityName: c.name, title: typeof l.title === 'string' ? l.title : '' };
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null);
+  const featured = await api.getCities(true).catch(() => []);
+  const cities =
+    featured.length > 0 ? featured : await api.getCities().catch(() => []);
 
   return (
     <div className="container-page py-8 sm:py-10">
@@ -32,19 +43,34 @@ export default async function Salute9MayRootPage() {
 
       <section className="mt-8">
         <h2 className="text-lg font-bold text-slate-900">Города</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Канонические страницы ведут на лендинги в каталоге:{' '}
+          <span className="font-mono text-xs">/cities/…/salute-9-may</span> (редактируются в админке).
+        </p>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {cities.map((c) => (
-            <Link
-              key={c.id}
-              href={`/salute-9-may/${c.slug}`}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
-            >
-              <div className="text-base font-bold text-slate-900">{c.name}</div>
-              <div className="mt-1 text-sm text-slate-500">
-                {c._count?.events ? `${c._count.events} событий в каталоге` : 'Открыть'}
-              </div>
-            </Link>
-          ))}
+          {saluteHub.length > 0
+            ? saluteHub.map((row) => (
+                <Link
+                  key={row.id}
+                  href={`/cities/${row.citySlug}/salute-9-may`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                >
+                  <div className="text-base font-bold text-slate-900">{row.cityName}</div>
+                  <div className="mt-1 text-sm text-slate-500">{row.title || 'Открыть'}</div>
+                </Link>
+              ))
+            : cities.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/cities/${c.slug}/salute-9-may`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                >
+                  <div className="text-base font-bold text-slate-900">{c.name}</div>
+                  <div className="mt-1 text-sm text-slate-500">
+                    {c._count?.events ? `${c._count.events} событий в каталоге` : 'Открыть'}
+                  </div>
+                </Link>
+              ))}
         </div>
       </section>
     </div>

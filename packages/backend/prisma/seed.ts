@@ -7,8 +7,11 @@ import {
   ReviewSupplierResponseStatus,
   ReviewDisputeStatus,
   ReviewDisputeReasonCode,
+  EventTagAssignmentSource,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+
+import { SALUTE_9_MAY_LANDING_SEEDS } from './salute-9-may-landings.data';
 
 dotenv.config({ path: '../../.env' });
 
@@ -693,6 +696,102 @@ async function main() {
       metaDescription: 'Билеты на экскурсии, морские и водные прогулки, развлечения в Сочи.',
       isFeatured: false,
     },
+    {
+      slug: 'volgograd',
+      name: 'Волгоград',
+      description:
+        'Город-герой на великой Волге: Мамаев курган, историческая панорама Сталинградской битвы, набережные и речные прогулки.',
+      lat: 48.708,
+      lng: 44.5133,
+      timezone: 'Europe/Volgograd',
+      metaTitle: 'Экскурсии и билеты в Волгограде — Дайбилет',
+      metaDescription: 'Билеты на экскурсии и речные прогулки в Волгограде. Мамаев курган, набережная, Волга.',
+      isFeatured: false,
+    },
+    {
+      slug: 'perm',
+      name: 'Пермь',
+      description:
+        'Уральский город на Каме: набережные, театр оперы и балета, музеи и выходы к горным ландшафтам Предуралья.',
+      lat: 58.0105,
+      lng: 56.2502,
+      timezone: 'Asia/Yekaterinburg',
+      metaTitle: 'Экскурсии и билеты в Перми — Дайбилет',
+      metaDescription: 'Билеты на экскурсии и речные прогулки по Каме в Перми.',
+      isFeatured: false,
+    },
+    {
+      slug: 'samara',
+      name: 'Самара',
+      description:
+        'Волжский мегаполис с длинными набережными, космической историей и живым центром: на Волге здесь особенно хороши закаты и речные прогулки.',
+      lat: 53.1959,
+      lng: 50.1002,
+      timezone: 'Europe/Samara',
+      metaTitle: 'Экскурсии и билеты в Самаре — Дайбилет',
+      metaDescription: 'Билеты на экскурсии и речные прогулки в Самаре по Волге.',
+      isFeatured: false,
+    },
+    {
+      slug: 'tver',
+      name: 'Тверь',
+      description:
+        'Город на верхней Волге между Москвой и Петербургом: набережные, путевой дворец, купеческая архитектура и удобные речные маршруты.',
+      lat: 56.8587,
+      lng: 35.9176,
+      timezone: 'Europe/Moscow',
+      metaTitle: 'Экскурсии и билеты в Твери — Дайбилет',
+      metaDescription: 'Билеты на экскурсии и речные прогулки в Твери по Волге.',
+      isFeatured: false,
+    },
+    {
+      slug: 'novosibirsk',
+      name: 'Новосибирск',
+      description:
+        'Столица Сибири на Оби: крупнейший за Уралом мегаполис с оперным театром, набережной и точками для городских водных прогулок.',
+      lat: 55.0084,
+      lng: 82.9357,
+      timezone: 'Asia/Novosibirsk',
+      metaTitle: 'Экскурсии и билеты в Новосибирске — Дайбилет',
+      metaDescription: 'Билеты на экскурсии и речные прогулки в Новосибирске по Оби.',
+      isFeatured: false,
+    },
+    {
+      slug: 'krasnoyarsk',
+      name: 'Красноярск',
+      description:
+        'Сибирский город на Енисее: заповедные столбы неподалёку, длинная набережная и речные прогулки с видами на саянские дали.',
+      lat: 56.0153,
+      lng: 92.8932,
+      timezone: 'Asia/Krasnoyarsk',
+      metaTitle: 'Экскурсии и билеты в Красноярске — Дайбилет',
+      metaDescription: 'Билеты на экскурсии и речные прогулки в Красноярске по Енисею.',
+      isFeatured: false,
+    },
+    {
+      slug: 'ekaterinburg',
+      name: 'Екатеринбург',
+      description:
+        'Столица Урала: граница Европы и Азии, Исеть, современная культура и обзорные программы по городу и окрестностям.',
+      lat: 56.8389,
+      lng: 60.6057,
+      timezone: 'Asia/Yekaterinburg',
+      metaTitle: 'Экскурсии и билеты в Екатеринбурге — Дайбилет',
+      metaDescription: 'Билеты на экскурсии и водные прогулки в Екатеринбурге.',
+      isFeatured: false,
+    },
+    {
+      slug: 'rostov-na-donu',
+      name: 'Ростов-на-Дону',
+      description:
+        'Южная столица на Дону: набережные, театры, купеческий центр и речные прогулки вдоль городских видов.',
+      lat: 47.2357,
+      lng: 39.7015,
+      timezone: 'Europe/Moscow',
+      metaTitle: 'Экскурсии и билеты в Ростове-на-Дону — Дайбилет',
+      metaDescription: 'Билеты на экскурсии и речные прогулки в Ростове-на-Дону по Дону.',
+      isFeatured: false,
+    },
   ];
 
   for (const city of cities) {
@@ -803,6 +902,12 @@ async function main() {
       name: 'Салют с воды',
       category: TagCategory.THEME,
       description: 'Салют с теплохода — праздничные рейсы',
+    },
+    {
+      slug: 'salyut-9-maya',
+      name: 'Салют 9 мая',
+      category: TagCategory.THEME,
+      description: 'Тег лендингов «Салют 9 мая» (тестовые данные из city-landing-enhancer)',
     },
     {
       slug: 'meteor-petergof',
@@ -918,6 +1023,140 @@ async function main() {
       category: TagCategory.THEME,
       description: 'Канатная дорога через Волгу в Бор',
     },
+
+    // Региональные кластеры река + автобус (черновики Lovable / расширение хабов)
+    {
+      slug: 'river-cruises-volgograd',
+      name: 'Речные прогулки Волгоград',
+      category: TagCategory.THEME,
+      description: 'Речные прогулки по Волге в Волгограде',
+    },
+    {
+      slug: 'river-cruises-perm',
+      name: 'Речные прогулки Пермь',
+      category: TagCategory.THEME,
+      description: 'Речные прогулки по Каме в Перми',
+    },
+    {
+      slug: 'river-cruises-samara',
+      name: 'Речные прогулки Самара',
+      category: TagCategory.THEME,
+      description: 'Речные прогулки по Волге в Самаре',
+    },
+    {
+      slug: 'river-cruises-tver',
+      name: 'Речные прогулки Тверь',
+      category: TagCategory.THEME,
+      description: 'Речные прогулки по Волге в Твери',
+    },
+    {
+      slug: 'river-cruises-novosibirsk',
+      name: 'Речные прогулки Новосибирск',
+      category: TagCategory.THEME,
+      description: 'Речные прогулки по Оби в Новосибирске',
+    },
+    {
+      slug: 'river-cruises-krasnoyarsk',
+      name: 'Речные прогулки Красноярск',
+      category: TagCategory.THEME,
+      description: 'Речные прогулки по Енисею в Красноярске',
+    },
+    {
+      slug: 'river-cruises-ekaterinburg',
+      name: 'Речные прогулки Екатеринбург',
+      category: TagCategory.THEME,
+      description: 'Городские водные прогулки в Екатеринбурге',
+    },
+    {
+      slug: 'river-cruises-rostov-na-donu',
+      name: 'Речные прогулки Ростов-на-Дону',
+      category: TagCategory.THEME,
+      description: 'Речные прогулки по Дону в Ростове-на-Дону',
+    },
+    {
+      slug: 'river-cruises-yaroslavl',
+      name: 'Речные прогулки Ярославль',
+      category: TagCategory.THEME,
+      description: 'Речные прогулки по Волге и Которосли в Ярославле',
+    },
+    {
+      slug: 'bus-tours-volgograd',
+      name: 'Автобусные экскурсии Волгоград',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Волгограде',
+    },
+    {
+      slug: 'bus-tours-perm',
+      name: 'Автобусные экскурсии Пермь',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Перми',
+    },
+    {
+      slug: 'bus-tours-samara',
+      name: 'Автобусные экскурсии Самара',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Самаре',
+    },
+    {
+      slug: 'bus-tours-tver',
+      name: 'Автобусные экскурсии Тверь',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Твери',
+    },
+    {
+      slug: 'bus-tours-novosibirsk',
+      name: 'Автобусные экскурсии Новосибирск',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Новосибирске',
+    },
+    {
+      slug: 'bus-tours-krasnoyarsk',
+      name: 'Автобусные экскурсии Красноярск',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Красноярске',
+    },
+    {
+      slug: 'bus-tours-ekaterinburg',
+      name: 'Автобусные экскурсии Екатеринбург',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Екатеринбурге',
+    },
+    {
+      slug: 'bus-tours-rostov-na-donu',
+      name: 'Автобусные экскурсии Ростов-на-Дону',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Ростове-на-Дону',
+    },
+    {
+      slug: 'bus-tours-yaroslavl',
+      name: 'Автобусные экскурсии Ярославль',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Ярославле',
+    },
+    {
+      slug: 'bus-tours-kazan',
+      name: 'Автобусные экскурсии Казань',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Казани',
+    },
+    {
+      slug: 'bus-tours-kaliningrad',
+      name: 'Автобусные экскурсии Калининград',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Калининграде',
+    },
+    {
+      slug: 'bus-tours-nizhny-novgorod',
+      name: 'Автобусные экскурсии Нижний Новгород',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Нижнем Новгороде',
+    },
+    {
+      slug: 'bus-tours-sochi',
+      name: 'Автобусные экскурсии Сочи',
+      category: TagCategory.THEME,
+      description: 'Обзорные автобусные экскурсии в Сочи',
+    },
   ];
 
   for (const tag of tags) {
@@ -929,6 +1168,528 @@ async function main() {
   }
 
   console.log(`  ✓ ${tags.length} тегов`);
+
+  // --- Тестовые события «Салют 9 мая» — выровнено с MOCK_VARIANTS в city-landing-enhancer (Salute.tsx) ---
+  const saluteTagRecord = await prisma.tag.findUnique({ where: { slug: 'salyut-9-maya' } });
+  const saluteOperator = await prisma.operator.findUnique({ where: { slug: 'test-supplier' } });
+  if (saluteTagRecord && saluteOperator) {
+    const legacySaluteSlugs = [
+      'seed-salute-teplohod-moscow',
+      'seed-salute-bus-moscow',
+      'seed-salute-teplohod-spb',
+      'seed-salute-krysha-spb',
+      'seed-salute-teplohod-kazan',
+      'seed-salute-naberezhnaya-kazan',
+      'seed-salute-teplohod-nn',
+      'seed-salute-chkalov-nn',
+    ];
+    const legacyIds = (
+      await prisma.event.findMany({
+        where: { slug: { in: legacySaluteSlugs } },
+        select: { id: true },
+      })
+    ).map((e) => e.id);
+    if (legacyIds.length > 0) {
+      try {
+        await prisma.eventSession.deleteMany({ where: { eventId: { in: legacyIds } } });
+        await prisma.eventOffer.deleteMany({ where: { eventId: { in: legacyIds } } });
+        await prisma.eventTag.deleteMany({ where: { eventId: { in: legacyIds } } });
+        await prisma.event.deleteMany({ where: { id: { in: legacyIds } } });
+      } catch (e) {
+        console.warn('  ⚠ Salute legacy cleanup skipped (FK/orders?):', e);
+      }
+    }
+
+    const saluteDemoSpecs: Array<{
+      citySlug: string;
+      slug: string;
+      title: string;
+      shortDescription: string;
+      address: string;
+      priceFrom: number;
+      subcategories: Array<'RIVER' | 'BUS' | 'ROOFTOP' | 'WALKING' | 'GASTRO' | 'COMBINED' | 'EXTREME'>;
+      durationMinutes: number;
+      startsAtIso: string;
+      availableTickets: number;
+      rating: number;
+      reviewCount: number;
+    }> = [
+      {
+        citySlug: 'moscow',
+        slug: 'seed-salute-enhancer-s1',
+        title: 'Салют с борта теплохода — панорама Кремля «Москва-река Люкс»',
+        shortDescription: 'Панорама Кремля с воды, праздничный вечер.',
+        address: 'Москва, причал «Большой Устьинский мост»',
+        priceFrom: 2490 * 100,
+        subcategories: ['RIVER', 'GASTRO'],
+        durationMinutes: 120,
+        startsAtIso: '2026-05-09T20:30:00+03:00',
+        availableTickets: 6,
+        rating: 4.9,
+        reviewCount: 542,
+      },
+      {
+        citySlug: 'moscow',
+        slug: 'seed-salute-enhancer-s2',
+        title: 'Автобусная экскурсия + салют на Воробьёвых горах',
+        shortDescription: 'Обзорная программа и смотровая площадка.',
+        address: 'Москва, м. Парк Культуры',
+        priceFrom: 1290 * 100,
+        subcategories: ['BUS'],
+        durationMinutes: 180,
+        startsAtIso: '2026-05-09T19:00:00+03:00',
+        availableTickets: 15,
+        rating: 4.6,
+        reviewCount: 318,
+      },
+      {
+        citySlug: 'moscow',
+        slug: 'seed-salute-enhancer-s3',
+        title: 'VIP-авто: маршрут по праздничной Москве + салют',
+        shortDescription: 'Индивидуальный маршрут, гибкий тайминг.',
+        address: 'Москва, подбор по адресу в центре',
+        priceFrom: 5900 * 100,
+        subcategories: ['COMBINED', 'GASTRO'],
+        durationMinutes: 150,
+        startsAtIso: '2026-05-09T20:00:00+03:00',
+        availableTickets: 2,
+        rating: 4.8,
+        reviewCount: 87,
+      },
+      {
+        citySlug: 'moscow',
+        slug: 'seed-salute-enhancer-s4',
+        title: 'Мото-колонна: парад и салют',
+        shortDescription: 'Организованная колонна, финал у площадки просмотра.',
+        address: 'Москва, Парк Победы',
+        priceFrom: 1990 * 100,
+        subcategories: ['EXTREME'],
+        durationMinutes: 240,
+        startsAtIso: '2026-05-09T18:00:00+03:00',
+        availableTickets: 8,
+        rating: 4.7,
+        reviewCount: 156,
+      },
+      {
+        citySlug: 'saint-petersburg',
+        slug: 'seed-salute-enhancer-s5',
+        title: 'Салют на Неве — разводные мосты и фейерверк «Аврора Ривер»',
+        shortDescription: 'Ночная Нева, салют и виды центра.',
+        address: 'Санкт-Петербург, Дворцовая наб.',
+        priceFrom: 1990 * 100,
+        subcategories: ['RIVER', 'GASTRO'],
+        durationMinutes: 120,
+        startsAtIso: '2026-05-09T21:00:00+03:00',
+        availableTickets: 4,
+        rating: 4.9,
+        reviewCount: 423,
+      },
+      {
+        citySlug: 'saint-petersburg',
+        slug: 'seed-salute-enhancer-s6',
+        title: 'Автобусный тур: военная история + салют',
+        shortDescription: 'Экскурсия с гидом, финиш у точки просмотра.',
+        address: 'Санкт-Петербург, Московский вокзал',
+        priceFrom: 890 * 100,
+        subcategories: ['BUS'],
+        durationMinutes: 240,
+        startsAtIso: '2026-05-09T17:00:00+03:00',
+        availableTickets: 20,
+        rating: 4.5,
+        reviewCount: 267,
+      },
+      {
+        citySlug: 'kazan',
+        slug: 'seed-salute-enhancer-s7',
+        title: 'Речная прогулка с видом на салют — Казанка «Волга Стар»',
+        shortDescription: 'Кремль и Кул-Шариф с воды.',
+        address: 'Казань, причал «Кремлёвская»',
+        priceFrom: 1490 * 100,
+        subcategories: ['RIVER', 'GASTRO'],
+        durationMinutes: 90,
+        startsAtIso: '2026-05-09T20:00:00+03:00',
+        availableTickets: 12,
+        rating: 4.7,
+        reviewCount: 198,
+      },
+      {
+        citySlug: 'kazan',
+        slug: 'seed-salute-enhancer-s8',
+        title: 'Авто-тур по праздничной Казани',
+        shortDescription: 'Комфортный автомобиль, маршрут по ключевым точкам.',
+        address: 'Казань, старт у Кремля',
+        priceFrom: 2990 * 100,
+        subcategories: ['COMBINED', 'GASTRO'],
+        durationMinutes: 120,
+        startsAtIso: '2026-05-09T19:30:00+03:00',
+        availableTickets: 3,
+        rating: 4.6,
+        reviewCount: 64,
+      },
+      {
+        citySlug: 'nizhny-novgorod',
+        slug: 'seed-salute-enhancer-s9',
+        title: 'Салют с борта: слияние Оки и Волги «Нижегородец»',
+        shortDescription: 'Панорама Стрелки и праздничный салют.',
+        address: 'Нижний Новгород, причал «Стрелка»',
+        priceFrom: 1690 * 100,
+        subcategories: ['RIVER', 'GASTRO'],
+        durationMinutes: 120,
+        startsAtIso: '2026-05-09T20:30:00+03:00',
+        availableTickets: 9,
+        rating: 4.8,
+        reviewCount: 231,
+      },
+      {
+        citySlug: 'nizhny-novgorod',
+        slug: 'seed-salute-enhancer-s10',
+        title: 'Автобус по местам боевой славы + салют',
+        shortDescription: 'Познавательный маршрут, удобная посадка.',
+        address: 'Нижний Новгород, пл. Минина',
+        priceFrom: 790 * 100,
+        subcategories: ['BUS'],
+        durationMinutes: 300,
+        startsAtIso: '2026-05-09T16:00:00+03:00',
+        availableTickets: 25,
+        rating: 4.4,
+        reviewCount: 145,
+      },
+      {
+        citySlug: 'nizhny-novgorod',
+        slug: 'seed-salute-enhancer-s11',
+        title: 'Мото-парад 9 мая — Нижний Новгород',
+        shortDescription: 'Колонна и праздничная программа.',
+        address: 'Нижний Новгород, пл. Победы',
+        priceFrom: 1290 * 100,
+        subcategories: ['EXTREME'],
+        durationMinutes: 180,
+        startsAtIso: '2026-05-09T17:00:00+03:00',
+        availableTickets: 0,
+        rating: 4.5,
+        reviewCount: 78,
+      },
+      {
+        citySlug: 'saint-petersburg',
+        slug: 'seed-salute-enhancer-s12',
+        title: 'Речной круиз «Праздничный вечер» — СПб «Царица Невы»',
+        shortDescription: 'Длинная программа на Неве с ужином и музыкой.',
+        address: 'Санкт-Петербург, Английская наб.',
+        priceFrom: 2990 * 100,
+        subcategories: ['RIVER', 'GASTRO'],
+        durationMinutes: 180,
+        startsAtIso: '2026-05-09T19:00:00+03:00',
+        availableTickets: 3,
+        rating: 4.8,
+        reviewCount: 189,
+      },
+    ];
+
+    for (const spec of saluteDemoSpecs) {
+      const cityRow = await prisma.city.findUnique({ where: { slug: spec.citySlug } });
+      if (!cityRow) continue;
+
+      const startsAt = new Date(spec.startsAtIso);
+      const endsAt = new Date(startsAt.getTime() + spec.durationMinutes * 60 * 1000);
+
+      const ev = await prisma.event.upsert({
+        where: { slug: spec.slug },
+        update: {
+          cityId: cityRow.id,
+          title: spec.title,
+          shortDescription: spec.shortDescription,
+          address: spec.address,
+          priceFrom: spec.priceFrom,
+          subcategories: spec.subcategories,
+          durationMinutes: spec.durationMinutes,
+          rating: spec.rating,
+          reviewCount: spec.reviewCount,
+          isActive: true,
+          supplierId: saluteOperator.id,
+          operatorId: saluteOperator.id,
+        },
+        create: {
+          cityId: cityRow.id,
+          source: 'MANUAL',
+          tcEventId: spec.slug,
+          title: spec.title,
+          slug: spec.slug,
+          description: `${spec.shortDescription} Тестовая карточка для лендинга «Салют 9 мая» (seed, city-landing-enhancer).`,
+          shortDescription: spec.shortDescription,
+          category: 'EXCURSION',
+          audience: 'ALL',
+          subcategories: spec.subcategories,
+          durationMinutes: spec.durationMinutes,
+          address: spec.address,
+          priceFrom: spec.priceFrom,
+          rating: spec.rating,
+          reviewCount: spec.reviewCount,
+          isActive: true,
+          imageUrl: 'https://images.unsplash.com/photo-1521292270410-a8c53642e9d0?w=800',
+          galleryUrls: [],
+          supplierId: saluteOperator.id,
+          operatorId: saluteOperator.id,
+          moderationStatus: 'APPROVED',
+          createdByType: 'ADMIN',
+        },
+      });
+
+      await prisma.eventTag.upsert({
+        where: { eventId_tagId: { eventId: ev.id, tagId: saluteTagRecord.id } },
+        update: { assignmentSource: EventTagAssignmentSource.MANUAL_ADMIN },
+        create: {
+          eventId: ev.id,
+          tagId: saluteTagRecord.id,
+          assignmentSource: EventTagAssignmentSource.MANUAL_ADMIN,
+        },
+      });
+
+      const offer = await prisma.eventOffer.upsert({
+        where: {
+          source_externalEventId: { source: 'MANUAL', externalEventId: spec.slug },
+        },
+        update: { eventId: ev.id, priceFrom: spec.priceFrom, status: 'ACTIVE' },
+        create: {
+          eventId: ev.id,
+          source: 'MANUAL',
+          purchaseType: 'WIDGET',
+          externalEventId: spec.slug,
+          priceFrom: spec.priceFrom,
+          isPrimary: true,
+          status: 'ACTIVE',
+          priority: 0,
+        },
+      });
+
+      const tcSid = `manual-salute-${spec.slug}`;
+      await prisma.eventSession.upsert({
+        where: { tcSessionId: tcSid },
+        update: {
+          eventId: ev.id,
+          offerId: offer.id,
+          startsAt,
+          endsAt,
+          availableTickets: spec.availableTickets,
+          prices: [{ type: 'adult', price: spec.priceFrom }],
+          isActive: true,
+        },
+        create: {
+          eventId: ev.id,
+          offerId: offer.id,
+          tcSessionId: tcSid,
+          startsAt,
+          endsAt,
+          availableTickets: spec.availableTickets,
+          prices: [{ type: 'adult', price: spec.priceFrom }],
+          isActive: true,
+        },
+      });
+    }
+
+    console.log('  ✓ Salute 9 May demo events (tag salyut-9-maya, city-landing-enhancer Salute.tsx)');
+  }
+
+  // --- Ночные мосты СПб + ужин-круиз Москва (витрина как в city-landing-enhancer) ---
+  const enhancerDemoOp = await prisma.operator.findUnique({ where: { slug: 'test-supplier' } });
+  const nochnyeTagDemo = await prisma.tag.findUnique({ where: { slug: 'nochnye-mosty' } });
+  const spbDemoCity = await prisma.city.findUnique({ where: { slug: 'saint-petersburg' } });
+  if (enhancerDemoOp && nochnyeTagDemo && spbDemoCity) {
+    const nightNeva = await prisma.event.findUnique({ where: { slug: 'night-cruise-neva-test' } });
+    if (nightNeva) {
+      await prisma.eventTag.upsert({
+        where: { eventId_tagId: { eventId: nightNeva.id, tagId: nochnyeTagDemo.id } },
+        update: { assignmentSource: EventTagAssignmentSource.MANUAL_ADMIN },
+        create: {
+          eventId: nightNeva.id,
+          tagId: nochnyeTagDemo.id,
+          assignmentSource: EventTagAssignmentSource.MANUAL_ADMIN,
+        },
+      });
+    }
+
+    const bridgeSlug = 'seed-nochnye-mosty-dvortsovyy-spb';
+    const bridgeEv = await prisma.event.upsert({
+      where: { slug: bridgeSlug },
+      update: {
+        cityId: spbDemoCity.id,
+        isActive: true,
+        supplierId: enhancerDemoOp.id,
+        operatorId: enhancerDemoOp.id,
+      },
+      create: {
+        cityId: spbDemoCity.id,
+        source: 'MANUAL',
+        tcEventId: bridgeSlug,
+        title: 'Ночная прогулка с разводом Дворцового моста',
+        slug: bridgeSlug,
+        description:
+          'Тестовая карточка для лендинга «Ночные мосты» (seed, city-landing-enhancer / Index).',
+        shortDescription: 'Рейс к 01:10 — Дворцовый мост, обзор Невы.',
+        category: 'EXCURSION',
+        audience: 'ALL',
+        subcategories: ['RIVER'],
+        durationMinutes: 150,
+        address: 'Санкт-Петербург, Дворцовая набережная',
+        priceFrom: 140_000,
+        isActive: true,
+        imageUrl: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=800',
+        galleryUrls: [],
+        supplierId: enhancerDemoOp.id,
+        operatorId: enhancerDemoOp.id,
+        moderationStatus: 'APPROVED',
+        createdByType: 'ADMIN',
+      },
+    });
+    await prisma.eventTag.upsert({
+      where: { eventId_tagId: { eventId: bridgeEv.id, tagId: nochnyeTagDemo.id } },
+      update: { assignmentSource: EventTagAssignmentSource.MANUAL_ADMIN },
+      create: {
+        eventId: bridgeEv.id,
+        tagId: nochnyeTagDemo.id,
+        assignmentSource: EventTagAssignmentSource.MANUAL_ADMIN,
+      },
+    });
+    const bridgeOffer = await prisma.eventOffer.upsert({
+      where: {
+        source_externalEventId: { source: 'MANUAL', externalEventId: bridgeSlug },
+      },
+      update: { eventId: bridgeEv.id, status: 'ACTIVE' },
+      create: {
+        eventId: bridgeEv.id,
+        source: 'MANUAL',
+        purchaseType: 'WIDGET',
+        externalEventId: bridgeSlug,
+        priceFrom: 140_000,
+        isPrimary: true,
+        status: 'ACTIVE',
+        priority: 0,
+      },
+    });
+    const bridgeNightStart = new Date('2026-06-15T20:30:00.000Z');
+    const bridgeNightEnd = new Date('2026-06-16T02:00:00.000Z');
+    const bridgeSession = await prisma.eventSession.findFirst({
+      where: { eventId: bridgeEv.id, startsAt: bridgeNightStart },
+    });
+    if (!bridgeSession) {
+      await prisma.eventSession.create({
+        data: {
+          eventId: bridgeEv.id,
+          offerId: bridgeOffer.id,
+          tcSessionId: `manual-${bridgeSlug}`,
+          startsAt: bridgeNightStart,
+          endsAt: bridgeNightEnd,
+          availableTickets: 40,
+          prices: [{ type: 'adult', price: 140_000 }],
+          isActive: true,
+        },
+      });
+    }
+
+    console.log('  ✓ Nochnye mosty SPb demo (tag nochnye-mosty)');
+  }
+
+  const uzhinTagDemo = await prisma.tag.findUnique({ where: { slug: 'uzhin-kruiz-msk' } });
+  const mskDemoCity = await prisma.city.findUnique({ where: { slug: 'moscow' } });
+  if (enhancerDemoOp && uzhinTagDemo && mskDemoCity) {
+    const uzhinSpecs = [
+      {
+        slug: 'seed-uzhin-kruiz-klassika-msk',
+        title: 'Ужин-круиз по Москве-реке — классическое меню',
+        shortDescription: 'Вечерний рейс, ужин на борту, живая музыка.',
+        address: 'Москва, причал «Парк Горького»',
+        priceFrom: 620_000,
+      },
+      {
+        slug: 'seed-uzhin-kruiz-furshet-msk',
+        title: 'Ужин-круиз — фуршет и панорама Москва-Сити',
+        shortDescription: 'Свободная рассадка, фуршет, открытая палуба.',
+        address: 'Москва, Китай-город, причал',
+        priceFrom: 540_000,
+      },
+    ] as const;
+    const uzhinStart = new Date('2026-07-10T16:00:00.000Z');
+    const uzhinEnd = new Date('2026-07-10T21:00:00.000Z');
+    for (const us of uzhinSpecs) {
+      const uzhinEv = await prisma.event.upsert({
+        where: { slug: us.slug },
+        update: {
+          cityId: mskDemoCity.id,
+          title: us.title,
+          shortDescription: us.shortDescription,
+          address: us.address,
+          priceFrom: us.priceFrom,
+          subcategories: ['RIVER', 'GASTRO'],
+          isActive: true,
+          supplierId: enhancerDemoOp.id,
+          operatorId: enhancerDemoOp.id,
+        },
+        create: {
+          cityId: mskDemoCity.id,
+          source: 'MANUAL',
+          tcEventId: us.slug,
+          title: us.title,
+          slug: us.slug,
+          description: `${us.shortDescription} Тестовая карточка для лендинга «Ужин-круиз Москва» (seed, city-landing-enhancer).`,
+          shortDescription: us.shortDescription,
+          category: 'EXCURSION',
+          audience: 'ALL',
+          subcategories: ['RIVER', 'GASTRO'],
+          durationMinutes: 180,
+          address: us.address,
+          priceFrom: us.priceFrom,
+          isActive: true,
+          imageUrl: 'https://images.unsplash.com/photo-1567894340315-735d7c361db0?w=800',
+          galleryUrls: [],
+          supplierId: enhancerDemoOp.id,
+          operatorId: enhancerDemoOp.id,
+          moderationStatus: 'APPROVED',
+          createdByType: 'ADMIN',
+        },
+      });
+      await prisma.eventTag.upsert({
+        where: { eventId_tagId: { eventId: uzhinEv.id, tagId: uzhinTagDemo.id } },
+        update: { assignmentSource: EventTagAssignmentSource.MANUAL_ADMIN },
+        create: {
+          eventId: uzhinEv.id,
+          tagId: uzhinTagDemo.id,
+          assignmentSource: EventTagAssignmentSource.MANUAL_ADMIN,
+        },
+      });
+      const uzhinOffer = await prisma.eventOffer.upsert({
+        where: {
+          source_externalEventId: { source: 'MANUAL', externalEventId: us.slug },
+        },
+        update: { eventId: uzhinEv.id, priceFrom: us.priceFrom, status: 'ACTIVE' },
+        create: {
+          eventId: uzhinEv.id,
+          source: 'MANUAL',
+          purchaseType: 'WIDGET',
+          externalEventId: us.slug,
+          priceFrom: us.priceFrom,
+          isPrimary: true,
+          status: 'ACTIVE',
+          priority: 0,
+        },
+      });
+      const hasSession = await prisma.eventSession.findFirst({
+        where: { eventId: uzhinEv.id, startsAt: uzhinStart },
+      });
+      if (!hasSession) {
+        await prisma.eventSession.create({
+          data: {
+            eventId: uzhinEv.id,
+            offerId: uzhinOffer.id,
+            tcSessionId: `manual-${us.slug}`,
+            startsAt: uzhinStart,
+            endsAt: uzhinEnd,
+            availableTickets: 60,
+            prices: [{ type: 'adult', price: us.priceFrom }],
+            isActive: true,
+          },
+        });
+      }
+    }
+    console.log('  ✓ Uzhin-kruiz Moskva demo (tag uzhin-kruiz-msk)');
+  }
 
   // --- Единый справочник подкатегорий (master list) ---
   const subcategoriesMaster: Array<{
@@ -1253,9 +2014,18 @@ async function main() {
         slug: 'nochnye-mosty',
         cityId: spb.id,
         filterTag: 'nochnye-mosty',
-        title: 'Ночные прогулки на развод мостов в Санкт-Петербурге — сравнение рейсов',
+        selectionMode: 'CUSTOM',
+        templateType: 'COMPARISON_TABLE',
+        status: 'ACTIVE',
+        isActive: true,
+        isIndexable: true,
+        showInCollections: true,
+        title: 'Ночные прогулки на развод мостов в Санкт-Петербурге сегодня — расписание и билеты',
         subtitle: 'Сравните время отправления, причалы и цены от разных операторов. Выберите лучший рейс.',
-        metaTitle: 'Развод мостов СПб 2026 — ночные прогулки, расписание, билеты | Дайбилет',
+        heroText:
+          'Увидьте разводные мосты с воды — выберите рейс по цене, времени и рейтингу. Сравните предложения от проверенных организаторов; покупка билета — у оператора через его билетную систему.',
+        metaTitle:
+          'Ночные прогулки на развод мостов в Санкт-Петербурге сегодня — расписание и билеты | Дайбилет',
         metaDescription:
           'Ночные прогулки на развод мостов в Петербурге. Сравнение рейсов по времени, причалу и цене. Купите билет онлайн без наценки.',
         howToChoose: [
@@ -1348,7 +2118,7 @@ async function main() {
           { title: 'Все события в Петербурге', href: '/cities/saint-petersburg' },
         ],
         legalText:
-          'Продажа билетов осуществляется организатором мероприятия через билетную систему. Дайбилет является информационным сервисом и не несёт ответственности за проведение мероприятий.',
+          'Продажа билетов осуществляется организатором мероприятия через билетную систему. Дайбилет является информационным сервисом сравнения предложений и не несёт ответственности за проведение мероприятий.',
         sortOrder: 1,
       },
 
@@ -1357,6 +2127,9 @@ async function main() {
         slug: 'salyut',
         cityId: spb.id,
         filterTag: 'salyut-s-vody',
+        templateType: 'COMPARISON_TABLE',
+        status: 'ACTIVE',
+        isActive: true,
         title: 'Салют с воды в Санкт-Петербурге — лучшие рейсы',
         subtitle: 'Праздничный салют с борта теплохода — один из лучших ракурсов в городе.',
         metaTitle: 'Салют с воды СПб — прогулки на теплоходе, билеты | Дайбилет',
@@ -1418,6 +2191,9 @@ async function main() {
         slug: 'meteory',
         cityId: spb.id,
         filterTag: 'meteor-petergof',
+        templateType: 'COMPARISON_TABLE',
+        status: 'ACTIVE',
+        isActive: true,
         title: 'Метеор в Петергоф из Санкт-Петербурга — расписание и билеты',
         subtitle: 'Скоростной катамаран через Финский залив за 40 минут. Сравните расписание и цены.',
         metaTitle: 'Метеор в Петергоф 2026 — расписание, цены, билеты онлайн | Дайбилет',
@@ -1484,9 +2260,10 @@ async function main() {
         cityId: spb.id,
         filterTag: 'bus-tours-saint-petersburg',
         isActive: false,
-        title: 'Автобусные экскурсии в Санкт-Петербурге — обзорные и тематические туры',
+        title: 'Автобусные экскурсии в Санкт-Петербурге сегодня — обзорные туры, расписание и билеты',
         subtitle: 'Сравните маршруты, длительность и стоимость рейсов разных операторов.',
-        metaTitle: 'Автобусные экскурсии СПб 2026 — обзорные туры, билеты | Дайбилет',
+        metaTitle:
+          'Автобусные экскурсии в Санкт-Петербурге сегодня — обзорные туры, расписание | Дайбилет',
         metaDescription:
           'Автобусные экскурсии по Санкт-Петербургу: обзорные и тематические маршруты, сравнение предложений. Билеты онлайн.',
         heroText:
@@ -1527,9 +2304,16 @@ async function main() {
         slug: 'rechnye-progulki',
         cityId: msk.id,
         filterTag: 'rechnye-progulki-msk',
-        title: 'Речные прогулки по Москве-реке — сравнение рейсов',
+        selectionMode: 'CUSTOM',
+        templateType: 'COMPARISON_TABLE',
+        status: 'ACTIVE',
+        isActive: true,
+        heroText:
+          'Сравните речные прогулки по Москве-реке: длительность, причал, цену и удобства на борту. Фильтры по дате и времени помогут быстро сузить выбор.',
+        title: 'Речные прогулки по Москве-реке сегодня — расписание, цены и билеты',
         subtitle: 'Теплоходы, яхты и катамараны. Сравните маршруты, время и цены.',
-        metaTitle: 'Речные прогулки Москва 2026 — теплоходы, расписание, билеты | Дайбилет',
+        metaTitle:
+          'Речные прогулки по Москве-реке сегодня — расписание, цены и билеты | Дайбилет',
         metaDescription:
           'Речные прогулки по Москве-реке на теплоходах. Сравнение рейсов, маршрутов и цен. Билеты онлайн без наценки.',
         howToChoose: [
@@ -1601,12 +2385,13 @@ async function main() {
         templateType: 'HYBRID',
         status: 'ACTIVE',
         isActive: true,
-        title: 'Ужин-круиз по Москве-реке — сравнение рейсов от разных операторов',
+        title: 'Ужин-круиз по Москве-реке сегодня — ресторан на теплоходе, расписание и билеты',
         subtitle:
           'Ужин, фуршет или сет-меню на борту, живая музыка и виды на подсветку. Сравните время отправления, причал, длительность и цену.',
         heroText:
           'На этой странице собраны вечерние рейсы с питанием на борту: от лёгкого фуршета до полноценного ужина от шефа. Таблица ниже помогает сравнить предложения разных операторов по дате, времени, причалу и стоимости. Используйте фильтры, чтобы сузить выбор — например, по дню или максимальной цене.',
-        metaTitle: 'Ужин-круиз Москва 2026 — теплоход с ужином, цены, расписание | Дайбилет',
+        metaTitle:
+          'Ужин-круиз по Москве-реке сегодня — ресторан на теплоходе, расписание | Дайбилет',
         metaDescription:
           'Вечерний ужин-круиз по Москве-реке: сравнение рейсов операторов, причалы Киевский, Парк Горького, Новоспасский. Билеты онлайн.',
         howToChoose: [
@@ -1705,9 +2490,10 @@ async function main() {
         cityId: msk.id,
         filterTag: 'bus-tours-moscow',
         isActive: false,
-        title: 'Автобусные экскурсии в Москве — обзорные и тематические туры',
+        title: 'Автобусные экскурсии в Москве сегодня — обзорные туры, расписание и билеты',
         subtitle: 'Классические обзорные маршруты и тематические программы по городу. Сравните операторов.',
-        metaTitle: 'Автобусные экскурсии Москва 2026 — обзорные туры, билеты | Дайбилет',
+        metaTitle:
+          'Автобусные экскурсии в Москве сегодня — обзорные туры, расписание | Дайбилет',
         metaDescription:
           'Автобусные экскурсии по Москве: обзорные и тематические туры, сравнение расписания и цен. Билеты онлайн.',
         heroText:
@@ -1745,9 +2531,9 @@ async function main() {
         filterTag: 'river-cruises-kazan',
         status: 'ACTIVE',
         isActive: true,
-        title: 'Речные прогулки в Казани — теплоходы и прогулки по воде',
+        title: 'Речные прогулки в Казани сегодня — расписание, цены и билеты',
         subtitle: 'Обзорные рейсы по Казанке и городские водные маршруты. Сравните время, причалы и цены.',
-        metaTitle: 'Речные прогулки в Казани 2026 — теплоходы, билеты | Дайбилет',
+        metaTitle: 'Речные прогулки в Казани сегодня — расписание, цены и билеты | Дайбилет',
         metaDescription:
           'Речные прогулки и экскурсии по воде в Казани: теплоходы, расписание, сравнение предложений. Билеты онлайн.',
         heroText:
@@ -1994,9 +2780,10 @@ async function main() {
           cityId: kld.id,
           filterTag: 'river-cruises-kaliningrad',
           isActive: false,
-          title: 'Водные и морские прогулки в Калининграде — теплоходы и катамараны',
+          title: 'Морские и речные прогулки в Калининграде сегодня — расписание, цены и билеты',
           subtitle: 'Прогулки по заливу и городским маршрутам. Сравните время отправления и цены.',
-          metaTitle: 'Прогулки по воде Калининград 2026 — море, залив, билеты | Дайбилет',
+          metaTitle:
+            'Морские и речные прогулки в Калининграде сегодня — расписание, цены | Дайбилет',
           metaDescription:
             'Морские и водные прогулки в Калининграде: теплоходы, расписание, сравнение предложений. Билеты онлайн.',
           heroText:
@@ -2103,9 +2890,9 @@ async function main() {
         cityId: sochi.id,
         filterTag: 'river-cruises-sochi',
         isActive: false,
-        title: 'Морские и водные прогулки в Сочи — катера и теплоходы',
+        title: 'Морские и речные прогулки в Сочи сегодня — расписание, цены и билеты',
         subtitle: 'Прогулки вдоль набережных и морские маршруты. Сравните расписание и цены.',
-        metaTitle: 'Морские прогулки Сочи 2026 — теплоходы, катера, билеты | Дайбилет',
+        metaTitle: 'Морские и речные прогулки в Сочи сегодня — расписание, цены | Дайбилет',
         metaDescription:
           'Водные и морские прогулки в Сочи: теплоходы, катера, сравнение предложений. Билеты онлайн.',
         heroText:
@@ -2147,9 +2934,10 @@ async function main() {
           filterTag: 'river-cruises-nizhny-novgorod',
           status: 'ACTIVE',
           isActive: true,
-          title: 'Речные прогулки в Нижнем Новгороде — Волга, Ока, теплоходы',
+          title: 'Речные прогулки в Нижнем Новгороде сегодня — расписание, цены и билеты',
           subtitle: 'Городские водные маршруты у Стрелки и набережных. Сравните рейсы операторов.',
-          metaTitle: 'Речные прогулки Нижний Новгород 2026 — теплоходы, билеты | Дайбилет',
+          metaTitle:
+            'Речные прогулки в Нижнем Новгороде сегодня — расписание, цены и билеты | Дайбилет',
           metaDescription:
             'Речные прогулки в Нижнем Новгороде по Оке и Волге: теплоходы, расписание, сравнение предложений. Билеты онлайн.',
           heroText:
@@ -2195,9 +2983,10 @@ async function main() {
           slug: 'progulki-po-volge',
           cityId: nn.id,
           filterTag: 'progulki-volga-nn',
-          title: 'Речные прогулки по Волге в Нижнем Новгороде — сравнение рейсов',
+          title: 'Речные прогулки по Волге в Нижнем Новгороде сегодня — расписание, цены и билеты',
           subtitle: 'Теплоходы от Стрелки и Нижневолжской набережной. Сравните маршруты, время и цены.',
-          metaTitle: 'Речные прогулки Нижний Новгород 2026 — теплоходы по Волге, билеты | Дайбилет',
+          metaTitle:
+            'Речные прогулки по Волге в Нижнем Новгороде сегодня — расписание и билеты | Дайбилет',
           metaDescription:
             'Речные прогулки по Волге и Оке в Нижнем Новгороде. Сравнение рейсов от разных операторов. Билеты онлайн.',
           howToChoose: [
@@ -2389,11 +3178,240 @@ async function main() {
       );
     }
 
+    // Города из SEO-черновиков (Lovable): общие лендинги «река» + «автобусы» на канон /cities/.../...
+    const regionalRiverBusDefs: Array<{
+      slug: string;
+      cityPrep: string;
+      cityDat: string;
+      riverBit: string;
+    }> = [
+      { slug: 'volgograd', cityPrep: 'Волгограде', cityDat: 'Волгограду', riverBit: 'по Волге' },
+      { slug: 'perm', cityPrep: 'Перми', cityDat: 'Перми', riverBit: 'по Каме' },
+      { slug: 'samara', cityPrep: 'Самаре', cityDat: 'Самаре', riverBit: 'по Волге' },
+      { slug: 'tver', cityPrep: 'Твери', cityDat: 'Твери', riverBit: 'по Волге' },
+      { slug: 'novosibirsk', cityPrep: 'Новосибирске', cityDat: 'Новосибирску', riverBit: 'по Оби' },
+      { slug: 'krasnoyarsk', cityPrep: 'Красноярске', cityDat: 'Красноярску', riverBit: 'по Енисею' },
+      { slug: 'ekaterinburg', cityPrep: 'Екатеринбурге', cityDat: 'Екатеринбургу', riverBit: 'по Исети и городским маршрутам' },
+      { slug: 'rostov-na-donu', cityPrep: 'Ростове-на-Дону', cityDat: 'Ростову-на-Дону', riverBit: 'по Дону' },
+      { slug: 'yaroslavl', cityPrep: 'Ярославле', cityDat: 'Ярославлю', riverBit: 'по Волге и Которосли' },
+    ];
+
+    for (const r of regionalRiverBusDefs) {
+      const rcx = await prisma.city.findUnique({ where: { slug: r.slug } });
+      if (!rcx) continue;
+      const cityPath = `/cities/${r.slug}`;
+      landings.push(
+        {
+          slug: 'rechnye-progulki',
+          cityId: rcx.id,
+          filterTag: `river-cruises-${r.slug}`,
+          selectionMode: 'CUSTOM',
+          templateType: 'COMPARISON_TABLE',
+          status: 'ACTIVE',
+          isActive: true,
+          title: `Речные прогулки в ${r.cityPrep} ${r.riverBit} — расписание и цены 2026`,
+          subtitle:
+            'Сравните маршруты, время отправления, причалы и стоимость рейсов. Фильтры помогут выбрать день и удобный интервал.',
+          metaTitle: `Речные прогулки в ${r.cityPrep} — расписание и билеты | Дайбилет`,
+          metaDescription: `Речные и водные прогулки в ${r.cityPrep}: сравнение расписания и цен. Билеты у организаторов.`,
+          heroText: `Здесь собраны городские водные маршруты в ${r.cityPrep} по коммерческому тегу кластера. Таблица строится из актуальных сеансов каталога; при малом числе событий список временно короткий — загляните в смежные разделы города.`,
+          howToChoose: [
+            {
+              title: 'Как пользоваться таблицей',
+              text: 'Каждая строка — конкретный сеанс. Сверяйте причал в описании, длительность и удобство по времени; для семьи часто проще дневные слоты.',
+            },
+            {
+              title: 'На борту и в дороге',
+              text: 'На воде обычно прохолоднее и ветренее, чем в центре — запас ветровки уместен даже летом. Точные услуги (еда, гид) — в карточке события.',
+            },
+          ],
+          faq: [
+            {
+              question: 'Почему мало или нет предложений?',
+              answer:
+                'Подборка привязана к тегу кластера в каталоге. После импорта или ручного заведения событий с этим тегом список наполнится автоматически.',
+            },
+            {
+              question: 'Кто продаёт билет?',
+              answer:
+                'Оплата и оферта — у организатора рейса. Дайбилет — информационное сравнение без наценки от городской афиши.',
+            },
+          ],
+          stats: { soldTickets: 0, avgRating: 0 },
+          relatedLinks: [
+            { title: 'Все события в городе', href: cityPath },
+            { title: 'Хаб «Речные прогулки»', href: '/river-cruises' },
+            { title: 'Автобусные экскурсии', href: `${cityPath}/avtobusnye-ekskursii` },
+          ],
+          sortOrder: 0,
+        },
+        {
+          slug: 'avtobusnye-ekskursii',
+          cityId: rcx.id,
+          filterTag: `bus-tours-${r.slug}`,
+          templateType: 'COMPARISON_TABLE',
+          status: 'ACTIVE',
+          isActive: true,
+          title: `Обзорные автобусные экскурсии по ${r.cityDat} — расписание и цены 2026`,
+          subtitle: 'Обзорные и тематические маршруты: сравните операторов, длительность и стоимость.',
+          metaTitle: `Автобусные экскурсии по ${r.cityDat} — расписание | Дайбилет`,
+          metaDescription: `Автобусные экскурсии по ${r.cityDat}: сравнение туров и цен. Билеты онлайн у организаторов.`,
+          heroText: `Кластер автобусных и обзорных экскурсий по ${r.cityDat}. Сетка ниже обновляется из событий с городским тегом; пока афиша наполняется, используйте фильтры и карточки соседних тем.`,
+          howToChoose: [
+            {
+              title: 'Обзорная или тематическая программа',
+              text: 'Короткая обзорная (2–3 ч) удобна для первого знакомства. Тематические туры дольше и глубже — смотрите состав точек в описании.',
+            },
+            {
+              title: 'Посадка и язык',
+              text: 'Проверьте район отправления и наличие аудиогида или живого гида — это влияет на комфорт группы.',
+            },
+          ],
+          faq: [
+            {
+              question: 'Когда страница «раскроется» полностью?',
+              answer:
+                'Когда в каталоге достаточно событий с соответствующим городским тегом и активными сеансами; материализатор может скрывать пустые лендинги в навигации.',
+            },
+          ],
+          stats: { soldTickets: 0, avgRating: 0 },
+          relatedLinks: [
+            { title: 'Речные прогулки', href: `${cityPath}/rechnye-progulki` },
+            { title: 'Все события в городе', href: cityPath },
+            { title: 'Хаб «Автобусы»', href: '/bus-tours' },
+          ],
+          sortOrder: 5,
+        },
+      );
+    }
+
+    // Автобусные кластеры для городов, где речной лендинг уже заведён отдельно (SEO-черновики mhtml)
+    const extraBusOnlyDefs: Array<{ slug: string; cityPrep: string; cityDat: string }> = [
+      { slug: 'kazan', cityPrep: 'Казани', cityDat: 'Казани' },
+      { slug: 'kaliningrad', cityPrep: 'Калининграде', cityDat: 'Калининграду' },
+      { slug: 'nizhny-novgorod', cityPrep: 'Нижнем Новгороде', cityDat: 'Нижнему Новгороду' },
+      { slug: 'sochi', cityPrep: 'Сочи', cityDat: 'Сочи' },
+    ];
+    for (const b of extraBusOnlyDefs) {
+      const bcx = await prisma.city.findUnique({ where: { slug: b.slug } });
+      if (!bcx) continue;
+      const cityPath = `/cities/${b.slug}`;
+      landings.push({
+        slug: 'avtobusnye-ekskursii',
+        cityId: bcx.id,
+        filterTag: `bus-tours-${b.slug}`,
+        templateType: 'COMPARISON_TABLE',
+        status: 'ACTIVE',
+        isActive: true,
+        title: `Обзорные автобусные экскурсии по ${b.cityDat} — расписание и цены 2026`,
+        subtitle: 'Обзорные и тематические маршруты: сравните операторов, длительность и стоимость.',
+        metaTitle: `Автобусные экскурсии по ${b.cityDat} — расписание | Дайбилет`,
+        metaDescription: `Автобусные экскурсии по ${b.cityDat}: сравнение туров и цен. Билеты онлайн у организаторов.`,
+        heroText: `Кластер автобусных и обзорных экскурсий в ${b.cityPrep}. Сетка ниже обновляется из событий с городским тегом; пока афиша наполняется, используйте фильтры и карточки соседних тем.`,
+        howToChoose: [
+          {
+            title: 'Обзорная или тематическая программа',
+            text: 'Короткая обзорная (2–3 ч) удобна для первого знакомства. Тематические туры дольше и глубже — смотрите состав точек в описании.',
+          },
+          {
+            title: 'Посадка и язык',
+            text: 'Проверьте район отправления и наличие аудиогида или живого гида — это влияет на комфорт группы.',
+          },
+        ],
+        faq: [
+          {
+            question: 'Когда страница «раскроется» полностью?',
+            answer:
+              'Когда в каталоге достаточно событий с соответствующим городским тегом и активными сеансами; материализатор может скрывать пустые лендинги в навигации.',
+          },
+        ],
+        stats: { soldTickets: 0, avgRating: 0 },
+        relatedLinks: [
+          { title: 'Речные прогулки', href: `${cityPath}/rechnye-progulki` },
+          { title: 'Все события в городе', href: cityPath },
+          { title: 'Хаб «Автобусы»', href: '/bus-tours' },
+        ],
+        sortOrder: 5,
+      });
+    }
+
+    for (const sal of SALUTE_9_MAY_LANDING_SEEDS) {
+      const sc = await prisma.city.findUnique({ where: { slug: sal.citySlug } });
+      if (!sc) continue;
+      const { citySlug: _citySlug, relatedLinks, seasonalPayload, ...body } = sal;
+      void _citySlug;
+      landings.push({
+        slug: 'salute-9-may',
+        cityId: sc.id,
+        filterTag: 'salyut-9-maya',
+        templateType: 'SEASONAL_EVENT',
+        selectionMode: 'CUSTOM',
+        status: 'ACTIVE',
+        isActive: true,
+        showInCollections: true,
+        sortOrder: 8,
+        stats: { soldTickets: 0, avgRating: 0 },
+        ...body,
+        seasonalPayload,
+        relatedLinks: relatedLinks.map((l) =>
+          l.description ? { title: l.title, href: l.href, description: l.description } : { title: l.title, href: l.href },
+        ),
+      });
+    }
+
     for (const lp of landings) {
       await prisma.landingPage.upsert({
         where: { cityId_slug: { cityId: lp.cityId, slug: lp.slug } },
         update: lp,
         create: lp,
+      });
+    }
+
+    // СПб «Реки и каналы»: в части БД остался глобальный UNIQUE(slug) — не дублируем upsert в массиве выше.
+    const rekiKanalyPayload = {
+      cityId: spb.id,
+      filterTag: 'panoramnyi',
+      isActive: false,
+      title: 'Речные прогулки по Неве и каналам Санкт-Петербурга сегодня — расписание, цены и билеты',
+      subtitle: 'Дневные и вечерние маршруты по центру. Сравните причалы, длительность и цены.',
+      metaTitle:
+        'Речные прогулки по Неве и каналам Петербурга сегодня — расписание и билеты | Дайбилет',
+      metaDescription:
+        'Прогулки на теплоходе по Неве и каналам Санкт-Петербурга: сравнение рейсов, расписание, билеты онлайн.',
+      heroText:
+        'Подборка панорамных речных прогулок по центру Петербурга. Страница в навигации активируется при достаточном числе событий с тегом кластера.',
+      howToChoose: [
+        {
+          title: 'Нева или каналы?',
+          text: 'Нева — широкие виды на набережные и мосты. Каналы — камерная атмосфера. Комбинированные рейсы дают и то и другое — смотрите маршрут в карточке.',
+        },
+      ],
+      faq: [
+        {
+          question: 'Почему страницы может не быть в меню города?',
+          answer:
+            'Лендинг включается автоматически при достаточном числе актуальных предложений с тегом кластера; до этого прямой URL может быть недоступен.',
+        },
+      ],
+      stats: { soldTickets: 0, avgRating: 0 },
+      relatedLinks: [
+        { title: 'Ночные мосты', href: '/cities/saint-petersburg/nochnye-mosty' },
+        { title: 'Метеор в Петергоф', href: '/cities/saint-petersburg/meteory' },
+        { title: 'Все события в Петербурге', href: '/cities/saint-petersburg' },
+      ],
+      sortOrder: 4,
+    };
+    const existingReki = await prisma.landingPage.findFirst({
+      where: { slug: 'reki-kanaly', isDeleted: false },
+    });
+    if (existingReki) {
+      await prisma.landingPage.update({
+        where: { id: existingReki.id },
+        data: rekiKanalyPayload,
+      });
+    } else {
+      await prisma.landingPage.create({
+        data: { slug: 'reki-kanaly', ...rekiKanalyPayload },
       });
     }
 

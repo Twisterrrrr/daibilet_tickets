@@ -1036,6 +1036,8 @@ model LandingPage {
   filterTag         String // slug тега для фильтрации событий
   additionalFilters Json? // {category?, source?, minDuration?, maxDuration?, features[]?}
   rankingJson       Json?
+  /** SEASONAL_EVENT и др.: { viewpoints?: [{name, description, isFree}], tips?: string[] } */
+  seasonalPayload   Json?
   title             String // H1
   subtitle          String?
   heroText          String?   @db.Text

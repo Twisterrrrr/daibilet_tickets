@@ -1,4 +1,4 @@
-import { getFirstPriceKopecks, moscowCalendarDayFromIso } from '@daibilet/shared';
+import { calendarDayFromIso, getFirstPriceKopecks, getCityTimezone } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DateMode, LandingStatus, Prisma } from '@prisma/client';
 
@@ -183,9 +183,10 @@ export class LandingService {
       .map((v) => getFirstPriceKopecks(v.prices))
       .filter((p): p is number => p !== null && p > 0);
 
+    const landingTz = getCityTimezone(landing.city.slug);
     const allDates = variants
       .filter((v) => v.startsAt != null)
-      .map((v) => moscowCalendarDayFromIso((v.startsAt as Date).toISOString()));
+      .map((v) => calendarDayFromIso((v.startsAt as Date).toISOString(), landingTz));
     const uniqueDates = [...new Set(allDates)].filter((d): d is string => Boolean(d)).sort();
 
     const filters = {
@@ -203,6 +204,7 @@ export class LandingService {
         title: landing.title,
         subtitle: landing.subtitle,
         heroText: landing.heroText,
+        seasonalPayload: landing.seasonalPayload,
         howToChoose: landing.howToChoose,
         infoBlocks: landing.infoBlocks,
         faq: landing.faq,
