@@ -1,6 +1,6 @@
 'use client';
 
-import { getMoscowTodayISO, getMoscowTomorrowISO } from '@daibilet/shared';
+import { DEFAULT_CALENDAR_TZ, getTodayISO, getTomorrowISO } from '@daibilet/shared';
 import { RotateCcw, SlidersHorizontal, X } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -19,6 +19,8 @@ interface FilterBarProps {
   piers: string[];
   priceRange: [number, number];
   dates: string[];
+  /** IANA timezone для «сегодня»/«завтра» и подписей дат (как DateFilter timezone в city-landing-enhancer) */
+  ianaTimeZone?: string;
   /** Ночные мосты / вечерние круизы / скрыть чипы времени */
   timeSlotMode?: LandingTimeSlotMode;
   onFilterChange: (filters: FilterState) => void;
@@ -46,10 +48,10 @@ const SORT_OPTIONS = [
   { value: 'popular', label: 'По рейтингу' },
 ];
 
-/** iso — YYYY-MM-DD календарного дня (как в фильтрах API, по Москве) */
-function formatDateShort(iso: string): string {
-  const today = getMoscowTodayISO();
-  const tomorrow = getMoscowTomorrowISO();
+/** iso — YYYY-MM-DD календарного дня в часовом поясе города */
+function formatDateShort(iso: string, tz: string): string {
+  const today = getTodayISO(tz);
+  const tomorrow = getTomorrowISO(tz);
   if (iso === today) return 'Сегодня';
   if (iso === tomorrow) return 'Завтра';
   const [y, mo, da] = iso.split('-').map(Number);
@@ -59,7 +61,7 @@ function formatDateShort(iso: string): string {
     day: 'numeric',
     month: 'short',
     weekday: 'short',
-    timeZone: 'Europe/Moscow',
+    timeZone: tz,
   });
 }
 
@@ -121,6 +123,7 @@ export function FilterBar({
   piers,
   priceRange,
   dates,
+  ianaTimeZone = DEFAULT_CALENDAR_TZ,
   timeSlotMode = 'night',
   onFilterChange,
   filterTitle,
@@ -165,7 +168,7 @@ export function FilterBar({
   const hasFilters = Boolean(state.date || state.timeSlot || state.pier || state.maxPrice);
 
   const activeLabels: string[] = [];
-  if (state.date) activeLabels.push(formatDateShort(state.date));
+  if (state.date) activeLabels.push(formatDateShort(state.date, ianaTimeZone));
   const tsLabel = timeSlots.find((t) => t.value === state.timeSlot)?.label;
   if (tsLabel) activeLabels.push(tsLabel);
   if (state.pier) activeLabels.push(shortenPier(state.pier));
@@ -222,7 +225,7 @@ export function FilterBar({
             {chipDates.map((d) => (
               <Chip
                 key={d}
-                label={formatDateShort(d)}
+                label={formatDateShort(d, ianaTimeZone)}
                 active={state.date === d}
                 onClick={() => update({ date: state.date === d ? '' : d })}
               />
@@ -236,7 +239,7 @@ export function FilterBar({
                 <option value="">Другая дата…</option>
                 {dates.slice(5).map((d) => (
                   <option key={d} value={d}>
-                    {formatDateShort(d)}
+                    {formatDateShort(d, ianaTimeZone)}
                   </option>
                 ))}
               </select>
@@ -299,8 +302,9 @@ export function FilterBar({
         ) : null}
 
         <FilterSection title="Цена и порядок">
+          {/* Табы как в Lovable/shadcn: muted-foreground / primary, underline на всю ширину кнопки (светлый лендинг) */}
           <div
-            className="-mx-1 mb-3 flex flex-wrap gap-0 border-b border-slate-200"
+            className="-mx-1 mb-3 flex flex-wrap gap-1 border-b border-slate-200"
             role="tablist"
             aria-label="Сортировка списка"
           >
@@ -311,18 +315,15 @@ export function FilterBar({
                 role="tab"
                 aria-selected={state.sort === s.value}
                 onClick={() => update({ sort: s.value })}
-                className={`relative px-3 py-2.5 text-sm font-medium transition-colors sm:px-4 ${
+                className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
                   state.sort === s.value
-                    ? 'text-primary-700'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'text-primary-600'
+                    : 'text-[hsl(var(--muted-foreground))] hover:text-[color:var(--color-foreground)]'
                 }`}
               >
                 {s.label}
                 {state.sort === s.value ? (
-                  <span
-                    className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary-600"
-                    aria-hidden
-                  />
+                  <span className="absolute inset-x-0 bottom-0 h-0.5 bg-primary-600" aria-hidden />
                 ) : null}
               </button>
             ))}

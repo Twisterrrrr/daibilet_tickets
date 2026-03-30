@@ -10,6 +10,7 @@ import { CITY_INFO } from '@/lib/cityInfo';
 import { CITY_IMAGES } from '@/lib/cityImages';
 import type { CityDetail } from '@/lib/api.types';
 import { getSeoMeta } from '@/lib/seo/getSeoMeta';
+import { ClusterHubLinks } from '@/components/landing/ClusterHubLinks';
 
 // ISR: обновлять каждые 6 часов
 export const revalidate = 21600;
@@ -198,6 +199,7 @@ export default async function CityPage({ params }: Props) {
                 </Link>
               ))}
             </div>
+            <ClusterHubLinks citySlug={slug} variant="chips" />
           </div>
         </section>
       )}

@@ -11,9 +11,16 @@ declare var console: { warn: (...args: unknown[]) => void; log: (...args: unknow
 
 // --- Widget Payload Validation ---
 export {
+  calendarDayFromIso,
+  CITY_TIMEZONES,
+  dateToISO,
   dateToMoscowISO,
+  DEFAULT_CALENDAR_TZ,
+  getCityTimezone,
   getMoscowTodayISO,
   getMoscowTomorrowISO,
+  getTodayISO,
+  getTomorrowISO,
   moscowCalendarDayFromIso,
 } from './moscow-calendar';
 export { shortenAddressToStreet } from './address-utils';

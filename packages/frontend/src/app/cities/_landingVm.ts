@@ -238,6 +238,7 @@ const HIDE_TIME_SLOT_LANDING_SLUGS = new Set([
   'nizhegorodskij-kreml',
   'kanatnaya-doroga',
   'progulki-po-volge',
+  'salute-9-may',
 ]);
 
 export function landingTimeSlotMode(landingSlug: string): LandingTimeSlotMode {

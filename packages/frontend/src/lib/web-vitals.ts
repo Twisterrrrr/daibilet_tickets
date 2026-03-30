@@ -13,9 +13,10 @@ const sendToAnalytics: MetricHandler = (metric) => {
     });
   }
 
-  // Console in development
-  if (process.env.NODE_ENV === 'development') {
-    console.warn(`[Web Vitals] ${metric.name}: ${Math.round(metric.value)}`);
+  // Только при явном флаге — иначе засоряет консоль и даёт лишние stack trace в DevTools
+  if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEBUG_WEB_VITALS === '1') {
+    // eslint-disable-next-line no-console
+    console.debug(`[Web Vitals] ${metric.name}: ${Math.round(metric.value)}`);
   }
 };
 

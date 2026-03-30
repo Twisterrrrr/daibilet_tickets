@@ -1,5 +1,6 @@
 'use client';
 
+import { DEFAULT_CALENDAR_TZ } from '@daibilet/shared';
 import { ChevronDown, Clock, ExternalLink, MapPin, Ship, Star, Users } from 'lucide-react';
 import { useState } from 'react';
 
@@ -28,22 +29,23 @@ interface Variant {
 interface VariantCardProps {
   variant: Variant;
   isBest: boolean;
+  ianaTimeZone?: string;
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, timeZone: string): string {
   return new Date(iso).toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Europe/Moscow',
+    timeZone,
   });
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, timeZone: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'short',
     weekday: 'short',
-    timeZone: 'Europe/Moscow',
+    timeZone,
   });
 }
 
@@ -77,7 +79,7 @@ function Pill({ children, className = '' }: { children: React.ReactNode; classNa
   );
 }
 
-export function VariantCard({ variant: v, isBest }: VariantCardProps) {
+export function VariantCard({ variant: v, isBest, ianaTimeZone = DEFAULT_CALENDAR_TZ }: VariantCardProps) {
   const [expanded, setExpanded] = useState(false);
   const price = getPrice(v);
   const isSoldOut = v.availableTickets <= 0;
@@ -100,8 +102,8 @@ export function VariantCard({ variant: v, isBest }: VariantCardProps) {
         {/* Верхний ряд: время + цена */}
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-2xl font-black text-slate-900 leading-none">{formatTime(v.startsAt)}</div>
-            <div className="mt-1 text-[13px] text-slate-500">{formatDate(v.startsAt)}</div>
+            <div className="text-2xl font-black text-slate-900 leading-none">{formatTime(v.startsAt, ianaTimeZone)}</div>
+            <div className="mt-1 text-[13px] text-slate-500">{formatDate(v.startsAt, ianaTimeZone)}</div>
           </div>
           <div className="text-right">
             <div className="text-2xl font-black text-slate-900 leading-none">
@@ -194,7 +196,15 @@ export function VariantCard({ variant: v, isBest }: VariantCardProps) {
 }
 
 /** Mobile cards list */
-export function VariantCards({ variants, bestDealIdx }: { variants: Variant[]; bestDealIdx: number | null }) {
+export function VariantCards({
+  variants,
+  bestDealIdx,
+  ianaTimeZone = DEFAULT_CALENDAR_TZ,
+}: {
+  variants: Variant[];
+  bestDealIdx: number | null;
+  ianaTimeZone?: string;
+}) {
   if (variants.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center md:hidden">
@@ -208,7 +218,7 @@ export function VariantCards({ variants, bestDealIdx }: { variants: Variant[]; b
   return (
     <div className="grid gap-3 md:hidden">
       {variants.map((v, idx) => (
-        <VariantCard key={v.sessionId} variant={v} isBest={idx === bestDealIdx} />
+        <VariantCard key={v.sessionId} variant={v} isBest={idx === bestDealIdx} ianaTimeZone={ianaTimeZone} />
       ))}
     </div>
   );

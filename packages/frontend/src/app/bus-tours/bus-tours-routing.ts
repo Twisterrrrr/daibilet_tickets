@@ -20,6 +20,71 @@ export const BUS_TOUR_CITY_ROUTES: BusTourCityRoute[] = [
     cityName: 'Санкт-Петербург',
     canonicalPath: '/cities/saint-petersburg/avtobusnye-ekskursii',
   },
+  {
+    citySlug: 'volgograd',
+    cityName: 'Волгоград',
+    canonicalPath: '/cities/volgograd/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'perm',
+    cityName: 'Пермь',
+    canonicalPath: '/cities/perm/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'samara',
+    cityName: 'Самара',
+    canonicalPath: '/cities/samara/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'tver',
+    cityName: 'Тверь',
+    canonicalPath: '/cities/tver/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'novosibirsk',
+    cityName: 'Новосибирск',
+    canonicalPath: '/cities/novosibirsk/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'krasnoyarsk',
+    cityName: 'Красноярск',
+    canonicalPath: '/cities/krasnoyarsk/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'ekaterinburg',
+    cityName: 'Екатеринбург',
+    canonicalPath: '/cities/ekaterinburg/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'rostov-na-donu',
+    cityName: 'Ростов-на-Дону',
+    canonicalPath: '/cities/rostov-na-donu/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'yaroslavl',
+    cityName: 'Ярославль',
+    canonicalPath: '/cities/yaroslavl/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'kazan',
+    cityName: 'Казань',
+    canonicalPath: '/cities/kazan/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'kaliningrad',
+    cityName: 'Калининград',
+    canonicalPath: '/cities/kaliningrad/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'nizhny-novgorod',
+    cityName: 'Нижний Новгород',
+    canonicalPath: '/cities/nizhny-novgorod/avtobusnye-ekskursii',
+  },
+  {
+    citySlug: 'sochi',
+    cityName: 'Сочи',
+    canonicalPath: '/cities/sochi/avtobusnye-ekskursii',
+  },
 ];
 
 const ROUTE_BY_SLUG = Object.fromEntries(BUS_TOUR_CITY_ROUTES.map((r) => [r.citySlug, r])) as Record<

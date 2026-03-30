@@ -1,5 +1,6 @@
 'use client';
 
+import { DEFAULT_CALENDAR_TZ } from '@daibilet/shared';
 import { Clock, ExternalLink, Ship, Star, Users } from 'lucide-react';
 
 import { TcWidgetButton } from '@/components/ui/TcWidget';
@@ -27,23 +28,25 @@ interface Variant {
 interface ComparisonTableProps {
   variants: Variant[];
   bestDealIdx: number | null;
+  /** IANA timezone отображения времени/даты рейса */
+  ianaTimeZone?: string;
 }
 
-function formatTime(iso: string | undefined): string {
+function formatTime(iso: string | undefined, timeZone: string): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Europe/Moscow',
+    timeZone,
   });
 }
 
-function formatDate(iso: string | undefined): string {
+function formatDate(iso: string | undefined, timeZone: string): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'short',
-    timeZone: 'Europe/Moscow',
+    timeZone,
   });
 }
 
@@ -91,7 +94,7 @@ function Pill({ children, className = '' }: { children: React.ReactNode; classNa
   );
 }
 
-export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps) {
+export function ComparisonTable({ variants, bestDealIdx, ianaTimeZone = DEFAULT_CALENDAR_TZ }: ComparisonTableProps) {
   if (variants.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center sm:p-12">
@@ -136,9 +139,9 @@ export function ComparisonTable({ variants, bestDealIdx }: ComparisonTableProps)
                       Оптимальный
                     </div>
                   )}
-                  <div className="text-lg font-black text-slate-900 leading-none">{formatTime(v.startsAt)}</div>
+                  <div className="text-lg font-black text-slate-900 leading-none">{formatTime(v.startsAt, ianaTimeZone)}</div>
                   <div className="mt-0.5 text-[12px] text-slate-400">
-                    {formatDate(v.startsAt)} · {formatDuration(v.event.durationMinutes)}
+                    {formatDate(v.startsAt, ianaTimeZone)} · {formatDuration(v.event.durationMinutes)}
                   </div>
                 </td>
 

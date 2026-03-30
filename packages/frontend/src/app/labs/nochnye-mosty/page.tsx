@@ -73,6 +73,7 @@ export default async function NochnyeMostyLabPage() {
 
           <div id="variants-list">
             <LandingClient
+              citySlug={citySlug}
               variants={vm.variants}
               filters={vm.filters}
               templateType={vm.templateType}

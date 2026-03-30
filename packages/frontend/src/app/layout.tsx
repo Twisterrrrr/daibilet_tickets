@@ -54,8 +54,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </UserAuthProvider>
         </CartProvider>
 
-        {/* Ticketscloud — скрипт виджета покупки билетов */}
-        <Script src="https://ticketscloud.com/static/scripts/widget/tcwidget.js" strategy="beforeInteractive" />
+        {/* Ticketscloud — виджет покупки; afterInteractive убирает лишний preload+warning в Chrome без потери кликов по кнопкам */}
+        <Script src="https://ticketscloud.com/static/scripts/widget/tcwidget.js" strategy="afterInteractive" />
 
         {/* Teplohod.info — скрипт виджета покупки билетов */}
         <Script src="https://api.teplohod.info/v1/widget/widget.js" strategy="lazyOnload" />

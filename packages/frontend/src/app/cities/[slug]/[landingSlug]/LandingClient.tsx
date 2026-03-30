@@ -1,6 +1,6 @@
 'use client';
 
-import { moscowCalendarDayFromIso } from '@daibilet/shared';
+import { calendarDayFromIso, getCityTimezone } from '@daibilet/shared';
 import { useMemo, useState } from 'react';
 
 import type { LandingTimeSlotMode } from '@/app/cities/_landingVm';
@@ -19,15 +19,15 @@ function getPrice(v: Variant): number {
   return sessionPrice > 0 ? sessionPrice : (v.event.priceFrom ?? 0);
 }
 
-function getHourMinute(iso: string): { h: number; m: number } {
+function getHourMinute(iso: string, tz: string): { h: number; m: number } {
   const d = new Date(iso);
-  const moscow = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
-  return { h: moscow.getHours(), m: moscow.getMinutes() };
+  const local = new Date(d.toLocaleString('en-US', { timeZone: tz }));
+  return { h: local.getHours(), m: local.getMinutes() };
 }
 
-function matchTimeSlot(iso: string, slot: string, mode: LandingTimeSlotMode): boolean {
+function matchTimeSlot(iso: string, slot: string, mode: LandingTimeSlotMode, tz: string): boolean {
   if (!slot || mode === 'hidden') return true;
-  const { h, m } = getHourMinute(iso);
+  const { h, m } = getHourMinute(iso, tz);
   const time = h * 60 + m;
   if (mode === 'evening') {
     if (slot === 'ev-17-19') return time >= 17 * 60 && time < 19 * 60;
@@ -59,11 +59,11 @@ const FILTER_BAR_COPY: Record<
 };
 
 /** Оценка варианта для «Оптимального выбора» */
-function scoreOffer(v: Variant, allPrices: number[]): number {
+function scoreOffer(v: Variant, allPrices: number[], tz: string): number {
   const price = getPrice(v);
   let timeScore = 0.5;
   if (v.startsAt) {
-    const { h, m } = getHourMinute(v.startsAt);
+    const { h, m } = getHourMinute(v.startsAt, tz);
     const timeMin = h * 60 + m;
     const normTime = timeMin < 720 ? timeMin + 1440 : timeMin;
     const distToMid = Math.abs(normTime - 1440);
@@ -84,7 +84,7 @@ function scoreOffer(v: Variant, allPrices: number[]): number {
   return 0.35 * timeScore + 0.3 * priceScore + 0.2 * ratingScore + 0.15 * seatScore;
 }
 
-function pickOptimal(variants: Variant[]): number | null {
+function pickOptimal(variants: Variant[], tz: string): number | null {
   const available = variants.filter((v) => v.availableTickets > 0);
   if (available.length === 0) return null;
   const prices = available.map(getPrice).filter((p) => p > 0);
@@ -95,7 +95,7 @@ function pickOptimal(variants: Variant[]): number | null {
   for (let i = 0; i < variants.length; i++) {
     const v = variants[i];
     if (v.availableTickets <= 0) continue;
-    const s = scoreOffer(v, prices);
+    const s = scoreOffer(v, prices, tz);
     if (s > bestScore) {
       bestScore = s;
       bestIdx = i;
@@ -123,16 +123,19 @@ function sortVariants(variants: Variant[], sort: string): Variant[] {
 }
 
 export function LandingClient({
+  citySlug,
   variants: allVariants,
   filters: apiFilters,
   templateType,
   timeSlotMode = 'night',
 }: {
+  citySlug: string;
   variants: Variant[];
   filters: Filters;
   templateType: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
   timeSlotMode?: LandingTimeSlotMode;
 }) {
+  const ianaTimeZone = useMemo(() => getCityTimezone(citySlug), [citySlug]);
   const [filterState, setFilterState] = useState<FilterState>({
     date: '',
     timeSlot: '',
@@ -149,12 +152,12 @@ export function LandingClient({
       // Date
       if (filterState.date) {
         if (!v.startsAt) return false;
-        if (moscowCalendarDayFromIso(v.startsAt) !== filterState.date) return false;
+        if (calendarDayFromIso(v.startsAt, ianaTimeZone) !== filterState.date) return false;
       }
       // Time slot
       if (filterState.timeSlot) {
         if (!v.startsAt) return false;
-        if (!matchTimeSlot(v.startsAt, filterState.timeSlot, timeSlotMode)) return false;
+        if (!matchTimeSlot(v.startsAt, filterState.timeSlot, timeSlotMode, ianaTimeZone)) return false;
       }
       // Pier
       if (filterState.pier) {
@@ -166,11 +169,11 @@ export function LandingClient({
       }
       return true;
     });
-  }, [allVariants, filterState, timeSlotMode]);
+  }, [allVariants, filterState, timeSlotMode, ianaTimeZone]);
 
   const sorted = useMemo(() => sortVariants(filtered, filterState.sort), [filtered, filterState.sort]);
 
-  const bestDealIdx = useMemo(() => pickOptimal(sorted), [sorted]);
+  const bestDealIdx = useMemo(() => pickOptimal(sorted, ianaTimeZone), [sorted, ianaTimeZone]);
 
   const filterCopy = FILTER_BAR_COPY[timeSlotMode];
 
@@ -180,6 +183,7 @@ export function LandingClient({
         piers={apiFilters.piers}
         priceRange={apiFilters.priceRange as [number, number]}
         dates={apiFilters.dates}
+        ianaTimeZone={ianaTimeZone}
         timeSlotMode={timeSlotMode}
         onFilterChange={setFilterState}
         filterTitle={filterCopy.title}
@@ -202,11 +206,11 @@ export function LandingClient({
 
       {/* Таблица: COMPARISON_TABLE и HYBRID — на всех ширинах (горизонтальный скролл на телефоне) */}
       {(templateType === 'COMPARISON_TABLE' || templateType === 'HYBRID') && (
-        <ComparisonTable variants={sorted} bestDealIdx={bestDealIdx} />
+        <ComparisonTable variants={sorted} bestDealIdx={bestDealIdx} ianaTimeZone={ianaTimeZone} />
       )}
       {/* Карточки: только GENERIC / SEASONAL (без дубля с таблицей в HYBRID) */}
       {(templateType === 'GENERIC_CARDS' || templateType === 'SEASONAL_EVENT') && (
-        <VariantCards variants={sorted} bestDealIdx={bestDealIdx} />
+        <VariantCards variants={sorted} bestDealIdx={bestDealIdx} ianaTimeZone={ianaTimeZone} />
       )}
     </div>
   );

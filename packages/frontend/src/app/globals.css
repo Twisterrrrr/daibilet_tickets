@@ -6,6 +6,8 @@
   :root {
     --color-background: #ffffff;
     --color-foreground: #0f172a;
+    /* shadcn/Lovable: muted подписи и неактивные табы (HSL без hsl()) */
+    --muted-foreground: 215 16% 47%;
   }
 
   body {
@@ -60,6 +62,14 @@
 }
 
 @layer utilities {
+  /* Как в city-landing-enhancer (Lovable): синий герой лендингов */
+  .gradient-hero-lovable {
+    background: linear-gradient(180deg, hsl(224 76% 48%) 0%, hsl(224 76% 38%) 100%);
+  }
+  .best-deal-ring {
+    @apply border-2 border-primary-600;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
+  }
   .gradient-hero {
     background: linear-gradient(135deg, hsl(220 55% 15%) 0%, hsl(220 50% 20%) 50%, hsl(220 45% 25%) 100%);
   }

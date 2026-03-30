@@ -24,6 +24,10 @@ const staticFooterLinks = {
     { name: 'Экскурсии', href: '/events?category=EXCURSION&page=1' },
     { name: 'Музеи', href: '/events?category=MUSEUM&page=1' },
     { name: 'Мероприятия', href: '/events?category=EVENT&page=1' },
+    // Хабы по кластерам
+    { name: 'Речные прогулки', href: '/river-cruises' },
+    { name: 'Автобусные экскурсии', href: '/bus-tours' },
+    { name: 'Салют 9 мая', href: '/salute-9-may' },
   ],
   Компания: [
     { name: 'О сервисе', href: '/about' },

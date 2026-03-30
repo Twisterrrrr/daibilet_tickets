@@ -12,9 +12,9 @@ import {
 export const revalidate = 21600;
 
 export const metadata: Metadata = {
-  title: 'Автобусные экскурсии 2026 — по городам России | Дайбилет',
+  title: 'Обзорные автобусные экскурсии по России — расписание и цены 2026 | Дайбилет',
   description:
-    'Города с активной подборкой автобусных и обзорных экскурсий. Канонические страницы /cities/…/avtobusnye-ekskursii.',
+    'Обзорные и тематические автобусные экскурсии по городам России: канонические страницы /cities/…/avtobusnye-ekskursii с расписанием и ценами.',
   alternates: { canonical: '/bus-tours' },
 };
 

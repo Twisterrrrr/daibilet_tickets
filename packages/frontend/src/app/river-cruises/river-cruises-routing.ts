@@ -43,6 +43,51 @@ export const RIVER_CRUISE_CITY_ROUTES: RiverCruiseCityRoute[] = [
     cityName: 'Сочи',
     canonicalPath: '/cities/sochi/rechnye-progulki',
   },
+  {
+    citySlug: 'volgograd',
+    cityName: 'Волгоград',
+    canonicalPath: '/cities/volgograd/rechnye-progulki',
+  },
+  {
+    citySlug: 'perm',
+    cityName: 'Пермь',
+    canonicalPath: '/cities/perm/rechnye-progulki',
+  },
+  {
+    citySlug: 'samara',
+    cityName: 'Самара',
+    canonicalPath: '/cities/samara/rechnye-progulki',
+  },
+  {
+    citySlug: 'tver',
+    cityName: 'Тверь',
+    canonicalPath: '/cities/tver/rechnye-progulki',
+  },
+  {
+    citySlug: 'novosibirsk',
+    cityName: 'Новосибирск',
+    canonicalPath: '/cities/novosibirsk/rechnye-progulki',
+  },
+  {
+    citySlug: 'krasnoyarsk',
+    cityName: 'Красноярск',
+    canonicalPath: '/cities/krasnoyarsk/rechnye-progulki',
+  },
+  {
+    citySlug: 'ekaterinburg',
+    cityName: 'Екатеринбург',
+    canonicalPath: '/cities/ekaterinburg/rechnye-progulki',
+  },
+  {
+    citySlug: 'rostov-na-donu',
+    cityName: 'Ростов-на-Дону',
+    canonicalPath: '/cities/rostov-na-donu/rechnye-progulki',
+  },
+  {
+    citySlug: 'yaroslavl',
+    cityName: 'Ярославль',
+    canonicalPath: '/cities/yaroslavl/rechnye-progulki',
+  },
 ];
 
 const ROUTE_BY_SLUG = Object.fromEntries(RIVER_CRUISE_CITY_ROUTES.map((r) => [r.citySlug, r])) as Record<

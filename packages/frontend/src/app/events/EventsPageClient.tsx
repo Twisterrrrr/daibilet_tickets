@@ -12,6 +12,7 @@ import { EventCardHorizontal } from '@/components/ui/EventCardHorizontal';
 import { CatalogCard } from '@/components/ui/CatalogCard';
 import { DateRibbon } from '@/components/ui/DateRibbon';
 import { PromoBlock } from '@/components/ui/PromoBlock';
+import { ClusterHubLinks } from '@/components/landing/ClusterHubLinks';
 import {
   AUDIENCE_LABELS,
   CATEGORY_LABELS,
@@ -609,6 +610,12 @@ export function EventsPageClient() {
     [updateUrl, sort],
   );
 
+  const showClusterHubs =
+    !isMuseumCategory &&
+    !audience &&
+    !urlTag &&
+    !activeQuickFilter;
+
   return (
     <div className="container-page py-6 sm:py-10">
       <div className="mb-5 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -619,6 +626,7 @@ export function EventsPageClient() {
               ? `${total} ${isMuseumCategory ? 'мест' : 'событий'}`
               : 'Экскурсии, музеи и мероприятия по городам России'}
           </p>
+          {showClusterHubs && <ClusterHubLinks citySlug={city || undefined} variant="inline" />}
         </div>
         <div className="hidden sm:flex flex-wrap items-center gap-2 self-start">
           <label className="flex items-center gap-2 text-sm text-slate-600">
