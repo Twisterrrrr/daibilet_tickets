@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-03-25
+> Последнее обновление: 2026-04-03
 
 ## Миссия
 
@@ -26,6 +26,7 @@
 - **Личный кабинет покупателя / Buyer Account**: `BuyerAccountSpecs.md`.
 - **Система доверия поставщикам / Supplier Trust System**: `archive/specs/SupplierTrustSpec.md`.
 - **Посадочные страницы и хабы (включая сезонные лендинги)**: `Landings-Architecture.md`.
+- **B2B / внешние ticket providers (capability foundation)**: `TicketProviderCapabilityFoundation.md`, матрица: `TicketProviderCapabilityMatrix.md`, подготовка Wave 1 (Radario/Qtickets, env + HTTP): `Wave1-Radario-Qtickets-Prep.md`.
 
 Эти 3–4 файла считаются “центром тяжести” документации; остальные спецификации рассматриваются как детализация или архив и должны ссылаться на них при изменениях.
 

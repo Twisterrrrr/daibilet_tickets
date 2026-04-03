@@ -6,6 +6,21 @@
 
 ## Открытые задачи (активный бэклог)
 
+### Ticket provider capability foundation (`ticket-provider-capability-foundation`)
+
+| Трек | Статус | Комментарий |
+|------|--------|-------------|
+| REST core foundation (registry, routing, Prisma, admin read, webhooks 204) | `[x]` **03.04.2026** | `packages/backend/src/integrations/`, миграция `20260403154025_ticket_provider_capability_foundation`, см. `docs/TicketProviderCapabilityFoundation.md` |
+| Wave 1 prep: Radario/Qtickets env + `ticketProviderJsonFetch` + HTTP-сервисы | `[x]` **03.04.2026** | `docs/Wave1-Radario-Qtickets-Prep.md`, `RadarioHttpService` / `QticketsHttpService` |
+| Live Radario adapter | `[ ]` Высокий | HTTP + заказы по спецификации |
+| Live Qtickets adapter | `[ ]` Высокий | |
+| Live Intickets или Edinoe Pole | `[ ]` Средний | После документов |
+| TicketNet SOAP client + mapper | `[ ]` Средний | `integrations/clients/soap-client.ts` |
+| Yandex / Mos.ru / Lanit secure onboarding | `[ ]` Средний | Сертификаты, подпись, `ProviderSignatureService` |
+| Checkout `createExternalOrder` + `ExternalOrderLink` | `[ ]` Критический | TODO в `checkout.service.ts`; без ломания текущего TC flow |
+| Reconcile jobs | `[ ]` Средний | Зависшие `integrationState` |
+| Provider accounts UI + mask credentials | `[ ]` Средний | `ProviderAccountConfig` |
+
 ### Каталог, согласованность, данные
 
 | ID / якорь | Задача | Приоритет | Статус |

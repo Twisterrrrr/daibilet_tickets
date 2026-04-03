@@ -468,6 +468,90 @@ model RegionCity {
 }
 
 // ========================
+// Ticket provider / B2B integrations (capability foundation)
+// ========================
+
+enum TicketProviderCode {
+  MANUAL
+  TICKETS_CLOUD
+  TEPLOHOD
+  RADARIO
+  QTICKETS
+  INTICKETS
+  EDINOE_POLE
+  TICKETNET
+  YANDEX_TICKETS
+  MOSRU_RUSSPASS
+  LANIT
+}
+
+enum ProviderProtocolType {
+  REST_JSON
+  SOAP_XML
+  CUSTOM
+}
+
+enum ProviderOperationalClass {
+  CORE_REST
+  ENTERPRISE_GATED
+  LEGACY_SOAP
+  CUSTOM_PARTNER
+}
+
+enum ProviderAccountAuthType {
+  NONE
+  API_KEY
+  BEARER
+  BASIC
+  OAUTH2
+  MUTUAL_TLS
+  CUSTOM
+}
+
+enum ProviderAccountEnvironment {
+  SANDBOX
+  PRODUCTION
+}
+
+enum ProviderLinkStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+enum ProviderSyncMode {
+  PULL
+  PUSH
+  MANUAL
+  DISABLED
+}
+
+/// Статус заказа у провайдера (высокоуровневый). Этап пайплайна — integrationState.
+enum ExternalOrderStatus {
+  OPEN
+  CONFIRMED
+  CANCELLED
+  FAILED
+}
+
+/// Этап интеграции (webhook, сверка, подвисание).
+enum ExternalIntegrationState {
+  CREATED
+  SENT_TO_PROVIDER
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  FAILED
+  RECONCILE_REQUIRED
+}
+
+enum ProviderWebhookProcessingStatus {
+  RECEIVED
+  PROCESSED
+  ERROR
+  NO_OP_UNSUPPORTED
+}
+
+// ========================
 // События (из Ticketscloud / teplohod.info)
 // ========================
 
@@ -529,6 +613,9 @@ model Event {
   /// Default capacity for MANUAL sessions created in admin (Teplohod-style schedule).
   defaultCapacityTotal Int?
 
+  /// Предпочитаемый ticket provider при отсутствии активного EventProviderLink (B2B foundation).
+  defaultProvider TicketProviderCode?
+
   // Дедупликация: если canonicalOfId задан — это дубль, скрывается из каталога
   canonicalOfId String? @db.Uuid
   canonicalOf   Event?  @relation("EventDuplicates", fields: [canonicalOfId], references: [id])
@@ -569,6 +656,7 @@ model Event {
   promoCodes           PromoCode[]
   subcategoryLinks     EventSubcategoryLink[]
   dailyStats           DailyEventStats[]
+  providerLinks        EventProviderLink[]
 
   @@unique([source, tcEventId])
   @@index([source, tcEventId])
@@ -635,8 +723,9 @@ model EventSession {
 
   event        Event              @relation(fields: [eventId], references: [id], onDelete: Restrict)
   offer        EventOffer?        @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  packageItems PackageItem[]
-  stats        EventSessionStats?
+  packageItems  PackageItem[]
+  stats         EventSessionStats?
+  providerLinks EventSessionProviderLink[]
 
   @@unique([eventId, startsAt])
   @@index([startsAt])
@@ -646,6 +735,132 @@ model EventSession {
   @@index([offerId])
   @@index([offerId, startsAt])
   @@map("event_sessions")
+}
+
+/// Связь события с внешним событием у ticket provider.
+model EventProviderLink {
+  id              String             @id @default(uuid()) @db.Uuid
+  eventId         String             @db.Uuid
+  provider        TicketProviderCode
+  externalEventId String
+  syncMode        ProviderSyncMode   @default(PULL)
+  status          ProviderLinkStatus @default(ACTIVE)
+  isPrimary       Boolean            @default(false)
+  priority        Int                @default(0)
+  configJson      Json?
+  rawSnapshotJson Json?
+  lastError       String?            @db.Text
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalEventId])
+  @@index([eventId])
+  @@index([eventId, isPrimary])
+  @@map("event_provider_links")
+}
+
+/// Связь сеанса с внешним сеансом у ticket provider.
+model EventSessionProviderLink {
+  id                String             @id @default(uuid()) @db.Uuid
+  sessionId         String             @db.Uuid
+  provider          TicketProviderCode
+  externalSessionId String
+  syncMode          ProviderSyncMode   @default(PULL)
+  status            ProviderLinkStatus @default(ACTIVE)
+  isPrimary         Boolean            @default(false)
+  priority          Int                @default(0)
+  configJson        Json?
+  rawSnapshotJson   Json?
+  lastError         String?            @db.Text
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  session EventSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalSessionId])
+  @@index([sessionId])
+  @@map("event_session_provider_links")
+}
+
+/// Внешний заказ: integrationState — этап; status — итог у провайдера.
+model ExternalOrderLink {
+  id                String                   @id @default(uuid()) @db.Uuid
+  provider          TicketProviderCode
+  externalOrderId   String
+  status            ExternalOrderStatus      @default(OPEN)
+  integrationState  ExternalIntegrationState @default(CREATED)
+  payloadJson       Json?
+  lastError         String?                  @db.Text
+  checkoutSessionId String?                  @db.Uuid
+  packageId         String?                  @db.Uuid
+  packageItemId     String?                  @db.Uuid
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  checkoutSession CheckoutSession? @relation(fields: [checkoutSessionId], references: [id], onDelete: SetNull)
+  package         Package?         @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  packageItem     PackageItem?     @relation(fields: [packageItemId], references: [id], onDelete: SetNull)
+  tickets         ExternalTicket[]
+
+  @@unique([provider, externalOrderId])
+  @@index([checkoutSessionId])
+  @@index([packageId])
+  @@index([packageItemId])
+  @@index([integrationState])
+  @@map("external_order_links")
+}
+
+model ExternalTicket {
+  id                  String             @id @default(uuid()) @db.Uuid
+  externalOrderLinkId String             @db.Uuid
+  provider            TicketProviderCode
+  externalTicketId    String
+  payloadJson         Json?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  orderLink ExternalOrderLink @relation(fields: [externalOrderLinkId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalTicketId])
+  @@index([externalOrderLinkId])
+  @@map("external_tickets")
+}
+
+model ProviderWebhookLog {
+  id               String                          @id @default(uuid()) @db.Uuid
+  provider         TicketProviderCode
+  processingStatus ProviderWebhookProcessingStatus @default(RECEIVED)
+  payload          Json
+  headersJson      Json?
+  notes            String?                         @db.Text
+  errorMessage     String?                         @db.Text
+  receivedAt       DateTime                        @default(now())
+  processedAt      DateTime?
+
+  @@index([provider, receivedAt])
+  @@map("provider_webhook_logs")
+}
+
+/// Аккаунт партнёрской интеграции. credentialsJson не отдавать в API без mask.
+model ProviderAccountConfig {
+  id                        String                   @id @default(uuid()) @db.Uuid
+  provider                  TicketProviderCode
+  protocolType              ProviderProtocolType
+  operationalClass          ProviderOperationalClass
+  authType                  ProviderAccountAuthType
+  environment               ProviderAccountEnvironment
+  sandboxBaseUrl            String?
+  productionBaseUrl         String?
+  requiresClientCertificate Boolean                  @default(false)
+  credentialsJson           Json?
+  settingsJson              Json?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  @@index([provider, environment])
+  @@map("provider_account_configs")
 }
 
 /// Precomputed stats для read API: POPULAR / sold last 24h (C6). Обновляется cron.
@@ -858,9 +1073,10 @@ model Package {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  city    City          @relation(fields: [cityId], references: [id])
-  items   PackageItem[]
-  voucher Voucher?
+  city               City               @relation(fields: [cityId], references: [id])
+  items              PackageItem[]
+  voucher            Voucher?
+  externalOrderLinks ExternalOrderLink[]
 
   @@index([email])
   @@index([status])
@@ -886,9 +1102,10 @@ model PackageItem {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
-  package Package      @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  event   Event        @relation(fields: [eventId], references: [id])
-  session EventSession @relation(fields: [sessionId], references: [id])
+  package            Package           @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  event              Event             @relation(fields: [eventId], references: [id])
+  session            EventSession      @relation(fields: [sessionId], references: [id])
+  externalOrderLinks ExternalOrderLink[]
 
   @@index([packageId])
   @@index([eventId])
@@ -2065,6 +2282,7 @@ model CheckoutSession {
   paymentIntents                 PaymentIntent[]
   fulfillmentItems               FulfillmentItem[]
   giftCertificate                GiftCertificate?
+  externalOrderLinks             ExternalOrderLink[]
 
   @@index([status])
   @@index([customerEmail])

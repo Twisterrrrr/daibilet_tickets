@@ -4,6 +4,42 @@
 
 ---
 
+## 03.04.2026 — Wave 1 prep: Radario / Qtickets без вендора
+
+### Наблюдения
+
+- До выдачи API-ключей и спецификаций можно подготовить общий REST-слой и контракт env, чтобы live-адаптеры не плодили разрозненный `fetch`.
+
+### Решения
+
+- Добавлены `ticket-provider-json-fetch.ts` (таймаут, JSON, `TicketProviderHttpError`), `ProviderIntegrationNotConfiguredError` (503), `RadarioIntegrationEnv` + `RadarioHttpService`, `QticketsIntegrationEnv` + `QticketsHttpService`; модуль `IntegrationsModule` импортирует `ConfigModule`, сервисы экспортируются. Документ `docs/Wave1-Radario-Qtickets-Prep.md` с таблицей env и чеклистом онбординга. Тесты: `wave1-radario-qtickets-http-prep.spec.ts`.
+
+### Проблемы
+
+- Конкретные пути и схемы тел запросов остаются TBD до официальных материалов вендоров.
+
+---
+
+## 03.04.2026 — Audit: foundation слой ticket providers (B2B)
+
+### Наблюдения
+
+- Каталог и импорт сегодня завязаны на legacy `Event.source` (`TC` / `TEPLOHOD` / `MANUAL`) и `tcEventId` / `tcSessionId`; синхронизация: `TcSyncService`, `TepSyncService`, очередь `sync.processor`. Чекаут использует отдельный `BookingProvider` и `FulfillmentItem` с полями внешнего заказа; **платёжный** `PaymentIntent.provider` — про YooKassa/STUB, не про билетных партнёров.
+- Для 20–30 интеграций нужны: реестр провайдеров, capability-based контракт, маршрутизация без provider-specific кода в контроллерах, учёт внешних заказов и webhook-логов, **без** ломания текущих production flow.
+
+### Решения
+
+- Встраивание: новый модуль `packages/backend/src/integrations/` (дескрипторы, registry, routing, клиентский слой REST/SOAP scaffold, persistence, admin read + входной webhook `POST /api/v1/webhooks/providers/:code`, при отсутствии webhooks у провайдера — **204** + лог `NO_OP_UNSUPPORTED`). Prisma: миграция `20260403154025_ticket_provider_capability_foundation`, `Event.defaultProvider`, связи `EventProviderLink` / `EventSessionProviderLink`, `ExternalOrderLink` (`status` + `integrationState`), `ExternalTicket`, `ProviderWebhookLog`, `ProviderAccountConfig` (`environment` SANDBOX/PRODUCTION).
+- `EventProviderLinkService`: при `isPrimary=true` сброс прочих primary в транзакции. Admin: `GET .../admin/integrations/providers`, `routing/debug?eventId=`, `external-orders`, `provider-webhooks`, `GET .../admin/events/:id/providers`.
+- Legacy: `Event.source` и `tcEventId` **не удаляются**; fallback маршрутизации: `MANUAL` → `MANUAL`, `TC` → `TICKETS_CLOUD`, `TEPLOHOD` → `TEPLOHOD`. Решения по возможностям — только через `ProviderDescriptor` + `assertCapability`.
+- Документация: `docs/TicketProviderCapabilityFoundation.md`, `docs/TicketProviderCapabilityMatrix.md`; тесты: `src/integrations/__tests__/*`.
+
+### Проблемы
+
+- Полный паритет с реальными API Radario/Qtickets/… — отдельные волны; на этапе foundation только адаптеры-заглушки и тесты без внешних вызовов.
+
+---
+
 ## 31.03.2026 — Seasonal landings: салют и события по окну дат
 
 ### Наблюдения

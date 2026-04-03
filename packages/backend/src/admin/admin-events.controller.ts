@@ -40,6 +40,8 @@ import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
 import { ReviewService } from '../catalog/review.service';
 import { streamCsv } from '../common/csv-stream.util';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
+import { ProviderRegistryService } from '../integrations/routing/provider-registry.service';
+import { ProviderRoutingService } from '../integrations/routing/provider-routing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { IsArray, IsOptional, IsString } from 'class-validator';
@@ -116,6 +118,8 @@ export class AdminEventsController {
     private readonly audit: AuditService,
     private readonly subcategoryPolicy: SubcategoryPolicyService,
     private readonly catalogClassificationNormalizer: CatalogClassificationNormalizerService,
+    private readonly providerRegistry: ProviderRegistryService,
+    private readonly providerRouting: ProviderRoutingService,
   ) {}
 
   @Get()
@@ -1835,6 +1839,37 @@ export class AdminEventsController {
         operator: { select: { id: true, name: true, slug: true, isActive: true } },
       },
     });
+  }
+
+  /**
+   * Ticket provider: ссылки на внешнее событие + диагностика маршрутизации (B2B foundation).
+   */
+  @Get(':id/providers')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async getTicketProviderContext(@Param('id') id: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        source: true,
+        defaultProvider: true,
+        providerLinks: { orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }] },
+      },
+    });
+    if (!event) throw new NotFoundException('Событие не найдено');
+    const routing = await this.providerRouting.resolveProviderDebug(id);
+    const descriptor = this.providerRegistry.getDescriptor(routing.provider);
+    return {
+      event,
+      routing,
+      resolvedDescriptor: {
+        code: descriptor.code,
+        protocolType: descriptor.protocolType,
+        operationalClass: descriptor.operationalClass,
+        authType: descriptor.authType,
+        capabilities: descriptor.capabilities,
+      },
+    };
   }
 
   /**

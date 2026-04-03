@@ -17,6 +17,7 @@ import { PromoModule } from '../promo/promo.module';
 import { ReportsModule } from '../reports/reports.module';
 import { SupplierModule } from '../supplier/supplier.module';
 import { EdoModule } from '../edo/edo.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
 
 import { AdminArticlesController } from './admin-articles.controller';
 import { AdminAuditController } from './admin-audit.controller';
@@ -91,6 +92,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     ReportsModule,
     SupplierModule,
     EdoModule,
+    IntegrationsModule,
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_SYNC },

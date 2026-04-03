@@ -18,6 +18,10 @@ import { CartItemDto, CreatePackageDto, CreateTripPlanCheckoutDto } from './dto/
 
 /**
  * Checkout Service — покупка билетов + корзина + заявки.
+ *
+ * TODO(B2B ticket foundation): при внедрении createExternalOrder у ticket provider — связать
+ * CheckoutSession / FulfillmentItem с ExternalOrderLink через ProviderRoutingService.
+ * Не путать с PaymentIntent.provider (это платёжный провайдер, не ticket).
  */
 @Injectable()
 export class CheckoutService {
