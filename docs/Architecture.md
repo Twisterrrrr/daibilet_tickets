@@ -52,7 +52,15 @@
 - **Эндпоинты:** `POST /admin/landings/materialize`, `POST /admin/settings/ops/retag-and-materialize`.
 - **Автоматически:** sync → retag → materialize (CatalogController, SyncProcessor).
 
-### 3.4 Staging verification
+### 3.4 Subcategory Collections Engine и SEO-лендинги (MVP)
+
+- **Цель:** подкатегории (`Subcategory` + links) — единый источник отбора для **автоподборок** и **SEO-страниц** по паттерну `/cities/{citySlug}/{subcategorySlug}` (витрина: fallback в `cities/[slug]/[landingSlug]/page.tsx` после материализованного `catalog/landings`).
+- **Collections:** `SubcategoryCollectionsService` — события **только** через `CatalogService.getEvents` (паблишабилити, сеансы, sellable-guard, фильтр подкатегории из `SubcategoryPolicyService`); площадки — отдельный Prisma-поток по `subcategoryLinks`, без смешивания сущностей в одном списке.
+- **SEO landing:** `SubcategoryLandingService` — шаблонные title/h1/description, `canonicalPath`; **публикация** только если `isActive` + `isLandingEnabled` + порог контента (`SUBCATEGORY_LANDING_MIN_EVENTS` / `SUBCATEGORY_LANDING_MIN_VENUES`, см. `subcategory-collections.constants.ts`). Кэш: только **опубликованные** payload (TTL `SUBCATEGORY_COLLECTION_CACHE_TTL_SEC`, по умолчанию 120 с).
+- **API:** `GET /api/v1/collections/subcategories/events|venues?code=&city=`, `GET /api/v1/landings/subcategories/:citySlug/:subcategorySlug` (404 если не опубликовано); админ-превью: `GET /api/v1/admin/subcategory-collections/preview/*`.
+- **Related:** похожие события — расширен `fetchRelatedEvents` (пересечение `subcategoryLinks` + ослабление «только та же category»); похожие площадки — `VenueService.getRelatedVenues` с приоритетом общих подкатегорий.
+
+### 3.5 Staging verification
 
 `POST /admin/settings/ops/retag-and-materialize` возвращает:
 - `beforeVisible` / `visible` / `hidden` — сверка до/после;

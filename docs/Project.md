@@ -27,8 +27,10 @@
 - **Система доверия поставщикам / Supplier Trust System**: `archive/specs/SupplierTrustSpec.md`.
 - **Посадочные страницы и хабы (включая сезонные лендинги)**: `Landings-Architecture.md`.
 - **B2B / внешние ticket providers (capability foundation)**: `TicketProviderCapabilityFoundation.md`, матрица: `TicketProviderCapabilityMatrix.md`, подготовка Wave 1 (Radario/Qtickets, env + HTTP): `Wave1-Radario-Qtickets-Prep.md`.
+- **Дорожная карта (3 спринта × 2 недели: каталог/редакция → admin-v2/ЛК → поставщик + YooKassa + SEO)**: `Roadmap-3-Sprints-Catalog-Admin-Supplier.md`.
+- **Событие + сеансы (продуктовый контракт эпика Event, admin + supplier; Venue как отдельная сущность — в том же файле §6–7):** `Event-Sessions-Product-Contract.md`.
 
-Эти 3–4 файла считаются “центром тяжести” документации; остальные спецификации рассматриваются как детализация или архив и должны ссылаться на них при изменениях.
+Перечисленные выше документы (включая дорожную карту спринтов) образуют «центр тяжести»; остальные спецификации — детализация или архив и должны ссылаться на них при изменениях.
 
 ## Venue PDP (template-driven + venue program)
 
@@ -49,6 +51,15 @@
 | БД | PostgreSQL 16 (Docker) | — |
 | Кэш/очереди | Redis 7 + BullMQ | — |
 | Инфраструктура | Docker Compose, Nginx, Certbot, pnpm workspaces | корень |
+
+### Admin V2 и ЛК поставщика V2 — роль в продукте
+
+- **Интерфейс управления, не «перенос legacy»:** V2 — тонкий слой списков, карточек и integration blueprints; параллельно качаются **каталог**, **SEO/лендинги** и **B2B API**.
+- **Три слоя смысла:** **ядро** — каталог + API; **growth** — лендинги (в т.ч. topic hub, агрегация нескольких `LandingPage` по slug), маркетинговая зона в админке; **интеграция** — партнёры поверх API.
+- **ComboPage:** не переносить в V2 до **единой корзины** — иначе фиксируются две логики (страница программы и checkout); после корзины комбо логичнее как слой поверх одной модели покупки.
+- **Контракты UI:** **DetailPage** = `PageHeader + Tabs + Data + States`; **Supplier** — те же UX-паттерны, что у админа, с **RBAC** и другим API. Новые и перерабатываемые экраны **обязаны** опираться на примитивы **`@daibilet/shared-ui`** по мере их появления (admin-v2 и supplier-v2 — композиция, не второй UI-kit).
+- **Лендинги и slug:** каноническая пара для публичной витрины — **город + slug** (модель `LandingPage`, публичный контракт в `Landings-Architecture.md`). При агрегации тем по slug нужны осознанные **canonical URL**, редиректы с дублей и правила SEO; уникальность в БД при подключении API — отдельное решение.
+- **Осознанный долг:** стандарт DTO и нормализация на клиенте, стратегия кеширования/инвалидации, evolution blueprint из текста в runtime (связь с data fetching, правами и состоянием UI). Детальный пофазный план — внутренний roadmap (`admin_v2_roadmap_*.plan.md` в Cursor).
 
 ### Supplier Finance (P1–P3.2+)
 
@@ -204,6 +215,7 @@
   - **Правила дерева**: максимальная глубина `root + child` (2 уровня), циклы запрещены, `slug` глобально уникален.
   - **Совместимость типов parent-child**: `UNIVERSAL` может быть родителем для любых типов; для специализированных родителей (`EVENT_ONLY`, `VENUE_ONLY`) тип ребёнка должен совпадать с типом родителя.
   - **Удаление**: базовый сценарий — soft deprecate через `isActive=false`; физическое удаление подкатегорий допускается только для ошибочных/мусорных записей.
+- **Collections Engine + SEO по подкатегории (MVP):** автоматические подборки событий и площадок по `Subcategory.code`, без второго классификатора. Публичные SEO-страницы строятся только при `isLandingEnabled` **и** достаточном количестве элементов (env-пороги); выдача событий для лендинга идёт **только** через тот же отбор, что и у подборки (`CatalogService.getEvents`). URL на витрине согласован с городскими лендингами: `/cities/{citySlug}/{subcategorySlug}` (fallback после CMS-лендинга с тем же сегментом). См. `docs/Architecture.md` §3.4.
 - **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate. Шаблоны страниц — `docs/Reference.md` § PageTemplateSpecs.
 - **EventOffer расширен**: venueId для прямых офферов к месту (без привязки к Event).
 - **Location** — причал, площадка, точка встречи (каркас, Фаза 2)

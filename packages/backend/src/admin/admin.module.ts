@@ -67,6 +67,7 @@ import { AdminAvailabilityController } from './admin-availability.controller';
 import { AdminSupplierEdoController } from './admin-supplier-edo.controller';
 import { AdminEdoDeliveryController } from './admin-edo-delivery.controller';
 import { AdminSubcategoriesController } from './admin-subcategories.controller';
+import { AdminSubcategoryCollectionsController } from './admin-subcategory-collections.controller';
 import { AdminTicketPdfDebugController } from './admin-ticket-pdf-debug.controller';
 import { AuditService } from './audit.service';
 import { EventAdminSummaryService } from './event-admin-summary.service';
@@ -160,6 +161,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminSupplierEdoController,
     AdminEdoDeliveryController,
     AdminSubcategoriesController,
+    AdminSubcategoryCollectionsController,
     AdminTicketPdfDebugController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],

@@ -26,26 +26,45 @@ const LEGACY_EVENT_SUBCATEGORY_TO_SLUG: Partial<Record<EventSubcategory, string>
   PARTY: 'party',
 };
 
+const LEGACY_SLUG_TO_EVENT_SUBCODE: Record<string, string> = Object.fromEntries(
+  Object.entries(LEGACY_EVENT_SUBCATEGORY_TO_SLUG).map(([enumVal, slug]) => [slug, enumVal]),
+);
+
 @Injectable()
 export class SubcategoryPolicyService {
-  /** Лимит для события (publish + API). Площадки — см. MAX_VENUE_SUBCATEGORIES. */
-  static readonly MAX_EVENT_SUBCATEGORIES = 3;
-  static readonly MAX_VENUE_SUBCATEGORIES = 5;
+  /** 1 PRIMARY + до 3 SECONDARY. */
+  static readonly MAX_EVENT_SUBCATEGORIES = 4;
+  static readonly MAX_VENUE_SUBCATEGORIES = 4;
+
+  /**
+   * Фильтр площадок по подкатегории (links-only; legacy у Venue нет).
+   * Токен — code или legacy slug из URL или enum EventSubcategory.
+   */
+  buildVenueSubcategoryFilter(value: string): Prisma.VenueWhereInput {
+    const token = value.trim();
+    if (!token) return {};
+
+    const asLegacyEnum = Object.values(EventSubcategory).includes(token as EventSubcategory);
+    const code = asLegacyEnum ? token : (LEGACY_SLUG_TO_EVENT_SUBCODE[token] ?? token);
+
+    return {
+      subcategoryLinks: { some: { subcategory: { code, isActive: true } } },
+    };
+  }
 
   buildEventSubcategoryFilter(value: string): Prisma.EventWhereInput {
     const token = value.trim();
     if (!token) return {};
 
-    // source of truth = new links; legacy enum only fallback for not-yet-migrated events.
-    const asLegacy = Object.values(EventSubcategory).includes(token as EventSubcategory);
-    const mappedSlug = asLegacy
-      ? LEGACY_EVENT_SUBCATEGORY_TO_SLUG[token as EventSubcategory] ?? token.toLowerCase()
-      : token;
+    // source of truth = new links (по code); legacy enum / slug — только fallback.
+    const asLegacyEnum = Object.values(EventSubcategory).includes(token as EventSubcategory);
+    const code =
+      asLegacyEnum ? token : (LEGACY_SLUG_TO_EVENT_SUBCODE[token] ?? token);
 
     return {
       OR: [
-        { subcategoryLinks: { some: { subcategory: { slug: mappedSlug } } } },
-        ...(asLegacy
+        { subcategoryLinks: { some: { subcategory: { code } } } },
+        ...(asLegacyEnum
           ? [
               {
                 AND: [

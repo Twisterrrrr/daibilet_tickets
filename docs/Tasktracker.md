@@ -2,9 +2,72 @@
 
 > **Структура (25.03.2026):** сверху — **только незакрытые** задачи по логическим группам; внизу — **архив закрытых** эпиков и справочные разделы. См. также `Reference.md`, `Operations.md`, `Diary.md`.
 
+### Дорожная карта 6 недель (03.04.2026)
+
+Единый план спринтов (фильтры/редакция → v2-паритет → поставщик + YooKassa + контент): **[Roadmap-3-Sprints-Catalog-Admin-Supplier.md](Roadmap-3-Sprints-Catalog-Admin-Supplier.md)**.  
+Ниже — прежний бэклог; при планировании спринта выносить пункты из roadmap в строки таблиц с якорем `roadmap-s1` / `s2` / `s3`.
+
+### Исполнение roadmap (спринты 1–3) — прогресс
+
+| Якорь | Задача | Статус |
+|--------|--------|--------|
+| `roadmap-s1a-tz-events` | **Спринт 1a (TZ):** `/events` — лента дат (`DateRibbon`), чип «Выходные» и мобильные быстрые чипы считают «сегодня»/диапазон выходных в IANA города (`getCityTimezone`); без `city` в URL — `Europe/Moscow` как дефолт каталога | `[x]` **03.04.2026** |
+| `roadmap-s1a-url-module` | **Спринт 1a (URL):** `packages/frontend/src/lib/catalog-events-url.ts` — каноническая сборка query для `/events`; подключены хедер/футер, города, combo/multi-event, поиск, промо-fallback, sitemap filters, `ClusterHubLinks` (каталог река/автобус) | `[x]` **03.04.2026** |
+| `roadmap-s1b-sessions-board` | **Спринт 1b:** админка «Сеансы» (`/events/sessions`), `GET /admin/events/sessions/overview`, флаги `issues`, параметр `issuesOnly` (расширенная выборка + фильтр) | `[x]` **03.04.2026** |
+| `roadmap-s1b-sessions-bulk` | **Спринт 1b / 2b:** `POST /admin/events/sessions/bulk` (pause/resume, MANUAL, будущие), UI на доске «Сеансы»; пауза не для распроданных (`SOLD_OUT`); массовая отмена — отдельно | `[~]` Высокий |
+| `roadmap-s1a-filters-landings` | **Спринт 1a:** мост лендинг ↔ каталог + хабы `/river-cruises`, `/bus-tours` (ссылки в `/events` с RIVER/BUS и по городу); полный паритет UI фильтров с `/events` — дальше | `[~]` Высокий |
+| `roadmap-s1c-seo-3` | **Спринт 1c:** 3 эталонные SEO-статьи по шаблону + перелинковка + проверка индексации | `[ ]` Средний |
+| `roadmap-s2-dual-run` | **Спринт 2a:** dual-run admin-v2 ↔ legacy, паритет Events/Sessions/Orders/Finance/Users | `[ ]` Критический |
+| `roadmap-s2-slots-ext` | **Спринт 2b:** аудит изменений слотов, bulk-редактирование; «только проблемные» — базово через `issuesOnly` в обзоре, без истории | `[~]` Средний |
+| `roadmap-s3-yk-e2e` | **Спринт 3a:** YooKassa полный E2E на staging, негативные кейсы, smoke, фиксация в `finance.md` | `[~]` Критический |
+| `roadmap-s3-content-scale` | **Спринт 3b:** 10–20 статей, карта приоритетов, внутренние ссылки | `[ ]` Высокий |
+| `patch-a-yk-idempotency` | **Patch A (ЮKassa):** `ProcessedWebhookEvent.dedupeKey` уникален (`eventType:object.id`); refund API — стабильный `Idempotence-Key` (`refund:intent:{id}` / partial + `:items:{ids}`). Миграция `20260403190000_webhook_dedupe_key` | `[x]` **03.04.2026** |
+| `patch-b-yk-ipv6-whitelist` | **Patch B (отдельно):** проверка IPv6 и CIDR для webhook ЮKassa (`2a02:5180::/32`), нормализация IP, тесты — не смешивать с платежной идемпотентностью | `[ ]` |
+
 ---
 
 ## Открытые задачи (активный бэклог)
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `subcat-collections-landing-mvp` | **Subcategory → Collections Engine + SEO landings:** backend-сервисы, публичные/admin API, кэш, пороги env, витрина fallback на `/cities/.../...`, related events/venues по links | Высокий | `[x]` **05.04.2026** |
+
+### Admin / Supplier V2 — архитектурный долг (roadmap 04.2026)
+
+Стратегия и контракты: `Project.md` § Admin V2 и ЛК поставщика V2; детализация фаз — план Cursor `admin_v2_roadmap_*.plan.md`.
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `v2-shared-ui-primitives` | Вынести List / Detail / SectionCard / Tabs / PageHeader в `@daibilet/shared-ui`; новые экраны admin-v2 и supplier-v2 — на общих примитивах | Высокий | `[ ]` |
+| `v2-detail-page-contract` | Зафиксировать и выровнять контракт DetailPage (`PageHeader + Tabs + Data + States`) по всем новым карточкам | Средний | `[ ]` |
+| `v2-blueprint-runtime` | Blueprint: `queries` / `relations` / `actions` + связь с fetching, RBAC и UI state (не только текст для людей) | Средний | `[ ]` |
+| `v2-landing-slug-policy` | Политика slug: canonical **city + slug**, редиректы, уникальность и SEO при нескольких `LandingPage` на тему; согласовать с `Landings-Architecture.md` | Высокий | `[ ]` |
+| `v2-marketing-api-gate` | Маркетинг и мультилендинги: не подключать прод-API без стандарта DTO, кеширования и нормализации на клиенте | Критический | `[ ]` |
+
+### Event + Sessions — ядро (приоритет эпика)
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `event-core-create-scheduled-sessions` | **P0 эпика:** механика создания/редактирования **Event** + **расписание (sessions)** в режиме **SCHEDULED** (разовый слот + повторяющаяся сетка, таблица+календарь, квоты слота); согласование с admin/supplier API и публикацией; общий UX admin+supplier. См. `Event-Sessions-Product-Contract.md` §11 | Критический | `[ ]` |
+
+### Сиды и фикстуры (сценарии для UX и эпика Event + Sessions)
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `seed-scenario-venue-events` | **Сценарный сид** (отдельно от базового): `packages/backend/prisma/seed-scenarios.ts`, запуск `pnpm --filter @daibilet/backend db:seed:scenarios`. Площадки-хабы, `Event` с явными `venueId`, `OPEN_DATE` / `SCHEDULED`, офферы, сеансы, quality-кейсы; UX-метаданные (oldPrice, weekday, groupSize, лимиты) пока в `EventOffer.externalData` — не продуктовый контракт. См. `Event-Sessions-Product-Contract.md` §12 | Высокий | `[x]` **03.04.2026** |
+
+### Прайсинг / категории билетов и программа площадки — долг (подсветка `seed-scenarios`)
+
+Сид зафиксировал временный слой; следующий шаг к **Event Master + Session Editor** — формальная модель, а не расширение `externalData`.
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `domain-offer-old-price` | Нормализовать **старую цену** (сейчас демо в `externalData`) в схеме/API/витрине | Средний | `[ ]` |
+| `domain-offer-weekday-visibility` | Нормализовать **доступность категории по дням недели** (weekday visibility) | Средний | `[ ]` |
+| `domain-offer-group-size` | Нормализовать **groupSize** (семейный/мини-группа) | Средний | `[ ]` |
+| `domain-offer-max-purchases` | Нормализовать **maxPurchasesPerCategory** (лимит покупок на категорию) | Средний | `[ ]` |
+| `domain-venue-program-scope` | Решение продукта: остаётся ли **venue-program** только на `EXHIBITION`, или расширяется на другие подкатегории/типы слотов (сейчас read-model жёстко завязан на `EXHIBITION`) | Средний | `[ ]` |
+| `domain-content-quality-heuristics` | Редакторские эвристики «слабый контент» поверх `EventQualityService` (сейчас покрытие = реальные коды вроде `MISSING_DESCRIPTION` / `MISSING_IMAGE`, без отдельного `WEAK_*`) | Низкий | `[ ]` |
 
 ### Ticket provider capability foundation (`ticket-provider-capability-foundation`)
 

@@ -17,7 +17,9 @@ import {
 import { FaqSection } from '@/components/landing/FaqSection';
 import { ClusterHubLinks } from '@/components/landing/ClusterHubLinks';
 import { SaluteLandingPage } from '@/components/landing/SaluteLandingPage';
+import { SubcategoryLandingView } from '@/components/landing/SubcategoryLandingView';
 import { api } from '@/lib/api';
+import { catalogParamsFromLandingContext } from '@/lib/catalog-events-url';
 import {
   buildSaluteFilterOptionsFromEvents,
   catalogLandingToSaluteContent,
@@ -67,7 +69,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ) {
       redirect(`/cities/${slug}`);
     }
-    return { title: 'Страница не найдена' };
+    try {
+      const sub = await api.getSubcategoryLandingPublished(slug, landingSlug);
+      return {
+        title: sub.definition.title,
+        description: sub.definition.description,
+        alternates: { canonical: sub.definition.canonicalPath },
+      };
+    } catch {
+      return { title: 'Страница не найдена' };
+    }
   }
 }
 
@@ -93,10 +104,19 @@ export default async function LandingPage({ params }: Props) {
     ) {
       redirect(`/cities/${citySlug}`);
     }
-    notFound();
+    try {
+      const subPayload = await api.getSubcategoryLandingPublished(citySlug, landingSlug);
+      return <SubcategoryLandingView citySlug={citySlug} payload={subPayload} />;
+    } catch {
+      notFound();
+    }
   }
 
   const { vm, total } = toLandingVM(data);
+  const catalogEventsBaseParams = catalogParamsFromLandingContext(
+    typeof data.landing.filterTag === 'string' ? data.landing.filterTag : undefined,
+    data.landing.additionalFilters,
+  );
   const { city, ...landing } = vm;
 
   if (!city || city.slug !== citySlug) {
@@ -117,6 +137,7 @@ export default async function LandingPage({ params }: Props) {
           content={content}
           events={events}
           filterOptions={filterOptions}
+          catalogEventsBaseParams={catalogEventsBaseParams}
         />
         <div className="mt-10 border-t border-slate-200 pt-6">
           <h2 className="text-base font-semibold text-slate-900">Смотрите также</h2>
@@ -220,6 +241,7 @@ export default async function LandingPage({ params }: Props) {
             filters={vm.filters}
             templateType={vm.templateType}
             timeSlotMode={landingTimeSlotMode(landingSlug)}
+            catalogEventsBaseParams={catalogEventsBaseParams}
           />
         </div>
 

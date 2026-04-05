@@ -49,4 +49,10 @@ export const cacheKeys = {
   pricing: {
     config: () => 'pricing:config',
   },
+  /** Подборки и SEO по Subcategory (city + code/slug + пагинация в хеше) */
+  subcategoryCollections: {
+    events: (hash: string) => `subcat:coll:evt:${hash}`,
+    venues: (hash: string) => `subcat:coll:venue:${hash}`,
+    landing: (hash: string) => `subcat:landing:${hash}`,
+  },
 } as const;

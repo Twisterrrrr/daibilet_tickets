@@ -4,6 +4,7 @@ import type { VenueProgramItemDto, VenueProgramResponse, VenuePublicTemplate, Ve
 import { parseVenueTemplateData } from '@daibilet/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveVenueSubcategoryPresentation } from '../subcategories/subcategory-public.mapper';
 import {
   buildSortMeta,
   buildVenueProgramEventWhere,
@@ -115,6 +116,11 @@ export class VenueService {
             endDate: true,
             shortDescription: true,
             durationMinutes: true,
+          },
+        },
+        subcategoryLinks: {
+          select: {
+            subcategory: { select: { code: true, nameRu: true, layer: true } },
           },
         },
       },
@@ -308,6 +314,11 @@ export class VenueService {
             durationMinutes: true,
           },
         },
+        subcategoryLinks: {
+          select: {
+            subcategory: { select: { code: true, nameRu: true, layer: true } },
+          },
+        },
       },
     });
 
@@ -379,10 +390,16 @@ export class VenueService {
         shortDescription: string | null;
         durationMinutes: number | null;
       }[];
+      subcategoryLinks?: {
+        subcategory: { code: string; nameRu: string; layer: string };
+      }[];
     },
     _requireActive: boolean,
   ) {
     const events = venue.events;
+    const subPres = resolveVenueSubcategoryPresentation(
+      venue.subcategoryLinks as Parameters<typeof resolveVenueSubcategoryPresentation>[0],
+    );
     // Загрузим последние отзывы: прямые venue-отзывы + по привязанным events
     const eventIds = events.map((e) => e.id);
     const reviewWhere = {
@@ -421,6 +438,8 @@ export class VenueService {
       id: venue.id,
       cityId: venue.cityId,
       slug: venue.slug,
+      primarySubcategory: subPres.primarySubcategory,
+      secondarySubcategories: subPres.secondarySubcategories,
       title: venue.title,
       shortTitle: venue.shortTitle,
       venueType: venue.venueType,
@@ -667,8 +686,63 @@ export class VenueService {
     return null;
   }
 
-  /** Похожие места: тот же город, тот же тип, исключая текущее */
+  /** Похожие места: приоритет общим подкатегориям (links), затем тот же тип в городе */
   async getRelatedVenues(venueId: string, cityId: string, venueType: string, limit = 6) {
+    const self = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+      select: {
+        subcategoryLinks: { select: { subcategory: { select: { code: true } } } },
+      },
+    });
+    const codes =
+      self?.subcategoryLinks.map((l) => l.subcategory.code).filter((c): c is string => Boolean(c)) ?? [];
+
+    const baseSelect = {
+      id: true,
+      slug: true,
+      title: true,
+      shortTitle: true,
+      venueType: true,
+      imageUrl: true,
+      address: true,
+      priceFrom: true,
+      rating: true,
+      reviewCount: true,
+      city: { select: { slug: true, name: true } },
+    } as const;
+
+    if (codes.length > 0) {
+      const byLinks = await this.prisma.venue.findMany({
+        where: {
+          id: { not: venueId },
+          cityId,
+          isActive: true,
+          isDeleted: false,
+          subcategoryLinks: { some: { subcategory: { code: { in: codes } } } },
+        },
+        orderBy: { rating: 'desc' },
+        take: limit,
+        select: baseSelect,
+      });
+      if (byLinks.length >= limit) return byLinks;
+      const exclude = new Set(byLinks.map((v) => v.id));
+      const fillerIdFilter =
+        exclude.size > 0 ? { not: venueId, notIn: [...exclude] as string[] } : { not: venueId };
+      const filler = await this.prisma.venue.findMany({
+        where: {
+          id: fillerIdFilter,
+          cityId,
+          venueType: venueType as VenueType,
+          isActive: true,
+          isDeleted: false,
+        },
+        orderBy: { rating: 'desc' },
+        take: limit - byLinks.length,
+        select: baseSelect,
+      });
+      return [...byLinks, ...filler];
+    }
+
     return this.prisma.venue.findMany({
       where: {
         id: { not: venueId },
@@ -679,19 +753,7 @@ export class VenueService {
       },
       orderBy: { rating: 'desc' },
       take: limit,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        shortTitle: true,
-        venueType: true,
-        imageUrl: true,
-        address: true,
-        priceFrom: true,
-        rating: true,
-        reviewCount: true,
-        city: { select: { slug: true, name: true } },
-      },
+      select: baseSelect,
     });
   }
 

@@ -27,6 +27,11 @@ import { LocationNormalizerService } from './location-normalizer.service';
 import { VenueNormalizerService } from './venue-normalizer.service';
 import { OfferNormalizerService } from './offer-normalizer.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
+import { SubcategoryCollectionsService } from '../subcategories/subcategory-collections.service';
+import { SubcategoryLandingService } from '../subcategories/subcategory-landing.service';
+import { SubcategoryCollectionsController } from '../subcategories/subcategory-collections.controller';
+import { SubcategoryLandingsController } from '../subcategories/subcategory-landings.controller';
 import { CatalogClassificationNormalizerService } from './catalog-classification-normalizer.service';
 import { CatalogConsistencyService } from './catalog-consistency.service';
 import { CatalogGuardService } from './catalog-guard.service';
@@ -34,7 +39,7 @@ import { CatalogAuditService } from './catalog-audit.service';
 
 @Module({
   imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule],
-  controllers: [CatalogController],
+  controllers: [CatalogController, SubcategoryCollectionsController, SubcategoryLandingsController],
   providers: [
     CatalogService,
     RegionService,
@@ -59,6 +64,9 @@ import { CatalogAuditService } from './catalog-audit.service';
     VenueNormalizerService,
     OfferNormalizerService,
     SubcategoryPolicyService,
+    SubcategoryAssignmentService,
+    SubcategoryCollectionsService,
+    SubcategoryLandingService,
     CatalogClassificationNormalizerService,
     CatalogConsistencyService,
     CatalogGuardService,
@@ -87,6 +95,9 @@ import { CatalogAuditService } from './catalog-audit.service';
     VenueNormalizerService,
     OfferNormalizerService,
     SubcategoryPolicyService,
+    SubcategoryAssignmentService,
+    SubcategoryCollectionsService,
+    SubcategoryLandingService,
     CatalogClassificationNormalizerService,
     CatalogConsistencyService,
     CatalogGuardService,
