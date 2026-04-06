@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { DateMode, EventAudience, EventCategory, Prisma } from '@prisma/client';
+import {
+  DateMode,
+  EventAudience,
+  EventCategory,
+  Prisma,
+  SubcategoryLayer,
+  SubcategoryType,
+} from '@prisma/client';
 
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
@@ -38,7 +45,9 @@ export class EventQualityService {
         sessions: { where: { isActive: true } },
         subcategoryLinks: {
           where: { subcategory: { isActive: true } },
-          select: { subcategoryId: true },
+          include: {
+            subcategory: { select: { layer: true, type: true, code: true } },
+          },
         },
         override: true,
       },
@@ -81,25 +90,58 @@ export class EventQualityService {
       });
     }
 
-    const linkCount = event.subcategoryLinks.length;
+    const links = event.subcategoryLinks ?? [];
     const legacyEnumCount = Array.isArray(event.subcategories) ? event.subcategories.length : 0;
-    const effectiveSubcategoryCount = linkCount > 0 ? linkCount : legacyEnumCount;
     const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
 
-    if (effectiveSubcategoryCount === 0) {
-      issues.push({
-        code: 'MISSING_SUBCATEGORY',
-        message: 'Выберите хотя бы одну подкатегорию (справочник Subcategory или legacy-поле до миграции)',
-        field: 'subcategories',
-        ownership: linkCount > 0 ? 'local' : 'source',
-      });
-    } else if (effectiveSubcategoryCount > maxSub) {
-      issues.push({
-        code: 'TOO_MANY_SUBCATEGORIES',
-        message: `Слишком много подкатегорий (максимум ${maxSub}). Удалите лишние связи или enum-значения.`,
-        field: 'subcategories',
-        ownership: 'local',
-      });
+    if (links.length > 0) {
+      const primary = links.filter(
+        (l) =>
+          l.subcategory.layer === SubcategoryLayer.PRIMARY &&
+          l.subcategory.type === SubcategoryType.EVENT_ONLY,
+      );
+      if (primary.length !== 1) {
+        issues.push({
+          code: 'MISSING_PRIMARY_SUBCATEGORY',
+          message: 'Назначьте ровно один основной формат (PRIMARY / EVENT_ONLY) в связях подкатегорий.',
+          field: 'subcategories',
+          ownership: 'local',
+        });
+      }
+      const secondaries = links.filter((l) => l.subcategory.layer === SubcategoryLayer.SECONDARY);
+      if (secondaries.length === 0) {
+        issues.push({
+          code: 'MISSING_SECONDARY_SUBCATEGORY',
+          message: 'Добавьте до трёх дополнительных подкатегорий (SECONDARY) для витрины и SEO.',
+          field: 'subcategories',
+          ownership: 'local',
+        });
+      }
+      if (links.length > maxSub) {
+        issues.push({
+          code: 'TOO_MANY_SUBCATEGORIES',
+          message: `Слишком много связей подкатегорий (максимум ${maxSub}: 1 основной + 3 доп.).`,
+          field: 'subcategories',
+          ownership: 'local',
+        });
+      }
+    } else {
+      if (legacyEnumCount === 0) {
+        issues.push({
+          code: 'MISSING_PRIMARY_SUBCATEGORY',
+          message:
+            'Нет подкатегорий: назначьте PRIMARY+SECONDARY через админку (M:N) или временно legacy enum.',
+          field: 'subcategories',
+          ownership: 'source',
+        });
+      } else if (legacyEnumCount > maxSub) {
+        issues.push({
+          code: 'TOO_MANY_SUBCATEGORIES',
+          message: `Слишком много значений в legacy subcategories (максимум ${maxSub}).`,
+          field: 'subcategories',
+          ownership: 'source',
+        });
+      }
     }
 
     const audience = event.override?.audience ?? event.audience;

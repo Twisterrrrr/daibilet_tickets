@@ -7,6 +7,7 @@ import type { LandingTimeSlotMode } from '@/app/cities/_landingVm';
 import { ComparisonTable } from '@/components/landing/ComparisonTable';
 import { FilterBar, type FilterState } from '@/components/landing/FilterBar';
 import { VariantCards } from '@/components/landing/VariantCard';
+import type { CatalogEventsUrlParams } from '@/lib/catalog-events-url';
 import type { LandingFilters, LandingVariant } from '../../_landingVm';
 
 type Variant = LandingVariant;
@@ -128,12 +129,15 @@ export function LandingClient({
   filters: apiFilters,
   templateType,
   timeSlotMode = 'night',
+  catalogEventsBaseParams,
 }: {
   citySlug: string;
   variants: Variant[];
   filters: Filters;
   templateType: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
   timeSlotMode?: LandingTimeSlotMode;
+  /** Тег/категория лендинга для ссылки «Открыть в каталоге». */
+  catalogEventsBaseParams?: CatalogEventsUrlParams;
 }) {
   const ianaTimeZone = useMemo(() => getCityTimezone(citySlug), [citySlug]);
   const [filterState, setFilterState] = useState<FilterState>({
@@ -188,6 +192,7 @@ export function LandingClient({
         onFilterChange={setFilterState}
         filterTitle={filterCopy.title}
         filterSubtitle={filterCopy.subtitle}
+        catalogEventsContext={{ citySlug, baseParams: catalogEventsBaseParams }}
       />
 
       {/* Количество и подсказка */}

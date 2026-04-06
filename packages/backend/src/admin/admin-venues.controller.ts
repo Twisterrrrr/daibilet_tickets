@@ -21,13 +21,15 @@ import { IsArray, IsOptional, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { paginationArgs, parsePagination } from '../common/pagination';
-import { Prisma, SubcategoryType } from '@prisma/client';
+import { Prisma, SubcategoryLayer, SubcategoryType } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateVenueDto, UpdateVenueDto, VenueAdminSummaryDto } from './dto/admin.dto';
 import { VenueAdminSummaryService } from './venue-admin-summary.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
+import { PublishGateService } from '../catalog/publish-gate.service';
 
 class UpdateVenueSubcategoriesDto {
   @IsOptional()
@@ -41,6 +43,16 @@ class UpdateVenueSubcategoriesDto {
   subcategorySlugs?: string[];
 }
 
+class AssignVenueSubcategoriesDto {
+  @IsString()
+  primaryCode!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  secondaryCodes?: string[];
+}
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -51,6 +63,8 @@ export class AdminVenuesController {
     private readonly prisma: PrismaService,
     private readonly venueAdminSummary: VenueAdminSummaryService,
     private readonly subcategoryPolicy: SubcategoryPolicyService,
+    private readonly subcategoryAssignment: SubcategoryAssignmentService,
+    private readonly publishGate: PublishGateService,
   ) {}
 
   @Get()
@@ -189,9 +203,35 @@ export class AdminVenuesController {
       orderBy: [{ subcategory: { sortOrder: 'asc' } }, { subcategory: { nameRu: 'asc' } }],
     });
 
-    return links.map((l) => l.subcategory);
+    const primarySubcategory =
+      links.find((l) => l.subcategory.layer === SubcategoryLayer.PRIMARY)?.subcategory ?? null;
+    const secondarySubcategories = links
+      .filter((l) => l.subcategory.layer === SubcategoryLayer.SECONDARY)
+      .map((l) => l.subcategory);
+
+    return {
+      primarySubcategory,
+      secondarySubcategories,
+      all: links.map((l) => l.subcategory),
+    };
   }
 
+  @Post(':id/subcategories')
+  @Roles('ADMIN', 'EDITOR')
+  async assignVenueSubcategoriesPost(@Param('id') id: string, @Body() dto: AssignVenueSubcategoriesDto) {
+    const venueExists = await this.prisma.venue.findUnique({ where: { id }, select: { id: true } });
+    if (!venueExists) throw new NotFoundException('Venue not found');
+
+    await this.prisma.$transaction((tx) =>
+      this.subcategoryAssignment.assignVenueSubcategories(id, dto.primaryCode, dto.secondaryCodes ?? [], tx),
+    );
+
+    return this.getVenueSubcategories(id);
+  }
+
+  /**
+   * @deprecated Используйте POST .../subcategories с primaryCode + secondaryCodes.
+   */
   @Patch(':id/subcategories')
   @Roles('ADMIN', 'EDITOR')
   async setVenueSubcategories(@Param('id') id: string, @Body() body: UpdateVenueSubcategoriesDto) {
@@ -311,6 +351,14 @@ export class AdminVenuesController {
           description: body.description ?? existing.description,
         };
         this.validateForPublish(merged);
+        const gate = await this.publishGate.validateVenueForPublish(id);
+        if (gate.result === 'BLOCKING') {
+          const msg = gate.checks
+            .filter((c) => c.status === 'BLOCKING')
+            .map((c) => c.message)
+            .join('; ');
+          throw new BadRequestException(msg || 'Площадка не проходит проверки публикации');
+        }
       }
     }
 

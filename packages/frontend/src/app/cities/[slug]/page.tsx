@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { EventCard } from '@/components/ui/EventCard';
 import { VenueCard } from '@/components/ui/VenueCard';
 import { api } from '@/lib/api';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 import { CITY_INFO } from '@/lib/cityInfo';
 import { CITY_IMAGES } from '@/lib/cityImages';
 import type { CityDetail } from '@/lib/api.types';
@@ -173,7 +174,7 @@ export default async function CityPage({ params }: Props) {
           )}
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href={`/events?city=${slug}`} className="btn-primary bg-white !text-primary-700 hover:!bg-primary-50">
+            <Link href={catalogEventsHref({ city: slug })} className="btn-primary bg-white !text-primary-700 hover:!bg-primary-50">
               <Ticket className="mr-2 h-4 w-4" />
               Все события в {city.name}
             </Link>
@@ -238,7 +239,7 @@ export default async function CityPage({ params }: Props) {
                 href={
                   category === EventCategory.MUSEUM
                     ? `/cities/${slug}/museums`
-                    : `/events?city=${slug}&category=${category}`
+                    : catalogEventsHref({ city: slug, category })
                 }
                 className="card flex items-center gap-4 p-5 transition-transform hover:scale-[1.02]"
               >
@@ -308,7 +309,7 @@ export default async function CityPage({ params }: Props) {
               <p className="mt-1 text-sm text-slate-500">Топ событий по рейтингу</p>
             </div>
             <Link
-              href={`/events?city=${slug}`}
+              href={catalogEventsHref({ city: slug })}
               className="hidden text-sm font-medium text-primary-600 hover:text-primary-700 sm:flex sm:items-center sm:gap-1"
             >
               Все события <ArrowRight className="h-4 w-4" />
@@ -354,7 +355,7 @@ export default async function CityPage({ params }: Props) {
             ))}
           </div>
           <div className="mt-6 text-center">
-            <Link href={`/events?city=${slug}`} className="btn-secondary inline-flex items-center gap-2">
+            <Link href={catalogEventsHref({ city: slug })} className="btn-secondary inline-flex items-center gap-2">
               Все события в {city.name}
               <ArrowRight className="h-4 w-4" />
             </Link>

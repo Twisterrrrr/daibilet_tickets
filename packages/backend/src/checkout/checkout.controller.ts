@@ -36,7 +36,7 @@ import {
 import { PaymentEventLogService } from './payment-event-log.service';
 import { PaymentService } from './payment.service';
 import { WebhookIdempotencyService } from './webhook-idempotency.service';
-import { extractPaymentIdFromWebhook, isYkWebhookEvent } from './yookassa.types';
+import { buildYookassaWebhookDedupeKey, extractPaymentIdFromWebhook, isYkWebhookEvent } from './yookassa.types';
 
 @ApiTags('checkout')
 @Controller('checkout')
@@ -125,6 +125,15 @@ export class CheckoutController {
     const paymentObj = body.object as unknown as Record<string, unknown>;
     const eventType = body.event;
 
+    const dedupeKey = buildYookassaWebhookDedupeKey(eventType, body.object);
+    if (!dedupeKey) {
+      this.logger.warn('YooKassa webhook: cannot build dedupeKey (missing object.id)');
+      return { status: 'ignored', reason: 'missing object.id' };
+    }
+
+    const providerObjectId =
+      typeof paymentObj.id === 'string' && paymentObj.id.trim() ? paymentObj.id.trim() : paymentId;
+
     // 4. PaymentEventLog: accept & log (idempotent). Duplicate → 200 OK, no retry.
     const logged = await this.paymentEventLog.logOnce(eventType, paymentId, body);
     if (!logged) {
@@ -133,13 +142,12 @@ export class CheckoutController {
     }
 
     // 5. Idempotent processing → queue (ProcessedWebhookEvent + fulfillment)
-    const providerEventId = paymentId; // для payment.* = object.id, для refund.* = object.id
-    const result = await this.webhookIdempotency.processOnce(providerEventId, 'YOOKASSA', eventType, body, async () => {
-      // Minimal handler: validate + enqueue job
+    const providerEventId = paymentId;
+    const result = await this.webhookIdempotency.processOnce(dedupeKey, 'YOOKASSA', eventType, body, async () => {
       await this.fulfillmentQueue.add(
         'yookassa-webhook',
-      {
-        providerEventId,
+        {
+          providerEventId,
           eventType,
           paymentObject: paymentObj,
         },
@@ -149,10 +157,10 @@ export class CheckoutController {
         },
       );
       return eventType === 'payment.succeeded' ? 'QUEUED_PAID' : 'QUEUED_' + eventType.toUpperCase();
-    });
+    }, { providerObjectId });
 
     if (!result.processed) {
-      this.logger.debug(`webhook_duplicate_ignored providerEventId=${providerEventId} result=${result.result}`);
+      this.logger.debug(`webhook_duplicate_ignored dedupeKey=${dedupeKey} result=${result.result}`);
     }
     return { status: 'ok', processed: result.processed, result: result.result };
   }
@@ -285,8 +293,9 @@ export class CheckoutController {
   @SkipThrottle()
   @ApiOperation({ summary: 'Webhook от платёжного провайдера (generic/STUB)' })
   async handlePaymentWebhook(@Body() body: PaymentWebhookDto) {
+    const dedupeKey = `GENERIC:${body.paymentIntentId}:${body.status}`;
     const result = await this.webhookIdempotency.processOnce(
-      `generic_${body.paymentIntentId}_${body.status}`,
+      dedupeKey,
       'GENERIC',
       body.status,
       body,
@@ -309,6 +318,7 @@ export class CheckoutController {
         }
         return `IGNORED_${body.status}`;
       },
+      { providerObjectId: body.paymentIntentId },
     );
 
     return { status: 'ok', processed: result.processed, result: result.result };

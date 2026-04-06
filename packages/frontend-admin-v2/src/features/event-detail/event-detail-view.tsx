@@ -1,8 +1,10 @@
 import type { EventEntity } from '@/entities/event/types';
 import { formatDateTime } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/badge';
+import { Button } from '@/shared/ui/button';
 import { StatusBadge } from '@/shared/ui/status-badge';
 import { Surface } from '@/shared/ui/surface';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { DetailTabs } from '@/shared/layout/detail-tabs';
 import { SectionTitle } from '@/shared/ui/section-title';
 
@@ -18,7 +20,7 @@ export function EventDetailView({ event }: { event: EventEntity }) {
         },
         {
           id: 'schedule',
-          label: 'Расписание',
+          label: 'Сеансы',
           content: <EventScheduleTab event={event} />,
         },
         {
@@ -85,25 +87,91 @@ function EventMainTab({ event }: { event: EventEntity }) {
 
 function EventScheduleTab({ event }: { event: EventEntity }) {
   const sessions = [
-    { at: '2025-03-26T10:30:00.000Z', label: 'Дневной выход', seats: '14 / 18' },
-    { at: '2025-03-26T14:00:00.000Z', label: 'Дневной выход', seats: '9 / 18' },
-    { at: '2025-03-27T10:30:00.000Z', label: 'Будни', seats: '18 / 18' },
+    {
+      id: 's-1',
+      at: '2025-03-26T10:30:00.000Z',
+      label: 'Дневной выход',
+      seats: '14 / 18',
+      status: 'Продажи открыты' as const,
+      statusVariant: 'success' as const,
+    },
+    {
+      id: 's-2',
+      at: '2025-03-26T14:00:00.000Z',
+      label: 'Дневной выход',
+      seats: '9 / 18',
+      status: 'Почти sold out' as const,
+      statusVariant: 'warning' as const,
+    },
+    {
+      id: 's-3',
+      at: '2025-03-27T10:30:00.000Z',
+      label: 'Будни',
+      seats: '18 / 18',
+      status: 'Черновик слота' as const,
+      statusVariant: 'default' as const,
+    },
   ];
   return (
-    <Surface padding="md">
-      <SectionTitle title="Ближайшие сеансы" description={event.sessionsSummary} />
-      <ul className="mt-6 divide-y divide-border-soft">
-        {sessions.map((s, i) => (
-          <li key={i} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-            <div>
-              <p className="text-body text-text-primary">{s.label}</p>
-              <p className="text-small text-text-muted">{formatDateTime(s.at)}</p>
-            </div>
-            <Badge variant="default">{s.seats}</Badge>
-          </li>
-        ))}
-      </ul>
-    </Surface>
+    <div className="space-y-6">
+      <Surface padding="md" tone="muted">
+        <SectionTitle
+          title="Расписание и слоты"
+          description={`${event.sessionsSummary} · Здесь будет полный редактор сеансов (как ScheduleTab в legacy): периоды, ёмкость, паузы, копирование недель.`}
+        />
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-small text-text-secondary">
+            Период (mock): 26 мар — 2 апр 2025 · часовой пояс Europe/Moscow
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" size="md">
+              Добавить слот
+            </Button>
+            <Button type="button" variant="ghost" size="md">
+              Массовое копирование
+            </Button>
+          </div>
+        </div>
+      </Surface>
+
+      <Surface padding="md">
+        <SectionTitle title="Ближайшие сеансы" description="Mock-таблица; статусы и действия совпадут с API сеансов." />
+        <div className="mt-6 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Дата и время</TableHead>
+                <TableHead>Слот</TableHead>
+                <TableHead>Занято</TableHead>
+                <TableHead>Статус</TableHead>
+                <TableHead className="text-right">Действия</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessions.map((s) => (
+                <TableRow key={s.id}>
+                  <TableCell className="whitespace-nowrap text-body text-text-primary">
+                    {formatDateTime(s.at)}
+                  </TableCell>
+                  <TableCell className="text-body text-text-primary">{s.label}</TableCell>
+                  <TableCell>
+                    <Badge variant="default">{s.seats}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={s.statusVariant}>{s.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button type="button" variant="ghost" size="sm">
+                      Изменить
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Surface>
+    </div>
   );
 }
 

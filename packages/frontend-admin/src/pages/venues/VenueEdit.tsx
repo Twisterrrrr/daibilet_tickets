@@ -78,9 +78,17 @@ const DAY_LABELS: Record<string, string> = {
 type AdminSubcategory = {
   id: string;
   slug: string;
+  code?: string;
   nameRu: string;
   type: 'UNIVERSAL' | 'EVENT_ONLY' | 'VENUE_ONLY';
+  layer?: string;
   parent?: { id: string; slug: string; nameRu: string } | null;
+};
+
+type VenueSubcategoriesResponse = {
+  primarySubcategory: AdminSubcategory | null;
+  secondarySubcategories: AdminSubcategory[];
+  all: AdminSubcategory[];
 };
 
 interface VenueFormData {
@@ -182,8 +190,10 @@ export function VenueEditPage() {
   const [venueSummary, setVenueSummary] = useState<VenueAdminSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-  const [venueSubcategoryOptions, setVenueSubcategoryOptions] = useState<AdminSubcategory[]>([]);
-  const [selectedVenueSubcategoryIds, setSelectedVenueSubcategoryIds] = useState<string[]>([]);
+  const [venuePrimaryOptions, setVenuePrimaryOptions] = useState<AdminSubcategory[]>([]);
+  const [venueSecondaryOptions, setVenueSecondaryOptions] = useState<AdminSubcategory[]>([]);
+  const [selectedVenuePrimaryId, setSelectedVenuePrimaryId] = useState<string | null>(null);
+  const [selectedVenueSecondaryIds, setSelectedVenueSecondaryIds] = useState<string[]>([]);
 
   useEffect(() => {
     // Load cities
@@ -205,9 +215,13 @@ export function VenueEditPage() {
       .catch((e) => console.error('Load operators failed:', e));
 
     adminApi
-      .get<AdminSubcategory[]>('/admin/subcategories?forEntity=venue')
-      .then((data) => setVenueSubcategoryOptions(Array.isArray(data) ? data : []))
-      .catch(() => setVenueSubcategoryOptions([]));
+      .get<AdminSubcategory[]>('/admin/subcategories?entity=venue&layer=PRIMARY')
+      .then((data) => setVenuePrimaryOptions(Array.isArray(data) ? data : []))
+      .catch(() => setVenuePrimaryOptions([]));
+    adminApi
+      .get<AdminSubcategory[]>('/admin/subcategories?entity=venue&layer=SECONDARY')
+      .then((data) => setVenueSecondaryOptions(Array.isArray(data) ? data : []))
+      .catch(() => setVenueSecondaryOptions([]));
 
     if (!isNew && id) {
       setLoading(true);
@@ -259,10 +273,11 @@ export function VenueEditPage() {
           setEvents(venue.events || []);
           setOffers(venue.offers || []);
 
-          const selected = await adminApi
-            .get<AdminSubcategory[]>(`/admin/venues/${id}/subcategories`)
-            .catch(() => []);
-          setSelectedVenueSubcategoryIds(selected.map((item) => item.id));
+          const vsc = await adminApi
+            .get<VenueSubcategoriesResponse>(`/admin/venues/${id}/subcategories`)
+            .catch(() => null);
+          setSelectedVenuePrimaryId(vsc?.primarySubcategory?.id ?? null);
+          setSelectedVenueSecondaryIds(vsc?.secondarySubcategories?.map((s) => s.id) ?? []);
         })
         .catch((e) => setError(e.message))
         .finally(() => setLoading(false));
@@ -294,8 +309,16 @@ export function VenueEditPage() {
         navigate(`/venues/${result.id}`, { replace: true });
       } else {
         await adminApi.patch(`/admin/venues/${id}`, payload);
-        await adminApi.patch(`/admin/venues/${id}/subcategories`, {
-          subcategoryIds: selectedVenueSubcategoryIds,
+        const pRow = venuePrimaryOptions.find((p) => p.id === selectedVenuePrimaryId);
+        if (!pRow?.code) {
+          setError('Выберите основной формат площадки (PRIMARY)');
+          setSaving(false);
+          return;
+        }
+        const sRows = venueSecondaryOptions.filter((s) => selectedVenueSecondaryIds.includes(s.id));
+        await adminApi.post(`/admin/venues/${id}/subcategories`, {
+          primaryCode: pRow.code,
+          secondaryCodes: sRows.map((s) => s.code).filter(Boolean) as string[],
         });
         setForm((f) => ({ ...f, version: f.version + 1 }));
         if (id) {
@@ -663,49 +686,63 @@ export function VenueEditPage() {
               </div>
 
               {!isNew && (
-                <div className="space-y-2">
-                  <Label>Подкатегории площадки</Label>
-                  <div className="flex flex-wrap gap-2 rounded-md border p-3">
-                    {venueSubcategoryOptions.map((opt) => {
-                      const isChecked = selectedVenueSubcategoryIds.includes(opt.id);
-                      const limitReached = !isChecked && selectedVenueSubcategoryIds.length >= 5;
-                      return (
-                        <label
-                          key={opt.id}
-                          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                            isChecked
-                              ? 'bg-primary text-primary-foreground'
-                              : limitReached
-                                ? 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
-                                : 'bg-muted text-muted-foreground hover:bg-accent cursor-pointer'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={limitReached}
-                            onChange={(e) => {
-                              setSelectedVenueSubcategoryIds((prev) => {
-                                if (e.target.checked) {
-                                  if (prev.length >= 5) return prev;
-                                  return [...prev, opt.id];
-                                }
-                                return prev.filter((id) => id !== opt.id);
-                              });
-                            }}
-                            className="sr-only"
-                          />
-                          {opt.nameRu}
-                        </label>
-                      );
-                    })}
-                    {venueSubcategoryOptions.length === 0 && (
-                      <span className="text-xs text-muted-foreground">Справочник подкатегорий пока пуст</span>
-                    )}
+                <div className="space-y-3 rounded-md border p-3">
+                  <div className="space-y-2">
+                    <Label>Основной формат площадки (обязательно)</Label>
+                    <Select
+                      value={selectedVenuePrimaryId ?? '__none__'}
+                      onValueChange={(v) => setSelectedVenuePrimaryId(v === '__none__' ? null : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите формат" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Не выбрано</SelectItem>
+                        {venuePrimaryOptions.map((opt) => (
+                          <SelectItem key={opt.id} value={opt.id}>
+                            {opt.nameRu} ({opt.code ?? opt.slug})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Выбрано: {selectedVenueSubcategoryIds.length}/5. Сохраняется вместе с площадкой.
-                  </p>
+                  <div className="space-y-2">
+                    <Label>Доп. подкатегории (до 3)</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {venueSecondaryOptions.map((opt) => {
+                        const isChecked = selectedVenueSecondaryIds.includes(opt.id);
+                        return (
+                          <label
+                            key={opt.id}
+                            className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                              isChecked
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground hover:bg-accent'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                setSelectedVenueSecondaryIds((prev) => {
+                                  if (e.target.checked) {
+                                    if (prev.length >= 3) return prev;
+                                    return [...prev, opt.id];
+                                  }
+                                  return prev.filter((sid) => sid !== opt.id);
+                                });
+                              }}
+                              className="sr-only"
+                            />
+                            {opt.nameRu}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Доп.: {selectedVenueSecondaryIds.length}/3. Сохраняется при «Сохранить».
+                    </p>
+                  </div>
                 </div>
               )}
 

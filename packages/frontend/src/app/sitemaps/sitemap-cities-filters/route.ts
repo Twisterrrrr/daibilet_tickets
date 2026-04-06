@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { api } from '@/lib/api';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 import { SITE_URL, type SitemapUrl, toUrlSetXml } from '@/lib/sitemap-xml';
 
 const FEATURED_CITY_SLUGS = [
@@ -75,7 +76,7 @@ export async function GET() {
       batch.map(({ city, def }) =>
         getCount(city, def.category, def.qf).then((total) =>
           total >= MIN_COUNT_FOR_SITEMAP
-            ? { loc: `${SITE_URL}/events?city=${city}&category=${def.category}&qf=${def.qf}`, def }
+            ? { loc: `${SITE_URL}${catalogEventsHref({ city, category: def.category, qf: def.qf })}`, def }
             : null,
         ),
       ),

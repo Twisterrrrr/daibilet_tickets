@@ -115,6 +115,17 @@ export function isYkWebhookEvent(value: unknown): value is YkWebhookEvent {
 }
 
 /**
+ * Ключ идемпотентности для ЮKassa: `eventType:object.id`
+ * (разные события одного платежа — разные ключи).
+ */
+export function buildYookassaWebhookDedupeKey(eventType: string, webhookObject: unknown): string | null {
+  if (!webhookObject || typeof webhookObject !== 'object') return null;
+  const id = (webhookObject as Record<string, unknown>).id;
+  if (typeof id !== 'string' || !id.trim()) return null;
+  return `${eventType}:${id.trim()}`;
+}
+
+/**
  * Извлечь payment ID из webhook object.
  * Для payment.* — object.id
  * Для refund.* — object.payment_id

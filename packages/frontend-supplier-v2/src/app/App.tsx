@@ -12,6 +12,7 @@ import { IntegrationsPage } from '@/pages/integrations-page';
 import { InvitePage } from '@/pages/invite-page';
 import { LoginPage } from '@/pages/login-page';
 import { NotificationsPage } from '@/pages/notifications-page';
+import { SupplierOrderDetailPage } from '@/pages/supplier-order-detail-page';
 import { OrdersPage } from '@/pages/orders-page';
 import { RegisterPage } from '@/pages/register-page';
 import { ReportsPage } from '@/pages/reports-page';
@@ -44,6 +45,7 @@ export function App() {
         <Route path="events" element={<EventsListPage />} />
         <Route path="events/new" element={<EventWorkspaceStubPage />} />
         <Route path="events/:id" element={<EventWorkspaceStubPage />} />
+        <Route path="orders/:id" element={<SupplierOrderDetailPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="reviews" element={<ReviewsListPage />} />
         <Route path="reviews/:id" element={<ReviewDetailPage />} />

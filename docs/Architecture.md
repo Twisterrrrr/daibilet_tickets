@@ -56,9 +56,15 @@
 
 - **Цель:** подкатегории (`Subcategory` + links) — единый источник отбора для **автоподборок** и **SEO-страниц** по паттерну `/cities/{citySlug}/{subcategorySlug}` (витрина: fallback в `cities/[slug]/[landingSlug]/page.tsx` после материализованного `catalog/landings`).
 - **Collections:** `SubcategoryCollectionsService` — события **только** через `CatalogService.getEvents` (паблишабилити, сеансы, sellable-guard, фильтр подкатегории из `SubcategoryPolicyService`); площадки — отдельный Prisma-поток по `subcategoryLinks`, без смешивания сущностей в одном списке.
-- **SEO landing:** `SubcategoryLandingService` — шаблонные title/h1/description, `canonicalPath`; **публикация** только если `isActive` + `isLandingEnabled` + порог контента (`SUBCATEGORY_LANDING_MIN_EVENTS` / `SUBCATEGORY_LANDING_MIN_VENUES`, см. `subcategory-collections.constants.ts`). Кэш: только **опубликованные** payload (TTL `SUBCATEGORY_COLLECTION_CACHE_TTL_SEC`, по умолчанию 120 с).
-- **API:** `GET /api/v1/collections/subcategories/events|venues?code=&city=`, `GET /api/v1/landings/subcategories/:citySlug/:subcategorySlug` (404 если не опубликовано); админ-превью: `GET /api/v1/admin/subcategory-collections/preview/*`.
+- **SEO landing:** `SubcategoryLandingService` — шаблонные title/h1/description, `canonicalPath`; **публикация** только если `landingMode = AUTO`, `isActive`, `isLandingEnabled` и порог контента (`SUBCATEGORY_LANDING_MIN_EVENTS` / `SUBCATEGORY_LANDING_MIN_VENUES`, см. `subcategory-collections.constants.ts`). Режим **`TOPIC_HUB`** не отдаёт generic-лендинг: канонический URL задаётся тематическим хабом (`landingTopicKey`, напр. `river-cruises` → `/river-cruises/{citySlug}`). Кэш: только **опубликованные** payload (TTL `SUBCATEGORY_COLLECTION_CACHE_TTL_SEC`, по умолчанию 120 с).
+- **API:** `GET /api/v1/collections/subcategories/events|venues?code=&city=`, `GET /api/v1/landings/subcategories/:citySlug/:subcategorySlug/route` (резолв TOPIC_HUB vs AUTO), `GET /api/v1/landings/subcategories/:citySlug/:subcategorySlug` (404 если не опубликовано); админ-превью: `GET /api/v1/admin/subcategory-collections/preview/*`.
 - **Related:** похожие события — расширен `fetchRelatedEvents` (пересечение `subcategoryLinks` + ослабление «только та же category»); похожие площадки — `VenueService.getRelatedVenues` с приоритетом общих подкатегорий.
+
+#### 3.4.1 Routing policy: subcategories vs landings
+
+- **Зарезервированное пространство имён:** сегмент второго уровня под городом (`/cities/{city}/{segment}`) используется и **материализованными** лендингами каталога (`LandingPage`), и **автогенерацией** по подкатегориям. Конфликты разрешаются **явным приоритетом**, а не неявным порядком fallback.
+- **Приоритет:** сначала материализованный лендинг (`GET /catalog/landings/{city}/{slug}`); если его нет — специальные алиасы (например river/bus); затем резолв подкатегории (`/route` → TOPIC_HUB редирект или AUTO); только потом полный subcategory payload.
+- **Канон и whitelist:** справочник подкатегорий для SEO не «все строки из БД»: `landingMode`, `isLandingEnabled` и канонические `code`/`slug` задаются контролируемым сидом (`prisma/seeds/subcategories-canonical.seed.ts`). Генератор generic-страниц учитывает только **`landingMode = AUTO`** (и порог контента); **`TOPIC_HUB`** не создаёт параллельный URL рядом с уже существующим мультилендингом (пример: **RIVER** → хаб `river-cruises`, slug подкатегории остаётся таксономией/подборками, а не вторым независимым SEO-роутом).
 
 ### 3.5 Staging verification
 

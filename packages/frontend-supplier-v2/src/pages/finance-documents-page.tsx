@@ -189,7 +189,11 @@ export function FinanceDocumentsPage() {
   if (loading && !settings) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Финансовые документы" glyph={<PageGlyph icon={FileCheck2} tone="sky" />} />
+        <PageHeader
+          title="Финансовые документы"
+          subtitle="Настройки и закрывающие документы"
+          glyph={<PageGlyph icon={FileCheck2} tone="sky" />}
+        />
         <LoadingBlock />
       </div>
     );
@@ -198,7 +202,11 @@ export function FinanceDocumentsPage() {
   if (!settings) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Финансовые документы" glyph={<PageGlyph icon={FileCheck2} tone="sky" />} />
+        <PageHeader
+          title="Финансовые документы"
+          subtitle="Настройки и закрывающие документы"
+          glyph={<PageGlyph icon={FileCheck2} tone="sky" />}
+        />
         <EmptyState title="Нет данных" description={error || 'Не удалось загрузить настройки.'} />
         {error ? <ErrorPanel title="Ошибка" description={error} onRetry={load} /> : null}
       </div>

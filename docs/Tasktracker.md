@@ -32,6 +32,7 @@
 |--------|-----------|-----------|--------|
 | `subcat-collections-landing-mvp` | **Subcategory → Collections Engine + SEO landings:** backend-сервисы, публичные/admin API, кэш, пороги env, витрина fallback на `/cities/.../...`, related events/venues по links | Высокий | `[x]` **05.04.2026** |
 | `mvp-item-refunds` | **MVP возвраты по FulfillmentItem:** `RefundRequest`, REFUND_PENDING, isRedeemed, админ API + eligibility, квоты/sold через CONFIRMED+REFUND_PENDING и освобождение при COMPLETED, UI в legacy admin checkout sessions | Высокий | `[x]` **05.04.2026** |
+| `subcat-landing-mode-topic-hub` | **Подкатегории:** `SubcategoryLandingMode` + `landingTopicKey`, RIVER → TOPIC_HUB `river-cruises`, API `/landings/subcategories/.../route`, фронт редирект, канонический seed whitelist, политика маршрутизации в Architecture/Project | Высокий | `[x]` **06.04.2026** |
 
 ### Admin / Supplier V2 — архитектурный долг (roadmap 04.2026)
 

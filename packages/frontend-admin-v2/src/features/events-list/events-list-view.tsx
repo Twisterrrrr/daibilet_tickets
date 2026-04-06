@@ -3,12 +3,12 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import type { EventEntity } from '@/entities/event/types';
+import type { EventTableColumnId } from '@/features/events-list/events-table-columns';
 import { EventsColumnSettingsModal } from '@/features/events-list/events-column-settings-modal';
 import {
   EVENT_TABLE_COLUMN_LABELS,
   loadPersistedEventsColumns,
   savePersistedEventsColumns,
-  type EventTableColumnId,
 } from '@/features/events-list/events-table-columns';
 import { FilterBar, FilterField } from '@/shared/layout/filter-bar';
 import { formatDateTime } from '@/shared/lib/format';
@@ -21,7 +21,8 @@ import { SearchInput } from '@/shared/ui/search-input';
 import { Select } from '@/shared/ui/select-field';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { StatusBadge } from '@/shared/ui/status-badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
+import { compareSortValues, SortableTableHead, type TableSortDirection } from '@/shared/ui/sortable-table-head';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/shared/ui/table';
 import { DataTableShell } from '@/widgets/data-table-shell/data-table-shell';
 import { PageStateToggle } from '@/widgets/page-state-toggle/page-state-toggle';
 
@@ -75,6 +76,33 @@ function renderEventCell(columnId: EventTableColumnId, e: EventEntity) {
   }
 }
 
+function getEventSortValue(colId: EventTableColumnId, e: EventEntity): string | number {
+  switch (colId) {
+    case 'title':
+      return e.title;
+    case 'city':
+      return e.city;
+    case 'status':
+      return e.status;
+    case 'source':
+      return e.source;
+    case 'quality':
+      return e.qualityScore;
+    case 'issues':
+      return e.issuesCount;
+    case 'supplier':
+      return e.supplierName;
+    case 'sessions':
+      return e.sessionsSummary;
+    case 'created':
+      return new Date(e.createdAt).getTime();
+    case 'updated':
+      return new Date(e.updatedAt).getTime();
+    default:
+      return '';
+  }
+}
+
 export function EventsListView({ rows }: { rows: EventEntity[] }) {
   const [demo, setDemo] = useState<PageDataState>('data');
   const [q, setQ] = useState('');
@@ -83,6 +111,8 @@ export function EventsListView({ rows }: { rows: EventEntity[] }) {
   const [source, setSource] = useState('');
   const [columnOrder, setColumnOrder] = useState<EventTableColumnId[]>(() => loadPersistedEventsColumns());
   const [columnsModalOpen, setColumnsModalOpen] = useState(false);
+  const [sortColumnId, setSortColumnId] = useState<EventTableColumnId | null>(null);
+  const [sortDir, setSortDir] = useState<TableSortDirection>('asc');
 
   const cities = useMemo(() => Array.from(new Set(rows.map((r) => r.city))).sort(), [rows]);
 
@@ -95,6 +125,23 @@ export function EventsListView({ rows }: { rows: EventEntity[] }) {
       return true;
     });
   }, [rows, q, city, status, source]);
+
+  const sortedFiltered = useMemo(() => {
+    if (!sortColumnId) return filtered;
+    const mult = sortDir === 'asc' ? 1 : -1;
+    return [...filtered].sort(
+      (a, b) => mult * compareSortValues(getEventSortValue(sortColumnId, a), getEventSortValue(sortColumnId, b)),
+    );
+  }, [filtered, sortColumnId, sortDir]);
+
+  const onSortColumn = (colId: EventTableColumnId) => {
+    if (sortColumnId !== colId) {
+      setSortColumnId(colId);
+      setSortDir('asc');
+      return;
+    }
+    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+  };
 
   const applyColumns = (order: EventTableColumnId[]) => {
     setColumnOrder(order);
@@ -171,12 +218,18 @@ export function EventsListView({ rows }: { rows: EventEntity[] }) {
             <TableHeader>
               <TableRow>
                 {columnOrder.map((colId) => (
-                  <TableHead key={colId}>{EVENT_TABLE_COLUMN_LABELS[colId]}</TableHead>
+                  <SortableTableHead
+                    key={colId}
+                    label={EVENT_TABLE_COLUMN_LABELS[colId]}
+                    active={sortColumnId === colId}
+                    direction={sortDir}
+                    onToggle={() => onSortColumn(colId)}
+                  />
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((e) => (
+              {sortedFiltered.map((e) => (
                 <TableRow key={e.id}>
                   {columnOrder.map((colId) => (
                     <TableCell key={colId}>{renderEventCell(colId, e)}</TableCell>

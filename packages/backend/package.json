@@ -22,6 +22,7 @@
     "db:seed:finance-docs-demo": "npx tsx prisma/seed-finance-docs-demo.ts",
     "db:seed:buyer-test": "npx tsx prisma/seed-buyer-account-test.ts",
     "db:seed:event-sessions-test": "npx tsx prisma/seed-event-sessions-test.ts",
+    "db:seed:scenarios": "npx tsx prisma/seed-scenarios.ts",
     "finance:print-samples": "npx tsx scripts/generate-finance-print-samples.ts",
     "sync:tep": "npx tsx scripts/sync-teplohod.ts",
     "full:sync": "npx tsx scripts/full-sync.ts",

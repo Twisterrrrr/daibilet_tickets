@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { X, LayoutGrid, List as ListIcon, SlidersHorizontal } from 'lucide-react';
 import { api } from '@/lib/api';
+import { parseCatalogEventsParams } from '@/lib/catalog-events-url';
 import type { CityListItem, EventListItem, CatalogItem } from '@daibilet/shared';
 import type { MultiEventListItemDto } from '@/lib/api.types';
 import { EventCard } from '@/components/ui/EventCard';
@@ -18,6 +19,9 @@ import {
   CATEGORY_LABELS,
   EventAudience,
   EventCategory,
+  getCityTimezone,
+  getNextWeekendRangeISO,
+  getTodayISO,
   QUICK_FILTERS,
   type QuickFilter,
 } from '@daibilet/shared';
@@ -72,6 +76,7 @@ type MobileQuickChip =
   | { id: 'romantic'; label: string; active: boolean; preset: 'romantic' };
 
 function getMobileQuickChips(
+  citySlug: string,
   selectedDate: string | null,
   timeOfDay: string,
   priceMax: string,
@@ -79,16 +84,9 @@ function getMobileQuickChips(
   urlTag: string,
   activeQuickFilter: string,
 ): MobileQuickChip[] {
-  const today = new Date().toISOString().slice(0, 10);
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  const dayOfWeek = d.getDay();
-  const daysToSat = dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek;
-  const sat = new Date(d);
-  sat.setDate(d.getDate() + daysToSat);
-  const sun = new Date(sat);
-  sun.setDate(sat.getDate() + 1);
-  const weekendRange = `${sat.toISOString().slice(0, 10)}..${sun.toISOString().slice(0, 10)}`;
+  const tz = getCityTimezone(citySlug || null);
+  const today = getTodayISO(tz);
+  const weekendRange = getNextWeekendRangeISO(tz);
 
   const popularActive =
     sort === 'popular' &&
@@ -165,32 +163,6 @@ function buildDisplayItems(events: EventListItem[]): DisplayItem[] {
     }
   }
   return result;
-}
-
-function filtersFromParams(sp: URLSearchParams) {
-  const sort = sp.get('sort') || 'popular';
-  const isSoon = sort === 'departing_soon';
-  const rawLimit = parseInt(sp.get('limit') || '20', 10);
-  const limit = LIMIT_OPTIONS.includes(rawLimit as 20 | 50 | 100) ? rawLimit : 20;
-  return {
-    city: sp.get('city') || '',
-    category: sp.get('category') || '',
-    audience: sp.get('audience') || '',
-    sort,
-    timeOfDay: isSoon ? 'soon' : sp.get('timeOfDay') || '',
-    tag: sp.get('tag') || '',
-    structuralTags: sp.get('structuralTags') || '',
-    popularTags: sp.get('popularTags') || '',
-    date: sp.get('date') || null,
-    pier: sp.get('pier') || '',
-    priceMax: sp.get('priceMax') || '',
-    page: Math.max(1, parseInt(sp.get('page') || '1', 10)),
-    limit,
-    qf: sp.get('qf') || '',
-    q: sp.get('q') || '',
-    venueId: sp.get('venueId') || '',
-    subcategory: sp.get('subcategory') || '',
-  };
 }
 
 function parseCsvSlugs(value: string) {
@@ -273,7 +245,7 @@ export function EventsPageClient() {
   const [tagOptionsLoaded, setTagOptionsLoaded] = useState(false);
 
   useEffect(() => {
-    const f = filtersFromParams(searchParams);
+    const f = parseCatalogEventsParams(searchParams);
     setCity(f.city);
     setCategory(f.category);
     setAudience(f.audience);
@@ -409,7 +381,7 @@ export function EventsPageClient() {
 
   useEffect(() => {
     setLoading(true);
-    const f = filtersFromParams(searchParams);
+    const f = parseCatalogEventsParams(searchParams);
     const cityFromUrl = f.city;
     const sortFromUrl = f.sort === 'departing_soon' || f.timeOfDay === 'soon' ? 'departing_soon' : f.sort;
     const categoryFromUrl = f.category;
@@ -563,8 +535,9 @@ export function EventsPageClient() {
   }, [events, city]);
 
   const mobileQuickChips = useMemo(
-    () => getMobileQuickChips(selectedDate, timeOfDay, priceMax, sort, urlTag, activeQuickFilter),
-    [selectedDate, timeOfDay, priceMax, sort, urlTag, activeQuickFilter],
+    () =>
+      getMobileQuickChips(city, selectedDate, timeOfDay, priceMax, sort, urlTag, activeQuickFilter),
+    [city, selectedDate, timeOfDay, priceMax, sort, urlTag, activeQuickFilter],
   );
 
   const handleMobileChipClick = useCallback(
@@ -781,7 +754,11 @@ export function EventsPageClient() {
       </div>
 
       <div className={`-mx-4 mb-4 px-4 sm:mx-0 sm:mb-5 sm:px-0 ${filtersPanelOpen ? 'block' : 'hidden md:block'}`}>
-        <DateRibbon selected={selectedDate} onChange={(date) => updateUrl({ date: date || null, page: 1 })} />
+        <DateRibbon
+          selected={selectedDate}
+          onChange={(date) => updateUrl({ date: date || null, page: 1 })}
+          ianaTimeZone={getCityTimezone(city || null)}
+        />
       </div>
 
       <div className={`mb-5 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${filtersPanelOpen ? 'block' : 'hidden md:flex'}`}>

@@ -173,6 +173,13 @@ enum SubcategoryLayer {
   SECONDARY
 }
 
+/// Режим SEO/маршрутизации лендинга по подкатегории (не смешивать с «участием в подборках»).
+enum SubcategoryLandingMode {
+  DISABLED
+  AUTO
+  TOPIC_HUB
+}
+
 /// Режим наследования правил возврата/обмена (Venue)
 enum VenueRefundPolicyMode {
   INHERIT_SUPPLIER
@@ -1513,12 +1520,16 @@ model Subcategory {
   nameRu           String
   type             SubcategoryType   @default(UNIVERSAL)
   layer            SubcategoryLayer  @default(SECONDARY)
-  parentId         String?           @db.Uuid
-  isActive         Boolean           @default(true)
-  isLandingEnabled Boolean           @default(false)
-  sortOrder        Int               @default(0)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  parentId         String?                  @db.Uuid
+  isActive         Boolean                  @default(true)
+  isLandingEnabled Boolean                  @default(false)
+  /// AUTO: generic `/cities/{city}/{slug}`; TOPIC_HUB: канонический тематический хаб (`landingTopicKey`); DISABLED: без auto-SEO-роута.
+  landingMode      SubcategoryLandingMode    @default(DISABLED)
+  /// Ключ тематического хаба (например `river-cruises` → `/river-cruises/{citySlug}`).
+  landingTopicKey  String?
+  sortOrder        Int                      @default(0)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
   parent     Subcategory?          @relation("SubcategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
   children   Subcategory[]         @relation("SubcategoryTree")
@@ -1530,6 +1541,7 @@ model Subcategory {
   @@index([type, layer, isActive])
   @@index([parentId])
   @@index([isLandingEnabled])
+  @@index([isLandingEnabled, landingMode])
   @@map("subcategories")
 }
 

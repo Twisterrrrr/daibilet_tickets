@@ -15,6 +15,7 @@ import { RatingBadge, ReviewSection } from '@/components/ui/ReviewSection';
 import { TcSessionSlot, TcWidgetButton } from '@/components/ui/TcWidget';
 import { TepWidgetEmbed } from '@/components/ui/TepWidget';
 import { shortenAddressToStreet } from '@/lib/address';
+import { isPastOpenDateExhibition } from '@/lib/event-ended';
 
 type EventDetail = EventDetailFrontend;
 type EventOfferLite = EventOffer | null;
@@ -25,6 +26,7 @@ export type EventPageViewProps = {
 };
 
 export function EventPageView({ event }: EventPageViewProps) {
+  const exhibitionEnded = isPastOpenDateExhibition(event);
   const tags = (event.tags ?? []).map((t) => t.tag).filter(Boolean);
   const venueName = getVenueName(event.tcData);
 
@@ -90,15 +92,17 @@ export function EventPageView({ event }: EventPageViewProps) {
               name: 'Дайбилет',
               url: 'https://daibilet.ru',
             },
-            offers: event.priceFrom
-              ? {
-                  '@type': 'Offer',
-                  price: (event.priceFrom / 100).toFixed(0),
-                  priceCurrency: 'RUB',
-                  availability: hasActiveSessions ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
-                  url: `https://daibilet.ru/events/${event.slug}`,
-                }
-              : undefined,
+            ...(event.endDate && { endDate: new Date(event.endDate).toISOString() }),
+            offers:
+              !exhibitionEnded && event.priceFrom
+                ? {
+                    '@type': 'Offer',
+                    price: (event.priceFrom / 100).toFixed(0),
+                    priceCurrency: 'RUB',
+                    availability: hasActiveSessions ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
+                    url: `https://daibilet.ru/events/${event.slug}`,
+                  }
+                : undefined,
             performer: {
               '@type': 'Organization',
               name: venueName || 'Организатор',
@@ -209,6 +213,11 @@ export function EventPageView({ event }: EventPageViewProps) {
                     {label}
                   </span>
                 ))}
+                {exhibitionEnded && (
+                  <span className="inline-flex items-center rounded-full bg-white/25 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                    Период проведения завершён
+                  </span>
+                )}
               </div>
               <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl lg:text-4xl leading-tight">
                 {event.title}
@@ -378,7 +387,10 @@ export function EventPageView({ event }: EventPageViewProps) {
             )}
 
             {/* Mobile buy card — над правилами / контентными блоками */}
-            {(primaryOffer || event.tcEventId || event.offers?.some((o) => o.status === 'ACTIVE')) && (
+            {(exhibitionEnded ||
+              primaryOffer ||
+              event.tcEventId ||
+              event.offers?.some((o) => o.status === 'ACTIVE')) && (
               <div className="mt-6 lg:hidden" id="buy-card">
                 <BuyCard
                   event={event}
@@ -439,14 +451,19 @@ export function EventPageView({ event }: EventPageViewProps) {
           {/* Right sidebar */}
           <div className="hidden lg:block lg:col-span-1">
             <div className="sticky top-20" id="buy-card">
-              <BuyCard
-                event={event}
-                buyUrl={buyUrl}
-                hasActiveSessions={hasActiveSessions}
-                categoryLabel={categoryLabel}
-                venueName={venueName}
-                primaryOffer={primaryOffer}
-              />
+              {(exhibitionEnded ||
+                primaryOffer ||
+                event.tcEventId ||
+                event.offers?.some((o) => o.status === 'ACTIVE')) && (
+                <BuyCard
+                  event={event}
+                  buyUrl={buyUrl}
+                  hasActiveSessions={hasActiveSessions}
+                  categoryLabel={categoryLabel}
+                  venueName={venueName}
+                  primaryOffer={primaryOffer}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -968,6 +985,37 @@ function BuyCard({
   venueName: string | null;
   primaryOffer?: EventOfferLite;
 }) {
+  const [buyModalOpen, setBuyModalOpen] = useState(false);
+  const [preselectedSessionId, setPreselectedSessionId] = useState<string | null>(null);
+
+  if (isPastOpenDateExhibition(event)) {
+    const endLabel =
+      event.endDate != null && event.endDate !== ''
+        ? new Date(event.endDate).toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        : null;
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-900">Билеты не продаются</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          {endLabel ? `Период проведения завершён (${endLabel}).` : 'Период проведения этого мероприятия завершён.'}
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Страница доступна по ссылке для справки; в каталоге такие события не показываются.
+        </p>
+        <Link
+          href="/events"
+          className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-medium text-primary-800 transition hover:bg-primary-100"
+        >
+          Смотреть актуальные события
+        </Link>
+      </div>
+    );
+  }
+
   const purchaseType = primaryOffer?.purchaseType || (event.source === 'TEPLOHOD' ? 'REDIRECT' : 'WIDGET');
   const isWidget = purchaseType === 'WIDGET';
   const isRequest = purchaseType === 'REQUEST';
@@ -1010,9 +1058,6 @@ function BuyCard({
     }
   }
   const showFromPrefix = allPrices.size > 1;
-
-  const [buyModalOpen, setBuyModalOpen] = useState(false);
-  const [preselectedSessionId, setPreselectedSessionId] = useState<string | null>(null);
 
   const handleOpenBuyModal = (sessionId: string | null) => {
     setPreselectedSessionId(sessionId);

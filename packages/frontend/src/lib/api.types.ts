@@ -231,10 +231,17 @@ export interface LandingPageResponse {
   total?: number;
 }
 
+/** GET /landings/subcategories/:city/:slug/route — до полного payload */
+export type SubcategoryLandingRoutePayload =
+  | { kind: 'NOT_FOUND' }
+  | { kind: 'TOPIC_HUB'; redirectPath: string }
+  | { kind: 'AUTO' };
+
 /** Публичный SEO-лендинг по Subcategory (backend: GET /landings/subcategories/:city/:slug) */
 export interface SubcategoryLandingPublishedPayload {
   published: boolean;
   unpublishedReasons?: string[];
+  topicHubRedirect?: string | null;
   definition: {
     key: string;
     entityKind: 'EVENT' | 'VENUE';

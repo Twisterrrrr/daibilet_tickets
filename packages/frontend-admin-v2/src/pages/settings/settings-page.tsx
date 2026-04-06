@@ -1,5 +1,7 @@
 import { Settings } from 'lucide-react';
 
+import { blueprintSettings } from '@/shared/config/admin-v2-blueprints';
+import { IntegrationBlueprint } from '@/shared/layout/admin-v2-blueprint';
 import { DetailPageLayout } from '@/shared/layout/detail-page-layout';
 import { DetailTabs } from '@/shared/layout/detail-tabs';
 import { PageGlyph } from '@/shared/ui/page-glyph';
@@ -71,6 +73,7 @@ export function SettingsPage() {
           ]}
         />
       }
+      blueprint={<IntegrationBlueprint {...blueprintSettings} />}
     />
   );
 }

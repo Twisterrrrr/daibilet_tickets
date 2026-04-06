@@ -70,6 +70,9 @@ const FinanceDocumentsAdminPage = lazy(() =>
 const EventsListPage = lazy(() =>
   import('./pages/events/EventsList').then((m) => ({ default: m.EventsListPage })),
 );
+const EventSessionsBoardPage = lazy(() =>
+  import('./pages/events/EventSessionsBoardPage').then((m) => ({ default: m.EventSessionsBoardPage })),
+);
 const SuppliersListPage = lazy(() =>
   import('./pages/suppliers/SuppliersList').then((m) => ({ default: m.SuppliersListPage })),
 );
@@ -106,6 +109,7 @@ export default function App() {
         >
           <Route index element={<DashboardPage />} />
           <Route path="events" element={flags.showEvents ? <EventsListPage /> : <DisabledRoute />} />
+          <Route path="events/sessions" element={flags.showEvents ? <EventSessionsBoardPage /> : <DisabledRoute />} />
           <Route path="events/merge" element={flags.showEvents ? <EventsMergePage /> : <DisabledRoute />} />
           <Route path="events/new" element={flags.showEvents ? <EventCreatePage /> : <DisabledRoute />} />
           <Route path="events/:id" element={flags.showEvents ? <EventEditPage /> : <DisabledRoute />} />

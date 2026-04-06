@@ -203,6 +203,9 @@ export class LandingService {
         templateType: landing.templateType,
         title: landing.title,
         subtitle: landing.subtitle,
+        /** Для перелинковки в публичный каталог `/events` (канон query-string). */
+        filterTag: landing.filterTag,
+        additionalFilters: landing.additionalFilters,
         heroText: landing.heroText,
         seasonalPayload: landing.seasonalPayload,
         howToChoose: landing.howToChoose,

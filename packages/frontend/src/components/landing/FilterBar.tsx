@@ -2,9 +2,16 @@
 
 import { DEFAULT_CALENDAR_TZ, getTodayISO, getTomorrowISO } from '@daibilet/shared';
 import { RotateCcw, SlidersHorizontal, X } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 
 import type { LandingTimeSlotMode } from '@/app/cities/_landingVm';
+import {
+  catalogEventsHref,
+  landingFilterSortToCatalogSort,
+  landingTimeSlotToCatalogTimeOfDay,
+  type CatalogEventsUrlParams,
+} from '@/lib/catalog-events-url';
 
 export interface FilterState {
   date: string;
@@ -28,6 +35,11 @@ interface FilterBarProps {
   filterTitle?: string;
   /** Подзаголовок под заголовком */
   filterSubtitle?: string;
+  /** Перелинковка в общий каталог: город + базовые параметры лендинга (тег, категория из CMS). */
+  catalogEventsContext?: {
+    citySlug: string;
+    baseParams?: CatalogEventsUrlParams;
+  };
 }
 
 const TIME_SLOTS_NIGHT = [
@@ -128,6 +140,7 @@ export function FilterBar({
   onFilterChange,
   filterTitle,
   filterSubtitle,
+  catalogEventsContext,
 }: FilterBarProps) {
   const [state, setState] = useState<FilterState>({
     date: '',
@@ -177,6 +190,26 @@ export function FilterBar({
   if (sortLabel && state.sort !== 'time') activeLabels.push(sortLabel);
 
   const chipDates = dates.slice(0, 5);
+
+  const catalogHref = useMemo(() => {
+    if (!catalogEventsContext) return null;
+    const citySlug = catalogEventsContext.citySlug?.trim();
+    if (!citySlug) return null;
+    const timeOfDay = landingTimeSlotToCatalogTimeOfDay(timeSlotMode, state.timeSlot);
+    const rubMax =
+      state.maxPrice != null && state.maxPrice > 0
+        ? String(Math.max(1, Math.round(state.maxPrice / 100)))
+        : null;
+    return catalogEventsHref({
+      ...(catalogEventsContext.baseParams ?? {}),
+      city: citySlug,
+      date: state.date || null,
+      pier: state.pier || null,
+      priceMax: rubMax,
+      sort: landingFilterSortToCatalogSort(state.sort),
+      ...(timeOfDay ? { timeOfDay } : {}),
+    });
+  }, [catalogEventsContext, state, timeSlotMode]);
 
   const title =
     filterTitle ??
@@ -358,6 +391,21 @@ export function FilterBar({
         <div className="mt-4 rounded-lg bg-slate-100/80 px-3 py-2 text-[13px] text-slate-600">
           <span className="font-semibold text-slate-700">Активно: </span>
           {activeLabels.join(' · ')}
+        </div>
+      ) : null}
+
+      {catalogHref ? (
+        <div className="mt-4 border-t border-slate-200 pt-3">
+          <Link
+            href={catalogHref}
+            className="text-sm font-semibold text-primary-700 hover:text-primary-900 hover:underline"
+          >
+            Открыть в каталоге /events →
+          </Link>
+          <p className="mt-1 text-[11px] leading-snug text-slate-500">
+            В ссылку подставляются город, параметры лендинга и выбранные дата, причал, лимит цены и сортировка (как на
+            витрине каталога).
+          </p>
         </div>
       ) : null}
     </div>

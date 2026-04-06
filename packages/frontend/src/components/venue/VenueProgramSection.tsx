@@ -9,6 +9,7 @@ import { EventCategory } from '@daibilet/shared';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 import { buildVenueProgramGroups, type ProgramItem } from '@/lib/venues/buildVenueProgramGroups';
 import { VenueExhibitionCard } from './VenueExhibitionCard';
 import { VenueFeaturedExhibitionCard } from './VenueFeaturedExhibitionCard';
@@ -31,12 +32,12 @@ type Props = {
 };
 
 function buildAllEventsHref(venueId: string, citySlug?: string | null): string {
-  const q = new URLSearchParams();
-  if (citySlug) q.set('city', citySlug);
-  q.set('venueId', venueId);
-  q.set('category', EventCategory.MUSEUM);
-  q.set('subcategory', 'EXHIBITION');
-  return `/events?${q.toString()}`;
+  return catalogEventsHref({
+    city: citySlug || undefined,
+    venueId,
+    category: EventCategory.MUSEUM,
+    subcategory: 'EXHIBITION',
+  });
 }
 
 export function VenueProgramSection({ program, venueId, citySlug, title, intro, featured, current, upcoming }: Props) {

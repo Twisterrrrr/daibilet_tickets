@@ -10,3 +10,12 @@ export interface SupplierEntity {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Карточка поставщика (мок / GET /admin/suppliers/:id). */
+export interface SupplierDetail extends SupplierEntity {
+  legalName: string;
+  contactEmail: string;
+  contactPhone: string;
+  notes: string;
+  ordersCount30d: number;
+}

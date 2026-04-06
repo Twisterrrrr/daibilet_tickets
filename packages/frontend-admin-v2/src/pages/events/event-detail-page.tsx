@@ -3,6 +3,8 @@ import { CalendarDays } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 
 import { EventDetailView } from '@/features/event-detail/event-detail-view';
+import { blueprintEventDetail } from '@/shared/config/admin-v2-blueprints';
+import { IntegrationBlueprint } from '@/shared/layout/admin-v2-blueprint';
 import { DetailPageLayout } from '@/shared/layout/detail-page-layout';
 import { formatDateTime } from '@/shared/lib/format';
 import { getMockEventById } from '@/shared/mock/events';
@@ -42,6 +44,7 @@ export function EventDetailPage() {
         </>
       }
       tabs={<EventDetailView event={event} />}
+      blueprint={<IntegrationBlueprint {...blueprintEventDetail} />}
     />
   );
 }

@@ -1,4 +1,5 @@
 import { Inbox } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 
 import type { SupplierEntity } from '@/entities/supplier/types';
@@ -12,14 +13,36 @@ import { SearchInput } from '@/shared/ui/search-input';
 import { Select } from '@/shared/ui/select-field';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { StatusBadge } from '@/shared/ui/status-badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
+import { compareSortValues, SortableTableHead, type TableSortDirection } from '@/shared/ui/sortable-table-head';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/shared/ui/table';
 import { DataTableShell } from '@/widgets/data-table-shell/data-table-shell';
 import { PageStateToggle } from '@/widgets/page-state-toggle/page-state-toggle';
+
+type SupplierSortColumn = 'name' | 'status' | 'events' | 'quality' | 'updated';
+
+function supplierSortValue(key: SupplierSortColumn, s: SupplierEntity): string | number {
+  switch (key) {
+    case 'name':
+      return s.name;
+    case 'status':
+      return s.status;
+    case 'events':
+      return s.eventsCount;
+    case 'quality':
+      return s.catalogQuality;
+    case 'updated':
+      return new Date(s.updatedAt).getTime();
+    default:
+      return '';
+  }
+}
 
 export function SuppliersListView({ rows }: { rows: SupplierEntity[] }) {
   const [demo, setDemo] = useState<PageDataState>('data');
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [sortColumn, setSortColumn] = useState<SupplierSortColumn | null>(null);
+  const [sortDir, setSortDir] = useState<TableSortDirection>('asc');
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -28,6 +51,23 @@ export function SuppliersListView({ rows }: { rows: SupplierEntity[] }) {
       return true;
     });
   }, [rows, q, status]);
+
+  const sortedFiltered = useMemo(() => {
+    if (!sortColumn) return filtered;
+    const mult = sortDir === 'asc' ? 1 : -1;
+    return [...filtered].sort(
+      (a, b) => mult * compareSortValues(supplierSortValue(sortColumn, a), supplierSortValue(sortColumn, b)),
+    );
+  }, [filtered, sortColumn, sortDir]);
+
+  const toggleSort = (key: SupplierSortColumn) => {
+    if (sortColumn !== key) {
+      setSortColumn(key);
+      setSortDir('asc');
+      return;
+    }
+    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+  };
 
   return (
     <DataTableShell
@@ -62,18 +102,48 @@ export function SuppliersListView({ rows }: { rows: SupplierEntity[] }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Поставщик</TableHead>
-              <TableHead>Статус</TableHead>
-              <TableHead>События</TableHead>
-              <TableHead>Качество каталога</TableHead>
-              <TableHead>Обновлено</TableHead>
+              <SortableTableHead
+                label="Поставщик"
+                active={sortColumn === 'name'}
+                direction={sortDir}
+                onToggle={() => toggleSort('name')}
+              />
+              <SortableTableHead
+                label="Статус"
+                active={sortColumn === 'status'}
+                direction={sortDir}
+                onToggle={() => toggleSort('status')}
+              />
+              <SortableTableHead
+                label="События"
+                active={sortColumn === 'events'}
+                direction={sortDir}
+                onToggle={() => toggleSort('events')}
+              />
+              <SortableTableHead
+                label="Качество каталога"
+                active={sortColumn === 'quality'}
+                direction={sortDir}
+                onToggle={() => toggleSort('quality')}
+              />
+              <SortableTableHead
+                label="Обновлено"
+                active={sortColumn === 'updated'}
+                direction={sortDir}
+                onToggle={() => toggleSort('updated')}
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((s) => (
+            {sortedFiltered.map((s) => (
               <TableRow key={s.id}>
                 <TableCell>
-                  <p className="font-medium text-text-primary">{s.name}</p>
+                  <Link
+                    className="font-medium text-text-primary text-accent underline hover:no-underline"
+                    to={`/suppliers/${s.id}`}
+                  >
+                    {s.name}
+                  </Link>
                   <p className="text-small text-text-muted">{s.operatorLabel}</p>
                 </TableCell>
                 <TableCell>

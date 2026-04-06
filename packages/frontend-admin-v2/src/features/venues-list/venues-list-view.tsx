@@ -13,9 +13,33 @@ import { SearchInput } from '@/shared/ui/search-input';
 import { Select } from '@/shared/ui/select-field';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { StatusBadge } from '@/shared/ui/status-badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
+import { compareSortValues, SortableTableHead, type TableSortDirection } from '@/shared/ui/sortable-table-head';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/shared/ui/table';
 import { DataTableShell } from '@/widgets/data-table-shell/data-table-shell';
 import { PageStateToggle } from '@/widgets/page-state-toggle/page-state-toggle';
+
+type VenueSortColumn = 'name' | 'city' | 'status' | 'type' | 'quality' | 'events' | 'updated';
+
+function venueSortValue(key: VenueSortColumn, v: VenueEntity): string | number {
+  switch (key) {
+    case 'name':
+      return v.name;
+    case 'city':
+      return v.city;
+    case 'status':
+      return v.status;
+    case 'type':
+      return v.type;
+    case 'quality':
+      return v.qualityScore;
+    case 'events':
+      return v.eventsCount;
+    case 'updated':
+      return new Date(v.updatedAt).getTime();
+    default:
+      return '';
+  }
+}
 
 export function VenuesListView({ rows }: { rows: VenueEntity[] }) {
   const [demo, setDemo] = useState<PageDataState>('data');
@@ -23,6 +47,8 @@ export function VenuesListView({ rows }: { rows: VenueEntity[] }) {
   const [city, setCity] = useState('');
   const [status, setStatus] = useState('');
   const [type, setType] = useState('');
+  const [sortColumn, setSortColumn] = useState<VenueSortColumn | null>(null);
+  const [sortDir, setSortDir] = useState<TableSortDirection>('asc');
 
   const cities = useMemo(() => Array.from(new Set(rows.map((r) => r.city))).sort(), [rows]);
 
@@ -35,6 +61,23 @@ export function VenuesListView({ rows }: { rows: VenueEntity[] }) {
       return true;
     });
   }, [rows, q, city, status, type]);
+
+  const sortedFiltered = useMemo(() => {
+    if (!sortColumn) return filtered;
+    const mult = sortDir === 'asc' ? 1 : -1;
+    return [...filtered].sort(
+      (a, b) => mult * compareSortValues(venueSortValue(sortColumn, a), venueSortValue(sortColumn, b)),
+    );
+  }, [filtered, sortColumn, sortDir]);
+
+  const toggleSort = (key: VenueSortColumn) => {
+    if (sortColumn !== key) {
+      setSortColumn(key);
+      setSortDir('asc');
+      return;
+    }
+    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+  };
 
   return (
     <DataTableShell
@@ -64,17 +107,24 @@ export function VenuesListView({ rows }: { rows: VenueEntity[] }) {
                 <option value="paused">Пауза</option>
               </Select>
             </FilterField>
-            <FilterField label="Тип">
+            <FilterField label="Тип площадки">
               <Select value={type} onChange={(e) => setType(e.target.value)}>
                 <option value="">Все</option>
-                <option value="museum">Музей</option>
-                <option value="theater">Театр</option>
-                <option value="boat">Вода</option>
-                <option value="walking">Пешком</option>
-                <option value="other">Другое</option>
+                <option value="MUSEUM">Музей</option>
+                <option value="GALLERY">Галерея</option>
+                <option value="ART_SPACE">Арт-пространство</option>
+                <option value="EXHIBITION_HALL">Выставочный зал</option>
+                <option value="THEATER">Театр</option>
+                <option value="PALACE">Дворец / усадьба</option>
+                <option value="PARK">Парк / заповедник</option>
               </Select>
             </FilterField>
           </FilterBar>
+          <p className="text-small text-text-muted">
+            Здесь только культурные площадки (как в проде). Причалы, точки старта пеших/водных маршрутов — сущность{' '}
+            <strong>Location</strong> в БД; публичный хаб по речным прогулкам — отдельно (например, раздел «Речные» /
+            причалы), не смешивать с типом музея.
+          </p>
         </div>
       }
     >
@@ -90,17 +140,52 @@ export function VenuesListView({ rows }: { rows: VenueEntity[] }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Площадка</TableHead>
-              <TableHead>Город</TableHead>
-              <TableHead>Статус</TableHead>
-              <TableHead>Тип</TableHead>
-              <TableHead>Quality</TableHead>
-              <TableHead>События</TableHead>
-              <TableHead>Обновлено</TableHead>
+              <SortableTableHead
+                label="Площадка"
+                active={sortColumn === 'name'}
+                direction={sortDir}
+                onToggle={() => toggleSort('name')}
+              />
+              <SortableTableHead
+                label="Город"
+                active={sortColumn === 'city'}
+                direction={sortDir}
+                onToggle={() => toggleSort('city')}
+              />
+              <SortableTableHead
+                label="Статус"
+                active={sortColumn === 'status'}
+                direction={sortDir}
+                onToggle={() => toggleSort('status')}
+              />
+              <SortableTableHead
+                label="Тип"
+                active={sortColumn === 'type'}
+                direction={sortDir}
+                onToggle={() => toggleSort('type')}
+              />
+              <SortableTableHead
+                label="Quality"
+                active={sortColumn === 'quality'}
+                direction={sortDir}
+                onToggle={() => toggleSort('quality')}
+              />
+              <SortableTableHead
+                label="События"
+                active={sortColumn === 'events'}
+                direction={sortDir}
+                onToggle={() => toggleSort('events')}
+              />
+              <SortableTableHead
+                label="Обновлено"
+                active={sortColumn === 'updated'}
+                direction={sortDir}
+                onToggle={() => toggleSort('updated')}
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((v) => (
+            {sortedFiltered.map((v) => (
               <TableRow key={v.id}>
                 <TableCell>
                   <Link to={`/venues/${v.id}`} className="font-medium text-text-primary hover:text-accent">

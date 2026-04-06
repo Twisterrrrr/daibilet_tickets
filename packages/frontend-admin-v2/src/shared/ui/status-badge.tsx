@@ -52,11 +52,13 @@ const LABELS: Record<string, string> = {
   supplier: 'Поставщик',
   import: 'Импорт',
   partner: 'Партнёр',
-  museum: 'Музей',
-  theater: 'Театр',
-  boat: 'Вода',
-  walking: 'Пешком',
-  other: 'Другое',
+  MUSEUM: 'Музей',
+  GALLERY: 'Галерея',
+  ART_SPACE: 'Арт-пространство',
+  EXHIBITION_HALL: 'Выставочный зал',
+  THEATER: 'Театр',
+  PALACE: 'Дворец / усадьба',
+  PARK: 'Парк / заповедник',
 };
 
 function label(key: string): string {
@@ -87,9 +89,11 @@ export function StatusBadge({
     variant = 'default';
   }
 
+  const text = label(value);
+
   return (
     <Badge variant={variant} className={cn(className)}>
-      {label(value)}
+      {text}
     </Badge>
   );
 }

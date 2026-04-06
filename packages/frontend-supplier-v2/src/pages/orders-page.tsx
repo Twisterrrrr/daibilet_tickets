@@ -1,4 +1,5 @@
 import { FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 
 import { useSupplierOrders } from '@/shared/hooks/use-supplier-orders';
@@ -205,7 +206,15 @@ export function OrdersPage() {
               <tbody>
                 {filtered.map((o) => (
                   <tr key={o.id} className="border-b border-border-soft last:border-0">
-                    <td className="px-2 py-2 font-mono text-[11px] text-text-secondary">{o.shortCode || '—'}</td>
+                    <td className="px-2 py-2 font-mono text-[11px] text-text-secondary">
+                      {o.shortCode ? (
+                        <Link className="text-accent underline hover:no-underline" to={`/orders/${o.id}`}>
+                          {o.shortCode}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td className="max-w-[240px] truncate px-2 py-2 text-text-primary">{o.eventTitle || '—'}</td>
                     <td className="px-2 py-2 text-[11px] text-text-secondary">
                       <div>{o.customerName || '—'}</div>

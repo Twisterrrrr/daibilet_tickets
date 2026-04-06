@@ -6,6 +6,7 @@ import {
   EventCategory,
   EventRefundPolicyMode,
   EventSubcategory,
+  LocationType,
   OfferSource,
   OfferStatus,
   PurchaseType,
@@ -16,6 +17,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsISO8601,
   IsNotEmpty,
@@ -143,6 +145,152 @@ export class AdminEventSessionsRangeDto {
   @ValidateNested({ each: true })
   @Type(() => AdminEventSessionRowDto)
   rows!: AdminEventSessionRowDto[];
+}
+
+/** Строка сводки сеансов (кросс-событийный обзор для админки). */
+export class AdminSessionsOverviewRowDto {
+  @ApiProperty()
+  @IsString()
+  sessionId!: string;
+
+  @ApiProperty()
+  @IsString()
+  eventId!: string;
+
+  @ApiProperty()
+  @IsString()
+  eventTitle!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  eventSlug?: string | null;
+
+  @ApiProperty()
+  @IsString()
+  citySlug!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  cityName?: string | null;
+
+  @ApiProperty()
+  @IsString()
+  startsAt!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  endsAt?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  capacity?: number | null;
+
+  @ApiProperty()
+  @IsInt()
+  soldCount!: number;
+
+  @ApiProperty()
+  @IsBoolean()
+  locked!: boolean;
+
+  @ApiPropertyOptional({ enum: ['SOLD', 'PAST', 'IMPORTED', 'OTHER'] })
+  @IsOptional()
+  @IsString()
+  lockReason?: 'SOLD' | 'PAST' | 'IMPORTED' | 'OTHER';
+
+  @ApiProperty()
+  @IsBoolean()
+  isCancelled!: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  canceledAt?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  cancelReason?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  offerId?: string | null;
+
+  @ApiProperty({ description: 'Источник события (MANUAL — допускаются массовые pause/resume)' })
+  @IsString()
+  eventSource!: string;
+
+  @ApiProperty({ description: 'Флаг isActive у сеанса в БД' })
+  @IsBoolean()
+  sessionIsActive!: boolean;
+
+  @ApiProperty({
+    description:
+      'Диагностические флаги: CANCELLED, PAUSED, CAPACITY_ZERO, SOLD_OUT, NO_OFFER_LINK, NO_PRICE',
+    type: [String],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  issues!: string[];
+}
+
+export class AdminSessionsBulkDto {
+  @ApiProperty({ type: [String], description: 'До 100 id за запрос' })
+  @IsArray()
+  @IsString({ each: true })
+  sessionIds!: string[];
+
+  @ApiProperty({ enum: ['pause', 'resume'] })
+  @IsIn(['pause', 'resume'])
+  action!: 'pause' | 'resume';
+}
+
+export class AdminSessionsBulkResultItemDto {
+  @ApiProperty()
+  @IsString()
+  id!: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  ok!: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  error?: string;
+}
+
+export class AdminSessionsBulkResponseDto {
+  @ApiProperty({ type: [AdminSessionsBulkResultItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdminSessionsBulkResultItemDto)
+  results!: AdminSessionsBulkResultItemDto[];
+}
+
+export class AdminSessionsOverviewDto {
+  @ApiProperty()
+  @IsString()
+  from!: string;
+
+  @ApiProperty()
+  @IsString()
+  to!: string;
+
+  @ApiProperty({ description: 'true если строк больше, чем take (есть ещё данные)' })
+  @IsBoolean()
+  truncated!: boolean;
+
+  @ApiProperty({ type: [AdminSessionsOverviewRowDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdminSessionsOverviewRowDto)
+  rows!: AdminSessionsOverviewRowDto[];
 }
 
 export class AdminCreateSessionDto {
@@ -345,6 +493,23 @@ export class PatchEventOfferDto {
 
 // ─── Create Event (with optional nested offer) ─────────────────────
 
+export class LocationProposalDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  title!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional({ enum: LocationType })
+  @IsOptional()
+  @IsEnum(LocationType)
+  type?: LocationType;
+}
+
 export class CreateEventDto {
   @ApiProperty()
   @IsString()
@@ -428,6 +593,20 @@ export class CreateEventDto {
   @IsOptional()
   @IsObject()
   templateData?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Точка старта маршрута (локация в выбранном городе)' })
+  @IsOptional()
+  @IsUUID()
+  startLocationId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Заявка на новую локацию (если не указан startLocationId)',
+    type: LocationProposalDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocationProposalDto)
+  locationProposal?: LocationProposalDto;
 }
 
 export class UpdateEventSlugDto {

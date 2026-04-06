@@ -8,6 +8,7 @@ export const SUPPLIER_API = {
   events: '/supplier/events',
   event: (id: string) => `/supplier/events/${id}`,
   orders: '/supplier/orders',
+  order: (id: string) => `/supplier/orders/${id}`,
   orderConfirm: (id: string) => `/supplier/orders/${id}/confirm`,
   orderReject: (id: string) => `/supplier/orders/${id}/reject`,
 } as const;

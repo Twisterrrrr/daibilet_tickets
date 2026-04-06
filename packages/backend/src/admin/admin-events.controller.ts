@@ -30,6 +30,7 @@ import {
   PurchaseType,
   TagKind,
   EventTagAssignmentSource,
+  SubcategoryLayer,
 } from '@prisma/client';
 import type { Response } from 'express';
 
@@ -48,6 +49,9 @@ import { IsArray, IsOptional, IsString } from 'class-validator';
 import {
   AdminCreateSessionDto,
   AdminEventSessionsRangeDto,
+  AdminSessionsBulkDto,
+  AdminSessionsBulkResponseDto,
+  AdminSessionsOverviewDto,
   AdminStopSessionDto,
   AdminUpdateSessionDto,
   AdminCancelSessionDto,
@@ -73,6 +77,7 @@ import { AuditService } from './audit.service';
 import { toJsonValue } from '../common/typing';
 import { EventTagRulesService } from './event-tag-rules.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
 import { CatalogClassificationNormalizerService } from '../catalog/catalog-classification-normalizer.service';
 
 class UpdateEventTagsDto {
@@ -99,6 +104,17 @@ class UpdateEventSubcategoriesDto {
   subcategorySlugs?: string[];
 }
 
+/** Назначение PRIMARY + SECONDARY по code (источник истины — link-таблица). */
+class AssignEventSubcategoriesDto {
+  @IsString()
+  primaryCode!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  secondaryCodes?: string[];
+}
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -117,6 +133,7 @@ export class AdminEventsController {
     private readonly eventAdminSummary: EventAdminSummaryService,
     private readonly audit: AuditService,
     private readonly subcategoryPolicy: SubcategoryPolicyService,
+    private readonly subcategoryAssignment: SubcategoryAssignmentService,
     private readonly catalogClassificationNormalizer: CatalogClassificationNormalizerService,
     private readonly providerRegistry: ProviderRegistryService,
     private readonly providerRouting: ProviderRoutingService,
@@ -274,6 +291,245 @@ export class AdminEventsController {
       title: e.title,
       cityName: e.city?.name ?? '',
     }));
+  }
+
+  /**
+   * Кросс-событийный обзор сеансов (фильтр по датам и городу).
+   * GET /admin/events/sessions/overview?from&to&city&take&issuesOnly
+   * При issuesOnly=true запрашивается расширенная выборка (до 1500 строк по времени), затем фильтр по непустым issues.
+   */
+  @Get('sessions/overview')
+  @Roles('ADMIN', 'EDITOR')
+  async getSessionsOverview(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('city') citySlug?: string,
+    @Query('take') takeStr?: string,
+    @Query('issuesOnly') issuesOnly?: string,
+  ): Promise<AdminSessionsOverviewDto> {
+    const take = Math.min(500, Math.max(1, parseInt(takeStr ?? '200', 10) || 200));
+    const issuesOnlyBool = issuesOnly === '1' || issuesOnly === 'true' || issuesOnly === 'yes';
+    const fetchLimit = issuesOnlyBool
+      ? Math.min(1500, Math.max(take + 1, take * 6))
+      : take + 1;
+
+    const now = new Date();
+    const fromDate = from ? new Date(from) : now;
+    if (Number.isNaN(fromDate.getTime())) {
+      throw new BadRequestException('Invalid "from" date');
+    }
+    let toDate = to ? new Date(to) : new Date(fromDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(toDate.getTime())) {
+      throw new BadRequestException('Invalid "to" date');
+    }
+    const maxRangeMs = 93 * 24 * 60 * 60 * 1000;
+    if (toDate.getTime() - fromDate.getTime() > maxRangeMs) {
+      toDate = new Date(fromDate.getTime() + maxRangeMs);
+    }
+    if (toDate.getTime() < fromDate.getTime()) {
+      throw new BadRequestException('"to" must be after "from"');
+    }
+
+    const eventWhere: Prisma.EventWhereInput = { isDeleted: false };
+    const cityTrim = citySlug?.trim();
+    if (cityTrim) {
+      eventWhere.city = { slug: cityTrim };
+    }
+
+    const sessions = await this.prisma.eventSession.findMany({
+      where: {
+        startsAt: { gte: fromDate, lte: toDate },
+        event: eventWhere,
+      },
+      take: fetchLimit,
+      orderBy: { startsAt: 'asc' },
+      select: {
+        id: true,
+        startsAt: true,
+        endsAt: true,
+        capacityTotal: true,
+        isActive: true,
+        canceledAt: true,
+        cancelReason: true,
+        offerId: true,
+        prices: true,
+        event: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            source: true,
+            defaultCapacityTotal: true,
+            city: { select: { slug: true, name: true } },
+          },
+        },
+      },
+    });
+
+    const hitFetchCap = sessions.length >= fetchLimit;
+    const sessionIds = sessions.map((s) => s.id);
+
+    const soldBySessionId: Record<string, number> = {};
+    if (sessionIds.length > 0) {
+      const sold = await this.prisma.packageItem.groupBy({
+        by: ['sessionId'],
+        where: {
+          sessionId: { in: sessionIds },
+          status: { in: ['BOOKED', 'CONFIRMED'] },
+        },
+        _sum: {
+          adultTickets: true,
+          childTickets: true,
+        },
+      });
+      for (const row of sold) {
+        soldBySessionId[row.sessionId] = (row._sum.adultTickets ?? 0) + (row._sum.childTickets ?? 0);
+      }
+    }
+
+    const allRows: AdminSessionsOverviewDto['rows'] = sessions.map((s) => {
+      const soldCount = soldBySessionId[s.id] ?? 0;
+      const event = s.event;
+      const base = this.buildAdminSessionRow(
+        {
+          id: s.id,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt ?? null,
+          capacityTotal: s.capacityTotal ?? null,
+          canceledAt: s.canceledAt,
+          cancelReason: s.cancelReason,
+        },
+        { source: event.source, defaultCapacityTotal: event.defaultCapacityTotal ?? null },
+        soldCount,
+      );
+
+      const cap = base.capacity ?? null;
+      const issues: string[] = [];
+      if (s.canceledAt) {
+        issues.push('CANCELLED');
+      } else {
+        if (!s.isActive) issues.push('PAUSED');
+        if (cap !== null && cap <= 0) issues.push('CAPACITY_ZERO');
+        if (cap !== null && cap > 0 && soldCount >= cap) issues.push('SOLD_OUT');
+      }
+      if (!s.offerId) issues.push('NO_OFFER_LINK');
+      const pricesArr = Array.isArray(s.prices) ? s.prices : [];
+      if (pricesArr.length === 0) issues.push('NO_PRICE');
+
+      return {
+        sessionId: s.id,
+        eventId: event.id,
+        eventTitle: event.title,
+        eventSlug: event.slug,
+        citySlug: event.city.slug,
+        cityName: event.city.name,
+        startsAt: base.startsAt,
+        endsAt: base.endsAt,
+        capacity: base.capacity,
+        soldCount: base.soldCount,
+        locked: base.locked,
+        lockReason: base.lockReason,
+        isCancelled: base.isCancelled,
+        canceledAt: base.canceledAt,
+        cancelReason: base.cancelReason,
+        offerId: s.offerId,
+        eventSource: event.source,
+        sessionIsActive: s.isActive,
+        issues,
+      };
+    });
+
+    let rows: AdminSessionsOverviewDto['rows'];
+    let truncated: boolean;
+    if (issuesOnlyBool) {
+      const withIssues = allRows.filter((r) => r.issues.length > 0);
+      truncated = hitFetchCap || withIssues.length > take;
+      rows = withIssues.slice(0, take);
+    } else {
+      truncated = sessions.length > take;
+      rows = truncated ? allRows.slice(0, take) : allRows;
+    }
+
+    return {
+      from: fromDate.toISOString(),
+      to: toDate.toISOString(),
+      truncated,
+      rows,
+    };
+  }
+
+  /**
+   * Массовая пауза / возобновление продажи слотов (только MANUAL, будущие, не отменённые).
+   * POST /admin/events/sessions/bulk
+   */
+  @Post('sessions/bulk')
+  @Roles('ADMIN', 'EDITOR')
+  async bulkSessions(@Body() body: AdminSessionsBulkDto): Promise<AdminSessionsBulkResponseDto> {
+    const uniqueIds = [...new Set(body.sessionIds.map((id) => id.trim()).filter(Boolean))];
+    const ids = uniqueIds.slice(0, 100);
+    if (ids.length === 0) {
+      throw new BadRequestException('sessionIds обязателен');
+    }
+
+    const results: AdminSessionsBulkResponseDto['results'] = [];
+    const now = new Date();
+
+    for (const id of ids) {
+      try {
+        const { session, event } = await this.getSessionWithEvent(id);
+        if (event.source !== 'MANUAL') {
+          results.push({ id, ok: false, error: 'IMPORTED' });
+          continue;
+        }
+        if (session.canceledAt) {
+          results.push({ id, ok: false, error: 'CANCELLED' });
+          continue;
+        }
+        if (session.startsAt < now) {
+          results.push({ id, ok: false, error: 'PAST' });
+          continue;
+        }
+        if (body.action === 'pause') {
+          const soldCount = await this.getSessionSoldCount(id);
+          const cap = session.capacityTotal ?? event.defaultCapacityTotal ?? null;
+          if (cap != null && cap > 0 && soldCount >= cap) {
+            results.push({ id, ok: false, error: 'SOLD_OUT' });
+            continue;
+          }
+          if (!session.isActive) {
+            results.push({ id, ok: true });
+            continue;
+          }
+          await this.prisma.eventSession.update({
+            where: { id },
+            data: { isActive: false },
+          });
+          results.push({ id, ok: true });
+        } else {
+          if (session.isActive) {
+            results.push({ id, ok: true });
+            continue;
+          }
+          await this.prisma.eventSession.update({
+            where: { id },
+            data: { isActive: true },
+          });
+          results.push({ id, ok: true });
+        }
+      } catch (e) {
+        if (e instanceof NotFoundException) {
+          results.push({ id, ok: false, error: 'NOT_FOUND' });
+        } else {
+          results.push({
+            id,
+            ok: false,
+            error: e instanceof Error ? e.message.slice(0, 200) : 'UNKNOWN',
+          });
+        }
+      }
+    }
+
+    return { results };
   }
 
   /**
@@ -479,6 +735,32 @@ export class AdminEventsController {
     const city = await this.prisma.city.findUnique({ where: { id: data.cityId } });
     if (!city) throw new NotFoundException('Город не найден');
 
+    let resolvedStartLocationId: string | undefined;
+    if (data.startLocationId) {
+      const loc = await this.prisma.location.findFirst({
+        where: { id: data.startLocationId, cityId: data.cityId, isActive: true },
+        select: { id: true },
+      });
+      if (!loc) {
+        throw new BadRequestException('Локация не найдена или не относится к выбранному городу');
+      }
+      resolvedStartLocationId = loc.id;
+    }
+
+    const templateBase: Record<string, unknown> =
+      typeof data.templateData === 'object' && data.templateData !== null && !Array.isArray(data.templateData)
+        ? { ...data.templateData }
+        : {};
+
+    if (!resolvedStartLocationId && data.locationProposal?.title?.trim()) {
+      templateBase.pendingLocationProposal = {
+        title: data.locationProposal.title.trim(),
+        address: data.locationProposal.address?.trim() || undefined,
+        type: data.locationProposal.type ?? 'OTHER',
+        submittedAt: new Date().toISOString(),
+      };
+    }
+
     // Create in transaction
     const result = await this.prisma.$transaction(async (tx): Promise<{ event: { id: string }; offer: { id: string } | null }> => {
       // Create event — generate a unique tcEventId for manual events
@@ -502,6 +784,7 @@ export class AdminEventsController {
           imageUrl: data.imageUrl || null,
           galleryUrls: data.galleryUrls || [],
           priceFrom: data.offer?.priceFrom || null,
+          startLocationId: resolvedStartLocationId ?? null,
           isActive: true,
           createdByType: 'ADMIN',
           createdById: req.user.id,
@@ -528,19 +811,19 @@ export class AdminEventsController {
           });
       }
 
-      // Create override with templateData if provided.
+      // Create override with templateData if provided (включая pendingLocationProposal из createEvent).
       // Важно использовать тот же транзакционный клиент (tx), иначе FK на eventId
       // может сработать до коммита события и дать ошибку `event_overrides_eventId_fkey`.
-      if (data.templateData && Object.keys(data.templateData).length > 0) {
+      if (Object.keys(templateBase).length > 0) {
         await tx.eventOverride.upsert({
           where: { eventId: event.id },
           create: {
             eventId: event.id,
-            templateData: toJsonValue(data.templateData),
+            templateData: toJsonValue(templateBase),
             updatedBy: req.user.id,
           },
           update: {
-            templateData: toJsonValue(data.templateData),
+            templateData: toJsonValue(templateBase),
             updatedBy: req.user.id,
           },
         });
@@ -1563,9 +1846,37 @@ export class AdminEventsController {
       orderBy: [{ subcategory: { sortOrder: 'asc' } }, { subcategory: { nameRu: 'asc' } }],
     });
 
-    return links.map((l) => l.subcategory);
+    const primarySubcategory =
+      links.find((l) => l.subcategory.layer === SubcategoryLayer.PRIMARY)?.subcategory ?? null;
+    const secondarySubcategories = links
+      .filter((l) => l.subcategory.layer === SubcategoryLayer.SECONDARY)
+      .map((l) => l.subcategory);
+
+    return {
+      primarySubcategory,
+      secondarySubcategories,
+      /** @deprecated плоский список для старых клиентов */
+      all: links.map((l) => l.subcategory),
+    };
   }
 
+  @Post(':id/subcategories')
+  @Roles('ADMIN', 'EDITOR')
+  async assignEventSubcategoriesPost(@Param('id') id: string, @Body() dto: AssignEventSubcategoriesDto) {
+    const eventExists = await this.prisma.event.findUnique({ where: { id }, select: { id: true } });
+    if (!eventExists) throw new NotFoundException('Событие не найдено');
+
+    await this.prisma.$transaction((tx) =>
+      this.subcategoryAssignment.assignEventSubcategories(id, dto.primaryCode, dto.secondaryCodes ?? [], tx),
+    );
+
+    await this.cacheInvalidation.invalidateEventById(id);
+    return this.getEventSubcategories(id);
+  }
+
+  /**
+   * @deprecated Используйте POST .../subcategories с primaryCode + secondaryCodes. Не пишет legacy Event.subcategories.
+   */
   @Put(':id/subcategories')
   @Roles('ADMIN', 'EDITOR')
   async setEventSubcategories(@Param('id') id: string, @Body() dto: UpdateEventSubcategoriesDto) {

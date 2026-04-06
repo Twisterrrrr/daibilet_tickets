@@ -277,6 +277,11 @@ export function buildDraftFromSupplierEvent(event: any): EventWizardDraft {
       fullDescription: event.description || '',
       coverImageUrl: event.imageUrl || '',
       gallery: Array.isArray(event.galleryUrls) ? event.galleryUrls : [],
+      locationChoice: 'existing',
+      startLocationId: '',
+      locationProposalTitle: '',
+      locationProposalAddress: '',
+      locationProposalType: '',
     },
     schedule: {
       mode: 'single',

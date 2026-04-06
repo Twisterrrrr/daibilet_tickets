@@ -255,11 +255,27 @@ RANGE-партиционирование `event_sessions` по `startsAt` (ме�
 
 Чеклист: happy-path checkout, edge-cases, идемпотентность fulfilment. **Полный операторский чеклист** (скриншоты, шаги проверки): [archive/Gate0-Gate1.md](archive/Gate0-Gate1.md).
 
-### Gate 1 — YooKassa (пока не активирован)
+### Gate 1 — YooKassa
 
-- Заполнить `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` в prod .env.
-- Сменить `PAYMENT_PROVIDER` на `YOOKASSA`.
-- Sandbox на staging → ограниченный prod rollout → полный rollout.
+- Заполнить `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` (из личного кабинета ЮKassa; для проверок обычно используют **тестовый магазин** и тестовые ключи — запросы всё равно идут на `https://api.yookassa.ru/v3/...`).
+- Сменить `PAYMENT_PROVIDER=YOOKASSA` (вместо `STUB`). После правки `.env` **перезапустить backend** (процесс читает env только при старте).
+- При подключённой онлайн-кассе API требует **`receipt`** в теле создания платежа: бэкенд формирует чек (email или телефон покупателя из сессии, одна позиция на полную сумму). Опционально: `YOOKASSA_RECEIPT_VAT_CODE` (по умолчанию `1`), при нескольких СНО — `YOOKASSA_RECEIPT_TAX_SYSTEM_CODE`.
+- **`APP_URL`** — публичный URL **фронта** (куда ЮKassa вернёт пользователя после оплаты), например `https://staging.daibilet.ru` или `http://localhost:3000`. В коде из него собирается `return_url`: `{APP_URL}/checkout/result?session=<checkoutSessionId>`.
+- **Webhook в личном кабинете ЮKassa:** URL вида `https://<ваш-api-хост>/api/v1/checkout/webhook/yookassa` (глобальный префикс Nest — `api/v1`). Для локальной машины нужен туннель (ngrok и т.п.), иначе ЮKassa не достучится.
+- **Проверка IP webhook:** при `NODE_ENV !== 'production'` whitelist отключён (удобно для dev/tunnel). В **production** принимаются только IP из диапазонов ЮKassa (`PaymentService.YOOKASSA_IPS`).
+- **Очередь:** после webhook задача уходит в BullMQ (`QUEUE_FULFILLMENT`). Должны быть запущены **Redis** и **worker**, иначе оплата в БД может не дойти до финала.
+
+#### Быстрый smoke (рекомендуется первым)
+
+1. В `.env` бэкенда (корень монорепо подхватывается в `main.ts`): `PAYMENT_PROVIDER=YOOKASSA`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `APP_URL` как выше.
+2. Фронт: при отдельном origin задать `NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1` (или URL staging API).
+3. Открыть **`/gift-certificate`**: сессия создаётся сразу в **`CONFIRMED`**, затем вызывается `POST .../checkout/:sessionId/pay` — должен вернуться **`paymentUrl`** и редирект на форму ЮKassa.
+4. Оплатить тестовой картой из [документации ЮKassa](https://yookassa.ru/developers/payment-acceptance/testing-and-going-live/testing) (например `5555 5555 5555 4477`).
+5. Убедиться: редирект на `/checkout/result?...`, в логах бэка — обработка webhook, сессия/фулфилмент в нужном статусе.
+
+**Корзина с офферами `REQUEST`:** сессия изначально `PENDING_CONFIRMATION` — до вызова `/pay` нужно **подтвердить заказ из админки** (перевод в `CONFIRMED`). Иначе `createPaymentIntent` вернёт 400.
+
+**Split (transfers):** если у поставщика заполнен `yookassaAccountId`, в создание платежа добавляется `transfers`. Для первого теста проще номинал сертификата или оффер без split.
 
 ---
 

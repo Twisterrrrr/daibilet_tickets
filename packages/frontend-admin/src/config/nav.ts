@@ -3,6 +3,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  CalendarClock,
   LayoutTemplate,
   FolderOpen,
   HeadphonesIcon,
@@ -51,7 +52,12 @@ function buildNavSections(): NavSection[] {
     {
       title: 'Каталог',
       items: [
-        ...(show.events ? [{ to: '/events', label: 'События', icon: CalendarDays, section: 'Каталог' }] : []),
+        ...(show.events
+          ? [
+              { to: '/events', label: 'События', icon: CalendarDays, section: 'Каталог' },
+              { to: '/events/sessions', label: 'Сеансы', icon: CalendarClock, section: 'Каталог' },
+            ]
+          : []),
         { to: '/moderation', label: 'Модерация', icon: ShieldCheck, section: 'Каталог' },
         ...(show.catalog ? [{ to: '/venues', label: 'Площадки', icon: Building2, section: 'Каталог' }] : []),
         ...(show.content ? [{ to: '/cities', label: 'Города', icon: MapPin, section: 'Каталог' }] : []),

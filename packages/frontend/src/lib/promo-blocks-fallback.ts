@@ -1,4 +1,5 @@
 import type { PromoBlockDto } from '@/lib/api';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 
 /** Дефолтный градиент при отсутствии gradientFrom/gradientTo */
 export const PROMO_DEFAULT_GRADIENT = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
@@ -39,7 +40,7 @@ export const PROMO_BLOCKS_FALLBACK: PromoBlockDto[] = [
     slug: 'with-kids',
     title: 'С детьми',
     description: 'Семейные события, музеи и маршруты для отдыха вместе',
-    href: '/events?audience=KIDS',
+    href: catalogEventsHref({ audience: 'KIDS' }),
     iconSource: 'LIBRARY',
     iconKey: 'baby',
     iconSvg: null,
@@ -52,7 +53,7 @@ export const PROMO_BLOCKS_FALLBACK: PromoBlockDto[] = [
     slug: 'museums-and-exhibitions',
     title: 'Музеи и выставки',
     description: 'Проверенные культурные места и интересные экспозиции',
-    href: '/events?category=MUSEUM',
+    href: catalogEventsHref({ category: 'MUSEUM' }),
     iconSource: 'LIBRARY',
     iconKey: 'building-2',
     iconSvg: null,

@@ -69,15 +69,17 @@ export class EventOverrideService {
 
   /**
    * Применить overrides к массиву событий.
-   * Возвращает события с мёрженными данными, фильтрует isHidden.
+   * Возвращает события с мёрженными данными, по умолчанию отфильтровывает isHidden (только списки/каталог).
+   * Для публичной карточки по прямой ссылке: forPublicEventDetail — не отбрасывать скрытые из каталога (без HTTP 404).
    */
   async applyOverrides<T extends Record<string, unknown> & { id: string }>(
     events: T[],
-    options?: { preview?: boolean },
+    options?: { preview?: boolean; forPublicEventDetail?: boolean },
   ): Promise<T[]> {
     if (events.length === 0) return events;
 
     const preview = options?.preview ?? false;
+    const forPublicEventDetail = options?.forPublicEventDetail ?? false;
 
     const eventIds = events.map((e) => e.id);
     const overrides = await this.prisma.eventOverride.findMany({
@@ -99,7 +101,7 @@ export class EventOverrideService {
             })
           | undefined;
         if (!override) return event;
-        if (!preview && (override as { isHidden?: boolean }).isHidden) return null;
+        if (!preview && !forPublicEventDetail && (override as { isHidden?: boolean }).isHidden) return null;
         // Очередь постредакции: не показывать, пока редактор не выставил PUBLISHED
         const status = override.editorStatus;
         if (!preview && status !== undefined && status !== 'PUBLISHED') return null;

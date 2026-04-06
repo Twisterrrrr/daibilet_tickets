@@ -70,6 +70,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       redirect(`/cities/${slug}`);
     }
     try {
+      const route = await api.getSubcategoryLandingRoute(slug, landingSlug);
+      if (route.kind === 'TOPIC_HUB') redirect(route.redirectPath);
+    } catch {
+      /* ignore */
+    }
+    try {
       const sub = await api.getSubcategoryLandingPublished(slug, landingSlug);
       return {
         title: sub.definition.title,
@@ -103,6 +109,12 @@ export default async function LandingPage({ params }: Props) {
       matchesBusToursCanonicalLanding(citySlug, landingSlug)
     ) {
       redirect(`/cities/${citySlug}`);
+    }
+    try {
+      const route = await api.getSubcategoryLandingRoute(citySlug, landingSlug);
+      if (route.kind === 'TOPIC_HUB') redirect(route.redirectPath);
+    } catch {
+      /* ignore */
     }
     try {
       const subPayload = await api.getSubcategoryLandingPublished(citySlug, landingSlug);

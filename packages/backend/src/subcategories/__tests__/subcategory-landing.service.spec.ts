@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { SubcategoryType } from '@prisma/client';
+import { SubcategoryLandingMode, SubcategoryType } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CacheService } from '../../cache/cache.service';
@@ -11,6 +11,18 @@ describe('SubcategoryLandingService', () => {
   let prisma: {
     city: { findFirst: ReturnType<typeof vi.fn> };
     subcategory: { findFirst: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
+  };
+  const baseSub = {
+    id: 's1',
+    code: 'NIGHT',
+    slug: 'night',
+    nameRu: 'Ночные экскурсии',
+    type: SubcategoryType.UNIVERSAL,
+    isActive: true,
+    isLandingEnabled: true,
+    landingMode: SubcategoryLandingMode.AUTO,
+    landingTopicKey: null as string | null,
+    parentId: null,
   };
   let collections: { getEventCollectionBySubcategory: ReturnType<typeof vi.fn> };
   let cache: { get: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn> };
@@ -27,16 +39,7 @@ describe('SubcategoryLandingService', () => {
         }),
       },
       subcategory: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: 's1',
-          code: 'NIGHT',
-          slug: 'night',
-          nameRu: 'Ночные экскурсии',
-          type: SubcategoryType.UNIVERSAL,
-          isActive: true,
-          isLandingEnabled: true,
-          parentId: null,
-        }),
+        findFirst: vi.fn().mockResolvedValue({ ...baseSub }),
         findMany: vi.fn().mockResolvedValue([]),
       },
     };
@@ -76,6 +79,40 @@ describe('SubcategoryLandingService', () => {
 
   it('getPublishedLandingOrThrow throws when not published', async () => {
     await expect(service.getPublishedLandingOrThrow('spb', 'night')).rejects.toThrow(NotFoundException);
+  });
+
+  it('buildLandingPayload: TOPIC_HUB → not published + topicHubRedirect', async () => {
+    prisma.subcategory.findFirst.mockResolvedValue({
+      ...baseSub,
+      code: 'RIVER',
+      landingMode: SubcategoryLandingMode.TOPIC_HUB,
+      landingTopicKey: 'river-cruises',
+    });
+    const p = await service.buildLandingPayload('spb', 'river-excursion', { nocache: true });
+    expect(p.published).toBe(false);
+    expect(p.unpublishedReasons).toContain('TOPIC_HUB_CANONICAL');
+    expect(p.topicHubRedirect).toBe('/river-cruises/spb');
+    expect(collections.getEventCollectionBySubcategory).not.toHaveBeenCalled();
+  });
+
+  it('resolvePublicRoute: TOPIC_HUB', async () => {
+    prisma.subcategory.findFirst.mockResolvedValue({
+      landingMode: SubcategoryLandingMode.TOPIC_HUB,
+      landingTopicKey: 'river-cruises',
+      isActive: true,
+    });
+    const r = await service.resolvePublicRoute('spb', 'river-excursion');
+    expect(r).toEqual({ kind: 'TOPIC_HUB', redirectPath: '/river-cruises/spb' });
+  });
+
+  it('resolvePublicRoute: AUTO', async () => {
+    prisma.subcategory.findFirst.mockResolvedValue({
+      landingMode: SubcategoryLandingMode.AUTO,
+      landingTopicKey: null,
+      isActive: true,
+    });
+    const r = await service.resolvePublicRoute('spb', 'night');
+    expect(r).toEqual({ kind: 'AUTO' });
   });
 
   it('cache: stores only published payloads', async () => {

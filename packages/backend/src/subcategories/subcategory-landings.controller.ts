@@ -10,9 +10,19 @@ import { SubcategoryLandingService } from './subcategory-landing.service';
 export class SubcategoryLandingsController {
   constructor(private readonly landings: SubcategoryLandingService) {}
 
+  @Get(':citySlug/:subcategorySlug/route')
+  @ApiOperation({
+    summary:
+      'Резолв маршрута: TOPIC_HUB → канонический тематический путь; AUTO → можно запрашивать полный payload; иначе NOT_FOUND',
+  })
+  async getRoute(@Param('citySlug') citySlug: string, @Param('subcategorySlug') subcategorySlug: string) {
+    return this.landings.resolvePublicRoute(citySlug, subcategorySlug);
+  }
+
   @Get(':citySlug/:subcategorySlug')
   @ApiOperation({
-    summary: 'Публичный SEO-лендинг по городу и slug подкатегории (только если isLandingEnabled и порог контента)',
+    summary:
+      'Публичный SEO-лендинг по городу и slug подкатегории (только landingMode=AUTO, isLandingEnabled и порог контента)',
   })
   async getPublished(
     @Param('citySlug') citySlug: string,

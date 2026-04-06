@@ -11,6 +11,7 @@ declare var console: { warn: (...args: unknown[]) => void; log: (...args: unknow
 
 // --- Widget Payload Validation ---
 export {
+  addCalendarDaysISO,
   calendarDayFromIso,
   CITY_TIMEZONES,
   dateToISO,
@@ -19,8 +20,11 @@ export {
   getCityTimezone,
   getMoscowTodayISO,
   getMoscowTomorrowISO,
+  getNextWeekendRangeISO,
+  getNextWeekendSatSunISO,
   getTodayISO,
   getTomorrowISO,
+  getWeekdaySun0FromYmdInTz,
   moscowCalendarDayFromIso,
 } from './moscow-calendar';
 export { shortenAddressToStreet } from './address-utils';
@@ -409,12 +413,19 @@ export interface CityListItem {
   museumCount?: number;
 }
 
+/** Публичная ссылка на подкатегорию (источник истины — M:N + code). */
+export type SubcategoryRefPublic = { code: string; nameRu: string };
+
 export interface EventListItem {
   id: string;
   slug: string;
   title: string;
   category: EventCategory;
   subcategories: EventSubcategory[];
+  /** Основной формат (PRIMARY), если задан через link-таблицу. */
+  primarySubcategory?: SubcategoryRefPublic | null;
+  /** Доп. подкатегории (SECONDARY). */
+  secondarySubcategories?: SubcategoryRefPublic[];
   audience: EventAudience;
   imageUrl: string | null;
   priceFrom: number | null;
@@ -476,6 +487,8 @@ export interface CatalogItemEvent extends CatalogItemBase {
   startsAt?: string | null;
   durationMinutes?: number | null;
   subcategories?: EventSubcategory[];
+  primarySubcategory?: SubcategoryRefPublic | null;
+  secondarySubcategories?: SubcategoryRefPublic[];
   audience?: EventAudience;
   tagSlugs?: string[];
   reviewCount?: number;
@@ -872,6 +885,8 @@ export interface VenueListItem {
 
 export interface VenueDetail extends VenueListItem {
   cityId?: string;
+  primarySubcategory?: SubcategoryRefPublic | null;
+  secondarySubcategories?: SubcategoryRefPublic[];
   description?: string | null;
   shortDescription?: string | null;
   galleryUrls: string[];

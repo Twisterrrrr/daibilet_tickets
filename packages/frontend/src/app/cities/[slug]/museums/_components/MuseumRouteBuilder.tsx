@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { catalogEventsHref } from '@/lib/catalog-events-url';
+
 interface MuseumRouteBuilderProps {
   citySlug: string;
   anchors: string[];
@@ -38,7 +40,7 @@ export function MuseumRouteBuilder({ citySlug }: MuseumRouteBuilderProps) {
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Link
-          href="/events?city=saint-petersburg&category=EXCURSION"
+          href={catalogEventsHref({ city: citySlug, category: 'EXCURSION' })}
           className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
         >
           Посмотреть экскурсии

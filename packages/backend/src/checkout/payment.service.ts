@@ -14,8 +14,8 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as Sentry from '@sentry/nestjs';
 import { ConfigService } from '@nestjs/config';
-import { PaymentMode, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { PaymentMode, Prisma } from '@prisma/client';
 
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -232,12 +232,18 @@ export class PaymentService {
           : 'STUB payment — POST /checkout/payment/:id/simulate-paid для имитации',
       };
     } else if (this.provider === 'YOOKASSA') {
+      const receiptLine = giftCert
+        ? 'Подарочный сертификат'
+        : `Заказ ${session.shortCode}`;
       const ykResult = await this.createYookassaPayment({
         amount: grossAmount,
         currency: 'RUB',
         idempotencyKey: key,
         returnUrl: `${this.appUrl}/checkout/result?session=${checkoutSessionId}`,
         description: `Заказ ${session.shortCode}`,
+        customerEmail: session.customerEmail,
+        customerPhone: session.customerPhone,
+        receiptLineDescription: receiptLine,
         metadata: {
           paymentIntentId: key,
           checkoutSessionId: String(checkoutSessionId),
@@ -587,6 +593,76 @@ export class PaymentService {
   // ============================================
 
   /**
+   * Покупатель для чека ЮKassa: email или телефон в формате +7… (требование 54-ФЗ при онлайн-кассе).
+   */
+  private yookassaReceiptCustomer(
+    email: string | null | undefined,
+    phone: string | null | undefined,
+  ): Record<string, string> {
+    const em = email?.trim();
+    if (em && em.includes('@')) {
+      return { email: em };
+    }
+    const digits = (phone ?? '').replace(/\D/g, '');
+    if (digits.length >= 10) {
+      let d = digits;
+      if (d.length === 11 && d.startsWith('8')) {
+        d = `7${d.slice(1)}`;
+      } else if (d.length === 10) {
+        d = `7${d}`;
+      }
+      if (d.startsWith('7') && d.length === 11) {
+        return { phone: `+${d}` };
+      }
+    }
+    throw new BadRequestException(
+      'Для оплаты через ЮKassa укажите email или корректный телефон покупателя (нужно для фискального чека).',
+    );
+  }
+
+  /**
+   * Чек для create payment (одна позиция на полную сумму — совпадает с amount платежа).
+   */
+  private buildYookassaReceiptPayload(params: {
+    amountKopecks: number;
+    currency: string;
+    customerEmail: string | null | undefined;
+    customerPhone: string | null | undefined;
+    lineDescription: string;
+  }): Record<string, unknown> {
+    const customer = this.yookassaReceiptCustomer(params.customerEmail, params.customerPhone);
+    const vatRaw = this.config.get<string>('YOOKASSA_RECEIPT_VAT_CODE', '1');
+    const vatParsed = Number.parseInt(vatRaw, 10);
+    const vatCode =
+      Number.isFinite(vatParsed) && vatParsed >= 1 && vatParsed <= 6 ? vatParsed : 1;
+    const desc = (params.lineDescription.trim() || 'Оплата заказа').slice(0, 128);
+    const receipt: Record<string, unknown> = {
+      customer,
+      items: [
+        {
+          description: desc,
+          quantity: '1.000',
+          amount: {
+            value: (params.amountKopecks / 100).toFixed(2),
+            currency: params.currency,
+          },
+          vat_code: vatCode,
+          payment_mode: 'full_payment',
+          payment_subject: 'service',
+        },
+      ],
+    };
+    const taxSystem = this.config.get<string>('YOOKASSA_RECEIPT_TAX_SYSTEM_CODE')?.trim();
+    if (taxSystem) {
+      const n = Number.parseInt(taxSystem, 10);
+      if (Number.isFinite(n)) {
+        receipt.tax_system_code = n;
+      }
+    }
+    return receipt;
+  }
+
+  /**
    * Создать платёж в YooKassa.
    * https://yookassa.ru/developers/api#create_payment
    */
@@ -596,11 +672,26 @@ export class PaymentService {
     idempotencyKey: string;
     returnUrl: string;
     description: string;
+    customerEmail: string | null | undefined;
+    customerPhone: string | null | undefined;
+    receiptLineDescription: string;
     metadata: Record<string, string>;
     supplierId: string | null;
     supplierAmount: number | null;
   }): Promise<{ paymentId: string; confirmationUrl: string; rawResponse: Record<string, unknown> }> {
-    const { amount, currency, idempotencyKey, returnUrl, description, metadata, supplierId, supplierAmount } = params;
+    const {
+      amount,
+      currency,
+      idempotencyKey,
+      returnUrl,
+      description,
+      metadata,
+      supplierId,
+      supplierAmount,
+      customerEmail,
+      customerPhone,
+      receiptLineDescription,
+    } = params;
 
     // Build request body
     const body: Record<string, unknown> = {
@@ -615,6 +706,13 @@ export class PaymentService {
       },
       description,
       metadata,
+      receipt: this.buildYookassaReceiptPayload({
+        amountKopecks: amount,
+        currency,
+        customerEmail,
+        customerPhone,
+        lineDescription: receiptLineDescription,
+      }),
     };
 
     // Marketplace split: transfers to supplier
@@ -684,8 +782,10 @@ export class PaymentService {
     amount: number;
     currency?: string;
     description?: string;
+    /** Один и тот же ключ на все retry одной операции возврата (Idempotence-Key в ЮKassa). */
+    idempotencyKey: string;
   }): Promise<{ refundId: string; status: string; rawResponse: Record<string, unknown> }> {
-    const { providerPaymentId, amount, currency = 'RUB', description } = params;
+    const { providerPaymentId, amount, currency = 'RUB', description, idempotencyKey } = params;
 
     const body: Record<string, unknown> = {
       payment_id: providerPaymentId,
@@ -697,7 +797,6 @@ export class PaymentService {
     if (description) body.description = description;
 
     const auth = Buffer.from(`${this.yookassaShopId}:${this.yookassaSecretKey}`).toString('base64');
-    const idempotencyKey = randomUUID();
 
     const response = await fetch('https://api.yookassa.ru/v3/refunds', {
       method: 'POST',

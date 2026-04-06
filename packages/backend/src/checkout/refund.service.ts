@@ -52,6 +52,7 @@ export class RefundService {
         providerPaymentId: intent.providerPaymentId,
         amount: intent.amount,
         description: reason,
+        idempotencyKey: `refund:intent:${intentId}`,
       });
       refundId = ykResult.refundId;
     }
@@ -126,10 +127,15 @@ export class RefundService {
     // YooKassa partial refund
     let refundId: string | null = null;
     if (intent.provider === 'YOOKASSA' && intent.providerPaymentId) {
+      const itemKey = failedItems
+        .map((item) => item.id)
+        .sort()
+        .join(',');
       const ykResult = await this.paymentService.createYookassaRefund({
         providerPaymentId: intent.providerPaymentId,
         amount: refundAmount,
         description: `Частичный возврат: ${reason}`,
+        idempotencyKey: `refund:intent:${intent.id}:items:${itemKey}`,
       });
       refundId = ykResult.refundId;
     }

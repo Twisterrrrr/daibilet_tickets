@@ -1,6 +1,8 @@
 import { LayoutDashboard, Plus } from 'lucide-react';
 
 import { DashboardOverviewView } from '@/features/dashboard-overview/dashboard-overview';
+import { blueprintDashboard } from '@/shared/config/admin-v2-blueprints';
+import { IntegrationBlueprint } from '@/shared/layout/admin-v2-blueprint';
 import { ListPageLayout } from '@/shared/layout/list-page-layout';
 import { PageGlyph } from '@/shared/ui/page-glyph';
 import { getMockDashboardOverview } from '@/shared/mock/dashboard';
@@ -25,6 +27,7 @@ export function DashboardPage() {
           </Button>
         </>
       }
+      blueprint={<IntegrationBlueprint {...blueprintDashboard} />}
     >
       <DashboardOverviewView data={overview} />
     </ListPageLayout>

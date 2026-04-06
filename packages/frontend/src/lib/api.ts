@@ -33,6 +33,7 @@ import type {
   MultiEventDetailDto,
   MultiEventListItemDto,
   MultiEventSort,
+  SubcategoryLandingRoutePayload,
 } from './api.types';
 
 /**
@@ -400,6 +401,12 @@ export const api = {
 
   getCatalogLandingByCityAndSlug: (citySlug: string, slug: string) =>
     fetchApi<LandingPageResponse>(`/catalog/landings/${encodeURIComponent(citySlug)}/${encodeURIComponent(slug)}`),
+
+  /** Резолв: TOPIC_HUB → редирект на тематический хаб; AUTO → можно запрашивать published payload */
+  getSubcategoryLandingRoute: (citySlug: string, subcategorySlug: string) =>
+    fetchApi<SubcategoryLandingRoutePayload>(
+      `/landings/subcategories/${encodeURIComponent(citySlug)}/${encodeURIComponent(subcategorySlug)}/route`,
+    ),
 
   /** SEO-лендинг по подкатегории + городу (только опубликованные; иначе 404) */
   getSubcategoryLandingPublished: (citySlug: string, subcategorySlug: string) =>

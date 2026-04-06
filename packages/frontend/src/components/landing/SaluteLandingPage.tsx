@@ -7,6 +7,7 @@ import { Shield, Star, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { FilterBar } from '@/components/landing/FilterBar';
+import type { CatalogEventsUrlParams } from '@/lib/catalog-events-url';
 import { FaqSection } from '@/components/landing/FaqSection';
 import { HowToChoose, InfoBlocks, ReviewsSection } from '@/components/landing/ContentSections';
 import { SaluteTripCard } from '@/components/landing/SaluteTripCard';
@@ -110,11 +111,13 @@ export function SaluteLandingPage({
   content,
   events,
   filterOptions,
+  catalogEventsBaseParams,
 }: {
   city: CityLite;
   content: SaluteLandingContent;
   events: EventListItem[];
   filterOptions: { piers: string[]; priceRange: [number, number]; dates: string[] };
+  catalogEventsBaseParams?: CatalogEventsUrlParams;
 }) {
   const ianaTimeZone = useMemo(() => getCityTimezone(city?.slug ?? null), [city?.slug]);
 
@@ -295,6 +298,11 @@ export function SaluteLandingPage({
           ianaTimeZone={ianaTimeZone}
           timeSlotMode="hidden"
           onFilterChange={setFilters}
+          catalogEventsContext={
+            city?.slug
+              ? { citySlug: city.slug, baseParams: catalogEventsBaseParams }
+              : undefined
+          }
         />
 
         <div className="flex flex-wrap items-center gap-3">

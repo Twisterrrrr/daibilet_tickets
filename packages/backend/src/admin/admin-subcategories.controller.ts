@@ -11,23 +11,35 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { SubcategoryType } from '@prisma/client';
+import { EventCategory, SubcategoryLandingMode, SubcategoryLayer, SubcategoryType } from '@prisma/client';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import {
+  EVENT_PRIMARY_CODES_BY_CATEGORY,
+  VENUE_PRIMARY_CODES,
+} from '../subcategories/subcategory-assignment.constants';
 
 class UpsertSubcategoryDto {
   @IsString()
   slug!: string;
+
+  @IsOptional()
+  @IsString()
+  code?: string;
 
   @IsString()
   nameRu!: string;
 
   @IsEnum(SubcategoryType)
   type!: SubcategoryType;
+
+  @IsOptional()
+  @IsEnum(SubcategoryLayer)
+  layer?: SubcategoryLayer;
 
   @IsOptional()
   @IsString()
@@ -40,6 +52,14 @@ class UpsertSubcategoryDto {
   @IsOptional()
   @IsBoolean()
   isLandingEnabled?: boolean;
+
+  @IsOptional()
+  @IsEnum(SubcategoryLandingMode)
+  landingMode?: SubcategoryLandingMode;
+
+  @IsOptional()
+  @IsString()
+  landingTopicKey?: string | null;
 
   @IsOptional()
   @IsInt()
@@ -68,9 +88,79 @@ export class AdminSubcategoriesController {
   async list(
     @Query('type') type?: string,
     @Query('forEntity') forEntity?: string,
+    @Query('entity') entity?: string,
+    @Query('layer') layer?: string,
     @Query('includeInactive') includeInactive?: string,
   ) {
     const includeInactiveBool = includeInactive === '1' || includeInactive === 'true';
+    const entityNorm = (entity ?? forEntity)?.toLowerCase();
+    const layerNorm = layer?.toUpperCase();
+
+    const baseWhere = includeInactiveBool ? {} : { isActive: true };
+
+    if (layerNorm === 'PRIMARY' && entityNorm === 'event' && type) {
+      const cat = type.toUpperCase() as EventCategory;
+      const codes = EVENT_PRIMARY_CODES_BY_CATEGORY[cat];
+      if (!codes) {
+        throw new BadRequestException(`Неизвестная категория события для type=${type}`);
+      }
+      return this.prisma.subcategory.findMany({
+        where: {
+          ...baseWhere,
+          layer: SubcategoryLayer.PRIMARY,
+          type: SubcategoryType.EVENT_ONLY,
+          code: { in: [...codes] },
+        },
+        include: {
+          parent: { select: { id: true, slug: true, nameRu: true } },
+        },
+        orderBy: [{ sortOrder: 'asc' }, { nameRu: 'asc' }],
+      });
+    }
+
+    if (layerNorm === 'PRIMARY' && entityNorm === 'venue') {
+      return this.prisma.subcategory.findMany({
+        where: {
+          ...baseWhere,
+          layer: SubcategoryLayer.PRIMARY,
+          type: SubcategoryType.VENUE_ONLY,
+          code: { in: [...VENUE_PRIMARY_CODES] },
+        },
+        include: {
+          parent: { select: { id: true, slug: true, nameRu: true } },
+        },
+        orderBy: [{ sortOrder: 'asc' }, { nameRu: 'asc' }],
+      });
+    }
+
+    if (layerNorm === 'SECONDARY' && entityNorm === 'event') {
+      return this.prisma.subcategory.findMany({
+        where: {
+          ...baseWhere,
+          layer: SubcategoryLayer.SECONDARY,
+          type: { in: [SubcategoryType.UNIVERSAL, SubcategoryType.EVENT_ONLY] },
+        },
+        include: {
+          parent: { select: { id: true, slug: true, nameRu: true } },
+        },
+        orderBy: [{ sortOrder: 'asc' }, { nameRu: 'asc' }],
+      });
+    }
+
+    if (layerNorm === 'SECONDARY' && entityNorm === 'venue') {
+      return this.prisma.subcategory.findMany({
+        where: {
+          ...baseWhere,
+          layer: SubcategoryLayer.SECONDARY,
+          type: { in: [SubcategoryType.UNIVERSAL, SubcategoryType.VENUE_ONLY] },
+        },
+        include: {
+          parent: { select: { id: true, slug: true, nameRu: true } },
+        },
+        orderBy: [{ sortOrder: 'asc' }, { nameRu: 'asc' }],
+      });
+    }
+
     const types = this.resolveTypes(type, forEntity);
 
     return this.prisma.subcategory.findMany({
@@ -128,6 +218,9 @@ export class AdminSubcategoriesController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() dto: UpsertSubcategoryDto) {
+    if (!dto.code?.trim()) {
+      throw new BadRequestException('Поле code обязательно при создании подкатегории');
+    }
     const parent = dto.parentId
       ? await this.prisma.subcategory.findUnique({ where: { id: dto.parentId }, select: { id: true, parentId: true, type: true } })
       : null;
@@ -136,14 +229,23 @@ export class AdminSubcategoriesController {
       this.subcategoryPolicy.assertDepth(Boolean(parent.parentId));
       this.subcategoryPolicy.assertParentTypeCompatibility(dto.type, parent.type);
     }
+    const code = dto.code.trim().toUpperCase();
+    const isLandingEnabled = dto.isLandingEnabled ?? true;
+    const landingMode =
+      dto.landingMode ??
+      (isLandingEnabled ? SubcategoryLandingMode.AUTO : SubcategoryLandingMode.DISABLED);
     return this.prisma.subcategory.create({
       data: {
         slug: dto.slug.trim().toLowerCase(),
+        code,
         nameRu: dto.nameRu.trim(),
         type: dto.type,
+        layer: dto.layer ?? SubcategoryLayer.SECONDARY,
         parentId: dto.parentId ?? null,
         isActive: dto.isActive ?? true,
-        isLandingEnabled: dto.isLandingEnabled ?? true,
+        isLandingEnabled,
+        landingMode,
+        landingTopicKey: dto.landingTopicKey?.trim() || null,
         sortOrder: dto.sortOrder ?? 0,
       },
     });
@@ -184,11 +286,17 @@ export class AdminSubcategoriesController {
       where: { id },
       data: {
         ...(dto.slug !== undefined ? { slug: dto.slug.trim().toLowerCase() } : {}),
+        ...(dto.code !== undefined ? { code: dto.code.trim().toUpperCase() } : {}),
         ...(dto.nameRu !== undefined ? { nameRu: dto.nameRu.trim() } : {}),
         ...(dto.type !== undefined ? { type: dto.type } : {}),
+        ...(dto.layer !== undefined ? { layer: dto.layer } : {}),
         ...(dto.parentId !== undefined ? { parentId: dto.parentId } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         ...(dto.isLandingEnabled !== undefined ? { isLandingEnabled: dto.isLandingEnabled } : {}),
+        ...(dto.landingMode !== undefined ? { landingMode: dto.landingMode } : {}),
+        ...(dto.landingTopicKey !== undefined
+          ? { landingTopicKey: dto.landingTopicKey?.trim() || null }
+          : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
       },
     });

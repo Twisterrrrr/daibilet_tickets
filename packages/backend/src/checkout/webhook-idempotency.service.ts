@@ -1,15 +1,14 @@
 /**
  * Webhook Idempotency Service — защита от повторной обработки webhook.
  *
- * Использует таблицу ProcessedWebhookEvent с unique constraint на providerEventId.
- * Гарантия: один и тот же webhook обрабатывается ровно один раз.
+ * Использует таблицу ProcessedWebhookEvent с unique constraint на dedupeKey
+ * (например `payment.succeeded:<uuid>`), чтобы разные типы событий по одному payment.id
+ * не перетирали друг друга.
  *
  * Паттерн:
- *   const result = await idempotency.processOnce(eventId, 'YOOKASSA', 'payment.succeeded', payload, async () => {
- *     // Обработка — выполняется только если eventId ещё не обрабатывался
+ *   const result = await idempotency.processOnce(dedupeKey, 'YOOKASSA', 'payment.succeeded', payload, async () => {
  *     return 'PAID';
- *   });
- *   // result.processed = false → дубликат, пропущен
+ *   }, { providerObjectId: '...', paymentIntentId: '...' });
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -24,6 +23,12 @@ export interface ProcessOnceResult {
   result: string;
 }
 
+export interface ProcessOnceOptions {
+  /** object.id провайдера — в БД как providerEventId */
+  providerObjectId?: string;
+  paymentIntentId?: string;
+}
+
 @Injectable()
 export class WebhookIdempotencyService {
   private readonly logger = new Logger(WebhookIdempotencyService.name);
@@ -33,51 +38,48 @@ export class WebhookIdempotencyService {
   /**
    * Обработать webhook ровно один раз.
    *
-   * @param providerEventId — уникальный ID события от провайдера (payment.id от YK, order.id от TC)
+   * @param dedupeKey — уникальный ключ доставки (eventType:object.id для ЮKassa)
    * @param provider — имя провайдера (YOOKASSA, TC, PARTNER)
    * @param eventType — тип события (payment.succeeded, payment.canceled, etc.)
    * @param payload — полный payload webhook для аудита
    * @param handler — функция обработки, вызывается ТОЛЬКО если событие ещё не обрабатывалось
-   * @returns ProcessOnceResult
    */
   async processOnce(
-    providerEventId: string,
+    dedupeKey: string,
     provider: string,
     eventType: string,
     payload: unknown,
     handler: () => Promise<string>,
-    paymentIntentId?: string,
+    options?: ProcessOnceOptions,
   ): Promise<ProcessOnceResult> {
-    // 1. Проверяем — уже обрабатывали?
+    const providerObjectId = options?.providerObjectId ?? dedupeKey;
+    const paymentIntentId = options?.paymentIntentId;
+
     const existing = await this.prisma.processedWebhookEvent.findUnique({
-      where: { providerEventId },
+      where: { dedupeKey },
     });
 
     if (existing) {
       this.logger.debug(
-        `Webhook duplicate skipped: provider=${provider}, eventId=${providerEventId}, previousResult=${existing.result}`,
+        `Webhook duplicate skipped: provider=${provider}, dedupeKey=${dedupeKey}, previousResult=${existing.result}`,
       );
       return { processed: false, result: existing.result || 'UNKNOWN' };
     }
 
-    // 2. Обрабатываем
     let result: string;
     try {
       result = await handler();
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Webhook handler failed: provider=${provider}, eventId=${providerEventId}, error=${msg}`);
-
-      // Записываем FAILED, чтобы повторная доставка могла быть обработана
-      // (не записываем → позволяем retry от провайдера)
+      this.logger.error(`Webhook handler failed: provider=${provider}, dedupeKey=${dedupeKey}, error=${msg}`);
       throw error;
     }
 
-    // 3. Записываем факт обработки (идемпотентность через unique constraint)
     try {
       await this.prisma.processedWebhookEvent.create({
         data: {
-          providerEventId,
+          dedupeKey,
+          providerEventId: providerObjectId,
           provider,
           eventType,
           payload: payload as unknown as Prisma.InputJsonValue,
@@ -86,11 +88,10 @@ export class WebhookIdempotencyService {
         },
       });
     } catch (error) {
-      // Unique constraint violation = параллельная обработка, кто-то успел первым
       if ((error as Record<string, unknown>)?.code === 'P2002') {
-        this.logger.warn(`Webhook race condition (concurrent): provider=${provider}, eventId=${providerEventId}`);
+        this.logger.warn(`Webhook race condition (concurrent): provider=${provider}, dedupeKey=${dedupeKey}`);
         const race = await this.prisma.processedWebhookEvent.findUnique({
-          where: { providerEventId },
+          where: { dedupeKey },
         });
         return { processed: false, result: race?.result || 'RACE_CONDITION' };
       }
@@ -98,7 +99,7 @@ export class WebhookIdempotencyService {
     }
 
     this.logger.log(
-      `[provider=${provider}] [eventId=${providerEventId}] [eventType=${eventType}]` +
+      `[provider=${provider}] [dedupeKey=${dedupeKey}] [eventType=${eventType}]` +
         (paymentIntentId ? ` [intent=${paymentIntentId}]` : '') +
         ` Webhook processed: result=${result}`,
     );
@@ -107,11 +108,11 @@ export class WebhookIdempotencyService {
   }
 
   /**
-   * Проверить, был ли webhook уже обработан (без выполнения).
+   * Проверить, был ли webhook с данным dedupeKey уже обработан.
    */
-  async isProcessed(providerEventId: string): Promise<boolean> {
+  async isProcessed(dedupeKey: string): Promise<boolean> {
     const existing = await this.prisma.processedWebhookEvent.findUnique({
-      where: { providerEventId },
+      where: { dedupeKey },
       select: { id: true },
     });
     return !!existing;

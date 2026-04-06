@@ -4,6 +4,20 @@
 
 ---
 
+## 06.04.2026 — Subcategory: landingMode, TOPIC_HUB (RIVER → river-cruises), routing policy
+
+### Наблюдения
+
+- Сегмент `/cities/{city}/{slug}` общий для CMS-лендингов и auto-subcategory; без явного приоритета и whitelist генератор может дублировать уже существующие мультилендинги (река).
+
+### Решения
+
+- В `Subcategory`: enum `SubcategoryLandingMode` (DISABLED | AUTO | TOPIC_HUB), поле `landingTopicKey`. Generic SEO только при `AUTO`; `TOPIC_HUB` резолвится в тематический путь (`GET .../route`, маппинг в `subcategory-landing-topic-hubs.ts`). Канонический сид `prisma/seeds/subcategories-canonical.seed.ts` + вызов из `seed.ts` после сброса parentId. Документация: `Architecture.md` §3.4.1, `Project.md` (Collections bullet).
+
+### Проблемы
+
+- Смена slug у части PRIMARY в сиде ломает старые закладки; обратная совместимость — редиректы/алиасы отдельно при необходимости.
+
 ## 05.04.2026 — MVP возвратов по позициям FulfillmentItem (RefundRequest)
 
 ### Наблюдения

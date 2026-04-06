@@ -1,5 +1,13 @@
 'use client';
 
+import {
+  addCalendarDaysISO,
+  DEFAULT_CALENDAR_TZ,
+  getNextWeekendSatSunISO,
+  getTodayISO,
+  getTomorrowISO,
+  getWeekdaySun0FromYmdInTz,
+} from '@daibilet/shared';
 import { Calendar, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -8,53 +16,30 @@ interface DateRibbonProps {
   selected: string | null;
   /** Вызывается при выборе даты или сбросе (null) */
   onChange: (date: string | null) => void;
+  /** IANA TZ для «сегодня», ленты дней и выходных (как FilterBar / календарь города) */
+  ianaTimeZone?: string;
 }
 
 /** Кол-во дней в ленте (сегодня + 13 дней вперёд) */
 const DAYS_COUNT = 14;
 
-/** Форматировать Date в yyyy-mm-dd */
-function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+function weekdayShortFromIso(iso: string, tz: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).toLocaleDateString('ru-RU', {
+    weekday: 'short',
+    timeZone: tz,
+  });
 }
 
-/** День недели сокращённо (пн, вт...) */
-function weekdayShort(d: Date): string {
-  return d.toLocaleDateString('ru-RU', { weekday: 'short' });
-}
-
-/** Число + месяц ("12 фев") */
-function dayMonth(d: Date): string {
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-}
-
-/** Проверить, является ли дата сегодня/завтра */
-function getDayLabel(d: Date, today: Date): string | null {
-  const t = new Date(today);
-  t.setHours(0, 0, 0, 0);
-  const diff = Math.floor((d.getTime() - t.getTime()) / 86400000);
-  if (diff === 0) return 'Сегодня';
-  if (diff === 1) return 'Завтра';
-  return null;
-}
-
-/** Проверить, является ли дата выходным (сб/вс) */
-function isWeekend(d: Date): boolean {
-  const day = d.getDay();
-  return day === 0 || day === 6;
-}
-
-/** Найти ближайшие выходные (сб+вс), вернуть ISO-строки */
-function getNextWeekend(today: Date): [string, string] {
-  const d = new Date(today);
-  d.setHours(0, 0, 0, 0);
-  const dayOfWeek = d.getDay();
-  const daysToSat = dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek;
-  const sat = new Date(d);
-  sat.setDate(d.getDate() + daysToSat);
-  const sun = new Date(sat);
-  sun.setDate(sat.getDate() + 1);
-  return [toISODate(sat), toISODate(sun)];
+function dayMonthFromIso(iso: string, tz: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0)).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: tz,
+  });
 }
 
 /** Понедельник = 0 */
@@ -78,11 +63,22 @@ const MONTHS = [
   'Декабрь',
 ];
 
-export function DateRibbon({ selected, onChange }: DateRibbonProps) {
+export function DateRibbon({
+  selected,
+  onChange,
+  ianaTimeZone = DEFAULT_CALENDAR_TZ,
+}: DateRibbonProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
-  const today = useMemo(() => new Date(), []);
-  const todayISO = useMemo(() => toISODate(today), [today]);
+  const nowAnchor = useMemo(() => new Date(), []);
+  const todayISO = useMemo(
+    () => getTodayISO(ianaTimeZone, nowAnchor),
+    [ianaTimeZone, nowAnchor],
+  );
+  const tomorrowISO = useMemo(
+    () => getTomorrowISO(ianaTimeZone, nowAnchor),
+    [ianaTimeZone, nowAnchor],
+  );
 
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [displayMonth, setDisplayMonth] = useState(() => {
@@ -92,27 +88,25 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
     return d;
   });
 
-  // Генерируем дни
   const days = useMemo(() => {
-    const result: { date: Date; iso: string; label: string | null; isWeekend: boolean }[] = [];
+    const result: { iso: string; label: string | null; isWeekend: boolean }[] = [];
     for (let i = 0; i < DAYS_COUNT; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      d.setHours(0, 0, 0, 0);
-      result.push({
-        date: d,
-        iso: toISODate(d),
-        label: getDayLabel(d, today),
-        isWeekend: isWeekend(d),
-      });
+      const iso = addCalendarDaysISO(todayISO, i, ianaTimeZone);
+      const label =
+        iso === todayISO ? 'Сегодня' : iso === tomorrowISO ? 'Завтра' : null;
+      const dow = getWeekdaySun0FromYmdInTz(iso, ianaTimeZone);
+      const isWeekend = dow === 0 || dow === 6;
+      result.push({ iso, label, isWeekend });
     }
     return result;
-  }, [today]);
+  }, [todayISO, tomorrowISO, ianaTimeZone]);
 
-  const [weekendSat, weekendSun] = useMemo(() => getNextWeekend(today), [today]);
+  const [weekendSat, weekendSun] = useMemo(
+    () => getNextWeekendSatSunISO(ianaTimeZone, nowAnchor),
+    [ianaTimeZone, nowAnchor],
+  );
   const isWeekendSelected = selected === weekendSat || selected === `${weekendSat}..${weekendSun}`;
 
-  // Авто-скролл к выбранному элементу
   useEffect(() => {
     if (!selected || !scrollRef.current) return;
     const el = scrollRef.current.querySelector(`[data-date="${selected.split('..')[0]}"]`);
@@ -124,11 +118,9 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
   const isOtherDateSelected =
     selected && !days.some((d) => d.iso === selected) && selected !== `${weekendSat}..${weekendSun}`;
 
-  /** Подсветка в попапе — только для даты, выбранной через «Другая дата», не с ленты Сегодня/Завтра */
   const calendarSelectedIso =
     isOtherDateSelected && selected && selected.length === 10 && !selected.includes('..') ? selected : null;
 
-  // Месяц в календаре: только если выбрана кастомная дата (иначе текущий месяц при открытии)
   useEffect(() => {
     if (calendarOpen && calendarSelectedIso) {
       const [y, m] = calendarSelectedIso.split('-').map(Number);
@@ -141,7 +133,6 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
     }
   }, [calendarOpen, calendarSelectedIso]);
 
-  // Клик снаружи — закрыть календарь
   useEffect(() => {
     if (!calendarOpen) return;
     const onOutside = (e: MouseEvent) => {
@@ -200,7 +191,6 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
         ref={scrollRef}
         className="flex flex-1 min-w-0 items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory"
       >
-        {/* "Все даты" — сброс */}
         <button
           onClick={() => onChange(null)}
           className={`flex shrink-0 snap-start items-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -213,7 +203,6 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
           Все даты
         </button>
 
-        {/* Кнопка "Выходные" */}
         <button
           onClick={() => onChange(`${weekendSat}..${weekendSun}`)}
           className={`flex shrink-0 snap-start items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -225,10 +214,8 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
           Выходные
         </button>
 
-        {/* Разделитель */}
         <div className="mx-0.5 h-6 w-px shrink-0 bg-slate-200" />
 
-        {/* Дни */}
         {days.map((day) => {
           const isSelected = selected === day.iso;
           return (
@@ -249,14 +236,23 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
                   isSelected ? 'text-white/80' : day.isWeekend ? 'text-amber-600' : 'text-slate-400'
                 }`}
               >
-                {day.label || weekdayShort(day.date)}
+                {day.label || weekdayShortFromIso(day.iso, ianaTimeZone)}
               </span>
               <span className="text-sm font-semibold leading-tight mt-0.5">
-                {day.label ? dayMonth(day.date) : day.date.getDate()}
+                {day.label ? dayMonthFromIso(day.iso, ianaTimeZone) : Number(day.iso.slice(8, 10))}
               </span>
               {!day.label && (
                 <span className={`text-[10px] leading-tight ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>
-                  {day.date.toLocaleDateString('ru-RU', { month: 'short' })}
+                  {new Date(
+                    Date.UTC(
+                      Number(day.iso.slice(0, 4)),
+                      Number(day.iso.slice(5, 7)) - 1,
+                      Number(day.iso.slice(8, 10)),
+                      12,
+                      0,
+                      0,
+                    ),
+                  ).toLocaleDateString('ru-RU', { month: 'short', timeZone: ianaTimeZone })}
                 </span>
               )}
             </button>
@@ -264,7 +260,6 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
         })}
       </div>
 
-      {/* Другая дата + календарь рядом */}
       <div ref={calendarRef} className="relative flex shrink-0 items-start">
         <button
           type="button"
@@ -277,10 +272,7 @@ export function DateRibbon({ selected, onChange }: DateRibbonProps) {
         >
           <Calendar className="h-3.5 w-3.5" />
           {isOtherDateSelected && selected
-            ? (() => {
-                const d = new Date(selected + 'T12:00:00');
-                return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-              })()
+            ? dayMonthFromIso(selected, ianaTimeZone)
             : 'Другая дата'}
         </button>
 

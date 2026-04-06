@@ -11,6 +11,7 @@ import {
   EventWizard,
   PageHeader,
   type EventWizardDraft,
+  type EventWizardLocationOption,
   mapDraftToUpdatePayload,
   mapEventToDraft,
 } from '@daibilet/shared-ui';
@@ -59,9 +60,17 @@ type EventSubcategory = string;
 type AdminSubcategory = {
   id: string;
   slug: string;
+  code?: string;
   nameRu: string;
   type: 'UNIVERSAL' | 'EVENT_ONLY' | 'VENUE_ONLY';
+  layer?: string;
   parent?: { id: string; slug: string; nameRu: string } | null;
+};
+
+type EventSubcategoriesResponse = {
+  primarySubcategory: AdminSubcategory | null;
+  secondarySubcategories: AdminSubcategory[];
+  all: AdminSubcategory[];
 };
 
 const CATEGORY_OPTIONS = [
@@ -169,6 +178,9 @@ interface EventDetail {
   shortDescription: string | null;
   minAge: number | null;
   venueId: string | null;
+  cityId?: string;
+  city?: { id: string };
+  startLocationId?: string | null;
   dateMode: string;
   isPermanent: boolean;
   endDate: string | null;
@@ -257,6 +269,8 @@ export function EventEditPage() {
   }>({});
 
   const [wizardDraft, setWizardDraft] = useState<EventWizardDraft | null>(null);
+  const [wizardLocations, setWizardLocations] = useState<EventWizardLocationOption[]>([]);
+  const [wizardLocationsLoading, setWizardLocationsLoading] = useState(false);
   const [schedulePlan, setSchedulePlan] = useState<ScheduleSyncPlan | null>(null);
   const [schedulePlanLoading, setSchedulePlanLoading] = useState(false);
   const [schedulePlanError, setSchedulePlanError] = useState<string | null>(null);
@@ -264,8 +278,10 @@ export function EventEditPage() {
   // Venues list for museum linking
   const [venues, setVenues] = useState<VenueOption[]>([]);
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
-  const [eventSubcategoryOptions, setEventSubcategoryOptions] = useState<AdminSubcategory[]>([]);
-  const [selectedEventSubcategoryIds, setSelectedEventSubcategoryIds] = useState<string[]>([]);
+  const [primarySubcategoryOptions, setPrimarySubcategoryOptions] = useState<AdminSubcategory[]>([]);
+  const [secondarySubcategoryOptions, setSecondarySubcategoryOptions] = useState<AdminSubcategory[]>([]);
+  const [selectedPrimarySubcategoryId, setSelectedPrimarySubcategoryId] = useState<string | null>(null);
+  const [selectedSecondarySubcategoryIds, setSelectedSecondarySubcategoryIds] = useState<string[]>([]);
 
   // Anti-duplicates: показывает бейдж, если событие в списке кандидатов на дедупликацию
   const [isProbableDuplicate, setIsProbableDuplicate] = useState(false);
@@ -286,10 +302,24 @@ export function EventEditPage() {
 
   useEffect(() => {
     adminApi
-      .get<AdminSubcategory[]>('/admin/subcategories?forEntity=event')
-      .then((res) => setEventSubcategoryOptions(Array.isArray(res) ? res : []))
-      .catch(() => setEventSubcategoryOptions([]));
+      .get<AdminSubcategory[]>('/admin/subcategories?entity=event&layer=SECONDARY')
+      .then((res) => setSecondarySubcategoryOptions(Array.isArray(res) ? res : []))
+      .catch(() => setSecondarySubcategoryOptions([]));
   }, []);
+
+  useEffect(() => {
+    const cat = form.category;
+    if (!cat) {
+      setPrimarySubcategoryOptions([]);
+      return;
+    }
+    adminApi
+      .get<AdminSubcategory[]>(
+        `/admin/subcategories?entity=event&type=${encodeURIComponent(cat)}&layer=PRIMARY`,
+      )
+      .then((res) => setPrimarySubcategoryOptions(Array.isArray(res) ? res : []))
+      .catch(() => setPrimarySubcategoryOptions([]));
+  }, [form.category]);
 
   useEffect(() => {
     adminApi
@@ -300,6 +330,35 @@ export function EventEditPage() {
       })
       .catch(() => setCities([]));
   }, []);
+
+  useEffect(() => {
+    const cityId = wizardDraft?.basics.cityId;
+    if (!cityId) {
+      setWizardLocations([]);
+      setWizardLocationsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setWizardLocationsLoading(true);
+    adminApi
+      .get<{ items?: EventWizardLocationOption[] }>(
+        `/admin/locations?cityId=${encodeURIComponent(cityId)}`,
+      )
+      .then((res) => {
+        if (cancelled) return;
+        const list = res.items;
+        setWizardLocations(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setWizardLocations([]);
+      })
+      .finally(() => {
+        if (!cancelled) setWizardLocationsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wizardDraft?.basics.cityId]);
 
   useEffect(() => {
     if (!id) return;
@@ -385,10 +444,11 @@ export function EventEditPage() {
         });
         setWizardDraft(mapEventToDraft(data));
 
-        const selected = await adminApi
-          .get<AdminSubcategory[]>(`/admin/events/${id}/subcategories`)
-          .catch(() => []);
-        setSelectedEventSubcategoryIds(selected.map((item) => item.id));
+        const sc = await adminApi
+          .get<EventSubcategoriesResponse>(`/admin/events/${id}/subcategories`)
+          .catch(() => null);
+        setSelectedPrimarySubcategoryId(sc?.primarySubcategory?.id ?? null);
+        setSelectedSecondarySubcategoryIds(sc?.secondarySubcategories?.map((s) => s.id) ?? []);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Ошибка загрузки'))
       .finally(() => setLoading(false));
@@ -470,8 +530,18 @@ export function EventEditPage() {
       });
       setEvent((prev) => (prev ? { ...prev, override: ov } : null));
 
-      await adminApi.put(`/admin/events/${id}/subcategories`, {
-        subcategoryIds: selectedEventSubcategoryIds,
+      const primaryRow = primarySubcategoryOptions.find((p) => p.id === selectedPrimarySubcategoryId);
+      if (!primaryRow?.code) {
+        toast.error('Выберите основной формат подкатегории');
+        setSaving(false);
+        return;
+      }
+      const secondaryRows = secondarySubcategoryOptions.filter((s) =>
+        selectedSecondarySubcategoryIds.includes(s.id),
+      );
+      await adminApi.post(`/admin/events/${id}/subcategories`, {
+        primaryCode: primaryRow.code,
+        secondaryCodes: secondaryRows.map((s) => s.code).filter(Boolean) as string[],
       });
 
       // Save venue/location-specific fields (прямо на Event, не в override)
@@ -920,6 +990,8 @@ export function EventEditPage() {
                     onDraftChange={setWizardDraft}
                     onSubmit={(d) => handleWizardSubmit(d)}
                     citiesOptions={cities}
+                    locationsForCity={wizardLocations}
+                    locationsLoading={wizardLocationsLoading}
                     mediaUpload={adminMediaUpload}
                   />
                 </CardContent>
@@ -1018,7 +1090,11 @@ export function EventEditPage() {
                   </div>
                   <Select
                     value={form.category ?? ''}
-                    onValueChange={(v) => setForm((f) => ({ ...f, category: v as EventCategory, subcategories: [] }))}
+                    onValueChange={(v) => {
+                      setSelectedPrimarySubcategoryId(null);
+                      setSelectedSecondarySubcategoryIds([]);
+                      setForm((f) => ({ ...f, category: v as EventCategory, subcategories: [] }));
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -1078,48 +1154,69 @@ export function EventEditPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="sm:col-span-2 space-y-2">
-                  <Label>Подкатегории</Label>
-                  <div className="flex flex-wrap gap-2 rounded-md border p-3">
-                    {eventSubcategoryOptions.map((opt) => {
-                      const isChecked = selectedEventSubcategoryIds.includes(opt.id);
-                      return (
-                        <label
-                          key={opt.id}
-                          className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                            isChecked
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground hover:bg-accent'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              setSelectedEventSubcategoryIds((prev) => {
-                                if (e.target.checked) {
-                                  if (prev.length >= 3) {
-                                    toast.warning('Можно выбрать не более 3 подкатегорий');
-                                    return prev;
-                                  }
-                                  return [...prev, opt.id];
-                                }
-                                return prev.filter((id) => id !== opt.id);
-                              });
-                            }}
-                            className="sr-only"
-                          />
-                          {opt.nameRu}
-                        </label>
-                      );
-                    })}
-                    {eventSubcategoryOptions.length === 0 && (
-                      <span className="text-xs text-muted-foreground">Справочник подкатегорий пока пуст</span>
-                    )}
+                <div className="sm:col-span-2 space-y-3 rounded-md border p-3">
+                  <div className="space-y-2">
+                    <Label>Основной формат (обязательно)</Label>
+                    <Select
+                      value={selectedPrimarySubcategoryId ?? '__none__'}
+                      onValueChange={(v) => setSelectedPrimarySubcategoryId(v === '__none__' ? null : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите формат" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Не выбрано</SelectItem>
+                        {primarySubcategoryOptions.map((opt) => (
+                          <SelectItem key={opt.id} value={opt.id}>
+                            {opt.nameRu} ({opt.code ?? opt.slug})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Выбрано: {selectedEventSubcategoryIds.length}/3. Справочник загружается из backend API.
-                  </p>
+                  <div className="space-y-2">
+                    <Label>Доп. подкатегории (до 3)</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {secondarySubcategoryOptions.map((opt) => {
+                        const isChecked = selectedSecondarySubcategoryIds.includes(opt.id);
+                        return (
+                          <label
+                            key={opt.id}
+                            className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                              isChecked
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground hover:bg-accent'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                setSelectedSecondarySubcategoryIds((prev) => {
+                                  if (e.target.checked) {
+                                    if (prev.length >= 3) {
+                                      toast.warning('Не более 3 дополнительных подкатегорий');
+                                      return prev;
+                                    }
+                                    return [...prev, opt.id];
+                                  }
+                                  return prev.filter((sid) => sid !== opt.id);
+                                });
+                              }}
+                              className="sr-only"
+                            />
+                            {opt.nameRu}
+                          </label>
+                        );
+                      })}
+                      {secondarySubcategoryOptions.length === 0 && (
+                        <span className="text-xs text-muted-foreground">Справочник SECONDARY пуст</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Выбрано доп.: {selectedSecondarySubcategoryIds.length}/3. Коды и слой PRIMARY/SECONDARY — с бэкенда.
+                    </p>
+                  </div>
                 </div>
                 {/* Venue & Date Mode — показываем для всех категорий (quality: MISSING_LOCATION) */}
                     <div className="space-y-2" data-quality-field="location">

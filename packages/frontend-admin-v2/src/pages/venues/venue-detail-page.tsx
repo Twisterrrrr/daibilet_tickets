@@ -3,6 +3,8 @@ import { Building2 } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 
 import { VenueDetailView } from '@/features/venue-detail/venue-detail-view';
+import { blueprintVenueDetail } from '@/shared/config/admin-v2-blueprints';
+import { IntegrationBlueprint } from '@/shared/layout/admin-v2-blueprint';
 import { DetailPageLayout } from '@/shared/layout/detail-page-layout';
 import { cn } from '@/shared/lib/cn';
 import { formatDateTime } from '@/shared/lib/format';
@@ -42,6 +44,7 @@ export function VenueDetailPage() {
         </>
       }
       tabs={<VenueDetailView venue={venue} />}
+      blueprint={<IntegrationBlueprint {...blueprintVenueDetail} />}
     />
   );
 }

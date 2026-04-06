@@ -21,6 +21,7 @@ interface AdminEventDetailLite {
   cityId?: string;
   venueId?: string | null;
   supplierId?: string | null;
+  startLocationId?: string | null;
   description?: string | null;
   shortDescription?: string | null;
   imageUrl?: string | null;
@@ -60,6 +61,11 @@ export function mapEventToDraft(event: AdminEventDetailLite): EventWizardDraft {
       fullDescription: event.description ?? '',
       coverImageUrl: event.imageUrl ?? '',
       gallery: [], // Next: map galleryUrls, если появится контракт в EventDetail
+      locationChoice: event.startLocationId ? 'existing' : 'existing',
+      startLocationId: event.startLocationId ?? '',
+      locationProposalTitle: '',
+      locationProposalAddress: '',
+      locationProposalType: '',
     },
 
     schedule: {
@@ -132,6 +138,23 @@ export function mapDraftToCreatePayload(draft: EventWizardDraft): Record<string,
     imageUrl: basics.coverImageUrl || undefined,
     // Next: durationMinutes, address, minAge, templateData — добавить при расширении draft'а.
   };
+
+  if (basics.category === 'EXCURSION') {
+    const sid = (basics.startLocationId ?? '').trim();
+    if (sid) {
+      payload.startLocationId = sid;
+    } else if ((basics.locationChoice ?? 'existing') === 'propose') {
+      const t = (basics.locationProposalTitle ?? '').trim();
+      if (t) {
+        const proposal: Record<string, unknown> = { title: t };
+        const addr = (basics.locationProposalAddress ?? '').trim();
+        if (addr) proposal.address = addr;
+        const lt = (basics.locationProposalType ?? '').trim();
+        if (lt) proposal.type = lt;
+        payload.locationProposal = proposal;
+      }
+    }
+  }
 
   // Tickets/offers: high‑level → первый offer payload как в EventCreatePage.
   // Контракт POST /admin/events: offer опционален; при наличии — source и purchaseType обязательны.
