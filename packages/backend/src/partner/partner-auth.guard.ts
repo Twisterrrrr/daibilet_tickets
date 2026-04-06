@@ -38,7 +38,7 @@ export class ApiKeyGuard implements CanActivate {
       where: { keyHash },
       include: {
         operator: {
-          select: { id: true, name: true, isActive: true, isSupplier: true, trustLevel: true },
+          select: { id: true, name: true, isActive: true, status: true, isSupplier: true, trustLevel: true },
         },
       },
     });
@@ -57,6 +57,12 @@ export class ApiKeyGuard implements CanActivate {
 
     if (!apiKey.operator.isActive) {
       throw new ForbiddenException('Operator account is disabled');
+    }
+
+    // "Заморозка" обмена данными: аккаунт активен (портал/видимость сохраняются),
+    // но партнёрский B2B API отключён.
+    if (apiKey.operator.status === 'SUSPENDED') {
+      throw new ForbiddenException('Operator data exchange is frozen');
     }
 
     // IP whitelist check

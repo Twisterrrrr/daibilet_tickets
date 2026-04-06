@@ -84,6 +84,54 @@ export class CatalogService {
     return { ...ev, ...pres };
   }
 
+  /**
+   * Политика "поставщик отключен":
+   * - страницы/карточки событий НЕ должны превращаться в 404
+   * - покупка должна быть недоступна (убираем offers, а checkout дополнительно режет попытки покупки)
+   *
+   * Источник truth по поставщику:
+   * - Event.supplierId (поставщик события)
+   * - EventOffer.operatorId (поставщик конкретного оффера)
+   */
+  private async applySupplierDisablePolicyToEvents<T extends Record<string, unknown>>(events: T[]): Promise<T[]> {
+    const supplierIds = new Set<string>();
+    const offerOperatorIds = new Set<string>();
+
+    for (const ev of events) {
+      const supplierId = ev.supplierId;
+      if (typeof supplierId === 'string' && supplierId) supplierIds.add(supplierId);
+
+      const offers = (ev.offers as Array<Record<string, unknown>> | undefined) ?? [];
+      for (const o of offers) {
+        const opId = o.operatorId;
+        if (typeof opId === 'string' && opId) offerOperatorIds.add(opId);
+      }
+    }
+
+    if (supplierIds.size === 0 && offerOperatorIds.size === 0) return events;
+
+    const operators = await this.prisma.operator.findMany({
+      where: { id: { in: [...new Set([...supplierIds, ...offerOperatorIds])] } },
+      select: { id: true, isActive: true, status: true },
+    });
+    const operatorById = new Map(operators.map((o) => [o.id, o]));
+
+    return events.map((ev) => {
+      const supplierId = typeof ev.supplierId === 'string' ? ev.supplierId : null;
+      const supplier = supplierId ? operatorById.get(supplierId) : null;
+      const supplierDisabled = !!(supplier && (!supplier.isActive || supplier.status !== 'ACTIVE'));
+
+      const offers = ((ev.offers as Array<Record<string, unknown>> | undefined) ?? []).filter((o) => {
+        const opId = typeof o.operatorId === 'string' ? o.operatorId : null;
+        const op = opId ? operatorById.get(opId) : null;
+        if (!op) return !supplierDisabled;
+        return op.isActive && op.status === 'ACTIVE' && !supplierDisabled;
+      });
+
+      return { ...ev, offers: supplierDisabled ? [] : offers };
+    });
+  }
+
   // --- Города ---
 
   async getCities(featured?: boolean) {
@@ -1311,6 +1359,7 @@ export class CatalogService {
               imageUrl: true,
               galleryUrls: true,
               priceFrom: true,
+              supplierId: true,
               rating: true,
               reviewCount: true,
               city: { select: { slug: true, name: true } },
@@ -1339,6 +1388,7 @@ export class CatalogService {
                   isDeleted: true,
                   meetingPoint: true,
                   isPrimary: true,
+                  operatorId: true,
                 },
               },
               sessions: {
@@ -1358,6 +1408,7 @@ export class CatalogService {
               city: { select: { slug: true, name: true } },
               venue: { select: { title: true, shortTitle: true } },
               override: { select: { manualBoost: true } },
+              supplierId: true,
               subcategoryLinks: {
                 select: {
                   subcategory: { select: { code: true, nameRu: true, layer: true } },
@@ -1381,6 +1432,7 @@ export class CatalogService {
                   isDeleted: true,
                   meetingPoint: true,
                   isPrimary: true,
+                  operatorId: true,
                 },
               },
               sessions: {
@@ -1398,7 +1450,8 @@ export class CatalogService {
 
     const tOv0 = Date.now();
     const overriddenRaw = await this.overrideService.applyOverrides(rawItems);
-    const overridden = overriddenRaw.map((e) => this.mergeEventSubcategoryFields(e as Record<string, unknown>));
+    const overriddenBase = overriddenRaw.map((e) => this.mergeEventSubcategoryFields(e as Record<string, unknown>));
+    const overridden = await this.applySupplierDisablePolicyToEvents(overriddenBase as Record<string, unknown>[]);
     const overrideMs = Date.now() - tOv0;
 
     if (!this.catalogGuard.isCatalogStrictMode()) {
@@ -1639,6 +1692,10 @@ export class CatalogService {
     }
 
     const overridden = this.mergeEventSubcategoryFields(overriddenRaw as Record<string, unknown>) as typeof overriddenRaw;
+    const [overriddenWithPolicy] = await this.applySupplierDisablePolicyToEvents([
+      overridden as unknown as Record<string, unknown>,
+    ]);
+    const eventForPublic = overriddenWithPolicy as typeof overridden;
 
     // SCHEDULED без активных слотов (все на паузе / нет дат) — показываем страницу (с пустыми сеансами), не 404.
     // В каталоге такие события не выводятся; по прямой ссылке — контекст без «битой» страницы.
@@ -1647,24 +1704,24 @@ export class CatalogService {
     // «мягко»; покупка по-прежнему режется sellable/checkout по endDate.
 
     // Primary offer для удобства фронтенда
-    const primaryOffer = overridden.offers?.length > 0 ? overridden.offers[0] : null;
+    const primaryOffer = eventForPublic.offers?.length > 0 ? eventForPublic.offers[0] : null;
 
     // Похожие события: город + категория + скоринг по тегам, подкатегории, priceFrom
-    const relatedEvents = await this.fetchRelatedEvents(overridden);
+    const relatedEvents = await this.fetchRelatedEvents(eventForPublic);
 
-    const rc = Number(overridden.reviewCount ?? 0) | 0;
-    const rawR = Number(overridden.rating) || 0;
-    const displayRating = this.getDisplayedEventRating(String(overridden.id || overridden.slug || ''), rawR, rc);
+    const rc = Number(eventForPublic.reviewCount ?? 0) | 0;
+    const rawR = Number(eventForPublic.rating) || 0;
+    const displayRating = this.getDisplayedEventRating(String(eventForPublic.id || eventForPublic.slug || ''), rawR, rc);
 
     const canAcceptReviews = this.reviewCapability.canAcceptReviews({
-      source: overridden.source,
-      supplierId: overridden.supplierId,
-      operatorId: overridden.operatorId,
+      source: eventForPublic.source,
+      supplierId: eventForPublic.supplierId,
+      operatorId: eventForPublic.operatorId,
     });
 
-    const operatorId = overridden.supplierId ?? overridden.venue?.operatorId;
-    const operator = overridden.venue?.operator
-      ? { defaultRefundPolicyText: overridden.venue.operator.defaultRefundPolicyText }
+    const operatorId = eventForPublic.supplierId ?? eventForPublic.venue?.operatorId;
+    const operator = eventForPublic.venue?.operator
+      ? { defaultRefundPolicyText: eventForPublic.venue.operator.defaultRefundPolicyText }
       : operatorId
         ? await this.prisma.operator
             .findUnique({ where: { id: operatorId }, select: { defaultRefundPolicyText: true } })
@@ -1673,17 +1730,20 @@ export class CatalogService {
 
     const refundPolicyResolved = this.refundResolution.resolveEventRefundPolicy(
       {
-        refundPolicyMode: overridden.refundPolicyMode,
-        refundPolicyText: overridden.refundPolicyText,
+        refundPolicyMode: eventForPublic.refundPolicyMode,
+        refundPolicyText: eventForPublic.refundPolicyText,
       },
-      overridden.venue
-        ? { refundPolicyMode: overridden.venue.refundPolicyMode, refundPolicyText: overridden.venue.refundPolicyText }
+      eventForPublic.venue
+        ? {
+            refundPolicyMode: eventForPublic.venue.refundPolicyMode,
+            refundPolicyText: eventForPublic.venue.refundPolicyText,
+          }
         : null,
       operator,
     );
 
-    const tags = Array.isArray((overridden as unknown as { tags?: unknown }).tags)
-      ? ((overridden as unknown as { tags: unknown[] }).tags as unknown[])
+    const tags = Array.isArray((eventForPublic as unknown as { tags?: unknown }).tags)
+      ? ((eventForPublic as unknown as { tags: unknown[] }).tags as unknown[])
       : [];
 
     const structuralTags: { THEME: string[]; AUDIENCE: string[]; FORMAT: string[] } = {

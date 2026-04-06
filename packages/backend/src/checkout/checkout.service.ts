@@ -67,10 +67,18 @@ export class CheckoutService {
       where: {
         OR: [...(isUuid ? [{ id: body.eventId }] : []), { slug: body.eventId }, { tcEventId: body.eventId }],
       },
+      include: {
+        supplier: { select: { id: true, isActive: true, status: true } },
+      },
     });
 
     if (!event) {
       throw new NotFoundException(`Событие не найдено: ${body.eventId}`);
+    }
+
+    // Мягкое отключение поставщика: событие доступно для просмотра, но покупка запрещена.
+    if (event.supplier && (!event.supplier.isActive || event.supplier.status !== 'ACTIVE')) {
+      throw new ForbiddenException('Покупка недоступна: поставщик отключен');
     }
 
     if (event.source !== 'TC') {
@@ -332,6 +340,7 @@ export class CheckoutService {
         where: { id: item.offerId, eventId: item.eventId, status: 'ACTIVE' },
         include: {
           event: { select: { id: true, title: true, slug: true, imageUrl: true, isActive: true } },
+          operator: { select: { id: true, isActive: true, status: true } },
         },
       });
 
@@ -342,6 +351,12 @@ export class CheckoutService {
 
       if (!offer.event.isActive) {
         validated.push({ ...item, valid: false, currentPrice: null, reason: 'Событие неактивно' });
+        continue;
+      }
+
+      // Мягкое отключение поставщика: событие остаётся доступным по ссылке, но покупка запрещена.
+      if (offer.operator && (!offer.operator.isActive || offer.operator.status !== 'ACTIVE')) {
+        validated.push({ ...item, valid: false, currentPrice: null, reason: 'Поставщик отключен' });
         continue;
       }
 
