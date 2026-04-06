@@ -1,6 +1,7 @@
 import './globals.css';
 
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Script from 'next/script';
 import { Suspense } from 'react';
 
@@ -82,12 +83,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Script>
             <noscript>
               <div>
-                {/* next/image в <noscript> не используем — сторонний 1×1-пиксель Метрики без JS */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={`https://mc.yandex.ru/watch/${process.env.NEXT_PUBLIC_YM_ID}`}
-                  style={{ position: 'absolute', left: '-9999px' }}
                   alt=""
+                  width={1}
+                  height={1}
+                  unoptimized
+                  className="absolute"
+                  style={{ left: '-9999px' }}
                 />
               </div>
             </noscript>

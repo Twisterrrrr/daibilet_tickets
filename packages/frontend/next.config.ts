@@ -84,6 +84,11 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'daibilet.ru',
       },
+      {
+        protocol: 'https',
+        hostname: 'mc.yandex.ru',
+        pathname: '/**',
+      },
     ],
   },
 
