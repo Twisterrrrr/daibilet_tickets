@@ -14,7 +14,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { PaymentMode, PspFeeMode, SupplierRole } from '@prisma/client';
+import { OperatorStatus, PaymentMode, PspFeeMode, SupplierRole } from '@prisma/client';
 
 export class UpdateSupplierDto {
   @ApiPropertyOptional({ description: 'Trust level: 0, 1, 2' })
@@ -46,6 +46,22 @@ export class UpdateSupplierDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    enum: OperatorStatus,
+    description: 'Статус поставщика: влияет на обмен данными и операционный режим',
+  })
+  @IsOptional()
+  @IsEnum(OperatorStatus)
+  status?: OperatorStatus;
+
+  @ApiPropertyOptional({
+    description:
+      'Заморозить обмен данными (status=SUSPENDED). При false принудительно возвращает status=ACTIVE.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isExchangeFrozen?: boolean;
 
   @ApiPropertyOptional({ description: 'Sub-merchant ID в YooKassa' })
   @IsOptional()

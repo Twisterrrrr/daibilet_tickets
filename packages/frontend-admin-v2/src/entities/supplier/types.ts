@@ -4,6 +4,10 @@ export interface SupplierEntity {
   id: string;
   name: string;
   status: SupplierStatus;
+  /** Мягкое отключение поставщика: события видны, покупка отключена. */
+  isActive: boolean;
+  /** Заморозка обмена данными: B2B API/интеграции могут быть остановлены. */
+  isExchangeFrozen: boolean;
   eventsCount: number;
   catalogQuality: number;
   operatorLabel: string;

@@ -388,6 +388,11 @@ export class AdminSuppliersController {
     updateData.promoRate = null;
     updateData.promoUntil = null;
     if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
+    if (data.isExchangeFrozen !== undefined) {
+      updateData.status = data.isExchangeFrozen ? 'SUSPENDED' : 'ACTIVE';
+    } else if (data.status !== undefined) {
+      updateData.status = data.status;
+    }
     if (data.yookassaAccountId !== undefined) updateData.yookassaAccountId = data.yookassaAccountId || null;
     if (data.verifiedAt !== undefined) updateData.verifiedAt = data.verifiedAt ? new Date() : null;
     if (data.defaultRefundPolicyText !== undefined) {
