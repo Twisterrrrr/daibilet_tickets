@@ -4,6 +4,20 @@
 
 ---
 
+## 05.04.2026 — MVP возвратов по позициям FulfillmentItem (RefundRequest)
+
+### Наблюдения
+
+- Нужен единый доменный контур возврата **по билету (line item)**, не только полный refund PaymentIntent; квоты и «продано» не должны освобождаться до фактического COMPLETED, но нельзя продавать место повторно, пока висит заявка.
+
+### Решения
+
+- Таблица **refund_requests**, enum статусов/причин; **FulfillmentStatus.REFUND_PENDING**, **FulfillmentItem.isRedeemed**. Сервис **FulfillmentRefundRequestService** + чистые правила **evaluateRefundEligibility** / **allowRefundForSession** (обход при `EventSession.canceledAt`). Агрегаты `getPaidBySessionId` (checkout + widgets) и **SessionStatsService** учитывают CONFIRMED + REFUND_PENDING; при COMPLETED заявки — REFUNDED, инкремент **availableTickets**. Админ UI: вкладка checkout sessions — список позиций, «Сделать возврат» / «Провести возврат». Тесты: `refund-eligibility.spec.ts`.
+
+### Проблемы
+
+- Частичные возвраты по одному PaymentIntent при нескольких позициях ограничены политикой YooKassa (сумма ≤ оплаты); MVP — полный возврат суммы позиции за раз.
+
 ## 05.04.2026 — Subcategory: Collections Engine и SEO-лендинги (MVP)
 
 ### Наблюдения

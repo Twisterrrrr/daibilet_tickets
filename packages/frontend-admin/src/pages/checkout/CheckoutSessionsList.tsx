@@ -344,6 +344,26 @@ function OrderRequestsTab() {
 // Checkout Sessions Tab
 // ═══════════════════════════════════════════
 
+const FULFILLMENT_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Ожидает',
+  RESERVING: 'Резерв',
+  RESERVED: 'Зарезервирован',
+  CONFIRMED: 'Активен',
+  REFUND_PENDING: 'Возврат (ожидание)',
+  FAILED: 'Ошибка',
+  CANCELLED: 'Отменён',
+  REFUNDED: 'Возвращён',
+};
+
+const REFUND_REQUEST_STATUS_LABELS: Record<string, string> = {
+  CREATED: 'Заявка создана',
+  APPROVED: 'Одобрена',
+  REJECTED: 'Отклонена',
+  PROCESSING: 'В обработке',
+  COMPLETED: 'Возвращён',
+  FAILED: 'Ошибка возврата',
+};
+
 function CheckoutSessionsTab() {
   const [sessions, setSessions] = useState<CheckoutSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -352,6 +372,7 @@ function CheckoutSessionsTab() {
   const [total, setTotal] = useState(0);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
+  const [refundBusy, setRefundBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -379,6 +400,37 @@ function CheckoutSessionsTab() {
       setDetail(data);
     } catch {
       setDetail(null);
+    }
+  };
+
+  const runRefundCreate = async (itemId: string) => {
+    setRefundBusy(`c:${itemId}`);
+    try {
+      await adminApi.post('/admin/refunds', { itemId, reason: 'USER_REQUEST' });
+      toast.success('Заявка на возврат создана');
+      if (detailId) await loadDetail(detailId);
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e ? String((e as { message?: string }).message) : 'Ошибка';
+      toast.error(msg);
+    } finally {
+      setRefundBusy(null);
+    }
+  };
+
+  const runRefundProcess = async (refundId: string) => {
+    setRefundBusy(`p:${refundId}`);
+    try {
+      await adminApi.post(`/admin/refunds/${refundId}/process`, {});
+      toast.success('Возврат обработан');
+      if (detailId) await loadDetail(detailId);
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e ? String((e as { message?: string }).message) : 'Ошибка';
+      toast.error(msg);
+      if (detailId) await loadDetail(detailId);
+    } finally {
+      setRefundBusy(null);
     }
   };
 
@@ -465,7 +517,7 @@ function CheckoutSessionsTab() {
 
       {/* Detail Dialog */}
       <Dialog open={!!detailId} onOpenChange={(open) => !open && setDetailId(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Детали сессии {detail?.shortCode}</DialogTitle>
           </DialogHeader>
@@ -525,6 +577,69 @@ function CheckoutSessionsTab() {
                         {req.customerComment && <p className="text-xs italic">"{req.customerComment}"</p>}
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {Array.isArray(detail.fulfillmentItems) && detail.fulfillmentItems.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Билеты (позиции)</h4>
+                  <div className="space-y-2">
+                    {detail.fulfillmentItems.map((item: any) => {
+                      const refunds: Array<{ id: string; status: string }> = item.refundRequests ?? [];
+                      const activeRefund = refunds.find((r) =>
+                        ['CREATED', 'APPROVED', 'PROCESSING'].includes(r.status),
+                      );
+                      const canCreateRefund =
+                        item.status === 'CONFIRMED' &&
+                        !activeRefund &&
+                        !refunds.some((r) => r.status === 'COMPLETED');
+                      const canProcessRefund =
+                        activeRefund &&
+                        ['CREATED', 'APPROVED', 'PROCESSING'].includes(activeRefund.status);
+                      const latest = refunds[0];
+                      return (
+                        <div key={item.id} className="rounded border p-3 space-y-2 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <Badge variant="secondary">
+                              {FULFILLMENT_STATUS_LABELS[item.status] ?? item.status}
+                            </Badge>
+                            <span className="font-medium">{formatPrice(item.amount)}</span>
+                          </div>
+                          <div className="text-muted-foreground">
+                            Строка #{item.lineItemIndex} · offer {String(item.offerId).slice(0, 8)}…
+                          </div>
+                          {latest && (
+                            <div className="text-muted-foreground">
+                              Возврат:{' '}
+                              {REFUND_REQUEST_STATUS_LABELS[latest.status] ?? latest.status}
+                            </div>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {canCreateRefund && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={refundBusy !== null}
+                                onClick={() => runRefundCreate(item.id)}
+                              >
+                                {refundBusy === `c:${item.id}` ? '…' : 'Сделать возврат'}
+                              </Button>
+                            )}
+                            {canProcessRefund && activeRefund && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                disabled={refundBusy !== null}
+                                onClick={() => runRefundProcess(activeRefund.id)}
+                              >
+                                {refundBusy === `p:${activeRefund.id}` ? '…' : 'Провести возврат'}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

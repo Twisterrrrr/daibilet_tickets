@@ -1112,7 +1112,7 @@ export class CheckoutService {
     }
 
     const fulfilled = await this.prisma.fulfillmentItem.findMany({
-      where: { status: 'CONFIRMED' },
+      where: { status: { in: ['CONFIRMED', 'REFUND_PENDING'] } },
       select: { lineItemIndex: true, checkoutSessionId: true },
     });
     if (fulfilled.length > 0) {

@@ -47,6 +47,7 @@ import { AdminVenuesController } from './admin-venues.controller';
 import { AdminWidgetsController } from './admin-widgets.controller';
 import { AdminUploadController } from './admin-upload.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
+import { AdminRefundsController } from './admin-refunds.controller';
 import { AdminSeoAuditController } from './admin-seo-audit.controller';
 import { AdminPreviewsController } from './admin-previews.controller';
 import { AdminPromoBlocksController } from './admin-promo-blocks.controller';
@@ -133,6 +134,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminReviewsController,
     AdminExternalReviewsController,
     AdminCheckoutController,
+    AdminRefundsController,
     AdminSuppliersController,
     AdminModerationController,
     AdminVenuesController,

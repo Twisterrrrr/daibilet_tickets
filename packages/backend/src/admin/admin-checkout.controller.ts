@@ -99,6 +99,12 @@ export class AdminCheckoutController {
       include: {
         orderRequests: true,
         paymentIntents: { orderBy: { createdAt: 'desc' } },
+        fulfillmentItems: {
+          orderBy: { lineItemIndex: 'asc' },
+          include: {
+            refundRequests: { orderBy: { createdAt: 'desc' } },
+          },
+        },
       },
     });
     if (!session) throw new NotFoundException('Сессия не найдена');

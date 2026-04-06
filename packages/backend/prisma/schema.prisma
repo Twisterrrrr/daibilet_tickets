@@ -168,6 +168,11 @@ enum SubcategoryType {
   VENUE_ONLY
 }
 
+enum SubcategoryLayer {
+  PRIMARY
+  SECONDARY
+}
+
 /// Режим наследования правил возврата/обмена (Venue)
 enum VenueRefundPolicyMode {
   INHERIT_SUPPLIER
@@ -568,6 +573,7 @@ model Event {
   description         String?            @db.Text
   shortDescription    String?
   category            EventCategory
+  /// TODO: удалить после полной миграции на EventSubcategoryLink; только fallback чтения, запись новых значений запрещена.
   subcategories       EventSubcategory[] @default([])
   audience            EventAudience      @default(ALL)
   minAge              Int                @default(0)
@@ -1500,23 +1506,28 @@ model Venue {
 }
 
 model Subcategory {
-  id               String          @id @default(uuid()) @db.Uuid
-  slug             String          @unique
+  id               String            @id @default(uuid()) @db.Uuid
+  slug             String            @unique
+  /// Стабильный код справочника (совпадает с EventSubcategory / API primaryCode в рамках type). Уникальность: code + type.
+  code             String
   nameRu           String
-  type             SubcategoryType @default(UNIVERSAL)
-  parentId         String?         @db.Uuid
-  isActive         Boolean         @default(true)
-  isLandingEnabled Boolean         @default(false)
-  sortOrder        Int             @default(0)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  type             SubcategoryType   @default(UNIVERSAL)
+  layer            SubcategoryLayer  @default(SECONDARY)
+  parentId         String?           @db.Uuid
+  isActive         Boolean           @default(true)
+  isLandingEnabled Boolean           @default(false)
+  sortOrder        Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   parent     Subcategory?          @relation("SubcategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
   children   Subcategory[]         @relation("SubcategoryTree")
   eventLinks EventSubcategoryLink[]
   venueLinks VenueSubcategoryLink[]
 
+  @@unique([code, type])
   @@index([type, isActive])
+  @@index([type, layer, isActive])
   @@index([parentId])
   @@index([isLandingEnabled])
   @@map("subcategories")
@@ -2399,6 +2410,7 @@ model PaymentIntent {
   splitPaymentId String? // ID split-платежа YooKassa
 
   checkoutSession CheckoutSession @relation(fields: [checkoutSessionId], references: [id])
+  refundRequests  RefundRequest[]
 
   @@index([checkoutSessionId])
   @@index([status])
@@ -2421,9 +2433,33 @@ enum FulfillmentStatus {
   RESERVING // В процессе резервирования
   RESERVED // Зарезервировано у провайдера
   CONFIRMED // Подтверждено провайдером
+  REFUND_PENDING // Заявка на возврат (MVP item-level refunds)
   FAILED // Ошибка (исчерпаны ретраи)
   CANCELLED // Отменено
   REFUNDED // Возврат выполнен
+}
+
+/// Статус заявки на возврат по позиции fulfillment (MVP).
+enum RefundRequestStatus {
+  CREATED
+  APPROVED
+  REJECTED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum RefundRequestReason {
+  USER_REQUEST
+  EVENT_CANCELLED
+  SUPPORT
+  OTHER
+}
+
+enum RefundCreatedByType {
+  ADMIN
+  USER
+  SYSTEM
 }
 
 model FulfillmentItem {
@@ -2438,6 +2474,8 @@ model FulfillmentItem {
   externalPaymentUrl String? // Ссылка на оплату у провайдера
   providerData       Json? // Данные от провайдера
   amount             Int // Сумма позиции в копейках
+  /// OPEN_DATE: билет ещё не погашен (MVP eligibility).
+  isRedeemed         Boolean           @default(false)
   refundedAmount     Int               @default(0) // Возвращённая сумма в копейках
   refundId           String? // ID рефанда (YooKassa)
   attemptCount       Int               @default(0) // Количество попыток
@@ -2449,6 +2487,7 @@ model FulfillmentItem {
   updatedAt          DateTime          @updatedAt
 
   checkoutSession CheckoutSession @relation(fields: [checkoutSessionId], references: [id])
+  refundRequests  RefundRequest[]
 
   @@index([checkoutSessionId])
   @@index([offerId])
@@ -2456,6 +2495,30 @@ model FulfillmentItem {
   @@index([status, nextRetryAt]) // Для cron retry
   @@index([status, escalatedAt]) // Для cron auto-compensate
   @@map("fulfillment_items")
+}
+
+/// Заявка на возврат по одной позиции FulfillmentItem (MVP).
+model RefundRequest {
+  id                  String               @id @default(uuid()) @db.Uuid
+  fulfillmentItemId   String               @db.Uuid
+  paymentIntentId     String               @db.Uuid
+  amount              Int
+  currency            String               @default("RUB")
+  reason              RefundRequestReason  @default(OTHER)
+  reasonNote          String?              @db.Text
+  status              RefundRequestStatus  @default(CREATED)
+  createdByType       RefundCreatedByType  @default(ADMIN)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  processedAt         DateTime?
+
+  fulfillmentItem FulfillmentItem @relation(fields: [fulfillmentItemId], references: [id], onDelete: Restrict)
+  paymentIntent     PaymentIntent   @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+
+  @@index([fulfillmentItemId])
+  @@index([paymentIntentId])
+  @@index([status])
+  @@map("refund_requests")
 }
 
 // ========================
@@ -2482,7 +2545,10 @@ model PaymentEventLog {
 
 model ProcessedWebhookEvent {
   id              String   @id @default(uuid()) @db.Uuid
-  providerEventId String   @unique // Ключ идемпотентности (payment.id от YK, etc.)
+  /// Составной ключ дедупликации: `eventType:object.id` (ЮKassa), не смешивать разные типы событий одного платежа.
+  dedupeKey       String   @unique
+  /// object.id от провайдера (payment.id / refund.id / и т.д.) — для трассировки и отчётов.
+  providerEventId String
   provider        String // YOOKASSA | TC | PARTNER
   eventType       String // payment.succeeded, payment.canceled, etc.
   payload         Json // Полный payload для аудита
@@ -2492,6 +2558,7 @@ model ProcessedWebhookEvent {
 
   @@index([provider, eventType])
   @@index([paymentIntentId])
+  @@index([providerEventId])
   @@map("processed_webhook_events")
 }
 

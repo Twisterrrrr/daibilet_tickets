@@ -1329,6 +1329,7 @@ export class SupplierController {
       const statuses = items.map((i) => i.status);
       if (statuses.some((s) => s === 'REFUNDED')) return 'REFUNDED';
       if (statuses.some((s) => s === 'FAILED' || s === 'CANCELLED')) return 'FAILED';
+      if (statuses.some((s) => s === 'REFUND_PENDING')) return 'PENDING';
       if (statuses.every((s) => s === 'CONFIRMED')) return 'CONFIRMED';
       return 'PENDING';
     }
