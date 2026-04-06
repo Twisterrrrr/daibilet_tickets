@@ -86,6 +86,7 @@
 
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
+| `import-auto-subcategory-links` | Импорт (TC/TEP): автопроставление подкатегорий в `event_subcategory_links` (links-first), чтобы модерация начиналась с “разумного дефолта”, а не с ручной посадки | Высокий | `[x]` **06.04.2026** |
 | `catalog-consistency-snapshot` | (Опц.) фоновый пересчёт / snapshot-таблица для `GET /admin/catalog/consistency` | Низкий | `[ ]` |
 | `legacy-classification-fix` | Приведение legacy-событий к новой модели (скрипты reclassify / backfill — отдельный план) | Средний | `[ ]` |
 | `G-data-cleanup` | Программа G: trim links и legacy-classification — см. Epic G в архиве | Низкий | `[~]` |

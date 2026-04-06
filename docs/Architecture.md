@@ -36,6 +36,10 @@
 
 Источник истины для **публикации**: `category` + подкатегории (активные `EventSubcategoryLink`, при отсутствии связей — legacy enum `Event.subcategories`), минимум 1 и максимум 3 подкатегории на событие. Теги (STRUCTURAL/POPULAR) — вторичный слой, **не** блокируют publish. Подробнее: **[Catalog-Classification-Policy.md](Catalog-Classification-Policy.md)**.
 
+**Политика импорта (MVP, чтобы убрать ручную рутину):**
+- Импортёры **TC/TEP** при синхронизации **автоматически** проставляют `event_subcategory_links` (PRIMARY по сигналам классификатора; при отсутствии — safe default по `category`), а также best-effort UNIVERSAL secondary (на текущем этапе: `FAMILY` / `INDOOR` / `OUTDOOR` / `WATER`, до 3).
+- Экран **Source categories** остаётся как редкий инструмент саппорта для редких неизвестных строк, но не является обязательным шагом модерации.
+
 ### 2.4 Публичная выдача `/events` (фильтры query)
 
 Сборка `where`: `packages/backend/src/catalog/where-builders.ts` — подкатегория и теги не перетирают верхнеуровневые `OR` (например, правила импорта в production); при совместном запросе `subcategory` + теги применяется **OR** между блоком подкатегории и блоком тегов (внутри тегов — AND по списку). Фильтр сеансов/OPEN_DATE передаётся вторым аргументом и попадает в `AND`.

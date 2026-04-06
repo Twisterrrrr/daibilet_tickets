@@ -722,6 +722,52 @@ export class OverrideEventDto {
   editorStatus?: EditorStatus;
 
   @ApiPropertyOptional({
+    description:
+      'Ручной буст для сортировки в каталоге / блоке «Популярные». null = сбросить к значению из sync/override',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsInt()
+  @Min(0)
+  manualBoost?: number | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Подавить показ события в витрине при низком качестве (override.suppressLowQuality = true скрывает событие)',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsBoolean()
+  suppressLowQuality?: boolean | null;
+
+  @ApiPropertyOptional({
+    description: 'Управление показом события в программе площадки. false = скрыть из программы площадки',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsBoolean()
+  showInVenueProgram?: boolean | null;
+
+  @ApiPropertyOptional({
+    description: 'Флаг «избранное событие» в программе площадки (featured). Влияет на сортировку в программе',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsBoolean()
+  isFeaturedInVenue?: boolean | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Явный порядок сортировки события в программе площадки. null = использовать порядок по умолчанию',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsInt()
+  venueProgramSortOrder?: number | null;
+
+  @ApiPropertyOptional({
     enum: SubcategoriesMode,
     description: 'Режим подкатегорий: INHERIT=из sync, OVERRIDE=свой список, CLEAR=пусто',
   })
