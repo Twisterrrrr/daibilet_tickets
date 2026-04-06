@@ -18,6 +18,66 @@ export class CategoryMappingService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Fallback-эвристики для маппинга внешних категорий в EventCategory.
+   *
+   * Важно: это НЕ “контракт”, а best-effort, чтобы импорт по умолчанию
+   * садил событие в разумную категорию и не требовал ручного маппинга.
+   *
+   * Если нужны точные правила для конкретной пары source+category — используем DB mappings.
+   */
+  private fallbackHeuristicCategory(
+    source: string,
+    externalCategoryNorm: string,
+  ): EventCategory | null {
+    if (!externalCategoryNorm) return null;
+
+    // Сейчас ручной маппинг реально нужен в основном для teplohod.info
+    if (source === 'TEPLOHOD') {
+      const s = externalCategoryNorm;
+
+      // Музейные/выставочные истории
+      if (
+        s.includes('музей') ||
+        s.includes('выстав') ||
+        s.includes('галере') ||
+        s.includes('экспозиц') ||
+        s.includes('арт') ||
+        s.includes('искусств')
+      ) {
+        return EventCategory.MUSEUM;
+      }
+
+      // Экскурсионный класс (включая прогулки/круизы, но без попытки угадать подкатегории)
+      if (
+        s.includes('экскурс') ||
+        s.includes('прогул') ||
+        s.includes('тур') ||
+        s.includes('круиз') ||
+        s.includes('маршрут')
+      ) {
+        return EventCategory.EXCURSION;
+      }
+
+      // “Концерт/шоу/спектакль/фестиваль/вечеринка”
+      if (
+        s.includes('концерт') ||
+        s.includes('шоу') ||
+        s.includes('спектак') ||
+        s.includes('театр') ||
+        s.includes('фестив') ||
+        s.includes('вечерин') ||
+        s.includes('дискот') ||
+        s.includes('stand') ||
+        s.includes('стендап')
+      ) {
+        return EventCategory.EVENT;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Ищет маппинг по source + externalCategoryRaw. Без побочных эффектов.
    * @returns EventCategory или null, если маппинга нет
    */
@@ -37,7 +97,10 @@ export class CategoryMappingService {
       LIMIT 1
     `);
 
-    return mappings.length > 0 ? mappings[0]!.internalCategory : null;
+    if (mappings.length > 0) return mappings[0]!.internalCategory;
+
+    // Fallback: best-effort эвристика, чтобы не требовать ручного маппинга на каждую новую строку.
+    return this.fallbackHeuristicCategory(source, externalCategoryNorm);
   }
 
   /**

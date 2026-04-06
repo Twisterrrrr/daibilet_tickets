@@ -38,15 +38,27 @@ export class SubcategoryAssignmentService {
       );
     }
 
-    const primaryRow = await client.subcategory.findFirst({
-      where: {
-        code: primaryCode,
-        type: SubcategoryType.EVENT_ONLY,
-        layer: SubcategoryLayer.PRIMARY,
-        isActive: true,
-      },
-      select: { id: true },
-    });
+    // Исторически в базе могли отсутствовать PRIMARY-слой (все коды лежали в SECONDARY).
+    // Для MVP-процесса импорта/модерации важнее иметь связку по code, чем блокировать импорт.
+    const primaryRow =
+      (await client.subcategory.findFirst({
+        where: {
+          code: primaryCode,
+          type: SubcategoryType.EVENT_ONLY,
+          layer: SubcategoryLayer.PRIMARY,
+          isActive: true,
+        },
+        select: { id: true },
+      })) ??
+      (await client.subcategory.findFirst({
+        where: {
+          code: primaryCode,
+          type: SubcategoryType.EVENT_ONLY,
+          layer: SubcategoryLayer.SECONDARY,
+          isActive: true,
+        },
+        select: { id: true },
+      }));
     if (!primaryRow) {
       throw new BadRequestException(`PRIMARY подкатегория не найдена или неактивна: ${primaryCode}`);
     }
@@ -103,15 +115,25 @@ export class SubcategoryAssignmentService {
       );
     }
 
-    const primaryRow = await client.subcategory.findFirst({
-      where: {
-        code: primaryCode,
-        type: SubcategoryType.VENUE_ONLY,
-        layer: SubcategoryLayer.PRIMARY,
-        isActive: true,
-      },
-      select: { id: true },
-    });
+    const primaryRow =
+      (await client.subcategory.findFirst({
+        where: {
+          code: primaryCode,
+          type: SubcategoryType.VENUE_ONLY,
+          layer: SubcategoryLayer.PRIMARY,
+          isActive: true,
+        },
+        select: { id: true },
+      })) ??
+      (await client.subcategory.findFirst({
+        where: {
+          code: primaryCode,
+          type: SubcategoryType.VENUE_ONLY,
+          layer: SubcategoryLayer.SECONDARY,
+          isActive: true,
+        },
+        select: { id: true },
+      }));
     if (!primaryRow) {
       throw new BadRequestException(`PRIMARY подкатегория площадки не найдена или неактивна: ${primaryCode}`);
     }
