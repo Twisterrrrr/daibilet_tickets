@@ -1,6 +1,7 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 import { DataTableShell, PageHeader, StatusBadge } from '@daibilet/shared-ui';
 
@@ -41,92 +42,6 @@ interface SupplierItem {
   trustOverrideActive?: boolean;
 }
 
-const columns: ColumnDef<SupplierItem>[] = [
-  {
-    accessorKey: 'name',
-    header: ({ column }) => <SortableHeader column={column}>Поставщик</SortableHeader>,
-    cell: ({ row }) => {
-      const s = row.original;
-      const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
-      const name = s.companyName || s.name;
-      return (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            {isAggregator ? (
-              <span className="font-medium text-muted-foreground">{name}</span>
-            ) : (
-              <Link
-                to={`/suppliers/${s.id}`}
-                className="-m-2 block rounded p-2 font-medium text-primary hover:bg-muted/50 hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {name}
-              </Link>
-            )}
-            {isAggregator && (
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
-                агрегатор
-              </span>
-            )}
-          </div>
-          {!isAggregator && s.inn && (
-            <span className="text-xs text-muted-foreground">ИНН: {s.inn}</span>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    accessorKey: 'contactEmail',
-    header: 'Контакт',
-    cell: ({ row }) => <span className="text-muted-foreground text-sm">{row.original.contactEmail || '—'}</span>,
-  },
-  {
-    accessorKey: 'trustLevel',
-    header: 'Trust',
-    cell: ({ row }) => {
-      const s = row.original;
-      const isAgg = typeof s.id === 'string' && s.id.startsWith('agg:');
-      const eff = typeof s.effectiveTrustScore === 'number' ? s.effectiveTrustScore : null;
-      return (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={TRUST_VARIANTS[s.trustLevel] ?? 'secondary'}>
-            {TRUST_LABELS[s.trustLevel] ?? s.trustLevel}
-          </Badge>
-          {!isAgg && eff !== null && (
-            <span className="text-xs tabular-nums text-muted-foreground">{eff}</span>
-          )}
-          {!isAgg && s.trustOverrideActive && (
-            <StatusBadge tone="warning" label="OV" />
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    id: 'commission',
-    header: 'Комиссия',
-    cell: ({ row }) => {
-      const s = row.original;
-      const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
-      if (isAggregator) return <span className="text-sm text-muted-foreground">—</span>;
-      return (
-        <span className="text-sm tabular-nums">{(Number(s.commissionRate) * 100).toFixed(0)}%</span>
-      );
-    },
-  },
-  {
-    id: 'eventsCount',
-    header: 'Событий',
-    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.events ?? 0}</span>,
-  },
-  {
-    id: 'offersCount',
-    header: 'Офферов',
-    cell: ({ row }) => <span className="tabular-nums">{row.original._count?.offers ?? 0}</span>,
-  },
-];
-
 export function SuppliersListPage() {
   const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
@@ -138,6 +53,116 @@ export function SuppliersListPage() {
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const columns: ColumnDef<SupplierItem>[] = [
+    {
+      accessorKey: 'name',
+      header: ({ column }) => <SortableHeader column={column}>Поставщик</SortableHeader>,
+      cell: ({ row }) => {
+        const s = row.original;
+        const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
+        const name = s.companyName || s.name;
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              {isAggregator ? (
+                <span className="font-medium text-muted-foreground">{name}</span>
+              ) : (
+                <Link
+                  to={`/suppliers/${s.id}`}
+                  className="-m-2 block rounded p-2 font-medium text-primary hover:bg-muted/50 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {name}
+                </Link>
+              )}
+              {isAggregator && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
+                  агрегатор
+                </span>
+              )}
+            </div>
+            {!isAggregator && s.inn && <span className="text-xs text-muted-foreground">ИНН: {s.inn}</span>}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'active',
+      header: 'Активен',
+      cell: ({ row }) => {
+        const s = row.original;
+        const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
+        return (
+          <input
+            type="checkbox"
+            checked={s.isActive}
+            disabled={isAggregator || savingId === s.id}
+            onClick={(e) => e.stopPropagation()}
+            onChange={async (e) => {
+              const next = e.target.checked;
+              if (isAggregator) return;
+
+              const prev = s.isActive;
+              setSavingId(s.id);
+              setSuppliers((rows) => rows.map((r) => (r.id === s.id ? { ...r, isActive: next } : r)));
+              try {
+                await adminApi.patch(`/admin/suppliers/${s.id}`, { isActive: next });
+                toast.success(next ? 'Поставщик включен' : 'Поставщик отключен');
+              } catch (err: unknown) {
+                setSuppliers((rows) => rows.map((r) => (r.id === s.id ? { ...r, isActive: prev } : r)));
+                toast.error(err instanceof Error ? err.message : String(err));
+              } finally {
+                setSavingId(null);
+              }
+            }}
+          />
+        );
+      },
+    },
+    {
+      accessorKey: 'contactEmail',
+      header: 'Контакт',
+      cell: ({ row }) => <span className="text-muted-foreground text-sm">{row.original.contactEmail || '—'}</span>,
+    },
+    {
+      accessorKey: 'trustLevel',
+      header: 'Trust',
+      cell: ({ row }) => {
+        const s = row.original;
+        const isAgg = typeof s.id === 'string' && s.id.startsWith('agg:');
+        const eff = typeof s.effectiveTrustScore === 'number' ? s.effectiveTrustScore : null;
+        return (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant={TRUST_VARIANTS[s.trustLevel] ?? 'secondary'}>{TRUST_LABELS[s.trustLevel] ?? s.trustLevel}</Badge>
+            {!isAgg && eff !== null && <span className="text-xs tabular-nums text-muted-foreground">{eff}</span>}
+            {!isAgg && s.trustOverrideActive && <StatusBadge tone="warning" label="OV" />}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'commission',
+      header: 'Комиссия',
+      cell: ({ row }) => {
+        const s = row.original;
+        const isAggregator = typeof s.id === 'string' && s.id.startsWith('agg:');
+        if (isAggregator) return <span className="text-sm text-muted-foreground">—</span>;
+        return <span className="text-sm tabular-nums">{(Number(s.commissionRate) * 100).toFixed(0)}%</span>;
+      },
+    },
+    {
+      id: 'eventsCount',
+      header: 'Событий',
+      cell: ({ row }) => <span className="tabular-nums">{row.original._count?.events ?? 0}</span>,
+    },
+    {
+      id: 'offersCount',
+      header: 'Офферов',
+      cell: ({ row }) => <span className="tabular-nums">{row.original._count?.offers ?? 0}</span>,
+    },
+  ];
 
   const load = (opts?: { page?: number; search?: string; trust?: string; isActive?: string }) => {
     const nextPage = opts?.page ?? page;
