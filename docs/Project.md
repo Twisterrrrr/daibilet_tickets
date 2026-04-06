@@ -203,6 +203,17 @@
 - **RefundRequest** — заявка на возврат одной позиции (FK на FulfillmentItem и PAID PaymentIntent), статусы CREATED→…→COMPLETED/FAILED, причина enum (USER_REQUEST, …). Идемпотентность проведения: `Idempotence-Key` YooKassa `refund:fulfillment-request:{id}`; STUB — без внешнего вызова.
 - **Operator** — юридическое лицо/правообладатель. Поля маркетплейса: isSupplier, trustLevel, commissionRate, status (ACTIVE/ARCHIVED/SUSPENDED), trustScore + разложение по блокам доверия (profile/catalog/operations/reputation/stability/penalties), флаги ручного override. Подробно: § Архитектура Supplier ниже.
 - **SupplierUser** — аккаунт поставщика (Operator 1—N SupplierUser). Роли: OWNER, MANAGER, CONTENT, ACCOUNTANT.
+
+### Операционные режимы поставщика (политика платформы)
+
+- **Мягкое отключение (sales OFF):** `Operator.isActive = false`.
+  - Поставщик и его контент **не удаляются**.
+  - Страницы событий **не превращаются в 404** (контент остаётся доступен по прямой ссылке).
+  - Покупка отключается: публичный read-path **не отдаёт offers**, а checkout **запрещает** создание новых заказов.
+  - Уже купленные билеты и заказы остаются валидными.
+- **Заморозка обмена (exchange frozen):** `Operator.status = SUSPENDED`.
+  - Используется, когда нужно остановить обмен данными (B2B Partner API) без удаления поставщика.
+  - Может применяться отдельно от `isActive`.
 - **User** — пользователь сайта (регистрация/вход). Избранное в UserFavorite (eventSlug).
 - **ApiKey** — API-ключ для Partner B2B API: SHA-256 хеш (не храним оригинал), prefix (8 символов для UI), rateLimit, ipWhitelist, expiresAt.
 - **Venue** — место (музей, галерея, арт-пространство). VenueType enum (MUSEUM/GALLERY/ART_SPACE/EXHIBITION_HALL/THEATER/PALACE/PARK). Содержит: openingHours (JSON), priceFrom, rating, galleryUrls, address/metro/lat/lng, operatorId (партнёр), опционально **venueTemplateData** (JSON контента PDP из админки). Soft delete, optimistic lock.

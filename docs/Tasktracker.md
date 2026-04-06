@@ -105,6 +105,7 @@
 | `rbac-enforcement-audit` | Сводка по admin/supplier в матрицах; полный ручной проход по мере изменений | Критический | `[~]` |
 | `supplier-mutation-role-hardening` (**E.1**) | Мутации supplier API с явным `@SupplierRoles` (confirm/reject, settings, finance и т.д.) | Критический | `[ ]` |
 | `audit-log-actor-role` (**E.2**) | Prisma: `AuditLog.actorRole`; interceptor / `AuditService` | Высокий | `[ ]` |
+| `supplier-soft-disable-and-freeze` | **Операционный режим поставщика:** `Operator.isActive=false` (sales OFF без 404) + `Operator.status=SUSPENDED` (freeze Partner API); быстрый тумблер `isActive` в legacy admin suppliers list | Высокий | `[x]` **06.04.2026** |
 
 ### Gates — оставшиеся пункты
 
