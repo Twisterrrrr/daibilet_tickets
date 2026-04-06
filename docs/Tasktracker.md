@@ -28,11 +28,7 @@
 
 ## Открытые задачи (активный бэклог)
 
-| ID / якорь | Задача | Приоритет | Статус |
-|--------|-----------|-----------|--------|
-| `subcat-collections-landing-mvp` | **Subcategory → Collections Engine + SEO landings:** backend-сервисы, публичные/admin API, кэш, пороги env, витрина fallback на `/cities/.../...`, related events/venues по links | Высокий | `[x]` **05.04.2026** |
-| `mvp-item-refunds` | **MVP возвраты по FulfillmentItem:** `RefundRequest`, REFUND_PENDING, isRedeemed, админ API + eligibility, квоты/sold через CONFIRMED+REFUND_PENDING и освобождение при COMPLETED, UI в legacy admin checkout sessions | Высокий | `[x]` **05.04.2026** |
-| `subcat-landing-mode-topic-hub` | **Подкатегории:** `SubcategoryLandingMode` + `landingTopicKey`, RIVER → TOPIC_HUB `river-cruises`, API `/landings/subcategories/.../route`, фронт редирект, канонический seed whitelist, политика маршрутизации в Architecture/Project | Высокий | `[x]` **06.04.2026** |
+Пакет по подкатегориям / Collections / MVP возвратов перенесён в архив — **закрыт в коммите `9d1770a`** (см. таблицу ниже в разделе «Архив»). Правки линтера для CI — **`1cf963f`**.
 
 ### Admin / Supplier V2 — архитектурный долг (roadmap 04.2026)
 
@@ -196,6 +192,14 @@
 ## Архив: закрытые эпики и итерации
 
 > Ниже — **выполненные** треки. Актуальный бэклог — только в секции **«Открытые задачи»** выше.
+
+### Закрыто в коммите `9d1770a` (main, апрель 2026)
+
+| ID / якорь | Задача | Дата в трекере |
+|--------|-----------|----------------|
+| `subcat-collections-landing-mvp` | **Subcategory → Collections Engine + SEO landings:** backend-сервисы, публичные/admin API, кэш, пороги env, витрина fallback на `/cities/.../...`, related events/venues по links | **05.04.2026** |
+| `mvp-item-refunds` | **MVP возвраты по FulfillmentItem:** `RefundRequest`, REFUND_PENDING, isRedeemed, админ API + eligibility, квоты/sold через CONFIRMED+REFUND_PENDING и освобождение при COMPLETED, UI в legacy admin checkout sessions | **05.04.2026** |
+| `subcat-landing-mode-topic-hub` | **Подкатегории:** `SubcategoryLandingMode` + `landingTopicKey`, RIVER → TOPIC_HUB `river-cruises`, API `/landings/subcategories/.../route`, фронт редирект, канонический seed whitelist, политика маршрутизации в Architecture/Project | **06.04.2026** |
 
 ### Сводка по крупным закрытым блокам (2025–2026)
 

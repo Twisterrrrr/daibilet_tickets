@@ -49,7 +49,7 @@
     "typescript-eslint": "^8.55.0"
   },
   "lint-staged": {
-    "packages/frontend/src/**/*.{ts,tsx,js,jsx}": "npx eslint --max-warnings=0"
+    "packages/frontend/src/**/*.{ts,tsx,js,jsx}": "npx eslint --config packages/frontend/eslint.config.mjs --max-warnings=0"
   },
   "engines": {
     "node": ">=20.0.0",
