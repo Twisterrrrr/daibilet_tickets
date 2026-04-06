@@ -8,7 +8,7 @@ import { CatalogClassificationNormalizerService } from '../catalog-classificatio
 describe('CatalogClassificationNormalizerService', () => {
   const policy = new SubcategoryPolicyService();
 
-  it('returns ordered unique rows and respects max 3', async () => {
+  it('returns ordered unique rows and respects max 4', async () => {
     const findMany = vi.fn().mockResolvedValue([
       { id: 'a', slug: 'alpha' },
       { id: 'b', slug: 'beta' },
@@ -21,16 +21,19 @@ describe('CatalogClassificationNormalizerService', () => {
     expect(findMany).toHaveBeenCalled();
   });
 
-  it('throws when more than 3 unique subcategories', async () => {
+  it('throws when more than 4 unique subcategories', async () => {
     const findMany = vi.fn().mockResolvedValue([
       { id: 'a', slug: 'a' },
       { id: 'b', slug: 'b' },
       { id: 'c', slug: 'c' },
       { id: 'd', slug: 'd' },
+      { id: 'e', slug: 'e' },
     ]);
     const prisma = { subcategory: { findMany } } as unknown as PrismaService;
     const svc = new CatalogClassificationNormalizerService(prisma, policy);
-    await expect(svc.resolveActiveEventSubcategories(['a', 'b', 'c', 'd'], [])).rejects.toThrow(BadRequestException);
+    await expect(svc.resolveActiveEventSubcategories(['a', 'b', 'c', 'd', 'e'], [])).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('throws when id missing in DB', async () => {
