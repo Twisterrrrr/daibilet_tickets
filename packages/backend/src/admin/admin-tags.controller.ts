@@ -13,7 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { StructuralTagGroup, TagKind } from '@prisma/client';
+import { Prisma, StructuralTagGroup, TagKind } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -120,7 +120,7 @@ export class AdminTagsController {
       structuralGroup: data.structuralGroup ?? null,
     });
     const normalized = this.normalizeTagPayload(data as unknown as Record<string, unknown>);
-    return this.prisma.tag.create({ data: normalized as any });
+    return this.prisma.tag.create({ data: normalized as Prisma.TagCreateInput });
   }
 
   @Patch(':id')

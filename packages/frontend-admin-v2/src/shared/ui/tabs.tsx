@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useId,
   useMemo,
@@ -42,10 +43,13 @@ export function Tabs({
   const isControlled = valueProp !== undefined;
   const value = isControlled ? valueProp : internal;
 
-  const setValue = (v: string) => {
-    if (!isControlled) setInternal(v);
-    onValueChange?.(v);
-  };
+  const setValue = useCallback(
+    (v: string) => {
+      if (!isControlled) setInternal(v);
+      onValueChange?.(v);
+    },
+    [isControlled, onValueChange],
+  );
 
   const ctx = useMemo(() => ({ value, setValue, baseId }), [value, setValue, baseId]);
 

@@ -163,7 +163,7 @@ export function EventSessionsBoardPage() {
 
   const selectedIds = useMemo(() => Object.keys(selected).filter((id) => selected[id]), [selected]);
 
-  const tableRows = data?.rows ?? [];
+  const tableRows = useMemo(() => data?.rows ?? [], [data]);
   const rowBySessionId = useMemo(() => {
     const m = new Map<string, OverviewRow>();
     for (const r of tableRows) m.set(r.sessionId, r);

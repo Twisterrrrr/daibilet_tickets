@@ -139,5 +139,5 @@ export async function seedCanonicalSubcategories(prisma: PrismaClient): Promise<
     await upsertAll(tx);
     await linkParents(tx);
   });
-  console.log(`  ✓ Canonical subcategories whitelist (${SUBCATEGORIES.length} rows, landingMode + hierarchy)`);
+  console.warn(`  ✓ Canonical subcategories whitelist (${SUBCATEGORIES.length} rows, landingMode + hierarchy)`);
 }
