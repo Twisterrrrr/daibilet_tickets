@@ -1408,7 +1408,6 @@ export class CatalogService {
               city: { select: { slug: true, name: true } },
               venue: { select: { title: true, shortTitle: true } },
               override: { select: { manualBoost: true } },
-              supplierId: true,
               subcategoryLinks: {
                 select: {
                   subcategory: { select: { code: true, nameRu: true, layer: true } },
@@ -1449,7 +1448,9 @@ export class CatalogService {
     const dbMs = Date.now() - tDb0;
 
     const tOv0 = Date.now();
-    const overriddenRaw = await this.overrideService.applyOverrides(rawItems);
+    const overriddenRaw = await this.overrideService.applyOverrides(
+      rawItems as unknown as Array<Record<string, unknown> & { id: string }>,
+    );
     const overriddenBase = overriddenRaw.map((e) => this.mergeEventSubcategoryFields(e as Record<string, unknown>));
     const overridden = await this.applySupplierDisablePolicyToEvents(overriddenBase as Record<string, unknown>[]);
     const overrideMs = Date.now() - tOv0;

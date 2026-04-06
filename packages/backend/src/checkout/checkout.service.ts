@@ -67,9 +67,6 @@ export class CheckoutService {
       where: {
         OR: [...(isUuid ? [{ id: body.eventId }] : []), { slug: body.eventId }, { tcEventId: body.eventId }],
       },
-      include: {
-        supplier: { select: { id: true, isActive: true, status: true } },
-      },
     });
 
     if (!event) {
@@ -77,8 +74,14 @@ export class CheckoutService {
     }
 
     // Мягкое отключение поставщика: событие доступно для просмотра, но покупка запрещена.
-    if (event.supplier && (!event.supplier.isActive || event.supplier.status !== 'ACTIVE')) {
-      throw new ForbiddenException('Покупка недоступна: поставщик отключен');
+    if (event.supplierId) {
+      const supplier = await this.prisma.operator.findUnique({
+        where: { id: event.supplierId },
+        select: { isActive: true, status: true },
+      });
+      if (supplier && (!supplier.isActive || supplier.status !== 'ACTIVE')) {
+        throw new ForbiddenException('Покупка недоступна: поставщик отключен');
+      }
     }
 
     if (event.source !== 'TC') {
