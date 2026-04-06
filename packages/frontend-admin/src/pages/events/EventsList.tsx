@@ -1,11 +1,12 @@
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
-import { MoreHorizontal, Plus, RefreshCw, Search, Star } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, MoreHorizontal, Plus, RefreshCw, Search, Star, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { DataTableShell, FilterBar, PageHeader } from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
+import { getEventAdminSummary, type EventAdminSummary } from '@/api/adminEventSummary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/DataTable';
@@ -73,6 +74,8 @@ export function EventsListPage() {
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [cities, setCities] = useState<Array<{ slug: string; name: string }>>([]);
   const [citiesLoaded, setCitiesLoaded] = useState(false);
+  const [summaryById, setSummaryById] = useState<Record<string, EventAdminSummary | undefined>>({});
+  const [summaryLoadingIds, setSummaryLoadingIds] = useState<Record<string, boolean | undefined>>({});
 
   const [filters, setFilters] = useState({
     city: '',
@@ -80,6 +83,7 @@ export function EventsListPage() {
     source: '',
     active: '',
     hidden: '',
+    readiness: '',
     search: '',
     page: 1,
     limit: 50,
@@ -105,6 +109,33 @@ export function EventsListPage() {
       .finally(() => setLoading(false));
   }, [filters]);
 
+  const ensureSummaries = useCallback(
+    async (ids: string[]) => {
+      const missing = ids.filter((id) => !summaryById[id] && !summaryLoadingIds[id]);
+      if (missing.length === 0) return;
+
+      const concurrency = 6;
+      let idx = 0;
+      const run = async () => {
+        while (idx < missing.length) {
+          const id = missing[idx++];
+          setSummaryLoadingIds((prev) => ({ ...prev, [id]: true }));
+          try {
+            const s = await getEventAdminSummary(id);
+            setSummaryById((prev) => ({ ...prev, [id]: s }));
+          } catch {
+            // не блокируем UI, если summary временно недоступен
+          } finally {
+            setSummaryLoadingIds((prev) => ({ ...prev, [id]: false }));
+          }
+        }
+      };
+
+      await Promise.all(Array.from({ length: Math.min(concurrency, missing.length) }, run));
+    },
+    [summaryById, summaryLoadingIds],
+  );
+
   const handleDuplicate = async (eventId: string) => {
     setDuplicatingId(eventId);
     try {
@@ -128,6 +159,11 @@ export function EventsListPage() {
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  useEffect(() => {
+    const ids = data?.items?.map((i) => i.id) ?? [];
+    void ensureSummaries(ids);
+  }, [data?.items, ensureSummaries]);
 
   // Загрузить все города для фильтра (админский список, не витрина)
   useEffect(() => {
@@ -229,6 +265,58 @@ export function EventsListPage() {
       ),
     },
     {
+      id: 'readiness',
+      header: 'Готовность',
+      cell: ({ row }) => {
+        const id = row.original.id;
+        const summary = summaryById[id];
+        const status = summary?.readiness?.status ?? null;
+        const issuesCount = summary?.readiness?.issues?.length ?? 0;
+        const isLoading = !!summaryLoadingIds[id];
+
+        if (!summary && isLoading) {
+          return <span className="text-xs text-muted-foreground">Проверяем…</span>;
+        }
+        if (!summary) {
+          return <span className="text-xs text-muted-foreground">—</span>;
+        }
+
+        if (status === 'READY') {
+          return (
+            <div className="flex items-center gap-2">
+              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200" variant="outline">
+                <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                Готово
+              </Badge>
+              {issuesCount > 0 && <span className="text-xs text-muted-foreground">({issuesCount})</span>}
+            </div>
+          );
+        }
+
+        if (status === 'NEEDS_WORK') {
+          return (
+            <div className="flex items-center gap-2">
+              <Badge className="bg-amber-50 text-amber-800 border-amber-200" variant="outline">
+                <AlertTriangle className="mr-1 h-3.5 w-3.5" />
+                Есть правки
+              </Badge>
+              {issuesCount > 0 && <span className="text-xs text-muted-foreground">({issuesCount})</span>}
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex items-center gap-2">
+            <Badge className="bg-red-50 text-red-700 border-red-200" variant="outline">
+              <XCircle className="mr-1 h-3.5 w-3.5" />
+              Блокер
+            </Badge>
+            {issuesCount > 0 && <span className="text-xs text-muted-foreground">({issuesCount})</span>}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: 'category',
       header: 'Категория',
       cell: ({ row }) => (
@@ -259,7 +347,7 @@ export function EventsListPage() {
     },
     {
       id: 'status',
-      header: 'Вкл/Выкл',
+      header: 'В каталоге',
       cell: ({ row }) => {
         const isHidden = row.original.override?.isHidden ?? false;
         const inCatalog = row.original.isActive && !isHidden;
@@ -283,7 +371,7 @@ export function EventsListPage() {
                 }
               }}
             />
-            <span className="text-xs text-muted-foreground">{inCatalog ? 'Вкл' : 'Выкл'}</span>
+            <span className="text-xs text-muted-foreground">{inCatalog ? 'Да' : 'Нет'}</span>
           </div>
         );
       },
@@ -325,6 +413,25 @@ export function EventsListPage() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => navigate(`/events/${event.id}`)}>
                 Открыть
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  setStatusBusyId(event.id);
+                  try {
+                    const res = await adminApi.post<{ ok: boolean; issues?: unknown[] }>(`/admin/events/${event.id}/publish`);
+                    if (res?.ok) {
+                      await adminApi.patch(`/admin/events/${event.id}/hide`, { isHidden: false });
+                      fetchEvents();
+                    }
+                    await ensureSummaries([event.id]);
+                  } catch (e) {
+                    console.error('Publish failed', e);
+                  } finally {
+                    setStatusBusyId(null);
+                  }
+                }}
+              >
+                Опубликовать (с проверкой)
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
@@ -405,6 +512,7 @@ export function EventsListPage() {
                 source: '',
                 active: '',
                 hidden: '',
+                readiness: '',
                 search: '',
                 page: 1,
                 limit: filters.limit,
@@ -488,6 +596,20 @@ export function EventsListPage() {
                 <SelectItem value="false">Неактивные</SelectItem>
               </SelectContent>
             </Select>
+            <Select
+              value={filters.readiness || '__all__'}
+              onValueChange={(v) => setFilters((f) => ({ ...f, readiness: v === '__all__' ? '' : v, page: 1 }))}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Готовность" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Любая готовность</SelectItem>
+                <SelectItem value="READY">Готово</SelectItem>
+                <SelectItem value="NEEDS_WORK">Есть правки</SelectItem>
+                <SelectItem value="BLOCKED">Блокер</SelectItem>
+              </SelectContent>
+            </Select>
             {hasSelection && (
               <>
                 <span className="ml-1 text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
@@ -554,7 +676,13 @@ export function EventsListPage() {
         <div className="overflow-hidden rounded-[10px] border border-border/80 bg-white shadow-none">
           <DataTable
             columns={columns}
-            data={data?.items ?? []}
+            data={
+              (data?.items ?? []).filter((item) => {
+                if (!filters.readiness) return true;
+                const s = summaryById[item.id]?.readiness?.status ?? null;
+                return s === filters.readiness;
+              })
+            }
             loading={false}
             emptyText="Нет событий, соответствующих фильтрам"
             onRowClick={(item) => navigate(`/events/${item.id}`)}
