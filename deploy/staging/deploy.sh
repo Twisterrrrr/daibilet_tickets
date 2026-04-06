@@ -12,9 +12,9 @@ DEPLOY_BRANCH="${DEPLOY_BRANCH:-staging}"
 
 echo "=== [1/7] Git sync (origin/${DEPLOY_BRANCH}) ==="
 git fetch origin "${DEPLOY_BRANCH}"
-if [ -f "scripts/setup-ssl-production.sh" ] && ! git ls-files --error-unmatch "scripts/setup-ssl-production.sh" >/dev/null 2>&1; then
+if [ \( -e "scripts/setup-ssl-production.sh" -o -L "scripts/setup-ssl-production.sh" \) ] && ! git ls-files --error-unmatch "scripts/setup-ssl-production.sh" >/dev/null 2>&1; then
   echo "[git] removing untracked scripts/setup-ssl-production.sh (will be restored from repo)"
-  rm -f "scripts/setup-ssl-production.sh"
+  rm -rf "scripts/setup-ssl-production.sh"
 fi
 git checkout -B "${DEPLOY_BRANCH}" "origin/${DEPLOY_BRANCH}"
 git reset --hard "origin/${DEPLOY_BRANCH}"
