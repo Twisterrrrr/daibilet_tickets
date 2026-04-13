@@ -1,0 +1,355 @@
+// =============================================================================
+// CATALOG FOUNDATION (Phase 1 — sellable core)
+// =============================================================================
+// Это НЕ самостоятельный schema-файл. Слить в schema.prisma после удаления legacy-
+// моделей каталога (Event/Venue/старый Location/EventSession/EventOffer/…).
+//
+// Обязательно обновить модели City и Operator (см. комментарии внизу).
+// Region — не трогать.
+// =============================================================================
+
+enum PublishStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SourceType {
+  MANUAL
+  TICKETSCLOUD
+  TEPLOHOD
+  EXTERNAL_API
+}
+
+enum SessionOwnerKind {
+  EVENT
+  ADMISSION
+}
+
+enum OfferOwnerKind {
+  EVENT
+  ADMISSION
+}
+
+enum ProviderEntityKind {
+  EVENT
+  ADMISSION
+  SESSION
+  OFFER
+  LOCATION
+}
+
+enum EventFormat {
+  EXCURSION
+  CRUISE
+  CONCERT
+  PERFORMANCE
+  EXHIBITION_EVENT
+  TOUR
+  MASTER_CLASS
+  FESTIVAL
+  LECTURE
+  OTHER
+}
+
+enum EventDateMode {
+  ONE_TIME
+  SCHEDULED
+  OPEN_DATE
+}
+
+enum AdmissionType {
+  MUSEUM_ENTRY
+  EXHIBITION_ENTRY
+  OBSERVATION_ENTRY
+  PARK_ENTRY
+  ATTRACTION_ENTRY
+  COMPLEX_ENTRY
+  OTHER
+}
+
+enum LocationKind {
+  MUSEUM
+  VENUE
+  LANDMARK
+  PIER
+  PARK
+  DISTRICT
+  ROUTE_OBJECT
+  OTHER
+}
+
+enum PlacePointKind {
+  START_POINT
+  END_POINT
+  BOARDING_POINT
+  DISEMBARK_POINT
+  OTHER
+}
+
+/// Хаб / площадка (новая доменная Location; не путать со старой таблицей locations до reset)
+model Location {
+  id           String        @id @default(uuid()) @db.Uuid
+  slug         String        @unique
+  name         String
+  shortName    String?
+  kind         LocationKind
+  cityId       String        @db.Uuid
+  operatorId   String?       @db.Uuid
+  source       SourceType    @default(MANUAL)
+  sourceRef    String?
+
+  address   String?
+  metro     String?
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+
+  isActive      Boolean       @default(true)
+  publishStatus PublishStatus @default(DRAFT)
+
+  summary     String? @db.Text
+  description String? @db.Text
+
+  externalUrl String?
+  h1          String?
+  seoTitle       String?
+  seoDescription String? @db.Text
+
+  city     City      @relation(fields: [cityId], references: [id])
+  operator Operator? @relation(fields: [operatorId], references: [id])
+
+  placePoints PlacePoint[]
+  events              Event[]
+  admissionProducts   AdmissionProduct[]
+  providerLinks       ProviderLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cityId, kind, publishStatus])
+  @@index([operatorId])
+  @@map("locations")
+}
+
+model PlacePoint {
+  id         String         @id @default(uuid()) @db.Uuid
+  locationId String         @db.Uuid
+
+  name String
+  kind PlacePointKind @default(OTHER)
+
+  address   String?
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+  notes     String?  @db.Text
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([locationId, kind])
+  @@index([locationId])
+  @@map("place_points")
+}
+
+model Event {
+  id       String @id @default(uuid()) @db.Uuid
+  slug     String @unique
+  title    String
+  shortTitle String?
+  format   EventFormat
+  dateMode EventDateMode
+
+  cityId     String  @db.Uuid
+  locationId String? @db.Uuid
+  operatorId String? @db.Uuid
+
+  source    SourceType @default(MANUAL)
+  sourceRef String?
+  externalUrl String?
+
+  summary         String? @db.Text
+  description     String? @db.Text
+  durationMinutes Int?
+  ageMin          Int?
+
+  isActive      Boolean       @default(true)
+  publishStatus PublishStatus @default(DRAFT)
+
+  h1             String?
+  seoTitle       String?
+  seoDescription String? @db.Text
+
+  city     City       @relation(fields: [cityId], references: [id])
+  location Location?  @relation(fields: [locationId], references: [id])
+  operator Operator?  @relation(fields: [operatorId], references: [id])
+
+  sessions       Session[]
+  offers         Offer[]
+  providerLinks  ProviderLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cityId, publishStatus])
+  @@index([locationId])
+  @@index([operatorId])
+  @@map("events")
+}
+
+model AdmissionProduct {
+  id       String @id @default(uuid()) @db.Uuid
+  slug     String @unique
+  title    String
+  shortTitle String?
+  type     AdmissionType
+
+  cityId     String @db.Uuid
+  locationId String @db.Uuid
+  operatorId String? @db.Uuid
+
+  source    SourceType @default(MANUAL)
+  sourceRef String?
+  externalUrl String?
+
+  summary     String? @db.Text
+  description String? @db.Text
+  durationMinutes Int?
+  ageMin          Int?
+
+  isActive      Boolean       @default(true)
+  publishStatus PublishStatus @default(DRAFT)
+
+  h1             String?
+  seoTitle       String?
+  seoDescription String? @db.Text
+
+  city     City     @relation(fields: [cityId], references: [id])
+  location Location @relation(fields: [locationId], references: [id])
+  operator Operator? @relation(fields: [operatorId], references: [id])
+
+  sessions      Session[]
+  offers        Offer[]
+  providerLinks ProviderLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cityId, publishStatus])
+  @@index([locationId])
+  @@index([operatorId])
+  @@map("admission_products")
+}
+
+model Session {
+  id                 String           @id @default(uuid()) @db.Uuid
+  ownerKind          SessionOwnerKind
+  eventId            String?          @db.Uuid
+  admissionProductId String?          @db.Uuid
+
+  startsAt DateTime
+  endsAt   DateTime?
+  doorsOpenAt DateTime?
+
+  capacity    Int?
+  isCancelled Boolean @default(false)
+  isActive    Boolean @default(true)
+
+  event            Event?            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  admissionProduct AdmissionProduct? @relation(fields: [admissionProductId], references: [id], onDelete: Cascade)
+
+  providerLinks ProviderLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId, startsAt])
+  @@index([admissionProductId, startsAt])
+  @@index([startsAt])
+  @@map("catalog_sessions")
+}
+
+model Offer {
+  id                 String         @id @default(uuid()) @db.Uuid
+  ownerKind          OfferOwnerKind
+  eventId            String?        @db.Uuid
+  admissionProductId String?        @db.Uuid
+
+  title       String
+  code        String?
+  description String? @db.Text
+
+  currency  String   @default("RUB") @db.VarChar(3)
+  priceFrom Decimal? @db.Decimal(10, 2)
+  priceTo   Decimal? @db.Decimal(10, 2)
+
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  event            Event?            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  admissionProduct AdmissionProduct? @relation(fields: [admissionProductId], references: [id], onDelete: Cascade)
+
+  providerLinks ProviderLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId, isActive])
+  @@index([admissionProductId, isActive])
+  @@index([isActive])
+  @@map("catalog_offers")
+}
+
+model ProviderLink {
+  id                 String @id @default(uuid()) @db.Uuid
+  source             SourceType
+  entityKind         ProviderEntityKind
+
+  eventId            String? @db.Uuid
+  admissionProductId String? @db.Uuid
+  sessionId          String? @db.Uuid
+  offerId            String? @db.Uuid
+  locationId         String? @db.Uuid
+
+  externalId       String
+  externalParentId String?
+
+  payload Json?
+
+  event            Event?            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  admissionProduct AdmissionProduct? @relation(fields: [admissionProductId], references: [id], onDelete: Cascade)
+  session          Session?          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  offer            Offer?            @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  location         Location?         @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([source, entityKind, externalId])
+  @@index([eventId])
+  @@index([admissionProductId])
+  @@index([sessionId])
+  @@index([offerId])
+  @@index([locationId])
+  @@map("provider_links")
+}
+
+// -----------------------------------------------------------------------------
+// Патч City: удалить связи к legacy-каталогу (events, venues, articles, …) и добавить:
+//
+//   foundationLocations    Location[]
+//   foundationEvents       Event[]
+//   foundationAdmissions   AdmissionProduct[]
+//
+// (имена полей выбрать осмысленно; Prisma требует уникальные имена relation fields.)
+// -----------------------------------------------------------------------------
+//
+// Патч Operator: удалить events Event[], venues Venue[], offers EventOffer[] (legacy)
+// и добавить:
+//
+//   foundationLocations    Location[]
+//   foundationEvents       Event[]
+//   foundationAdmissions   AdmissionProduct[]
+// -----------------------------------------------------------------------------
