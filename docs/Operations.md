@@ -334,3 +334,39 @@ curl -L -H "Authorization: Bearer <ADMIN_JWT>" \
 
 - В `Dockerfile.backend` для рантайма установлены пакеты Chromium (`chromium`, `nss`, `freetype`, `harfbuzz`, `ca-certificates`, `ttf-freefont`).
 - По умолчанию задан `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser`.
+
+---
+
+## Telegram — ответы в чате поддержки из бота (опционально)
+
+Клиент пишет в виджет на сайте; операторы с numeric **user id** из `TELEGRAM_OPERATOR_USER_IDS` получают уведомление в личку с ботом и после `/start conv_<uuid>` могут отвечать текстом — сообщения сохраняются как ответы администратора в том же диалоге (как в админке).
+
+**Переменные окружения:**
+
+| Переменная | Назначение |
+|------------|------------|
+| `TELEGRAM_BOT_TOKEN` | Токен бота |
+| `TELEGRAM_WEBHOOK_SECRET` | Секрет для заголовка `X-Telegram-Bot-Api-Secret-Token` |
+| `TELEGRAM_OPERATOR_USER_IDS` | Через запятую: numeric id пользователей Telegram (личный чат с ботом) |
+| `TELEGRAM_BOT_USERNAME` | Имя бота без `@` — ссылки в письме и в тексте уведомления |
+
+**Важно:** уведомления `sendMessage` в личку возможны только после того, как оператор **открыл бота и нажал Start** (или отправил любое сообщение боту). Иначе Telegram отвечает 403 — в логах backend будет предупреждение.
+
+Если пушей нет: проверьте имя переменной **`TELEGRAM_OPERATOR_USER_IDS`** (именно мн. число), только цифры id через запятую, без `@username`. Для отладки включите уровень логов с `debug`, чтобы видеть строку «уведомление пропущено», если токен или список пустые.
+
+**Webhook** (публичный HTTPS API):
+
+- URL: `https://<host>/api/v1/webhooks/telegram`
+- При установке webhook передать `secret_token` = `TELEGRAM_WEBHOOK_SECRET` (Telegram будет слать его в заголовке).
+
+Пример:
+
+```bash
+curl -fsS -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -d "url=https://<public-api-host>/api/v1/webhooks/telegram" \
+  -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+```
+
+**Миграция БД:** таблица `chat_telegram_operator_states` (состояние «активный диалог» на оператора).
+
+После деплоя: `npx prisma migrate deploy` (или эквивалент в вашем CI) и `pnpm exec prisma generate` при необходимости.

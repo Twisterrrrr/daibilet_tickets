@@ -10,6 +10,22 @@
 - **Каталог** — direct DB queries; будущее: event_card_cache / static index (см. §5).
 - **Landing Engine** — TopicDefinition → isActive по порогу событий; Canonical Tag Enrichment.
 
+### 1.1 Слои данных и источник истины
+
+В системе есть базовые сущности (core), канонический слой (dictionary/normalization) и производные read‑модели. **Производные слои не являются источником истины** и не должны хранить самостоятельное состояние, которое может рассинхронизироваться.
+
+- **Core (источник истины)**: `Event`, `Venue` и связанные с ними write‑сущности/статусы, которые определяют поведение (публикация, доступность, продажи).
+- **Канонический слой**: справочники и нормализация, например `Subcategory` (whitelist + SEO policy), связи `event_subcategory_links`, нормализованные площадки/локации.
+- **Производные слои (derived / read models)**: Категория/Section (5 разделов), публичные страницы/маршруты, хабы/лендинги, витринные представления — **всегда вычисляются** из core + каноники и не должны быть отдельным полем в `Event`.
+
+### 1.2 Derived sections (5 разделов) и политика маппинга
+
+- **Sections (derived):** `events | excursions | museums | activities | entertainment` — производный слой для фильтров/SEO/быстрой навигации.
+- **Источник вычисления:** только `section-map` (slug PRIMARY `Subcategory` → section slug). Нельзя выводить section из `EventCategory` напрямую, иначе появятся “висящие” кейсы при смешанных данных и legacy.
+- **Coverage‑инвариант:** любая **активная EVENT_ONLY PRIMARY** подкатегория обязана иметь mapping; если в данных есть legacy/inactive slug — он тоже должен иметь compat mapping, чтобы старые события не выпадали из section‑фильтра.
+
+См. `catalog-sections-backend.md`.
+
 ---
 
 ## 2. Каталог событий

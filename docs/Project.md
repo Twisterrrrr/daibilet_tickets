@@ -29,6 +29,8 @@
 - **B2B / внешние ticket providers (capability foundation)**: `TicketProviderCapabilityFoundation.md`, матрица: `TicketProviderCapabilityMatrix.md`, подготовка Wave 1 (Radario/Qtickets, env + HTTP): `Wave1-Radario-Qtickets-Prep.md`.
 - **Дорожная карта (3 спринта × 2 недели: каталог/редакция → admin-v2/ЛК → поставщик + YooKassa + SEO)**: `Roadmap-3-Sprints-Catalog-Admin-Supplier.md`.
 - **Событие + сеансы (продуктовый контракт эпика Event, admin + supplier; Venue как отдельная сущность — в том же файле §6–7):** `Event-Sessions-Product-Contract.md`.
+- **Admin V3 (легковесная оболочка поверх текущего backend):** `admin-v3-plan.md`, `admin-v3-routing.md`, `admin-v3-ux.md`, `admin-v3-components.md`.
+- **Каталог: derived sections (5 разделов) и маппинг PRIMARY → section:** `catalog-sections-backend.md`.
 
 Перечисленные выше документы (включая дорожную карту спринтов) образуют «центр тяжести»; остальные спецификации — детализация или архив и должны ссылаться на них при изменениях.
 
@@ -60,6 +62,16 @@
 - **Контракты UI:** **DetailPage** = `PageHeader + Tabs + Data + States`; **Supplier** — те же UX-паттерны, что у админа, с **RBAC** и другим API. Новые и перерабатываемые экраны **обязаны** опираться на примитивы **`@daibilet/shared-ui`** по мере их появления (admin-v2 и supplier-v2 — композиция, не второй UI-kit).
 - **Лендинги и slug:** каноническая пара для публичной витрины — **город + slug** (модель `LandingPage`, публичный контракт в `Landings-Architecture.md`). При агрегации тем по slug нужны осознанные **canonical URL**, редиректы с дублей и правила SEO; уникальность в БД при подключении API — отдельное решение.
 - **Осознанный долг:** стандарт DTO и нормализация на клиенте, стратегия кеширования/инвалидации, evolution blueprint из текста в runtime (связь с data fetching, правами и состоянием UI). Детальный пофазный план — внутренний roadmap (`admin_v2_roadmap_*.plan.md` в Cursor).
+
+### Admin V3 — цель и границы (2026‑04)
+
+- **Цель:** быстрый и чистый UI для операционных задач **без** переписывания backend; миграция экранов поштучно (phased migration).
+- **Scope на первом этапе:** Events List + Event Detail с акцентом на **классификацию каталога** (5 derived sections + canonical PRIMARY подкатегории) и работу со **смешанными данными** (новые links + legacy enum fallback).
+- **Инварианты данных (обязательные):**
+  - **Источник истины:** `EventSubcategoryLink` + справочник `Subcategory` (каноника).
+  - **Legacy fallback:** `Event.subcategories[]` используется только для чтения старых данных при отсутствии links.
+  - **Derived section:** вычисляется **только** через `section-map` по slug PRIMARY подкатегории; для любого события section должен резолвиться через канонику/compat mapping.
+  - **UI‑правило:** не предлагать неактивные/legacy подкатегории в выборе, но **показывать** их если они уже стоят у события (read‑only, с пометкой legacy).
 
 ### Supplier Finance (P1–P3.2+)
 
@@ -228,6 +240,8 @@
   - **Правила дерева**: максимальная глубина `root + child` (2 уровня), циклы запрещены, `slug` глобально уникален.
   - **Совместимость типов parent-child**: `UNIVERSAL` может быть родителем для любых типов; для специализированных родителей (`EVENT_ONLY`, `VENUE_ONLY`) тип ребёнка должен совпадать с типом родителя.
   - **Удаление**: базовый сценарий — soft deprecate через `isActive=false`; физическое удаление подкатегорий допускается только для ошибочных/мусорных записей.
+
+> Примечание по совместимости: `EventSubcategory` (enum) остаётся как **legacy‑слой** для старых данных и части override‑логики, но целевая модель классификации и модерации в админке — **links-first**.
 - **Collections Engine + SEO по подкатегории (MVP):** автоматические подборки событий и площадок по `Subcategory.code`, без второго классификатора. Публичные **авто**-SEO-страницы (`landingMode = AUTO`) строятся только при `isLandingEnabled` **и** достаточном количестве элементов (env-пороги); выдача событий для лендинга идёт **только** через тот же отбор, что и у подборки (`CatalogService.getEvents`). Режим **`TOPIC_HUB`** + `landingTopicKey` привязывает таксономию к уже существующему тематическому хабу (без дублирующего generic-URL). **Routing policy:** сегмент `/cities/{city}/{slug}` — зарезервированное пространство; **материализованный** `LandingPage` имеет **более высокий приоритет**, чем автогенерация по подкатегории; канонический whitelist и иерархия — `prisma/seeds/subcategories-canonical.seed.ts`. См. `docs/Architecture.md` §3.4–3.4.1.
 - **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate. Шаблоны страниц — `docs/Reference.md` § PageTemplateSpecs.
 - **EventOffer расширен**: venueId для прямых офферов к месту (без привязки к Event).

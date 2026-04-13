@@ -87,9 +87,20 @@
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
 | `import-auto-subcategory-links` | Импорт (TC/TEP): автопроставление подкатегорий в `event_subcategory_links` (links-first), чтобы модерация начиналась с “разумного дефолта”, а не с ручной посадки | Высокий | `[x]` **06.04.2026** |
+| `admin-v3-shell` | Admin V3 (легковесная оболочка): Events List/Detail, сортировка/колонки, мультиселект, links-first подкатегории | Высокий | `[x]` **13.04.2026** |
+| `catalog-primary-matrix-finalize` | Финальная матрица PRIMARY (event-only) + 5 derived sections: canonical seed + coverage в section-map + legacy inactive compat | Критический | `[x]` **13.04.2026** |
+| `import-mapping-modules` | Import mapping (TC/TEP) → canonical PRIMARY (после keyword классификатора, до fallback) | Высокий | `[x]` **13.04.2026** |
+| `quality-classification-review-flags` | Quality/moderation: derived `classificationSource` + `classificationNeedsReview` в summary DTO и отображение в Admin V3 | Высокий | `[x]` **13.04.2026** |
 | `catalog-consistency-snapshot` | (Опц.) фоновый пересчёт / snapshot-таблица для `GET /admin/catalog/consistency` | Низкий | `[ ]` |
 | `legacy-classification-fix` | Приведение legacy-событий к новой модели (скрипты reclassify / backfill — отдельный план) | Средний | `[ ]` |
 | `G-data-cleanup` | Программа G: trim links и legacy-classification — см. Epic G в архиве | Низкий | `[~]` |
+
+### Catalog foundation v2 — публичный sellable read / checkout adapter
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `foundation-pdp-commercial-layer` | **PDP коммерческий слой:** довести public read-model до “продаваемого” состояния (offers + sessions как основной слой PDP; стабильные сортировки, лимиты, контракт) на базе нового `catalog-foundation-read` | Высокий | `[ ]` |
+| `foundation-checkout-offerid-adapter` | **Минимальный checkout adapter:** перевести точки входа checkout на новый `offerId` (v2) через адаптер-слой, без ломания legacy flow; зафиксировать контракт и миграцию данных при необходимости | Критический | `[ ]` |
 
 ### Наблюдаемость и ops (D-follow-up)
 
