@@ -2706,6 +2706,7 @@ model ChatConversation {
   // Guest info (optional). For authenticated users use userId.
   guestName  String?
   guestEmail String?
+  guestPhone String?
 
   // If user is authenticated we can bind conversation to userId.
   userId String? @db.Uuid
@@ -2721,7 +2722,8 @@ model ChatConversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages ChatMessage[]
+  messages               ChatMessage[]
+  telegramOperatorStates ChatTelegramOperatorState[]
 
   @@index([status])
   @@index([guestEmail])
@@ -2746,6 +2748,18 @@ model ChatMessage {
   @@index([conversationId])
   @@index([createdAt])
   @@map("chat_messages")
+}
+
+/// Состояние оператора в Telegram: какой диалог поддержки сейчас «активен» для ответов из бота.
+model ChatTelegramOperatorState {
+  id                   String            @id @default(uuid()) @db.Uuid
+  telegramUserId       String            @unique
+  activeConversationId String?           @db.Uuid
+  activeConversation   ChatConversation? @relation(fields: [activeConversationId], references: [id], onDelete: SetNull)
+  updatedAt            DateTime          @updatedAt
+
+  @@index([activeConversationId])
+  @@map("chat_telegram_operator_states")
 }
 
 enum TicketStatus {
