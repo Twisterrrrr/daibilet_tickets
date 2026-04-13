@@ -98,6 +98,22 @@ export class AdminSubcategoriesController {
 
     const baseWhere = includeInactiveBool ? {} : { isActive: true };
 
+    // Canonical PRIMARY list for Events: return all active EVENT_ONLY PRIMARY regardless of legacy EventCategory enum.
+    // This is used by Admin V3 for "Подкатегория" filters and editors.
+    if (layerNorm === 'PRIMARY' && entityNorm === 'event' && !type) {
+      return this.prisma.subcategory.findMany({
+        where: {
+          ...baseWhere,
+          layer: SubcategoryLayer.PRIMARY,
+          type: SubcategoryType.EVENT_ONLY,
+        },
+        include: {
+          parent: { select: { id: true, slug: true, nameRu: true } },
+        },
+        orderBy: [{ sortOrder: 'asc' }, { nameRu: 'asc' }],
+      });
+    }
+
     if (layerNorm === 'PRIMARY' && entityNorm === 'event' && type) {
       const cat = type.toUpperCase() as EventCategory;
       const codes = EVENT_PRIMARY_CODES_BY_CATEGORY[cat];

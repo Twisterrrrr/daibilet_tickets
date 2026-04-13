@@ -32,8 +32,8 @@ const LEGACY_SLUG_TO_EVENT_SUBCODE: Record<string, string> = Object.fromEntries(
 
 @Injectable()
 export class SubcategoryPolicyService {
-  /** 1 PRIMARY + до 3 SECONDARY. */
-  static readonly MAX_EVENT_SUBCATEGORIES = 4;
+  /** До 3 подкатегорий на событие (жёсткий publish gate). */
+  static readonly MAX_EVENT_SUBCATEGORIES = 3;
   static readonly MAX_VENUE_SUBCATEGORIES = 4;
 
   /**
@@ -48,7 +48,14 @@ export class SubcategoryPolicyService {
     const code = asLegacyEnum ? token : (LEGACY_SLUG_TO_EVENT_SUBCODE[token] ?? token);
 
     return {
-      subcategoryLinks: { some: { subcategory: { code, isActive: true } } },
+      subcategoryLinks: {
+        some: {
+          subcategory: {
+            isActive: true,
+            OR: [{ code }, { slug: token }],
+          },
+        },
+      },
     };
   }
 
@@ -58,12 +65,19 @@ export class SubcategoryPolicyService {
 
     // source of truth = new links (по code); legacy enum / slug — только fallback.
     const asLegacyEnum = Object.values(EventSubcategory).includes(token as EventSubcategory);
-    const code =
-      asLegacyEnum ? token : (LEGACY_SLUG_TO_EVENT_SUBCODE[token] ?? token);
+    const code = asLegacyEnum ? token : (LEGACY_SLUG_TO_EVENT_SUBCODE[token] ?? token);
 
     return {
       OR: [
-        { subcategoryLinks: { some: { subcategory: { code } } } },
+        {
+          subcategoryLinks: {
+            some: {
+              subcategory: {
+                OR: [{ code }, { slug: token }],
+              },
+            },
+          },
+        },
         ...(asLegacyEnum
           ? [
               {

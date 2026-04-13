@@ -18,6 +18,8 @@ import { mapManualBoostToTier } from './event-admin-summary.util';
 
 function mapIssueSeverity(code: string): 'warning' | 'error' {
   if (code === 'EVENT_NOT_FOUND') return 'error';
+  if (code === 'HAS_INACTIVE_SUBCATEGORY') return 'warning';
+  if (code === 'MISSING_SECONDARY_SUBCATEGORY') return 'warning';
   return 'error';
 }
 
@@ -36,15 +38,9 @@ export class EventAdminSummaryService {
         source: true,
         lastSyncAt: true,
         groupingKey: true,
+        subcategories: true,
         minAge: true,
         audience: true,
-        override: {
-          select: {
-            minAge: true,
-            audience: true,
-            manualBoost: true,
-          },
-        },
       },
     });
 
@@ -52,12 +48,35 @@ export class EventAdminSummaryService {
       throw new NotFoundException('Событие не найдено');
     }
 
+    const override = await this.prisma.eventOverride.findUnique({
+      where: { eventId },
+      select: { minAge: true, audience: true, manualBoost: true },
+    });
+    const subcategoryLinksCount = await this.prisma.eventSubcategoryLink.count({ where: { eventId } });
+
     const quality = await this.eventQuality.validateForPublish(eventId);
 
-    const checklist = this.buildChecklist(quality.issues, event);
-    const readiness = this.buildReadiness(quality.issues, checklist, quality.isReady);
+    const checklist = this.buildChecklist(quality.issues, {
+      minAge: event.minAge,
+      audience: event.audience,
+      override: override ? { minAge: override.minAge, audience: override.audience } : null,
+    });
+    const classificationSource =
+      subcategoryLinksCount > 0
+        ? 'LINKS'
+        : Array.isArray(event.subcategories) && event.subcategories.length > 0
+          ? 'LEGACY_ENUM'
+          : 'NONE';
+    const classificationNeedsReview = quality.issues.some((i) =>
+      ['MISSING_PRIMARY_SUBCATEGORY', 'TOO_MANY_SUBCATEGORIES', 'HAS_INACTIVE_SUBCATEGORY'].includes(i.code),
+    );
 
-    const manualBoost = event.override?.manualBoost ?? 0;
+    const readiness = this.buildReadiness(quality.issues, checklist, quality.isReady, {
+      classificationSource,
+      classificationNeedsReview,
+    });
+
+    const manualBoost = override?.manualBoost ?? 0;
     const tier = mapManualBoostToTier(manualBoost);
     const promotion: EventAdminPromotionDto = {
       tier,
@@ -118,6 +137,7 @@ export class EventAdminSummaryService {
     issues: EventQualityIssue[],
     checklist: EventAdminReadinessChecklistDto,
     isReady: boolean,
+    meta: { classificationSource: 'LINKS' | 'LEGACY_ENUM' | 'NONE'; classificationNeedsReview: boolean },
   ): EventAdminReadinessDto {
     const mappedIssues: EventAdminReadinessIssueDto[] = issues
       .filter((i) => i.code !== 'EVENT_NOT_FOUND')
@@ -138,8 +158,15 @@ export class EventAdminSummaryService {
       status = 'READY';
     }
 
+    const total = Object.keys(checklist).length || 1;
+    const ok = Object.values(checklist).filter(Boolean).length;
+    const score = Math.max(0, Math.min(100, Math.round((ok / total) * 100)));
+
     return {
       status,
+      score,
+      classificationSource: meta.classificationSource,
+      classificationNeedsReview: meta.classificationNeedsReview,
       checklist,
       issues: mappedIssues,
     };

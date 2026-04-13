@@ -7,9 +7,11 @@ import { EventSubcategory, EventTagAssignmentSource, Prisma } from '@prisma/clie
 import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';
 import { classify } from './event-classifier';
+import { pickTicketscloudPrimaryCode } from './ticketscloud-keyword-classifier';
 import { EventTagLifecycleService } from './event-tag-lifecycle.service';
 import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
 import { EVENT_PRIMARY_CODES_BY_CATEGORY } from '../subcategories/subcategory-assignment.constants';
+import { mapTicketscloudLegacyPrimaryToCanonicalPrimaryCode } from './import-mapping/ticketscloud-mapping';
 import { TcApiService } from './tc-api.service';
 import { type TcEvent, type TcTicketSet, type TcTicketSetRule, type TcVenueCity, isTcEvent } from './tc-api.types';
 import {
@@ -113,6 +115,10 @@ export class TcSyncService {
     if (category === 'MUSEUM') return 'MUSEUM_CLASSIC';
     if (category === 'EXCURSION') return 'WALKING';
     return 'SHOW'; // EVENT
+  }
+
+  private pickTicketscloudPrimaryCodeFromText(input: { title?: string | null; description?: string | null; organizer?: string | null }) {
+    return pickTicketscloudPrimaryCode(input);
   }
 
   // ============================================================
@@ -483,7 +489,22 @@ export class TcSyncService {
     // Авто-проставление подкатегорий в “новом слое” (eventSubcategoryLinks).
     // Это убирает рутину из модерации: импорт по умолчанию садит событие в PRIMARY.
     try {
-      const primaryCode = this.pickPrimarySubcategoryCode(String(category), subcategories as EventSubcategory[]);
+      const keywordPrimary = this.pickTicketscloudPrimaryCodeFromText({
+        title,
+        description,
+        organizer: (best as unknown as { orgTitle?: string | null }).orgTitle ?? null,
+      });
+      const allowed =
+        EVENT_PRIMARY_CODES_BY_CATEGORY[String(category) as keyof typeof EVENT_PRIMARY_CODES_BY_CATEGORY] ?? [];
+      const mappedPrimary = mapTicketscloudLegacyPrimaryToCanonicalPrimaryCode({
+        category: String(category),
+        legacy: subcategories as EventSubcategory[],
+        allowedPrimaryCodes: allowed,
+        title,
+        description,
+      });
+      const primaryCode =
+        keywordPrimary ?? mappedPrimary ?? this.pickPrimarySubcategoryCode(String(category), subcategories as EventSubcategory[]);
       const secondaryCodes = this.pickSecondaryUniversalCodes(`${title}\n${description || ''}`, {
         category: String(category),
         audience: String(audience),
@@ -1118,7 +1139,22 @@ export class TcSyncService {
 
     // REST fallback тоже должен проставлять links, чтобы модерация не зависела от режима sync.
     try {
-      const primaryCode = this.pickPrimarySubcategoryCode(String(category), subcategories as EventSubcategory[]);
+      const keywordPrimary = this.pickTicketscloudPrimaryCodeFromText({
+        title,
+        description,
+        organizer: (best as unknown as { org?: { name?: string | null } | null }).org?.name ?? null,
+      });
+      const allowed =
+        EVENT_PRIMARY_CODES_BY_CATEGORY[String(category) as keyof typeof EVENT_PRIMARY_CODES_BY_CATEGORY] ?? [];
+      const mappedPrimary = mapTicketscloudLegacyPrimaryToCanonicalPrimaryCode({
+        category: String(category),
+        legacy: subcategories as EventSubcategory[],
+        allowedPrimaryCodes: allowed,
+        title,
+        description,
+      });
+      const primaryCode =
+        keywordPrimary ?? mappedPrimary ?? this.pickPrimarySubcategoryCode(String(category), subcategories as EventSubcategory[]);
       const secondaryCodes = this.pickSecondaryUniversalCodes(`${title}\n${description || ''}`, {
         category: String(category),
       });

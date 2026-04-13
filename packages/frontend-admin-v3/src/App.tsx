@@ -1,0 +1,136 @@
+import { AdminShell } from '@/app/layout/AdminShell';
+import { QueryProvider } from '@/app/providers/query-provider';
+import { FeatureRoute } from '@/lib/guards/FeatureRoute';
+import { FeatureDisabledPage } from '@/pages/feature-disabled/FeatureDisabledPage';
+import { StubPage } from '@/pages/_stub/StubPage';
+import * as React from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+
+const DashboardPage = React.lazy(() => import('@/pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const EventsListPage = React.lazy(() => import('@/pages/events/EventsListPage').then((m) => ({ default: m.EventsListPage })));
+const EventDetailPage = React.lazy(() => import('@/pages/events/EventDetailPage').then((m) => ({ default: m.EventDetailPage })));
+
+const VenuesListPage = React.lazy(() => import('@/modules/venues/pages/VenuesListPage').then((m) => ({ default: m.VenuesListPage })));
+const VenueDetailPage = React.lazy(() => import('@/modules/venues/pages/VenueDetailPage').then((m) => ({ default: m.VenueDetailPage })));
+
+const CitiesListPage = React.lazy(() => import('@/modules/cities/pages/CitiesListPage').then((m) => ({ default: m.CitiesListPage })));
+const CityDetailPage = React.lazy(() => import('@/modules/cities/pages/CityDetailPage').then((m) => ({ default: m.CityDetailPage })));
+
+const SuppliersListPage = React.lazy(() => import('@/modules/suppliers/pages/SuppliersListPage').then((m) => ({ default: m.SuppliersListPage })));
+const SupplierDetailPage = React.lazy(() => import('@/modules/suppliers/pages/SupplierDetailPage').then((m) => ({ default: m.SupplierDetailPage })));
+
+const CollectionsListPage = React.lazy(() => import('@/modules/collections/pages/CollectionsListPage').then((m) => ({ default: m.CollectionsListPage })));
+const CollectionDetailPage = React.lazy(() => import('@/modules/collections/pages/CollectionDetailPage').then((m) => ({ default: m.CollectionDetailPage })));
+
+const LandingsListPage = React.lazy(() => import('@/modules/landings/pages/LandingsListPage').then((m) => ({ default: m.LandingsListPage })));
+const LandingDetailPage = React.lazy(() => import('@/modules/landings/pages/LandingDetailPage').then((m) => ({ default: m.LandingDetailPage })));
+
+const TagsListPage = React.lazy(() => import('@/modules/tags/pages/TagsListPage').then((m) => ({ default: m.TagsListPage })));
+const SeoAuditPage = React.lazy(() => import('@/modules/seo-audit/pages/SeoAuditPage').then((m) => ({ default: m.SeoAuditPage })));
+
+const ChatListPage = React.lazy(() => import('@/modules/chat/pages/ChatListPage').then((m) => ({ default: m.ChatListPage })));
+const ChatDetailPage = React.lazy(() => import('@/modules/chat/pages/ChatDetailPage').then((m) => ({ default: m.ChatDetailPage })));
+
+const ReviewsListPage = React.lazy(() => import('@/modules/reviews/pages/ReviewsListPage').then((m) => ({ default: m.ReviewsListPage })));
+const PromoBlocksListPage = React.lazy(() =>
+  import('@/modules/promo-blocks/pages/PromoBlocksListPage').then((m) => ({ default: m.PromoBlocksListPage })),
+);
+const TicketsPage = React.lazy(() => import('@/modules/tickets/pages/TicketsPage').then((m) => ({ default: m.TicketsPage })));
+const SettingsPage = React.lazy(() => import('@/modules/settings/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const ModerationPage = React.lazy(() =>
+  import('@/modules/moderation/pages/ModerationPage').then((m) => ({ default: m.ModerationPage })),
+);
+
+export default function App() {
+  return (
+    <QueryProvider>
+      <BrowserRouter>
+        <React.Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Загрузка…</div>}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/admin-v3/dashboard" replace />} />
+
+            <Route path="/admin-v3" element={<AdminShell />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+
+              <Route path="events" element={<EventsListPage />} />
+              <Route path="events/:id" element={<EventDetailPage />} />
+
+              <Route path="venues" element={<VenuesListPage />} />
+              <Route path="venues/:id" element={<VenueDetailPage />} />
+
+              <Route path="cities" element={<CitiesListPage />} />
+              <Route path="cities/:id" element={<CityDetailPage />} />
+
+              <Route path="suppliers" element={<SuppliersListPage />} />
+              <Route path="suppliers/:id" element={<SupplierDetailPage />} />
+
+              <Route path="collections" element={<CollectionsListPage />} />
+              <Route path="collections/:id" element={<CollectionDetailPage />} />
+
+              <Route path="landings" element={<LandingsListPage />} />
+              <Route path="landings/:id" element={<LandingDetailPage />} />
+
+              <Route path="tags" element={<TagsListPage />} />
+              <Route path="seo-audit" element={<SeoAuditPage />} />
+            <Route path="promo-blocks" element={<PromoBlocksListPage />} />
+
+              <Route path="chat" element={<ChatListPage />} />
+              <Route path="chat/:id" element={<ChatDetailPage />} />
+
+              <Route path="reviews" element={<ReviewsListPage />} />
+            <Route path="tickets" element={<TicketsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+              <Route
+                path="moderation"
+                element={
+                  <FeatureRoute feature="MODERATION">
+                    <ModerationPage />
+                  </FeatureRoute>
+                }
+              />
+
+              <Route
+                path="sales"
+                element={
+                  <FeatureRoute feature="SALES">
+                    <StubPage title="Продажи" />
+                  </FeatureRoute>
+                }
+              />
+              <Route
+                path="finance"
+                element={
+                  <FeatureRoute feature="FINANCE">
+                    <StubPage title="Финансы" />
+                  </FeatureRoute>
+                }
+              />
+              <Route
+                path="reports"
+                element={
+                  <FeatureRoute feature="REPORTS">
+                    <StubPage title="Отчеты" />
+                  </FeatureRoute>
+                }
+              />
+              <Route
+                path="users"
+                element={
+                  <FeatureRoute feature="USERS">
+                    <StubPage title="Пользователи" />
+                  </FeatureRoute>
+                }
+              />
+
+              <Route path="feature-disabled" element={<FeatureDisabledPage />} />
+
+              <Route path="*" element={<Navigate to="dashboard" replace />} />
+            </Route>
+          </Routes>
+        </React.Suspense>
+      </BrowserRouter>
+    </QueryProvider>
+  );
+}
+

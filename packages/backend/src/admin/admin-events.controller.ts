@@ -45,7 +45,7 @@ import { ProviderRegistryService } from '../integrations/routing/provider-regist
 import { ProviderRoutingService } from '../integrations/routing/provider-routing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import {
   AdminCreateSessionDto,
   AdminEventSessionsRangeDto,
@@ -79,6 +79,8 @@ import { EventTagRulesService } from './event-tag-rules.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
 import { CatalogClassificationNormalizerService } from '../catalog/catalog-classification-normalizer.service';
+import { deriveSectionsFromSubcategories, getSubcategorySlugsForSection } from '../catalog-classification/derive-sections';
+import type { SectionSlug } from '../catalog-classification/classification.types';
 
 class UpdateEventTagsDto {
   @IsOptional()
@@ -115,6 +117,25 @@ class AssignEventSubcategoriesDto {
   secondaryCodes?: string[];
 }
 
+class BatchArchiveImportedEventsDto {
+  @IsBoolean()
+  dryRun!: boolean;
+
+  @IsString()
+  source!: 'TICKETSCLOUD' | 'TEPLOHOD';
+
+  @IsInt()
+  @Min(1)
+  @Max(3650)
+  olderThanDays!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  take?: number;
+}
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -147,6 +168,16 @@ export class AdminEventsController {
     @Query('active') active?: string,
     @Query('hidden') hidden?: string,
     @Query('search') search?: string,
+    @Query('isPast') isPast?: string,
+    @Query('isArchived') isArchived?: string,
+    @Query('isIndexable') isIndexable?: string,
+    @Query('pastDays') pastDays?: string,
+    @Query('section') section?: string,
+    @Query('subcategory') subcategory?: string,
+    @Query('hasNoSubcategory') hasNoSubcategory?: string,
+    @Query('hasMultipleSubcategories') hasMultipleSubcategories?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -179,7 +210,149 @@ export class AdminEventsController {
         OR: [{ override: null }, { override: { isHidden: false } }],
       });
     }
+
+    // Archive / index policy (legacy schema mode):
+    // - isPast is derived from presence of future active sessions.
+    // - isArchived is derived as (isActive=false) for imported events (source != MANUAL).
+    // Default behavior for admin UX: hide imported past events + imported archived events from the main list.
+    const now = new Date();
+    const pastBool = isPast === '1' || isPast === 'true' || isPast === 'yes' ? true : isPast === '0' || isPast === 'false' || isPast === 'no' ? false : undefined;
+    const archivedBool =
+      isArchived === '1' || isArchived === 'true' || isArchived === 'yes'
+        ? true
+        : isArchived === '0' || isArchived === 'false' || isArchived === 'no'
+          ? false
+          : undefined;
+    const indexableBool =
+      isIndexable === '1' || isIndexable === 'true' || isIndexable === 'yes'
+        ? true
+        : isIndexable === '0' || isIndexable === 'false' || isIndexable === 'no'
+          ? false
+          : undefined;
+
+    if (archivedBool === true) {
+      andParts.push({ source: { not: EventSource.MANUAL }, isActive: false });
+    } else if (archivedBool === false || archivedBool === undefined) {
+      // default: exclude archived (imported inactive) unless explicitly requested
+      andParts.push({ OR: [{ source: EventSource.MANUAL }, { isActive: true }] });
+    }
+
+    // Past filter is intentionally applied mainly to imported events to keep admin clean without hiding manual drafts.
+    const futureSessionsWhere: Prisma.EventSessionWhereInput = { startsAt: { gt: now }, isActive: true };
+    if (pastBool === true) {
+      andParts.push({
+        OR: [
+          { source: EventSource.MANUAL },
+          { sessions: { none: futureSessionsWhere } },
+        ],
+      });
+    } else if (pastBool === false || pastBool === undefined) {
+      // default: hide past imported events (no future active sessions)
+      andParts.push({
+        OR: [
+          { source: EventSource.MANUAL },
+          { sessions: { some: futureSessionsWhere } },
+        ],
+      });
+    }
+
+    // isIndexable is currently derived: past => false, active future => true.
+    // This param is supported for filtering UX; it does not persist a flag yet.
+    if (indexableBool === true) {
+      andParts.push({ sessions: { some: futureSessionsWhere } });
+    } else if (indexableBool === false) {
+      andParts.push({ sessions: { none: futureSessionsWhere } });
+    }
+
+    const pastDaysNum = pastDays ? Math.max(1, Math.min(365, parseInt(pastDays, 10) || 0)) : 0;
+    if (pastDaysNum > 0) {
+      const from = new Date(now.getTime() - pastDaysNum * 24 * 60 * 60 * 1000);
+      // Past in window: no future sessions + at least one session in [from, now)
+      andParts.push({
+        sessions: {
+          none: futureSessionsWhere,
+          some: { startsAt: { gte: from, lt: now } },
+        },
+      });
+    }
+
+    // Derived classification filters (canonical source: event_subcategory_links).
+    const sectionTrim = section?.trim() as SectionSlug | undefined;
+    if (sectionTrim) {
+      const allowed: readonly SectionSlug[] = ['events', 'excursions', 'museums', 'activities', 'entertainment'];
+      if (!allowed.includes(sectionTrim)) {
+        throw new BadRequestException('Invalid "section"');
+      }
+      const slugs = getSubcategorySlugsForSection(sectionTrim);
+      andParts.push({
+        subcategoryLinks: {
+          some: { subcategory: { slug: { in: slugs } } },
+        },
+      });
+    }
+
+    const subcategoryTrim = subcategory?.trim();
+    if (subcategoryTrim) {
+      andParts.push({
+        subcategoryLinks: {
+          // NOTE: we filter by exact slug; the UI selector uses active options only.
+          some: { subcategory: { slug: subcategoryTrim } },
+        },
+      });
+    }
+
+    const hasNo =
+      hasNoSubcategory === '1' || hasNoSubcategory === 'true' || hasNoSubcategory === 'yes';
+    const hasNoExplicitFalse =
+      hasNoSubcategory === '0' || hasNoSubcategory === 'false' || hasNoSubcategory === 'no';
+    if (hasNo) {
+      // "no subcategory" means no links at all (including legacy/inactive)
+      andParts.push({ subcategoryLinks: { none: {} } });
+    } else if (hasNoExplicitFalse) {
+      andParts.push({ subcategoryLinks: { some: {} } });
+    }
+
+    const hasMulti =
+      hasMultipleSubcategories === '1' ||
+      hasMultipleSubcategories === 'true' ||
+      hasMultipleSubcategories === 'yes';
+    const hasMultiExplicitFalse =
+      hasMultipleSubcategories === '0' ||
+      hasMultipleSubcategories === 'false' ||
+      hasMultipleSubcategories === 'no';
+    if (hasMulti) {
+      const groups = await this.prisma.eventSubcategoryLink.groupBy({
+        by: ['eventId'],
+        _count: { _all: true },
+      });
+      const ids = groups.filter((g) => (g as any)._count?._all > 1).map((g) => g.eventId);
+      andParts.push({ id: { in: ids.length ? ids : ['00000000-0000-0000-0000-000000000000'] } });
+    } else if (hasMultiExplicitFalse) {
+      const groupsEq1 = await this.prisma.eventSubcategoryLink.groupBy({
+        by: ['eventId'],
+        _count: { _all: true },
+      });
+      const idsEq1 = groupsEq1.filter((g) => (g as any)._count?._all === 1).map((g) => g.eventId);
+      andParts.push({
+        OR: [
+          { subcategoryLinks: { none: {} } },
+          { id: { in: idsEq1.length ? idsEq1 : ['00000000-0000-0000-0000-000000000000'] } },
+        ],
+      });
+    }
+
     const where: Prisma.EventWhereInput = andParts.length === 1 ? andParts[0]! : { AND: andParts };
+
+    const sortDirNorm = sortDir === 'asc' || sortDir === 'desc' ? sortDir : 'desc';
+    const sortByNorm = (sortBy || '').trim();
+    const orderBy: Prisma.EventOrderByWithRelationInput =
+      sortByNorm === 'title'
+        ? { title: sortDirNorm }
+        : sortByNorm === 'source'
+          ? { source: sortDirNorm }
+          : sortByNorm === 'city'
+            ? { city: { name: sortDirNorm } }
+            : { updatedAt: 'desc' };
 
     const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
@@ -188,18 +361,205 @@ export class AdminEventsController {
           city: { select: { slug: true, name: true } },
           _count: { select: { sessions: true, tags: true, offers: true } },
           override: true,
+          subcategoryLinks: {
+            include: {
+              subcategory: { select: { id: true, slug: true, nameRu: true, isActive: true } },
+            },
+          },
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy,
         ...paginationArgs(pg),
       }),
       this.prisma.event.count({ where }),
     ]);
 
     const result = buildPaginatedResult(rawItems, total, pg.limit);
+
+    const eventIds = result.items.map((e) => e.id);
+    const lastSessionMax = eventIds.length
+      ? await this.prisma.eventSession.groupBy({
+          by: ['eventId'],
+          where: { eventId: { in: eventIds } },
+          _max: { startsAt: true },
+        })
+      : [];
+    const lastSessionAtByEventId = new Map<string, Date>();
+    for (const row of lastSessionMax) {
+      const d = (row as any)?._max?.startsAt as Date | null | undefined;
+      if (d) lastSessionAtByEventId.set((row as any).eventId as string, d);
+    }
+
+    const items = result.items.map((e) => {
+      const allSubcats = (e.subcategoryLinks ?? [])
+        .map((l) => l.subcategory)
+        .filter((s): s is { id: string; slug: string; nameRu: string; isActive: boolean } => Boolean(s));
+
+      const lastSessionAt = lastSessionAtByEventId.get(e.id) ?? null;
+      const derivedIsPast = lastSessionAt ? lastSessionAt < now : false;
+      const derivedIsArchived = e.source !== EventSource.MANUAL && e.isActive === false;
+      const derivedIsIndexable = !derivedIsPast && !derivedIsArchived;
+
+      return {
+        ...e,
+        subcategoriesCanonical: allSubcats.map((s) => ({ id: s.id, slug: s.slug, name: s.nameRu, isActive: s.isActive })),
+        sectionsDerived: deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
+        lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
+        isPast: derivedIsPast,
+        isArchived: derivedIsArchived,
+        isIndexable: derivedIsIndexable,
+      };
+    });
+
     return {
       ...result,
+      items,
       page: pg.page,
       pages: Math.ceil(total / pg.limit) || 1,
+    };
+  }
+
+  /**
+   * Safe batch archive for imported events (dry-run only).
+   *
+   * Rules:
+   * - only imported sources (TICKETSCLOUD / TEPLOHOD)
+   * - only events without future active sessions
+   * - dryRun обязательный (не архивирует реально в первой версии)
+   * - explicit source filter required
+   */
+  @Post('archive/batch')
+  @Roles('ADMIN', 'EDITOR')
+  async batchArchiveImported(@Body() dto: BatchArchiveImportedEventsDto) {
+    const source = String(dto.source || '').toUpperCase();
+    if (source !== 'TICKETSCLOUD' && source !== 'TEPLOHOD') {
+      throw new BadRequestException('source должен быть TICKETSCLOUD или TEPLOHOD');
+    }
+
+    const now = new Date();
+    const threshold = new Date(now.getTime() - dto.olderThanDays * 24 * 60 * 60 * 1000);
+    const take = Math.min(2000, Math.max(1, dto.take ?? 500));
+
+    const futureSessionsWhere: Prisma.EventSessionWhereInput = { startsAt: { gt: now }, isActive: true };
+
+    // Preselect candidate ids (no future sessions, active now).
+    const candidates = await this.prisma.event.findMany({
+      where: {
+        isDeleted: false,
+        source: source as any,
+        isActive: true,
+        sessions: { none: futureSessionsWhere },
+      },
+      select: { id: true, title: true, source: true },
+      orderBy: { updatedAt: 'desc' },
+      take,
+    });
+
+    const ids = candidates.map((c) => c.id);
+    if (ids.length === 0) {
+      return { count: 0, ids: [], items: [] as any[] };
+    }
+
+    const lastSessionMax = await this.prisma.eventSession.groupBy({
+      by: ['eventId'],
+      where: { eventId: { in: ids } },
+      _max: { startsAt: true },
+    });
+    const lastSessionAtByEventId = new Map<string, Date>();
+    for (const row of lastSessionMax) {
+      const d = (row as any)?._max?.startsAt as Date | null | undefined;
+      if (d) lastSessionAtByEventId.set((row as any).eventId as string, d);
+    }
+
+    const items = candidates
+      .map((e) => {
+        const lastSessionAt = lastSessionAtByEventId.get(e.id) ?? null;
+        return {
+          id: e.id,
+          title: e.title,
+          source: e.source,
+          lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
+        };
+      })
+      .filter((e) => e.lastSessionAt && new Date(e.lastSessionAt) < threshold);
+
+    // Dry-run returns candidates only (no changes).
+    if (dto.dryRun) {
+      return {
+        dryRun: true,
+        source,
+        olderThanDays: dto.olderThanDays,
+        take,
+        count: items.length,
+        ids: items.map((i) => i.id),
+        items,
+      };
+    }
+
+    // Execute: archive those exact candidates (still safe: only imported, no future sessions).
+    // Hard safety cap to avoid accidental large runs.
+    if (items.length > 1000) {
+      throw new BadRequestException('Слишком много кандидатов для execute (лимит 1000). Увеличьте olderThanDays или снизьте take.');
+    }
+
+    const idsToArchive = items.map((i) => i.id);
+    const updated = await this.prisma.event.updateMany({
+      where: {
+        id: { in: idsToArchive },
+        isDeleted: false,
+        source: source as any,
+        isActive: true,
+        sessions: { none: futureSessionsWhere },
+      },
+      data: { isActive: false },
+    });
+
+    // Invalidate caches for updated ids (best-effort).
+    await Promise.all(idsToArchive.map((id) => this.cacheInvalidation.invalidateEventById(id)));
+
+    const postRows = await this.prisma.event.findMany({
+      where: { id: { in: idsToArchive } },
+      select: {
+        id: true,
+        isActive: true,
+        sessions: { where: futureSessionsWhere, select: { id: true }, take: 1 },
+      },
+    });
+    const postById = new Map(postRows.map((r) => [r.id, r]));
+
+    const skipped: Array<{
+      id: string;
+      reason: 'FUTURE_SESSIONS' | 'ALREADY_ARCHIVED' | 'NOT_FOUND' | 'OTHER';
+    }> = [];
+    const archivedIds: string[] = [];
+
+    for (const id of idsToArchive) {
+      const row = postById.get(id);
+      if (!row) {
+        skipped.push({ id, reason: 'NOT_FOUND' });
+        continue;
+      }
+      if (row.sessions.length > 0) {
+        skipped.push({ id, reason: 'FUTURE_SESSIONS' });
+        continue;
+      }
+      if (row.isActive === false) {
+        archivedIds.push(id);
+      } else {
+        skipped.push({ id, reason: 'OTHER' });
+      }
+    }
+
+    return {
+      dryRun: false,
+      source,
+      olderThanDays: dto.olderThanDays,
+      take,
+      count: items.length,
+      ids: idsToArchive,
+      items,
+      archivedCount: updated.count,
+      archivedIds,
+      skipped,
     };
   }
 
@@ -1564,7 +1924,8 @@ export class AdminEventsController {
 
   @Get(':id')
   async get(@Param('id') id: string) {
-    return this.prisma.event.findUniqueOrThrow({
+    const now = new Date();
+    const event = await this.prisma.event.findUniqueOrThrow({
       where: { id },
       include: {
         city: { select: { slug: true, name: true } },
@@ -1579,8 +1940,36 @@ export class AdminEventsController {
           },
         },
         override: true,
+        subcategoryLinks: {
+          include: {
+            subcategory: { select: { id: true, slug: true, nameRu: true, isActive: true } },
+          },
+        },
       },
     });
+
+    const allSubcats = (event.subcategoryLinks ?? [])
+      .map((l) => l.subcategory)
+      .filter((s): s is { id: string; slug: string; nameRu: string; isActive: boolean } => Boolean(s));
+
+    const lastSession = await this.prisma.eventSession.aggregate({
+      where: { eventId: id },
+      _max: { startsAt: true },
+    });
+    const lastSessionAt = (lastSession as any)?._max?.startsAt as Date | null | undefined;
+    const derivedIsPast = lastSessionAt ? lastSessionAt < now : false;
+    const derivedIsArchived = (event as any)?.publishStatus === 'ARCHIVED';
+    const derivedIsIndexable = !derivedIsPast && !derivedIsArchived;
+
+    return {
+      ...event,
+      subcategoriesCanonical: allSubcats.map((s) => ({ id: s.id, slug: s.slug, name: s.nameRu, isActive: s.isActive })),
+      sectionsDerived: deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
+      lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
+      isPast: derivedIsPast,
+      isArchived: derivedIsArchived,
+      isIndexable: derivedIsIndexable,
+    };
   }
 
   /**
@@ -1805,6 +2194,34 @@ export class AdminEventsController {
     const result = await this.overrideService.toggleHidden(id, isHidden, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
+  }
+
+  /**
+   * Archive/unarchive event for admin UX (non-destructive).
+   *
+   * Policy:
+   * - Archived events are excluded from default admin list.
+   * - Record remains доступна по прямому URL.
+   */
+  @Patch(':id/archive')
+  @Roles('ADMIN', 'EDITOR')
+  async setArchived(@Param('id') id: string, @Body('isArchived') isArchived: boolean) {
+    const event = await this.prisma.event.findUnique({ where: { id }, select: { id: true, source: true, isActive: true } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    // Legacy schema: treat "archived" as imported inactive (source != MANUAL && isActive=false).
+    // Unarchive toggles isActive=true (safe: does not auto-publish anything; visibility is controlled elsewhere).
+    if (event.source === EventSource.MANUAL) {
+      throw new BadRequestException('Архивирование доступно только для импортных событий');
+    }
+    const updated = await this.prisma.event.update({
+      where: { id },
+      data: { isActive: isArchived ? false : true },
+      select: { id: true, isActive: true, updatedAt: true },
+    });
+
+    await this.cacheInvalidation.invalidateEventById(id);
+    return updated;
   }
 
   /**

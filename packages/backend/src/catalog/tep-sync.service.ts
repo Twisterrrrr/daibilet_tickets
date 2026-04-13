@@ -11,6 +11,7 @@ import { EventTagLifecycleService } from './event-tag-lifecycle.service';
 import { TepApiService, TepCity, TepEvent } from './tep-api.service';
 import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
 import { EVENT_PRIMARY_CODES_BY_CATEGORY } from '../subcategories/subcategory-assignment.constants';
+import { mapTeplohodExternalCategoryToPrimaryCode } from './import-mapping/teplohod-mapping';
 
 /**
  * Синхронизация событий из teplohod.info → наша БД.
@@ -429,7 +430,9 @@ export class TepSyncService {
       // Авто-проставление подкатегорий в “новом слое” (eventSubcategoryLinks).
       // Для модерации важно, чтобы PRIMARY был задан сразу после импорта.
       try {
-        const primaryCode = this.pickPrimarySubcategoryCode(category, subcategories);
+        const mappedPrimary =
+          mapTeplohodExternalCategoryToPrimaryCode({ category, externalCategoryRaw: externalRaw }) ?? null;
+        const primaryCode = mappedPrimary ?? this.pickPrimarySubcategoryCode(category, subcategories);
         const secondaryCodes = this.pickSecondaryUniversalCodes(
           `${title}\n${description || ''}\n${externalRaw || ''}`,
           { category, audience },

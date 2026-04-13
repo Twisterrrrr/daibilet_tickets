@@ -59,7 +59,14 @@ describe('SubcategoryCollectionsService', () => {
     expect(prisma.venue.findMany).toHaveBeenCalled();
     const arg = prisma.venue.findMany.mock.calls[0]![0];
     expect(arg.where).toMatchObject({
-      subcategoryLinks: { some: { subcategory: { code: 'MUSEUM', isActive: true } } },
+      subcategoryLinks: {
+        some: {
+          subcategory: {
+            isActive: true,
+            OR: [{ code: 'MUSEUM' }, { slug: 'MUSEUM' }],
+          },
+        },
+      },
     });
   });
 

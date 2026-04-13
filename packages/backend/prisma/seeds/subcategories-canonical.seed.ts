@@ -40,22 +40,144 @@ const SUBCATEGORIES: SeedRow[] = [
     landingTopicKey: 'river-cruises',
     sortOrder: 10,
   },
-  { code: 'WALKING', slug: 'peshehodnye-ekskursii', nameRu: 'Пешеходные экскурсии', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 20 },
-  { code: 'BUS', slug: 'avtobusnye-ekskursii', nameRu: 'Автобусные экскурсии', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 30 },
-  { code: 'COMBINED', slug: 'kombinirovannye-ekskursii', nameRu: 'Комбинированные экскурсии', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 40 },
-  { code: 'QUEST', slug: 'kvesty', nameRu: 'Квесты', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 50 },
-  { code: 'GASTRO', slug: 'gastro-ekskursii', nameRu: 'Гастрономические экскурсии', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 60 },
-  { code: 'ROOFTOP', slug: 'ekskursii-po-krysham', nameRu: 'Экскурсии по крышам', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 70 },
-  { code: 'EXTREME', slug: 'ekstremalnye-ekskursii', nameRu: 'Экстремальные экскурсии', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 80 },
+  { code: 'WALKING', slug: 'walking-tours', nameRu: 'Пешие', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 20 },
+  { code: 'BUS', slug: 'bus-tours', nameRu: 'Автобусные', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 30 },
+  { code: 'BOAT_TOURS', slug: 'boat-tours', nameRu: 'Водные экскурсии', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 35 },
+  { code: 'NIGHT_TOURS', slug: 'night-tours', nameRu: 'Ночные', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 36 },
+  { code: 'CITY_TOURS', slug: 'city-tours', nameRu: 'Обзорные', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 37 },
+  { code: 'PRIVATE_TOURS', slug: 'private-tours', nameRu: 'Индивидуальные', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 38 },
+  // Legacy PRIMARY (deprecated): keep inactive to avoid new assignments
+  { code: 'COMBINED', slug: 'kombinirovannye-ekskursii', nameRu: 'Комбинированные экскурсии', type: 'EVENT_ONLY', layer: 'PRIMARY', isActive: false, isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 40 },
+  { code: 'QUEST', slug: 'kvesty', nameRu: 'Квесты (legacy)', type: 'EVENT_ONLY', layer: 'PRIMARY', isActive: false, isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 50 },
 
-  { code: 'CONCERT', slug: 'koncerty', nameRu: 'Концерты', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 110 },
-  { code: 'SHOW', slug: 'shou', nameRu: 'Шоу', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 120 },
+  // Canonical PRIMARY (matrix)
+  { code: 'GASTRO', slug: 'gastro-tours', nameRu: 'Гастро-экскурсии', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 60 },
+  { code: 'ROOFTOP', slug: 'rooftop', nameRu: 'Крыши', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 70 },
+  { code: 'EXTREME', slug: 'extreme', nameRu: 'Экстрим', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 80 },
+  { code: 'QUESTS', slug: 'quests', nameRu: 'Квесты', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 85 },
+
+  { code: 'CONCERT', slug: 'concerts', nameRu: 'Концерты', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 110 },
+  { code: 'THEATER', slug: 'theater', nameRu: 'Театр', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 115 },
+  { code: 'SHOW', slug: 'shows', nameRu: 'Шоу', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 120 },
   { code: 'STANDUP', slug: 'standup', nameRu: 'Стендап', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 130 },
-  { code: 'THEATER', slug: 'spektakli', nameRu: 'Спектакли', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 140 },
-  { code: 'SPORT', slug: 'sportivnye-meropriyatiya', nameRu: 'Спорт', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 150 },
-  { code: 'FESTIVAL', slug: 'festivali', nameRu: 'Фестивали', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 160 },
-  { code: 'MASTERCLASS', slug: 'master-klassy', nameRu: 'Мастер-классы', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 170 },
-  { code: 'PARTY', slug: 'vecherinki', nameRu: 'Вечеринки', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 180 },
+  { code: 'FESTIVAL', slug: 'festivals', nameRu: 'Фестивали', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 160 },
+  { code: 'LECTURES', slug: 'lectures', nameRu: 'Лекции', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 165 },
+  { code: 'KIDS_SHOWS', slug: 'kids-shows', nameRu: 'Детские спектакли/шоу', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 170 },
+  { code: 'IMMERSIVE_SHOWS', slug: 'immersive-shows', nameRu: 'Иммерсивные шоу', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 175 },
+  { code: 'SPORT_EVENTS', slug: 'sport-events', nameRu: 'Спортивные активности', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 180 },
+  { code: 'MASTERCLASS', slug: 'masterclasses', nameRu: 'Мастер-классы', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 172 },
+  { code: 'PARTY', slug: 'parties', nameRu: 'Вечеринки', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 182 },
+
+  /**
+   * События категории MUSEUM: отдельные PRIMARY + EVENT_ONLY (тот же code, что в whitelist API;
+   * slug уникален от строк VENUE_ONLY для площадок).
+   */
+  {
+    code: 'MUSEUM_CLASSIC',
+    slug: 'museums',
+    nameRu: 'Музеи',
+    type: 'EVENT_ONLY',
+    layer: 'PRIMARY',
+    isLandingEnabled: true,
+    landingMode: 'AUTO',
+    sortOrder: 210,
+  },
+  {
+    code: 'EXHIBITION',
+    slug: 'exhibitions',
+    nameRu: 'Выставки',
+    type: 'EVENT_ONLY',
+    layer: 'PRIMARY',
+    isLandingEnabled: true,
+    landingMode: 'AUTO',
+    sortOrder: 220,
+  },
+  {
+    code: 'PLANETARIUMS',
+    slug: 'planetariums',
+    nameRu: 'Планетарии',
+    type: 'EVENT_ONLY',
+    layer: 'PRIMARY',
+    isLandingEnabled: true,
+    landingMode: 'AUTO',
+    sortOrder: 225,
+  },
+  {
+    code: 'GALLERY',
+    slug: 'gallery-visits',
+    nameRu: 'Посещение галерей',
+    type: 'EVENT_ONLY',
+    layer: 'PRIMARY',
+    isLandingEnabled: true,
+    landingMode: 'AUTO',
+    sortOrder: 230,
+  },
+  {
+    code: 'PALACE',
+    slug: 'palace-visits',
+    nameRu: 'Посещение дворцов',
+    type: 'EVENT_ONLY',
+    layer: 'PRIMARY',
+    isLandingEnabled: true,
+    landingMode: 'AUTO',
+    sortOrder: 240,
+  },
+  {
+    code: 'PARK',
+    slug: 'park-visits',
+    nameRu: 'Посещение парков',
+    type: 'EVENT_ONLY',
+    layer: 'PRIMARY',
+    isLandingEnabled: true,
+    landingMode: 'AUTO',
+    sortOrder: 250,
+  },
+  {
+    code: 'ART_SPACE',
+    slug: 'art-space-visits',
+    nameRu: 'Посещение арт-пространств',
+    type: 'EVENT_ONLY',
+    layer: 'PRIMARY',
+    isLandingEnabled: true,
+    landingMode: 'AUTO',
+    sortOrder: 260,
+  },
+  {
+    code: 'SCULPTURE',
+    slug: 'poseshchenie-skulptura',
+    nameRu: 'Скульптура',
+    type: 'EVENT_ONLY',
+    layer: 'PRIMARY',
+    isActive: false,
+    isLandingEnabled: false,
+    landingMode: 'DISABLED',
+    sortOrder: 262,
+  },
+  {
+    code: 'CONTEMPORARY',
+    slug: 'poseshchenie-sovremennoe-iskusstvo',
+    nameRu: 'Современное искусство',
+    type: 'EVENT_ONLY',
+    layer: 'PRIMARY',
+    isActive: false,
+    isLandingEnabled: false,
+    landingMode: 'DISABLED',
+    sortOrder: 264,
+  },
+
+  // ACTIVITIES
+  { code: 'WATER_SPORTS', slug: 'water-sports', nameRu: 'Водный спорт', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 300 },
+  { code: 'CYCLING', slug: 'cycling', nameRu: 'Велопрогулки', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 305 },
+  { code: 'OUTDOOR_ACTIVITIES', slug: 'outdoor', nameRu: 'Активности на природе', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 307 },
+  { code: 'KARTING', slug: 'karting', nameRu: 'Картинг', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 310 },
+  { code: 'CLIMBING', slug: 'climbing', nameRu: 'Скалодромы', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 320 },
+
+  // ENTERTAINMENT
+  { code: 'INTERACTIVE_ENT', slug: 'interactive', nameRu: 'Интерактив', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 400 },
+  { code: 'KIDS_ACTIVITIES', slug: 'kids-activities', nameRu: 'Детские активности', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 405 },
+  { code: 'GAME_ZONES', slug: 'game-zones', nameRu: 'Игровые зоны', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 407 },
+  { code: 'ATTRACTIONS', slug: 'attractions', nameRu: 'Аттракционы', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 410 },
+  { code: 'ESCAPE_ROOMS', slug: 'escape-rooms', nameRu: 'Эскейп-румы', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 420 },
 
   { code: 'MUSEUM', slug: 'muzei', nameRu: 'Музеи', type: 'VENUE_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 210 },
   { code: 'EXHIBITION', slug: 'vystavki', nameRu: 'Выставки', type: 'VENUE_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 220 },
@@ -134,10 +256,23 @@ async function linkParents(tx: Prisma.TransactionClient) {
   }
 }
 
+async function deactivateLegacyPrimaryEventOnly(tx: Prisma.TransactionClient) {
+  const allowedCodes = SUBCATEGORIES.filter((s) => s.type === 'EVENT_ONLY' && s.layer === 'PRIMARY' && (s.isActive ?? true)).map((s) => s.code);
+  await tx.subcategory.updateMany({
+    where: {
+      type: SubcategoryType.EVENT_ONLY,
+      layer: SubcategoryLayer.PRIMARY,
+      code: { notIn: allowedCodes },
+    },
+    data: { isActive: false },
+  });
+}
+
 export async function seedCanonicalSubcategories(prisma: PrismaClient): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await upsertAll(tx);
     await linkParents(tx);
+    await deactivateLegacyPrimaryEventOnly(tx);
   });
   console.warn(`  ✓ Canonical subcategories whitelist (${SUBCATEGORIES.length} rows, landingMode + hierarchy)`);
 }

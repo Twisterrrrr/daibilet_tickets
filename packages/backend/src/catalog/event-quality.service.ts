@@ -44,9 +44,8 @@ export class EventQualityService {
         offers: true,
         sessions: { where: { isActive: true } },
         subcategoryLinks: {
-          where: { subcategory: { isActive: true } },
           include: {
-            subcategory: { select: { layer: true, type: true, code: true } },
+            subcategory: { select: { layer: true, type: true, code: true, isActive: true } },
           },
         },
         override: true,
@@ -90,9 +89,21 @@ export class EventQualityService {
       });
     }
 
-    const links = event.subcategoryLinks ?? [];
+    const allLinks = event.subcategoryLinks ?? [];
+    const inactiveLinks = allLinks.filter((l) => l.subcategory?.isActive === false);
+    const links = allLinks.filter((l) => l.subcategory?.isActive !== false);
     const legacyEnumCount = Array.isArray(event.subcategories) ? event.subcategories.length : 0;
     const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
+
+    if (inactiveLinks.length > 0) {
+      issues.push({
+        code: 'HAS_INACTIVE_SUBCATEGORY',
+        message:
+          'У события есть legacy/неактивные подкатегории. Для новых выборов они недоступны — замените на активные канонические.',
+        field: 'subcategories',
+        ownership: 'local',
+      });
+    }
 
     if (links.length > 0) {
       const primary = links.filter(
@@ -103,7 +114,7 @@ export class EventQualityService {
       if (primary.length !== 1) {
         issues.push({
           code: 'MISSING_PRIMARY_SUBCATEGORY',
-          message: 'Назначьте ровно один основной формат (PRIMARY / EVENT_ONLY) в связях подкатегорий.',
+          message: 'Назначьте ровно один основной формат (PRIMARY, EVENT_ONLY) в связях подкатегорий.',
           field: 'subcategories',
           ownership: 'local',
         });
