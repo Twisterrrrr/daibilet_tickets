@@ -34,7 +34,7 @@ const staticFooterLinks = {
     { name: 'О сервисе', href: '/about' },
     { name: 'Правовая информация', href: '/legal' },
     { name: 'Стать партнёром', href: '/partner' },
-    { name: 'Блог', href: '/blog' },
+    { name: 'Статьи', href: '/articles' },
     { name: 'Помощь', href: '/help' },
     { name: 'Контакты', href: '/contacts' },
   ],

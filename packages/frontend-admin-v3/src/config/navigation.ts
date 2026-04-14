@@ -2,6 +2,7 @@ import {
   BarChart3,
   Building2,
   CalendarDays,
+  BookOpen,
   FolderOpen,
   Inbox,
   LayoutDashboard,
@@ -49,6 +50,7 @@ export const navigation: NavSection[] = [
   {
     title: 'Рост',
     items: [
+      { label: 'Статьи', to: 'articles', icon: BookOpen, feature: null },
       { label: 'Подборки', to: 'collections', icon: FolderOpen, feature: null },
       { label: 'Лендинги', to: 'landings', icon: LayoutTemplate, feature: null },
       { label: 'Промо-блоки', to: 'promo-blocks', icon: BarChart3, feature: null },

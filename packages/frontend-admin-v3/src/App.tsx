@@ -22,6 +22,9 @@ const SupplierDetailPage = React.lazy(() => import('@/modules/suppliers/pages/Su
 const CollectionsListPage = React.lazy(() => import('@/modules/collections/pages/CollectionsListPage').then((m) => ({ default: m.CollectionsListPage })));
 const CollectionDetailPage = React.lazy(() => import('@/modules/collections/pages/CollectionDetailPage').then((m) => ({ default: m.CollectionDetailPage })));
 
+const ArticlesListPage = React.lazy(() => import('@/modules/articles/pages/ArticlesListPage').then((m) => ({ default: m.ArticlesListPage })));
+const ArticleEditPage = React.lazy(() => import('@/modules/articles/pages/ArticleEditPage').then((m) => ({ default: m.ArticleEditPage })));
+
 const LandingsListPage = React.lazy(() => import('@/modules/landings/pages/LandingsListPage').then((m) => ({ default: m.LandingsListPage })));
 const LandingDetailPage = React.lazy(() => import('@/modules/landings/pages/LandingDetailPage').then((m) => ({ default: m.LandingDetailPage })));
 
@@ -67,6 +70,9 @@ export default function App() {
 
               <Route path="collections" element={<CollectionsListPage />} />
               <Route path="collections/:id" element={<CollectionDetailPage />} />
+
+              <Route path="articles" element={<ArticlesListPage />} />
+              <Route path="articles/:id" element={<ArticleEditPage />} />
 
               <Route path="landings" element={<LandingsListPage />} />
               <Route path="landings/:id" element={<LandingDetailPage />} />

@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CollectionSelectionBasis, CollectionSourceType, CollectionStatus, Prisma } from '@/prisma-client';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsString } from 'class-validator';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -25,6 +26,19 @@ import { CollectionSuggestionService } from '../collection/collection-suggestion
 import { CollectionSelectionService } from '../catalog/collection-selection.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateCollectionDto, UpdateCollectionDto } from './dto/admin.dto';
+
+class AddCollectionItemDto {
+  @IsString()
+  eventId!: string;
+}
+
+class ReorderCollectionItemsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  itemIdsInOrder!: string[];
+}
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -92,6 +106,16 @@ export class AdminCollectionsController {
     const pageItems = hasMore ? items.slice(0, pg.limit) : items;
     const nextCursor = hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null;
 
+    const ids = pageItems.map((c) => c.id);
+    const itemCounts = ids.length
+      ? await this.prisma.collectionItem.groupBy({
+          by: ['collectionId'],
+          where: { collectionId: { in: ids } },
+          _count: { _all: true },
+        })
+      : [];
+    const itemCountByCollectionId = new Map(itemCounts.map((r) => [r.collectionId, r._count._all]));
+
     return {
       items: pageItems.map((c) => ({
         id: c.id,
@@ -109,6 +133,8 @@ export class AdminCollectionsController {
         eventCountCached: c.eventCountCached,
         pinnedCount: c.pinnedEventIds.length,
         excludedCount: c.excludedEventIds.length,
+        itemsCount: itemCountByCollectionId.get(c.id) ?? 0,
+        publishedAt: c.publishedAt,
         updatedAt: c.updatedAt,
       })),
       total,
@@ -124,6 +150,22 @@ export class AdminCollectionsController {
       where: { id },
       include: {
         city: { select: { id: true, name: true, slug: true } },
+        items: {
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+          include: {
+            event: {
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+                isActive: true,
+                source: true,
+                priceFrom: true,
+                city: { select: { id: true, name: true, slug: true } },
+              },
+            },
+          },
+        },
       },
     });
     if (!collection) throw new NotFoundException('Подборка не найдена');
@@ -177,6 +219,34 @@ export class AdminCollectionsController {
     const version = body.version;
     if (version === undefined) throw new BadRequestException('version обязателен для обновления');
 
+    const current = body.status === CollectionStatus.ACTIVE
+      ? await this.prisma.collection.findUnique({
+          where: { id },
+          select: {
+            status: true,
+            sourceType: true,
+            publishedAt: true,
+          },
+        })
+      : null;
+    if (body.status === CollectionStatus.ACTIVE && !current) {
+      throw new NotFoundException('Подборка не найдена');
+    }
+    if (
+      body.status === CollectionStatus.ACTIVE &&
+      current &&
+      current.status !== CollectionStatus.ACTIVE &&
+      current.sourceType === CollectionSourceType.MANUAL
+    ) {
+      const manualCount = await this.prisma.collectionItem.count({ where: { collectionId: id } });
+      if (manualCount <= 0) {
+        throw new BadRequestException({
+          code: 'COLLECTION_PUBLISH_REQUIRES_ITEMS',
+          message: 'Нельзя публиковать MANUAL подборку без выбранных событий',
+        });
+      }
+    }
+
     const result = await this.prisma.collection.updateMany({
       where: { id, version: Number(version) },
       data: {
@@ -207,6 +277,10 @@ export class AdminCollectionsController {
         ...(body.status !== undefined && { status: body.status }),
         ...(body.isActive !== undefined && { isActive: body.isActive }),
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
+        ...(body.status === CollectionStatus.ACTIVE &&
+          current &&
+          current.status !== CollectionStatus.ACTIVE &&
+          current.publishedAt === null && { publishedAt: new Date() }),
         version: { increment: 1 },
       },
     });
@@ -248,10 +322,22 @@ export class AdminCollectionsController {
   @Post(':id/approve')
   @Roles('ADMIN', 'EDITOR')
   async approve(@Param('id') id: string) {
-    const current = await this.prisma.collection.findUnique({ where: { id }, select: { status: true } });
+    const current = await this.prisma.collection.findUnique({
+      where: { id },
+      select: { status: true, sourceType: true, publishedAt: true },
+    });
     if (!current) throw new NotFoundException('Подборка не найдена');
     if (!this.canTransition(current.status, CollectionStatus.ACTIVE)) {
       throw new BadRequestException(`Недопустимый переход ${current.status} -> ACTIVE`);
+    }
+    if (current.sourceType === CollectionSourceType.MANUAL) {
+      const manualCount = await this.prisma.collectionItem.count({ where: { collectionId: id } });
+      if (manualCount <= 0) {
+        throw new BadRequestException({
+          code: 'COLLECTION_PUBLISH_REQUIRES_ITEMS',
+          message: 'Нельзя публиковать MANUAL подборку без выбранных событий',
+        });
+      }
     }
     return this.prisma.collection.update({
       where: { id },
@@ -259,6 +345,7 @@ export class AdminCollectionsController {
         status: CollectionStatus.ACTIVE,
         sourceType: CollectionSourceType.ACTIVE,
         isActive: true,
+        publishedAt: current.publishedAt ?? new Date(),
       },
     });
   }
@@ -447,6 +534,188 @@ export class AdminCollectionsController {
         score: '_selectionScore' in event ? event._selectionScore : null,
         rating: event.rating,
         reviewCount: event.reviewCount,
+      })),
+    };
+  }
+
+  /**
+   * MANUAL/HYBRID: добавить событие в явные items (CollectionItem) + синхронизировать pinnedEventIds.
+   * POST /admin/collections/:id/items
+   */
+  @Post(':id/items')
+  @Roles('ADMIN', 'EDITOR')
+  async addItem(@Param('id') id: string, @Body() body: AddCollectionItemDto) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: body.eventId },
+      select: { id: true },
+    });
+    if (!event) {
+      throw new BadRequestException({ code: 'EVENT_NOT_FOUND', message: 'Событие не найдено' });
+    }
+
+    const collection = await this.prisma.collection.findUnique({
+      where: { id },
+      select: { id: true, pinnedEventIds: true, isDeleted: true },
+    });
+    if (!collection || collection.isDeleted) throw new NotFoundException('Подборка не найдена');
+
+    const existing = await this.prisma.collectionItem.findFirst({
+      where: { collectionId: id, eventId: body.eventId },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new BadRequestException({
+        code: 'COLLECTION_ITEM_ALREADY_EXISTS',
+        message: 'Событие уже добавлено в подборку',
+      });
+    }
+
+    const maxSort = await this.prisma.collectionItem.aggregate({
+      where: { collectionId: id },
+      _max: { sortOrder: true },
+    });
+    const nextSortOrder = (maxSort._max.sortOrder ?? 0) + 1;
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const item = await tx.collectionItem.create({
+        data: {
+          collectionId: id,
+          eventId: body.eventId,
+          sortOrder: nextSortOrder,
+        },
+        include: {
+          event: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              isActive: true,
+              source: true,
+              priceFrom: true,
+              city: { select: { id: true, name: true, slug: true } },
+            },
+          },
+        },
+      });
+
+      const nextPinned = collection.pinnedEventIds.includes(body.eventId)
+        ? collection.pinnedEventIds
+        : [...collection.pinnedEventIds, body.eventId];
+      await tx.collection.update({
+        where: { id },
+        data: { pinnedEventIds: nextPinned },
+      });
+
+      return item;
+    });
+
+    return created;
+  }
+
+  /**
+   * MANUAL/HYBRID: удалить item + синхронизировать pinnedEventIds.
+   * DELETE /admin/collections/:id/items/:itemId
+   */
+  @Delete(':id/items/:itemId')
+  @Roles('ADMIN', 'EDITOR')
+  async removeItem(@Param('id') id: string, @Param('itemId') itemId: string) {
+    const item = await this.prisma.collectionItem.findFirst({
+      where: { id: itemId, collectionId: id },
+      select: { id: true, eventId: true },
+    });
+    if (!item) throw new NotFoundException('Элемент подборки не найден');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.collectionItem.delete({ where: { id: item.id } });
+      const collection = await tx.collection.findUnique({
+        where: { id },
+        select: { pinnedEventIds: true },
+      });
+      const nextPinned = (collection?.pinnedEventIds ?? []).filter((eid) => eid !== item.eventId);
+      await tx.collection.update({ where: { id }, data: { pinnedEventIds: nextPinned } });
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * MANUAL/HYBRID: reorder items + синхронизировать pinnedEventIds.
+   * PATCH /admin/collections/:id/items/reorder
+   */
+  @Patch(':id/items/reorder')
+  @Roles('ADMIN', 'EDITOR')
+  async reorderItems(@Param('id') id: string, @Body() body: ReorderCollectionItemsDto) {
+    const items = await this.prisma.collectionItem.findMany({
+      where: { collectionId: id },
+      select: { id: true, eventId: true },
+    });
+    if (items.length === 0) {
+      throw new BadRequestException({ code: 'COLLECTION_REORDER_INVALID', message: 'В подборке нет элементов' });
+    }
+
+    const existingIds = new Set(items.map((i) => i.id));
+    const providedIds = body.itemIdsInOrder;
+    if (providedIds.length !== existingIds.size || providedIds.some((x) => !existingIds.has(x))) {
+      throw new BadRequestException({
+        code: 'COLLECTION_REORDER_INVALID',
+        message: 'Некорректный список itemIdsInOrder',
+      });
+    }
+
+    const eventIdByItemId = new Map(items.map((i) => [i.id, i.eventId]));
+    const orderedEventIds = providedIds.map((itemId) => eventIdByItemId.get(itemId)!).filter(Boolean);
+
+    await this.prisma.$transaction(async (tx) => {
+      await Promise.all(
+        providedIds.map((itemId, idx) =>
+          tx.collectionItem.update({
+            where: { id: itemId },
+            data: { sortOrder: idx },
+          }),
+        ),
+      );
+      await tx.collection.update({
+        where: { id },
+        data: { pinnedEventIds: orderedEventIds },
+      });
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Preview resolved items (AUTO/HYBRID/MANUAL) — компактный view.
+   * GET /admin/collections/:id/resolved-items
+   */
+  @Get(':id/resolved-items')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async resolvedItems(@Param('id') id: string, @Query('limit') limit?: string) {
+    const collection = await this.prisma.collection.findUnique({ where: { id } });
+    if (!collection) throw new NotFoundException('Подборка не найдена');
+
+    const lim = Math.min(200, Math.max(1, Number(limit ?? 50)));
+    const resolved = await this.selectionService.resolveSelection({
+      cityId: collection.cityId,
+      filterTags: collection.filterTags,
+      filterCategory: collection.filterCategory,
+      filterSubcategory: collection.filterSubcategory,
+      filterAudience: collection.filterAudience,
+      additionalFilters: collection.additionalFilters as Record<string, unknown>,
+      ranking: (collection.rankingJson as { preset?: 'popularity' | 'availability' | 'balanced' }) ?? { preset: 'balanced' },
+      pinnedEventIds: collection.pinnedEventIds,
+      excludedEventIds: collection.excludedEventIds,
+      page: 1,
+      limit: lim,
+    });
+
+    return {
+      total: resolved.total,
+      items: resolved.items.map((e) => ({
+        eventId: e.id,
+        title: e.title,
+        slug: e.slug,
+        isActive: e.isActive,
+        priceFrom: e.priceFrom ?? null,
       })),
     };
   }

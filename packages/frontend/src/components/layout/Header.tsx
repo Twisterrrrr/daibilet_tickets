@@ -18,7 +18,7 @@ const navigation = [
   { name: 'Мероприятия', href: catalogEventsHref({ category: 'EVENT' }) },
   { name: 'Подборки', href: '/podborki' },
   { name: 'Города', href: '/cities' },
-  { name: 'Блог', href: '/blog' },
+  { name: 'Статьи', href: '/articles' },
 ];
 
 interface HeaderCity {

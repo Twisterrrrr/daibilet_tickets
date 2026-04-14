@@ -95,5 +95,6 @@ export const adminApi = {
     api<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   patch: <T = unknown>(path: string, body?: unknown) =>
     api<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
+  delete: <T = unknown>(path: string) => api<T>(path, { method: 'DELETE' }),
 };
 

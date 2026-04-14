@@ -623,7 +623,7 @@ export function VenuePageView({ venue, program = null }: VenuePageViewProps) {
                   {(venue.relatedArticles as ArticleItem[]).map((article) => (
                     <Link
                       key={article.slug}
-                      href={`/blog/${article.slug}`}
+                      href={`/articles/${article.slug}`}
                       className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow group"
                     >
                       {article.coverImage && (
