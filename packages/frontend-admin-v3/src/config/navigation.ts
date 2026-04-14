@@ -68,6 +68,7 @@ export const navigation: NavSection[] = [
     title: 'Система',
     items: [
       { label: 'SEO-аудит', to: 'seo-audit', icon: Sparkles, feature: null },
+      { label: 'Подкатегории', to: 'subcategories', icon: Tags, feature: null },
       { label: 'Теги', to: 'tags', icon: Tags, feature: null },
       { label: 'Настройки', to: 'settings', icon: Settings, feature: null },
       { label: 'Продажи', to: 'sales', icon: BarChart3, feature: 'SALES' },

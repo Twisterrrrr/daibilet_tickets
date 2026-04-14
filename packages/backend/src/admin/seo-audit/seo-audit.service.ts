@@ -3,7 +3,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { EventSource, Prisma } from '@/prisma-client';
+import { EventSource, OfferStatus, Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
@@ -15,10 +15,17 @@ import type {
   SeoAuditVenueRowDto,
   SeoAuditVenuesResponseDto,
   SeoIssueDto,
+  UnifiedSeoAuditEntityIssuesResponseDto,
+  UnifiedSeoAuditIssuesResponseDto,
+  UnifiedSeoAuditSummaryDto,
+  UnifiedSeoEntityType,
+  UnifiedSeoIssueListItemDto,
+  UnifiedSeoSeverity,
 } from './seo-audit.types';
 import type { SeoAuditContext, SeoAuditEventInput } from './seo-audit-rules';
 import { runAllRules } from './seo-audit-rules';
 import { countEntityIssues, runCityRules, runVenueRules } from './seo-audit-entity-rules';
+import { SubcategoryPolicyService } from '../../subcategories/subcategory-policy.service';
 
 export interface SeoAuditEventsParams {
   search?: string;
@@ -34,6 +41,379 @@ export interface SeoAuditEventsParams {
 @Injectable()
 export class SeoAuditService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Unified (soft) endpoints — MVP for Admin V3 SEO Audit UI
+  // ────────────────────────────────────────────────────────────────────────────
+
+  async getUnifiedSummary(): Promise<UnifiedSeoAuditSummaryDto> {
+    const now = new Date();
+    const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
+
+    // Events: counts by coarse operational issues (fast, DB-level).
+    const [
+      totalEvents,
+      noPhoto,
+      noPrice,
+      noFutureSessions,
+      noSubcategory,
+      tooManyLinks,
+    ] = await Promise.all([
+      this.prisma.event.count({ where: { isDeleted: false } }),
+      this.prisma.event.count({
+        where: {
+          isDeleted: false,
+          imageUrl: null,
+          OR: [{ override: null }, { override: { imageUrl: null } }],
+        },
+      }),
+      this.prisma.event.count({
+        where: {
+          isDeleted: false,
+          NOT: {
+            offers: {
+              some: {
+                isDeleted: false,
+                status: OfferStatus.ACTIVE,
+                priceFrom: { gt: 0 },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.event.count({
+        where: {
+          isDeleted: false,
+          isActive: true,
+          NOT: {
+            sessions: {
+              some: {
+                isActive: true,
+                canceledAt: null,
+                startsAt: { gt: now },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.event.count({
+        where: {
+          isDeleted: false,
+          AND: [
+            { subcategoryLinks: { none: {} } },
+            { subcategories: { equals: [] } },
+          ],
+        },
+      }),
+      this.prisma.eventSubcategoryLink
+        .groupBy({
+          by: ['eventId'],
+          where: { event: { isDeleted: false } },
+          _count: { _all: true },
+          having: { _count: { _all: { gt: maxSub } } },
+        })
+        .then((rows) => rows.length),
+    ]);
+
+    // Cities / Venues: lightweight (gate-3 style).
+    const [citiesAudit, venuesAudit] = await Promise.all([
+      this.getCitiesAudit({ onlyIssues: 'true', page: '1', limit: '1000' }),
+      this.getVenuesAudit({ onlyIssues: 'true', page: '1', limit: '1000' }),
+    ]);
+
+    const issueBuckets: Array<{ issueCode: string; severity: UnifiedSeoSeverity; total: number; entityType: UnifiedSeoEntityType }> = [
+      { issueCode: 'NO_PHOTO', severity: 'WARN', total: noPhoto, entityType: 'EVENT' },
+      { issueCode: 'NO_PRICE', severity: 'ERROR', total: noPrice, entityType: 'EVENT' },
+      { issueCode: 'NO_FUTURE_SESSIONS', severity: 'ERROR', total: noFutureSessions, entityType: 'EVENT' },
+      { issueCode: 'NO_SUBCATEGORY', severity: 'WARN', total: noSubcategory, entityType: 'EVENT' },
+      { issueCode: 'TOO_MANY_SUBCATEGORIES', severity: 'WARN', total: tooManyLinks, entityType: 'EVENT' },
+    ];
+
+    const byIssueCode = issueBuckets
+      .filter((x) => x.total > 0)
+      .map((x) => ({ issueCode: x.issueCode, total: x.total }))
+      .sort((a, b) => b.total - a.total);
+
+    const eventErrors = issueBuckets.filter((x) => x.entityType === 'EVENT' && x.severity === 'ERROR').reduce((s, x) => s + x.total, 0);
+    const eventWarnings = issueBuckets.filter((x) => x.entityType === 'EVENT' && x.severity === 'WARN').reduce((s, x) => s + x.total, 0);
+    const eventInfo = 0;
+
+    const cityErrors = citiesAudit.summary.issuesBySeverity.ERROR;
+    const cityWarnings = citiesAudit.summary.issuesBySeverity.WARN;
+    const cityInfo = citiesAudit.summary.issuesBySeverity.INFO;
+
+    const venueErrors = venuesAudit.summary.issuesBySeverity.ERROR;
+    const venueWarnings = venuesAudit.summary.issuesBySeverity.WARN;
+    const venueInfo = venuesAudit.summary.issuesBySeverity.INFO;
+
+    const totals = {
+      errors: eventErrors + cityErrors + venueErrors,
+      warnings: eventWarnings + cityWarnings + venueWarnings,
+      info: eventInfo + cityInfo + venueInfo,
+      issues: eventErrors + eventWarnings + eventInfo + cityErrors + cityWarnings + cityInfo + venueErrors + venueWarnings + venueInfo,
+    };
+
+    return {
+      totals,
+      byEntityType: [
+        { entityType: 'EVENT', total: eventErrors + eventWarnings + eventInfo, errors: eventErrors, warnings: eventWarnings, info: eventInfo },
+        { entityType: 'CITY', total: cityErrors + cityWarnings + cityInfo, errors: cityErrors, warnings: cityWarnings, info: cityInfo },
+        { entityType: 'VENUE', total: venueErrors + venueWarnings + venueInfo, errors: venueErrors, warnings: venueWarnings, info: venueInfo },
+      ],
+      byIssueCode,
+    };
+  }
+
+  async getUnifiedIssues(params: {
+    entityType?: string;
+    severity?: string;
+    issueCode?: string;
+    search?: string;
+    cityId?: string;
+    onlyIssues?: 'true' | 'false';
+    page?: string;
+    limit?: string;
+  }): Promise<UnifiedSeoAuditIssuesResponseDto> {
+    const entityType = (params.entityType ?? 'EVENT').toUpperCase();
+    if (entityType === 'CITY') {
+      const res = await this.getCitiesAudit({ onlyIssues: params.onlyIssues, page: params.page, limit: params.limit });
+      const items: UnifiedSeoIssueListItemDto[] = [];
+      for (const c of res.items) {
+        for (const i of c.issues) {
+          items.push({
+            entityType: 'CITY',
+            entityId: c.id,
+            entityTitle: c.name,
+            entitySlug: c.slug,
+            issueCode: i.code,
+            severity: i.severity as UnifiedSeoSeverity,
+            message: i.message,
+            updatedAt: c.updatedAt,
+          });
+        }
+      }
+      return { items, total: items.length, page: res.page, pages: res.pages };
+    }
+
+    if (entityType === 'VENUE') {
+      const res = await this.getVenuesAudit({ cityId: params.cityId, onlyIssues: params.onlyIssues, page: params.page, limit: params.limit });
+      const items: UnifiedSeoIssueListItemDto[] = [];
+      for (const v of res.items) {
+        for (const i of v.issues) {
+          items.push({
+            entityType: 'VENUE',
+            entityId: v.id,
+            entityTitle: v.title,
+            entitySlug: v.slug,
+            cityName: v.cityName,
+            issueCode: i.code,
+            severity: i.severity as UnifiedSeoSeverity,
+            message: i.message,
+            updatedAt: v.updatedAt,
+          });
+        }
+      }
+      return { items, total: items.length, page: res.page, pages: res.pages };
+    }
+
+    // EVENT (soft operational issues + taxonomy issues, links-first with legacy fallback)
+    const page = Math.max(1, parseInt(params.page || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(params.limit || '50', 10) || 50));
+    const onlyIssues = params.onlyIssues !== 'false';
+    const now = new Date();
+    const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
+
+    const where: Prisma.EventWhereInput = { isDeleted: false };
+    if (params.search?.trim()) {
+      const q = params.search.trim();
+      where.OR = [
+        { title: { contains: q, mode: 'insensitive' } },
+        { slug: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+    if (params.cityId) where.cityId = params.cityId;
+
+    const [total, rows] = await Promise.all([
+      this.prisma.event.count({ where }),
+      this.prisma.event.findMany({
+        where,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          imageUrl: true,
+          subcategories: true,
+          isActive: true,
+          updatedAt: true,
+          city: { select: { name: true } },
+          override: { select: { imageUrl: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    const ids = rows.map((r) => r.id);
+    const [futureSessions, pricedOffers, linkCounts] = await Promise.all([
+      this.prisma.eventSession.groupBy({
+        by: ['eventId'],
+        where: {
+          eventId: { in: ids },
+          isActive: true,
+          canceledAt: null,
+          startsAt: { gt: now },
+        },
+        _count: { id: true },
+      }),
+      this.prisma.eventOffer.groupBy({
+        by: ['eventId'],
+        where: {
+          eventId: { in: ids },
+          isDeleted: false,
+          status: OfferStatus.ACTIVE,
+          priceFrom: { gt: 0 },
+        },
+        _count: { id: true },
+      }),
+      this.prisma.eventSubcategoryLink.groupBy({
+        by: ['eventId'],
+        where: { eventId: { in: ids } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const futureById = new Map(futureSessions.map((r) => [r.eventId, r._count.id]));
+    const pricedById = new Map(pricedOffers.map((r) => [r.eventId, r._count.id]));
+    const linksById = new Map(linkCounts.map((r) => [r.eventId, r._count._all]));
+
+    const items: UnifiedSeoIssueListItemDto[] = [];
+    for (const e of rows) {
+      const effImage = e.override?.imageUrl ?? e.imageUrl;
+      const hasImage = Boolean(effImage);
+      const hasFuture = (futureById.get(e.id) ?? 0) > 0;
+      const hasPrice = (pricedById.get(e.id) ?? 0) > 0;
+      const linksCount = linksById.get(e.id) ?? 0;
+      const legacyCount = Array.isArray(e.subcategories) ? e.subcategories.length : 0;
+      const hasSub = linksCount > 0 || legacyCount > 0;
+
+      const issuesForEntity: Array<{ code: string; severity: UnifiedSeoSeverity; message: string }> = [];
+
+      if (!hasImage) issuesForEntity.push({ code: 'NO_PHOTO', severity: 'WARN', message: 'Нет фото' });
+      if (!hasPrice) issuesForEntity.push({ code: 'NO_PRICE', severity: 'ERROR', message: 'Нет цены (нет активного оффера с priceFrom>0)' });
+      if (e.isActive && !hasFuture) issuesForEntity.push({ code: 'NO_FUTURE_SESSIONS', severity: 'ERROR', message: 'Нет будущих активных сеансов' });
+      if (!hasSub) issuesForEntity.push({ code: 'NO_SUBCATEGORY', severity: 'WARN', message: 'Нет подкатегории (links-first, fallback на legacy)' });
+      if (linksCount > maxSub || (linksCount === 0 && legacyCount > maxSub)) {
+        issuesForEntity.push({ code: 'TOO_MANY_SUBCATEGORIES', severity: 'WARN', message: `Слишком много подкатегорий (макс. ${maxSub})` });
+      }
+
+      // Apply filters at issue-level
+      const filtered = issuesForEntity.filter((i) => {
+        if (params.issueCode && i.code !== params.issueCode) return false;
+        if (params.severity && i.severity !== params.severity) return false;
+        return true;
+      });
+
+      if (onlyIssues && filtered.length === 0) continue;
+
+      for (const i of filtered) {
+        items.push({
+          entityType: 'EVENT',
+          entityId: e.id,
+          entityTitle: e.title,
+          entitySlug: e.slug,
+          cityName: e.city?.name ?? null,
+          issueCode: i.code,
+          severity: i.severity,
+          message: i.message,
+          updatedAt: e.updatedAt,
+        });
+      }
+    }
+
+    return {
+      items,
+      total: onlyIssues ? items.length : total,
+      page,
+      pages: onlyIssues ? 1 : Math.ceil(total / limit),
+    };
+  }
+
+  async getUnifiedEntityIssues(params: {
+    entityType: string;
+    entityId: string;
+  }): Promise<UnifiedSeoAuditEntityIssuesResponseDto> {
+    const entityType = params.entityType.toUpperCase();
+    if (entityType === 'CITY') {
+      const c = await this.prisma.city.findUnique({
+        where: { id: params.entityId },
+        select: { id: true, slug: true, name: true, description: true, metaTitle: true, metaDescription: true, updatedAt: true, isActive: true },
+      });
+      if (!c) return { entityType: 'CITY', entityId: params.entityId, issues: [] };
+      const issues = runCityRules({ description: c.description, metaTitle: c.metaTitle, metaDescription: c.metaDescription }).map((i) => ({
+        entityType: 'CITY' as const,
+        entityId: c.id,
+        entityTitle: c.name,
+        entitySlug: c.slug,
+        issueCode: i.code,
+        severity: i.severity as UnifiedSeoSeverity,
+        message: i.message,
+        updatedAt: c.updatedAt,
+      }));
+      return { entityType: 'CITY', entityId: c.id, issues };
+    }
+
+    if (entityType === 'VENUE') {
+      const v = await this.prisma.venue.findUnique({
+        where: { id: params.entityId },
+        select: { id: true, slug: true, title: true, description: true, metaTitle: true, metaDescription: true, updatedAt: true, city: { select: { name: true } } },
+      });
+      if (!v) return { entityType: 'VENUE', entityId: params.entityId, issues: [] };
+      const issues = runVenueRules({ description: v.description, metaTitle: v.metaTitle, metaDescription: v.metaDescription }).map((i) => ({
+        entityType: 'VENUE' as const,
+        entityId: v.id,
+        entityTitle: v.title,
+        entitySlug: v.slug,
+        cityName: v.city?.name ?? null,
+        issueCode: i.code,
+        severity: i.severity as UnifiedSeoSeverity,
+        message: i.message,
+        updatedAt: v.updatedAt,
+      }));
+      return { entityType: 'VENUE', entityId: v.id, issues };
+    }
+
+    // EVENT
+    const e = await this.prisma.event.findUnique({
+      where: { id: params.entityId },
+      select: { id: true, title: true, slug: true, imageUrl: true, subcategories: true, isActive: true, updatedAt: true, city: { select: { name: true } }, override: { select: { imageUrl: true } } },
+    });
+    if (!e) return { entityType: 'EVENT', entityId: params.entityId, issues: [] };
+
+    const now = new Date();
+    const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
+    const [futureCount, pricedOffersCount, linksCount] = await Promise.all([
+      this.prisma.eventSession.count({ where: { eventId: e.id, isActive: true, canceledAt: null, startsAt: { gt: now } } }),
+      this.prisma.eventOffer.count({ where: { eventId: e.id, isDeleted: false, status: OfferStatus.ACTIVE, priceFrom: { gt: 0 } } }),
+      this.prisma.eventSubcategoryLink.count({ where: { eventId: e.id } }),
+    ]);
+
+    const legacyCount = Array.isArray(e.subcategories) ? e.subcategories.length : 0;
+    const effImage = e.override?.imageUrl ?? e.imageUrl;
+    const hasImage = Boolean(effImage);
+    const hasPrice = pricedOffersCount > 0;
+    const hasFuture = futureCount > 0;
+    const hasSub = linksCount > 0 || legacyCount > 0;
+
+    const issues: UnifiedSeoIssueListItemDto[] = [];
+    if (!hasImage) issues.push({ entityType: 'EVENT', entityId: e.id, entityTitle: e.title, entitySlug: e.slug, cityName: e.city?.name ?? null, issueCode: 'NO_PHOTO', severity: 'WARN', message: 'Нет фото', updatedAt: e.updatedAt });
+    if (!hasPrice) issues.push({ entityType: 'EVENT', entityId: e.id, entityTitle: e.title, entitySlug: e.slug, cityName: e.city?.name ?? null, issueCode: 'NO_PRICE', severity: 'ERROR', message: 'Нет цены (нет активного оффера с priceFrom>0)', updatedAt: e.updatedAt });
+    if (e.isActive && !hasFuture) issues.push({ entityType: 'EVENT', entityId: e.id, entityTitle: e.title, entitySlug: e.slug, cityName: e.city?.name ?? null, issueCode: 'NO_FUTURE_SESSIONS', severity: 'ERROR', message: 'Нет будущих активных сеансов', updatedAt: e.updatedAt });
+    if (!hasSub) issues.push({ entityType: 'EVENT', entityId: e.id, entityTitle: e.title, entitySlug: e.slug, cityName: e.city?.name ?? null, issueCode: 'NO_SUBCATEGORY', severity: 'WARN', message: 'Нет подкатегории (links-first, fallback на legacy)', updatedAt: e.updatedAt });
+    if (linksCount > maxSub || (linksCount === 0 && legacyCount > maxSub)) issues.push({ entityType: 'EVENT', entityId: e.id, entityTitle: e.title, entitySlug: e.slug, cityName: e.city?.name ?? null, issueCode: 'TOO_MANY_SUBCATEGORIES', severity: 'WARN', message: `Слишком много подкатегорий (макс. ${maxSub})`, updatedAt: e.updatedAt });
+
+    return { entityType: 'EVENT', entityId: e.id, issues };
+  }
 
   async getEventsAudit(params: SeoAuditEventsParams): Promise<SeoAuditEventsResponseDto> {
     const page = Math.max(1, parseInt(params.page || '1', 10) || 1);

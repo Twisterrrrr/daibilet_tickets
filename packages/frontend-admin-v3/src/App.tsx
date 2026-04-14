@@ -30,6 +30,15 @@ const LandingDetailPage = React.lazy(() => import('@/modules/landings/pages/Land
 
 const TagsListPage = React.lazy(() => import('@/modules/tags/pages/TagsListPage').then((m) => ({ default: m.TagsListPage })));
 const SeoAuditPage = React.lazy(() => import('@/modules/seo-audit/pages/SeoAuditPage').then((m) => ({ default: m.SeoAuditPage })));
+const SubcategoriesListPage = React.lazy(() =>
+  import('@/modules/subcategories/pages/SubcategoriesListPage').then((m) => ({ default: m.SubcategoriesListPage })),
+);
+const SubcategoryDetailPage = React.lazy(() =>
+  import('@/modules/subcategories/pages/SubcategoryDetailPage').then((m) => ({ default: m.SubcategoryDetailPage })),
+);
+const SubcategoryCreatePage = React.lazy(() =>
+  import('@/modules/subcategories/pages/SubcategoryCreatePage').then((m) => ({ default: m.SubcategoryCreatePage })),
+);
 
 const ChatListPage = React.lazy(() => import('@/modules/chat/pages/ChatListPage').then((m) => ({ default: m.ChatListPage })));
 const ChatDetailPage = React.lazy(() => import('@/modules/chat/pages/ChatDetailPage').then((m) => ({ default: m.ChatDetailPage })));
@@ -79,6 +88,9 @@ export default function App() {
 
               <Route path="tags" element={<TagsListPage />} />
               <Route path="seo-audit" element={<SeoAuditPage />} />
+              <Route path="subcategories" element={<SubcategoriesListPage />} />
+              <Route path="subcategories/new" element={<SubcategoryCreatePage />} />
+              <Route path="subcategories/:id" element={<SubcategoryDetailPage />} />
             <Route path="promo-blocks" element={<PromoBlocksListPage />} />
 
               <Route path="chat" element={<ChatListPage />} />

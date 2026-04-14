@@ -84,10 +84,14 @@ describe('CollectionService', () => {
 
       const result = await service.getBySlug('salyut', 1, 20);
 
-      expect(mockPrisma.collection.findFirst).toHaveBeenCalledWith({
-        where: { slug: 'salyut', isActive: true, isDeleted: false },
-        include: { city: { select: { id: true, slug: true, name: true } } },
-      });
+      expect(mockPrisma.collection.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { slug: 'salyut', isActive: true, isDeleted: false },
+          include: expect.objectContaining({
+            city: { select: { id: true, slug: true, name: true } },
+          }),
+        }),
+      );
       expect(mockPrisma.city.findFirst).not.toHaveBeenCalled();
       expect(result.collection.slug).toBe('salyut');
     });

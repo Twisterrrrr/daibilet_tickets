@@ -82,6 +82,22 @@ import { CatalogClassificationNormalizerService } from '../catalog/catalog-class
 import { deriveSectionsFromSubcategories, getSubcategorySlugsForSection } from '../catalog-classification/derive-sections';
 import type { SectionSlug } from '../catalog-classification/classification.types';
 
+function parseBool(v: string | undefined): boolean {
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
+function parseIdsParam(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return Array.from(
+    new Set(
+      raw
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 class UpdateEventTagsDto {
   @IsOptional()
   @IsArray()
@@ -160,6 +176,85 @@ export class AdminEventsController {
     private readonly providerRouting: ProviderRoutingService,
   ) {}
 
+  @Get('health/batch')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async batchHealth(@Query('ids') idsRaw?: string) {
+    const ids = parseIdsParam(idsRaw).slice(0, 200);
+    if (ids.length === 0) {
+      return { items: [] as Array<{ id: string; flags: Record<string, boolean>; issueCodes: string[] }> };
+    }
+
+    const now = new Date();
+
+    const [events, futureSessions, pricedOffers, linkCounts] = await Promise.all([
+      this.prisma.event.findMany({
+        where: { id: { in: ids }, isDeleted: false },
+        select: {
+          id: true,
+          imageUrl: true,
+          subcategories: true,
+          override: { select: { imageUrl: true } },
+        },
+      }),
+      this.prisma.eventSession.groupBy({
+        by: ['eventId'],
+        where: {
+          eventId: { in: ids },
+          isActive: true,
+          canceledAt: null,
+          startsAt: { gt: now },
+        },
+        _count: { id: true },
+      }),
+      this.prisma.eventOffer.groupBy({
+        by: ['eventId'],
+        where: {
+          eventId: { in: ids },
+          isDeleted: false,
+          status: OfferStatus.ACTIVE,
+          priceFrom: { gt: 0 },
+        },
+        _count: { id: true },
+      }),
+      this.prisma.eventSubcategoryLink.groupBy({
+        by: ['eventId'],
+        where: { eventId: { in: ids } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const futureById = new Map(futureSessions.map((r) => [r.eventId, r._count.id]));
+    const pricedById = new Map(pricedOffers.map((r) => [r.eventId, r._count.id]));
+    const linksById = new Map(linkCounts.map((r) => [r.eventId, r._count._all]));
+
+    const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
+
+    const items = events.map((e) => {
+      const effImage = e.override?.imageUrl ?? e.imageUrl;
+      const hasImage = Boolean(effImage);
+      const hasFutureSessions = (futureById.get(e.id) ?? 0) > 0;
+      const hasPrice = (pricedById.get(e.id) ?? 0) > 0;
+      const linksCount = linksById.get(e.id) ?? 0;
+      const legacyCount = Array.isArray(e.subcategories) ? e.subcategories.length : 0;
+      const hasSubcategory = linksCount > 0 || legacyCount > 0;
+
+      const issueCodes: string[] = [];
+      if (!hasImage) issueCodes.push('NO_PHOTO');
+      if (!hasPrice) issueCodes.push('NO_PRICE');
+      if (!hasFutureSessions) issueCodes.push('NO_FUTURE_SESSIONS');
+      if (!hasSubcategory) issueCodes.push('NO_SUBCATEGORY');
+      if (linksCount > maxSub || (linksCount === 0 && legacyCount > maxSub)) issueCodes.push('TOO_MANY_SUBCATEGORIES');
+
+      return {
+        id: e.id,
+        flags: { hasImage, hasPrice, hasFutureSessions, hasSubcategory },
+        issueCodes,
+      };
+    });
+
+    return { items };
+  }
+
   @Get()
   async list(
     @Query('city') city?: string,
@@ -216,7 +311,7 @@ export class AdminEventsController {
     // - isArchived is derived as (isActive=false) for imported events (source != MANUAL).
     // Default behavior for admin UX: hide imported past events + imported archived events from the main list.
     const now = new Date();
-    const pastBool = isPast === '1' || isPast === 'true' || isPast === 'yes' ? true : isPast === '0' || isPast === 'false' || isPast === 'no' ? false : undefined;
+    const pastBool = parseBool(isPast) ? true : isPast === '0' || isPast === 'false' || isPast === 'no' ? false : undefined;
     const archivedBool =
       isArchived === '1' || isArchived === 'true' || isArchived === 'yes'
         ? true

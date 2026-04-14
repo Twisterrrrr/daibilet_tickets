@@ -22,6 +22,7 @@
 
 - **Архитектура проекта**: `Project.md` (этот файл).
 - **Классификация каталога / publish-gate (category + subcategories)**: `Catalog-Classification-Policy.md`.
+- **Taxonomy + SEO Audit (единый слой структуры и качества каталога)**: `SeoAudit-Taxonomy-MasterPlan.md`.
 - **Финансы (Buyer + Supplier + Admin)**: `finance.md`.
 - **Личный кабинет покупателя / Buyer Account**: `BuyerAccountSpecs.md`.
 - **Система доверия поставщикам / Supplier Trust System**: `archive/specs/SupplierTrustSpec.md`.
@@ -407,6 +408,27 @@
 ### Админка: готовность, расписание, мультисобытия, SEO-аудит
 
 - **Спецификация:** [AdminSystem.md](AdminSystem.md) — готовность события, ручной publish, мультисобытия, SEO-аудит, Teplohod-style расписание (сетка дата×час, drag/ctrl-brush, Модель A при продажах). Scope: только MANUAL события.
+
+---
+
+## Taxonomy (Subcategories) + SEO Audit — единый слой качества и структуры витрины
+
+### Цель
+
+- **Taxonomy (Subcategories)** задаёт смысловую структуру каталога (темы/подтемы) и является источником для фильтрации, авто‑подборок и SEO‑routing.
+- **SEO Audit** — операционный read‑слой, который проверяет качество оформления сущностей и страниц относительно publish‑политик и таксономии (completeness + misuse).
+
+### Принцип
+
+Эти блоки проектируются вместе:
+
+- taxonomy отвечает на «**что это за сущность**»
+- audit отвечает на «**достаточно ли хорошо она оформлена и используется**»
+
+### Где зафиксировано целевое решение
+
+- `docs/SeoAudit-Taxonomy-MasterPlan.md` — master plan для связки Taxonomy + SEO Audit, правила и rollout по фазам.
+  - Примечание: документ описывает **целевую спецификацию**; реализация должна быть эволюционной и не ломать текущие контракты (links‑first `Subcategory`, publish‑gate, materialize‑слой).
 
 ### Глобальные мульти-события (одно шоу в разных городах)
 

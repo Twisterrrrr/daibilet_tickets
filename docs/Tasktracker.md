@@ -97,6 +97,19 @@
 | `legacy-classification-fix` | Приведение legacy-событий к новой модели (скрипты reclassify / backfill — отдельный план) | Средний | `[ ]` |
 | `G-data-cleanup` | Программа G: trim links и legacy-classification — см. Epic G в архиве | Низкий | `[~]` |
 
+### Качество витрины / SEO Audit (Taxonomy-aware)
+
+Спецификация и rollout: `docs/SeoAudit-Taxonomy-MasterPlan.md` (Taxonomy задаёт структуру, SEO Audit проверяет соответствие и качество).
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `seo-audit-backend-read-model` | Backend: read‑модель SEO Audit (summary + issues list + entity issues), без автоисправлений; issue groups/severity; базовые фильтры (entityType/severity/group/issueCode/search) | Высокий | `[ ]` |
+| `seo-audit-snapshot-plan` | Snapshot/caching plan: где хранить snapshot (Redis TTL vs DB), cron/инвалидация, `generatedAt` метаданные; оценка объёма и SLO | Средний | `[ ]` |
+| `seo-audit-taxonomy-rules` | Taxonomy-aware rules: completeness (нет subcategory/topic) + misuse (type mismatch, inactive in use, too many) + unused taxonomy | Высокий | `[ ]` |
+| `admin-v3-seo-audit-ui` | Admin V3 UI: `/admin-v3/seo-audit` (summary + issues table + фильтры), deep links в сущности | Высокий | `[ ]` |
+| `entity-health-badges` | Интеграция: health badge / issues count на страницах сущностей (events/venues/landings/collections/articles) + переходы в filtered audit | Средний | `[ ]` |
+| `seo-audit-indexability-policy` | Политика thin/indexability: критерии `LANDING_THIN_CONTENT`, auto `isIndexable=false?` vs manual; как соотнести с publish-gate | Высокий | `[ ]` |
+
 ### Catalog foundation v2 — публичный sellable read / checkout adapter
 
 | ID / якорь | Задача | Приоритет | Статус |

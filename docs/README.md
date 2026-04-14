@@ -19,6 +19,7 @@
 | [Landings-Architecture.md](Landings-Architecture.md) | Архитектура лендингов |
 | [Collections-Architecture.md](Collections-Architecture.md) | Архитектура подборок |
 | [Tags-Architecture.md](Tags-Architecture.md) | Архитектура тегов и SEO-routing |
+| [SeoAudit-Taxonomy-MasterPlan.md](SeoAudit-Taxonomy-MasterPlan.md) | Master plan: Taxonomy (Subcategories) + SEO Audit как единый слой качества |
 | [UX-Parity-Backlog.md](UX-Parity-Backlog.md) | UI-system enforcement и статус UX parity |
 | [admin-v3-grand-master-plan.md](admin-v3-grand-master-plan.md) | Admin V3: стратегия по фазам 0–8 и Stages A–F |
 | [admin-v3-roadmap.md](admin-v3-roadmap.md) | Admin V3: тактический roadmap к запуску витрины (TC + Teplohod) |

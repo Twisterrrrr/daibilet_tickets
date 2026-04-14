@@ -2,14 +2,16 @@ import { EmptyState } from '@/components/shared/states/EmptyState';
 import { ErrorState } from '@/components/shared/states/ErrorState';
 import { LoadingState } from '@/components/shared/states/LoadingState';
 import type { AdminEventListItem } from '@/modules/events/api/queries';
-import type { AdminEventSummary } from '@/modules/events/api/summary';
 import type { EventRowItem } from './types';
 import { EventsTableRow } from './EventsTableRow';
 
-function mapRow(e: AdminEventListItem, s: AdminEventSummary | undefined): EventRowItem {
-  const issues = s?.readiness?.issues ?? [];
-  const errors = issues.filter((i) => i.severity === 'error').length;
-  const warnings = issues.length - errors;
+type EventHealthRow = { flags: Record<string, boolean>; issueCodes: string[] };
+
+function mapRow(e: AdminEventListItem, health: EventHealthRow | undefined): EventRowItem {
+  const codes = health?.issueCodes ?? [];
+  const errorCodes = new Set(['NO_PRICE', 'NO_FUTURE_SESSIONS']);
+  const errors = codes.filter((c) => errorCodes.has(c)).length;
+  const warnings = codes.length - errors;
 
   return {
     id: e.id,
@@ -21,8 +23,8 @@ function mapRow(e: AdminEventListItem, s: AdminEventSummary | undefined): EventR
     cityName: e.city?.name ?? null,
     venueName: null,
 
-    nextDate: s?.operations?.nextSessionAt ?? null,
-    hasFutureSlots: s?.readiness?.checklist?.hasFutureSlots ?? null,
+    nextDate: null,
+    hasFutureSlots: typeof health?.flags?.hasFutureSessions === 'boolean' ? health.flags.hasFutureSessions : null,
 
     priceFrom: null,
 
@@ -35,9 +37,24 @@ function mapRow(e: AdminEventListItem, s: AdminEventSummary | undefined): EventR
 
     issueCount: errors,
     warningCount: warnings,
-    readinessStatus: s?.readiness?.status ?? null,
-    readinessScore: typeof s?.readiness?.score === 'number' ? s.readiness.score : null,
-    issues: issues.map((i) => ({ code: i.code, label: i.message, severity: i.severity })),
+    readinessStatus: codes.length === 0 ? 'READY' : errors > 0 ? 'BLOCKED' : 'NEEDS_WORK',
+    readinessScore: null,
+    issues: codes.map((c) => ({
+      code: c,
+      label:
+        c === 'NO_PHOTO'
+          ? 'Нет фото'
+          : c === 'NO_PRICE'
+            ? 'Нет цены'
+            : c === 'NO_FUTURE_SESSIONS'
+              ? 'Нет будущих сеансов'
+              : c === 'NO_SUBCATEGORY'
+                ? 'Нет подкатегории'
+                : c === 'TOO_MANY_SUBCATEGORIES'
+                  ? 'Слишком много подкатегорий'
+                  : c,
+      severity: errorCodes.has(c) ? ('error' as const) : ('warning' as const),
+    })),
 
     sessionsCount: e._count?.sessions ?? null,
 
@@ -53,7 +70,7 @@ function mapRow(e: AdminEventListItem, s: AdminEventSummary | undefined): EventR
 
 export function EventsTable({
   items,
-  summaryById,
+  healthById,
   loading,
   error,
   onRetry,
@@ -67,7 +84,7 @@ export function EventsTable({
   visibleCols,
 }: {
   items: AdminEventListItem[];
-  summaryById: Record<string, AdminEventSummary | undefined>;
+  healthById: Record<string, EventHealthRow | undefined>;
   loading: boolean;
   error: string | null;
   onRetry: () => void;
@@ -164,7 +181,7 @@ export function EventsTable({
         </thead>
         <tbody>
           {items.map((e) => {
-            const row = mapRow(e, summaryById[e.id]);
+            const row = mapRow(e, healthById[e.id]);
             return (
               <EventsTableRow
                 key={row.id}

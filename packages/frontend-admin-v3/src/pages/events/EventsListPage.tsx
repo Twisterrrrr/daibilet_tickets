@@ -9,10 +9,9 @@ import { Input } from '@/components/ui/input';
 import { useListPageState } from '@/hooks/useListPageState';
 import { fetchAdminEventsList } from '@/modules/events/api/queries';
 import { adminApi } from '@/api/client';
-import { fetchAdminEventSummary, type AdminEventSummary } from '@/modules/events/api/summary';
 import { EventsTable } from '@/modules/events/components/table/EventsTable';
 import { topGroupLabels, type TopGroup } from '@/config/top-groups';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 
 type CityOption = { slug: string; name: string };
@@ -261,22 +260,22 @@ export function EventsListPage() {
     staleTime: 60_000,
   });
 
-  const summaries = useQueries({
-    queries: items.map((e) => ({
-      queryKey: ['admin-event-summary', e.id],
-      queryFn: () => fetchAdminEventSummary(e.id),
-      enabled: Boolean(e.id),
-      staleTime: 60_000,
-    })),
+  const batchHealth = useQuery({
+    queryKey: ['admin-events-health-batch', { ids: items.map((x) => x.id).join(',') }],
+    enabled: items.length > 0,
+    queryFn: async () => {
+      const ids = items.map((x) => x.id).join(',');
+      const res = await adminApi.get<{
+        items: Array<{ id: string; flags: Record<string, boolean>; issueCodes: string[] }>;
+      }>(`/admin/events/health/batch?ids=${encodeURIComponent(ids)}`);
+      const byId: Record<string, { flags: Record<string, boolean>; issueCodes: string[] } | undefined> = {};
+      for (const row of res.items ?? []) byId[row.id] = { flags: row.flags ?? {}, issueCodes: row.issueCodes ?? [] };
+      return byId;
+    },
+    staleTime: 30_000,
   });
 
-  const summaryById = React.useMemo(() => {
-    const out: Record<string, AdminEventSummary | undefined> = {};
-    for (let i = 0; i < items.length; i += 1) {
-      out[items[i]!.id] = summaries[i]?.data;
-    }
-    return out;
-  }, [items, summaries]);
+  const healthById = batchHealth.data ?? {};
 
   async function toggleArchive(id: string, nextArchived: boolean) {
     await adminApi.patch(`/admin/events/${id}/archive`, { isArchived: nextArchived });
@@ -811,7 +810,7 @@ export function EventsListPage() {
         ) : null}
         <EventsTable
           items={items}
-          summaryById={summaryById}
+          healthById={healthById}
           loading={query.isLoading}
           error={query.isError ? (query.error instanceof Error ? query.error.message : 'Ошибка загрузки') : null}
           onRetry={() => query.refetch()}
