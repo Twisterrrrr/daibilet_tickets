@@ -28,6 +28,8 @@ import { VenueNormalizerService } from './venue-normalizer.service';
 import { VenueImportService } from './venue-import.service';
 import { VenueLifecycleService } from './venue-lifecycle.service';
 import { VenueModerationMetricsService } from './venue-moderation-metrics.service';
+import { VenueAutoModerationService } from './venue-auto-moderation.service';
+import { VenueTrustService } from './venue-trust.service';
 import { OfferNormalizerService } from './offer-normalizer.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
@@ -68,6 +70,8 @@ import { CatalogAuditService } from './catalog-audit.service';
     VenueImportService,
     VenueLifecycleService,
     VenueModerationMetricsService,
+    VenueTrustService,
+    VenueAutoModerationService,
     OfferNormalizerService,
     SubcategoryPolicyService,
     SubcategoryAssignmentService,
@@ -102,6 +106,8 @@ import { CatalogAuditService } from './catalog-audit.service';
     VenueImportService,
     VenueLifecycleService,
     VenueModerationMetricsService,
+    VenueTrustService,
+    VenueAutoModerationService,
     OfferNormalizerService,
     SubcategoryPolicyService,
     SubcategoryAssignmentService,

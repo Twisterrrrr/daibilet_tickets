@@ -22,8 +22,11 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsOptional,
   IsString,
+  Max,
+  Min,
 } from 'class-validator';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -41,7 +44,10 @@ import {
 } from '@prisma/client';
 import { VenueImportService } from '../catalog/venue-import.service';
 import { VenueLifecycleService } from '../catalog/venue-lifecycle.service';
+import { getVenueAutoModerationEnvFlags } from '../catalog/venue-auto-decision.config';
+import { VenueAutoModerationService } from '../catalog/venue-auto-moderation.service';
 import { VenueModerationMetricsService } from '../catalog/venue-moderation-metrics.service';
+import { VenueTrustService } from '../catalog/venue-trust.service';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
@@ -195,6 +201,41 @@ class RejectVenueBodyDto {
   expectedUpdatedAt?: string;
 }
 
+class AutoModerationDryRunBodyDto {
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @IsEnum(VenueImportSource)
+  importSource?: VenueImportSource;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit?: number;
+}
+
+class AutoModerationRunBodyDto {
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit!: number;
+
+  @IsOptional()
+  @IsEnum(VenueImportSource)
+  importSource?: VenueImportSource;
+
+  @IsOptional()
+  @IsBoolean()
+  onlyHighConfidence?: boolean;
+}
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -210,6 +251,8 @@ export class AdminVenuesController {
     private readonly venueImport: VenueImportService,
     private readonly venueLifecycle: VenueLifecycleService,
     private readonly venueModerationMetrics: VenueModerationMetricsService,
+    private readonly venueAutoModeration: VenueAutoModerationService,
+    private readonly venueTrust: VenueTrustService,
   ) {}
 
   @Get()
@@ -429,6 +472,52 @@ export class AdminVenuesController {
       from: from ? new Date(from) : undefined,
       to: to ? new Date(to) : undefined,
       importSource: importSource ? (importSource as VenueImportSource) : undefined,
+    });
+  }
+
+  /**
+   * Trust / авто-модерация по источникам импорта (Stage 5).
+   * GET /admin/venues/import-source-trust
+   */
+  @Get('import-source-trust')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async importSourceTrust() {
+    return this.venueTrust.getImportSourceTrustOverview();
+  }
+
+  /**
+   * Dry-run авто-модерации (без изменений в БД).
+   * POST /admin/venues/auto-moderation/dry-run
+   */
+  @Post('auto-moderation/dry-run')
+  @Roles('ADMIN', 'EDITOR')
+  async autoModerationDryRun(@Body() body: AutoModerationDryRunBodyDto) {
+    return this.venueAutoModeration.runDryRun({
+      from: body.from ? new Date(body.from) : undefined,
+      to: body.to ? new Date(body.to) : undefined,
+      importSource: body.importSource,
+      limit: body.limit,
+    });
+  }
+
+  /**
+   * Реальный запуск авто-модерации (только при AUTO_MODERATION_ENABLED=true).
+   * POST /admin/venues/auto-moderation/run
+   */
+  @Post('auto-moderation/run')
+  @Roles('ADMIN')
+  async autoModerationRun(@Body() body: AutoModerationRunBodyDto) {
+    const flags = getVenueAutoModerationEnvFlags();
+    if (!flags.autoModerationEnabled) {
+      throw new BadRequestException({
+        code: 'AUTO_MODERATION_DISABLED',
+        message: 'Авто-модерация отключена (AUTO_MODERATION_ENABLED).',
+      });
+    }
+    return this.venueAutoModeration.runAutoDecisionsForDrafts({
+      limit: body.limit,
+      importSource: body.importSource,
+      onlyHighConfidence: body.onlyHighConfidence,
     });
   }
 
