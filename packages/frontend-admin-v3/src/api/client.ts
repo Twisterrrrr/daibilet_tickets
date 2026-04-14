@@ -3,6 +3,19 @@ import { clearTokens, getToken, setToken } from '@/lib/auth';
 const BASE = '/api/v1';
 let refreshPromise: Promise<boolean> | null = null;
 
+/** Ошибка API с опциональным доменным `code` из тела ответа. */
+export class AdminApiError extends Error {
+  readonly code?: string;
+  readonly statusCode: number;
+
+  constructor(message: string, statusCode: number, code?: string) {
+    super(message);
+    this.name = 'AdminApiError';
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
+
 async function refreshAccessToken(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
 
@@ -62,9 +75,13 @@ export async function api<T = unknown>(path: string, options: RequestInit = {}):
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    const message: string = err.message || `HTTP ${res.status}`;
-    throw new Error(message);
+    const err = (await res.json().catch(() => ({ message: res.statusText }))) as {
+      message?: string;
+      error?: string;
+      code?: string;
+    };
+    const message: string = err.message || err.error || `HTTP ${res.status}`;
+    throw new AdminApiError(message, res.status, err.code);
   }
 
   return res.json() as Promise<T>;

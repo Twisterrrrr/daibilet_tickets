@@ -23,6 +23,8 @@ export type NavItem = {
   to: string;
   icon: LucideIcon;
   feature: FeatureFlag | null;
+  /** Для вложенных маршрутов (например venues vs venues/candidates) */
+  end?: boolean;
 };
 
 export type NavSection = {
