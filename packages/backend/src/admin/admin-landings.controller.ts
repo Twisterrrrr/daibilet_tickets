@@ -25,6 +25,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
 import { LandingMaterializerService } from '../landing/landing-materializer.service';
+import { LandingService } from '../landing/landing.service';
 import { CreateLandingDto, UpdateLandingDto } from './dto/admin.dto';
 import {
   AdditionalFiltersSchema,
@@ -48,30 +49,45 @@ export class AdminLandingsController {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly materializer: LandingMaterializerService,
+    private readonly landings: LandingService,
   ) {}
 
   @Get()
   async list(
+    @Query('search') search?: string,
     @Query('city') city?: string,
     @Query('status') status?: LandingStatus,
     @Query('templateType') templateType?: LandingTemplateType,
     @Query('showInCollections') showInCollections?: string,
+    @Query('landingType') landingType?: 'HUB' | 'CITY' | 'MULTI_CITY',
+    @Query('eventSourceType') eventSourceType?: 'AUTO_QUERY' | 'PRIMARY_COLLECTION' | 'MIXED',
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     const where: Record<string, unknown> = { isDeleted: false };
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
     if (city) where.city = { slug: city };
     if (status) where.status = status;
     if (templateType) where.templateType = templateType;
     if (showInCollections === 'true') where.showInCollections = true;
     if (showInCollections === 'false') where.showInCollections = false;
+    if (landingType) where.landingType = landingType;
+    if (eventSourceType) where.eventSourceType = eventSourceType;
 
     const pg = parsePagination({ cursor, page, limit });
     const [rawItems, total] = await Promise.all([
       this.prisma.landingPage.findMany({
         where,
-        include: { city: { select: { slug: true, name: true } } },
+        include: {
+          city: { select: { slug: true, name: true } },
+          parentLanding: { select: { id: true, slug: true, title: true, landingType: true } },
+        },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
         ...paginationArgs(pg),
       }),
@@ -80,23 +96,41 @@ export class AdminLandingsController {
     return buildPaginatedResult(rawItems, total, pg.limit);
   }
 
+  @Get(':id/resolved-events')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async getResolvedEvents(@Param('id') id: string) {
+    return this.landings.resolveAdminResolvedEvents(id);
+  }
+
   @Get(':id')
   async get(@Param('id') id: string) {
     return this.prisma.landingPage.findUniqueOrThrow({
       where: { id },
-      include: { city: { select: { slug: true, name: true } } },
+      include: {
+        city: { select: { slug: true, name: true } },
+        parentLanding: { select: { id: true, slug: true, title: true, landingType: true } },
+        childLandings: {
+          where: { isDeleted: false },
+          include: { city: { select: { slug: true, name: true } } },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+          take: 100,
+        },
+      },
     });
   }
 
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateLandingDto) {
+    // Для publish-guard’ов нужен id; в create пока запрещаем сразу активировать HUB/MULTI_CITY без child’ов.
+    await this.validateLandingRules(data as unknown as Record<string, unknown>);
     this.validateJsonFields(data as unknown as Record<string, unknown>);
     const prismaData = {
       ...data,
       additionalFilters: data.additionalFilters ? toJsonValue(data.additionalFilters) : undefined,
       rankingJson: data.rankingJson ? toJsonValue(data.rankingJson) : undefined,
       seasonalPayload: data.seasonalPayload ? toJsonValue(data.seasonalPayload) : undefined,
+      queryConfig: data.queryConfig ? toJsonValue(data.queryConfig) : undefined,
       status: data.status ?? (data.isActive ? LandingStatus.ACTIVE : LandingStatus.DRAFT),
     };
     return this.prisma.landingPage.create({ data: prismaData as Parameters<typeof this.prisma.landingPage.create>[0]['data'] });
@@ -109,6 +143,13 @@ export class AdminLandingsController {
 
     this.validateJsonFields(clean);
 
+    const beforeForRules = await this.prisma.landingPage.findUnique({ where: { id }, include: { city: { select: { id: true } } } });
+    if (!beforeForRules) throw new BadRequestException('Landing not found');
+    await this.validateLandingRules(
+      { id, ...(beforeForRules as unknown as Record<string, unknown>), ...(data as unknown as Record<string, unknown>) },
+      id,
+    );
+
     if (data.version !== undefined) {
       const before = await this.prisma.landingPage.findUnique({ where: { id } });
 
@@ -120,6 +161,7 @@ export class AdminLandingsController {
             ...(clean.rankingJson !== undefined ? { rankingJson: toJsonValue(clean.rankingJson) } : {}),
             ...(clean.additionalFilters !== undefined ? { additionalFilters: toJsonValue(clean.additionalFilters) } : {}),
             ...(clean.seasonalPayload !== undefined ? { seasonalPayload: toJsonValue(clean.seasonalPayload) } : {}),
+            ...(clean.queryConfig !== undefined ? { queryConfig: toJsonValue(clean.queryConfig) } : {}),
             version: { increment: 1 },
           },
         }),
@@ -254,6 +296,93 @@ export class AdminLandingsController {
         validateJson(SeasonalPayloadSchema, data.seasonalPayload, 'seasonalPayload');
     } catch (e: unknown) {
       throw new BadRequestException(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  private async validateLandingRules(raw: Record<string, unknown>, selfId?: string) {
+    const landingType = (raw.landingType as string | undefined) ?? 'CITY';
+    const cityId = (raw.cityId as string | null | undefined) ?? null;
+    const parentLandingId = (raw.parentLandingId as string | null | undefined) ?? null;
+    const slug = (raw.slug as string | undefined) ?? '';
+    const status = (raw.status as LandingStatus | undefined) ?? undefined;
+    const isActive = raw.isActive === undefined ? undefined : Boolean(raw.isActive);
+
+    if (!slug) throw new BadRequestException({ code: 'VALIDATION_ERROR', message: 'slug обязателен' });
+
+    if (landingType === 'CITY') {
+      if (!cityId) throw new BadRequestException({ code: 'LANDING_CITY_REQUIRED', message: 'CITY лендинг: cityId обязателен' });
+      if (parentLandingId) {
+        const parent = await this.prisma.landingPage.findUnique({ where: { id: parentLandingId } });
+        if (!parent || parent.isDeleted) {
+          throw new BadRequestException({ code: 'INVALID_PARENT_LANDING', message: 'Родительский лендинг не найден' });
+        }
+        if (!['HUB', 'MULTI_CITY'].includes(String(parent.landingType))) {
+          throw new BadRequestException({
+            code: 'LANDING_PARENT_TYPE_INVALID',
+            message: 'Родитель должен быть HUB или MULTI_CITY',
+          });
+        }
+      }
+
+      // Publish/activate guard: CITY нельзя активировать/публиковать, если выдача пуста.
+      const wantsActive = status === LandingStatus.ACTIVE || isActive === true;
+      if (wantsActive) {
+        const preview = await this.landings.resolveAdminResolvedEvents(selfId ?? String(raw.id ?? ''));
+        if ((preview.total ?? 0) <= 0) {
+          throw new ConflictException({
+            code: 'LANDING_PUBLISH_EMPTY_RESULTS',
+            message: 'Нельзя активировать CITY лендинг без выдачи событий',
+          });
+        }
+      }
+    } else if (landingType === 'HUB' || landingType === 'MULTI_CITY') {
+      if (cityId) {
+        throw new BadRequestException({ code: 'LANDING_CITY_FORBIDDEN', message: `${landingType} лендинг: cityId запрещён` });
+      }
+      if (parentLandingId) {
+        throw new BadRequestException({
+          code: 'LANDING_PARENT_TYPE_INVALID',
+          message: `${landingType} лендинг: parentLandingId запрещён`,
+        });
+      }
+
+      const conflict = await this.prisma.landingPage.findFirst({
+        where: {
+          isDeleted: false,
+          slug,
+          landingType: { in: ['HUB', 'MULTI_CITY'] },
+          ...(selfId ? { id: { not: selfId } } : {}),
+        },
+        select: { id: true },
+      });
+      if (conflict) {
+        throw new ConflictException({ code: 'LANDING_SLUG_CONFLICT', message: 'Slug уже занят (HUB/MULTI_CITY)' });
+      }
+
+      // Publish/activate guard: HUB/MULTI_CITY нельзя активировать/публиковать без живых child-вариантов.
+      const wantsActive = status === LandingStatus.ACTIVE || isActive === true;
+      if (wantsActive) {
+        const landingId = selfId ?? String(raw.id ?? '');
+        if (!landingId || landingId === 'undefined') return;
+        const liveChildren = await this.prisma.landingPage.count({
+          where: {
+            parentLandingId: landingId,
+            isDeleted: false,
+            landingType: 'CITY',
+            status: LandingStatus.ACTIVE,
+            isActive: true,
+            isIndexable: true,
+          },
+        });
+        if (liveChildren <= 0) {
+          throw new ConflictException({
+            code: 'LANDING_PUBLISH_EMPTY_RESULTS',
+            message: 'Нельзя активировать HUB/MULTI_CITY без живых городских вариантов',
+          });
+        }
+      }
+    } else {
+      throw new BadRequestException({ code: 'INVALID_LANDING_TYPE', message: 'Некорректный landingType' });
     }
   }
 }

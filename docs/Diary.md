@@ -5131,3 +5131,46 @@ Tripster — лидер рынка экскурсий в России. Прям�
   - пересмотреть ссылочность на `/checkout` и CTA «В корзину» в случаях, когда оплата идёт через внешние виджеты/redirect;
   - возможно, временно ограничить корзину только на сценарии с ручными/гибридными офферами.
 - Для промо-подборок необходимо следить за тем, чтобы события были корректно размечены тегами/подкатегориями (`romantic`, `GASTRO`, `bad-weather-ok`, аудитория `KIDS`), иначе часть промо-страниц может оказываться пустой.
+
+---
+
+### 14.04.2026 — Landings: multi-city family / hub / city pattern (доменная эволюция)
+
+#### Наблюдения
+- В проекте уже существует устойчивый public‑паттерн: **канонический city landing** в `/cities/:citySlug/:landingSlug` и отдельные **topic hubs** (например, `/river-cruises`, `/salute-9-may`), которые ведут в city‑варианты.
+- Текущая модель `LandingPage` описывает city‑bound лендинг и общий selection‑принцип; но “семейство темы” (родитель → варианты по городам) пока не оформлено как доменная конструкция, из‑за чего редактору сложнее управлять мультилендингами и SEO‑каноникализацией.
+
+#### Решения
+1. **Зафиксировать целевой паттерн** “Global hub / Multi‑city family / City landing” как эволюцию домена без ломки текущих контрактов и роутинга (документировано в `docs/Landings-Architecture.md`).
+2. **Инварианты SEO**:
+   - city landing каноникалится на самого себя;
+   - hub/family не каноникалится в child и наоборот;
+   - hub и city должны отличаться по интенту/контенту, чтобы не создать дубли.
+3. **UX‑инвариант админки**: перед публикацией и при редактировании обязателен preview “resolved events” + preview public URL/canonical.
+
+#### Проблемы
+- Любая реальная реализация family/parent-child потребует осторожной стыковки с уже существующими сущностями `LandingPage`/materialize‑логикой и действующими публичными хаб‑роутами, чтобы не разрушить текущие SEO‑страницы и редиректы.
+
+---
+
+### 14.04.2026 — Admin V3: боеспособные Landings (HUB/CITY/MULTI_CITY) + preview + safe public namespace
+
+#### Наблюдения
+- Для лендингов критичен preview “resolved events”: без него редактор не понимает, будет ли страница пустой.
+- Самый безопасный путь для HUB/MULTI_CITY — **не лезть в корневые маршруты**, а завести отдельный namespace `/landings/:slug`, оставив канон `/cities/:citySlug/:landingSlug` без изменений.
+
+#### Решения
+1. **Backend**:
+   - Эволюционно расширена модель `LandingPage`: `landingType`, `parentLandingId` (self relation), `cityId` сделан nullable для HUB/MULTI_CITY, добавлены `canonicalUrl`, `eventSourceType`, `queryConfig`, `relatedArticleIds[]`, `relatedCollectionIds[]`.
+   - Добавлен endpoint `GET /admin/landings/:id/resolved-events` (reuse selection logic).
+   - Добавлен endpoint `GET /catalog/landings/hub/:slug` для HUB/MULTI_CITY read-path.
+   - Добавлены publish/activate guards: CITY нельзя активировать при `resolvedEvents=0`; HUB/MULTI_CITY нельзя активировать без “живых” child CITY.
+2. **Admin V3**:
+   - Реализованы `/admin-v3/landings` (листинг с фильтрами) и `/admin-v3/landings/:id` (деталка/редактор).
+   - В деталке добавлены блоки редактирования контента (JSON поля) по образцу “речные/автобусные” лендингов, а также редактор `queryConfig`.
+   - Добавлен быстрый flow “создать city‑вариант” из HUB/MULTI_CITY с prefill основных полей.
+3. **Public frontend**:
+   - Добавлена страница `/landings/:slug` как безопасный хаб/семейство: “выбор города” → ссылки на канонические `/cities/...`.
+
+#### Проблемы
+- В dev окружении миграции требовали reset для восстановления консистентности (после конфликтов shadow DB). На prod любая стратегия “reset‑миграций” должна быть оформлена отдельным планом и не смешиваться с обычной линейной историей миграций.

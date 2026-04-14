@@ -14,6 +14,12 @@ export class CatalogLandingsController {
     return this.landingService.getCatalogByCityAndSlug(citySlug, slug);
   }
 
+  @Get('landings/hub/:slug')
+  @ApiOperation({ summary: 'HUB/MULTI_CITY лендинг по slug (без города)' })
+  getHubLanding(@Param('slug') slug: string) {
+    return this.landingService.getCatalogHubBySlug(slug);
+  }
+
   @Get('collections/featured-landings')
   @ApiOperation({ summary: 'Featured лендинги для раздела подборок' })
   getFeatured(@Query('city') city?: string) {

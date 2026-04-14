@@ -66,6 +66,10 @@ export class LandingService {
   }
 
   private async buildLandingPayload(landing: LandingWithCity) {
+    if (!landing.city) {
+      throw new NotFoundException(`Лендинг "${landing.slug}" не привязан к городу`);
+    }
+
     // Находим тег для фильтрации
     const tag = await this.prisma.tag.findFirst({
       where: { slug: landing.filterTag, isActive: true },
@@ -75,7 +79,7 @@ export class LandingService {
     const now = new Date();
 
     const eventsWhere = buildLandingEventsWhere({
-      cityId: landing.cityId,
+      cityId: landing.cityId!,
       now,
       tag,
       additionalFilters: landing.additionalFilters,
@@ -225,6 +229,104 @@ export class LandingService {
     };
   }
 
+  async resolveAdminResolvedEvents(landingId: string) {
+    const landing = await this.prisma.landingPage.findUnique({
+      where: { id: landingId },
+      include: { city: { select: { id: true, slug: true, name: true } } },
+    });
+    if (!landing || landing.isDeleted) throw new NotFoundException('Лендинг не найден');
+
+    type ResolvedEventItem = {
+      id: string;
+      slug: string | null;
+      title: string;
+      city: { id: string; slug: string; name: string } | null;
+      isActive: boolean;
+      priceFrom: string | null;
+      nextSessionAt: string | null;
+    };
+
+    const resolveCityLanding = async (lp: typeof landing): Promise<{ ids: string[]; items: ResolvedEventItem[] }> => {
+      if (!lp.cityId || !lp.city) return { ids: [], items: [] };
+      const tag = await this.prisma.tag.findFirst({ where: { slug: lp.filterTag, isActive: true } });
+      const now = new Date();
+      const where = buildLandingEventsWhere({
+        cityId: lp.cityId,
+        now,
+        tag,
+        additionalFilters: lp.additionalFilters,
+        subcategoryPolicy: this.subcategoryPolicy,
+      });
+      if (!where) return { ids: [], items: [] };
+
+      const events = await this.prisma.event.findMany({
+        where,
+        orderBy: [{ rating: 'desc' }, { reviewCount: 'desc' }, { createdAt: 'desc' }],
+        take: 60,
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          isActive: true,
+          priceFrom: true,
+          city: { select: { id: true, slug: true, name: true } },
+          sessions: {
+            where: { isActive: true, startsAt: { gte: now } },
+            orderBy: { startsAt: 'asc' },
+            take: 1,
+            select: { startsAt: true },
+          },
+        },
+      });
+
+      const items = events.map((e) => ({
+        id: e.id,
+        slug: e.slug,
+        title: e.title,
+        city: e.city,
+        isActive: e.isActive,
+        priceFrom: e.priceFrom != null ? String(e.priceFrom) : null,
+        nextSessionAt: e.sessions[0]?.startsAt ? e.sessions[0].startsAt.toISOString() : null,
+      }));
+
+      return { ids: events.map((e) => e.id), items };
+    };
+
+    if (landing.landingType === 'CITY') {
+      const { ids, items } = await resolveCityLanding(landing);
+      return { items, total: ids.length };
+    }
+
+    const children = await this.prisma.landingPage.findMany({
+      where: { parentLandingId: landing.id, isDeleted: false, landingType: 'CITY' },
+      include: { city: { select: { id: true, slug: true, name: true } } },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      take: 50,
+    });
+
+    const parts = await Promise.all(children.map((c) => resolveCityLanding(c)));
+    const idSet = new Set<string>();
+    const items: Array<{
+      id: string;
+      slug: string | null;
+      title: string;
+      city: { id: string; slug: string; name: string } | null;
+      isActive: boolean;
+      priceFrom: string | null;
+      nextSessionAt: string | null;
+    }> = [];
+
+    for (const p of parts) {
+      for (const id of p.ids) idSet.add(id);
+      for (const it of p.items) {
+        if (items.length >= 80) break;
+        items.push(it);
+      }
+    }
+
+    return { items, total: idSet.size };
+  }
+
   async getCatalogByCityAndSlug(citySlug: string, slug: string) {
     const landing = await this.prisma.landingPage.findFirst({
       where: {
@@ -239,6 +341,82 @@ export class LandingService {
     return this.buildLandingPayload(landing);
   }
 
+  async getCatalogHubBySlug(slug: string) {
+    const landing = await this.prisma.landingPage.findFirst({
+      where: {
+        slug,
+        isDeleted: false,
+        landingType: { in: ['HUB', 'MULTI_CITY'] },
+        OR: [{ status: LandingStatus.ACTIVE }, { isActive: true }],
+      },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        subtitle: true,
+        heroText: true,
+        landingType: true,
+        metaTitle: true,
+        metaDescription: true,
+        canonicalUrl: true,
+        status: true,
+        isIndexable: true,
+        isActive: true,
+        childLandings: {
+          where: { isDeleted: false, landingType: 'CITY' },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+          take: 200,
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            status: true,
+            isIndexable: true,
+            isActive: true,
+            city: { select: { id: true, slug: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!landing) throw new NotFoundException(`Лендинг "${slug}" не найден`);
+
+    const variants = (landing.childLandings ?? [])
+      .map((c) => {
+        if (!c.city) return null;
+        return {
+          id: c.id,
+          slug: c.slug,
+          title: c.title,
+          status: c.status,
+          isIndexable: c.isIndexable,
+          isActive: c.isActive,
+          city: c.city,
+          canonicalPath: `/cities/${c.city.slug}/${c.slug}`,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null);
+
+    return {
+      landing: {
+        id: landing.id,
+        slug: landing.slug,
+        title: landing.title,
+        subtitle: landing.subtitle,
+        heroText: landing.heroText,
+        landingType: landing.landingType,
+        metaTitle: landing.metaTitle,
+        metaDescription: landing.metaDescription,
+        canonicalUrl: landing.canonicalUrl,
+        status: landing.status,
+        isIndexable: landing.isIndexable,
+        isActive: landing.isActive,
+      },
+      variants,
+      total: variants.length,
+    };
+  }
+
   async getFeaturedForCollections(citySlug: string) {
     const rows = await this.prisma.landingPage.findMany({
       where: {
@@ -246,6 +424,7 @@ export class LandingService {
         showInCollections: true,
         OR: [{ status: LandingStatus.ACTIVE }, { isActive: true }],
         city: { slug: citySlug },
+        cityId: { not: null },
       },
       orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
       select: {
@@ -258,7 +437,9 @@ export class LandingService {
         city: { select: { slug: true, name: true } },
       },
     });
-    return rows.map((row) => ({
+    return rows
+      .filter((row) => row.city != null)
+      .map((row) => ({
       id: row.id,
       slug: row.slug,
       title: row.title,
@@ -266,8 +447,8 @@ export class LandingService {
       templateType: row.templateType,
       hero: row.heroText,
       city: row.city,
-      cta: { label: 'Открыть', href: `/cities/${row.city.slug}/${row.slug}` },
-    }));
+      cta: { label: 'Открыть', href: `/cities/${row.city!.slug}/${row.slug}` },
+      }));
   }
 
   async trackFeaturedEvent(

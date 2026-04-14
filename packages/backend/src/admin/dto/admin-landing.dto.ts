@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { LandingSelectionMode, LandingStatus, LandingTemplateType } from '@/prisma-client';
+import { LandingEventSourceType, LandingSelectionMode, LandingStatus, LandingTemplateType, LandingType } from '@/prisma-client';
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
 
@@ -9,9 +9,20 @@ export class CreateLandingDto {
   @IsNotEmpty()
   slug!: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Город (обязателен только для landingType=CITY)' })
+  @IsOptional()
   @IsUUID()
-  cityId!: string;
+  cityId?: string | null;
+
+  @ApiPropertyOptional({ enum: LandingType })
+  @IsOptional()
+  @IsEnum(LandingType)
+  landingType?: LandingType;
+
+  @ApiPropertyOptional({ description: 'Родительский HUB/MULTI_CITY (только для CITY)' })
+  @IsOptional()
+  @IsUUID()
+  parentLandingId?: string | null;
 
   @ApiProperty({ description: 'Slug тега для фильтрации событий' })
   @IsString()
@@ -78,6 +89,16 @@ export class CreateLandingDto {
   @IsEnum(LandingSelectionMode)
   selectionMode?: LandingSelectionMode;
 
+  @ApiPropertyOptional({ enum: LandingEventSourceType })
+  @IsOptional()
+  @IsEnum(LandingEventSourceType)
+  eventSourceType?: LandingEventSourceType;
+
+  @ApiPropertyOptional({ description: 'JSON: query config (валидируемый контракт на backend) ' })
+  @IsOptional()
+  @IsObject()
+  queryConfig?: Record<string, unknown> | null;
+
   @ApiPropertyOptional({ description: 'JSON: ranking config' })
   @IsOptional()
   @IsObject()
@@ -109,6 +130,21 @@ export class CreateLandingDto {
   @IsOptional()
   @IsString()
   metaDescription?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  canonicalUrl?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsArray()
+  relatedArticleIds?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsArray()
+  relatedCollectionIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -290,6 +290,18 @@ enum LandingStatus {
   ARCHIVED
 }
 
+enum LandingType {
+  HUB
+  CITY
+  MULTI_CITY
+}
+
+enum LandingEventSourceType {
+  AUTO_QUERY
+  PRIMARY_COLLECTION
+  MIXED
+}
+
 enum LandingTemplateType {
   GENERIC_CARDS
   COMPARISON_TABLE
@@ -1317,9 +1329,14 @@ model LandingPage {
   id                String    @id @default(uuid()) @db.Uuid
   /** Сегмент URL; уникальность только в паре с городом (@@unique([cityId, slug])). */
   slug              String
-  cityId            String    @db.Uuid
+  /// CITY лендинги обязаны иметь cityId; HUB/MULTI_CITY — должны быть null (валидация на backend).
+  cityId            String?   @db.Uuid
+  landingType       LandingType @default(CITY)
+  parentLandingId   String?   @db.Uuid
   collectionId      String?   @db.Uuid
   selectionMode     LandingSelectionMode @default(CUSTOM)
+  eventSourceType   LandingEventSourceType @default(PRIMARY_COLLECTION)
+  queryConfig       Json?
   filterTag         String // slug тега для фильтрации событий
   additionalFilters Json? // {category?, source?, minDuration?, maxDuration?, features[]?}
   rankingJson       Json?
@@ -1335,9 +1352,12 @@ model LandingPage {
   reviews           Json? // [{text, author, rating}]
   stats             Json? // {soldTickets, avgRating}
   relatedLinks      Json? // [{title, href}]
+  relatedArticleIds   String[] @db.Uuid @default([])
+  relatedCollectionIds String[] @db.Uuid @default([])
   legalText         String?   @db.Text
   metaTitle         String?
   metaDescription   String?   @db.Text
+  canonicalUrl      String?
   status            LandingStatus @default(DRAFT)
   showInCollections Boolean   @default(false)
   isIndexable       Boolean   @default(true)
@@ -1349,8 +1369,10 @@ model LandingPage {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  city       City        @relation(fields: [cityId], references: [id])
+  city       City?        @relation(fields: [cityId], references: [id])
   collection Collection? @relation(fields: [collectionId], references: [id])
+  parentLanding LandingPage? @relation("LandingParentChild", fields: [parentLandingId], references: [id])
+  childLandings LandingPage[] @relation("LandingParentChild")
 
   @@index([cityId])
   @@index([status, showInCollections])
