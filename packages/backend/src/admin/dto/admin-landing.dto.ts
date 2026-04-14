@@ -24,7 +24,12 @@ export class CreateLandingDto {
   @IsUUID()
   parentLandingId?: string | null;
 
-  @ApiProperty({ description: 'Slug тега для фильтрации событий' })
+  @ApiPropertyOptional({ description: 'FK на Tag (новый путь). Если задан, filterTag можно не присылать — backend подставит slug.' })
+  @IsOptional()
+  @IsUUID()
+  filterTagId?: string | null;
+
+  @ApiProperty({ description: 'Slug тега для фильтрации событий (legacy путь, без FK)' })
   @IsString()
   @IsNotEmpty()
   filterTag!: string;

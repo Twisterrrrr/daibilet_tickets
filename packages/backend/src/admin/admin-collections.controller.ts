@@ -96,6 +96,10 @@ export class AdminCollectionsController {
         ...paginationArgs(pg),
         include: {
           city: { select: { id: true, name: true, slug: true } },
+          tagFilters: {
+            orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+            include: { tag: { select: { id: true, slug: true, name: true } } },
+          },
         },
       }),
       this.prisma.collection.count({ where }),
@@ -127,6 +131,7 @@ export class AdminCollectionsController {
         sortOrder: c.sortOrder,
         filterCategory: c.filterCategory,
         filterTags: c.filterTags,
+        tagFilters: (c as any).tagFilters ?? [],
         sourceType: c.sourceType,
         status: c.status,
         selectionBasis: c.selectionBasis,
@@ -150,6 +155,10 @@ export class AdminCollectionsController {
       where: { id },
       include: {
         city: { select: { id: true, name: true, slug: true } },
+        tagFilters: {
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          include: { tag: { select: { id: true, slug: true, name: true } } },
+        },
         items: {
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
           include: {

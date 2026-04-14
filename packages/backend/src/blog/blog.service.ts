@@ -56,15 +56,28 @@ export class BlogService {
           },
         },
         articleTags: { include: { tag: { select: { slug: true, name: true } } } },
+        landingLinks: {
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          include: { landing: { select: { id: true } } },
+        },
+        collectionLinks: {
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          include: { collection: { select: { id: true } } },
+        },
       },
     });
 
     if (!article) throw new NotFoundException(`Статья "${slug}" не найдена`);
 
-    const [relatedLandings, relatedCollections] = await Promise.all([
-      article.relatedLandingIds.length
+    const landingIdsFromLinks = (article.landingLinks ?? []).map((l) => l.landing.id);
+    const collectionIdsFromLinks = (article.collectionLinks ?? []).map((l) => l.collection.id);
+    const landingIds = landingIdsFromLinks.length > 0 ? landingIdsFromLinks : article.relatedLandingIds;
+    const collectionIds = collectionIdsFromLinks.length > 0 ? collectionIdsFromLinks : article.relatedCollectionIds;
+
+    const [relatedLandingsRaw, relatedCollectionsRaw] = await Promise.all([
+      landingIds.length
         ? this.prisma.landingPage.findMany({
-            where: { id: { in: article.relatedLandingIds }, isDeleted: false, isActive: true },
+            where: { id: { in: landingIds }, isDeleted: false, isActive: true },
             select: {
               id: true,
               slug: true,
@@ -73,18 +86,24 @@ export class BlogService {
             },
           })
         : Promise.resolve([]),
-      article.relatedCollectionIds.length
+      collectionIds.length
         ? this.prisma.collection.findMany({
-            where: { id: { in: article.relatedCollectionIds }, isDeleted: false, isActive: true },
+            where: { id: { in: collectionIds }, isDeleted: false, isActive: true },
             select: { id: true, slug: true, title: true, heroImage: true },
           })
         : Promise.resolve([]),
     ]);
 
+    // Preserve order (join tables use position; legacy uses array order)
+    const landingOrder = new Map(landingIds.map((id, i) => [id, i]));
+    relatedLandingsRaw.sort((a, b) => (landingOrder.get(a.id) ?? 9999) - (landingOrder.get(b.id) ?? 9999));
+    const collectionOrder = new Map(collectionIds.map((id, i) => [id, i]));
+    relatedCollectionsRaw.sort((a, b) => (collectionOrder.get(a.id) ?? 9999) - (collectionOrder.get(b.id) ?? 9999));
+
     return {
       ...article,
-      relatedLandings,
-      relatedCollections,
+      relatedLandings: relatedLandingsRaw,
+      relatedCollections: relatedCollectionsRaw,
     };
   }
 

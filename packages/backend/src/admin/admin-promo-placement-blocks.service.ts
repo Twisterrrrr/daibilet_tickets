@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { PromoBlockStatus, PromoPageScopeType, PromoTargetType } from '@/prisma-client';
+import { CollectionStatus, LandingStatus, PromoBlockStatus, PromoPageScopeType, PromoTargetType } from '@/prisma-client';
 import type {
   AdminPromoPlacementBlocksQueryDto,
   CreatePromoPlacementBlockDto,
@@ -101,9 +101,11 @@ export class AdminPromoPlacementBlocksService {
 
   async create(data: CreatePromoPlacementBlockDto) {
     const normalized = this.normalizeDates(data.startsAt ?? null, data.endsAt ?? null);
-    this.validateScope(data.pageScopeType, data);
-    this.validateTarget(data.targetType, data);
-    await this.validateTargetExistsAndPublishable(data.targetType, data);
+    // DTO type is narrower than Record<string, unknown>; validation expects a generic object.
+    const v = data as unknown as Record<string, unknown>;
+    this.validateScope(data.pageScopeType, v);
+    this.validateTarget(data.targetType, v);
+    await this.validateTargetExistsAndPublishable(data.targetType, v);
 
     return this.prisma.promoPlacementBlock.create({
       data: {
@@ -272,7 +274,7 @@ export class AdminPromoPlacementBlocksService {
       if (!id) return;
       const col = await this.prisma.collection.findUnique({ where: { id }, select: { id: true, status: true, isActive: true, isDeleted: true, slug: true } });
       if (!col) throw new BadRequestException('targetCollectionId: collection не найдена');
-      if (!col.isActive || col.isDeleted || col.status !== 'PUBLISHED') {
+      if (!col.isActive || col.isDeleted || col.status !== CollectionStatus.ACTIVE) {
         throw new BadRequestException('targetCollectionId: collection не опубликована/неактивна');
       }
       return;
@@ -285,7 +287,7 @@ export class AdminPromoPlacementBlocksService {
         select: { id: true, status: true, isActive: true, isDeleted: true, slug: true, city: { select: { slug: true } } },
       });
       if (!landing) throw new BadRequestException('targetLandingId: landing не найден');
-      if (!landing.isActive || landing.isDeleted || landing.status !== 'PUBLISHED') {
+      if (!landing.isActive || landing.isDeleted || landing.status !== LandingStatus.ACTIVE) {
         throw new BadRequestException('targetLandingId: landing не опубликован/неактивен');
       }
       if (!landing.city?.slug) {

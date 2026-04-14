@@ -4,6 +4,26 @@
 
 ---
 
+## 14.04.2026 — Контентные связи: переход на FK/join (Article↔Landing/Collection, Landing.filterTagId, CollectionTagFilter)
+
+### Наблюдения
+
+- Legacy‑реализация контентных связей (`Article.relatedLandingIds/relatedCollectionIds`, `LandingPage.filterTag`, `Collection.filterTags`) не обеспечивает ссылочную целостность и не хранит порядок/приоритет связей.
+- Для админки и витрины важны: предсказуемый порядок (позиции), возможность миграции данных и отсутствие “битых” ссылок при удалении/архивации сущностей.
+
+### Решения
+
+- Введён эволюционный слой связей без ломания legacy:
+  - M2M link‑таблицы `ArticleLandingLink` и `ArticleCollectionLink` с `position/priority`.
+  - `LandingPage.filterTagId` (FK на `Tag`) параллельно legacy `filterTag` (slug).
+  - `CollectionTagFilter` (Collection↔Tag) с `position/priority` параллельно legacy `filterTags` (slug[]).
+- Реализован **dual‑read** в публичных сервисах (предпочитать FK/join → fallback на legacy) и в admin read‑поверхностях (показывать `filterTagRef` и `tagFilters`).
+- Добавлен безопасный backfill‑скрипт для переноса legacy данных в новый слой (идемпотентный).
+
+### Проблемы
+
+- Write‑path в UI можно мигрировать поэтапно: MVP допускает сохранение legacy полей при наличии dual‑read/backfill; полный переход на запись join‑таблиц потребует обновления форм (позиции/drag&drop, валидаторы) и чётких правил dual‑write.
+
 ## 06.04.2026 — Импорт: авто-категоризация + links-first подкатегории для снижения рутины модерации
 
 ### Наблюдения

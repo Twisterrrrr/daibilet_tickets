@@ -81,6 +81,8 @@ export class AdminArticlesController {
         city: { select: { slug: true, name: true } },
         articleEvents: { include: { event: { select: { id: true, title: true, slug: true } } } },
         articleTags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
+        landingLinks: { include: { landing: { select: { id: true, slug: true, title: true, cityId: true } } }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] },
+        collectionLinks: { include: { collection: { select: { id: true, slug: true, title: true, cityId: true } } }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] },
       },
     });
   }
@@ -88,14 +90,117 @@ export class AdminArticlesController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateArticleDto) {
-    const { articleEvents: _articleEvents, articleTags: _articleTags, ...articleData } = data as CreateArticleDto & { articleEvents?: unknown; articleTags?: unknown };
-    return this.prisma.article.create({ data: articleData });
+    const {
+      articleEvents: _articleEvents,
+      articleTags: _articleTags,
+      landingLinks,
+      collectionLinks,
+      relatedLandingIds,
+      relatedCollectionIds,
+      ...articleData
+    } = data as CreateArticleDto & {
+      articleEvents?: unknown;
+      articleTags?: unknown;
+      landingLinks?: Array<{ landingId: string; position?: number; priority?: number }>;
+      collectionLinks?: Array<{ collectionId: string; position?: number; priority?: number }>;
+      relatedLandingIds?: string[];
+      relatedCollectionIds?: string[];
+    };
+
+    const created = await this.prisma.article.create({
+      data: {
+        ...(articleData as Parameters<typeof this.prisma.article.create>[0]['data']),
+        ...(relatedLandingIds ? { relatedLandingIds } : {}),
+        ...(relatedCollectionIds ? { relatedCollectionIds } : {}),
+      },
+    });
+
+    // New M2M links (best-effort, additive; legacy arrays remain source-of-truth if UI not migrated)
+    if (landingLinks?.length) {
+      await this.prisma.articleLandingLink.createMany({
+        data: landingLinks.map((l) => ({
+          articleId: created.id,
+          landingId: l.landingId,
+          position: l.position ?? 0,
+          priority: l.priority ?? 0,
+        })),
+        skipDuplicates: true,
+      });
+    }
+    if (collectionLinks?.length) {
+      await this.prisma.articleCollectionLink.createMany({
+        data: collectionLinks.map((l) => ({
+          articleId: created.id,
+          collectionId: l.collectionId,
+          position: l.position ?? 0,
+          priority: l.priority ?? 0,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return this.get(created.id);
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() data: UpdateArticleDto, @Request() req: ExpressRequest) {
-    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, city: _city, articleEvents: _articleEvents, articleTags: _articleTags, _count, version: _version, ...clean } = data as UpdateArticleDto & { id?: string; createdAt?: unknown; updatedAt?: unknown; city?: unknown; articleEvents?: unknown; articleTags?: unknown; _count?: unknown };
+    const {
+      id: _id,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      city: _city,
+      articleEvents: _articleEvents,
+      articleTags: _articleTags,
+      _count,
+      version: _version,
+      landingLinks,
+      collectionLinks,
+      ...clean
+    } = data as UpdateArticleDto & {
+      id?: string;
+      createdAt?: unknown;
+      updatedAt?: unknown;
+      city?: unknown;
+      articleEvents?: unknown;
+      articleTags?: unknown;
+      _count?: unknown;
+      landingLinks?: Array<{ landingId: string; position?: number; priority?: number }>;
+      collectionLinks?: Array<{ collectionId: string; position?: number; priority?: number }>;
+    };
+
+    // If new link payload provided, rewrite link tables transactionally (additive evolution; legacy arrays not removed)
+    const wantsRewriteLinks = landingLinks !== undefined || collectionLinks !== undefined;
+    if (wantsRewriteLinks) {
+      await this.prisma.$transaction(async (tx) => {
+        if (landingLinks !== undefined) {
+          await tx.articleLandingLink.deleteMany({ where: { articleId: id } });
+          if (landingLinks.length) {
+            await tx.articleLandingLink.createMany({
+              data: landingLinks.map((l) => ({
+                articleId: id,
+                landingId: l.landingId,
+                position: l.position ?? 0,
+                priority: l.priority ?? 0,
+              })),
+            });
+          }
+        }
+        if (collectionLinks !== undefined) {
+          await tx.articleCollectionLink.deleteMany({ where: { articleId: id } });
+          if (collectionLinks.length) {
+            await tx.articleCollectionLink.createMany({
+              data: collectionLinks.map((l) => ({
+                articleId: id,
+                collectionId: l.collectionId,
+                position: l.position ?? 0,
+                priority: l.priority ?? 0,
+              })),
+            });
+          }
+        }
+      });
+    }
 
     if (data.version !== undefined) {
       const before = await this.prisma.article.findUnique({ where: { id } });
@@ -113,10 +218,11 @@ export class AdminArticlesController {
 
       const after = await this.prisma.article.findUnique({ where: { id } });
       await this.audit.log(req.user!.id, 'UPDATE', 'Article', id, before ?? undefined, after ?? undefined);
-      return after;
+      return this.get(id);
     }
 
-    return this.prisma.article.update({ where: { id }, data: clean });
+    await this.prisma.article.update({ where: { id }, data: clean as Prisma.ArticleUpdateInput });
+    return this.get(id);
   }
 
   @Delete(':id')

@@ -42,6 +42,7 @@
 | `v2-landing-slug-policy` | Политика slug: canonical **city + slug**, редиректы, уникальность и SEO при нескольких `LandingPage` на тему; согласовать с `Landings-Architecture.md` | Высокий | `[ ]` |
 | `v2-marketing-api-gate` | Маркетинг и мультилендинги: не подключать прод-API без стандарта DTO, кеширования и нормализации на клиенте | Критический | `[ ]` |
 | `landings-multicity-family-foundation` | **Landings (эволюция домена):** формализовать “topic hub / multi-city family / city landing” (parent-child, preview resolved, canonical policy) поверх текущих `/cities/:citySlug/:landingSlug` и хабов (`/river-cruises`, `/salute-9-may`) | Высокий | `[x]` **14.04.2026** |
+| `content-links-fk-evolution` | **Контентные связи (эволюция):** `Article↔Landing/Collection` через M2M link‑таблицы с `position/priority`, `LandingPage.filterTagId` (FK на Tag) параллельно slug, `Collection↔Tag` через join‑таблицу; dual‑read + backfill | Высокий | `[x]` **14.04.2026** |
 
 ### Event + Sessions — ядро (приоритет эпика)
 

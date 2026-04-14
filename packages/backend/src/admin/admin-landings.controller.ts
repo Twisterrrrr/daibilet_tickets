@@ -87,6 +87,7 @@ export class AdminLandingsController {
         include: {
           city: { select: { slug: true, name: true } },
           parentLanding: { select: { id: true, slug: true, title: true, landingType: true } },
+          filterTagRef: { select: { id: true, slug: true, name: true } },
         },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
         ...paginationArgs(pg),
@@ -109,6 +110,7 @@ export class AdminLandingsController {
       include: {
         city: { select: { slug: true, name: true } },
         parentLanding: { select: { id: true, slug: true, title: true, landingType: true } },
+        filterTagRef: { select: { id: true, slug: true, name: true } },
         childLandings: {
           where: { isDeleted: false },
           include: { city: { select: { slug: true, name: true } } },
@@ -125,6 +127,11 @@ export class AdminLandingsController {
     // Для publish-guard’ов нужен id; в create пока запрещаем сразу активировать HUB/MULTI_CITY без child’ов.
     await this.validateLandingRules(data as unknown as Record<string, unknown>);
     this.validateJsonFields(data as unknown as Record<string, unknown>);
+    // Эволюция: если пришёл filterTagId, но filterTag не заполнен (или пустой) — подставим slug.
+    if ((data as any).filterTagId && !(data as any).filterTag) {
+      const tag = await this.prisma.tag.findUnique({ where: { id: String((data as any).filterTagId) }, select: { slug: true } });
+      if (tag?.slug) (data as any).filterTag = tag.slug;
+    }
     const prismaData = {
       ...data,
       additionalFilters: data.additionalFilters ? toJsonValue(data.additionalFilters) : undefined,
@@ -133,7 +140,7 @@ export class AdminLandingsController {
       queryConfig: data.queryConfig ? toJsonValue(data.queryConfig) : undefined,
       status: data.status ?? (data.isActive ? LandingStatus.ACTIVE : LandingStatus.DRAFT),
     };
-    return this.prisma.landingPage.create({ data: prismaData as Parameters<typeof this.prisma.landingPage.create>[0]['data'] });
+    return this.prisma.landingPage.create({ data: prismaData as any });
   }
 
   @Patch(':id')

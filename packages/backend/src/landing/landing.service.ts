@@ -70,10 +70,16 @@ export class LandingService {
       throw new NotFoundException(`Лендинг "${landing.slug}" не привязан к городу`);
     }
 
-    // Находим тег для фильтрации
-    const tag = await this.prisma.tag.findFirst({
-      where: { slug: landing.filterTag, isActive: true },
-    });
+    // Находим тег для фильтрации (dual-read: предпочитаем FK filterTagId, fallback на legacy filterTag slug)
+    const tag = landing.filterTagId
+      ? await this.prisma.tag.findFirst({
+          where: { id: landing.filterTagId, isActive: true, isDeleted: false },
+          select: { id: true, slug: true },
+        })
+      : await this.prisma.tag.findFirst({
+          where: { slug: landing.filterTag, isActive: true, isDeleted: false },
+          select: { id: true, slug: true },
+        });
 
     // Получаем события с сессиями
     const now = new Date();
@@ -208,7 +214,7 @@ export class LandingService {
         title: landing.title,
         subtitle: landing.subtitle,
         /** Для перелинковки в публичный каталог `/events` (канон query-string). */
-        filterTag: landing.filterTag,
+        filterTag: tag?.slug ?? landing.filterTag,
         additionalFilters: landing.additionalFilters,
         heroText: landing.heroText,
         seasonalPayload: landing.seasonalPayload,

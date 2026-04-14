@@ -33,13 +33,21 @@ export class CollectionService {
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
         include: {
           city: { select: { id: true, slug: true, name: true } },
+          tagFilters: {
+            orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+            include: { tag: { select: { slug: true } } },
+          },
         },
       });
 
       const result = await mapBatchedParallel(collections, COLLECTION_LIST_COUNT_BATCH, async (c) => {
+        const filterTags =
+          c.tagFilters && c.tagFilters.length > 0
+            ? c.tagFilters.map((tf) => tf.tag.slug).filter(Boolean)
+            : c.filterTags;
         const eventWhere = this.selectionService.buildWhere({
           cityId: c.cityId,
-          filterTags: c.filterTags,
+          filterTags,
           filterCategory: c.filterCategory,
           filterSubcategory: c.filterSubcategory,
           filterAudience: c.filterAudience,
@@ -73,12 +81,20 @@ export class CollectionService {
         where: { slug, isActive: true, isDeleted: false },
         include: {
           city: { select: { id: true, slug: true, name: true } },
+          tagFilters: {
+            orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+            include: { tag: { select: { slug: true } } },
+          },
         },
       });
 
       if (!collection) {
         throw new NotFoundException(`Подборка "${slug}" не найдена`);
       }
+      const effectiveFilterTags =
+        collection.tagFilters && collection.tagFilters.length > 0
+          ? collection.tagFilters.map((tf) => tf.tag.slug).filter(Boolean)
+          : collection.filterTags;
 
       // Для кросс-городской: citySlug из query сужает выдачу; неизвестный город → 400
       let cityOverrideSlug: string | undefined;
@@ -133,7 +149,7 @@ export class CollectionService {
       const resolved = await this.selectionService.resolveSelection({
         cityId: collection.cityId,
         citySlug: cityOverrideSlug,
-        filterTags: collection.filterTags,
+        filterTags: effectiveFilterTags,
         filterCategory: collection.filterCategory,
         filterSubcategory: collection.filterSubcategory,
         filterAudience: collection.filterAudience,

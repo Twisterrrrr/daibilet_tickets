@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-04-06
+> Последнее обновление: 2026-04-14
 
 ## Миссия
 
@@ -190,6 +190,22 @@
 - **ComboPage** — готовая программа с курированными событиями
 - **PromoBlock** (планируется) — карточки на главной («Масленица», «Зимний город» и др.). Сейчас захардкожены в `PromoBlock.tsx`; планируется модель + раздел админки «Промо-блоки».
 - **Article** — SEO-статья с перелинковкой
+
+### Эволюция связей контента (2026‑04)
+
+Контентные связи исторически были реализованы как строки/массивы без ссылочной целостности (slug/UUID):
+
+- `Article.relatedLandingIds`, `Article.relatedCollectionIds` — `UUID[]` без FK.
+- `LandingPage.filterTag` — `string` (slug) без FK на `Tag`.
+- `Collection.filterTags` — `string[]` (slug’и) без FK.
+
+Для поддержки консистентности, управления порядком и дальнейшей миграции введён **параллельный FK/join слой** (без удаления legacy полей на первом этапе):
+
+- **`ArticleLandingLink`** и **`ArticleCollectionLink`** — M2M link‑таблицы с `position/priority`.
+- **`LandingPage.filterTagId?`** — FK на `Tag` (параллельно legacy `filterTag`).
+- **`CollectionTagFilter`** — M2M link‑таблица `Collection ↔ Tag` с `position/priority` (параллельно legacy `filterTags`).
+
+Правило чтения (MVP): **dual‑read** — сначала FK/join, затем fallback на legacy; запись — эволюционно (dual‑write там, где нужно для совместимости).
 - **Package** — заказ (Trip Planner)
 - **Voucher** — публичный ваучер пакета (`shortCode`, `publicUrl`, `pdfUrl?`) с PDF-представлением:
   - `GET /api/v1/vouchers/:shortCode/pdf` — on-demand генерация A4 PDF через Puppeteer;

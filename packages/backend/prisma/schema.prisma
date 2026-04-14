@@ -1098,6 +1098,10 @@ model Tag {
 
   events      EventTag[]
   articleTags ArticleTag[]
+  /// LandingPage.filterTagId (эволюция: FK поверх legacy filterTag slug)
+  landingPagesAsFilterTag LandingPage[] @relation("LandingFilterTag")
+  /// Collection tag filters (эволюция: FK поверх legacy filterTags slug[])
+  collectionTagFilters CollectionTagFilter[]
 
   @@map("tags")
   @@index([tagKind])
@@ -1259,6 +1263,9 @@ model Article {
   city          City?          @relation(fields: [cityId], references: [id])
   articleEvents ArticleEvent[]
   articleTags   ArticleTag[]
+  /// Эволюция связей: M2M с позициями/приоритетом (вместо String[] без FK)
+  landingLinks   ArticleLandingLink[]
+  collectionLinks ArticleCollectionLink[]
 
   promoPlacementBlocks       PromoPlacementBlock[]
   promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetArticle")
@@ -1290,6 +1297,44 @@ model ArticleTag {
   @@id([articleId, tagId])
   @@index([tagId])
   @@map("article_tags")
+}
+
+/// Article ↔ LandingPage (позиции/приоритеты для перелинковки/виджетов)
+model ArticleLandingLink {
+  articleId String @db.Uuid
+  landingId String @db.Uuid
+
+  /// Позиция в UI (0..N). Чем меньше — тем выше.
+  position Int @default(0)
+  /// Доп. приоритет (можно использовать как tie-breaker).
+  priority Int @default(0)
+  createdAt DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  landing LandingPage @relation(fields: [landingId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, landingId])
+  @@index([landingId])
+  @@index([articleId, position])
+  @@map("article_landing_links")
+}
+
+/// Article ↔ Collection (позиции/приоритеты для перелинковки/виджетов)
+model ArticleCollectionLink {
+  articleId String @db.Uuid
+  collectionId String @db.Uuid
+
+  position Int @default(0)
+  priority Int @default(0)
+  createdAt DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, collectionId])
+  @@index([collectionId])
+  @@index([articleId, position])
+  @@map("article_collection_links")
 }
 
 // ========================
@@ -1344,6 +1389,8 @@ model LandingPage {
   eventSourceType   LandingEventSourceType @default(PRIMARY_COLLECTION)
   queryConfig       Json?
   filterTag         String // slug тега для фильтрации событий
+  /// Эволюция: FK на Tag (параллельно legacy filterTag slug)
+  filterTagId       String?  @db.Uuid
   additionalFilters Json? // {category?, source?, minDuration?, maxDuration?, features[]?}
   rankingJson       Json?
   /** SEASONAL_EVENT и др.: { viewpoints?: [{name, description, isFree}], tips?: string[] } */
@@ -1377,8 +1424,11 @@ model LandingPage {
 
   city       City?        @relation(fields: [cityId], references: [id])
   collection Collection? @relation(fields: [collectionId], references: [id])
+  filterTagRef Tag?      @relation("LandingFilterTag", fields: [filterTagId], references: [id], onDelete: SetNull)
   parentLanding LandingPage? @relation("LandingParentChild", fields: [parentLandingId], references: [id])
   childLandings LandingPage[] @relation("LandingParentChild")
+  /// Эволюция связей: M2M к статьям с позициями/приоритетом (вместо Article.relatedLandingIds без FK)
+  articleLinks ArticleLandingLink[]
 
   promoPlacementBlocks       PromoPlacementBlock[]
   promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetLanding")
@@ -1386,6 +1436,7 @@ model LandingPage {
   @@index([cityId])
   @@index([status, showInCollections])
   @@index([collectionId])
+  @@index([filterTagId])
   @@unique([cityId, slug])
   @@map("landing_pages")
 }
@@ -1401,6 +1452,8 @@ model Collection {
 
   // --- Фильтры (динамические события) ---
   filterTags        String[] // slug тегов (OR-логика)
+  /// Эволюция: FK на Tag с позициями/приоритетом (параллельно legacy filterTags slug[])
+  tagFilters        CollectionTagFilter[]
   filterCategory    String? // EventCategory enum value
   filterSubcategory String? // EventSubcategory enum value
   filterAudience    String? // EventAudience enum value
@@ -1445,6 +1498,8 @@ model Collection {
   city     City?             @relation(fields: [cityId], references: [id])
   landings LandingPage[]
   items    CollectionItem[]
+  /// Эволюция связей: M2M к статьям с позициями/приоритетом (вместо String[] без FK на стороне Article)
+  articleLinks ArticleCollectionLink[]
 
   promoPlacementBlocks       PromoPlacementBlock[]
   promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetCollection")
@@ -1454,6 +1509,24 @@ model Collection {
   @@unique([cityId, slug])
   @@index([isActive, isDeleted])
   @@map("collections")
+}
+
+/// Collection ↔ Tag (фильтры подборки как FK, с позициями/приоритетом)
+model CollectionTagFilter {
+  collectionId String @db.Uuid
+  tagId        String @db.Uuid
+
+  position Int @default(0)
+  priority Int @default(0)
+  createdAt DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  tag        Tag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, tagId])
+  @@index([tagId])
+  @@index([collectionId, position])
+  @@map("collection_tag_filters")
 }
 
 /// Явные позиции подборки (ручной и гибридный слой курации)
