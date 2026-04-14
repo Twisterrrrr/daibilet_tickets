@@ -404,6 +404,7 @@ export function EventDetailPage() {
               <EventScheduleTab
                 eventId={e.id}
                 importedLocked={Boolean(e.scheduleSummary?.importedSessionsReadOnly)}
+                scheduleSummary={e.scheduleSummary}
               />
             ),
           },

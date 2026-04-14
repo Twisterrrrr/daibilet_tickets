@@ -112,6 +112,10 @@ export class AdminEventSessionRowDto {
   @IsBoolean()
   isCancelled!: boolean;
 
+  @ApiProperty({ description: 'false = сеанс на паузе (не отменён)' })
+  @IsBoolean()
+  isActive!: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

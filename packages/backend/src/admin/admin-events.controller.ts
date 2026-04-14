@@ -993,6 +993,7 @@ export class AdminEventsController {
           capacityTotal: s.capacityTotal ?? null,
           canceledAt: s.canceledAt,
           cancelReason: s.cancelReason,
+          isActive: s.isActive,
         },
         { source: event.source, defaultCapacityTotal: event.defaultCapacityTotal ?? null },
         soldCount,
@@ -1695,6 +1696,7 @@ export class AdminEventsController {
         offerId: true,
         canceledAt: true,
         cancelReason: true,
+        isActive: true,
       },
       orderBy: { startsAt: 'asc' },
     });
@@ -1739,6 +1741,7 @@ export class AdminEventsController {
           capacityTotal: s.capacityTotal ?? null,
           canceledAt: s.canceledAt,
           cancelReason: s.cancelReason,
+          isActive: s.isActive,
         },
         {
           source: event.source,
@@ -2033,6 +2036,7 @@ export class AdminEventsController {
       capacityTotal: number | null;
       canceledAt?: Date | null;
       cancelReason?: string | null;
+      isActive?: boolean;
     },
     event: { source: string; defaultCapacityTotal: number | null },
     soldCount: number,
@@ -2058,6 +2062,7 @@ export class AdminEventsController {
     const isCancelled = !!session.canceledAt;
     const canceledAt: Date | null = session.canceledAt ?? null;
     const cancelReason: string | null = session.cancelReason ?? null;
+    const isActive = session.isActive !== false;
 
     return {
       id: session.id,
@@ -2068,6 +2073,7 @@ export class AdminEventsController {
       locked,
       lockReason,
       isCancelled,
+      isActive,
       canceledAt: canceledAt ? canceledAt.toISOString() : null,
       cancelReason,
     };
@@ -2360,6 +2366,7 @@ export class AdminEventsController {
         capacityTotal: number | null;
         canceledAt: Date | null;
         cancelReason: string | null;
+        isActive: boolean;
       }[] = [];
 
       for (const n of toCreate) {
@@ -2384,6 +2391,7 @@ export class AdminEventsController {
             capacityTotal: true,
             canceledAt: true,
             cancelReason: true,
+            isActive: true,
           },
         });
         created.push(session);
@@ -2401,6 +2409,7 @@ export class AdminEventsController {
           capacityTotal: s.capacityTotal,
           canceledAt: s.canceledAt,
           cancelReason: s.cancelReason,
+          isActive: s.isActive,
         },
         {
           source: event.source,
