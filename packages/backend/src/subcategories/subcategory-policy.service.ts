@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { EventSubcategory, Prisma, SubcategoryType } from '@prisma/client';
+import { EventSubcategory, Prisma, SubcategoryType } from '@/prisma-client';
 
 const LEGACY_EVENT_SUBCATEGORY_TO_SLUG: Partial<Record<EventSubcategory, string>> = {
   RIVER: 'river-excursion',

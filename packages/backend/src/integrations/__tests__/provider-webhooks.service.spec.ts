@@ -1,4 +1,4 @@
-import { TicketProviderCode } from '@prisma/client';
+import { TicketProviderCode } from '@/prisma-client';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ProviderExternalPersistenceService } from '../provider-external-persistence.service';

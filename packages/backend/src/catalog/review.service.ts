@@ -14,7 +14,7 @@ import {
   ReviewDisputeStatus,
   ReviewStatus,
   ReviewSupplierResponseStatus,
-} from '@prisma/client';
+} from '@/prisma-client';
 import { Queue } from 'bullmq';
 import { createHash, randomBytes } from 'crypto';
 

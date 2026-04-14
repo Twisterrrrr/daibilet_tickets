@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SupplierRole } from '@prisma/client';
+import { SupplierRole } from '@/prisma-client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 

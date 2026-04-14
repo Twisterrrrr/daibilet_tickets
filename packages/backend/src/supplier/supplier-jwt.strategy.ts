@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
-import { SupplierRole } from '@prisma/client';
+import { SupplierRole } from '@/prisma-client';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
 import { PrismaService } from '../prisma/prisma.service';

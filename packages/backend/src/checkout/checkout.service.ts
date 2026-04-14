@@ -1,7 +1,7 @@
 import { resolvePurchaseType } from '@daibilet/shared';
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/prisma-client';
 
 import { TcApiService } from '../catalog/tc-api.service';
 import { MailService } from '../mail/mail.service';

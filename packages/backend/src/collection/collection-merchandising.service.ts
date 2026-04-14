@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Collection, CollectionSourceType, CollectionStatus, Prisma } from '@prisma/client';
+import { Collection, CollectionSourceType, CollectionStatus, Prisma } from '@/prisma-client';
 
 import { CollectionSelectionService } from '../catalog/collection-selection.service';
 import { PrismaService } from '../prisma/prisma.service';

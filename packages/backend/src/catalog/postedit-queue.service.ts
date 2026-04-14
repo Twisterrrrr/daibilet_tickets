@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EditorStatus, Prisma } from '@prisma/client';
-import type { EventSource } from '@prisma/client';
+import { EditorStatus, Prisma } from '@/prisma-client';
+import type { EventSource } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

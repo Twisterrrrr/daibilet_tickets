@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
-import { ReviewDisputeReasonCode } from '@prisma/client';
+import { ReviewDisputeReasonCode } from '@/prisma-client';
 
 export class CreateSupplierResponseDto {
   @ApiProperty({ description: 'Текст ответа на отзыв', example: 'Благодарим за обратную связь...' })

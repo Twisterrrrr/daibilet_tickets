@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { LandingSelectionMode, LandingStatus, LandingTemplateType } from '@prisma/client';
+import { LandingSelectionMode, LandingStatus, LandingTemplateType } from '@/prisma-client';
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
 

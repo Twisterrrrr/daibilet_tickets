@@ -1,4 +1,4 @@
-import { EventSubcategory, SubcategoryLayer } from '@prisma/client';
+import { EventSubcategory, SubcategoryLayer } from '@/prisma-client';
 import { describe, expect, it } from 'vitest';
 
 import { resolveEventSubcategoryPresentation } from '../subcategory-public.mapper';

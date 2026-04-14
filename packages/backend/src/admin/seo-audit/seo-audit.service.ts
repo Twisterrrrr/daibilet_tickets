@@ -3,7 +3,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { EventSource, Prisma } from '@prisma/client';
+import { EventSource, Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import type {

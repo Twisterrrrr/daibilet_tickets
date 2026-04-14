@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { EventCategory, SubcategoryLandingMode, SubcategoryLayer, SubcategoryType } from '@prisma/client';
+import { EventCategory, SubcategoryLandingMode, SubcategoryLayer, SubcategoryType } from '@/prisma-client';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';

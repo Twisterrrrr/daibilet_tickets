@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { ArticleStatus } from '@prisma/client';
+import { ArticleStatus } from '@/prisma-client';
 import { describe, expect, it, vi } from 'vitest';
 
 import { BlogService } from '../blog.service';

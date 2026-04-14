@@ -1,4 +1,4 @@
-import { TagCategory } from '@prisma/client';
+import { TagCategory } from '@/prisma-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TagAssignmentService } from '../tag-assignment.service';

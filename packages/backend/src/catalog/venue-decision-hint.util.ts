@@ -1,4 +1,4 @@
-import type { VenueLifecycleStatus } from '@prisma/client';
+import type { VenueLifecycleStatus } from '@/prisma-client';
 
 import { similarity01ToLabel, type SimilarityStrength } from './venue-merge-preview.util';
 

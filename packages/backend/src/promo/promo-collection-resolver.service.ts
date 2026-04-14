@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DateMode, EventCategory, Prisma, PromoSortMode } from '@prisma/client';
+import { DateMode, EventCategory, Prisma, PromoSortMode } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';

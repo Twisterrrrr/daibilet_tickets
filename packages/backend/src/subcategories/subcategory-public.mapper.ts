@@ -1,4 +1,4 @@
-import { EventSubcategory, SubcategoryLayer } from '@prisma/client';
+import { EventSubcategory, SubcategoryLayer } from '@/prisma-client';
 
 export type SubcategoryRefDto = { code: string; nameRu: string };
 

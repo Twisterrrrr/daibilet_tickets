@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { TicketProviderCode } from '@prisma/client';
+import type { TicketProviderCode } from '@/prisma-client';
 
 import { assertCapability } from '../contracts/capability-guard';
 import { ProviderExternalPersistenceService } from '../provider-external-persistence.service';

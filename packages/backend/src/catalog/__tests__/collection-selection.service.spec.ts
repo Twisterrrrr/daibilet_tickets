@@ -1,4 +1,4 @@
-import { DateMode, EventAudience, EventCategory } from '@prisma/client';
+import { DateMode, EventAudience, EventCategory } from '@/prisma-client';
 import { describe, expect, it } from 'vitest';
 
 import { SubcategoryPolicyService } from '../../subcategories/subcategory-policy.service';

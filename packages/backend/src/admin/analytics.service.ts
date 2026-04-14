@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PaymentStatus, Prisma } from '@prisma/client';
+import { PaymentStatus, Prisma } from '@/prisma-client';
 
 import { OperationLatencyTrackerService } from '../common/operation-latency-tracker.service';
 import { PrismaService } from '../prisma/prisma.service';

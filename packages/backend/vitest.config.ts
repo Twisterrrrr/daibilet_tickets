@@ -10,6 +10,7 @@ export default defineConfig({
   setupFiles: ['./vitest.setup.ts'],
   resolve: {
     alias: {
+      '@': path.resolve(__dirname, './src'),
       '@daibilet/shared': path.resolve(__dirname, '../shared/src/index.ts'),
     },
   },

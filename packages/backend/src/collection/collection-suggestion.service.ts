@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CollectionSelectionBasis, CollectionSourceType, CollectionStatus, Prisma } from '@prisma/client';
+import { CollectionSelectionBasis, CollectionSourceType, CollectionStatus, Prisma } from '@/prisma-client';
 
 import { CollectionSelectionService } from '../catalog/collection-selection.service';
 import { PrismaService } from '../prisma/prisma.service';

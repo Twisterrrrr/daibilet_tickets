@@ -1,4 +1,4 @@
-import { ProviderOperationalClass, ProviderProtocolType, TicketProviderCode } from '@prisma/client';
+import { ProviderOperationalClass, ProviderProtocolType, TicketProviderCode } from '@/prisma-client';
 import { describe, expect, it } from 'vitest';
 
 import { EdinoepoleTicketProviderService } from '../providers/edinoepole/edinoepole-ticket-provider.service';

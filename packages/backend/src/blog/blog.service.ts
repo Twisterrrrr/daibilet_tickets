@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ArticleStatus, Prisma } from '@prisma/client';
+import { ArticleStatus, Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

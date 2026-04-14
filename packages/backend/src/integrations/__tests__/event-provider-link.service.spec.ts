@@ -1,4 +1,4 @@
-import { TicketProviderCode, ProviderLinkStatus, ProviderSyncMode } from '@prisma/client';
+import { TicketProviderCode, ProviderLinkStatus, ProviderSyncMode } from '@/prisma-client';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EventProviderLinkService } from '../event-provider-link.service';

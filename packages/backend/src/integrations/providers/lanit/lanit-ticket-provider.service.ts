@@ -4,7 +4,7 @@ import {
   ProviderOperationalClass,
   ProviderProtocolType,
   TicketProviderCode,
-} from '@prisma/client';
+} from '@/prisma-client';
 
 import { emptyCapabilities } from '../../contracts/provider-capabilities';
 import type { ExternalTicketProvider } from '../../contracts/external-ticket-provider.interface';

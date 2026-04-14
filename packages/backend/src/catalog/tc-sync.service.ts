@@ -2,7 +2,7 @@ import { normalizeEventTitle } from '@daibilet/shared';
 import { getCanonicalLandingTags } from './canonical-tag-enrichment';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventSubcategory, EventTagAssignmentSource, Prisma } from '@prisma/client';
+import { EventSubcategory, EventTagAssignmentSource, Prisma } from '@/prisma-client';
 
 import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';

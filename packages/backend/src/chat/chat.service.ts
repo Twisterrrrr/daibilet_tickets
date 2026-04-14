@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ChatAuthorType, ChatConversationStatus, Prisma } from '@prisma/client';
+import { ChatAuthorType, ChatConversationStatus, Prisma } from '@/prisma-client';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 
 import { MailService } from '../mail/mail.service';

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, type VenueImportSource, type VenueModerationAction } from '@prisma/client';
+import { Prisma, type VenueImportSource, type VenueModerationAction } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

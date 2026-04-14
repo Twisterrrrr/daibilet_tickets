@@ -11,7 +11,7 @@ import {
   TagCategory,
   TagKind,
   StructuralTagGroup,
-} from '@prisma/client';
+} from '@/prisma-client';
 
 import { asCatalogEntityLite, asCityLite, toDateSafe } from '../common/typing';
 import { EventOverrideService } from '../admin/event-override.service';

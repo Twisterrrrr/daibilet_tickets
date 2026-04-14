@@ -1,4 +1,4 @@
-import type { DateMode, FulfillmentStatus } from '@prisma/client';
+import type { DateMode, FulfillmentStatus } from '@/prisma-client';
 
 import type { PrismaService } from '../prisma/prisma.service';
 

@@ -1,4 +1,4 @@
-import { TicketProviderCode } from '@prisma/client';
+import { TicketProviderCode } from '@/prisma-client';
 
 import { ProviderInvalidCodeError } from '../contracts/provider-errors';
 

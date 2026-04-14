@@ -16,7 +16,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import * as crypto from 'crypto';
 
-import { Prisma, SupplierRole } from '@prisma/client';
+import { Prisma, SupplierRole } from '@/prisma-client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';

@@ -1,5 +1,5 @@
 import { BadRequestException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
-import type { TicketProviderCode } from '@prisma/client';
+import type { TicketProviderCode } from '@/prisma-client';
 
 import type { ProviderCapabilities } from './provider-capabilities';
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ClosingDocumentMode, TaxMode } from '@prisma/client';
+import { ClosingDocumentMode, TaxMode } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

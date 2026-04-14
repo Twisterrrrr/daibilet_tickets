@@ -11,8 +11,8 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Prisma } from '@prisma/client';
-import { SupplierLegalProfileStatus } from '@prisma/client';
+import type { Prisma } from '@/prisma-client';
+import { SupplierLegalProfileStatus } from '@/prisma-client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';

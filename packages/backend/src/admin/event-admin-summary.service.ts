@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { EventSource } from '@prisma/client';
+import { EventSource } from '@/prisma-client';
 
 import { EventQualityIssue, EventQualityService } from '../catalog/event-quality.service';
 import { PrismaService } from '../prisma/prisma.service';

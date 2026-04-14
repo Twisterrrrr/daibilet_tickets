@@ -31,7 +31,7 @@ import {
   TagKind,
   EventTagAssignmentSource,
   SubcategoryLayer,
-} from '@prisma/client';
+} from '@/prisma-client';
 import type { Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -325,14 +325,16 @@ export class AdminEventsController {
         by: ['eventId'],
         _count: { _all: true },
       });
-      const ids = groups.filter((g) => (g as any)._count?._all > 1).map((g) => g.eventId);
+      const rows = groups as unknown as Array<{ eventId: string; _count: { _all: number } }>;
+      const ids = rows.filter((g) => g._count._all > 1).map((g) => g.eventId);
       andParts.push({ id: { in: ids.length ? ids : ['00000000-0000-0000-0000-000000000000'] } });
     } else if (hasMultiExplicitFalse) {
       const groupsEq1 = await this.prisma.eventSubcategoryLink.groupBy({
         by: ['eventId'],
         _count: { _all: true },
       });
-      const idsEq1 = groupsEq1.filter((g) => (g as any)._count?._all === 1).map((g) => g.eventId);
+      const rowsEq1 = groupsEq1 as unknown as Array<{ eventId: string; _count: { _all: number } }>;
+      const idsEq1 = rowsEq1.filter((g) => g._count._all === 1).map((g) => g.eventId);
       andParts.push({
         OR: [
           { subcategoryLinks: { none: {} } },
@@ -385,8 +387,9 @@ export class AdminEventsController {
       : [];
     const lastSessionAtByEventId = new Map<string, Date>();
     for (const row of lastSessionMax) {
-      const d = (row as any)?._max?.startsAt as Date | null | undefined;
-      if (d) lastSessionAtByEventId.set((row as any).eventId as string, d);
+      const r = row as unknown as { eventId: string; _max: { startsAt: Date | null } };
+      const d = r._max.startsAt;
+      if (d) lastSessionAtByEventId.set(r.eventId, d);
     }
 
     const items = result.items.map((e) => {
@@ -445,7 +448,7 @@ export class AdminEventsController {
     const candidates = await this.prisma.event.findMany({
       where: {
         isDeleted: false,
-        source: source as any,
+        source: source as EventSource,
         isActive: true,
         sessions: { none: futureSessionsWhere },
       },
@@ -456,7 +459,7 @@ export class AdminEventsController {
 
     const ids = candidates.map((c) => c.id);
     if (ids.length === 0) {
-      return { count: 0, ids: [], items: [] as any[] };
+      return { count: 0, ids: [], items: [] as Array<{ id: string; title: string; source: EventSource; lastSessionAt: string | null }> };
     }
 
     const lastSessionMax = await this.prisma.eventSession.groupBy({
@@ -466,8 +469,9 @@ export class AdminEventsController {
     });
     const lastSessionAtByEventId = new Map<string, Date>();
     for (const row of lastSessionMax) {
-      const d = (row as any)?._max?.startsAt as Date | null | undefined;
-      if (d) lastSessionAtByEventId.set((row as any).eventId as string, d);
+      const r = row as unknown as { eventId: string; _max: { startsAt: Date | null } };
+      const d = r._max.startsAt;
+      if (d) lastSessionAtByEventId.set(r.eventId, d);
     }
 
     const items = candidates
@@ -506,7 +510,7 @@ export class AdminEventsController {
       where: {
         id: { in: idsToArchive },
         isDeleted: false,
-        source: source as any,
+        source: source as EventSource,
         isActive: true,
         sessions: { none: futureSessionsWhere },
       },
@@ -1956,9 +1960,9 @@ export class AdminEventsController {
       where: { eventId: id },
       _max: { startsAt: true },
     });
-    const lastSessionAt = (lastSession as any)?._max?.startsAt as Date | null | undefined;
+    const lastSessionAt = (lastSession as unknown as { _max: { startsAt: Date | null } })._max.startsAt;
     const derivedIsPast = lastSessionAt ? lastSessionAt < now : false;
-    const derivedIsArchived = (event as any)?.publishStatus === 'ARCHIVED';
+    const derivedIsArchived = (event as unknown as { publishStatus?: string } | null)?.publishStatus === 'ARCHIVED';
     const derivedIsIndexable = !derivedIsPast && !derivedIsArchived;
 
     return {

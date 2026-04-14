@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ProviderLinkStatus, type TicketProviderCode } from '@prisma/client';
+import { ProviderLinkStatus, type TicketProviderCode } from '@/prisma-client';
 
 import type { ProviderDescriptor } from '../contracts/provider-descriptor';
 import type { ProviderRoutingStrategy } from '../contracts/provider-types';

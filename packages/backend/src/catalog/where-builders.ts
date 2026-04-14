@@ -6,8 +6,8 @@
  * см. `Catalog-Classification-Policy.md` §11. Для страницы тега — `CatalogService.getTagBySlug`.
  */
 
-import { EventSource, Prisma } from '@prisma/client';
-import { TagKind } from '@prisma/client';
+import { EventSource, Prisma } from '@/prisma-client';
+import { TagKind } from '@/prisma-client';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
 export interface EventWhereDto {

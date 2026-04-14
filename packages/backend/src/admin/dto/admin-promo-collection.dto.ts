@@ -15,7 +15,7 @@ import {
   PromoCollectionItemType,
   PromoSelectionMode,
   PromoSortMode,
-} from '@prisma/client';
+} from '@/prisma-client';
 
 const KEBAB_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 

@@ -1,4 +1,4 @@
-import { EventSource, TicketProviderCode } from '@prisma/client';
+import { EventSource, TicketProviderCode } from '@/prisma-client';
 
 import { ProviderRouteNotFoundError } from '../contracts/provider-errors';
 

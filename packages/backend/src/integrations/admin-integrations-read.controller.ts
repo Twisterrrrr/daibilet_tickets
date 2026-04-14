@@ -1,6 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { ExternalIntegrationState, Prisma, type ExternalOrderStatus } from '@prisma/client';
+import { ExternalIntegrationState, Prisma, type ExternalOrderStatus } from '@/prisma-client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';

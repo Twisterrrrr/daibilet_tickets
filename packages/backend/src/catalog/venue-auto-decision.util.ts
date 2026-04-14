@@ -1,4 +1,4 @@
-import type { VenueImportSource } from '@prisma/client';
+import type { VenueImportSource } from '@/prisma-client';
 
 import type { VenueAutoDecisionThresholds } from './venue-auto-decision.config';
 import { VenueDecisionHint, type VenueDecisionHintValue } from './venue-decision-hint.util';

@@ -1,4 +1,4 @@
-import type { VenueLifecycleStatus } from '@prisma/client';
+import type { VenueLifecycleStatus } from '@/prisma-client';
 
 /** Статус slug при soft-check (не транзакционная гарантия). */
 export type BatchVenueApproveSlugStatus =

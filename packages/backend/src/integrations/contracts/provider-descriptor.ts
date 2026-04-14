@@ -3,7 +3,7 @@ import type {
   ProviderOperationalClass,
   ProviderProtocolType,
   TicketProviderCode,
-} from '@prisma/client';
+} from '@/prisma-client';
 
 import type { ProviderCapabilities } from './provider-capabilities';
 

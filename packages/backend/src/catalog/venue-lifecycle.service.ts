@@ -6,7 +6,7 @@ import type {
   VenueModerationAction,
   VenueModerationReasonCode,
   VenueSourceType,
-} from '@prisma/client';
+} from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { PublishGateService } from './publish-gate.service';

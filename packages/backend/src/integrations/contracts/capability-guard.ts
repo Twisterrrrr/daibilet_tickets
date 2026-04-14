@@ -1,4 +1,4 @@
-import type { TicketProviderCode } from '@prisma/client';
+import type { TicketProviderCode } from '@/prisma-client';
 
 import type { ProviderCapabilities } from './provider-capabilities';
 import type { ProviderDescriptor } from './provider-descriptor';

@@ -13,7 +13,7 @@
 
 import { InjectQueue } from '@nestjs/bullmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/prisma-client';
 import { Queue } from 'bullmq';
 
 import { MailService } from '../mail/mail.service';

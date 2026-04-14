@@ -1,4 +1,4 @@
-import { EventSource } from '@prisma/client';
+import { EventSource } from '@/prisma-client';
 
 /** Контракт queryConfig для AUTO/HYBRID (валидируется на backend). */
 export type CollectionQueryConfig = {

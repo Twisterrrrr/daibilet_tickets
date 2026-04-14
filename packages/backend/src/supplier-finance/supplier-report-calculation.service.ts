@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma, SupplierReportBasis, SupplierReportLineType } from '@prisma/client';
+import { Prisma, SupplierReportBasis, SupplierReportLineType } from '@/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type Basis = SupplierReportBasis;

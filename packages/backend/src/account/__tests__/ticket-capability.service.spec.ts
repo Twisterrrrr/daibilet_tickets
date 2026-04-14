@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@/prisma-client';
 
 import { TicketCapabilityService } from '../ticket-capability.service';
 

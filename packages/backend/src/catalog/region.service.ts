@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, EventCategory, Prisma } from '@prisma/client';
+import { DateMode, EventCategory, Prisma } from '@/prisma-client';
 
 import { CACHE_TTL, cacheKeys, CacheService } from '../cache/cache.service';
 import { PrismaService } from '../prisma/prisma.service';

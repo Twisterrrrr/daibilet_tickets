@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { SeoEntityType } from './seo.types';
 import type { UpsertSeoMetaDto } from './dto/upsert-seo-meta.dto';
-import { TagKind } from '@prisma/client';
+import { TagKind } from '@/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TagSeoRoutingService } from './tag-seo-routing.service';
 

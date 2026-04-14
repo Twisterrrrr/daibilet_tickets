@@ -2,7 +2,7 @@
  * Маппинг QF slug → params для каталога.
  * Используется в getEvents / getCatalogMuseumAndVenues при применении qf.
  */
-import { EventSubcategory, VenueType } from '@prisma/client';
+import { EventSubcategory, VenueType } from '@/prisma-client';
 
 export type CatalogType = 'excursion' | 'venue' | 'event';
 

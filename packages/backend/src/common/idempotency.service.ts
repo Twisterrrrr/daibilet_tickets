@@ -12,10 +12,10 @@
  */
 
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { IdempotencyScope } from '@prisma/client';
+import { IdempotencyScope } from '@/prisma-client';
 
 const STATUS = {
   IN_PROGRESS: 'IN_PROGRESS',

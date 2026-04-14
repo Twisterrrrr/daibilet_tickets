@@ -41,7 +41,7 @@ import {
   VenueModerationReasonCode,
   VenueSourceType,
   VenueType,
-} from '@prisma/client';
+} from '@/prisma-client';
 import { VenueImportService } from '../catalog/venue-import.service';
 import { VenueLifecycleService } from '../catalog/venue-lifecycle.service';
 import { getVenueAutoModerationEnvFlags } from '../catalog/venue-auto-decision.config';

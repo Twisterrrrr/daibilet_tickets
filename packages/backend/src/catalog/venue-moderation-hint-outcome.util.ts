@@ -1,4 +1,4 @@
-import type { VenueModerationAction } from '@prisma/client';
+import type { VenueModerationAction } from '@/prisma-client';
 
 import type { VenueDecisionHintValue } from './venue-decision-hint.util';
 import { VenueDecisionHint } from './venue-decision-hint.util';

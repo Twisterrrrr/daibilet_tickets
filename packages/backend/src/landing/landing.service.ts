@@ -1,6 +1,6 @@
 import { calendarDayFromIso, getFirstPriceKopecks, getCityTimezone } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, LandingStatus, Prisma } from '@prisma/client';
+import { DateMode, LandingStatus, Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';

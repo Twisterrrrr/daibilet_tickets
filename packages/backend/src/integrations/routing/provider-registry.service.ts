@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import type { TicketProviderCode } from '@prisma/client';
+import type { TicketProviderCode } from '@/prisma-client';
 
 import { TICKET_PROVIDER_DISPLAY_LABEL } from '../provider-labels';
 import type { ExternalTicketProvider } from '../contracts/external-ticket-provider.interface';

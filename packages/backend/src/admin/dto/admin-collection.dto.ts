@@ -4,7 +4,7 @@ import {
   CollectionSelectionBasis,
   CollectionSourceType,
   CollectionStatus,
-} from '@prisma/client';
+} from '@/prisma-client';
 import {
   IsArray,
   IsBoolean,

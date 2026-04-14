@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { TicketProviderCode } from '@prisma/client';
+import type { TicketProviderCode } from '@/prisma-client';
 
 import { assertCapability } from '../contracts/capability-guard';
 import { ProviderMethodNotImplementedError } from '../contracts/provider-errors';

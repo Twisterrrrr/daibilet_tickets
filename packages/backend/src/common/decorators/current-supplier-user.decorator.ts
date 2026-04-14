@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import type { SupplierRole } from '@prisma/client';
+import type { SupplierRole } from '@/prisma-client';
 
 /** Тип пользователя-поставщика (req.user после SupplierJwtGuard) */
 export interface SupplierAuthUser {

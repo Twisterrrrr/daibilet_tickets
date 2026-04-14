@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EventCategory, EventSource } from '@prisma/client';
+import { EventCategory, EventSource } from '@/prisma-client';
 
 import { ReportsRepository } from './reports.repository';
 import { ReportQueryDto } from './dto/report-query.dto';

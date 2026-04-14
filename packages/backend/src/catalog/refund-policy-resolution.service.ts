@@ -4,7 +4,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import type { VenueRefundPolicyMode, EventRefundPolicyMode } from '@prisma/client';
+import type { VenueRefundPolicyMode, EventRefundPolicyMode } from '@/prisma-client';
 
 const DEFAULT_REFUND_POLICY_TEXT =
   'Условия возврата и обмена билетов зависят от правил конкретного организатора. ' +

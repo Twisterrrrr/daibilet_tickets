@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, Prisma, VenueType } from '@prisma/client';
+import { DateMode, Prisma, VenueType } from '@/prisma-client';
 import type { VenueProgramItemDto, VenueProgramResponse, VenuePublicTemplate, VenueTemplateData } from '@daibilet/shared';
 import { parseVenueTemplateData } from '@daibilet/shared';
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, TicketProviderCode } from '@prisma/client';
-import { ProviderLinkStatus, ProviderSyncMode } from '@prisma/client';
+import type { Prisma, TicketProviderCode } from '@/prisma-client';
+import { ProviderLinkStatus, ProviderSyncMode } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

@@ -2,7 +2,7 @@
  * Типы пользователей для req.user после прохождения guard'ов.
  * Использовать вместо req: any в контроллерах.
  */
-import type { AdminRole } from '@prisma/client';
+import type { AdminRole } from '@/prisma-client';
 
 /** req.user после JwtAuthGuard (Admin) */
 export interface AdminJwtUser {

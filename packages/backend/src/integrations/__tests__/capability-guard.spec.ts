@@ -1,4 +1,4 @@
-import { ProviderAccountAuthType, ProviderOperationalClass, ProviderProtocolType, TicketProviderCode } from '@prisma/client';
+import { ProviderAccountAuthType, ProviderOperationalClass, ProviderProtocolType, TicketProviderCode } from '@/prisma-client';
 import { describe, expect, it } from 'vitest';
 
 import { assertCapability } from '../contracts/capability-guard';

@@ -1,4 +1,4 @@
-import { EventCategory } from '@prisma/client';
+import { EventCategory } from '@/prisma-client';
 
 /** PRIMARY + EVENT_ONLY в справочнике подкатегорий (код = EventSubcategory). */
 export const EVENT_PRIMARY_CODES_BY_CATEGORY: Record<EventCategory, readonly string[]> = {

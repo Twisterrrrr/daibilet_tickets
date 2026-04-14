@@ -3,13 +3,15 @@
 // ==============================================
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["filteredRelationCount"]
+  provider = "prisma-client"
+  // Prisma 7 требует явный output. Генерируем в репозиторий,
+  // а код импортирует через shim `@/prisma-client`.
+  // Путь считается относительно папки prisma/ (где лежит schema.prisma).
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ========================

@@ -1,4 +1,4 @@
-import { EventSource, TicketProviderCode } from '@prisma/client';
+import { EventSource, TicketProviderCode } from '@/prisma-client';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ManualTicketProviderService } from '../providers/manual/manual-ticket-provider.service';

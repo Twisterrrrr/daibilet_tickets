@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { TaxMode } from '@prisma/client';
+import { TaxMode } from '@/prisma-client';
 
 import { commissionFromGross, vatFromGross } from '../tax-calculations';
 import { TAX_MATRIX } from '../tax.config';

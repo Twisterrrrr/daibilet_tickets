@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { PaymentStatus, Prisma } from '@prisma/client';
+import type { PaymentStatus, Prisma } from '@/prisma-client';
 
 import type { PurchaseListItemDto } from './dto/account.dto';
 import { derivePurchaseActions, getPurchaseDisplayType } from './purchase-display.util';

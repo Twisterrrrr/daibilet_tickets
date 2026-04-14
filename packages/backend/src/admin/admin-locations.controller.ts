@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, Get, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { LocationType } from '@prisma/client';
+import { LocationType } from '@/prisma-client';
 import { isUUID } from 'class-validator';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';

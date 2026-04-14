@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { SubcategoryLandingMode, SubcategoryType } from '@prisma/client';
+import { SubcategoryLandingMode, SubcategoryType } from '@/prisma-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CacheService } from '../../cache/cache.service';

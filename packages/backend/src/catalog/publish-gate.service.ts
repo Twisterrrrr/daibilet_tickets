@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SubcategoryLayer, SubcategoryType } from '@prisma/client';
+import { SubcategoryLayer, SubcategoryType } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

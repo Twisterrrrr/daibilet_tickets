@@ -1,6 +1,6 @@
 import { normalizeEventTitle } from '@daibilet/shared';
 import { Injectable, Logger } from '@nestjs/common';
-import { EventAudience, EventCategory, EventSubcategory, EventTagAssignmentSource, Prisma } from '@prisma/client';
+import { EventAudience, EventCategory, EventSubcategory, EventTagAssignmentSource, Prisma } from '@/prisma-client';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 

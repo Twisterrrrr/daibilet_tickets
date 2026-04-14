@@ -1,4 +1,4 @@
-import type { EventSubcategory } from '@prisma/client';
+import type { EventSubcategory } from '@/prisma-client';
 
 function norm(raw: string | null | undefined): string {
   return String(raw || '')

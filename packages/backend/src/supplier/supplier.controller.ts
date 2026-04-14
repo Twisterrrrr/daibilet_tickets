@@ -28,7 +28,7 @@ import {
   SupplierLegalProfileStatus,
   SupplierRole,
   TaxMode,
-} from '@prisma/client';
+} from '@/prisma-client';
 import { Request, Response } from 'express';
 
 import { CurrentSupplierUser } from '../common/decorators/current-supplier-user.decorator';

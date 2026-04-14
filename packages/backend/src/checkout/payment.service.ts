@@ -15,7 +15,7 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import * as Sentry from '@sentry/nestjs';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
-import { PaymentMode, Prisma } from '@prisma/client';
+import { PaymentMode, Prisma } from '@/prisma-client';
 
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';

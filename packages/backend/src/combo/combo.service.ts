@@ -1,6 +1,6 @@
 import { getPriceByTypeKopecks } from '@daibilet/shared';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/prisma-client';
 
 import { PricingService } from '../pricing/pricing.service';
 import { PrismaService } from '../prisma/prisma.service';

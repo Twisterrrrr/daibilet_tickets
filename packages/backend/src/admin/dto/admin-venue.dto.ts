@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { VenueRefundPolicyMode, VenueType } from '@prisma/client';
+import { VenueRefundPolicyMode, VenueType } from '@/prisma-client';
 import { Type } from 'class-transformer';
 import {
   IsArray,

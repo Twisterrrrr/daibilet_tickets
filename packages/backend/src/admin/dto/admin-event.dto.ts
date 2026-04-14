@@ -11,7 +11,7 @@ import {
   OfferStatus,
   PurchaseType,
   SubcategoriesMode,
-} from '@prisma/client';
+} from '@/prisma-client';
 import { Type } from 'class-transformer';
 import {
   IsArray,

@@ -15,7 +15,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { CheckoutStatus, Prisma } from '@prisma/client';
+import { CheckoutStatus, Prisma } from '@/prisma-client';
 import type { Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';

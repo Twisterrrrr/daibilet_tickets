@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DateMode, OfferStatus, PriceMode } from '@prisma/client';
+import { DateMode, OfferStatus, PriceMode } from '@/prisma-client';
 
 import { CatalogGuardService } from '../catalog-guard.service';
 

@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/prisma-client';
 
 import { cacheKeys } from '../cache/cache-keys';
 import { CacheService } from '../cache/cache.service';

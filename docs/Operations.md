@@ -237,6 +237,24 @@ RANGE-партиционирование `event_sessions` по `startsAt` (ме�
 - **Dev:** `npx prisma migrate dev`
 - **Staging/Prod:** только `npx prisma migrate deploy`
 
+### Prisma 7 (backend) — как устроено сейчас
+
+- **Конфиг**: `packages/backend/prisma.config.ts` (вынесены `schema`, `DATABASE_URL`, seed).
+- **Schema**: `packages/backend/prisma/schema.prisma`:
+  - в `datasource db` **нет** `url` (берётся из `prisma.config.ts`);
+  - генератор клиента выводит код в `packages/backend/src/generated/prisma`.
+- **Импорты Prisma**: по бэкенду используем `@/prisma-client` (shim), а не `@prisma/client`.
+- **PostgreSQL adapter**: PrismaClient создаётся с адаптером `@prisma/adapter-pg` (см. `packages/backend/src/prisma/prisma.service.ts`).
+
+### Команды (backend)
+
+```powershell
+cd packages/backend
+npx prisma validate
+npx prisma generate
+npx prisma migrate dev
+```
+
 ---
 
 ## 8. Gate 0 и Gate 1

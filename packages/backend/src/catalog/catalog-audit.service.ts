@@ -5,7 +5,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { DateMode, Prisma } from '@prisma/client';
+import { DateMode, Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

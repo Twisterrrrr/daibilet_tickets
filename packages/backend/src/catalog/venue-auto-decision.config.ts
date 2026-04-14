@@ -3,7 +3,7 @@
  * См. документацию Stage 5 / rollout.
  */
 
-import type { VenueModerationTrustLevel } from '@prisma/client';
+import type { VenueModerationTrustLevel } from '@/prisma-client';
 
 export type VenueAutoDecisionThresholds = {
   mergeMinConfidence: number;

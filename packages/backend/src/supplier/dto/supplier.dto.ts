@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ApiProperty } from '@nestjs/swagger';
 import { OmitType, PartialType } from '@nestjs/swagger';
-import { ClosingDocumentMode, EventAudience, EventCategory, OfferStatus, PurchaseType, TaxMode } from '@prisma/client';
+import { ClosingDocumentMode, EventAudience, EventCategory, OfferStatus, PurchaseType, TaxMode } from '@/prisma-client';
 import { Type } from 'class-transformer';
 import { IsArray, IsEmail, IsEnum, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 

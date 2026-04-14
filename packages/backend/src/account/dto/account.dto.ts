@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
-import type { ReviewStatus } from '@prisma/client';
+import type { ReviewStatus } from '@/prisma-client';
 
 /** Тип карточки покупки для единого экрана «Мои покупки» */
 export type PurchaseDisplayType =

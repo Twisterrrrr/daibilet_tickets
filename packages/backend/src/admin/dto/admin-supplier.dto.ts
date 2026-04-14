@@ -14,7 +14,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { OperatorStatus, PaymentMode, PspFeeMode, SupplierRole } from '@prisma/client';
+import { OperatorStatus, PaymentMode, PspFeeMode, SupplierRole } from '@/prisma-client';
 
 export class UpdateSupplierDto {
   @ApiPropertyOptional({ description: 'Trust level: 0, 1, 2' })

@@ -6,7 +6,7 @@ import {
   Prisma,
   SubcategoryLayer,
   SubcategoryType,
-} from '@prisma/client';
+} from '@/prisma-client';
 
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { CheckoutStatus } from '@prisma/client';
+import { CheckoutStatus } from '@/prisma-client';
 
 import {
   CHECKOUT_TERMINAL,

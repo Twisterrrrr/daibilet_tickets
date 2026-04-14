@@ -13,7 +13,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { StructuralTagGroup, TagCategory, TagKind } from '@prisma/client';
+import { StructuralTagGroup, TagCategory, TagKind } from '@/prisma-client';
 
 // ── Reconciliation ────────────────────────────────
 

@@ -1,4 +1,4 @@
-import { TicketProviderCode } from '@prisma/client';
+import { TicketProviderCode } from '@/prisma-client';
 
 /** Человекочитаемые подписи для admin API (вне ProviderDescriptor). */
 export const TICKET_PROVIDER_DISPLAY_LABEL: Record<TicketProviderCode, string> = {

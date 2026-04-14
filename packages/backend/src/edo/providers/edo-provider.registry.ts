@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EdoProviderType } from '@prisma/client';
+import { EdoProviderType } from '@/prisma-client';
 
 import type { EdoProvider } from '../domain/edo-provider.interface';
 import { EdoProviderNotImplementedError } from '../domain/edo.errors';

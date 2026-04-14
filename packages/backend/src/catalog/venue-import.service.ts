@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { VenueImportSource, VenueSourceType, VenueType } from '@prisma/client';
+import { VenueImportSource, VenueSourceType, VenueType } from '@/prisma-client';
 import { createHash } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';

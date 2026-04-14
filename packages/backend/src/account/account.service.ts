@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus, ReviewDisputeStatus, ReviewStatus, Prisma } from '@prisma/client';
+import { PaymentStatus, ReviewDisputeStatus, ReviewStatus, Prisma } from '@/prisma-client';
 
 import { CheckoutService } from '../checkout/checkout.service';
 import { PrismaService } from '../prisma/prisma.service';

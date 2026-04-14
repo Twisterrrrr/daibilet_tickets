@@ -1,4 +1,4 @@
-import { SubcategoryLayer, SubcategoryType } from '@prisma/client';
+import { SubcategoryLayer, SubcategoryType } from '@/prisma-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrismaService } from '../../prisma/prisma.service';

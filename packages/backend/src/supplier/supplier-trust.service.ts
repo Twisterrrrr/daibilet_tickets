@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import type { Operator, SupplierTrustOverride } from '@prisma/client';
+import type { Operator, SupplierTrustOverride } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
