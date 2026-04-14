@@ -210,6 +210,48 @@ enum VenueType {
   PARK // Парк / Заповедник
 }
 
+/// Импортируемые и ручные площадки: DRAFT → модерация → ACTIVE; MERGED → каноническая цель в mergeTargetId
+enum VenueLifecycleStatus {
+  DRAFT
+  ACTIVE
+  MERGED
+  REJECTED
+}
+
+enum VenueSourceType {
+  IMPORTED
+  MANUAL
+}
+
+enum VenueImportSource {
+  TICKETSCLOUD
+  TEPLOHOD
+}
+
+/// Уровень доверия к потоку импорта (Stage 5: авто-модерация).
+enum VenueModerationTrustLevel {
+  LOW
+  MEDIUM
+  HIGH
+  FULL_AUTO
+}
+
+enum VenueModerationAction {
+  APPROVE
+  REJECT
+  MERGE
+}
+
+enum VenueModerationReasonCode {
+  BAD_SOURCE_DATA
+  DUPLICATE_NOT_CONFIRMED
+  WRONG_CITY
+  WRONG_ADDRESS
+  SPAM
+  IRRELEVANT
+  OTHER
+}
+
 enum DateMode {
   SCHEDULED // Обычные события с сеансами
   OPEN_DATE // Билет с открытой датой (музеи)
@@ -217,6 +259,7 @@ enum DateMode {
 
 enum CollectionSourceType {
   MANUAL
+  AUTO
   SUGGESTED
   HYBRID
   ACTIVE
@@ -349,6 +392,8 @@ model AdminUser {
   lastLoginAt      DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+
+  venueModerationDecisions VenueModerationDecision[]
 
   @@map("admin_users")
 }
@@ -666,6 +711,7 @@ model Event {
   orderRequests        OrderRequest[]
   promoBlockEvents     PromoBlockEvent[]
   promoCollectionItems PromoCollectionItem[]
+  collectionItems      CollectionItem[]
   promoCodes           PromoCode[]
   subcategoryLinks     EventSubcategoryLink[]
   dailyStats           DailyEventStats[]
@@ -1164,8 +1210,14 @@ model Voucher {
 }
 
 // ========================
-// Блог
+// Блог / SEO-статьи
 // ========================
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
 
 model Article {
   id              String    @id @default(uuid()) @db.Uuid
@@ -1177,10 +1229,12 @@ model Article {
   coverImage      String?
   metaTitle       String?
   metaDescription String?   @db.Text
-  isPublished     Boolean   @default(false)
+  status          ArticleStatus @default(DRAFT)
+  /** UUID лендингов (landing_pages.id) */
+  relatedLandingIds   String[] @default([]) @db.Uuid
+  /** UUID подборок (collections.id) */
+  relatedCollectionIds String[] @default([]) @db.Uuid
   publishedAt     DateTime?
-  isDeleted       Boolean   @default(false)
-  deletedAt       DateTime?
   version         Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -1190,6 +1244,7 @@ model Article {
   articleTags   ArticleTag[]
 
   @@index([cityId])
+  @@index([status])
   @@map("articles")
 }
 
@@ -1342,6 +1397,10 @@ model Collection {
   status             CollectionStatus         @default(DRAFT)
   eventCountCached   Int?
   previewGeneratedAt DateTime?
+  /// Первая публикация (для витрины и SEO)
+  publishedAt DateTime?
+  /// Контракт AUTO/HYBRID: фильтры и лимиты (валидация на backend)
+  queryConfig Json?
   isActive  Boolean   @default(true)
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
@@ -1350,14 +1409,32 @@ model Collection {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  city     City?         @relation(fields: [cityId], references: [id])
+  city     City?             @relation(fields: [cityId], references: [id])
   landings LandingPage[]
+  items    CollectionItem[]
 
   @@index([cityId])
   @@index([status, sourceType])
   @@unique([cityId, slug])
   @@index([isActive, isDeleted])
   @@map("collections")
+}
+
+/// Явные позиции подборки (ручной и гибридный слой курации)
+model CollectionItem {
+  id           String     @id @default(uuid()) @db.Uuid
+  collectionId String     @db.Uuid
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  eventId      String     @db.Uuid
+  event        Event      @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  sortOrder    Int        @default(0)
+  isPinned     Boolean    @default(false)
+  isExcluded   Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  @@unique([collectionId, eventId])
+  @@index([collectionId, sortOrder])
+  @@map("collection_items")
 }
 
 // ========================
@@ -1496,6 +1573,29 @@ model Venue {
   createdByType     CreatedByType?         @default(ADMIN)
   createdById       String?                @db.Uuid
 
+  /// Статус жизненного цикла (импорт / модерация / merge)
+  lifecycleStatus VenueLifecycleStatus @default(ACTIVE) @map("lifecycle_status")
+  /// Публичная SEO-страница /venues/:slug (только при ACTIVE + модерации контента)
+  isPublished     Boolean              @default(true) @map("is_published")
+  sourceType      VenueSourceType      @default(MANUAL) @map("source_type")
+  importSource    VenueImportSource?   @map("import_source")
+  externalVenueId String?              @map("external_venue_id")
+  rawName         String?              @map("raw_name")
+  rawAddress      String?              @map("raw_address")
+  normalizedName  String               @map("normalized_name")
+  normalizedAddress String?            @map("normalized_address")
+  mergeTargetId   String?              @map("merge_target_id") @db.Uuid
+  confidenceScore Float?               @map("confidence_score")
+  needsReview     Boolean              @default(false) @map("needs_review")
+  /// Обход порога по количеству событий для публикации страницы площадки
+  isVenuePageWhitelisted Boolean       @default(false) @map("is_venue_page_whitelisted")
+
+  mergeTarget Venue?  @relation("VenueMerge", fields: [mergeTargetId], references: [id], onDelete: Restrict)
+  mergedFrom  Venue[] @relation("VenueMerge")
+
+  moderationDecisions VenueModerationDecision[]
+  moderationSignals   VenueModerationSignal[]
+
   city                 City                  @relation(fields: [cityId], references: [id])
   operator             Operator?             @relation("VenueOperator", fields: [operatorId], references: [id])
   events               Event[]               @relation("VenueEvents")
@@ -1509,7 +1609,77 @@ model Venue {
   @@index([venueType])
   @@index([slug])
   @@index([operatorId])
+  @@index([lifecycleStatus])
+  @@index([cityId, lifecycleStatus])
+  @@index([importSource, externalVenueId])
+  @@unique([cityId, importSource, externalVenueId])
   @@map("venues")
+}
+
+/// Профиль доверия и лимитов авто-модерации по источнику импорта (Stage 5).
+model ImportSourceModerationProfile {
+  importSource VenueImportSource @id @map("import_source")
+  trustLevel VenueModerationTrustLevel @default(LOW) @map("trust_level")
+  autoApproveEnabled Boolean @default(false) @map("auto_approve_enabled")
+  autoMergeEnabled Boolean @default(false) @map("auto_merge_enabled")
+  maxAutoActionsPerDay Int @default(20) @map("max_auto_actions_per_day")
+  /// Kill-switch для конкретного import source.
+  disabled Boolean @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("import_source_moderation_profiles")
+}
+
+/// История решений модерации импортных площадок (traceability + аналитика).
+model VenueModerationDecision {
+  id           String                    @id @default(cuid())
+  venueId      String                    @db.Uuid
+  action       VenueModerationAction
+  reasonCode   VenueModerationReasonCode?
+  reasonText   String?
+  actorAdminId String?                   @db.Uuid
+  createdAt    DateTime                  @default(now())
+  metadata     Json?
+
+  venue      Venue      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  actorAdmin AdminUser? @relation(fields: [actorAdminId], references: [id], onDelete: SetNull)
+
+  @@index([venueId])
+  @@index([createdAt])
+  @@index([actorAdminId])
+  @@index([venueId, createdAt])
+  @@index([action])
+  @@map("venue_moderation_decisions")
+}
+
+/// Детерминированные сигналы для аналитики / будущего обучения (без ML).
+model VenueModerationSignal {
+  id                String               @id @default(cuid())
+  venueId           String               @db.Uuid
+  action            VenueModerationAction
+  decisionHint      String?
+  /// Совпадение рекомендации и действия (MERGE↔MERGE, APPROVE↔APPROVE, REJECT↔REJECT для соответствующих hint).
+  wasHintAccepted   Boolean              @default(false)
+  /// Пользователь выбрал иное действие, чем «прямая» рекомендация (напр. APPROVE при MERGE_RECOMMENDED).
+  wasHintOverridden Boolean              @default(false)
+  confidenceScore   Float?
+  needsReview       Boolean?
+  duplicatesCount   Int?
+  titleSimilarity   Float?
+  addressSimilarity Float?
+  sameCity          Boolean?
+  importSource      VenueImportSource?
+  targetVenueId     String?              @db.Uuid
+  createdAt         DateTime             @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@index([createdAt])
+  @@index([importSource])
+  @@index([decisionHint])
+  @@map("venue_moderation_signals")
 }
 
 model Subcategory {

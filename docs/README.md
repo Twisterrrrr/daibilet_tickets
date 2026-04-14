@@ -20,6 +20,8 @@
 | [Collections-Architecture.md](Collections-Architecture.md) | Архитектура подборок |
 | [Tags-Architecture.md](Tags-Architecture.md) | Архитектура тегов и SEO-routing |
 | [UX-Parity-Backlog.md](UX-Parity-Backlog.md) | UI-system enforcement и статус UX parity |
+| [admin-v3-grand-master-plan.md](admin-v3-grand-master-plan.md) | Admin V3: стратегия по фазам 0–8 и Stages A–F |
+| [admin-v3-roadmap.md](admin-v3-roadmap.md) | Admin V3: тактический roadmap к запуску витрины (TC + Teplohod) |
 | [RegressionChecklist.md](RegressionChecklist.md) | Чек-лист перед merge |
 | [Operations.md](Operations.md) | Деплой, инфраструктура, Gates, Prisma |
 | [Runbook-Production-SSL-Deploy.md](Runbook-Production-SSL-Deploy.md) | Prod SSL/deploy runbook |

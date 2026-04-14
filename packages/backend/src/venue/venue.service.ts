@@ -761,8 +761,7 @@ export class VenueService {
   async getRelatedArticles(cityId: string, limit = 4) {
     return this.prisma.article.findMany({
       where: {
-        isPublished: true,
-        isDeleted: false,
+        status: 'PUBLISHED',
         cityId,
       },
       orderBy: { publishedAt: 'desc' },

@@ -25,6 +25,9 @@ import { CollectionSelectionService } from './collection-selection.service';
 import { PublishGateService } from './publish-gate.service';
 import { LocationNormalizerService } from './location-normalizer.service';
 import { VenueNormalizerService } from './venue-normalizer.service';
+import { VenueImportService } from './venue-import.service';
+import { VenueLifecycleService } from './venue-lifecycle.service';
+import { VenueModerationMetricsService } from './venue-moderation-metrics.service';
 import { OfferNormalizerService } from './offer-normalizer.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
@@ -62,6 +65,9 @@ import { CatalogAuditService } from './catalog-audit.service';
     PublishGateService,
     LocationNormalizerService,
     VenueNormalizerService,
+    VenueImportService,
+    VenueLifecycleService,
+    VenueModerationMetricsService,
     OfferNormalizerService,
     SubcategoryPolicyService,
     SubcategoryAssignmentService,
@@ -93,6 +99,9 @@ import { CatalogAuditService } from './catalog-audit.service';
     PublishGateService,
     LocationNormalizerService,
     VenueNormalizerService,
+    VenueImportService,
+    VenueLifecycleService,
+    VenueModerationMetricsService,
     OfferNormalizerService,
     SubcategoryPolicyService,
     SubcategoryAssignmentService,

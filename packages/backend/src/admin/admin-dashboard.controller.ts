@@ -1,7 +1,7 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { PackageItemStatus, PackageStatus } from '@prisma/client';
+import { ArticleStatus, PackageItemStatus, PackageStatus } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -176,7 +176,7 @@ export class AdminDashboardController {
       this.prisma.event.count({ where: { isActive: true } }),
       this.prisma.city.count(),
       this.prisma.tag.count({ where: { isDeleted: false } }),
-      this.prisma.article.count({ where: { isDeleted: false } }),
+      this.prisma.article.count({ where: { status: { not: ArticleStatus.ARCHIVED } } }),
       this.prisma.landingPage.count({ where: { isDeleted: false } }),
       this.prisma.comboPage.count({ where: { isDeleted: false } }),
       this.prisma.package.count(),

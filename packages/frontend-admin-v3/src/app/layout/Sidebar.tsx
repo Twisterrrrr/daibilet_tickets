@@ -24,6 +24,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
                     <NavLink
                       key={item.to}
                       to={item.to}
+                      end={item.end}
                       className={({ isActive }) =>
                         cn(
                           'flex items-center gap-2 rounded-md px-2 py-2 text-sm outline-none transition hover:bg-sidebar-accent',

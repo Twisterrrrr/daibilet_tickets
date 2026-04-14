@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ArticleStatus, Prisma } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
@@ -44,9 +45,11 @@ export class AdminArticlesController {
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
-    const where: Record<string, unknown> = { isDeleted: false };
+    const where: Prisma.ArticleWhereInput = { status: { not: ArticleStatus.ARCHIVED } };
     if (city) where.city = { slug: city };
-    if (published !== undefined) where.isPublished = published === 'true';
+    if (published !== undefined) {
+      where.status = published === 'true' ? ArticleStatus.PUBLISHED : ArticleStatus.DRAFT;
+    }
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -121,7 +124,7 @@ export class AdminArticlesController {
   async delete(@Param('id') id: string) {
     await this.prisma.article.update({
       where: { id },
-      data: { isDeleted: true, deletedAt: new Date() },
+      data: { status: ArticleStatus.ARCHIVED },
     });
     return { success: true };
   }
