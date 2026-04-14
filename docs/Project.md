@@ -74,6 +74,96 @@
   - **Derived section:** вычисляется **только** через `section-map` по slug PRIMARY подкатегории; для любого события section должен резолвиться через канонику/compat mapping.
   - **UI‑правило:** не предлагать неактивные/legacy подкатегории в выборе, но **показывать** их если они уже стоят у события (read‑only, с пометкой legacy).
 
+#### Settings (Admin V3) — управление системой (scope 2026‑04)
+
+**Ключевая идея:** Settings = управление **поведением системы**, доступами и интеграциями, а не контентом/каталогом.
+
+- **Не входит в Settings:** каталог, контент, операционные сущности (events, tickets, sessions, orders и т.д.).
+- **Входит в Settings:**
+  - пользователи админки и роли (RBAC),
+  - интеграции (Ticketscloud, teplohod.info, будущие провайдеры, webhooks),
+  - платежи (провайдер + режимы + ключи),
+  - уведомления (каналы + шаблоны),
+  - SEO (дефолтные мета, indexability; `baseUrl` берётся из ENV),
+  - feature flags,
+  - системные лимиты/дефолты.
+
+##### Безопасность и права
+
+- **Правило доступа:** role-based, роли `OWNER | ADMIN | MANAGER`. Мутации Settings — только `OWNER/ADMIN`, а критичные операции (admin users / payments / integrations / rotate secrets) — только `OWNER`.
+- **Чувствительные данные:** ключи/секреты должны быть masked при чтении из админки; UI показывает “••••••” + явное действие “заменить”, без возможности прочитать секрет полностью.
+- **Rotate secrets:** отдельный endpoint обязателен; чтение полного секрета через API запрещено.
+- **Аудит:** audit log нужен, но **не на MVP** (фиксируется как follow‑up).
+
+##### Архитектура хранения
+
+KV (`AppSetting`) используем только для “параметров”:
+
+- `AppSetting { key: String @id, value: Json }`
+- доступ в коде через `getSetting('seo.*')`, `getSetting('system.*')`
+
+Сущности с собственным CRUD (например, `AdminUser`, `Integration`, `FeatureFlag`) остаются отдельными таблицами.
+
+##### Модели (целевая схема, MVP‑friendly)
+
+- **RBAC (role‑based)**:
+  - `AdminUser { id, email(unique), passwordHash, role: AdminRole, isActive, createdAt, updatedAt }`
+  - `AdminRole = OWNER | ADMIN | MANAGER`
+- **Integration**:
+  - `Integration { id, type, name, isActive, config: Json, createdAt, updatedAt }`
+- **Payment settings** (минимально, даже если STUB):
+  - `PaymentSettings { provider, isEnabled, config: Json }`
+- **Notification settings** (MVP):
+  - шаблоны лежат в коде (Git); в БД — только параметры/переключатели
+- **SEO settings**:
+  - `SeoSettings { defaultTitle, defaultDescription, indexableByDefault }` (`baseUrl` — только ENV)
+- **FeatureFlag**:
+  - `FeatureFlag { id, key(unique), isEnabled, description?, createdAt }`
+- **System settings** (ключевые лимиты/дефолты):
+  - `SystemSettings` как тип/shape поверх `AppSetting` (например: `defaultPaginationLimit`, thresholds и т.д.).
+
+##### API (контуры, без фиксации URL вне /api/v1)
+
+Примечание: в проекте REST API канонически живёт под `/api/v1/*`, поэтому admin endpoints должны быть вида `/api/v1/admin/*`.
+
+- **Users (RBAC)**:
+  - `GET /api/v1/admin/users`
+  - `POST /api/v1/admin/users`
+  - `PATCH /api/v1/admin/users/:id`
+  - `DELETE /api/v1/admin/users/:id`
+  - `POST /api/v1/admin/users/:id/reset-password`
+- **Integrations**:
+  - `GET /api/v1/admin/integrations`
+  - `PATCH /api/v1/admin/integrations/:id`
+  - `POST /api/v1/admin/integrations/:id/test`
+- **Payments**:
+  - `GET /api/v1/admin/settings/payments`
+  - `PATCH /api/v1/admin/settings/payments`
+- **Feature flags**:
+  - `GET /api/v1/admin/feature-flags`
+  - `PATCH /api/v1/admin/feature-flags/:key`
+- **Settings aggregator (опционально, для ускорения UI)**:
+  - `GET /api/v1/admin/settings` → `{ users, integrations, payments, seo, featureFlags, system, notifications }`
+
+##### UI (Admin V3)
+
+Страница `/admin-v3/settings` с внутренним sidebar:
+
+- Пользователи и роли (таблица + actions: edit role, deactivate, reset password)
+- Интеграции (карточки: status, masked keys, test connection, sync optional)
+- Платежи (выбор провайдера, режим test/live, ключи)
+- Уведомления (toggles каналов + параметры; шаблоны в коде)
+- SEO (default meta + indexability; baseUrl из ENV)
+- Feature Flags (таблица key/status/description)
+- Система (формы лимитов/дефолтов + пояснения)
+
+##### Порядок внедрения (phased)
+
+- **Фаза A (база):** users+roles, feature flags.
+- **Фаза B (системные):** system settings, SEO settings.
+- **Фаза C (интеграции):** integrations, payments.
+- **Фаза D (коммуникации):** notifications.
+
 ### Supplier Finance (P1–P3.2+)
 
 - **Цель:** прозрачный и воспроизводимый финансовый контур для поставщиков поверх уже существующих заказов/платежей.

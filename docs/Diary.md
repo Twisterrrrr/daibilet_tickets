@@ -4,6 +4,27 @@
 
 ---
 
+## 14.04.2026 — Admin: magic-link сброс пароля, anti-lockout, AppSetting SEO/System
+
+### Наблюдения
+
+- Для админ-пользователей нужен безопасный сброс пароля без передачи `passwordHash` с клиента и без хранения сырого токена в БД.
+- Роль **OWNER** в документации Settings не совпадала с Prisma `AdminRole` (были только ADMIN/EDITOR/VIEWER); при этом anti-lockout должен охватывать «последнего» привилегированного оператора.
+
+### Решения
+
+- В `AdminUser` добавлены `passwordResetTokenHash` + `passwordResetExpiresAt`; в enum `AdminRole` — значение **OWNER**; таблица **`app_settings`** (KV `key` + `value` JSON).
+- Публичные эндпоинты `POST /auth/admin/forgot-password` и `POST /auth/admin/reset-password` (throttle); в письме — ссылка `ADMIN_APP_URL`/`APP_URL` + `/reset-password?token=`; после сброса инвалидируется `refreshTokenHash`; токены в логи не пишутся.
+- **RolesGuard:** иерархия ролей (OWNER ≥ ADMIN ≥ EDITOR ≥ VIEWER), чтобы OWNER проходил те же маршруты, что и ADMIN, без дублирования декораторов.
+- **Anti-lockout:** перед `PATCH /admin/users/:id` нельзя оставить 0 активных пользователей с ролью ADMIN или OWNER.
+- **Settings UI:** страницы `/forgot-password`, `/reset-password`; на экране настроек — формы SEO и System (ключи `seo` и `system` в KV), редактирование только для ADMIN/OWNER.
+
+### Проблемы
+
+- Роль **MANAGER** из продуктовых доков пока не добавлена в `AdminRole` (остаётся EDITOR как ближайший аналог до отдельной миграции).
+
+---
+
 ## 14.04.2026 — Контентные связи: переход на FK/join (Article↔Landing/Collection, Landing.filterTagId, CollectionTagFilter)
 
 ### Наблюдения
@@ -5217,3 +5238,65 @@ Tripster — лидер рынка экскурсий в России. Прям�
 
 #### Проблемы
 - В dev окружении миграции требовали reset для восстановления консистентности (после конфликтов shadow DB). На prod любая стратегия “reset‑миграций” должна быть оформлена отдельным планом и не смешиваться с обычной линейной историей миграций.
+
+---
+
+### 14.04.2026 — Settings (Admin V3): единый слой управления системой (план)
+
+#### Наблюдения
+- В Admin V3 уже формируется паттерн “тонкий UI поверх текущего backend” с поштучной миграцией экранов. Settings логично выделить как отдельный домен **управления системой**, чтобы не смешивать его с каталогом/контентом/операционкой.
+- Для масштабирования и безопасных релизов критичны два “рычага”: **RBAC** (кто может менять) и **feature flags** (что включено/выключено и как катить изменения).
+- Самый рискованный класс настроек — **секреты интеграций и платежей**: при неправильной выдаче в UI/API они утекут или начнут логироваться.
+
+#### Решения
+1. **Границы Settings** закреплены как “управление поведением системы” (RBAC, интеграции, payments, notifications, SEO/baseUrl, feature flags, system limits) без переноса туда каталога/контента.
+2. **Хранение настроек**: целевой базовый слой — KV `AppSetting(key,value)` для “настроек‑параметров”, а сущности с CRUD (`AdminUser`, `Integration`, `FeatureFlag`) остаются отдельными таблицами.
+3. **Безопасность**: политика “masked secrets” как инвариант Settings (API никогда не возвращает секрет целиком; UI только заменяет).
+4. **Phased rollout**: Фаза A (users/roles + feature flags) → Фаза B (system + SEO) → Фаза C (integrations + payments) → Фаза D (notifications).
+
+#### Проблемы
+- Нужны явные ответы по ряду вопросов до реализации: как устроена текущая auth-модель для админки (общий user vs отдельный `AdminUser`), где и как хранить/шифровать секреты, и какие операции должны быть только `OWNER` (lockout‑safe).
+
+---
+
+### 14.04.2026 — Финальные решения: Landings / Taxonomy+SEO Audit / Settings (Admin V3)
+
+#### Наблюдения
+- В проекте уже есть рабочие публичные хабы (`/river-cruises`, `/bus-tours`, `/salute-9-may`) и канонический паттерн city landing `/cities/:citySlug/:topicSlug`; любые параллельные namespace’ы создают конкурирующие URL и риски SEO-дублей.
+- Для качества витрины недостаточно “можно публиковать/нельзя публиковать”: нужен отдельный контур “можно показывать, но нельзя индексировать” (thin content, слабое наполнение), иначе SEO и продуктовые инварианты конфликтуют.
+- Settings как “управление системой” должен быть изолирован от каталога/контента, а самый рискованный класс настроек — секреты (платежи/интеграции): их нельзя возвращать полностью ни при каких условиях.
+
+#### Решения
+1. **Landings: роутинг и canonical**
+   - Global HUB canonical в корне: `/river-cruises`, `/bus-tours`, `/salute-9-may`.
+   - City landing: `/cities/:citySlug/:topicSlug`.
+   - `/landings/*` запрещён (ломает SEO); авто‑редирект HUB → CITY не делаем: HUB всегда самостоятельный.
+   - HUB ≠ CITY: HUB = навигация + high-level SEO, CITY = transactional SEO (основной трафик).
+2. **Landings: family / модель**
+   - Отдельной сущности family нет.
+   - `LandingPage.topicKey`, `cityId?`, `parentId?` (HUB→CITY), M:N запрещён (один CITY landing = один parent).
+3. **Landings: источник каталога**
+   - MVP поддерживает `PRIMARY_COLLECTION` (приоритет) и `AUTO_QUERY` (fallback).
+   - `queryConfig` только по строгому контракту (без произвольного JSON).
+   - Единое storefront-safe правило вынести в `CatalogPolicyService.isStorefrontSafe(event)`.
+4. **Landings: anti-thin**
+   - publish при `resolvedEventsCount > 0`.
+   - indexable только при `resolvedEventsCount >= 3` (авто `isIndexable=false` при `<3`, manual override разрешён).
+5. **Taxonomy + SEO Audit**
+   - Publish gate (blockers): `NO_LOCATION`, `NO_ACTIVE_OFFER`, `INVALID_STATE`.
+   - SEO Audit (soft): `NO_PHOTO`, `WEAK_DESC`, `NO_SUBCATEGORY`, `THIN_CONTENT`.
+   - Обязательное раздельное состояние: `canPublish=true` + `isIndexable=false`.
+   - MVP: on-the-fly вычисление + Redis cache TTL 60–120s (без snapshot).
+   - `IssueCode` и `Severity` — жёсткие контракты; subcategory обязательна для Event; max subcategories = 3; inactive subcategory = WARN.
+6. **Settings (Admin V3)**
+   - Namespace: `/admin-v3/settings/*`.
+   - MVP разделы: Users/Roles, Feature Flags, SEO, System; остальное под флагами.
+   - RBAC role-based: `OWNER|ADMIN|MANAGER`; критичное (admin users, payments, integrations, rotate secrets) — OWNER only; anti-lockout: нельзя деактивировать последнего OWNER.
+   - `baseUrl` только из ENV (не из админки).
+   - KV `AppSetting` только для `seo.*` (кроме baseUrl) и `system.*`.
+   - Notifications templates в коде (Git), в БД — только параметры.
+   - Secrets: хранение encrypted JSON, API возвращает только `{ hasSecret, last4 }`, rotate — отдельный endpoint.
+
+#### Проблемы
+- Реализация запрета `/landings/*` и возврат к корневым HUB’ам требует аккуратной миграции без регрессий: нужно убрать конкурирующие public routes и проверить canonical/links.
+- Для `CatalogPolicyService.isStorefrontSafe` важно не разойтись с текущими publish-gate инвариантами (чтобы “safe” не стало новым источником несовместимых правил в разных местах).

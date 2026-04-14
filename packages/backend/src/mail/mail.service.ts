@@ -519,4 +519,40 @@ export class MailService {
       this.logger.error(`Failed to notify admin: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
+
+  /**
+   * Сброс пароля админ-панели (magic link). Токен в логи не пишем.
+   */
+  async sendAdminPasswordReset(
+    to: string,
+    data: {
+      name: string;
+      resetUrl: string;
+    },
+  ): Promise<boolean> {
+    if (!this.enabled) {
+      this.logger.warn(`[DRY RUN] Admin password reset email → ${to} (SMTP выключен)`);
+      return false;
+    }
+
+    try {
+      await this.mailer.sendMail({
+        to,
+        subject: 'Сброс пароля — панель администратора',
+        template: 'admin-password-reset',
+        context: {
+          name: data.name,
+          resetUrl: data.resetUrl,
+          appUrl: this.appUrl,
+        },
+      });
+      this.logger.log(`Admin password reset email sent → ${to}`);
+      return true;
+    } catch (err: unknown) {
+      this.logger.error(
+        `Failed to send admin password reset to ${to}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return false;
+    }
+  }
 }

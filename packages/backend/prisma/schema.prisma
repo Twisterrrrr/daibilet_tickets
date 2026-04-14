@@ -127,6 +127,7 @@ enum AdminRole {
   ADMIN
   EDITOR
   VIEWER
+  OWNER // Владелец (полный доступ; anti-lockout вместе с ADMIN)
 }
 
 enum SupplierRole {
@@ -403,6 +404,9 @@ model AdminUser {
   role             AdminRole @default(EDITOR)
   isActive         Boolean   @default(true)
   refreshTokenHash String? // хеш refresh token для инвалидации
+  /// SHA-256 hex одноразового токена сброса пароля (сырой токен нигде не храним)
+  passwordResetTokenHash   String?
+  passwordResetExpiresAt     DateTime?
   lastLoginAt      DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -410,6 +414,16 @@ model AdminUser {
   venueModerationDecisions VenueModerationDecision[]
 
   @@map("admin_users")
+}
+
+/// KV-настройки продукта (SEO/System и др.) — без секретов; canonical URL сайта задаётся в ENV.
+model AppSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique @db.VarChar(160)
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
 }
 
 // ========================

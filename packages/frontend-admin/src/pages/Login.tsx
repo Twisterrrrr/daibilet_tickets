@@ -1,6 +1,6 @@
 import { Ticket } from 'lucide-react';
 import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -78,6 +78,11 @@ export function LoginPage() {
               <Button type="submit" disabled={loading} className="w-full">
                 {loading ? 'Вход...' : 'Войти'}
               </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                <Link to="/forgot-password" className="text-primary underline-offset-4 hover:underline">
+                  Забыли пароль?
+                </Link>
+              </p>
             </form>
           </CardContent>
         </Card>

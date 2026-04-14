@@ -15,7 +15,7 @@ export default async function NochnyeMostyLabPage() {
   const citySlug = 'saint-petersburg';
   const landingSlug = 'nochnye-mosty';
 
-  const data = await api.getLandingBySlug(landingSlug);
+  const data = await api.getCatalogLandingByCityAndSlug(citySlug, landingSlug);
   const { vm } = toLandingVM(data);
 
   return (

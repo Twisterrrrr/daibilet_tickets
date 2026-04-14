@@ -97,6 +97,31 @@
 | `legacy-classification-fix` | Приведение legacy-событий к новой модели (скрипты reclassify / backfill — отдельный план) | Средний | `[ ]` |
 | `G-data-cleanup` | Программа G: trim links и legacy-classification — см. Epic G в архиве | Низкий | `[~]` |
 
+### Settings (Admin V3) — управление системой (MVP)
+
+Источник архитектуры: `docs/Project.md` § “Settings (Admin V3) — управление системой”.
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `settings-scope-and-sections` | Зафиксировать разделы Settings и границы “управление системой vs каталог/контент/операционка”; навигация `/admin-v3/settings/*` | Высокий | `[ ]` |
+| `settings-rbac-admin-users` | RBAC: листинг/роль/активация `AdminUser`; magic-link сброс пароля; anti-lockout последнего **ADMIN/OWNER**; роль `OWNER` в Prisma. Создание пользователей из UI и роль MANAGER в enum — отдельно | Критический | `[~]` **14.04.2026** |
+| `settings-feature-flags` | Feature Flags: модель + API + таблица в UI; включение/скрытие разделов Admin V3 на флагах | Критический | `[x]` **14.04.2026** |
+| `settings-appsetting-kv` | KV `AppSetting` + ключи `seo` / `system` (merge PATCH, baseUrl из формы отклоняется) | Высокий | `[x]` **14.04.2026** |
+| `settings-seo` | SEO KV: GET/PATCH `/admin/settings/app/seo` + форма на Settings | Высокий | `[x]` **14.04.2026** |
+| `settings-system` | System KV: GET/PATCH `/admin/settings/app/system` + форма (maintenance, debug banner) | Средний | `[x]` **14.04.2026** |
+| `settings-integrations` | Integrations: список + редактирование config + test connection; masked secrets в DTO/UI | Высокий | `[ ]` |
+| `settings-integrations-rotate-secret` | Integrations: rotate secret endpoint (OWNER only) + audit-ready payload (без логирования секрета) | Высокий | `[ ]` |
+| `settings-payments` | Payments: provider + enabled + mode (test/live) + publicKey/secretKey; masked secrets + валидация “нельзя включить без ключей, режим соответствует ключам” | Высокий | `[ ]` |
+| `settings-notifications` | Notifications: toggles + параметры; шаблоны в коде (Git), не в БД | Средний | `[ ]` |
+| `settings-aggregator-endpoint` | `GET /api/v1/admin/settings` как агрегатор для ускорения UI (опционально) | Низкий | `[ ]` |
+| `settings-audit-log-followup` | Follow-up: audit log для изменений Settings (actor, diff, ip, userAgent) | Средний | `[ ]` |
+
+**Сводка Settings / админ-безопасность (14.04.2026)**
+
+- **Сделано:** роль `OWNER` в `AdminRole`; magic-link сброс пароля (`POST /auth/admin/forgot-password`, `reset-password`), шаблон письма, инвалидация refresh при сбросе; поля `passwordReset*` у `AdminUser`; anti-lockout последнего активного ADMIN/OWNER при `PATCH /admin/users/:id`; иерархия в `RolesGuard`; KV `AppSetting` + `GET/PATCH /admin/settings/app/seo|system` (merge PATCH, без `baseUrl` в SEO); формы SEO/System на странице Settings; страницы `/forgot-password`, `/reset-password`; миграция `20260414180000_admin_password_reset_and_app_settings`.
+- **Осталось:** зафиксировать scope разделов Settings и навигацию (`settings-scope-and-sections`); создание `AdminUser` из UI и/или роль `MANAGER` в enum (`settings-rbac-admin-users`); интеграции / платежи / уведомления / агрегатор (`settings-integrations*` …); audit log по изменениям Settings; явные OpenAPI-ответы для новых эндпоинтов; на проде — `prisma migrate deploy`, env `ADMIN_APP_URL` для ссылок в письмах.
+- **См. также:** запись в `docs/Diary.md` (14.04.2026 — Admin: magic-link, anti-lockout, AppSetting).
+
 ### Качество витрины / SEO Audit (Taxonomy-aware)
 
 Спецификация и rollout: `docs/SeoAudit-Taxonomy-MasterPlan.md` (Taxonomy задаёт структуру, SEO Audit проверяет соответствие и качество).
@@ -104,11 +129,11 @@
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
 | `seo-audit-backend-read-model` | Backend: read‑модель SEO Audit (summary + issues list + entity issues), без автоисправлений; issue groups/severity; базовые фильтры (entityType/severity/group/issueCode/search) | Высокий | `[ ]` |
-| `seo-audit-snapshot-plan` | Snapshot/caching plan: где хранить snapshot (Redis TTL vs DB), cron/инвалидация, `generatedAt` метаданные; оценка объёма и SLO | Средний | `[ ]` |
+| `seo-audit-cache-on-the-fly` | MVP: on-the-fly вычисление + Redis cache TTL 60–120s (`seo:audit:<entityType>:<filters>`), без snapshot/cron | Высокий | `[ ]` |
 | `seo-audit-taxonomy-rules` | Taxonomy-aware rules: completeness (нет subcategory/topic) + misuse (type mismatch, inactive in use, too many) + unused taxonomy | Высокий | `[ ]` |
 | `admin-v3-seo-audit-ui` | Admin V3 UI: `/admin-v3/seo-audit` (summary + issues table + фильтры), deep links в сущности | Высокий | `[ ]` |
 | `entity-health-badges` | Интеграция: health badge / issues count на страницах сущностей (events/venues/landings/collections/articles) + переходы в filtered audit | Средний | `[ ]` |
-| `seo-audit-indexability-policy` | Политика thin/indexability: критерии `LANDING_THIN_CONTENT`, auto `isIndexable=false?` vs manual; как соотнести с publish-gate | Высокий | `[ ]` |
+| `seo-audit-indexability-policy` | Политика publish vs index: blockers (NO_LOCATION/NO_ACTIVE_OFFER/INVALID_STATE) vs audit soft; состояние `canPublish=true` + `isIndexable=false` обязательно | Высокий | `[ ]` |
 
 ### Catalog foundation v2 — публичный sellable read / checkout adapter
 

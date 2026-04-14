@@ -1,4 +1,4 @@
-import { DateMode, EventCategory, EventSource, Prisma } from '@/prisma-client';
+import { DateMode, EventCategory, EventSource, OfferStatus, Prisma } from '@/prisma-client';
 
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 
@@ -54,6 +54,7 @@ export function buildLandingEventsWhere(params: {
   return {
     isActive: true,
     isDeleted: false,
+    offers: { some: { isDeleted: false, status: OfferStatus.ACTIVE } },
     cityId,
     OR: [
       {

@@ -397,8 +397,6 @@ export const api = {
   // Лендинги (посадочные страницы)
   getLandings: (city?: string) => fetchApi<LandingItem[]>(city ? `/landings?city=${city}` : '/landings'),
 
-  getLandingBySlug: (slug: string) => fetchApi<LandingPageResponse>(`/landings/${slug}`),
-
   getCatalogLandingByCityAndSlug: (citySlug: string, slug: string) =>
     fetchApi<LandingPageResponse>(`/catalog/landings/${encodeURIComponent(citySlug)}/${encodeURIComponent(slug)}`),
 

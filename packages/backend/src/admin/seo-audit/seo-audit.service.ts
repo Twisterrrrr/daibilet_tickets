@@ -5,6 +5,7 @@
 import { Injectable } from '@nestjs/common';
 import { EventSource, OfferStatus, Prisma } from '@/prisma-client';
 
+import { CacheService, CACHE_TTL } from '../../cache/cache.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
   SeoAuditCityRowDto,
@@ -40,131 +41,158 @@ export interface SeoAuditEventsParams {
 
 @Injectable()
 export class SeoAuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: CacheService,
+  ) {}
+
+  private buildCacheKey(prefix: string, parts: Record<string, string | number | boolean | null | undefined>): string {
+    const entries = Object.entries(parts)
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .sort(([a], [b]) => a.localeCompare(b));
+    const qs = entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
+    return qs ? `seo:audit:${prefix}:${qs}` : `seo:audit:${prefix}`;
+  }
 
   // ────────────────────────────────────────────────────────────────────────────
   // Unified (soft) endpoints — MVP for Admin V3 SEO Audit UI
   // ────────────────────────────────────────────────────────────────────────────
 
   async getUnifiedSummary(): Promise<UnifiedSeoAuditSummaryDto> {
-    const now = new Date();
-    const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
+    const cacheKey = this.buildCacheKey('summary', {});
+    return this.cache.getOrSet(cacheKey, CACHE_TTL.SEO_AUDIT, async () => {
+      const now = new Date();
+      const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
 
-    // Events: counts by coarse operational issues (fast, DB-level).
-    const [
-      totalEvents,
-      noPhoto,
-      noPrice,
-      noFutureSessions,
-      noSubcategory,
-      tooManyLinks,
-    ] = await Promise.all([
-      this.prisma.event.count({ where: { isDeleted: false } }),
-      this.prisma.event.count({
-        where: {
-          isDeleted: false,
-          imageUrl: null,
-          OR: [{ override: null }, { override: { imageUrl: null } }],
-        },
-      }),
-      this.prisma.event.count({
-        where: {
-          isDeleted: false,
-          NOT: {
-            offers: {
-              some: {
-                isDeleted: false,
-                status: OfferStatus.ACTIVE,
-                priceFrom: { gt: 0 },
+      // Events: counts by coarse operational issues (fast, DB-level).
+      const [
+        totalEvents,
+        noPhoto,
+        noPrice,
+        noFutureSessions,
+        noSubcategory,
+        tooManyLinks,
+      ] = await Promise.all([
+        this.prisma.event.count({ where: { isDeleted: false } }),
+        this.prisma.event.count({
+          where: {
+            isDeleted: false,
+            imageUrl: null,
+            OR: [{ override: null }, { override: { imageUrl: null } }],
+          },
+        }),
+        this.prisma.event.count({
+          where: {
+            isDeleted: false,
+            NOT: {
+              offers: {
+                some: {
+                  isDeleted: false,
+                  status: OfferStatus.ACTIVE,
+                  priceFrom: { gt: 0 },
+                },
               },
             },
           },
-        },
-      }),
-      this.prisma.event.count({
-        where: {
-          isDeleted: false,
-          isActive: true,
-          NOT: {
-            sessions: {
-              some: {
-                isActive: true,
-                canceledAt: null,
-                startsAt: { gt: now },
+        }),
+        this.prisma.event.count({
+          where: {
+            isDeleted: false,
+            isActive: true,
+            NOT: {
+              sessions: {
+                some: {
+                  isActive: true,
+                  canceledAt: null,
+                  startsAt: { gt: now },
+                },
               },
             },
           },
-        },
-      }),
-      this.prisma.event.count({
-        where: {
-          isDeleted: false,
-          AND: [
-            { subcategoryLinks: { none: {} } },
-            { subcategories: { equals: [] } },
-          ],
-        },
-      }),
-      this.prisma.eventSubcategoryLink
-        .groupBy({
-          by: ['eventId'],
-          where: { event: { isDeleted: false } },
-          _count: { _all: true },
-          having: { _count: { _all: { gt: maxSub } } },
-        })
-        .then((rows) => rows.length),
-    ]);
+        }),
+        this.prisma.event.count({
+          where: {
+            isDeleted: false,
+            AND: [
+              { subcategoryLinks: { none: {} } },
+              { subcategories: { equals: [] } },
+            ],
+          },
+        }),
+        this.prisma.eventSubcategoryLink
+          .groupBy({
+            by: ['eventId'],
+            where: { event: { isDeleted: false } },
+            _count: { _all: true },
+          })
+          .then((rows) => rows.filter((r) => r._count._all > maxSub).length),
+      ]);
 
-    // Cities / Venues: lightweight (gate-3 style).
-    const [citiesAudit, venuesAudit] = await Promise.all([
-      this.getCitiesAudit({ onlyIssues: 'true', page: '1', limit: '1000' }),
-      this.getVenuesAudit({ onlyIssues: 'true', page: '1', limit: '1000' }),
-    ]);
+      // Cities / Venues: lightweight (gate-3 style).
+      const [citiesAudit, venuesAudit] = await Promise.all([
+        this.getCitiesAudit({ onlyIssues: 'true', page: '1', limit: '1000' }),
+        this.getVenuesAudit({ onlyIssues: 'true', page: '1', limit: '1000' }),
+      ]);
 
-    const issueBuckets: Array<{ issueCode: string; severity: UnifiedSeoSeverity; total: number; entityType: UnifiedSeoEntityType }> = [
-      { issueCode: 'NO_PHOTO', severity: 'WARN', total: noPhoto, entityType: 'EVENT' },
-      { issueCode: 'NO_PRICE', severity: 'ERROR', total: noPrice, entityType: 'EVENT' },
-      { issueCode: 'NO_FUTURE_SESSIONS', severity: 'ERROR', total: noFutureSessions, entityType: 'EVENT' },
-      { issueCode: 'NO_SUBCATEGORY', severity: 'WARN', total: noSubcategory, entityType: 'EVENT' },
-      { issueCode: 'TOO_MANY_SUBCATEGORIES', severity: 'WARN', total: tooManyLinks, entityType: 'EVENT' },
-    ];
+      const issueBuckets: Array<{ issueCode: string; severity: UnifiedSeoSeverity; total: number; entityType: UnifiedSeoEntityType }> = [
+        { issueCode: 'NO_PHOTO', severity: 'WARN', total: noPhoto, entityType: 'EVENT' },
+        { issueCode: 'NO_PRICE', severity: 'ERROR', total: noPrice, entityType: 'EVENT' },
+        { issueCode: 'NO_FUTURE_SESSIONS', severity: 'ERROR', total: noFutureSessions, entityType: 'EVENT' },
+        { issueCode: 'NO_SUBCATEGORY', severity: 'WARN', total: noSubcategory, entityType: 'EVENT' },
+        { issueCode: 'TOO_MANY_SUBCATEGORIES', severity: 'WARN', total: tooManyLinks, entityType: 'EVENT' },
+      ];
 
-    const byIssueCode = issueBuckets
-      .filter((x) => x.total > 0)
-      .map((x) => ({ issueCode: x.issueCode, total: x.total }))
-      .sort((a, b) => b.total - a.total);
+      const byIssueCode = issueBuckets
+        .filter((x) => x.total > 0)
+        .map((x) => ({ issueCode: x.issueCode, total: x.total }))
+        .sort((a, b) => b.total - a.total);
 
-    const eventErrors = issueBuckets.filter((x) => x.entityType === 'EVENT' && x.severity === 'ERROR').reduce((s, x) => s + x.total, 0);
-    const eventWarnings = issueBuckets.filter((x) => x.entityType === 'EVENT' && x.severity === 'WARN').reduce((s, x) => s + x.total, 0);
-    const eventInfo = 0;
+      const eventErrors = issueBuckets.filter((x) => x.entityType === 'EVENT' && x.severity === 'ERROR').reduce((s, x) => s + x.total, 0);
+      const eventWarnings = issueBuckets.filter((x) => x.entityType === 'EVENT' && x.severity === 'WARN').reduce((s, x) => s + x.total, 0);
+      const eventInfo = 0;
 
-    const cityErrors = citiesAudit.summary.issuesBySeverity.ERROR;
-    const cityWarnings = citiesAudit.summary.issuesBySeverity.WARN;
-    const cityInfo = citiesAudit.summary.issuesBySeverity.INFO;
+      const cityErrors = citiesAudit.summary.issuesBySeverity.ERROR;
+      const cityWarnings = citiesAudit.summary.issuesBySeverity.WARN;
+      const cityInfo = citiesAudit.summary.issuesBySeverity.INFO;
 
-    const venueErrors = venuesAudit.summary.issuesBySeverity.ERROR;
-    const venueWarnings = venuesAudit.summary.issuesBySeverity.WARN;
-    const venueInfo = venuesAudit.summary.issuesBySeverity.INFO;
+      const venueErrors = venuesAudit.summary.issuesBySeverity.ERROR;
+      const venueWarnings = venuesAudit.summary.issuesBySeverity.WARN;
+      const venueInfo = venuesAudit.summary.issuesBySeverity.INFO;
 
-    const totals = {
-      errors: eventErrors + cityErrors + venueErrors,
-      warnings: eventWarnings + cityWarnings + venueWarnings,
-      info: eventInfo + cityInfo + venueInfo,
-      issues: eventErrors + eventWarnings + eventInfo + cityErrors + cityWarnings + cityInfo + venueErrors + venueWarnings + venueInfo,
-    };
+      const totals = {
+        errors: eventErrors + cityErrors + venueErrors,
+        warnings: eventWarnings + cityWarnings + venueWarnings,
+        info: eventInfo + cityInfo + venueInfo,
+        issues: eventErrors + eventWarnings + eventInfo + cityErrors + cityWarnings + cityInfo + venueErrors + venueWarnings + venueInfo,
+      };
 
-    return {
-      totals,
-      byEntityType: [
-        { entityType: 'EVENT', total: eventErrors + eventWarnings + eventInfo, errors: eventErrors, warnings: eventWarnings, info: eventInfo },
-        { entityType: 'CITY', total: cityErrors + cityWarnings + cityInfo, errors: cityErrors, warnings: cityWarnings, info: cityInfo },
-        { entityType: 'VENUE', total: venueErrors + venueWarnings + venueInfo, errors: venueErrors, warnings: venueWarnings, info: venueInfo },
-      ],
-      byIssueCode,
-    };
+      return {
+        totals,
+        byEntityType: [
+          { entityType: 'EVENT', total: eventErrors + eventWarnings + eventInfo, errors: eventErrors, warnings: eventWarnings, info: eventInfo },
+          { entityType: 'CITY', total: cityErrors + cityWarnings + cityInfo, errors: cityErrors, warnings: cityWarnings, info: cityInfo },
+          { entityType: 'VENUE', total: venueErrors + venueWarnings + venueInfo, errors: venueErrors, warnings: venueWarnings, info: venueInfo },
+        ],
+        byIssueCode,
+      };
+    });
   }
 
   async getUnifiedIssues(params: {
+    entityType?: string;
+    severity?: string;
+    issueCode?: string;
+    search?: string;
+    cityId?: string;
+    onlyIssues?: 'true' | 'false';
+    page?: string;
+    limit?: string;
+  }): Promise<UnifiedSeoAuditIssuesResponseDto> {
+    const cacheKey = this.buildCacheKey('issues', params);
+    return this.cache.getOrSet(cacheKey, CACHE_TTL.SEO_AUDIT, () => this.getUnifiedIssuesUncached(params));
+  }
+
+  private async getUnifiedIssuesUncached(params: {
     entityType?: string;
     severity?: string;
     issueCode?: string;
@@ -340,6 +368,14 @@ export class SeoAuditService {
   }
 
   async getUnifiedEntityIssues(params: {
+    entityType: string;
+    entityId: string;
+  }): Promise<UnifiedSeoAuditEntityIssuesResponseDto> {
+    const cacheKey = this.buildCacheKey('entity', { entityType: params.entityType, entityId: params.entityId });
+    return this.cache.getOrSet(cacheKey, CACHE_TTL.SEO_AUDIT, () => this.getUnifiedEntityIssuesUncached(params));
+  }
+
+  private async getUnifiedEntityIssuesUncached(params: {
     entityType: string;
     entityId: string;
   }): Promise<UnifiedSeoAuditEntityIssuesResponseDto> {

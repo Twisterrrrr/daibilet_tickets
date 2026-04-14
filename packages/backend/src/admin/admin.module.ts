@@ -39,6 +39,10 @@ import { AdminCacheController } from './admin-cache.controller';
 import { AdminReconciliationController } from './admin-reconciliation.controller';
 import { AdminReviewsController } from './admin-reviews.controller';
 import { AdminSettingsController } from './admin-settings.controller';
+import { AdminAppSettingsController } from './admin-app-settings.controller';
+import { AdminFeatureFlagsController } from './admin-feature-flags.controller';
+import { AdminUsersController } from './admin-users.controller';
+import { AdminUsersService } from './admin-users.service';
 import { AdminSuppliersController } from './admin-suppliers.controller';
 import { AdminSupportController } from './admin-support.controller';
 import { AdminTagsController } from './admin-tags.controller';
@@ -121,6 +125,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminPromoBlocksService,
     AdminPromoPlacementBlocksService,
     AdminPromoCollectionsService,
+    AdminUsersService,
   ],
   controllers: [
     AdminDashboardController,
@@ -132,6 +137,9 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminArticlesController,
     AdminOrdersController,
     AdminSettingsController,
+    AdminAppSettingsController,
+    AdminFeatureFlagsController,
+    AdminUsersController,
     AdminAuditController,
     AdminUpsellsController,
     AdminReviewsController,

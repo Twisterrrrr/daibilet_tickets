@@ -204,7 +204,7 @@ export interface LandingItem {
   [key: string]: unknown;
 }
 
-/** Landing page response (GET /landings/:slug) — landing, variants, filters, total */
+/** Landing page response (GET /catalog/landings/:city/:slug) — landing, variants, filters, total */
 export interface LandingPageResponse {
   landing: LandingItem & {
     templateType?: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';

@@ -41,6 +41,7 @@ import { CatalogClassificationNormalizerService } from './catalog-classification
 import { CatalogConsistencyService } from './catalog-consistency.service';
 import { CatalogGuardService } from './catalog-guard.service';
 import { CatalogAuditService } from './catalog-audit.service';
+import { CatalogPolicyService } from './catalog-policy.service';
 
 @Module({
   imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule],
@@ -81,6 +82,7 @@ import { CatalogAuditService } from './catalog-audit.service';
     CatalogConsistencyService,
     CatalogGuardService,
     CatalogAuditService,
+    CatalogPolicyService,
   ],
   exports: [
     CatalogService,
@@ -117,6 +119,7 @@ import { CatalogAuditService } from './catalog-audit.service';
     CatalogConsistencyService,
     CatalogGuardService,
     CatalogAuditService,
+    CatalogPolicyService,
   ],
 })
 export class CatalogModule {}

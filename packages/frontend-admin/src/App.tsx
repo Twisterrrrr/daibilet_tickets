@@ -16,7 +16,9 @@ import { CombosListPage } from './pages/combos/CombosList';
 import { FailedJobsPage } from './pages/jobs/FailedJobsPage';
 import { LandingEditPage } from './pages/landings/LandingEdit';
 import { LandingsListPage } from './pages/landings/LandingsList';
+import { ForgotPasswordPage } from './pages/ForgotPassword';
 import { LoginPage } from './pages/Login';
+import { ResetPasswordPage } from './pages/ResetPassword';
 import { ModerationQueuePage } from './pages/moderation/ModerationQueue';
 import { OrderDetailPage } from './pages/orders/OrderDetail';
 import { OrdersListPage } from './pages/orders/OrdersList';
@@ -99,6 +101,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/"
           element={

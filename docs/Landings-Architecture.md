@@ -103,94 +103,91 @@ If `showInCollections = true` and landing is active:
 
 ---
 
-## Multi-city / topic hub / city landing — целевой паттерн (proposal, 2026‑04)
+## Multi-city / topic hub / city landing — целевой паттерн (final, 2026‑04)
 
-### Зачем
+### Финальные решения (2026‑04)
 
-Нужен “landing-домен”, который работает не только как “одна страница = один slug”, а как:
+#### 1) Роутинг и canonical
 
-- **общий хаб‑топик** (без привязки к городу)
-- **городская версия топика** (основная коммерческая посадка)
-- **мультилендинг‑семейство**: один топик → набор city‑вариантов
+Фиксируем канонические публичные маршруты:
 
-При этом Landing остаётся отдельной сущностью и ролью:
+- **Global HUB (topic)** живёт в корне и является canonical:
+  - `/river-cruises`
+  - `/bus-tours`
+  - `/salute-9-may`
+- **City landing** (transactional SEO) живёт только здесь:
+  - `/cities/:citySlug/:topicSlug`
 
-- Article = объясняет
-- Collection = упаковывает предложения/выборку
-- Landing = ловит коммерческий спрос и конвертирует в каталог/выбор события
+Критично:
 
-### Текущая реальность в проекте (что уже есть)
+- **Никаких `/landings/*`** — это ломает SEO и создаёт конкурирующие URL.
+- **Не делаем авто‑редирект** `/<topicSlug>` → `/cities/spb/<topicSlug>`: HUB всегда самостоятельный.
+- **HUB ≠ CITY**:
+  - HUB = навигация + high‑level SEO,
+  - CITY = основной коммерческий трафик.
 
-- **Канонический URL city landing** уже принят как `/cities/:citySlug/:landingSlug`.
-- **Topic hubs** уже реализованы как отдельные публичные маршруты (например, `/river-cruises`, `/salute-9-may`) и ведут в city landings.
-- **Подбор событий для лендинга** уже унифицирован и привязан к общему “selection” принципу (см. `buildLandingEventsWhere` / subcategory-first).
+#### 2) Family / модель
 
-Это значит, что MVP‑часть “hub → города” у нас уже работает, но пока не формализована как единый домен “family/variants” внутри `LandingPage`.
+Отдельной сущности “family” **нет**. Используем простую parent-child связь в `LandingPage`:
 
-### Целевые режимы страницы (нормализованная модель для редактора)
+```ts
+LandingPage {
+  topicKey: string   // например: 'river-cruises'
+  cityId?: string    // null для HUB, не null для CITY
+  parentId?: string  // HUB → CITY
+}
+```
 
-1) **Global / topic hub**
+Правила:
 
-- Страница темы без привязки к одному городу
-- UX: “Выберите город” + ссылки на city варианты
-- SEO: отдельный интент (обзор/навигация), не дубль city‑лендингов
+- **HUB**: `cityId = null`, `parentId = null`.
+- **CITY**: `cityId != null`, `parentId = HUB.id`.
+- **M:N запрещён**: один landing = один `topicKey`; один CITY landing = один parent.
 
-2) **City landing**
+#### 3) Источник каталога (MVP)
 
-- Коммерческая посадка “тема в городе”
-- Каноника: на саму себя
-- Публикация должна быть запрещена, если нет выдачи (чтобы не плодить thin pages)
+MVP поддерживает оба режима источника:
 
-3) **Multi‑city topic family**
+- `PRIMARY_COLLECTION` (приоритет)
+- `AUTO_QUERY` (fallback / масштабирование)
 
-- Родитель темы + набор городских реализаций
-- UX: список вариантов по городам + быстрый flow “создать вариант для города”
+`queryConfig` — **жёсткий контракт**, никаких произвольных JSON:
 
-### Роутинг и canonical policy (что фиксируем)
+```ts
+type LandingQueryConfig = {
+  subcategoryIds?: string[]
+  cityId?: string
+  limit?: number
+  sort?: 'POPULAR' | 'SOONEST' | 'PRICE'
+}
+```
 
-- **City landing**: `/cities/:citySlug/:landingSlug` — canonical на самого себя.
-- **Hub/family**: остаётся отдельным URL‑пространством (примерно как сейчас `/river-cruises`, `/salute-9-may`).
-- **Важно**: hub **не каноникалится** в child и наоборот; hub и city‑страница должны отличаться по интенту/контенту, чтобы не создать дубли.
+Storefront-safe правило должно жить в **едином месте**:
 
-### Модель данных (целевая эволюция, не переписывая существующее сразу)
+- `CatalogPolicyService.isStorefrontSafe(event)`:
+  - `event.isActive === true`
+  - `event.publishStatus === 'PUBLISHED'`
+  - `hasActiveOffer === true`
 
-Текущая `LandingPage` уже несёт identity/workflow/selection/content. Для поддержки “семейств” нужно добавить (или эквивалентно представить) 2 недостающих аспекта:
+#### 4) Публикация / anti-thin
 
-- **тип/режим**: HUB vs CITY vs MULTI_CITY (family)
-- **связь родитель‑дочь**: parentLandingId и список childLandings
+- **Publish** разрешён при `resolvedEventsCount > 0`.
+- **Indexable** только при `resolvedEventsCount >= 3`.
+- Автоматизация:
+  - если `resolvedEventsCount < 3` → `isIndexable = false`,
+  - **manual override разрешён** (явное поле/режим, чтобы можно было “додавить” руками).
 
-Критичное ограничение, которое сохраняем:
+#### 5) Связи
 
-- **уникальность city + slug** (как сейчас принято в публичном routing)
+Article ↔ Landing — **только one-way**:
 
-### Источник каталога на landing (минимально‑безопасный MVP)
+- `Landing.relatedArticleIds: string[]`
+- приоритизация:
+  - `primaryArticleId?: string`
+  - `secondaryArticleIds?: string[]`
 
-Поддерживаем 3 режима источника событий (в UI/DTO/валидации), но на MVP можно начать с наиболее безопасного:
+#### 6) Admin UX / preview
 
-- **PRIMARY_COLLECTION** (самый контролируемый)
-- **AUTO_QUERY** (масштабирование, но требует валидируемого конфига)
-- **MIXED** (позже; важно не породить второй независимый selection engine)
-
-Принцип: selection остаётся единым; landing не должен заводить “свой” независимый механизм.
-
-### Preview “resolved events” (обязательный UX-инвариант)
-
-Редактор в админке должен видеть:
-
-- сколько событий реально резолвится,
-- какие именно,
-- есть ли city‑варианты у family/hub,
-- как выглядит public URL и canonical.
-
-Без этого лендинг превращается в “чёрный ящик” и быстро деградирует.
-
-### Связи с Collections / Articles / Events (не меняя контрактов)
-
-- **Landing ↔ Collection**: основной слой (primary + related).
-- **Landing ↔ Article**: поддержка информационного интента, FAQ/гайд и перелинковка.
-- **Landing ↔ Event**: лучше избегать ручного списка на MVP (через collection/queryConfig), чтобы не дублировать collections.
-
-### Что это меняет в roadmap
-
-Этот документ фиксирует целевой паттерн “hub/family/city” как **единый домен** поверх уже существующих city‑лендингов и публичных хабов.
-Реализация должна идти “foundation → admin preview → public routing/meta”, сохраняя текущие контракты и принципы selection.
+- **Отдельный endpoint для preview не нужен**.
+- Preview реализуется через **public read‑path** с `preview=true`.
+- Flow “create child from parent” — **не MVP**, позже.
