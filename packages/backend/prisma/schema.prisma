@@ -501,6 +501,8 @@ model City {
   hubForRegions Region[]     @relation("RegionHub")
   regionLinks   RegionCity[]
 
+  promoPlacementBlocks PromoPlacementBlock[]
+
   @@map("cities")
 }
 
@@ -726,6 +728,7 @@ model Event {
   promoBlockEvents     PromoBlockEvent[]
   promoCollectionItems PromoCollectionItem[]
   collectionItems      CollectionItem[]
+  promoPlacementBlocks PromoPlacementBlock[]
   promoCodes           PromoCode[]
   subcategoryLinks     EventSubcategoryLink[]
   dailyStats           DailyEventStats[]
@@ -1257,6 +1260,9 @@ model Article {
   articleEvents ArticleEvent[]
   articleTags   ArticleTag[]
 
+  promoPlacementBlocks       PromoPlacementBlock[]
+  promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetArticle")
+
   @@index([cityId])
   @@index([status])
   @@map("articles")
@@ -1374,6 +1380,9 @@ model LandingPage {
   parentLanding LandingPage? @relation("LandingParentChild", fields: [parentLandingId], references: [id])
   childLandings LandingPage[] @relation("LandingParentChild")
 
+  promoPlacementBlocks       PromoPlacementBlock[]
+  promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetLanding")
+
   @@index([cityId])
   @@index([status, showInCollections])
   @@index([collectionId])
@@ -1436,6 +1445,9 @@ model Collection {
   city     City?             @relation(fields: [cityId], references: [id])
   landings LandingPage[]
   items    CollectionItem[]
+
+  promoPlacementBlocks       PromoPlacementBlock[]
+  promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetCollection")
 
   @@index([cityId])
   @@index([status, sourceType])
@@ -1812,6 +1824,43 @@ enum PromoSortMode {
   RANDOM
 }
 
+// ========================
+// Promo Blocks v2 (placement-based distribution layer)
+// ========================
+
+enum PromoBlockStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PromoTargetType {
+  EVENT
+  COLLECTION
+  LANDING
+  ARTICLE
+}
+
+enum PromoPlacementZone {
+  HOME_HERO
+  HOME_FEATURED
+  CITY_HERO
+  CITY_BELOW_HERO
+  LANDING_HERO
+  LANDING_INLINE
+  ARTICLE_INLINE
+  COLLECTION_INLINE
+  CATALOG_INLINE
+}
+
+enum PromoPageScopeType {
+  GLOBAL
+  CITY
+  LANDING
+  COLLECTION
+  ARTICLE
+}
+
 model PromoBlock {
   id          String  @id @default(cuid())
   slug        String  @unique
@@ -1862,6 +1911,71 @@ model PromoBlock {
   @@index([isActive, sortOrder])
   @@index([collectionId])
   @@map("promo_blocks")
+}
+
+model PromoPlacementBlock {
+  id            String          @id @default(uuid()) @db.Uuid
+  title         String
+  status        PromoBlockStatus @default(DRAFT)
+
+  placementZone PromoPlacementZone
+  pageScopeType PromoPageScopeType @default(GLOBAL)
+
+  // page context (where to show)
+  cityId       String? @db.Uuid
+  landingId    String? @db.Uuid
+  collectionId String? @db.Uuid
+  articleId    String? @db.Uuid
+
+  city       City?        @relation(fields: [cityId], references: [id])
+  landing    LandingPage? @relation(fields: [landingId], references: [id])
+  collection Collection?  @relation(fields: [collectionId], references: [id])
+  article    Article?     @relation(fields: [articleId], references: [id])
+
+  // target (what to promote)
+  targetType         PromoTargetType
+  targetEventId      String? @db.Uuid
+  targetCollectionId String? @db.Uuid
+  targetLandingId    String? @db.Uuid
+  targetArticleId    String? @db.Uuid
+
+  targetEvent      Event?       @relation(fields: [targetEventId], references: [id])
+  targetCollection Collection?  @relation("PromoPlacementTargetCollection", fields: [targetCollectionId], references: [id])
+  targetLanding    LandingPage? @relation("PromoPlacementTargetLanding", fields: [targetLandingId], references: [id])
+  targetArticle    Article?     @relation("PromoPlacementTargetArticle", fields: [targetArticleId], references: [id])
+
+  // display overrides
+  customTitle    String?
+  customSubtitle String?
+  customImageUrl String?
+  ctaLabel       String?
+
+  // behavior
+  priority  Int @default(0)
+  sortOrder Int @default(0)
+
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  isIndexableHint Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  @@index([status, placementZone, pageScopeType])
+  @@index([cityId])
+  @@index([landingId])
+  @@index([collectionId])
+  @@index([articleId])
+  @@index([targetType])
+  @@index([targetEventId])
+  @@index([targetCollectionId])
+  @@index([targetLandingId])
+  @@index([targetArticleId])
+  @@index([startsAt, endsAt])
+  @@index([priority, sortOrder, updatedAt])
+  @@map("promo_placement_blocks")
 }
 
 model PromoCollection {

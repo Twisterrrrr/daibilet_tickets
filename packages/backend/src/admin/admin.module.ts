@@ -52,6 +52,8 @@ import { AdminSeoAuditController } from './admin-seo-audit.controller';
 import { AdminPreviewsController } from './admin-previews.controller';
 import { AdminPromoBlocksController } from './admin-promo-blocks.controller';
 import { AdminPromoBlocksService } from './admin-promo-blocks.service';
+import { AdminPromoPlacementBlocksController } from './admin-promo-placement-blocks.controller';
+import { AdminPromoPlacementBlocksService } from './admin-promo-placement-blocks.service';
 import { AdminPromoCollectionsController } from './admin-promo-collections.controller';
 import { AdminPromoCollectionsService } from './admin-promo-collections.service';
 import { AdminPromoCodesController } from './admin-promo-codes.controller';
@@ -117,6 +119,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     TagAssignmentService,
     SeoAuditService,
     AdminPromoBlocksService,
+    AdminPromoPlacementBlocksService,
     AdminPromoCollectionsService,
   ],
   controllers: [
@@ -148,6 +151,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminSeoAuditController,
     AdminPreviewsController,
     AdminPromoBlocksController,
+    AdminPromoPlacementBlocksController,
     AdminPromoCollectionsController,
     AdminPromoCodesController,
     AdminSourceCategoriesController,
