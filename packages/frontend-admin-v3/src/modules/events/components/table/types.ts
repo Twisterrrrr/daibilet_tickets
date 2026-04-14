@@ -10,6 +10,8 @@ export type EventRowItem = {
   venueName?: string | null;
 
   supplierSource?: 'MANUAL' | 'TICKETSCLOUD' | 'TEPLOHOD' | string | null;
+  /** Оператор / поставщик (из Event.operator), если задан */
+  supplierName?: string | null;
 
   nextDate?: string | null;
   hasFutureSlots?: boolean | null;
@@ -29,6 +31,7 @@ export type EventRowItem = {
   readinessScore?: number | null;
   issues?: Array<{ code: string; label: string; severity: 'warning' | 'error' }>;
 
+  /** Будущие сеансы (активные, не отменённые) */
   sessionsCount?: number | null;
 
   sectionsDerived?: Array<{ slug: string; name: string }>;

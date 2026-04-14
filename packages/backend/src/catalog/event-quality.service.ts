@@ -215,14 +215,14 @@ export class EventQualityService {
       if (activeOffers.length === 0) {
         issues.push({
           code: 'MISSING_ACTIVE_OFFER',
-          message: 'Нет ни одного активного оффера с валидной ценой',
+          message: 'Нет ни одной активной категории с ценой (добавьте запись в «Категории и цены»)',
           field: 'offers',
           ownership: 'source',
         });
       } else if (withPrice.length === 0) {
         issues.push({
           code: 'NO_VALID_PRICE',
-          message: 'Активные офферы без указанной цены — укажите priceFrom',
+          message: 'Активные категории без указанной цены — задайте priceFrom',
           field: 'offers',
           ownership: 'source',
         });

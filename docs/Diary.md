@@ -4,6 +4,27 @@
 
 ---
 
+## 14.04.2026 — Admin V3: сущность «Событие» — list/detail, API-обогащение, «Категории и цены»
+
+### Наблюдения
+
+- Для единообразия операционной работы нужен **один стандарт** списка и карточки события: локация, расписание, коммерческий слой (тарифы), готовность к публикации, SEO — без дублирования запросов и без «офферной» терминологии в UI.
+- Persistence-модель остаётся **`EventOffer`**; публичные и админские контракты нельзя ломать ради переименования таблицы.
+
+### Решения
+
+- **Backend:** `GET /admin/events` дополнен агрегатами (следующий будущий сеанс, счётчик будущих сеансов, `priceFromMin`, `supplier`, `venueShort`, `readinessSummary` с issueCodes/score), фильтры `operator`, `hasFutureSessions`, `hasCategoryPrices`. Общая логика быстрых сигналов вынесена в `event-admin-list-health.util.ts`; `GET /admin/events/health/batch` использует ту же функцию.
+- **`GET /admin/events/:id`:** добавлены `supplier`, `categoryPrices` (маппинг из offers), `scheduleSummary`, `mediaSummary`, `nextSessionAt`; `isArchived` выровнен с импортной политикой (`isImportedArchived`).
+- **Качество:** тексты `EventQualityService` для отсутствия цен/активных категорий переформулированы под «категории и цены».
+- **Admin V3:** список — без второго round-trip на health-batch; колонки цены/будущих сеансов/оператора; деталь — вкладки Основное, Готовность, Контент, Медиа, Расписание, **Категории и цены**, SEO, Техническое; вкладка тарифов показывает `PurchaseType` (WIDGET/REDIRECT/REQUEST) и **legacy-коды** тарифов (ADULT/CHILD/…); при отличии `name` от `purchaseType` показывается человекочитаемое имя.
+
+### Проблемы / план
+
+- Редактирование категорий/цен и тяжёлого контента из V3 пока не целевой scope — остаётся через существующие API/legacy-админку.
+- Нормализация **старой цены**, weekday visibility, groupSize — по-прежнему в бэклоге домена (`domain-offer-*` в Tasktracker).
+
+---
+
 ## 14.04.2026 — Admin: magic-link сброс пароля, anti-lockout, AppSetting SEO/System
 
 ### Наблюдения

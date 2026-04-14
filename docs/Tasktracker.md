@@ -49,6 +49,9 @@
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
 | `event-core-create-scheduled-sessions` | **P0 эпика:** механика создания/редактирования **Event** + **расписание (sessions)** в режиме **SCHEDULED** (разовый слот + повторяющаяся сетка, таблица+календарь, квоты слота); согласование с admin/supplier API и публикацией; общий UX admin+supplier. См. `Event-Sessions-Product-Contract.md` §11 | Критический | `[ ]` |
+| `admin-v3-events-entity-v1` | **Admin V3:** единый стандарт сущности Event — list/detail, обогащение `GET /admin/events` и `GET /admin/events/:id`, вкладка «Категории и цены» (presentation поверх `EventOffer`), готовность, фильтры; терминология без «офферов» в UI. См. `docs/Diary.md` 14.04.2026 | Высокий | `[x]` **14.04.2026** |
+| `admin-v3-events-edit-pricing-ui` | **Follow-up:** редактирование строк «Категории и цены» из V3 (создание/правка offer) с сохранением legacy API и RBAC | Высокий | `[ ]` |
+| `admin-v3-events-edit-content-media` | **Follow-up:** редактирование контента/медиа/SEO события из V3 (формы поверх существующих PATCH/override), без дублирования legacy EventEdit целиком | Средний | `[ ]` |
 
 ### Сиды и фикстуры (сценарии для UX и эпика Event + Sessions)
 

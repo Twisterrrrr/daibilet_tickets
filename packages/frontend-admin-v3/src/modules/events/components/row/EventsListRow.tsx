@@ -220,7 +220,7 @@ function EventCommerceCell({ commerce }: { commerce: EventListRowData['commerce'
       <div className="text-sm font-medium">{priceFrom ? `от ${priceFrom}` : 'Цена не задана'}</div>
       {typeof offers === 'number' ? (
         <div className="flex flex-wrap gap-1.5">
-          <Badge variant="outline">Офферов: {offers}</Badge>
+          <Badge variant="outline">Категорий с ценой: {offers}</Badge>
         </div>
       ) : null}
     </div>

@@ -5,7 +5,6 @@ import { SearchInput } from '@/components/shared/filters/SearchInput';
 import { DataTableShell } from '@/components/shared/table/DataTableShell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { useListPageState } from '@/hooks/useListPageState';
 import { fetchAdminEventsList } from '@/modules/events/api/queries';
 import { adminApi } from '@/api/client';
@@ -90,17 +89,20 @@ export function EventsListPage() {
   const [filtersOpen, setFiltersOpen] = React.useState<boolean>(true);
   const [sortBy, setSortBy] = React.useState<'updatedAt' | 'title' | 'city' | 'source'>('updatedAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
+  const [operatorSlug, setOperatorSlug] = React.useState<string>('');
+  const [hasFutureSessionsFilter, setHasFutureSessionsFilter] = React.useState<'' | 'true' | 'false'>('');
+  const [hasCategoryPricesFilter, setHasCategoryPricesFilter] = React.useState<'' | 'true' | 'false'>('');
   const [columnsOpen, setColumnsOpen] = React.useState<boolean>(false);
   const [visibleCols, setVisibleCols] = React.useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('admin_v3_events_columns');
-      if (!raw) return ['main', 'source', 'location', 'next', 'sessions', 'quality', 'status', 'issues', 'override', 'actions'];
+      if (!raw) return ['main', 'source', 'location', 'next', 'sessions', 'price', 'quality', 'status', 'issues', 'override', 'actions'];
       const parsed = JSON.parse(raw) as unknown;
       return Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')
         ? (parsed as string[])
-        : ['main', 'source', 'location', 'next', 'sessions', 'quality', 'status', 'issues', 'override', 'actions'];
+        : ['main', 'source', 'location', 'next', 'sessions', 'price', 'quality', 'status', 'issues', 'override', 'actions'];
     } catch {
-      return ['main', 'source', 'location', 'next', 'sessions', 'quality', 'status', 'issues', 'override', 'actions'];
+      return ['main', 'source', 'location', 'next', 'sessions', 'price', 'quality', 'status', 'issues', 'override', 'actions'];
     }
   });
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
@@ -166,6 +168,9 @@ export function EventsListPage() {
         hasMultipleSubcategories,
         sortBy,
         sortDir,
+        operatorSlug,
+        hasFutureSessionsFilter,
+        hasCategoryPricesFilter,
       },
     ],
     queryFn: () =>
@@ -185,6 +190,9 @@ export function EventsListPage() {
         pastDays: pastDays ?? undefined,
         sortBy,
         sortDir,
+        operator: operatorSlug || undefined,
+        hasFutureSessions: hasFutureSessionsFilter || undefined,
+        hasCategoryPrices: hasCategoryPricesFilter || undefined,
       }),
     placeholderData: (prev) => prev,
   });
@@ -245,6 +253,18 @@ export function EventsListPage() {
     },
   });
 
+  const suppliersQuery = useQuery({
+    queryKey: ['admin-suppliers-options'],
+    queryFn: async () => {
+      const res = await adminApi.get<{ items: Array<{ slug: string; name: string }> }>(
+        '/admin/suppliers?limit=500&isActive=true',
+      );
+      const raw = Array.isArray(res.items) ? res.items : [];
+      return raw.filter((s) => typeof s.slug === 'string' && typeof s.name === 'string');
+    },
+    staleTime: 120_000,
+  });
+
   const subcategoriesQuery = useQuery({
     queryKey: ['admin-event-subcategories-options'],
     queryFn: async () => {
@@ -259,23 +279,6 @@ export function EventsListPage() {
     },
     staleTime: 60_000,
   });
-
-  const batchHealth = useQuery({
-    queryKey: ['admin-events-health-batch', { ids: items.map((x) => x.id).join(',') }],
-    enabled: items.length > 0,
-    queryFn: async () => {
-      const ids = items.map((x) => x.id).join(',');
-      const res = await adminApi.get<{
-        items: Array<{ id: string; flags: Record<string, boolean>; issueCodes: string[] }>;
-      }>(`/admin/events/health/batch?ids=${encodeURIComponent(ids)}`);
-      const byId: Record<string, { flags: Record<string, boolean>; issueCodes: string[] } | undefined> = {};
-      for (const row of res.items ?? []) byId[row.id] = { flags: row.flags ?? {}, issueCodes: row.issueCodes ?? [] };
-      return byId;
-    },
-    staleTime: 30_000,
-  });
-
-  const healthById = batchHealth.data ?? {};
 
   async function toggleArchive(id: string, nextArchived: boolean) {
     await adminApi.patch(`/admin/events/${id}/archive`, { isArchived: nextArchived });
@@ -607,8 +610,22 @@ export function EventsListPage() {
                   ))}
                 </select>
               </FilterField>
-              <FilterField label="Поставщик">
-                <Input disabled value="Скоро" />
+              <FilterField label="Оператор (поставщик)">
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={operatorSlug}
+                  onChange={(e) => {
+                    setOperatorSlug(e.target.value);
+                    list.setPage(1);
+                  }}
+                >
+                  <option value="">Все</option>
+                  {(suppliersQuery.data ?? []).map((s) => (
+                    <option key={s.slug} value={s.slug}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
               </FilterField>
               <FilterField label="Город">
                 <select
@@ -624,8 +641,33 @@ export function EventsListPage() {
                   ))}
                 </select>
               </FilterField>
-              <FilterField label="Площадка">
-                <Input disabled value="Скоро" />
+              <FilterField label="Будущие сеансы">
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={hasFutureSessionsFilter}
+                  onChange={(e) => {
+                    setHasFutureSessionsFilter(e.target.value as '' | 'true' | 'false');
+                    list.setPage(1);
+                  }}
+                >
+                  <option value="">Все</option>
+                  <option value="true">Есть</option>
+                  <option value="false">Нет</option>
+                </select>
+              </FilterField>
+              <FilterField label="Категории и цены">
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={hasCategoryPricesFilter}
+                  onChange={(e) => {
+                    setHasCategoryPricesFilter(e.target.value as '' | 'true' | 'false');
+                    list.setPage(1);
+                  }}
+                >
+                  <option value="">Все</option>
+                  <option value="true">Есть цена</option>
+                  <option value="false">Нет цены</option>
+                </select>
               </FilterField>
               <FilterField label="Категория">
                 <select
@@ -810,7 +852,7 @@ export function EventsListPage() {
         ) : null}
         <EventsTable
           items={items}
-          healthById={healthById}
+          healthById={{}}
           loading={query.isLoading}
           error={query.isError ? (query.error instanceof Error ? query.error.message : 'Ошибка загрузки') : null}
           onRetry={() => query.refetch()}

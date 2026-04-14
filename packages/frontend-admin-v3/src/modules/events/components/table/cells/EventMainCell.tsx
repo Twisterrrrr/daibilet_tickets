@@ -31,6 +31,11 @@ export function EventMainCell({ item }: { item: EventRowItem }) {
         >
           {item.title}
         </Link>
+        {item.slug ? (
+          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" title={item.slug}>
+            {item.slug}
+          </div>
+        ) : null}
 
         {sec.visible.length || sub.visible.length ? (
           <div className="mt-1.5 flex flex-wrap gap-1.5">

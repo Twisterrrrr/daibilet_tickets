@@ -3,17 +3,29 @@ import { adminApi } from '@/api/client';
 export type AdminEventListItem = {
   id: string;
   title: string;
+  slug?: string;
   category: string;
   source: string;
   rating: number | null;
   isActive: boolean;
   updatedAt: string;
   city?: { name: string; slug: string };
+  supplier?: { id: string; name: string; slug: string } | null;
+  venueShort?: { id: string; name: string; slug: string } | null;
   _count?: { sessions?: number; tags?: number; offers?: number };
   override?: { isHidden?: boolean; editorStatus?: string | null } | null;
   sectionsDerived?: Array<{ slug: 'events' | 'excursions' | 'museums' | 'activities' | 'entertainment'; name: string }>;
   subcategoriesCanonical?: Array<{ id: string; slug: string; name: string; isActive?: boolean }>;
   lastSessionAt?: string | null;
+  nextSessionAt?: string | null;
+  futureSessionsCount?: number;
+  priceFromMin?: number | null;
+  categoriesCount?: number;
+  readinessSummary?: {
+    status: 'READY' | 'NEEDS_WORK' | 'BLOCKED';
+    score: number;
+    issueCodes: string[];
+  };
   isPast?: boolean;
   isArchived?: boolean;
   isIndexable?: boolean;
@@ -45,6 +57,9 @@ export type AdminEventsListParams = {
   pastDays?: number;
   sortBy?: 'updatedAt' | 'title' | 'city' | 'source';
   sortDir?: 'asc' | 'desc';
+  operator?: string;
+  hasFutureSessions?: 'true' | 'false';
+  hasCategoryPrices?: 'true' | 'false';
   page: number;
   limit: number;
 };
@@ -67,6 +82,9 @@ export async function fetchAdminEventsList(params: AdminEventsListParams) {
   if (params.pastDays) sp.set('pastDays', String(params.pastDays));
   if (params.sortBy) sp.set('sortBy', params.sortBy);
   if (params.sortDir) sp.set('sortDir', params.sortDir);
+  if (params.operator) sp.set('operator', params.operator);
+  if (params.hasFutureSessions) sp.set('hasFutureSessions', params.hasFutureSessions);
+  if (params.hasCategoryPrices) sp.set('hasCategoryPrices', params.hasCategoryPrices);
   sp.set('page', String(params.page));
   sp.set('limit', String(params.limit));
 

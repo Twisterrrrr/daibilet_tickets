@@ -111,6 +111,18 @@ describe('EventQualityService.validateForPublish', () => {
     expect(r.issues.some((i) => i.code === 'TOO_MANY_SUBCATEGORIES')).toBe(true);
   });
 
+  it('uses presentation wording for missing pricing layer (categories/prices)', async () => {
+    prisma.event.findUnique.mockResolvedValue(
+      baseEvent({
+        offers: [],
+      }),
+    );
+    const r = await service.validateForPublish('e1');
+    const miss = r.issues.find((i) => i.code === 'MISSING_ACTIVE_OFFER');
+    expect(miss).toBeTruthy();
+    expect(miss?.message).toContain('Категори');
+  });
+
   it('adds TOO_MANY_SUBCATEGORIES when legacy enum has more than 4 values and no links', async () => {
     prisma.event.findUnique.mockResolvedValue(
       baseEvent({

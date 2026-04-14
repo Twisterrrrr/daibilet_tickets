@@ -41,7 +41,7 @@ export function EventsTableRow({
       ) : null}
       {visibleCols.includes('source') ? (
         <td className="px-4 py-3 text-center">
-          <EventSourceCell source={item.supplierSource} />
+          <EventSourceCell source={item.supplierSource} supplierName={item.supplierName} />
         </td>
       ) : null}
       {visibleCols.includes('location') ? (

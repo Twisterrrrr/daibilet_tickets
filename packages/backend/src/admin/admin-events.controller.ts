@@ -81,6 +81,13 @@ import { SubcategoryAssignmentService } from '../subcategories/subcategory-assig
 import { CatalogClassificationNormalizerService } from '../catalog/catalog-classification-normalizer.service';
 import { deriveSectionsFromSubcategories, getSubcategorySlugsForSection } from '../catalog-classification/derive-sections';
 import type { SectionSlug } from '../catalog-classification/classification.types';
+import {
+  computeAdminEventQuickHealth,
+  isImportedArchived,
+  mapEventOfferToCategoryPriceDto,
+  readinessFromIssueCodes,
+  readinessScoreFromQuickHealth,
+} from './event-admin-list-health.util';
 
 function parseBool(v: string | undefined): boolean {
   return v === '1' || v === 'true' || v === 'yes';
@@ -227,8 +234,6 @@ export class AdminEventsController {
     const pricedById = new Map(pricedOffers.map((r) => [r.eventId, r._count.id]));
     const linksById = new Map(linkCounts.map((r) => [r.eventId, r._count._all]));
 
-    const maxSub = SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES;
-
     const items = events.map((e) => {
       const effImage = e.override?.imageUrl ?? e.imageUrl;
       const hasImage = Boolean(effImage);
@@ -236,18 +241,17 @@ export class AdminEventsController {
       const hasPrice = (pricedById.get(e.id) ?? 0) > 0;
       const linksCount = linksById.get(e.id) ?? 0;
       const legacyCount = Array.isArray(e.subcategories) ? e.subcategories.length : 0;
-      const hasSubcategory = linksCount > 0 || legacyCount > 0;
-
-      const issueCodes: string[] = [];
-      if (!hasImage) issueCodes.push('NO_PHOTO');
-      if (!hasPrice) issueCodes.push('NO_PRICE');
-      if (!hasFutureSessions) issueCodes.push('NO_FUTURE_SESSIONS');
-      if (!hasSubcategory) issueCodes.push('NO_SUBCATEGORY');
-      if (linksCount > maxSub || (linksCount === 0 && legacyCount > maxSub)) issueCodes.push('TOO_MANY_SUBCATEGORIES');
+      const { flags, issueCodes } = computeAdminEventQuickHealth({
+        hasImage,
+        hasPrice,
+        hasFutureSessions,
+        linksCount,
+        legacySubcategoryCount: legacyCount,
+      });
 
       return {
         id: e.id,
-        flags: { hasImage, hasPrice, hasFutureSessions, hasSubcategory },
+        flags,
         issueCodes,
       };
     });
@@ -276,6 +280,9 @@ export class AdminEventsController {
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('operator') operatorSlug?: string,
+    @Query('hasFutureSessions') hasFutureSessions?: string,
+    @Query('hasCategoryPrices') hasCategoryPrices?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
     const andParts: Prisma.EventWhereInput[] = [{ isDeleted: false }];
@@ -357,6 +364,45 @@ export class AdminEventsController {
       andParts.push({ sessions: { some: futureSessionsWhere } });
     } else if (indexableBool === false) {
       andParts.push({ sessions: { none: futureSessionsWhere } });
+    }
+
+    const opTrim = operatorSlug?.trim();
+    if (opTrim) {
+      andParts.push({ operator: { slug: opTrim } });
+    }
+
+    const futureSessionsWhereActive: Prisma.EventSessionWhereInput = {
+      startsAt: { gt: now },
+      isActive: true,
+      canceledAt: null,
+    };
+
+    const hasFs =
+      hasFutureSessions === '1' || hasFutureSessions === 'true' || hasFutureSessions === 'yes';
+    const hasFsFalse =
+      hasFutureSessions === '0' || hasFutureSessions === 'false' || hasFutureSessions === 'no';
+    if (hasFs) {
+      andParts.push({ sessions: { some: futureSessionsWhereActive } });
+    } else if (hasFsFalse) {
+      andParts.push({ sessions: { none: futureSessionsWhereActive } });
+    }
+
+    const hasCp =
+      hasCategoryPrices === '1' || hasCategoryPrices === 'true' || hasCategoryPrices === 'yes';
+    const hasCpFalse =
+      hasCategoryPrices === '0' || hasCategoryPrices === 'false' || hasCategoryPrices === 'no';
+    if (hasCp) {
+      andParts.push({
+        offers: {
+          some: { isDeleted: false, status: OfferStatus.ACTIVE, priceFrom: { gt: 0 } },
+        },
+      });
+    } else if (hasCpFalse) {
+      andParts.push({
+        offers: {
+          none: { isDeleted: false, status: OfferStatus.ACTIVE, priceFrom: { gt: 0 } },
+        },
+      });
     }
 
     const pastDaysNum = pastDays ? Math.max(1, Math.min(365, parseInt(pastDays, 10) || 0)) : 0;
@@ -456,6 +502,8 @@ export class AdminEventsController {
         where,
         include: {
           city: { select: { slug: true, name: true } },
+          venue: { select: { id: true, title: true, slug: true } },
+          operator: { select: { id: true, name: true, slug: true } },
           _count: { select: { sessions: true, tags: true, offers: true } },
           override: true,
           subcategoryLinks: {
@@ -473,18 +521,68 @@ export class AdminEventsController {
     const result = buildPaginatedResult(rawItems, total, pg.limit);
 
     const eventIds = result.items.map((e) => e.id);
-    const lastSessionMax = eventIds.length
-      ? await this.prisma.eventSession.groupBy({
-          by: ['eventId'],
-          where: { eventId: { in: eventIds } },
-          _max: { startsAt: true },
-        })
-      : [];
+    const [lastSessionMax, nextFutureMin, futureSessionCounts, minPricedOffers] = eventIds.length
+      ? await Promise.all([
+          this.prisma.eventSession.groupBy({
+            by: ['eventId'],
+            where: { eventId: { in: eventIds } },
+            _max: { startsAt: true },
+          }),
+          this.prisma.eventSession.groupBy({
+            by: ['eventId'],
+            where: {
+              eventId: { in: eventIds },
+              isActive: true,
+              canceledAt: null,
+              startsAt: { gt: now },
+            },
+            _min: { startsAt: true },
+          }),
+          this.prisma.eventSession.groupBy({
+            by: ['eventId'],
+            where: {
+              eventId: { in: eventIds },
+              isActive: true,
+              canceledAt: null,
+              startsAt: { gt: now },
+            },
+            _count: { id: true },
+          }),
+          this.prisma.eventOffer.groupBy({
+            by: ['eventId'],
+            where: {
+              eventId: { in: eventIds },
+              isDeleted: false,
+              status: OfferStatus.ACTIVE,
+              priceFrom: { gt: 0 },
+            },
+            _min: { priceFrom: true },
+          }),
+        ])
+      : [[], [], [], []];
+
     const lastSessionAtByEventId = new Map<string, Date>();
     for (const row of lastSessionMax) {
       const r = row as unknown as { eventId: string; _max: { startsAt: Date | null } };
       const d = r._max.startsAt;
       if (d) lastSessionAtByEventId.set(r.eventId, d);
+    }
+
+    const nextFutureSessionAtByEventId = new Map<string, Date>();
+    for (const row of nextFutureMin as Array<{ eventId: string; _min: { startsAt: Date | null } }>) {
+      const d = row._min.startsAt;
+      if (d) nextFutureSessionAtByEventId.set(row.eventId, d);
+    }
+
+    const futureSessionCountByEventId = new Map<string, number>();
+    for (const row of futureSessionCounts as Array<{ eventId: string; _count: { id: number } }>) {
+      futureSessionCountByEventId.set(row.eventId, row._count.id);
+    }
+
+    const minOfferPriceByEventId = new Map<string, number>();
+    for (const row of minPricedOffers as Array<{ eventId: string; _min: { priceFrom: number | null } }>) {
+      const p = row._min.priceFrom;
+      if (p != null && p > 0) minOfferPriceByEventId.set(row.eventId, p);
     }
 
     const items = result.items.map((e) => {
@@ -494,14 +592,52 @@ export class AdminEventsController {
 
       const lastSessionAt = lastSessionAtByEventId.get(e.id) ?? null;
       const derivedIsPast = lastSessionAt ? lastSessionAt < now : false;
-      const derivedIsArchived = e.source !== EventSource.MANUAL && e.isActive === false;
+      const derivedIsArchived = isImportedArchived({ source: e.source, isActive: e.isActive });
       const derivedIsIndexable = !derivedIsPast && !derivedIsArchived;
+
+      const nextFutureAt = nextFutureSessionAtByEventId.get(e.id) ?? null;
+      const futureSessionsCount = futureSessionCountByEventId.get(e.id) ?? 0;
+      const offerMin = minOfferPriceByEventId.get(e.id);
+      const eventPf = e.priceFrom != null && e.priceFrom > 0 ? e.priceFrom : null;
+      const priceFromMinKopecks =
+        offerMin != null && eventPf != null
+          ? Math.min(offerMin, eventPf)
+          : offerMin ?? eventPf ?? null;
+
+      const effImage = e.override?.imageUrl ?? e.imageUrl;
+      const hasImage = Boolean(effImage);
+      const hasPricedOffer = (offerMin != null && offerMin > 0) || (e.priceFrom != null && e.priceFrom > 0);
+      const linksCount = (e.subcategoryLinks ?? []).length;
+      const legacyCount = Array.isArray(e.subcategories) ? e.subcategories.length : 0;
+      const quickHealth = computeAdminEventQuickHealth({
+        hasImage,
+        hasPrice: hasPricedOffer,
+        hasFutureSessions: futureSessionsCount > 0,
+        linksCount,
+        legacySubcategoryCount: legacyCount,
+      });
+      const readinessStatus = readinessFromIssueCodes(quickHealth.issueCodes).readinessStatus;
+      const readinessScore = readinessScoreFromQuickHealth({
+        flags: quickHealth.flags,
+        issueCodes: quickHealth.issueCodes,
+      });
 
       return {
         ...e,
+        supplier: e.operator ? { id: e.operator.id, name: e.operator.name, slug: e.operator.slug } : null,
+        venueShort: e.venue ? { id: e.venue.id, name: e.venue.title, slug: e.venue.slug } : null,
         subcategoriesCanonical: allSubcats.map((s) => ({ id: s.id, slug: s.slug, name: s.nameRu, isActive: s.isActive })),
         sectionsDerived: deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
         lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
+        nextSessionAt: nextFutureAt ? nextFutureAt.toISOString() : null,
+        futureSessionsCount,
+        priceFromMin: priceFromMinKopecks,
+        categoriesCount: e._count?.offers ?? 0,
+        readinessSummary: {
+          status: readinessStatus,
+          score: readinessScore,
+          issueCodes: quickHealth.issueCodes,
+        },
         isPast: derivedIsPast,
         isArchived: derivedIsArchived,
         isIndexable: derivedIsIndexable,
@@ -2029,6 +2165,7 @@ export class AdminEventsController {
       include: {
         city: { select: { slug: true, name: true } },
         venue: { select: { id: true, title: true, slug: true } },
+        operator: { select: { id: true, name: true, slug: true, trustLevel: true, trustScore: true } },
         sessions: { where: { isActive: true }, orderBy: { startsAt: 'asc' }, take: 20 },
         tags: { include: { tag: true } },
         offers: {
@@ -2057,14 +2194,54 @@ export class AdminEventsController {
     });
     const lastSessionAt = (lastSession as unknown as { _max: { startsAt: Date | null } })._max.startsAt;
     const derivedIsPast = lastSessionAt ? lastSessionAt < now : false;
-    const derivedIsArchived = (event as unknown as { publishStatus?: string } | null)?.publishStatus === 'ARCHIVED';
+    const derivedIsArchived = isImportedArchived({ source: event.source, isActive: event.isActive });
     const derivedIsIndexable = !derivedIsPast && !derivedIsArchived;
+
+    const futureWhere: Prisma.EventSessionWhereInput = {
+      eventId: id,
+      isActive: true,
+      canceledAt: null,
+      startsAt: { gt: now },
+    };
+    const [futureSessionsCount, nextFutureSession] = await Promise.all([
+      this.prisma.eventSession.count({ where: futureWhere }),
+      this.prisma.eventSession.findFirst({
+        where: futureWhere,
+        orderBy: { startsAt: 'asc' },
+        select: { startsAt: true },
+      }),
+    ]);
+
+    const effCover = event.override?.imageUrl ?? event.imageUrl;
+    const categoryPrices = (event.offers ?? [])
+      .filter((o) => !o.isDeleted)
+      .map((o) => mapEventOfferToCategoryPriceDto(o));
 
     return {
       ...event,
+      supplier: event.operator
+        ? {
+            id: event.operator.id,
+            name: event.operator.name,
+            slug: event.operator.slug,
+            trustLevel: event.operator.trustLevel,
+            trustScore: event.operator.trustScore,
+          }
+        : null,
+      categoryPrices,
+      scheduleSummary: {
+        nextSessionAt: nextFutureSession?.startsAt.toISOString() ?? null,
+        futureSessionsCount,
+        importedSessionsReadOnly: event.source !== EventSource.MANUAL,
+      },
+      mediaSummary: {
+        hasCover: Boolean(effCover),
+        galleryCount: Array.isArray(event.galleryUrls) ? event.galleryUrls.length : 0,
+      },
       subcategoriesCanonical: allSubcats.map((s) => ({ id: s.id, slug: s.slug, name: s.nameRu, isActive: s.isActive })),
       sectionsDerived: deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
       lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
+      nextSessionAt: nextFutureSession?.startsAt.toISOString() ?? null,
       isPast: derivedIsPast,
       isArchived: derivedIsArchived,
       isIndexable: derivedIsIndexable,

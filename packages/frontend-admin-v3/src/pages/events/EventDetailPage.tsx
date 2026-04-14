@@ -12,6 +12,10 @@ import { ErrorState } from '@/components/shared/states/ErrorState';
 import { LoadingState } from '@/components/shared/states/LoadingState';
 import { fetchAdminEventDetail } from '@/modules/events/api/detail';
 import { fetchAdminEventSummary } from '@/modules/events/api/summary';
+import { EventCategoryPricesTab } from '@/modules/events/components/detail/EventCategoryPricesTab';
+import { EventMediaTab } from '@/modules/events/components/detail/EventMediaTab';
+import { EventReadinessPanel } from '@/modules/events/components/detail/EventReadinessPanel';
+import { EventScheduleTab } from '@/modules/events/components/detail/EventScheduleTab';
 import { adminApi } from '@/api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
@@ -87,8 +91,19 @@ export function EventDetailPage() {
 
   const summaryItems = [
     { label: 'Источник', value: e.source },
+    { label: 'Оператор', value: e.supplier?.name ?? '—' },
     { label: 'External ID', value: e.tcEventId ?? '—' },
     { label: 'Последняя синхронизация', value: lastSyncAt ? new Date(lastSyncAt).toLocaleString('ru-RU') : '—' },
+    {
+      label: 'Ближайший сеанс',
+      value: e.scheduleSummary?.nextSessionAt
+        ? new Date(e.scheduleSummary.nextSessionAt).toLocaleString('ru-RU')
+        : '—',
+    },
+    {
+      label: 'Будущих сеансов',
+      value: <span className="tabular-nums">{e.scheduleSummary?.futureSessionsCount ?? '—'}</span>,
+    },
     {
       label: 'Готовность',
       value: readiness ? (
@@ -208,8 +223,11 @@ export function EventDetailPage() {
                         },
                         { key: 'Город', value: e.city?.name ?? '—' },
                         { key: 'Площадка', value: e.venue?.title ?? '—' },
+                        { key: 'Оператор', value: e.supplier?.name ?? '—' },
+                        { key: 'Режим дат', value: e.dateMode ?? '—' },
+                        { key: 'Длительность (мин)', value: e.durationMinutes ?? '—' },
                         { key: 'Статус публикации', value: e.publishStatus ?? '—' },
-                        { key: 'Возраст', value: e.ageMin ?? '—' },
+                        { key: 'Возраст', value: e.minAge ?? e.ageMin ?? '—' },
                         { key: 'Обновлено', value: new Date(e.updatedAt).toLocaleString('ru-RU') },
                         { key: 'Последний сеанс', value: e.lastSessionAt ? new Date(e.lastSessionAt).toLocaleString('ru-RU') : '—' },
                         { key: 'Прошедшее', value: e.isPast ? 'Да' : 'Нет' },
@@ -232,7 +250,7 @@ export function EventDetailPage() {
                 </div>
 
                 <div className="rounded-lg border bg-card p-5">
-                  <div className="text-sm font-medium">Категория и подкатегории</div>
+                  <div className="text-sm font-medium">Связи: классификация</div>
                   <div className="mt-4 space-y-5">
                     <div>
                       <div className="text-xs font-medium text-muted-foreground">Категория (derived, read-only)</div>
@@ -320,85 +338,128 @@ export function EventDetailPage() {
             ),
           },
           {
-            value: 'quality',
-            label: 'Качество',
-            content: (
-              <div className="rounded-lg border bg-card p-5">
-                <div className="text-sm font-medium">Качество/проблемы</div>
-                  <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                    {summary.isLoading ? (
-                      <div>Загрузка summary…</div>
-                    ) : summary.isError ? (
-                      <div>Summary временно недоступен</div>
-                    ) : readiness?.issues?.length ? (
-                      readiness.issues.slice(0, 6).map((i) => (
-                        <div key={i.code} className="flex items-start justify-between gap-3 rounded-md border px-3 py-2">
-                          <div className="min-w-0">
-                            <div className="truncate font-medium text-foreground">{i.code}</div>
-                            <div className="mt-0.5 text-xs text-muted-foreground">{i.message}</div>
-                          </div>
-                          <StatusPill label={i.severity} tone={i.severity === 'error' ? 'danger' : 'warning'} />
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-muted-foreground">Проблем не найдено</div>
-                    )}
-
-                    {readiness?.issues?.length ? null : readiness ? (
-                      <div className="pt-3">
-                        <div className="flex flex-wrap gap-2">
-                          {!readiness.checklist.hasDescription ? <ContentIssueBadge count={1} tone="warning" /> : null}
-                          {!readiness.checklist.hasImage ? <ContentIssueBadge count={1} tone="warning" /> : null}
-                          {!readiness.checklist.hasCategory ? <ContentIssueBadge count={1} tone="warning" /> : null}
-                        </div>
-                      </div>
-                    ) : null}
+            value: 'readiness',
+            label: 'Готовность',
+            content:
+              summary.isLoading ? (
+                <div className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">Загрузка готовности…</div>
+              ) : summary.isError || !readiness ? (
+                <div className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">Сводка готовности недоступна</div>
+              ) : (
+                <div className="space-y-4">
+                  <EventReadinessPanel readiness={readiness} />
+                  <div className="rounded-lg border bg-card p-5">
+                    <div className="text-sm font-medium">Чеклист</div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {!readiness.checklist.hasDescription ? <ContentIssueBadge count={1} tone="warning" /> : null}
+                      {!readiness.checklist.hasImage ? <ContentIssueBadge count={1} tone="warning" /> : null}
+                      {!readiness.checklist.hasCategory ? <ContentIssueBadge count={1} tone="warning" /> : null}
+                      {!readiness.checklist.hasPrice ? <ContentIssueBadge count={1} tone="warning" /> : null}
+                      {!readiness.checklist.hasFutureSlots ? <ContentIssueBadge count={1} tone="warning" /> : null}
+                    </div>
                   </div>
                 </div>
-            ),
+              ),
           },
           {
             value: 'content',
-            label: 'Контент и SEO',
+            label: 'Контент',
             content: (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-lg border bg-card p-5">
-                  <div className="text-sm font-medium">Контент</div>
-                  <div className="mt-4 space-y-3">
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">Summary</div>
-                      <textarea className="mt-1 h-24 w-full rounded-md border bg-background p-2 text-sm" value={e.summary ?? ''} readOnly />
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">Description</div>
-                      <textarea className="mt-1 h-32 w-full rounded-md border bg-background p-2 text-sm" value={e.description ?? ''} readOnly />
-                    </div>
+              <div className="rounded-lg border bg-card p-5">
+                <div className="text-sm font-medium">Тексты</div>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">Краткое описание</div>
+                    <textarea
+                      className="mt-1 h-20 w-full rounded-md border bg-background p-2 text-sm"
+                      value={e.shortDescription ?? e.summary ?? ''}
+                      readOnly
+                    />
                   </div>
-                </div>
-
-                <div className="rounded-lg border bg-card p-5">
-                  <div className="text-sm font-medium">SEO</div>
-                  <div className="mt-4 space-y-3">
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">H1</div>
-                      <input className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm" value={e.h1 ?? ''} readOnly />
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">SEO title</div>
-                      <input className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm" value={e.seoTitle ?? ''} readOnly />
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground">SEO description</div>
-                      <textarea className="mt-1 h-24 w-full rounded-md border bg-background p-2 text-sm" value={e.seoDescription ?? ''} readOnly />
-                    </div>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">Полное описание</div>
+                    <textarea className="mt-1 h-40 w-full rounded-md border bg-background p-2 text-sm" value={e.description ?? ''} readOnly />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">Точка сбора / встреча</div>
+                    <textarea className="mt-1 h-20 w-full rounded-md border bg-background p-2 text-sm" value={e.meetingPoint ?? ''} readOnly />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">Возврат / отмена</div>
+                    <textarea className="mt-1 h-20 w-full rounded-md border bg-background p-2 text-sm" value={e.refundPolicyText ?? ''} readOnly />
                   </div>
                 </div>
               </div>
             ),
           },
-          { value: 'pricing', label: 'Цены', content: <div className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">Заглушка</div> },
-          { value: 'schedule', label: 'Расписание', content: <div className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">Заглушка</div> },
-          { value: 'tech', label: 'Техническое', content: <div className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">Заглушка</div> },
+          {
+            value: 'media',
+            label: 'Медиа',
+            content: <EventMediaTab detail={e} />,
+          },
+          {
+            value: 'schedule',
+            label: 'Расписание',
+            content: (
+              <EventScheduleTab
+                eventId={e.id}
+                importedLocked={Boolean(e.scheduleSummary?.importedSessionsReadOnly)}
+              />
+            ),
+          },
+          {
+            value: 'pricing',
+            label: 'Категории и цены',
+            content: <EventCategoryPricesTab detail={e} />,
+          },
+          {
+            value: 'seo',
+            label: 'SEO',
+            content: (
+              <div className="rounded-lg border bg-card p-5">
+                <div className="text-sm font-medium">SEO и URL</div>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">Публичный URL (через slug)</div>
+                    <input
+                      className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm font-mono"
+                      value={previewUrl}
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">H1 (если задано в слое SEO)</div>
+                    <input className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm" value={e.h1 ?? e.title} readOnly />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">SEO title</div>
+                    <input className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm" value={e.seoTitle ?? ''} readOnly />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground">SEO description</div>
+                    <textarea className="mt-1 h-24 w-full rounded-md border bg-background p-2 text-sm" value={e.seoDescription ?? ''} readOnly />
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Индексация на витрине зависит от наличия будущих сеансов и политики каталога; slug остаётся уникальным.
+                  </div>
+                </div>
+              </div>
+            ),
+          },
+          {
+            value: 'tech',
+            label: 'Техническое',
+            content: (
+              <div className="rounded-lg border bg-card p-5">
+                <div className="text-sm font-medium">Служебные поля</div>
+                <div className="mt-4 font-mono text-xs text-muted-foreground">
+                  <div>id: {e.id}</div>
+                  <div className="mt-1">source: {e.source}</div>
+                  <div className="mt-1">tcEventId: {e.tcEventId ?? '—'}</div>
+                </div>
+              </div>
+            ),
+          },
         ]}
       />
 

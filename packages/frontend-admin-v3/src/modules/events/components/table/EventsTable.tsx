@@ -7,28 +7,52 @@ import { EventsTableRow } from './EventsTableRow';
 
 type EventHealthRow = { flags: Record<string, boolean>; issueCodes: string[] };
 
+function issueLabel(code: string): string {
+  if (code === 'NO_PHOTO') return 'Нет обложки';
+  if (code === 'NO_PRICE') return 'Нет категории с ценой';
+  if (code === 'NO_FUTURE_SESSIONS') return 'Нет будущих сеансов';
+  if (code === 'NO_SUBCATEGORY') return 'Нет подкатегории';
+  if (code === 'TOO_MANY_SUBCATEGORIES') return 'Слишком много подкатегорий';
+  return code;
+}
+
 function mapRow(e: AdminEventListItem, health: EventHealthRow | undefined): EventRowItem {
-  const codes = health?.issueCodes ?? [];
+  const codes = e.readinessSummary?.issueCodes?.length
+    ? e.readinessSummary.issueCodes
+    : health?.issueCodes ?? [];
   const errorCodes = new Set(['NO_PRICE', 'NO_FUTURE_SESSIONS']);
   const errors = codes.filter((c) => errorCodes.has(c)).length;
   const warnings = codes.length - errors;
 
+  const readinessStatus =
+    e.readinessSummary?.status ??
+    (codes.length === 0 ? 'READY' : errors > 0 ? 'BLOCKED' : 'NEEDS_WORK');
+
+  const priceKop = e.priceFromMin;
+  const priceRub = priceKop != null && priceKop > 0 ? Math.round(priceKop / 100) : null;
+
   return {
     id: e.id,
-    slug: (e as any).slug ?? '',
+    slug: e.slug ?? '',
     title: e.title,
     imageThumb: null,
 
     supplierSource: e.source ?? null,
+    supplierName: e.supplier?.name ?? null,
     cityName: e.city?.name ?? null,
-    venueName: null,
+    venueName: e.venueShort?.name ?? null,
 
-    nextDate: null,
-    hasFutureSlots: typeof health?.flags?.hasFutureSessions === 'boolean' ? health.flags.hasFutureSessions : null,
+    nextDate: e.nextSessionAt ?? null,
+    hasFutureSlots:
+      typeof e.futureSessionsCount === 'number'
+        ? e.futureSessionsCount > 0
+        : typeof health?.flags?.hasFutureSessions === 'boolean'
+          ? health.flags.hasFutureSessions
+          : null,
 
-    priceFrom: null,
+    priceFrom: priceRub,
 
-    publishStatus: (e as any).publishStatus ?? null,
+    publishStatus: (e as { publishStatus?: string }).publishStatus ?? null,
     isPast: e.isPast,
     isArchived: e.isArchived,
     isActive: e.isActive,
@@ -37,33 +61,22 @@ function mapRow(e: AdminEventListItem, health: EventHealthRow | undefined): Even
 
     issueCount: errors,
     warningCount: warnings,
-    readinessStatus: codes.length === 0 ? 'READY' : errors > 0 ? 'BLOCKED' : 'NEEDS_WORK',
-    readinessScore: null,
-    issues: codes.map((c) => ({
+    readinessStatus,
+    readinessScore: e.readinessSummary?.score ?? null,
+    issues: codes.slice(0, 8).map((c) => ({
       code: c,
-      label:
-        c === 'NO_PHOTO'
-          ? 'Нет фото'
-          : c === 'NO_PRICE'
-            ? 'Нет цены'
-            : c === 'NO_FUTURE_SESSIONS'
-              ? 'Нет будущих сеансов'
-              : c === 'NO_SUBCATEGORY'
-                ? 'Нет подкатегории'
-                : c === 'TOO_MANY_SUBCATEGORIES'
-                  ? 'Слишком много подкатегорий'
-                  : c,
+      label: issueLabel(c),
       severity: errorCodes.has(c) ? ('error' as const) : ('warning' as const),
     })),
 
-    sessionsCount: e._count?.sessions ?? null,
+    sessionsCount: e.futureSessionsCount ?? e._count?.sessions ?? null,
 
     sectionsDerived: (e.sectionsDerived ?? []).map((x) => ({ slug: x.slug, name: x.name })),
     subcategoriesCanonical: (e.subcategoriesCanonical ?? []).map((x) => ({
       id: x.id,
       slug: x.slug,
       name: x.name,
-      isActive: (x as any).isActive,
+      isActive: (x as { isActive?: boolean }).isActive,
     })),
   };
 }
@@ -164,7 +177,9 @@ export function EventsTable({
               </th>
             ) : null}
             {visibleCols.includes('next') ? <th className="px-4 py-3 text-center">Ближайшая дата</th> : null}
-            {visibleCols.includes('sessions') ? <th className="px-4 py-3 text-center">Сеансы</th> : null}
+            {visibleCols.includes('sessions') ? (
+              <th className="px-4 py-3 text-center">Сеансы (будущие)</th>
+            ) : null}
             {visibleCols.includes('price') ? <th className="px-4 py-3 text-center">Цена от</th> : null}
             {visibleCols.includes('status') ? (
               <th className="px-4 py-3 text-center">

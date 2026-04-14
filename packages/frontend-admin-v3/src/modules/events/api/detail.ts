@@ -1,5 +1,18 @@
 import { adminApi } from '@/api/client';
 
+export type EventCategoryPriceRow = {
+  id: string;
+  name: string;
+  purchaseType: string;
+  priceFromKopecks: number | null;
+  status: string;
+  isPrimary: boolean;
+  priority: number;
+  availabilityMode: string | null;
+  sessionsLinkedCount: number;
+  isSellableHint: boolean;
+};
+
 export type AdminEventDetail = {
   id: string;
   title: string;
@@ -9,21 +22,46 @@ export type AdminEventDetail = {
   publishStatus?: string;
   source: string;
   updatedAt: string;
-  summary?: string | null;
+  shortDescription?: string | null;
   description?: string | null;
+  summary?: string | null;
   h1?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
+  imageUrl?: string | null;
+  galleryUrls?: string[];
+  dateMode?: string;
+  durationMinutes?: number | null;
+  minAge?: number | null;
+  meetingPoint?: string | null;
+  refundPolicyText?: string | null;
   ageMin?: number | null;
   city?: { slug: string; name: string } | null;
   venue?: { id: string; title: string; slug: string } | null;
-  override?: { isHidden?: boolean; editorStatus?: string | null } | null;
+  supplier?: {
+    id: string;
+    name: string;
+    slug: string;
+    trustLevel?: number;
+    trustScore?: number;
+  } | null;
+  /** Presentation: категории и цены (persistence: offers / EventOffer) */
+  categoryPrices?: EventCategoryPriceRow[];
+  scheduleSummary?: {
+    nextSessionAt: string | null;
+    futureSessionsCount: number;
+    importedSessionsReadOnly: boolean;
+  };
+  mediaSummary?: { hasCover: boolean; galleryCount: number };
+  nextSessionAt?: string | null;
+  override?: { isHidden?: boolean; editorStatus?: string | null; imageUrl?: string | null } | null;
   sectionsDerived?: Array<{ slug: 'events' | 'excursions' | 'museums' | 'activities' | 'entertainment'; name: string }>;
   subcategoriesCanonical?: Array<{ id: string; slug: string; name: string; isActive?: boolean }>;
   lastSessionAt?: string | null;
   isPast?: boolean;
   isArchived?: boolean;
   isIndexable?: boolean;
+  offers?: unknown[];
 };
 
 export async function fetchAdminEventDetail(id: string) {
