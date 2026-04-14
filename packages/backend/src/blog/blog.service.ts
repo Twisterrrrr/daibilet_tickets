@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ArticleStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -13,7 +13,7 @@ export class BlogService {
     const { city, tag, page = 1, limit = 12 } = opts || {};
 
     const where: Prisma.ArticleWhereInput = {
-      isPublished: true,
+      status: ArticleStatus.PUBLISHED,
       ...(city && { city: { slug: city } }),
       ...(tag && { articleTags: { some: { tag: { slug: tag } } } }),
     };
@@ -36,8 +36,8 @@ export class BlogService {
   }
 
   async getArticleBySlug(slug: string) {
-    const article = await this.prisma.article.findUnique({
-      where: { slug },
+    const article = await this.prisma.article.findFirst({
+      where: { slug, status: ArticleStatus.PUBLISHED },
       include: {
         city: { select: { slug: true, name: true } },
         articleEvents: {
@@ -60,7 +60,32 @@ export class BlogService {
     });
 
     if (!article) throw new NotFoundException(`Статья "${slug}" не найдена`);
-    return article;
+
+    const [relatedLandings, relatedCollections] = await Promise.all([
+      article.relatedLandingIds.length
+        ? this.prisma.landingPage.findMany({
+            where: { id: { in: article.relatedLandingIds }, isDeleted: false, isActive: true },
+            select: {
+              id: true,
+              slug: true,
+              title: true,
+              city: { select: { slug: true, name: true } },
+            },
+          })
+        : Promise.resolve([]),
+      article.relatedCollectionIds.length
+        ? this.prisma.collection.findMany({
+            where: { id: { in: article.relatedCollectionIds }, isDeleted: false, isActive: true },
+            select: { id: true, slug: true, title: true, heroImage: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return {
+      ...article,
+      relatedLandings,
+      relatedCollections,
+    };
   }
 
   /**
@@ -107,12 +132,11 @@ export class BlogService {
             coverImage: city.heroImage,
             metaTitle: `Что посмотреть в ${city.name} — топ экскурсий и мероприятий | Дайбилет`,
             metaDescription: `Лучшие экскурсии, музеи и мероприятия в ${city.name}. Покупайте билеты онлайн. ${city._count.events} событий в каталоге.`,
-            isPublished: true,
+            status: ArticleStatus.PUBLISHED,
             publishedAt: new Date(),
           },
         });
 
-        // Связать с событиями
         for (const event of city.events.slice(0, 5)) {
           await this.prisma.articleEvent
             .create({
@@ -143,7 +167,7 @@ export class BlogService {
               coverImage: city.heroImage,
               metaTitle: `Экскурсии в ${city.name} — рейтинг, цены, купить билеты | Дайбилет`,
               metaDescription: `Лучшие экскурсии в ${city.name}: обзор, цены от ${this.minPrice(excursions)} ₽. Покупка билетов онлайн на Дайбилет.`,
-              isPublished: true,
+              status: ArticleStatus.PUBLISHED,
               publishedAt: new Date(),
             },
           });

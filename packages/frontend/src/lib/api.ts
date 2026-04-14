@@ -332,10 +332,10 @@ export const api = {
             .map(([k, v]) => [k, String(v)]),
         ).toString()
       : '';
-    return fetchApi<PaginatedResponse<ArticleListItem>>(`/blog${query}`);
+    return fetchApi<PaginatedResponse<ArticleListItem>>(`/articles${query}`);
   },
 
-  getArticleBySlug: (slug: string) => fetchApi<ArticleDetail>(`/blog/${slug}`),
+  getArticleBySlug: (slug: string) => fetchApi<ArticleDetail>(`/articles/${encodeURIComponent(slug)}`),
 
   // Voucher
   getVoucher: (shortCode: string) => fetchApi<VoucherData>(`/vouchers/${shortCode}`),
