@@ -4,6 +4,28 @@
 
 ---
 
+## 14.04.2026 — Admin V3: площадки — фильтр readiness по SQL, лейблы ЖЦ, бэклог publish-gate
+
+### Наблюдения
+
+- Фильтр по **readiness** в списке площадок ранее опирался только на эвристику в теле ответа; для пагинации и производительности нужен отбор на стороне БД.
+- Лейблы статуса ЖЦ дублировались в списке, детали и кандидатах.
+- В репозитории **нет** общего E2E-контура для admin-v3 (playwright/cypress в корне не заведены).
+- Объединение **venueReadiness** с **validateVenueForPublish** (подкатегории) требует отдельного этапа и доп. запросов.
+
+### Решения
+
+- **Backend:** `GET /admin/venues?readinessStatus=READY|NEEDS_WORK|NEEDS_REVIEW|BLOCKED` — `venueReadinessListWhere` + `parseVenueReadinessStatusQuery` (`venue-admin-list-readiness-where.util.ts`); условия согласованы с `computeVenueAdminReadiness` (в т.ч. координаты при наличии адреса, SEO whitelist для ACTIVE+published).
+- **Тесты:** unit для where-парсера; контроллер — сценарий `readinessStatus=BLOCKED`.
+- **Frontend:** `fetchAdminVenuesList` передаёт `readinessStatus`; на списке площадок — селектор «Готовность (БД)»; `venue-lifecycle-labels.ts` — `VENUE_LIFECYCLE_LABEL_RU` / `venueLifecycleLabelRu` (список, detail, подпись кандидатов).
+- **Документация:** комментарий в `VenueAdminSummaryService` о бэклоге merge с publish-gate.
+
+### Проблемы
+
+- Полное совпадение SQL-фильтра с поштучным score (границы 50/80) без вычисляемого поля в БД не гарантируется на редких комбинациях предупреждений; для операционной сортировки приемлемо.
+
+---
+
 ## 14.04.2026 — Admin V3: вкладка «Расписание» — доступные сеансы read-only
 
 ### Наблюдения

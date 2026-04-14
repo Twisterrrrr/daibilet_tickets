@@ -57,6 +57,12 @@ import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.se
 import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
 import { PublishGateService } from '../catalog/publish-gate.service';
 import { buildVenueAdminListOrderBy, parseVenueListSortQuery } from './venue-admin-list-order.util';
+import {
+  computeVenueAdminReadiness,
+  loadVenueListEventStats,
+  venueDisplayAddress,
+} from './venue-admin-readiness.util';
+import { parseVenueReadinessStatusQuery, venueReadinessListWhere } from './venue-admin-list-readiness-where.util';
 
 class UpdateVenueSubcategoriesDto {
   @IsOptional()
@@ -150,20 +156,6 @@ class BatchRejectVenuesBodyDto {
   @IsOptional()
   @IsString()
   reasonText?: string | null;
-}
-
-/** Для списка админки: канонический адрес → сырой → нормализованный (читаемый fallback). */
-function venueListDisplayAddress(v: {
-  address: string | null;
-  rawAddress: string | null;
-  normalizedAddress: string | null;
-}): string | null {
-  const trim = (s: string | null | undefined) => {
-    if (s === null || s === undefined) return null;
-    const x = s.trim();
-    return x.length > 0 ? x : null;
-  };
-  return trim(v.address) ?? trim(v.rawAddress) ?? trim(v.normalizedAddress);
 }
 
 class ApproveDraftVenueBodyDto {
@@ -271,6 +263,9 @@ export class AdminVenuesController {
     @Query('sort') sort?: string,
     @Query('order') order?: string,
     @Query('includeDecisionHints') includeDecisionHints?: string,
+    @Query('hasMergeTarget') hasMergeTarget?: string,
+    @Query('venuePageWhitelist') venuePageWhitelist?: string,
+    @Query('readinessStatus') readinessStatus?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit: limit || '20' });
     const { sort: sortField, order: orderDir } = parseVenueListSortQuery(sort, order);
@@ -279,8 +274,11 @@ export class AdminVenuesController {
       ? ([{ updatedAt: 'desc' }, { id: 'desc' }] satisfies Prisma.VenueOrderByWithRelationInput[])
       : buildVenueAdminListOrderBy(sortField, orderDir);
 
+    const readinessWhere = parseVenueReadinessStatusQuery(readinessStatus);
+
     const where: Prisma.VenueWhereInput = {
       isDeleted: false,
+      ...(readinessWhere ? venueReadinessListWhere(readinessWhere) : {}),
       ...(city && { city: { slug: city } }),
       ...(venueType && { venueType: venueType as VenueType }),
       ...(lifecycleStatus && { lifecycleStatus: lifecycleStatus as VenueLifecycleStatus }),
@@ -295,6 +293,10 @@ export class AdminVenuesController {
           { address: { contains: search, mode: 'insensitive' } },
         ],
       }),
+      ...(hasMergeTarget === 'true' && { mergeTargetId: { not: null } }),
+      ...(hasMergeTarget === 'false' && { mergeTargetId: null }),
+      ...(venuePageWhitelist === 'true' && { isVenuePageWhitelisted: true }),
+      ...(venuePageWhitelist === 'false' && { isVenuePageWhitelisted: false }),
     };
 
     const [items, total] = await Promise.all([
@@ -303,8 +305,9 @@ export class AdminVenuesController {
         orderBy,
         ...paginationArgs(pg),
         include: {
-          city: { select: { name: true, slug: true } },
-          _count: { select: { events: true, offers: true } },
+          city: { select: { id: true, name: true, slug: true } },
+          mergeTarget: { select: { id: true, title: true, slug: true } },
+          _count: { select: { events: true, offers: true, mergedFrom: true } },
         },
       }),
       this.prisma.venue.count({ where }),
@@ -313,6 +316,11 @@ export class AdminVenuesController {
     const hasMore = items.length > pg.limit;
     const pageItems = hasMore ? items.slice(0, pg.limit) : items;
     const nextCursor = hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null;
+
+    const eventStats = await loadVenueListEventStats(
+      this.prisma,
+      pageItems.map((v) => v.id),
+    );
 
     let hints: Record<string, { decisionHint: string; decisionHintReasons: string[] }> = {};
     if (includeDecisionHints === 'true' && pageItems.length > 0) {
@@ -337,6 +345,24 @@ export class AdminVenuesController {
     return {
       items: pageItems.map((v) => {
         const h = hints[v.id];
+        const displayAddress = venueDisplayAddress(v);
+        const readiness = computeVenueAdminReadiness({
+          lifecycleStatus: v.lifecycleStatus,
+          needsReview: v.needsReview,
+          confidenceScore: v.confidenceScore,
+          mergeTargetId: v.mergeTargetId,
+          title: v.title,
+          displayAddress,
+          imageUrl: v.imageUrl,
+          shortDescription: v.shortDescription,
+          description: v.description,
+          lat: v.lat,
+          lng: v.lng,
+          isVenuePageWhitelisted: v.isVenuePageWhitelisted,
+          isPublished: v.isPublished,
+        });
+        const activeEventsCount = eventStats.activeEventsByVenue.get(v.id) ?? 0;
+        const futureEventsCount = eventStats.futureEventsByVenue.get(v.id) ?? 0;
         return {
           id: v.id,
           slug: v.slug,
@@ -352,8 +378,20 @@ export class AdminVenuesController {
           importSource: v.importSource,
           externalVenueId: v.externalVenueId,
           needsReview: v.needsReview,
+          isVenuePageWhitelisted: v.isVenuePageWhitelisted,
           eventsCount: v._count.events,
+          relatedEventsCount: v._count.events,
+          activeEventsCount,
+          futureEventsCount,
+          mergedFromCount: v._count.mergedFrom,
           offersCount: v._count.offers,
+          hasCover: Boolean(v.imageUrl?.trim()),
+          readinessStatus: readiness.status,
+          readinessScore: readiness.score,
+          readinessKeySignals: readiness.keySignals,
+          mergeTargetSummary: v.mergeTarget
+            ? { id: v.mergeTarget.id, title: v.mergeTarget.title, slug: v.mergeTarget.slug }
+            : null,
           updatedAt: v.updatedAt,
           rawName: v.rawName,
           rawAddress: v.rawAddress,
@@ -362,7 +400,7 @@ export class AdminVenuesController {
           confidenceScore: v.confidenceScore,
           mergeTargetId: v.mergeTargetId,
           version: v.version,
-          displayAddress: venueListDisplayAddress(v),
+          displayAddress,
           ...(h
             ? { decisionHint: h.decisionHint, decisionHintReasons: h.decisionHintReasons }
             : {}),
@@ -628,10 +666,28 @@ export class AdminVenuesController {
       },
     });
     if (!venue) throw new NotFoundException('Venue not found');
+    const displayAddress = venueDisplayAddress(venue);
+    const readiness = computeVenueAdminReadiness({
+      lifecycleStatus: venue.lifecycleStatus,
+      needsReview: venue.needsReview,
+      confidenceScore: venue.confidenceScore,
+      mergeTargetId: venue.mergeTargetId,
+      title: venue.title,
+      displayAddress,
+      imageUrl: venue.imageUrl,
+      shortDescription: venue.shortDescription,
+      description: venue.description,
+      lat: venue.lat,
+      lng: venue.lng,
+      isVenuePageWhitelisted: venue.isVenuePageWhitelisted,
+      isPublished: venue.isPublished,
+    });
     return {
       ...venue,
       rating: Number(venue.rating),
       externalRating: venue.externalRating ? Number(venue.externalRating) : null,
+      displayAddress,
+      readiness,
     };
   }
 

@@ -21,12 +21,21 @@ export type VenueDecisionHint =
   | 'REJECT_RECOMMENDED'
   | 'NO_HINT';
 
+export type VenueAdminReadinessDto = {
+  status: 'READY' | 'NEEDS_WORK' | 'NEEDS_REVIEW' | 'BLOCKED';
+  score: number;
+  blockers: string[];
+  warnings: string[];
+  moderationSignals: string[];
+  keySignals: string[];
+};
+
 export type AdminVenueCandidateRow = {
   id: string;
   slug: string | null;
   title: string;
   venueType: string;
-  city: { name: string; slug: string };
+  city: { id?: string; name: string; slug: string };
   rating: number;
   isActive: boolean;
   isFeatured: boolean;
@@ -36,7 +45,19 @@ export type AdminVenueCandidateRow = {
   importSource: VenueImportSource | null;
   externalVenueId: string | null;
   needsReview: boolean;
+  /** GET /admin/venues (расширенный list): whitelist SEO-страницы */
+  isVenuePageWhitelisted?: boolean;
   eventsCount: number;
+  /** Дублирует eventsCount для явного смысла «связанные события» */
+  relatedEventsCount?: number;
+  activeEventsCount?: number;
+  futureEventsCount?: number;
+  mergedFromCount?: number;
+  hasCover?: boolean;
+  readinessStatus?: VenueAdminReadinessDto['status'];
+  readinessScore?: number;
+  readinessKeySignals?: string[];
+  mergeTargetSummary?: { id: string; title: string; slug: string } | null;
   offersCount: number;
   updatedAt: string;
   rawName: string | null;
@@ -64,6 +85,23 @@ export type AdminVenueDetail = {
   slug: string | null;
   title: string;
   address: string | null;
+  shortDescription?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  galleryUrls?: string[];
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  venueType?: string;
+  lat?: number | null;
+  lng?: number | null;
+  metro?: string | null;
+  district?: string | null;
+  venueTemplateData?: unknown;
+  /** Legacy JSON с витрины / импорта — участвуют в сборке шаблона PDP */
+  highlights?: unknown;
+  faq?: unknown;
+  openingHours?: unknown;
+  isVenuePageWhitelisted?: boolean;
   /** ISO — для optimistic lock (GET /admin/venues/:id отдаёт полную модель). */
   updatedAt?: string;
   lifecycleStatus: VenueLifecycleStatus;
@@ -78,7 +116,47 @@ export type AdminVenueDetail = {
   externalVenueId: string | null;
   sourceType: VenueSourceType;
   isPublished: boolean;
+  isActive?: boolean;
+  mergeTargetId?: string | null;
+  /** Сводка готовности (добавлено бэкендом к полной модели). */
+  readiness?: VenueAdminReadinessDto;
+  /** Канонический адрес для UI (address → raw → normalized). */
+  displayAddress?: string | null;
   city: { id: string; name: string; slug: string };
+};
+
+/** GET /admin/venues/:id/summary — витрина, контент, события, готовность */
+export type VenueAdminSummaryResponse = {
+  id: string;
+  venueReadiness: VenueAdminReadinessDto;
+  storefront: {
+    activeEventsCount: number;
+    eventsWithFutureSlotsCount: number;
+    avgEventRating: number | null;
+    readyRatio: number | null;
+    readyDataQuality: 'FULL' | 'PARTIAL' | 'FROM_OVERRIDE_ONLY';
+    isFeatured: boolean;
+  };
+  content: { hasVenueTemplateData: boolean; sectionKeys?: string[] };
+  relatedEvents: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    category: string | null;
+    readinessStatus: string;
+    storefrontVisibility: string;
+    rating: number | null;
+    reviewCount: number;
+    adminUrlPath: string;
+    publicUrlPath: string;
+  }>;
+  truncated?: boolean;
+};
+
+export type AdminVenueSubcategoriesResponse = {
+  primarySubcategory: { id: string; slug: string; nameRu: string } | null;
+  secondarySubcategories: Array<{ id: string; slug: string; nameRu: string }>;
+  all: Array<{ id: string; slug: string; nameRu: string }>;
 };
 
 export type AdminVenueSimilarItem = {
@@ -221,6 +299,46 @@ export function parseVenueCandidatesListSortFromUrl(
   return { sort: s, order: o };
 }
 
+/** Полный список площадок (без пресета кандидатов DRAFT/IMPORTED). */
+export async function fetchAdminVenuesList(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  citySlug?: string;
+  venueType?: string;
+  lifecycleStatus?: string;
+  importSource?: VenueImportSource | '';
+  sourceType?: VenueSourceType | '';
+  needsReview?: boolean;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  hasMergeTarget?: boolean;
+  venuePageWhitelist?: boolean;
+  /** GET readinessStatus — фильтр на стороне БД (см. backend venueReadinessListWhere) */
+  readinessStatus?: 'READY' | 'NEEDS_WORK' | 'NEEDS_REVIEW' | 'BLOCKED';
+}): Promise<PaginatedVenues> {
+  const sp = new URLSearchParams();
+  sp.set('limit', String(params.limit ?? 25));
+  if (params.page != null) sp.set('page', String(params.page));
+  if (params.search) sp.set('search', params.search);
+  if (params.citySlug) sp.set('city', params.citySlug);
+  if (params.venueType) sp.set('venueType', params.venueType);
+  if (params.lifecycleStatus) sp.set('lifecycleStatus', params.lifecycleStatus);
+  if (params.importSource) sp.set('importSource', params.importSource);
+  if (params.sourceType) sp.set('sourceType', params.sourceType);
+  if (params.needsReview === true) sp.set('needsReview', 'true');
+  if (params.needsReview === false) sp.set('needsReview', 'false');
+  if (params.sort) sp.set('sort', params.sort);
+  if (params.order) sp.set('order', params.order);
+  if (params.hasMergeTarget === true) sp.set('hasMergeTarget', 'true');
+  if (params.hasMergeTarget === false) sp.set('hasMergeTarget', 'false');
+  if (params.venuePageWhitelist === true) sp.set('venuePageWhitelist', 'true');
+  if (params.venuePageWhitelist === false) sp.set('venuePageWhitelist', 'false');
+  if (params.readinessStatus) sp.set('readinessStatus', params.readinessStatus);
+
+  return adminApi.get<PaginatedVenues>(`/admin/venues?${sp.toString()}`);
+}
+
 export async function fetchVenueCandidates(params: {
   page?: number;
   limit?: number;
@@ -258,6 +376,14 @@ export async function fetchVenueCandidates(params: {
 
 export async function fetchAdminVenueDetail(id: string): Promise<AdminVenueDetail> {
   return adminApi.get<AdminVenueDetail>(`/admin/venues/${id}`);
+}
+
+export async function fetchVenueAdminSummary(id: string): Promise<VenueAdminSummaryResponse> {
+  return adminApi.get<VenueAdminSummaryResponse>(`/admin/venues/${id}/summary`);
+}
+
+export async function fetchVenueSubcategoriesAdmin(id: string): Promise<AdminVenueSubcategoriesResponse> {
+  return adminApi.get<AdminVenueSubcategoriesResponse>(`/admin/venues/${id}/subcategories`);
 }
 
 export async function fetchMergePreview(candidateId: string, targetId: string): Promise<VenueMergePreviewDto> {

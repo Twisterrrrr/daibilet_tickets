@@ -38,6 +38,7 @@ import {
   stripSimilarVenueContext,
   venueCandidatesParsedToSortPreset,
 } from '@/modules/venues/utils/venueCandidatesUrlState';
+import { VENUE_LIFECYCLE_LABEL_RU } from '@/modules/venues/utils/venue-lifecycle-labels';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -293,7 +294,10 @@ export function VenueCandidatesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Кандидаты площадок" subtitle={`Импортные DRAFT · всего в выборке: ${data.total}`} />
+      <PageHeader
+        title="Кандидаты площадок"
+        subtitle={`Импорт · ${VENUE_LIFECYCLE_LABEL_RU.DRAFT} · всего в выборке: ${data.total}`}
+      />
 
       {banner ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">

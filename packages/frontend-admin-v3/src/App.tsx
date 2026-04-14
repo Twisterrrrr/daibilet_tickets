@@ -11,6 +11,15 @@ const EventsListPage = React.lazy(() => import('@/pages/events/EventsListPage').
 const EventDetailPage = React.lazy(() => import('@/pages/events/EventDetailPage').then((m) => ({ default: m.EventDetailPage })));
 
 const VenuesListPage = React.lazy(() => import('@/modules/venues/pages/VenuesListPage').then((m) => ({ default: m.VenuesListPage })));
+const VenueCandidatesPage = React.lazy(() =>
+  import('@/modules/venues/pages/VenueCandidatesPage').then((m) => ({ default: m.VenueCandidatesPage })),
+);
+const VenueAutomationPage = React.lazy(() =>
+  import('@/modules/venues/pages/VenueAutomationPage').then((m) => ({ default: m.VenueAutomationPage })),
+);
+const VenueModerationAnalyticsPage = React.lazy(() =>
+  import('@/modules/venues/pages/VenueModerationAnalyticsPage').then((m) => ({ default: m.VenueModerationAnalyticsPage })),
+);
 const VenueDetailPage = React.lazy(() => import('@/modules/venues/pages/VenueDetailPage').then((m) => ({ default: m.VenueDetailPage })));
 
 const CitiesListPage = React.lazy(() => import('@/modules/cities/pages/CitiesListPage').then((m) => ({ default: m.CitiesListPage })));
@@ -69,6 +78,9 @@ export default function App() {
               <Route path="events/:id" element={<EventDetailPage />} />
 
               <Route path="venues" element={<VenuesListPage />} />
+              <Route path="venues/candidates" element={<VenueCandidatesPage />} />
+              <Route path="venues/automation" element={<VenueAutomationPage />} />
+              <Route path="venues/analytics" element={<VenueModerationAnalyticsPage />} />
               <Route path="venues/:id" element={<VenueDetailPage />} />
 
               <Route path="cities" element={<CitiesListPage />} />

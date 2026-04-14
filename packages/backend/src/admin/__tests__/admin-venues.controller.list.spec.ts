@@ -138,4 +138,33 @@ describe('AdminVenuesController.list', () => {
     const arg = findMany.mock.calls[0]![0] as { orderBy: unknown };
     expect(arg.orderBy).toEqual([{ updatedAt: 'desc' }, { id: 'desc' }]);
   });
+
+  it('readinessStatus=BLOCKED: where включает lifecycleStatus MERGED|REJECTED', async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const count = vi.fn().mockResolvedValue(0);
+    const prisma = { venue: { findMany, count } } as unknown as PrismaService;
+    const c = createController(prisma);
+
+    await c.list(
+      undefined,
+      '1',
+      '20',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'updatedAt',
+      'desc',
+      undefined,
+      undefined,
+      undefined,
+      'BLOCKED',
+    );
+
+    const arg = findMany.mock.calls[0]![0] as { where: { lifecycleStatus?: unknown } };
+    expect(arg.where.lifecycleStatus).toEqual({ in: ['MERGED', 'REJECTED'] });
+  });
 });

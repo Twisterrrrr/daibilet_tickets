@@ -8,6 +8,12 @@ import {
   VenueAdminSummaryDto,
   VenueRelatedEventDto,
 } from './dto/admin-venue-summary.dto';
+import { computeVenueAdminReadiness, venueDisplayAddress } from './venue-admin-readiness.util';
+
+/**
+ * Примечание (бэклог): свести `venueReadiness` с `PublishGateService.validateVenueForPublish` в одном read-model
+ * для GET /admin/venues/:id/summary (подкатегории, блокеры публикации) — отдельная задача, дополнительные запросы к БД.
+ */
 
 const READINESS_LIMIT = 20;
 
@@ -26,6 +32,21 @@ export class VenueAdminSummaryService {
         isDeleted: true,
         isFeatured: true,
         venueTemplateData: true,
+        title: true,
+        lifecycleStatus: true,
+        needsReview: true,
+        confidenceScore: true,
+        mergeTargetId: true,
+        address: true,
+        rawAddress: true,
+        normalizedAddress: true,
+        imageUrl: true,
+        shortDescription: true,
+        description: true,
+        lat: true,
+        lng: true,
+        isVenuePageWhitelisted: true,
+        isPublished: true,
       },
     });
 
@@ -176,11 +197,29 @@ export class VenueAdminSummaryService {
         return a.title.localeCompare(b.title, 'ru');
       });
 
+    const displayAddress = venueDisplayAddress(venue);
+    const venueReadiness = computeVenueAdminReadiness({
+      lifecycleStatus: venue.lifecycleStatus,
+      needsReview: venue.needsReview,
+      confidenceScore: venue.confidenceScore,
+      mergeTargetId: venue.mergeTargetId,
+      title: venue.title,
+      displayAddress,
+      imageUrl: venue.imageUrl,
+      shortDescription: venue.shortDescription,
+      description: venue.description,
+      lat: venue.lat,
+      lng: venue.lng,
+      isVenuePageWhitelisted: venue.isVenuePageWhitelisted,
+      isPublished: venue.isPublished,
+    });
+
     const result: VenueAdminSummaryDto = {
       id: venue.id,
       storefront,
       content,
       relatedEvents,
+      venueReadiness,
     };
     if (truncated) {
       result.truncated = true;

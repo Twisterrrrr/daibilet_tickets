@@ -266,3 +266,13 @@ type LandingQueryConfig = {
 - Какой минимальный набор полей для платежных настроек на MVP (provider, enabled, mode, keys)?
 - Нужна ли валидация “test/live ключи соответствуют режиму” и защита от включения платежей без ключей?
 
+## 10) Admin V3: E2E и площадки
+
+### Решения (зафиксировано, 2026‑04)
+
+- Отдельного **E2E-контура** для `frontend-admin-v3` в репозитории пока нет (нет playwright/cypress в workspace). Smoke — вручную или через общий CI, когда появится стандарт.
+- **`GET /admin/venues/:id/summary`:** объединение `venueReadiness` с `PublishGateService.validateVenueForPublish` (подкатегории VENUE) — отложено: доп. запросы к БД, см. комментарий в `VenueAdminSummaryService`.
+
+- Нужен ли единый шаблон E2E (Playwright) для admin-v3 при появлении staging-стенда?
+- Следует ли включать в summary площадки результат publish-gate по умолчанию или по флагу `?includePublishGate=true`?
+
