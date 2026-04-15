@@ -19,6 +19,13 @@ export class AdminDashboardController {
     private readonly dashboard: AdminDashboardService,
   ) {}
 
+  @Get('summary')
+  @ApiQuery({ name: 'nocache', required: false, description: '1/true — обойти Redis (debug)' })
+  async getSummary(@Query('nocache') nocache?: string) {
+    const bypassCache = nocache === '1' || nocache === 'true';
+    return this.dashboard.getDashboardSummary({ bypassCache });
+  }
+
   @Get('analytics-tabs')
   @ApiQuery({
     name: 'sinceDays',

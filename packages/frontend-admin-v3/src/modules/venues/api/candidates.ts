@@ -1,4 +1,5 @@
 import { adminApi } from '@/api/client';
+import type { HubReadinessSnapshot } from '@/types/hub-readiness';
 
 export type VenueLifecycleStatus = 'DRAFT' | 'ACTIVE' | 'MERGED' | 'REJECTED';
 export type VenueSourceType = 'IMPORTED' | 'MANUAL';
@@ -120,6 +121,9 @@ export type AdminVenueDetail = {
   mergeTargetId?: string | null;
   /** Сводка готовности (добавлено бэкендом к полной модели). */
   readiness?: VenueAdminReadinessDto;
+  /** Витринный hub-слой (отдельно от модерационной готовности). */
+  hubReadiness?: HubReadinessSnapshot;
+  venuePageMode?: 'NONE' | 'BASIC' | 'HUB';
   /** Канонический адрес для UI (address → raw → normalized). */
   displayAddress?: string | null;
   city: { id: string; name: string; slug: string };

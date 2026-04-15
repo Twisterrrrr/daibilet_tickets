@@ -297,6 +297,20 @@ enum LandingType {
   MULTI_CITY
 }
 
+/// Режим городского каталожного хаба (intent + конфигурация витрины).
+enum CityCatalogHubStatus {
+  DRAFT
+  ACTIVE
+  DISABLED
+}
+
+/// Режим публичной страницы площадки: без хаба / базовая страница / полноценный venue hub.
+enum VenuePageMode {
+  NONE
+  BASIC
+  HUB
+}
+
 enum LandingEventSourceType {
   AUTO_QUERY
   PRIMARY_COLLECTION
@@ -451,13 +465,18 @@ model User {
 model UserFavorite {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @db.Uuid
+  /// Legacy: slug события; предпочтительно заполнять eventId (dual-write) для FK-целостности.
   eventSlug String
+  eventId   String?  @db.Uuid
+
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventSlug])
   @@index([userId])
+  @@index([eventId])
   @@map("user_favorites")
 }
 
@@ -498,6 +517,9 @@ model City {
   metaDescription String?  @db.Text
   isFeatured      Boolean  @default(false)
   isActive        Boolean  @default(true)
+  /// Город задуман как основная географическая точка входа в каталог (витринный city hub).
+  isCatalogHub       Boolean               @default(false)
+  catalogHubStatus   CityCatalogHubStatus  @default(DISABLED)
   version         Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -728,7 +750,10 @@ model Event {
   startLocation        Location?             @relation("EventStartLocation", fields: [startLocationId], references: [id])
   endLocation          Location?             @relation("EventEndLocation", fields: [endLocationId], references: [id])
   operator             Operator?             @relation(fields: [operatorId], references: [id])
+  /// Поставщик/продавец (B2B); не путать с operatorId (маршрут/перевозчик). Dual-write: supplierId дублирует смысл operator там, где совпадают.
+  supplier             Operator?             @relation("EventSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
   route                Route?                @relation(fields: [routeId], references: [id])
+  userFavorites        UserFavorite[]
   offers               EventOffer[]
   sessions             EventSession[]
   tags                 EventTag[]
@@ -814,6 +839,7 @@ model EventSession {
   event        Event              @relation(fields: [eventId], references: [id], onDelete: Restrict)
   offer        EventOffer?        @relation(fields: [offerId], references: [id], onDelete: SetNull)
   packageItems  PackageItem[]
+  orderRequests OrderRequest[]
   stats         EventSessionStats?
   providerLinks EventSessionProviderLink[]
 
@@ -1712,6 +1738,8 @@ model Venue {
   needsReview     Boolean              @default(false) @map("needs_review")
   /// Обход порога по количеству событий для публикации страницы площадки
   isVenuePageWhitelisted Boolean       @default(false) @map("is_venue_page_whitelisted")
+  /// Уровень витринной страницы площадки (NONE / BASIC / HUB).
+  venuePageMode VenuePageMode @default(NONE) @map("venue_page_mode")
 
   mergeTarget Venue?  @relation("VenueMerge", fields: [mergeTargetId], references: [id], onDelete: Restrict)
   mergedFrom  Venue[] @relation("VenueMerge")
@@ -2237,6 +2265,8 @@ model Operator {
   pspFeeMode         PspFeeMode  @default(PLATFORM_PAYS)
 
   events                  Event[]
+  eventsAsSupplier        Event[]                  @relation("EventSupplier")
+  paymentIntentsSupplier  PaymentIntent[]        @relation("PaymentIntentSupplier")
   venues                  Venue[]                  @relation("VenueOperator")
   reviews                 Review[]
   offers                  EventOffer[]
@@ -2769,6 +2799,7 @@ model OrderRequest {
   checkoutSession CheckoutSession? @relation(fields: [checkoutSessionId], references: [id])
   event           Event            @relation(fields: [eventId], references: [id])
   eventOffer      EventOffer       @relation(fields: [eventOfferId], references: [id])
+  session         EventSession?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([checkoutSessionId])
   @@index([status])
@@ -2810,6 +2841,7 @@ model PaymentIntent {
 
   // === Split Payment (маркетплейс) ===
   supplierId     String?  @db.Uuid
+  supplier       Operator? @relation("PaymentIntentSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
   grossAmount    Int? // Полная сумма от клиента (копейки)
   platformFee    Int? // Комиссия платформы (копейки)
   supplierAmount Int? // Сумма поставщику (копейки)

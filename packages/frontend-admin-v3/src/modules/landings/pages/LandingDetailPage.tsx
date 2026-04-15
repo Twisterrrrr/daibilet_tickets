@@ -1,5 +1,6 @@
 import { ErrorState } from '@/components/shared/states/ErrorState';
 import { LoadingState } from '@/components/shared/states/LoadingState';
+import { HubReadinessPanel } from '@/components/shared/hub-readiness/HubReadinessPanel';
 import { PageHeader } from '@/components/shared/page-header/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -434,6 +435,8 @@ export function LandingDetailPage() {
           </div>
         }
       />
+
+      <HubReadinessPanel title="Лендинг (hub readiness)" snapshot={draft.hubReadiness} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg border bg-card p-5 space-y-4">

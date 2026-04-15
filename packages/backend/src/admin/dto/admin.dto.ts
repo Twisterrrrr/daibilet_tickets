@@ -13,7 +13,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { StructuralTagGroup, TagCategory, TagKind } from '@/prisma-client';
+import { CityCatalogHubStatus, StructuralTagGroup, TagCategory, TagKind } from '@/prisma-client';
 
 // ── Reconciliation ────────────────────────────────
 
@@ -244,6 +244,16 @@ export class UpdateCityDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ description: 'Город — каталожный хаб (географическая точка входа)' })
+  @IsOptional()
+  @IsBoolean()
+  isCatalogHub?: boolean;
+
+  @ApiPropertyOptional({ enum: CityCatalogHubStatus })
+  @IsOptional()
+  @IsEnum(CityCatalogHubStatus)
+  catalogHubStatus?: CityCatalogHubStatus;
 
   @ApiPropertyOptional()
   @IsOptional()

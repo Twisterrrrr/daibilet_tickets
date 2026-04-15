@@ -9,18 +9,19 @@ import { adminApi } from '@/api/client';
 import { getAdminErrorDisplay } from '@/lib/get-admin-error-message';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { fetchAdminLandingsList, type AdminLandingListRow } from '@/modules/landings/api/landings';
 
 export function LandingsListPage() {
+  const [searchParams] = useSearchParams();
   const siteBase =
     (import.meta as unknown as { env?: { VITE_PUBLIC_SITE_URL?: string } }).env?.VITE_PUBLIC_SITE_URL ?? '';
 
   const [searchInput, setSearchInput] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [page, setPage] = React.useState(1);
-  const [city, setCity] = React.useState('');
+  const [city, setCity] = React.useState(() => searchParams.get('city') ?? '');
   const [status, setStatus] = React.useState('');
   const [landingType, setLandingType] = React.useState('');
   const [eventSourceType, setEventSourceType] = React.useState('');

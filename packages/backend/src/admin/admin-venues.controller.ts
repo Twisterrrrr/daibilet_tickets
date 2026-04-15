@@ -63,6 +63,10 @@ import {
   venueDisplayAddress,
 } from './venue-admin-readiness.util';
 import { parseVenueReadinessStatusQuery, venueReadinessListWhere } from './venue-admin-list-readiness-where.util';
+import {
+  buildVenueHubReadinessSnapshot,
+  loadVenueStorefrontEventCounts,
+} from './hub-readiness/hub-readiness-snapshot.util';
 
 class UpdateVenueSubcategoriesDto {
   @IsOptional()
@@ -234,6 +238,8 @@ class AutoModerationRunBodyDto {
 @UseInterceptors(AuditInterceptor)
 @Controller('admin/venues')
 export class AdminVenuesController {
+  private readonly publicSiteBase = process.env.PUBLIC_SITE_URL?.replace(/\/$/, '') ?? null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly venueAdminSummary: VenueAdminSummaryService,
@@ -317,10 +323,11 @@ export class AdminVenuesController {
     const pageItems = hasMore ? items.slice(0, pg.limit) : items;
     const nextCursor = hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null;
 
-    const eventStats = await loadVenueListEventStats(
-      this.prisma,
-      pageItems.map((v) => v.id),
-    );
+    const venueIdsPage = pageItems.map((v) => v.id);
+    const [eventStats, storefrontEv] = await Promise.all([
+      loadVenueListEventStats(this.prisma, venueIdsPage),
+      loadVenueStorefrontEventCounts(this.prisma, venueIdsPage),
+    ]);
 
     let hints: Record<string, { decisionHint: string; decisionHintReasons: string[] }> = {};
     if (includeDecisionHints === 'true' && pageItems.length > 0) {
@@ -363,11 +370,33 @@ export class AdminVenuesController {
         });
         const activeEventsCount = eventStats.activeEventsByVenue.get(v.id) ?? 0;
         const futureEventsCount = eventStats.futureEventsByVenue.get(v.id) ?? 0;
+        const storefrontActiveEvents = storefrontEv.get(v.id) ?? 0;
+        const hubReadiness = buildVenueHubReadinessSnapshot({
+          venueId: v.id,
+          slug: v.slug,
+          title: v.title,
+          cityId: v.cityId,
+          citySlug: v.city?.slug ?? null,
+          venuePageMode: v.venuePageMode,
+          isActive: v.isActive,
+          isPublished: v.isPublished,
+          lifecycleStatus: v.lifecycleStatus,
+          mergeTargetId: v.mergeTargetId,
+          address: v.address,
+          displayAddress,
+          metaTitle: v.metaTitle,
+          metaDescription: v.metaDescription,
+          description: v.description,
+          imageUrl: v.imageUrl,
+          storefrontActiveEvents,
+          siteBaseUrl: this.publicSiteBase,
+        });
         return {
           id: v.id,
           slug: v.slug,
           title: v.title,
           venueType: v.venueType,
+          venuePageMode: v.venuePageMode,
           city: v.city,
           rating: Number(v.rating),
           isActive: v.isActive,
@@ -389,6 +418,7 @@ export class AdminVenuesController {
           readinessStatus: readiness.status,
           readinessScore: readiness.score,
           readinessKeySignals: readiness.keySignals,
+          hubReadiness,
           mergeTargetSummary: v.mergeTarget
             ? { id: v.mergeTarget.id, title: v.mergeTarget.title, slug: v.mergeTarget.slug }
             : null,
@@ -682,12 +712,35 @@ export class AdminVenuesController {
       isVenuePageWhitelisted: venue.isVenuePageWhitelisted,
       isPublished: venue.isPublished,
     });
+    const storefrontMap = await loadVenueStorefrontEventCounts(this.prisma, [id]);
+    const storefrontActiveEvents = storefrontMap.get(id) ?? 0;
+    const hubReadiness = buildVenueHubReadinessSnapshot({
+      venueId: venue.id,
+      slug: venue.slug,
+      title: venue.title,
+      cityId: venue.cityId,
+      citySlug: venue.city?.slug ?? null,
+      venuePageMode: venue.venuePageMode,
+      isActive: venue.isActive,
+      isPublished: venue.isPublished,
+      lifecycleStatus: venue.lifecycleStatus,
+      mergeTargetId: venue.mergeTargetId,
+      address: venue.address,
+      displayAddress,
+      metaTitle: venue.metaTitle,
+      metaDescription: venue.metaDescription,
+      description: venue.description,
+      imageUrl: venue.imageUrl,
+      storefrontActiveEvents,
+      siteBaseUrl: this.publicSiteBase,
+    });
     return {
       ...venue,
       rating: Number(venue.rating),
       externalRating: venue.externalRating ? Number(venue.externalRating) : null,
       displayAddress,
       readiness,
+      hubReadiness,
     };
   }
 
@@ -970,6 +1023,7 @@ export class AdminVenuesController {
         ...(body.refundPolicyMode !== undefined && { refundPolicyMode: body.refundPolicyMode }),
         ...(body.refundPolicyText !== undefined && { refundPolicyText: body.refundPolicyText || null }),
         ...(body.venueTemplateData !== undefined && { venueTemplateData: body.venueTemplateData }),
+        ...(body.venuePageMode !== undefined && { venuePageMode: body.venuePageMode }),
         version: { increment: 1 },
       } as Parameters<typeof this.prisma.venue.updateMany>[0]['data'],
     });

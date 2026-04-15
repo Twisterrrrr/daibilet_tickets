@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { VenueRefundPolicyMode, VenueType } from '@/prisma-client';
+import { VenuePageMode, VenueRefundPolicyMode, VenueType } from '@/prisma-client';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -183,6 +183,11 @@ export class CreateVenueDto {
   @IsOptional()
   @IsObject()
   venueTemplateData?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ enum: VenuePageMode, description: 'Режим витринной страницы площадки (NONE / BASIC / HUB)' })
+  @IsOptional()
+  @IsEnum(VenuePageMode)
+  venuePageMode?: VenuePageMode;
 }
 
 export class UpdateVenueDto extends PartialType(CreateVenueDto) {

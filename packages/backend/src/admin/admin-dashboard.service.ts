@@ -15,6 +15,9 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 
 import { AnalyticsService } from './analytics.service';
+import { buildDashboardSummary } from './admin-dashboard-summary.util';
+import type { DashboardSummaryResponse } from './dashboard-summary.types';
+import { SeoAuditService } from './seo-audit/seo-audit.service';
 
 
 
@@ -130,6 +133,8 @@ export class AdminDashboardService {
     private readonly latency: OperationLatencyTrackerService,
 
     private readonly analytics: AnalyticsService,
+
+    private readonly seoAudit: SeoAuditService,
 
   ) {}
 
@@ -291,6 +296,41 @@ export class AdminDashboardService {
 
     };
 
+  }
+
+  private static readonly DASHBOARD_SUMMARY_CACHE_KEY = 'dashboard:summary:v1';
+
+  /**
+   * Операционная сводка витрины (Health / Activity / Content / Operations + Attention).
+   * Кэш Redis ~60–120 с (см. CACHE_TTL.DASHBOARD_SUMMARY).
+   */
+  async getDashboardSummary(opts?: { bypassCache?: boolean }): Promise<DashboardSummaryResponse> {
+    const ttl = CACHE_TTL.DASHBOARD_SUMMARY;
+    const bypass =
+      opts?.bypassCache === true || process.env.DASHBOARD_CACHE_BYPASS === '1';
+    if (!bypass) {
+      const cached = await this.cache.get<DashboardSummaryResponse>(
+        AdminDashboardService.DASHBOARD_SUMMARY_CACHE_KEY,
+      );
+      if (cached) {
+        return {
+          ...cached,
+          meta: {
+            ...cached.meta,
+            servedFromCache: true,
+          },
+        };
+      }
+    }
+
+    const body = await buildDashboardSummary({
+      prisma: this.prisma,
+      seoAudit: this.seoAudit,
+    });
+    if (!bypass) {
+      await this.cache.set(AdminDashboardService.DASHBOARD_SUMMARY_CACHE_KEY, body, ttl);
+    }
+    return body;
   }
 
 }

@@ -31,6 +31,9 @@ import {
 } from './dto/admin.dto';
 import { SetTrustOverrideDto } from './dto/admin-supplier.dto';
 import { AuditService } from './audit.service';
+import { ListingHealthService } from '../catalog/listing-health.service';
+import { loadSupplierAdminPageMetrics } from './supplier-admin-metrics.util';
+import { computeSupplierAdminReadiness, supplierReadinessListWhere } from './supplier-admin-readiness.util';
 import { SupplierTrustService } from '../supplier/supplier-trust.service';
 
 @ApiTags('admin')
@@ -43,51 +46,112 @@ export class AdminSuppliersController {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly supplierTrust: SupplierTrustService,
+    private readonly listingHealth: ListingHealthService,
   ) {}
 
   /**
-   * Список поставщиков.
+   * Список поставщиков (обогащённый DTO: readiness, метрики каталога, юр./фин. сигналы).
    */
   @Get()
   async list(
     @Query('search') search?: string,
     @Query('trustLevel') trustLevel?: string,
     @Query('isActive') isActive?: string,
+    @Query('status') status?: string,
+    @Query('readinessStatus') readinessStatus?: string,
+    @Query('hasBlockedEvents') hasBlockedEvents?: string,
+    @Query('hasNoUsers') hasNoUsers?: string,
+    @Query('hasLegalIssue') hasLegalIssue?: string,
+    @Query('listingHealthMin') listingHealthMin?: string,
+    @Query('updatedFrom') updatedFrom?: string,
+    @Query('updatedTo') updatedTo?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
-    const where: Prisma.OperatorWhereInput = { isSupplier: true };
+    const andParts: Prisma.OperatorWhereInput[] = [{ isSupplier: true }];
 
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { companyName: { contains: search, mode: 'insensitive' } },
-        { contactEmail: { contains: search, mode: 'insensitive' } },
-        { inn: { contains: search } },
-      ];
+      andParts.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { companyName: { contains: search, mode: 'insensitive' } },
+          { contactEmail: { contains: search, mode: 'insensitive' } },
+          { inn: { contains: search } },
+        ],
+      });
     }
-    if (trustLevel !== undefined) {
+    if (trustLevel !== undefined && trustLevel !== '') {
       const tl = Number(trustLevel);
       if (!Number.isNaN(tl)) {
-        where.trustLevel = tl;
+        andParts.push({ trustLevel: tl });
       }
     }
     if (isActive === 'true') {
-      where.isActive = true;
+      andParts.push({ isActive: true });
     } else if (isActive === 'false') {
-      where.isActive = false;
+      andParts.push({ isActive: false });
     }
+    if (status && ['ACTIVE', 'SUSPENDED', 'ARCHIVED'].includes(status)) {
+      andParts.push({ status: status as 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED' });
+    }
+    if (readinessStatus === 'READY' || readinessStatus === 'NEEDS_WORK' || readinessStatus === 'BLOCKED') {
+      andParts.push(supplierReadinessListWhere(readinessStatus));
+    }
+    if (hasBlockedEvents === 'true') {
+      andParts.push({
+        events: { some: { isDeleted: false, moderationStatus: 'REJECTED' } },
+      });
+    }
+    if (hasNoUsers === 'true') {
+      andParts.push({ NOT: { supplierUsers: { some: { isActive: true } } } });
+    }
+    if (hasLegalIssue === 'true') {
+      andParts.push({
+        OR: [
+          { legalProfile: null },
+          { legalProfile: { status: { in: ['REJECTED', 'INCOMPLETE', 'DRAFT'] } } },
+        ],
+      });
+    }
+    if (listingHealthMin !== undefined && listingHealthMin !== '') {
+      const n = Number(listingHealthMin);
+      if (!Number.isNaN(n)) {
+        andParts.push({ trustCatalogScore: { gte: n } });
+      }
+    }
+    if (updatedFrom || updatedTo) {
+      const range: Prisma.DateTimeFilter = {};
+      if (updatedFrom) {
+        const d = new Date(updatedFrom);
+        if (!Number.isNaN(d.getTime())) range.gte = d;
+      }
+      if (updatedTo) {
+        const d = new Date(updatedTo);
+        if (!Number.isNaN(d.getTime())) range.lte = d;
+      }
+      if (Object.keys(range).length) andParts.push({ updatedAt: range });
+    }
+
+    const where: Prisma.OperatorWhereInput = { AND: andParts };
 
     const [rawItems, total, eventsBySourceRaw] = await Promise.all([
       this.prisma.operator.findMany({
         where,
         include: {
-          _count: { select: { events: true, offers: true, supplierUsers: true } },
+          _count: {
+            select: {
+              events: { where: { isDeleted: false } },
+              offers: true,
+              supplierUsers: { where: { isActive: true } },
+              venues: { where: { isDeleted: false } },
+            },
+          },
           supplierTrustOverride: true,
+          legalProfile: { select: { id: true, status: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { updatedAt: 'desc' },
         ...paginationArgs(pg),
       }),
       this.prisma.operator.count({ where }),
@@ -106,19 +170,128 @@ export class AdminSuppliersController {
       {} as Record<string, number>,
     );
 
+    const ids = rawItems.map((r) => r.id);
+    const metrics = await loadSupplierAdminPageMetrics(this.prisma, ids);
+
     const now = new Date();
     const itemsForPage = rawItems.map((r) => {
-      const { supplierTrustOverride, ...rest } = r;
+      const { supplierTrustOverride, legalProfile, _count, ...rest } = r;
+      const ev = metrics.events.get(r.id) ?? { total: 0, active: 0, blocked: 0, inactive: 0 };
+      const ownerCount = metrics.activeOwners.get(r.id) ?? 0;
+      const pendingSt = metrics.pendingSettlements.get(r.id) ?? 0;
+      const draftDocs = metrics.draftDocuments.get(r.id) ?? 0;
+      const commissionRate = Number(r.commissionRate);
+      const listingHealthScore = r.trustCatalogScore ?? 0;
+
+      const readiness = computeSupplierAdminReadiness({
+        name: r.name,
+        isActive: r.isActive,
+        status: r.status,
+        trustLevel: r.trustLevel,
+        listingHealthScore,
+        eventsCount: ev.total,
+        activeEventsCount: ev.active,
+        blockedEventsCount: ev.blocked,
+        usersCount: _count.supplierUsers,
+        hasOwner: ownerCount > 0,
+        legalStatus: legalProfile?.status ?? null,
+        hasLegalProfile: !!legalProfile,
+        pendingSettlementsCount: pendingSt,
+        documentsDraftCount: draftDocs,
+        commissionRate,
+      });
+
       return {
         ...rest,
+        _count,
+        legalProfile,
+        stats: {
+          eventsCount: ev.total,
+          activeEventsCount: ev.active,
+          publishableEventsCount: ev.active,
+          blockedEventsCount: ev.blocked,
+          draftEventsCount: ev.inactive,
+          venuesCount: _count.venues,
+          offersCount: _count.offers,
+          usersCount: _count.supplierUsers,
+          activeOwnersCount: ownerCount,
+          pendingSettlementsCount: pendingSt,
+          documentsDraftCount: draftDocs,
+        },
+        listingHealthScore,
+        /** Полный пересчёт: GET /admin/catalog/health?operatorId= */
+        listingHealthSource: 'trust_catalog_score' as const,
         effectiveTrustScore: this.supplierTrust.getEffectiveScore(r),
         trustOverrideActive: !!(supplierTrustOverride && supplierTrustOverride.expiresAt > now),
+        commissionRate,
+        readiness,
+        readinessStatus: readiness.status,
+        readinessScore: readiness.score,
+        readinessKeySignals: readiness.keySignals,
+        flags: {
+          hasLegalProfile: !!legalProfile,
+          legalProfileStatus: legalProfile?.status ?? null,
+          hasOwner: ownerCount > 0,
+        },
       };
     });
 
     return {
       ...buildPaginatedResult(itemsForPage, total, pg.limit),
       eventCountsBySource,
+    };
+  }
+
+  // ============================
+  // Analytics (статический путь до :id)
+  // ============================
+
+  /**
+   * Сводная аналитика по поставщикам.
+   */
+  @Get('analytics/summary')
+  @Roles('ADMIN')
+  async analyticsSummary() {
+    const [totalSuppliers, byTrustLevel, topByRevenue] = await Promise.all([
+      this.prisma.operator.count({ where: { isSupplier: true } }),
+      this.prisma.operator.groupBy({
+        by: ['trustLevel'],
+        where: { isSupplier: true },
+        _count: { id: true },
+      }),
+      this.prisma.paymentIntent.groupBy({
+        by: ['supplierId'],
+        where: { status: 'PAID', supplierId: { not: null } },
+        _sum: { grossAmount: true, platformFee: true },
+        _count: { id: true },
+        orderBy: { _sum: { grossAmount: 'desc' } },
+        take: 10,
+      }),
+    ]);
+
+    const topSupplierIds = topByRevenue.map((t) => t.supplierId).filter(Boolean) as string[];
+    const topSupplierNames =
+      topSupplierIds.length > 0
+        ? await this.prisma.operator.findMany({
+            where: { id: { in: topSupplierIds } },
+            select: { id: true, name: true },
+          })
+        : [];
+    const nameMap = new Map(topSupplierNames.map((s) => [s.id, s.name]));
+
+    return {
+      totalSuppliers,
+      byTrustLevel: byTrustLevel.map((t) => ({
+        level: t.trustLevel,
+        count: t._count.id,
+      })),
+      topByRevenue: topByRevenue.map((t) => ({
+        supplierId: t.supplierId,
+        supplierName: nameMap.get(t.supplierId!) || 'Unknown',
+        totalOrders: t._count.id,
+        grossRevenue: t._sum.grossAmount || 0,
+        platformFee: t._sum.platformFee || 0,
+      })),
     };
   }
 
@@ -162,20 +335,107 @@ export class AdminSuppliersController {
       include: {
         supplierTrustOverride: true,
         supplierUsers: { select: { id: true, email: true, name: true, role: true, isActive: true, lastLoginAt: true } },
-        _count: { select: { events: true, offers: true } },
+        legalProfile: {
+          include: {
+            bankAccounts: { select: { id: true, isPrimary: true, bankName: true, bik: true, accountNumber: true } },
+          },
+        },
+        edoProfile: { select: { id: true, provider: true, inn: true, isActive: true } },
+        _count: {
+          select: {
+            events: { where: { isDeleted: false } },
+            offers: true,
+            venues: { where: { isDeleted: false } },
+            supplierUsers: { where: { isActive: true } },
+            supplierSettlements: true,
+            supplierDocuments: true,
+          },
+        },
       },
     });
     if (!supplier) throw new NotFoundException('Поставщик не найден');
+    if (!supplier.isSupplier) throw new NotFoundException('Оператор не является поставщиком (isSupplier=false)');
 
-    // Финансовая сводка
-    const payments = await this.prisma.paymentIntent.aggregate({
-      where: { supplierId: id, status: 'PAID' },
-      _sum: { grossAmount: true, platformFee: true, supplierAmount: true },
-      _count: { id: true },
+    const [payments, metrics, listingHealthFull, settlementGroups, documentGroups] = await Promise.all([
+      this.prisma.paymentIntent.aggregate({
+        where: { supplierId: id, status: 'PAID' },
+        _sum: { grossAmount: true, platformFee: true, supplierAmount: true },
+        _count: { id: true },
+      }),
+      loadSupplierAdminPageMetrics(this.prisma, [id]),
+      this.listingHealth.computeForOperator(id),
+      this.prisma.supplierSettlement.groupBy({
+        by: ['status'],
+        where: { operatorId: id },
+        _count: { _all: true },
+      }),
+      this.prisma.supplierDocument.groupBy({
+        by: ['status'],
+        where: { operatorId: id },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const ev = metrics.events.get(id) ?? { total: 0, active: 0, blocked: 0, inactive: 0 };
+    const ownerCount = metrics.activeOwners.get(id) ?? 0;
+    const pendingSt = metrics.pendingSettlements.get(id) ?? 0;
+    const draftDocs = metrics.draftDocuments.get(id) ?? 0;
+    const commissionRate = Number(supplier.commissionRate);
+    const listingHealthScore = supplier.trustCatalogScore ?? 0;
+
+    const readiness = computeSupplierAdminReadiness({
+      name: supplier.name,
+      isActive: supplier.isActive,
+      status: supplier.status,
+      trustLevel: supplier.trustLevel,
+      listingHealthScore,
+      eventsCount: ev.total,
+      activeEventsCount: ev.active,
+      blockedEventsCount: ev.blocked,
+      usersCount: supplier._count.supplierUsers,
+      hasOwner: ownerCount > 0,
+      legalStatus: supplier.legalProfile?.status ?? null,
+      hasLegalProfile: !!supplier.legalProfile,
+      pendingSettlementsCount: pendingSt,
+      documentsDraftCount: draftDocs,
+      commissionRate,
     });
+
+    const rolesSummary = supplier.supplierUsers.reduce(
+      (acc, u) => {
+        acc[u.role] = (acc[u.role] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     return {
       ...supplier,
+      stats: {
+        eventsCount: ev.total,
+        activeEventsCount: ev.active,
+        publishableEventsCount: ev.active,
+        blockedEventsCount: ev.blocked,
+        draftEventsCount: ev.inactive,
+        venuesCount: supplier._count.venues,
+        offersCount: supplier._count.offers,
+        usersCount: supplier._count.supplierUsers,
+        activeOwnersCount: ownerCount,
+        pendingSettlementsCount: pendingSt,
+        documentsDraftCount: draftDocs,
+      },
+      listingHealth: {
+        scoreProxy: listingHealthScore,
+        full: listingHealthFull,
+      },
+      settlementsByStatus: settlementGroups.map((g) => ({ status: g.status, count: g._count._all })),
+      documentsByStatus: documentGroups.map((g) => ({ status: g.status, count: g._count._all })),
+      access: {
+        ownerPresent: ownerCount > 0,
+        activeOwnersCount: ownerCount,
+        rolesSummary,
+      },
+      readiness,
       financials: {
         totalOrders: payments._count.id,
         grossRevenue: payments._sum.grossAmount || 0,
@@ -520,60 +780,6 @@ export class AdminSuppliersController {
       webhookUrl: updated.webhookUrl,
       webhookSecret: updated.webhookSecret,
       message: 'Webhook настроен',
-    };
-  }
-
-  // ============================
-  // Analytics
-  // ============================
-
-  /**
-   * Сводная аналитика по поставщикам.
-   */
-  @Get('analytics/summary')
-  @Roles('ADMIN')
-  async analyticsSummary() {
-    const [totalSuppliers, byTrustLevel, topByRevenue] = await Promise.all([
-      this.prisma.operator.count({ where: { isSupplier: true } }),
-      this.prisma.operator.groupBy({
-        by: ['trustLevel'],
-        where: { isSupplier: true },
-        _count: { id: true },
-      }),
-      this.prisma.paymentIntent.groupBy({
-        by: ['supplierId'],
-        where: { status: 'PAID', supplierId: { not: null } },
-        _sum: { grossAmount: true, platformFee: true },
-        _count: { id: true },
-        orderBy: { _sum: { grossAmount: 'desc' } },
-        take: 10,
-      }),
-    ]);
-
-    // Enriched top suppliers
-    const topSupplierIds = topByRevenue.map((t) => t.supplierId).filter(Boolean) as string[];
-    const topSupplierNames =
-      topSupplierIds.length > 0
-        ? await this.prisma.operator.findMany({
-            where: { id: { in: topSupplierIds } },
-            select: { id: true, name: true },
-          })
-        : [];
-    const nameMap = new Map(topSupplierNames.map((s) => [s.id, s.name]));
-
-    return {
-      totalSuppliers,
-      byTrustLevel: byTrustLevel.map((t) => ({
-        level: t.trustLevel,
-        count: t._count.id,
-      })),
-      topByRevenue: topByRevenue.map((t) => ({
-        supplierId: t.supplierId,
-        supplierName: nameMap.get(t.supplierId!) || 'Unknown',
-        totalOrders: t._count.id,
-        grossRevenue: t._sum.grossAmount || 0,
-        platformFee: t._sum.platformFee || 0,
-      })),
     };
   }
 

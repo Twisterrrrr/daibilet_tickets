@@ -1,4 +1,5 @@
 import { adminApi } from '@/api/client';
+import type { HubReadinessSnapshot } from '@/types/hub-readiness';
 
 export type AdminLandingType = 'HUB' | 'CITY' | 'MULTI_CITY';
 export type AdminLandingEventSourceType = 'AUTO_QUERY' | 'PRIMARY_COLLECTION' | 'MIXED';
@@ -62,6 +63,8 @@ export type AdminLandingDetail = AdminLandingListRow & {
 
   relatedArticleIds: string[];
   relatedCollectionIds: string[];
+
+  hubReadiness?: HubReadinessSnapshot;
 };
 
 export type AdminLandingResolvedEventsResponse = {

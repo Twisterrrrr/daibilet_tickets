@@ -38,6 +38,7 @@ import {
   StatsSchema,
   validateJson,
 } from './json-schemas';
+import { buildLandingHubReadinessSnapshot } from './hub-readiness/hub-readiness-snapshot.util';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -45,6 +46,8 @@ import {
 @UseInterceptors(AuditInterceptor)
 @Controller('admin/landings')
 export class AdminLandingsController {
+  private readonly publicSiteBase = process.env.PUBLIC_SITE_URL?.replace(/\/$/, '') ?? null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -105,7 +108,7 @@ export class AdminLandingsController {
 
   @Get(':id')
   async get(@Param('id') id: string) {
-    return this.prisma.landingPage.findUniqueOrThrow({
+    const landing = await this.prisma.landingPage.findUniqueOrThrow({
       where: { id },
       include: {
         city: { select: { slug: true, name: true } },
@@ -119,6 +122,34 @@ export class AdminLandingsController {
         },
       },
     });
+
+    const resolved = await this.landings.resolveAdminResolvedEvents(id);
+    const hubReadiness = buildLandingHubReadinessSnapshot({
+      landingId: landing.id,
+      slug: landing.slug,
+      title: landing.title,
+      landingType: landing.landingType,
+      status: landing.status,
+      isDeleted: landing.isDeleted,
+      isActive: landing.isActive,
+      isIndexable: landing.isIndexable,
+      cityId: landing.cityId,
+      parentLandingId: landing.parentLandingId,
+      metaTitle: landing.metaTitle,
+      metaDescription: landing.metaDescription,
+      heroText: landing.heroText,
+      subtitle: landing.subtitle,
+      collectionId: landing.collectionId,
+      relatedArticleIds: landing.relatedArticleIds,
+      relatedCollectionIds: landing.relatedCollectionIds,
+      resolvedEventsTotal: resolved.total,
+      childLandingsCount: landing.childLandings.length,
+      citySlug: landing.city?.slug ?? null,
+      canonicalUrl: landing.canonicalUrl,
+      siteBaseUrl: this.publicSiteBase,
+    });
+
+    return { ...landing, hubReadiness };
   }
 
   @Post()

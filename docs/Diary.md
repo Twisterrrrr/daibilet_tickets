@@ -4,6 +4,62 @@
 
 ---
 
+## 14.04.2026 — Hub readiness framework (City / Venue / Landing, без таблицы Hub)
+
+### Наблюдения
+
+- Нужен единый read-model **готовности витринной точки входа** без новой сущности «Hub» и без дублирования City/Venue/Landing.
+- Intent-поля в Prisma: город — `isCatalogHub` + `catalogHubStatus`; площадка — `venuePageMode` (NONE/BASIC/HUB). У лендинга intent уже задаёт `landingType` + статусы.
+
+### Решения
+
+- **Prisma:** enum `CityCatalogHubStatus`, `VenuePageMode`; миграция `20260414233000_city_venue_hub_intent`.
+- **Backend:** модули `hub-readiness/*.ts` — `HubReadinessSnapshot`, `buildCityHubReadinessSnapshot` / `buildVenueHubReadinessSnapshot` / `buildLandingHubReadinessSnapshot`; батч `loadCityHubBatchAuxMetrics`, `loadVenueStorefrontEventCounts`; поле **`hubReadiness`** в ответах `GET /admin/cities`, `GET /admin/cities/:id`, `GET /admin/venues` (list), `GET /admin/venues/:id`, `GET /admin/landings/:id`; PATCH городов — `isCatalogHub`, `catalogHubStatus`; PATCH площадок — `venuePageMode`.
+- **Frontend:** `HubReadinessPanel`, типы `types/hub-readiness.ts`; блоки на City/Venue/Landing detail.
+- **Тесты:** vitest на snapshot (базовые кейсы).
+
+### Проблемы
+
+- `GET /admin/landings/:id` вызывает `resolveAdminResolvedEvents` — при открытии деталки фронт может второй раз запросить resolved-events (дублирование нагрузки); при необходимости вынести «только count» или кешировать.
+
+## 14.04.2026 — Admin V3: поставщики — list/detail, readiness, метрики (Operator isSupplier)
+
+### Наблюдения
+
+- Поставщик в БД — это **Operator** с `isSupplier: true`; админ-API `/admin/suppliers` уже существовал, UI был заглушкой.
+- Маршрут `GET /admin/suppliers/analytics/summary` был объявлен **после** `GET :id` — в Nest односегментный `:id` перехватывал бы `analytics` при неверном порядке; двухсегментный путь безопаснее, но порядок всё равно исправлен.
+
+### Решения
+
+- **Backend:** `computeSupplierAdminReadiness` + метрики `loadSupplierAdminPageMetrics` (события по operatorId, OWNER, pending settlements, черновики документов); расширены list/detail DTO; listing health на detail — один вызов `ListingHealthService.computeForOperator`; `analytics/summary` перенесён выше `:id`.
+- **Frontend:** список и карточка с вкладками (каталог, пользователи, финансы, юрданные, документы/расчёты, качество/trust); PATCH через существующий контракт.
+- **Тесты:** unit на readiness.
+
+### Проблемы
+
+- На списке индекс «listing health» показан как **proxy** (`trustCatalogScore`), полный пересчёт только на detail или `GET /admin/catalog/health`.
+
+---
+
+## 14.04.2026 — Admin V3: города — list/detail, readiness, метрики каталога
+
+### Наблюдения
+
+- Сущность **City** в Prisma уже была; админ-контроллер отдавал «сырой» список с `_count`, UI был заглушкой.
+- Для SEO-хаба нужны **готовность**, **счётчики** (события / площадки / лендинги) и **связи** без тяжёлого графа.
+
+### Решения
+
+- **Backend:** `computeCityAdminReadiness` + SQL-аппроксимация для фильтра списка; `loadCityAdminListMetrics` (активные события, будущие сеансы, активные площадки/лендинги); `GET /admin/cities/region-options`; list/detail обогащены `stats`, `flags`, `readiness`, публичный путь `/cities/:slug`.
+- **Frontend:** список городов с фильтрами и строкой как у площадок; детальная карточка с вкладками и панелью готовности; лендинги — deep link `?city=slug` в `LandingsListPage`.
+- **Тесты:** unit на readiness (vitest).
+
+### Проблемы
+
+- Фильтр готовности по списку — аппроксимация; точное совпадение с поштучным score на границах возможных расхождений.
+
+---
+
 ## 14.04.2026 — Admin V3: площадки — фильтр readiness по SQL, лейблы ЖЦ, бэклог publish-gate
 
 ### Наблюдения
@@ -5360,3 +5416,67 @@ Tripster — лидер рынка экскурсий в России. Прям�
 #### Проблемы
 - Реализация запрета `/landings/*` и возврат к корневым HUB’ам требует аккуратной миграции без регрессий: нужно убрать конкурирующие public routes и проверить canonical/links.
 - Для `CatalogPolicyService.isStorefrontSafe` важно не разойтись с текущими publish-gate инвариантами (чтобы “safe” не стало новым источником несовместимых правил в разных местах).
+
+---
+
+### 2026-04-14 — Admin V3: операционный Dashboard (UI)
+
+#### Наблюдения
+- Сводка `GET /api/v1/admin/dashboard/summary` уже собирается на бэкенде (health, activity-заглушки, content, operations, attention, meta с кэшем).
+- В админке нужна одна страница без «BI-графиков»: карточки метрик, таблица «Requires attention», ссылки на сущности и смежные разделы (SEO Audit, тикеты).
+
+#### Решения
+- Страница `DashboardPage`: React Query → `adminApi.get('/admin/dashboard/summary')`, секции Health / Activity / Content & SEO / Operations, таблица attention, кнопки SEO Audit / тикеты / чаты / отзывы.
+- Типы и вызов API вынесены в `modules/dashboard/api/dashboard.ts`.
+
+#### Проблемы
+- Трафик и просмотры в Activity пока нули/заглушка до появления трекинга или отдельного сервиса аналитики; текст пояснения берётся из `meta.activityNote`.
+
+---
+
+### 2026-04-14 — Аудит: Buyer Account / покупки / выравнивание с Admin (промпт)
+
+#### Наблюдения
+- Каноническая запись покупки для ЛК — **CheckoutSession** + снимки `offersSnapshot`, исполнение — **FulfillmentItem** / **PaymentIntent**; отдельной модели `CustomerPurchase` в Prisma нет.
+- **PurchaseReadService** + **purchase-display.util** (`getPurchaseDisplayType`, `derivePurchaseActions`) уже задают единые семантики типа/действий для `GET /api/v1/account/purchases`.
+- Публичный фронт: `/account/purchases` грузит список через API; деталь — **`/account/orders/[id]`**, не `/account/purchases/[id]`.
+- **RefundRequest** в БД — на уровне позиции фулфилмента; админ — `admin-refunds.controller` + `FulfillmentRefundRequestService` (не чистый «workflow без платежей»).
+- Admin V3: разделов **`/admin/customers`** и **`/admin/purchases`** по контракту из промпта в коде пока нет — общий read-layer с ЛК для админки не подключён.
+
+#### Решения
+- Зафиксирован аудит в шапке `packages/backend/src/account/purchase-read.service.ts` (источник истины для списка покупок, триггеры, GAP).
+- Дальнейшая реализация спецификации — по фазам: сначала расширение DTO/эндпоинтов поверх существующих таблиц и **одного** read-service; опциональная таблица-проекция — только после согласования миграции.
+
+#### Проблемы
+- Полное совпадение enum’ов промпта (`purchaseStatus`, `artifactStatus`, `refundStatus`) с текущими `PurchaseDisplayType` / `CheckoutStatus` / `FulfillmentStatus` потребует явной матрицы маппинга, иначе риск дублирования логики на фронте.
+
+---
+
+### 2026-04-14 — Prisma: FK для supplier, split payment, session в заявке, избранное
+
+#### Наблюдения
+- Часть контентных связей уже была усилена ранее (Article M2M, `LandingPage.filterTagId`, `CollectionTagFilter`).
+- Оставались «висячие» UUID без FK: `Event.supplierId`, `PaymentIntent.supplierId`, `OrderRequest.sessionId`, избранное только по slug.
+
+#### Решения
+- В схеме: `Event.supplier` → `Operator` (`EventSupplier`), `PaymentIntent.supplier` → `Operator` (`PaymentIntentSupplier`), `OrderRequest.session` → `EventSession`, `UserFavorite.eventId` → `Event` (slug сохранён).
+- Миграция `20260414240000_integrity_fks_supplier_payment_session_favorite`: очистка сиротских `supplierId`, бэкфилл `user_favorites.eventId` по slug, очистка невалидных `sessionId` в `order_requests`, затем FK.
+- `UserFavoritesService`: при add/sync dual-write `eventId` (slug или UUID события).
+
+#### Проблемы
+- Применять миграцию на проде после проверки: сброс сиротских supplier/session — осознанная потеря ссылки, не данных события/платежа.
+
+---
+
+### 2026-04-14 — ЛК: заявка на возврат по позиции; админка: маршруты клиентов/заказов/возвратов
+
+#### Наблюдения
+- Деталь заказа для ЛК (`GET /account/orders/:id`) уже отдаёт `fulfillmentItems` с последним `refund` по позиции; публичный фронт нужно было дотянуть типами и UI.
+- В Admin V3 маршруты `customers`, `orders`, `refunds`, `staff-users`, `tickets/:id` должны быть зарегистрированы в `App.tsx` вместе с lazy-страницами.
+
+#### Решения
+- В `packages/frontend`: типы `AccountFulfillmentLine`, `accountCreateRefundRequest`, блок на странице заказа — статус билета/возврата и форма заявки по `fulfillmentItemId`.
+- В `packages/frontend-admin-v3`: маршруты подключены в `App.tsx`.
+
+#### Проблемы
+- Нет.

@@ -1,5 +1,6 @@
 import { ErrorState } from '@/components/shared/states/ErrorState';
 import { LoadingState } from '@/components/shared/states/LoadingState';
+import { HubReadinessPanel } from '@/components/shared/hub-readiness/HubReadinessPanel';
 import { PageHeader } from '@/components/shared/page-header/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -246,6 +247,8 @@ export function VenueDetailPage() {
         <div className="text-sm text-muted-foreground">Загрузка сводки готовности…</div>
       ) : null}
 
+      <HubReadinessPanel title="Страница площадки (hub-слой)" snapshot={v.hubReadiness} />
+
       <div className="flex flex-wrap gap-1 border-b pb-2">
         {(Object.keys(TAB_LABEL) as TabId[]).map((k) => (
           <Button
@@ -271,6 +274,16 @@ export function VenueDetailPage() {
             <Field label="Источник" value={`${v.sourceType}${v.importSource ? ` · ${v.importSource}` : ''}`} />
             <Field label="Активна" value={v.isActive === false ? 'Нет' : 'Да'} />
             <Field label="Публикация (каталог)" value={v.isPublished ? 'Да' : 'Нет'} />
+            <Field
+              label="Режим витринной страницы"
+              value={
+                v.venuePageMode === 'HUB'
+                  ? 'HUB (полноценный хаб)'
+                  : v.venuePageMode === 'BASIC'
+                    ? 'BASIC'
+                    : 'NONE'
+              }
+            />
             <Field
               label="SEO whitelist страницы"
               value={v.isVenuePageWhitelisted ? 'Да' : 'Нет'}
