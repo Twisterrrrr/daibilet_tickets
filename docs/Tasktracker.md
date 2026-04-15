@@ -40,6 +40,17 @@
 | `support-realtime` | WebSocket/SSE вместо polling (виджет + админка) | Средний | `[ ]` |
 | `support-telegram-operator` | Реализация сценария по `ChatTelegramOperatorState` или явный отказ и упрощение схемы | Низкий | `[ ]` |
 
+## Логи (Admin V3)
+
+Источник правды: **`Logs.md`**.
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `admin-v3-logs-audit-mvp` | Страница «Логи» в V3 на базе `GET /admin/audit` + фильтры `q/from/to` | Средний | `[x]` **15.04.2026** |
+| `admin-v3-logs-payments` | Вкладка: `PaymentEventLog` / `ProcessedWebhookEvent` (список + карточка) | Средний | `[ ]` |
+| `admin-v3-logs-provider-webhooks` | Вкладка: `ProviderWebhookLog` (provider/status/error) | Средний | `[ ]` |
+| `admin-v3-logs-rbac-viewer` | RBAC: чтение логов без payload (Viewer) + маскирование полей | Высокий | `[ ]` |
+
 ## Открытые задачи (активный бэклог)
 
 Пакет по подкатегориям / Collections / MVP возвратов перенесён в архив — **закрыт в коммите `9d1770a`** (см. таблицу ниже в разделе «Архив»). Правки линтера для CI — **`1cf963f`**.
