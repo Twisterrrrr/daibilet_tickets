@@ -26,6 +26,20 @@
 
 ---
 
+## Поддержка: чат + тикеты (inbox, Admin V3)
+
+Источник правды по сделанному и долгу: **`Chat-Support.md`**.
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `support-chat-mvp` | Публичный виджет `ChatWidget`, `POST/GET /chat`, гостевой токен, админ список + деталь + ответ, письма `notifyAdminChatNeedsReply` | — | `[x]` **реализовано** |
+| `support-inbox-badge` | `GET /admin/support/inbox-count`, бейдж на пункте «Чат» в V3 (`useAdminInboxCount`, чаты needs-reply + тикеты OPEN/IN_PROGRESS/WAITING_CUSTOMER) | Высокий | `[x]` **14.04.2026** |
+| `support-chat-close-dialog` | API + UI: перевод `ChatConversation` в `CLOSED`, исключение из needs-reply | Высокий | `[ ]` |
+| `support-nav-unified-badge` | Опционально: один бейдж на секцию «Поддержка» или дублирование на «Тикеты» | Средний | `[ ]` |
+| `support-chat-userid-widget` | Виджет для залогиненного пользователя: `userId`, история в ЛК, не только localStorage | Средний | `[ ]` |
+| `support-realtime` | WebSocket/SSE вместо polling (виджет + админка) | Средний | `[ ]` |
+| `support-telegram-operator` | Реализация сценария по `ChatTelegramOperatorState` или явный отказ и упрощение схемы | Низкий | `[ ]` |
+
 ## Открытые задачи (активный бэклог)
 
 Пакет по подкатегориям / Collections / MVP возвратов перенесён в архив — **закрыт в коммите `9d1770a`** (см. таблицу ниже в разделе «Архив»). Правки линтера для CI — **`1cf963f`**.

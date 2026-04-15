@@ -31,6 +31,7 @@
 - **Дорожная карта (3 спринта × 2 недели: каталог/редакция → admin-v2/ЛК → поставщик + YooKassa + SEO)**: `Roadmap-3-Sprints-Catalog-Admin-Supplier.md`.
 - **Событие + сеансы (продуктовый контракт эпика Event, admin + supplier; Venue как отдельная сущность — в том же файле §6–7):** `Event-Sessions-Product-Contract.md`.
 - **Admin V3 (легковесная оболочка поверх текущего backend):** `admin-v3-plan.md`, `admin-v3-routing.md`, `admin-v3-ux.md`, `admin-v3-components.md`.
+- **Чат и поддержка (витрина + тикеты + Admin V3):** `Chat-Support.md` — инвентаризация API, UI, inbox-бейджа, пробелов (закрытие диалога, userId в виджете, Telegram-заготовка).
 - **Каталог: derived sections (5 разделов) и маппинг PRIMARY → section:** `catalog-sections-backend.md`.
 
 Перечисленные выше документы (включая дорожную карту спринтов) образуют «центр тяжести»; остальные спецификации — детализация или архив и должны ссылаться на них при изменениях.
