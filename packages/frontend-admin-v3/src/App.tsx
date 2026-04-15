@@ -57,6 +57,22 @@ const PromoBlocksListPage = React.lazy(() =>
   import('@/modules/promo-blocks/pages/PromoBlocksListPage').then((m) => ({ default: m.PromoBlocksListPage })),
 );
 const TicketsPage = React.lazy(() => import('@/modules/tickets/pages/TicketsPage').then((m) => ({ default: m.TicketsPage })));
+const SupportTicketDetailPage = React.lazy(() =>
+  import('@/modules/tickets/pages/SupportTicketDetailPage').then((m) => ({ default: m.SupportTicketDetailPage })),
+);
+const SiteUsersListPage = React.lazy(() =>
+  import('@/modules/customers/pages/SiteUsersListPage').then((m) => ({ default: m.SiteUsersListPage })),
+);
+const CheckoutOrdersListPage = React.lazy(() =>
+  import('@/modules/orders/pages/CheckoutOrdersListPage').then((m) => ({ default: m.CheckoutOrdersListPage })),
+);
+const CheckoutOrderDetailPage = React.lazy(() =>
+  import('@/modules/orders/pages/CheckoutOrderDetailPage').then((m) => ({ default: m.CheckoutOrderDetailPage })),
+);
+const RefundsListPage = React.lazy(() => import('@/modules/refunds/pages/RefundsListPage').then((m) => ({ default: m.RefundsListPage })));
+const StaffUsersListPage = React.lazy(() =>
+  import('@/modules/staff/pages/StaffUsersListPage').then((m) => ({ default: m.StaffUsersListPage })),
+);
 const SettingsPage = React.lazy(() => import('@/modules/settings/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const ModerationPage = React.lazy(() =>
   import('@/modules/moderation/pages/ModerationPage').then((m) => ({ default: m.ModerationPage })),
@@ -105,11 +121,17 @@ export default function App() {
               <Route path="subcategories/:id" element={<SubcategoryDetailPage />} />
             <Route path="promo-blocks" element={<PromoBlocksListPage />} />
 
+              <Route path="customers" element={<SiteUsersListPage />} />
+              <Route path="orders" element={<CheckoutOrdersListPage />} />
+              <Route path="orders/:id" element={<CheckoutOrderDetailPage />} />
+              <Route path="refunds" element={<RefundsListPage />} />
+
               <Route path="chat" element={<ChatListPage />} />
               <Route path="chat/:id" element={<ChatDetailPage />} />
 
               <Route path="reviews" element={<ReviewsListPage />} />
-            <Route path="tickets" element={<TicketsPage />} />
+              <Route path="tickets" element={<TicketsPage />} />
+              <Route path="tickets/:id" element={<SupportTicketDetailPage />} />
             <Route path="settings" element={<SettingsPage />} />
               <Route
                 path="moderation"
@@ -145,10 +167,10 @@ export default function App() {
                 }
               />
               <Route
-                path="users"
+                path="staff-users"
                 element={
                   <FeatureRoute feature="USERS">
-                    <StubPage title="Пользователи" />
+                    <StaffUsersListPage />
                   </FeatureRoute>
                 }
               />

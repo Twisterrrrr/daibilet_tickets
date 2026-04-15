@@ -7,12 +7,13 @@ import {
   Inbox,
   LayoutDashboard,
   LayoutTemplate,
-  Settings,
   MapPin,
   MessageSquare,
+  RotateCcw,
+  Settings,
   Sparkles,
-  Ticket,
   Tags,
+  Ticket,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -26,6 +27,8 @@ export type NavItem = {
   feature: FeatureFlag | null;
   /** Для вложенных маршрутов (например venues vs venues/candidates) */
   end?: boolean;
+  /** Показать бейдж непрочитанного inbox (чат + тикеты) — только для пункта «Чат» */
+  inboxBadge?: boolean;
 };
 
 export type NavSection = {
@@ -59,8 +62,16 @@ export const navigation: NavSection[] = [
   {
     title: 'Клиенты',
     items: [
+      { label: 'Покупатели', to: 'customers', icon: Users, feature: null },
+      { label: 'Заказы', to: 'orders', icon: Ticket, feature: null },
+      { label: 'Возвраты', to: 'refunds', icon: RotateCcw, feature: null },
       { label: 'Отзывы', to: 'reviews', icon: MessageSquare, feature: null },
-      { label: 'Чат', to: 'chat', icon: Inbox, feature: null },
+    ],
+  },
+  {
+    title: 'Поддержка',
+    items: [
+      { label: 'Чат', to: 'chat', icon: Inbox, feature: null, inboxBadge: true },
       { label: 'Тикеты', to: 'tickets', icon: Ticket, feature: null },
     ],
   },
@@ -74,10 +85,9 @@ export const navigation: NavSection[] = [
       { label: 'Продажи', to: 'sales', icon: BarChart3, feature: 'SALES' },
       { label: 'Финансы', to: 'finance', icon: BarChart3, feature: 'FINANCE' },
       { label: 'Отчеты', to: 'reports', icon: BarChart3, feature: 'REPORTS' },
-      { label: 'Пользователи', to: 'users', icon: Users, feature: 'USERS' },
+      { label: 'Команда (админы)', to: 'staff-users', icon: Users, feature: 'USERS' },
     ],
   },
 ];
 
 export const navigationFlat: NavItem[] = navigation.flatMap((s) => s.items);
-
