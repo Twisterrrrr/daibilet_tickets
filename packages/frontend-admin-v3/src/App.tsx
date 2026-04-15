@@ -73,6 +73,7 @@ const RefundsListPage = React.lazy(() => import('@/modules/refunds/pages/Refunds
 const StaffUsersListPage = React.lazy(() =>
   import('@/modules/staff/pages/StaffUsersListPage').then((m) => ({ default: m.StaffUsersListPage })),
 );
+const LogsPage = React.lazy(() => import('@/modules/logs/pages/LogsPage').then((m) => ({ default: m.LogsPage })));
 const SettingsPage = React.lazy(() => import('@/modules/settings/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const ModerationPage = React.lazy(() =>
   import('@/modules/moderation/pages/ModerationPage').then((m) => ({ default: m.ModerationPage })),
@@ -133,7 +134,7 @@ export default function App() {
               <Route path="tickets" element={<TicketsPage />} />
               <Route path="tickets/:id" element={<SupportTicketDetailPage />} />
               <Route path="settings" element={<SettingsPage />} />
-              <Route path="logs" element={<StubPage title="Логи" />} />
+              <Route path="logs" element={<LogsPage />} />
               <Route
                 path="moderation"
                 element={
