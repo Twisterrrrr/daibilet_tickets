@@ -75,4 +75,11 @@ export class AdminSupportController {
   async getStats() {
     return this.supportService.getStats();
   }
+
+  @Get('inbox-count')
+  @ApiTags('admin-support')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async inboxCount() {
+    return this.supportService.getInboxCounts();
+  }
 }
