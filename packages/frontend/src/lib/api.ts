@@ -602,6 +602,16 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 
+  accountCreateRefundRequest: (
+    token: string,
+    body: { fulfillmentItemId: string; reason?: string; reasonNote?: string },
+  ) =>
+    fetchApi<AccountRefundRequestResult>('/account/refund-requests', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }),
+
   accountPurchases: (token: string, params?: { page?: number; limit?: number }) => {
     const search = new URLSearchParams();
     if (params?.page != null) search.set('page', String(params.page));
@@ -787,6 +797,28 @@ export type AccountPurchasesResponse = {
   total: number;
 };
 
+export type AccountFulfillmentRefundInfo = {
+  id: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AccountFulfillmentLine = {
+  id: string;
+  lineItemIndex: number;
+  amount: number;
+  status: string;
+  refund: AccountFulfillmentRefundInfo | null;
+};
+
+export type AccountRefundRequestResult = {
+  refundId: string;
+  status: string;
+  amount: number;
+  currency: string;
+};
+
 export type AccountOrderDetail = {
   id: string;
   shortCode: string;
@@ -800,6 +832,10 @@ export type AccountOrderDetail = {
   completedAt: string | null;
   expiresAt: string | null;
   voucherUrl: string | null;
+  /** UUID сессии оформления (для сопоставления с fulfillment) */
+  checkoutSessionId?: string;
+  /** Позиции исполнения (билеты) и заявки на возврат */
+  fulfillmentItems?: AccountFulfillmentLine[];
   items: Array<{
     id: string;
     status?: string;
