@@ -41,6 +41,7 @@ import { AdminReviewsController } from './admin-reviews.controller';
 import { AdminSettingsController } from './admin-settings.controller';
 import { AdminAppSettingsController } from './admin-app-settings.controller';
 import { AdminFeatureFlagsController } from './admin-feature-flags.controller';
+import { AdminSiteUsersController } from './admin-site-users.controller';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminUsersService } from './admin-users.service';
 import { AdminSuppliersController } from './admin-suppliers.controller';
@@ -140,6 +141,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminAppSettingsController,
     AdminFeatureFlagsController,
     AdminUsersController,
+    AdminSiteUsersController,
     AdminAuditController,
     AdminUpsellsController,
     AdminReviewsController,
