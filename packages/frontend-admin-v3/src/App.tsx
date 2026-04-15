@@ -132,7 +132,8 @@ export default function App() {
               <Route path="reviews" element={<ReviewsListPage />} />
               <Route path="tickets" element={<TicketsPage />} />
               <Route path="tickets/:id" element={<SupportTicketDetailPage />} />
-            <Route path="settings" element={<SettingsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="logs" element={<StubPage title="Логи" />} />
               <Route
                 path="moderation"
                 element={
