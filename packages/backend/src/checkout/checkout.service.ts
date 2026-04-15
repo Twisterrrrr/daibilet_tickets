@@ -887,6 +887,11 @@ export class CheckoutService {
                 event: { select: { id: true, title: true, slug: true, imageUrl: true } },
               },
             },
+            fulfillmentItems: {
+              include: {
+                refundRequests: { orderBy: { createdAt: 'desc' }, take: 1 },
+              },
+            },
           },
         })
       : await this.prisma.checkoutSession.findFirst({
@@ -903,11 +908,38 @@ export class CheckoutService {
                 event: { select: { id: true, title: true, slug: true, imageUrl: true } },
               },
             },
+            fulfillmentItems: {
+              include: {
+                refundRequests: { orderBy: { createdAt: 'desc' }, take: 1 },
+              },
+            },
           },
         });
     if (!session) throw new NotFoundException('Заказ не найден');
     if (session.userId !== userId) throw new ForbiddenException('Доступ запрещён');
-    return this.formatTrackingResult(session as Parameters<typeof this.formatTrackingResult>[0]);
+    const base = await this.formatTrackingResult(session as Parameters<typeof this.formatTrackingResult>[0]);
+    const fulfillmentItems = session.fulfillmentItems.map((fi) => {
+      const rr = fi.refundRequests[0];
+      return {
+        id: fi.id,
+        lineItemIndex: fi.lineItemIndex,
+        amount: fi.amount,
+        status: fi.status,
+        refund: rr
+          ? {
+              id: rr.id,
+              status: rr.status,
+              createdAt: rr.createdAt.toISOString(),
+              updatedAt: rr.updatedAt.toISOString(),
+            }
+          : null,
+      };
+    });
+    return {
+      ...base,
+      checkoutSessionId: session.id,
+      fulfillmentItems,
+    };
   }
 
   private async formatTrackingResult(

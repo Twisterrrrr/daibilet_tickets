@@ -4,6 +4,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -39,18 +40,24 @@ export class FulfillmentRefundRequestService {
     fulfillmentItemId: string;
     reason?: string;
     reasonNote?: string | null;
+    /** Если задан — проверяем, что сессия принадлежит пользователю; createdByType = USER */
+    userId?: string;
   }): Promise<{ refundId: string; status: RefundRequestStatus; amount: number; currency: string }> {
     const { fulfillmentItemId } = params;
     const reason = parseRefundReason(params.reason);
+    const createdByUser = Boolean(params.userId);
 
     return this.prisma.$transaction(async (tx) => {
       const item = await tx.fulfillmentItem.findUnique({
         where: { id: fulfillmentItemId },
         include: {
-          checkoutSession: { select: { id: true, offersSnapshot: true } },
+          checkoutSession: { select: { id: true, offersSnapshot: true, userId: true } },
         },
       });
       if (!item) throw new NotFoundException('Позиция заказа не найдена');
+      if (params.userId && item.checkoutSession.userId !== params.userId) {
+        throw new ForbiddenException('Доступ к этой позиции запрещён');
+      }
 
       const existing = await tx.refundRequest.findFirst({
         where: {
@@ -120,7 +127,7 @@ export class FulfillmentRefundRequestService {
           reason,
           reasonNote: params.reasonNote ?? null,
           status: 'CREATED',
-          createdByType: 'ADMIN',
+          createdByType: createdByUser ? 'USER' : 'ADMIN',
         },
       });
 
@@ -324,5 +331,55 @@ export class FulfillmentRefundRequestService {
         });
       }
     });
+  }
+
+  async listRequestsForAdmin(params: { page: number; limit: number; status?: string }) {
+    const page = Math.max(1, params.page);
+    const limit = Math.min(100, Math.max(1, params.limit));
+    const skip = (page - 1) * limit;
+    const where: Prisma.RefundRequestWhereInput = {};
+    if (params.status?.trim()) {
+      where.status = params.status as RefundRequestStatus;
+    }
+    const [rows, total] = await Promise.all([
+      this.prisma.refundRequest.findMany({
+        where,
+        include: {
+          fulfillmentItem: {
+            select: {
+              id: true,
+              checkoutSessionId: true,
+              lineItemIndex: true,
+              amount: true,
+              status: true,
+            },
+          },
+          paymentIntent: { select: { id: true, status: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.refundRequest.count({ where }),
+    ]);
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        status: r.status,
+        amount: r.amount,
+        currency: r.currency,
+        reason: r.reason,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+        createdByType: r.createdByType,
+        fulfillmentItemId: r.fulfillmentItemId,
+        checkoutSessionId: r.fulfillmentItem.checkoutSessionId,
+        fulfillmentStatus: r.fulfillmentItem.status,
+        paymentIntentStatus: r.paymentIntent.status,
+      })),
+      total,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
+    };
   }
 }

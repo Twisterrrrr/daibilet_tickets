@@ -1,3 +1,30 @@
+/**
+ * AUDIT: Buyer Account / purchases read-layer (2026-04-14)
+ *
+ * Canonical DB record for a "purchase" in the cabinet: CheckoutSession (checkout_sessions),
+ * not a separate CustomerPurchase table. One session = one order row in the account UI;
+ * display type/status = projection via getPurchaseDisplayType + derivePurchaseActions
+ * (purchase-display.util.ts).
+ *
+ * Where a purchase is considered recorded:
+ * - Internal payment: CheckoutSession reaches terminal states and PaymentIntent.status = PAID;
+ *   completion paths: payment.service.ts, fulfillment.service.ts (e.g. session COMPLETED).
+ * - External widget (TC/TEP): FulfillmentItem (purchaseFlow EXTERNAL, provider, externalOrderId,
+ *   externalPaymentUrl); ExternalOrderLink may mirror provider order (integrations).
+ * - Webhooks: raw events in PaymentEventLog; completion still updates CheckoutSession/FulfillmentItem.
+ *
+ * Triggers in practice: successful payment, fulfillment confirmation, provider redirect/callback —
+ * all converge on CheckoutSession + FulfillmentItem updates, not a separate "purchase insert".
+ *
+ * GAP vs a greenfield "CustomerPurchase" spec:
+ * - No CustomerPurchase table — add as projection/materialized layer only if needed, without breaking FKs.
+ * - Purchases without CheckoutSession/userId linkage do not appear in account until modeled.
+ * - RefundRequest is tied to FulfillmentItem + PaymentIntent; FulfillmentRefundRequestService may call
+ *   real provider refunds — broader than "request-only workflow" in the product brief.
+ *
+ * Single read path for "My purchases" list: this service + AccountService.getPurchases.
+ * Order detail: AccountService.getOrderDetail -> CheckoutService.getOrderByIdForUser.
+ */
 import { Injectable } from '@nestjs/common';
 
 import type { PaymentStatus, Prisma } from '@/prisma-client';
@@ -82,4 +109,3 @@ export class PurchaseReadService {
     };
   }
 }
-

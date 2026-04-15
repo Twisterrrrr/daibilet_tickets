@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -14,6 +14,20 @@ import { CreateAdminRefundDto } from './dto/admin-refund.dto';
 @Controller('admin/refunds')
 export class AdminRefundsController {
   constructor(private readonly fulfillmentRefundRequests: FulfillmentRefundRequestService) {}
+
+  @Get('requests')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async listRequests(
+    @Query('status') status?: string,
+    @Query('page') pageRaw = '1',
+    @Query('limit') limitRaw = '25',
+  ) {
+    return this.fulfillmentRefundRequests.listRequestsForAdmin({
+      page: Number(pageRaw) || 1,
+      limit: Number(limitRaw) || 25,
+      status,
+    });
+  }
 
   @Post()
   @Roles('ADMIN', 'EDITOR')
