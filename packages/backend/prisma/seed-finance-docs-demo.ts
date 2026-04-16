@@ -1,4 +1,6 @@
-import { PrismaClient, SupplierLedgerEntryType } from '@prisma/client';
+import { SupplierLedgerEntryType } from '../src/prisma-client';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
 
 import { DocumentNumberService } from '../src/supplier-finance/document-number.service';
 import { FinanceDocumentRenderService } from '../src/supplier-finance/finance-document-render.service';
@@ -6,8 +8,11 @@ import { FinanceDocumentStorageService } from '../src/supplier-finance/finance-d
 import { SupplierDocumentIssueService } from '../src/supplier-finance/supplier-document-issue.service';
 import { SupplierDocumentPolicyService } from '../src/supplier-finance/supplier-document-policy.service';
 import { SupplierSettlementService } from '../src/supplier-finance/supplier-settlement.service';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
-const prisma = new PrismaClient();
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+const { prisma, pool } = createScriptPrismaClient();
 
 async function main() {
   const now = new Date();
@@ -164,5 +169,6 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });
 

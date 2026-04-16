@@ -63,6 +63,49 @@ export class ProviderExternalPersistenceService {
     });
   }
 
+  /**
+   * Идемпотентное зеркало заказа провайдера (синк по списку / GET order).
+   * @@unique([provider, externalOrderId])
+   */
+  upsertExternalOrderMirror(data: {
+    provider: TicketProviderCode;
+    externalOrderId: string;
+    status: ExternalOrderStatus;
+    integrationState: ExternalIntegrationState;
+    payloadJson?: Prisma.InputJsonValue | null;
+    checkoutSessionId?: string | null;
+    packageId?: string | null;
+    packageItemId?: string | null;
+  }) {
+    return this.prisma.externalOrderLink.upsert({
+      where: {
+        provider_externalOrderId: {
+          provider: data.provider,
+          externalOrderId: data.externalOrderId,
+        },
+      },
+      create: {
+        provider: data.provider,
+        externalOrderId: data.externalOrderId,
+        status: data.status,
+        integrationState: data.integrationState,
+        payloadJson: data.payloadJson ?? undefined,
+        checkoutSessionId: data.checkoutSessionId ?? undefined,
+        packageId: data.packageId ?? undefined,
+        packageItemId: data.packageItemId ?? undefined,
+      },
+      update: {
+        status: data.status,
+        integrationState: data.integrationState,
+        payloadJson: data.payloadJson ?? undefined,
+        lastError: null,
+        ...(data.checkoutSessionId !== undefined && { checkoutSessionId: data.checkoutSessionId }),
+        ...(data.packageId !== undefined && { packageId: data.packageId }),
+        ...(data.packageItemId !== undefined && { packageItemId: data.packageItemId }),
+      },
+    });
+  }
+
   /** Extension point: черновик внешнего заказа (checkout createExternalOrder — позже). */
   createExternalOrderPlaceholder(data: {
     provider: TicketProviderCode;

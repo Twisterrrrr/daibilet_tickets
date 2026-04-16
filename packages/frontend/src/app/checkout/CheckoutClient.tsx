@@ -18,6 +18,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { type CartItem, useCart } from '@/lib/cart';
+import { getStoredToken } from '@/lib/user-auth';
+import { useUserAuth } from '@/hooks/useUserAuth';
 
 /** Прогресс: Корзина → Данные → Оплата → Завершение (PR-4) */
 const PROGRESS_STEPS = [
@@ -46,6 +48,7 @@ interface ContactForm {
 
 export function CheckoutClient() {
   const { items, totalPrice, removeItem, updateQuantity, clearCart } = useCart();
+  const { token } = useUserAuth();
   const [step, setStep] = useState<CheckoutStep>('review');
   const [validating, setValidating] = useState(false);
   const [validatedItems, setValidatedItems] = useState<ValidatedItem[] | null>(null);
@@ -134,9 +137,13 @@ export function CheckoutClient() {
     setSubmitting(true);
     setValidationError(null);
     try {
+      const t = token ?? getStoredToken();
       const res = await fetch(`${API_BASE}/checkout/session`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(t ? { Authorization: `Bearer ${t}` } : {}),
+        },
         body: JSON.stringify({
           items,
           customer: contact,

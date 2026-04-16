@@ -1,6 +1,5 @@
 import * as dotenv from 'dotenv';
 import {
-  PrismaClient,
   TagCategory,
   SubcategoryType,
   SubcategoryLayer,
@@ -11,7 +10,7 @@ import {
   ReviewDisputeStatus,
   ReviewDisputeReasonCode,
   EventTagAssignmentSource,
-} from '@prisma/client';
+} from '../src/prisma-client';
 
 import {
   EVENT_PRIMARY_CODES_BY_CATEGORY,
@@ -22,10 +21,11 @@ import { seedCanonicalSubcategories } from './seeds/subcategories-canonical.seed
 import * as bcrypt from 'bcrypt';
 
 import { SALUTE_9_MAY_LANDING_SEEDS } from './salute-9-may-landings.data';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
 dotenv.config({ path: '../../.env' });
 
-const prisma = new PrismaClient();
+const { prisma, pool } = createScriptPrismaClient();
 
 async function main() {
   console.log('Seeding database...');
@@ -1752,7 +1752,8 @@ async function main() {
   for (const code of eventPrimaryCodeSet) {
     const meta = EVENT_PRIMARY_META[code];
     if (!meta) {
-      throw new Error(`Missing EVENT_PRIMARY_META for code ${code}`);
+      console.warn(`⚠ Missing EVENT_PRIMARY_META for code ${code} — skipping this subcategory seed row`);
+      continue;
     }
     const evLanding = meta.isLandingEnabled ?? true;
     await prisma.subcategory.upsert({
@@ -1787,7 +1788,8 @@ async function main() {
   for (const code of VENUE_PRIMARY_CODES) {
     const meta = VENUE_PRIMARY_META[code];
     if (!meta) {
-      throw new Error(`Missing VENUE_PRIMARY_META for code ${code}`);
+      console.warn(`⚠ Missing VENUE_PRIMARY_META for code ${code} — skipping this subcategory seed row`);
+      continue;
     }
     await prisma.subcategory.upsert({
       where: { code_type: { code, type: SubcategoryType.VENUE_ONLY } },
@@ -3663,4 +3665,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

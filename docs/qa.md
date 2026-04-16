@@ -276,3 +276,29 @@ type LandingQueryConfig = {
 - Нужен ли единый шаблон E2E (Playwright) для admin-v3 при появлении staging-стенда?
 - Следует ли включать в summary площадки результат publish-gate по умолчанию или по флагу `?includePublishGate=true`?
 
+---
+
+# Вопросы по архитектуре Orders: Order mirror layer (QA)
+
+> Цель: закрыть вопросы перед выводом `/account/orders` и `/admin/orders` на базе `OrderReadService`, сохранив принцип «Order = read‑model, не core checkout».
+
+## 1) Уникальность и дедупликация
+
+- Нужен ли **строгий unique** на `(source, externalOrderId)` в Prisma (`@@unique`), или пока достаточно soft‑дедупа (findFirst + update) до стабилизации форматов внешних ID?
+- Что делаем с источниками без стабильного `externalOrderId` (teplohod письма без referenceId): допускаем ли несколько `Order` без external id и как потом reconcile?
+
+## 2) Контакты и ownership в ЛК
+
+- Каноническое правило выборки в ЛК: сначала `userId`, затем fallback по `email`? Нужны ли доп. ограничения (например, `source=INTERNAL` для email‑fallback)?
+- Для TC mirror: откуда канонически брать `email/phone` (`customer`, `vendor_data`, tickets)? Нужен ли приоритет полей и политика “не затирать непустые значения пустыми” (как сейчас в апдейте)?
+
+## 3) Refund workflow и статусы
+
+- Подтверждаем ли минимальный контракт `OrderStatus`: `PENDING/PAID/CANCELLED/FAILED/REFUND_REQUESTED/REFUNDED`?
+- Когда ставим `REFUND_REQUESTED/REFUNDED`: от `RefundRequest` (item-level) или от payment-level события возврата? Нужен ли follow‑up bridge `RefundRequest.orderId`?
+
+## 4) Snapshot UX (title/date)
+
+- Подтверждаем ли политику `titleSnapshot`: event title (если доступен) → snapshot → `'Order'` (fallback)?
+- Нужно ли уже на MVP заполнять `eventId` в `Order`, если его можно однозначно восстановить из internal snapshot (для улучшения UX `/account/orders`)?
+

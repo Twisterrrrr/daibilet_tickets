@@ -25,6 +25,36 @@ export type AdminArticleDetail = {
   city: { id: string; name: string; slug: string } | null;
   relatedLandingIds: string[];
   relatedCollectionIds: string[];
+  landingLinks?: Array<{
+    landingId: string;
+    position: number;
+    priority: number;
+    landing: {
+      id: string;
+      title: string;
+      slug: string;
+      isActive: boolean;
+      status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+      isDeleted: boolean;
+      cityId: string | null;
+      city?: { id: string; name: string; slug: string } | null;
+    };
+  }>;
+  collectionLinks?: Array<{
+    collectionId: string;
+    position: number;
+    priority: number;
+    collection: {
+      id: string;
+      title: string;
+      slug: string;
+      isActive: boolean;
+      status: string;
+      isDeleted: boolean;
+      cityId: string | null;
+      city?: { id: string; name: string; slug: string } | null;
+    };
+  }>;
   seo: { title: string | null; description: string | null };
   status: ArticleStatus;
   publishedAt: string | null;

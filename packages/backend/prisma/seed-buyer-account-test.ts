@@ -9,11 +9,11 @@
  * После входа откройте «Мои покупки» — должна быть карточка «Тестовое событие для ЛК покупателя».
  */
 import * as dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
 dotenv.config({ path: '../../.env' });
 
-const prisma = new PrismaClient();
+const { prisma, pool } = createScriptPrismaClient();
 
 async function main() {
   console.log('=== Seed: Buyer Account test (event + user + paid order) ===\n');
@@ -50,6 +50,7 @@ async function main() {
       cityId: spbCity.id,
       slug: 'skver-dostoevskogo',
       title: 'Сквер Достоевского',
+      normalizedName: 'Сквер Достоевского',
       shortTitle: 'Сквер Достоевского',
       venueType: 'PARK',
       description: 'Зелёный сквер в центре Санкт-Петербурга рядом со станцией метро «Достоевская».',
@@ -423,4 +424,7 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });

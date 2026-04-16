@@ -11,6 +11,7 @@ import * as React from 'react';
 import { Link } from 'react-router-dom';
 
 export function SeoAuditPage() {
+  const [entityType, setEntityType] = React.useState<'EVENT' | 'VENUE' | 'CITY' | 'ARTICLE' | 'LANDING' | 'COLLECTION'>('EVENT');
   const [q, setQ] = React.useState('');
   const [issueCode, setIssueCode] = React.useState('');
   const [severity, setSeverity] = React.useState<'ALL' | 'ERROR' | 'WARN' | 'INFO'>('ALL');
@@ -29,10 +30,10 @@ export function SeoAuditPage() {
   });
 
   const issues = useQuery({
-    queryKey: ['seo-audit-unified-issues', { q, issueCode, severity, page, limit }],
+    queryKey: ['seo-audit-unified-issues', { entityType, q, issueCode, severity, page, limit }],
     queryFn: async () => {
       const sp = new URLSearchParams();
-      sp.set('entityType', 'EVENT');
+      sp.set('entityType', entityType);
       sp.set('onlyIssues', 'true');
       sp.set('page', String(page));
       sp.set('limit', String(limit));
@@ -60,6 +61,16 @@ export function SeoAuditPage() {
   });
 
   const topCodes = summary.data?.byIssueCode ?? [];
+
+  const adminHrefFor = (t: string, id: string): string => {
+    const tt = String(t).toUpperCase();
+    if (tt === 'ARTICLE') return `/admin-v3/articles/${encodeURIComponent(id)}`;
+    if (tt === 'LANDING') return `/admin-v3/landings/${encodeURIComponent(id)}`;
+    if (tt === 'COLLECTION') return `/admin-v3/collections/${encodeURIComponent(id)}`;
+    if (tt === 'VENUE') return `/admin-v3/venues/${encodeURIComponent(id)}`;
+    if (tt === 'CITY') return `/admin-v3/cities/${encodeURIComponent(id)}`;
+    return `/admin-v3/events/${encodeURIComponent(id)}`;
+  };
 
   return (
     <div className="space-y-8">
@@ -94,6 +105,21 @@ export function SeoAuditPage() {
       <DataTableShell
         toolbar={
           <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={entityType}
+              onChange={(e) => {
+                setEntityType(e.target.value as any);
+                setPage(1);
+              }}
+            >
+              <option value="EVENT">EVENT</option>
+              <option value="VENUE">VENUE</option>
+              <option value="CITY">CITY</option>
+              <option value="ARTICLE">ARTICLE</option>
+              <option value="LANDING">LANDING</option>
+              <option value="COLLECTION">COLLECTION</option>
+            </select>
             <Input
               value={q}
               onChange={(e) => {
@@ -189,7 +215,7 @@ export function SeoAuditPage() {
                     </td>
                     <td className="px-4 py-3 text-center align-top">
                       <Button type="button" variant="outline" size="sm" asChild>
-                        <Link to={`/admin-v3/events/${it.entityId}`}>Открыть</Link>
+                        <Link to={adminHrefFor(it.entityType, it.entityId)}>Открыть</Link>
                       </Button>
                     </td>
                   </tr>

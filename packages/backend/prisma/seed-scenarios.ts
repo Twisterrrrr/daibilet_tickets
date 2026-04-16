@@ -15,13 +15,13 @@ import {
   type EventSubcategory,
   type OfferStatus,
   type Prisma,
-  PrismaClient,
   type VenueType,
-} from '@prisma/client';
+} from '../src/prisma-client';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const prisma = new PrismaClient();
+const { prisma, pool } = createScriptPrismaClient();
 
 const IMG = 'https://images.unsplash.com/photo-1545989250-0d0a39a9ed30?auto=format&fit=crop&w=1400&q=80';
 const IMG2 = 'https://images.unsplash.com/photo-1518998053901-5348d0561edb?auto=format&fit=crop&w=1400&q=80';
@@ -79,9 +79,25 @@ async function requireCity(slug: string) {
 async function requireSubcategoryId(slug: string): Promise<string> {
   const s = await prisma.subcategory.findUnique({ where: { slug } });
   if (!s) {
-    throw new Error(
-      `Подкатегория "${slug}" не найдена. Нужен базовый seed со справочником подкатегорий.`,
-    );
+    // Backward-compatible fallbacks: scenario seed historically used older slugs.
+    const fallbackBySlug: Record<string, { code: string; type: 'EVENT_ONLY' | 'VENUE_ONLY' }> = {
+      'gallery-venue': { code: 'GALLERY', type: 'VENUE_ONLY' },
+      'museum-venue': { code: 'MUSEUM', type: 'VENUE_ONLY' },
+      exhibition: { code: 'EXHIBITION', type: 'EVENT_ONLY' },
+      museum: { code: 'MUSEUM_CLASSIC', type: 'EVENT_ONLY' },
+      'walking-excursion': { code: 'WALKING', type: 'EVENT_ONLY' },
+    };
+
+    const fb = fallbackBySlug[slug];
+    if (fb) {
+      const byCode = await prisma.subcategory.findFirst({
+        where: { code: fb.code, type: fb.type },
+        select: { id: true },
+      });
+      if (byCode) return byCode.id;
+    }
+
+    throw new Error(`Подкатегория "${slug}" не найдена. Нужен базовый seed со справочником подкатегорий.`);
   }
   return s.id;
 }
@@ -124,6 +140,7 @@ async function ensureVenue(input: {
     update: {
       cityId: input.cityId,
       title: input.title,
+      normalizedName: input.title,
       shortDescription: input.shortDescription,
       description: input.description,
       address: input.address,
@@ -141,6 +158,7 @@ async function ensureVenue(input: {
       slug: input.slug,
       cityId: input.cityId,
       title: input.title,
+      normalizedName: input.title,
       shortDescription: input.shortDescription,
       description: input.description,
       address: input.address,
@@ -938,4 +956,7 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });

@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shared/page-header/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SearchInput } from '@/components/shared/filters/SearchInput';
+import { Input } from '@/components/ui/input';
 import { adminApi } from '@/api/client';
 import { slugifyFromTitle } from '@/modules/articles/utils/slugify';
 import {
@@ -15,6 +16,7 @@ import {
   removeAdminCollectionItem,
   reorderAdminCollectionItems,
   type AdminCollectionDetail,
+  type AdminCollectionTagFilterUpsert,
 } from '@/modules/collections/api/collections';
 import { getAdminErrorDisplay } from '@/lib/get-admin-error-message';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -37,10 +39,45 @@ export function CollectionDetailPage() {
     if (detailQ.data) setDraft(detailQ.data);
   }, [detailQ.data]);
 
+  type TagFilterDraft = {
+    tagId: string;
+    position: number;
+    tag: { id: string; name: string; slug: string; isActive: boolean; isDeleted: boolean };
+  };
+  const [tagFiltersDraft, setTagFiltersDraft] = React.useState<TagFilterDraft[]>([]);
+  const [tagFiltersTouched, setTagFiltersTouched] = React.useState(false);
+  const [showLegacyTagSlugs, setShowLegacyTagSlugs] = React.useState(false);
+  const [banner, setBanner] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!detailQ.data) return;
+    const d = detailQ.data;
+    const normalized = (d.tagFilters ?? [])
+      .slice()
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      .map((tf, idx) => ({
+        tagId: tf.tagId,
+        position: idx,
+        tag: {
+          id: tf.tag.id,
+          name: tf.tag.name,
+          slug: tf.tag.slug,
+          isActive: Boolean(tf.tag.isActive ?? true),
+          isDeleted: Boolean(tf.tag.isDeleted ?? false),
+        },
+      }));
+    if (normalized.length) {
+      setTagFiltersDraft(normalized);
+    } else {
+      // transitional fallback: if API returns only legacy filterTags slugs, we show them as read-only in advanced
+      setTagFiltersDraft([]);
+    }
+    setTagFiltersTouched(false);
+  }, [detailQ.data]);
+
   const saveM = useMutation({
     mutationFn: async () => {
       if (!draft) throw new Error('No draft');
-      return patchAdminCollection(draft.id, {
+      const basePayload: Parameters<typeof patchAdminCollection>[1] = {
         version: draft.version,
         title: draft.title,
         slug: draft.slug,
@@ -55,12 +92,35 @@ export function CollectionDetailPage() {
         status: draft.status,
         isActive: Boolean(draft.isActive),
         queryConfig: draft.queryConfig ?? null,
+      };
+
+      // Safety: do not send tagFilters: [] unless user explicitly interacted with the canonical editor.
+      // Otherwise a legacy-only record could be wiped by a "save other fields" action.
+      if (!tagFiltersTouched) {
+        return patchAdminCollection(draft.id, basePayload);
+      }
+
+      const normalizedTagFilters: AdminCollectionTagFilterUpsert[] = tagFiltersDraft.map((t, idx) => ({
+        tagId: t.tagId,
+        position: idx,
+      }));
+      return patchAdminCollection(draft.id, {
+        ...basePayload,
+        // Canonical for admin: normalized tagFilters. Mirror legacy slugs server-side (and also send here for compatibility).
+        tagFilters: normalizedTagFilters,
+        filterTags: tagFiltersDraft.map((t) => t.tag.slug),
       });
     },
     onSuccess: async (next) => {
       setDraft(next);
+      setBanner('Сохранено');
+      window.setTimeout(() => setBanner(null), 3000);
       await qc.invalidateQueries({ queryKey: ['admin-collections'] });
       await qc.invalidateQueries({ queryKey: ['admin-collection-detail', id] });
+    },
+    onError: (e: unknown) => {
+      const d = getAdminErrorDisplay(e);
+      setBanner(`${d.title}${d.description ? `\n${d.description}` : ''}`);
     },
   });
 
@@ -216,6 +276,11 @@ export function CollectionDetailPage() {
           </div>
         }
       />
+      {banner ? (
+        <div className="whitespace-pre-wrap rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30">
+          {banner}
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg border bg-card p-5 space-y-4">
@@ -343,6 +408,110 @@ export function CollectionDetailPage() {
           </div>
         </div>
       </div>
+
+      <section className="space-y-3 rounded-lg border bg-card p-5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-base font-semibold">Tag filters (normalized)</div>
+          <Badge variant="outline">{tagFiltersDraft.length}</Badge>
+        </div>
+
+        {tagFiltersDraft.length === 0 && !tagFiltersTouched && (draft.filterTags ?? []).length > 0 ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30">
+            Эта подборка содержит legacy <span className="font-mono">filterTags</span> (slug[]). Пока вы не выберете теги в canonical-редакторе ниже,
+            сохранение не будет менять фильтры, чтобы избежать потери данных.
+          </div>
+        ) : null}
+
+        <TagMultiPicker
+          onPick={(t) => {
+            if (tagFiltersDraft.some((x) => x.tagId === t.id)) return;
+            setTagFiltersTouched(true);
+            setTagFiltersDraft((prev) => [
+              ...prev,
+              { tagId: t.id, position: prev.length, tag: { id: t.id, name: t.name, slug: t.slug, isActive: t.isActive, isDeleted: t.isDeleted } },
+            ]);
+          }}
+        />
+
+        {tagFiltersDraft.length === 0 ? (
+          <div className="text-sm text-muted-foreground">Теги фильтра не выбраны</div>
+        ) : (
+          <div className="space-y-2">
+            {tagFiltersDraft.map((tf, idx) => (
+              <div key={tf.tagId} className="flex items-center justify-between gap-2 rounded-md border px-2 py-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">
+                    {tf.tag.name} · {tf.tag.slug}
+                    {!tf.tag.isActive ? <span className="ml-2 text-xs text-amber-700">inactive</span> : null}
+                    {tf.tag.isDeleted ? <span className="ml-2 text-xs text-red-600">deleted</span> : null}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={idx === 0}
+                    onClick={() => {
+                      setTagFiltersTouched(true);
+                      setTagFiltersDraft((prev) => {
+                        const next = [...prev];
+                        const tmp = next[idx - 1];
+                        next[idx - 1] = next[idx];
+                        next[idx] = tmp;
+                        return next.map((x, i) => ({ ...x, position: i }));
+                      });
+                    }}
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={idx === tagFiltersDraft.length - 1}
+                    onClick={() => {
+                      setTagFiltersTouched(true);
+                      setTagFiltersDraft((prev) => {
+                        const next = [...prev];
+                        const tmp = next[idx + 1];
+                        next[idx + 1] = next[idx];
+                        next[idx] = tmp;
+                        return next.map((x, i) => ({ ...x, position: i }));
+                      });
+                    }}
+                  >
+                    ↓
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTagFiltersTouched(true);
+                      setTagFiltersDraft((prev) => prev.filter((x) => x.tagId !== tf.tagId).map((x, i) => ({ ...x, position: i })));
+                    }}
+                  >
+                    Удалить
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="pt-2">
+          <Button type="button" variant="outline" onClick={() => setShowLegacyTagSlugs((v) => !v)}>
+            {showLegacyTagSlugs ? 'Скрыть legacy slugs' : 'Показать legacy slugs'}
+          </Button>
+        </div>
+        {showLegacyTagSlugs ? (
+          <div className="rounded-md border bg-muted/20 p-3 text-xs">
+            <div className="text-muted-foreground">filterTags (legacy mirror)</div>
+            <div className="mt-1 font-mono">{(draft.filterTags ?? []).join(', ') || '—'}</div>
+          </div>
+        ) : null}
+      </section>
 
       {/* MANUAL items */}
       <div className="rounded-lg border bg-card p-5 space-y-4">
@@ -489,6 +658,87 @@ export function CollectionDetailPage() {
               </div>
             )}
           </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type TagPickItem = { id: string; name: string; slug: string; isActive: boolean; isDeleted: boolean };
+
+function TagMultiPicker(props: { onPick: (tag: TagPickItem) => void }) {
+  const [open, setOpen] = React.useState(false);
+  const [q, setQ] = React.useState('');
+  const [debounced, setDebounced] = React.useState('');
+  React.useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(q.trim()), 250);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
+  const tagsQ = useQuery({
+    queryKey: ['admin-tags-lookup', debounced],
+    queryFn: async (): Promise<TagPickItem[]> => {
+      if (!debounced) return [];
+      const res = await adminApi.get<{
+        items: Array<{ id: string; name: string; slug: string; isActive: boolean; isDeleted: boolean }>;
+      }>(`/admin/tags?search=${encodeURIComponent(debounced)}&limit=20`);
+      return (res.items ?? []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        slug: t.slug,
+        isActive: Boolean(t.isActive),
+        isDeleted: Boolean(t.isDeleted),
+      }));
+    },
+    enabled: open && debounced.length >= 2,
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Input placeholder="Поиск тегов…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Button type="button" variant="outline" onClick={() => setOpen((v) => !v)}>
+          {open ? 'Закрыть' : 'Найти'}
+        </Button>
+      </div>
+      {open ? (
+        <div className="rounded-md border p-2">
+          {debounced.length < 2 ? (
+            <div className="text-sm text-muted-foreground">Введите минимум 2 символа</div>
+          ) : tagsQ.isLoading ? (
+            <div className="text-sm text-muted-foreground">Поиск…</div>
+          ) : tagsQ.isError ? (
+            <div className="text-sm text-red-600">Ошибка поиска</div>
+          ) : (tagsQ.data ?? []).length === 0 ? (
+            <div className="text-sm text-muted-foreground">Ничего не найдено</div>
+          ) : (
+            <div className="space-y-1">
+              {(tagsQ.data ?? []).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="w-full rounded-md border px-2 py-2 text-left hover:bg-muted"
+                  onClick={() => {
+                    props.onPick(t);
+                    setOpen(false);
+                    setQ('');
+                    setDebounced('');
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{t.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">{t.slug}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {!t.isActive ? <Badge variant="warning">inactive</Badge> : null}
+                      {t.isDeleted ? <Badge variant="danger">deleted</Badge> : null}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ) : null}
     </div>

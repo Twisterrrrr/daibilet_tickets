@@ -2960,6 +2960,51 @@ model RefundRequest {
   @@map("refund_requests")
 }
 
+/// Плоский mirror-заказ (internal + external), не core checkout entity.
+model Order {
+  id                String   @id @default(cuid())
+
+  source            OrderSource
+  /// Идентификатор заказа во внешней системе (TicketsCloud order.id, Teplohod номер и т.п.)
+  externalOrderId   String?
+
+  status            OrderStatus
+
+  userId            String?  @db.Uuid
+  email             String?
+  phone             String?
+
+  eventId           String?  @db.Uuid
+  titleSnapshot     String
+  dateSnapshot      DateTime?
+
+  /// Сумма в копейках (если известна)
+  amount            Int?
+  currency          String?
+
+  purchasedAt       DateTime?
+  ingestionSource   OrderIngestionSource?
+
+  checkoutSessionId String?  @db.Uuid
+  packageId         String?  @db.Uuid
+  paymentIntentId   String?  @db.Uuid
+
+  sourcePayload     Json?
+  notes             String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([source, externalOrderId])
+  @@index([checkoutSessionId])
+  @@index([packageId])
+  @@index([paymentIntentId])
+  @@index([email])
+  @@index([phone])
+  @@index([purchasedAt])
+  @@index([status])
+}
+
 // ========================
 // Webhook — raw event log (accept & log, idempotent)
 // ========================
@@ -3010,6 +3055,30 @@ enum IdempotencyScope {
   CHECKOUT_CREATE // Создание Package/CheckoutSession
   EMAIL_SEND // Отправка email (dedup по template+recipient)
   EXTERNAL_CALLBACK // Внешние callbacks/partner webhooks
+}
+
+enum OrderSource {
+  INTERNAL
+  TICKETSCLOUD
+  TEPLOHOD
+  MANUAL
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  FAILED
+  REFUND_REQUESTED
+  REFUNDED
+}
+
+enum OrderIngestionSource {
+  CHECKOUT
+  TC_MIRROR
+  TEPLOHOD_EMAIL
+  MANUAL_ADMIN
+  RECONCILIATION
 }
 
 model IdempotencyKey {

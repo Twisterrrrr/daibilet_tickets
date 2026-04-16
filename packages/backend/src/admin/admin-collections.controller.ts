@@ -25,7 +25,7 @@ import { CollectionMaterializerService } from '../collection/collection-material
 import { CollectionSuggestionService } from '../collection/collection-suggestion.service';
 import { CollectionSelectionService } from '../catalog/collection-selection.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { CreateCollectionDto, UpdateCollectionDto } from './dto/admin.dto';
+import { CreateCollectionDto, UpdateCollectionDto } from './dto/admin.dto';import { AdminContentWriteValidationService } from './admin-content-write-validation.service';
 
 class AddCollectionItemDto {
   @IsString()
@@ -49,6 +49,7 @@ export class AdminCollectionsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly suggestionService: CollectionSuggestionService,
+    private readonly writeValidation: AdminContentWriteValidationService,
     private readonly selectionService: CollectionSelectionService,
     private readonly materializer: CollectionMaterializerService,
   ) {}
@@ -98,7 +99,7 @@ export class AdminCollectionsController {
           city: { select: { id: true, name: true, slug: true } },
           tagFilters: {
             orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-            include: { tag: { select: { id: true, slug: true, name: true } } },
+            include: { tag: { select: { id: true, slug: true, name: true, isActive: true } } },
           },
         },
       }),
@@ -130,8 +131,8 @@ export class AdminCollectionsController {
         isActive: c.isActive,
         sortOrder: c.sortOrder,
         filterCategory: c.filterCategory,
-        filterTags: c.filterTags,
-        tagFilters: (c as any).tagFilters ?? [],
+        filterTags: c.tagFilters?.length ? c.tagFilters.map((tf) => tf.tag.slug) : c.filterTags,
+        tagFilters: c.tagFilters ?? [],
         sourceType: c.sourceType,
         status: c.status,
         selectionBasis: c.selectionBasis,
@@ -157,7 +158,7 @@ export class AdminCollectionsController {
         city: { select: { id: true, name: true, slug: true } },
         tagFilters: {
           orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-          include: { tag: { select: { id: true, slug: true, name: true } } },
+          include: { tag: { select: { id: true, slug: true, name: true, isActive: true } } },
         },
         items: {
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -178,6 +179,12 @@ export class AdminCollectionsController {
       },
     });
     if (!collection) throw new NotFoundException('Подборка не найдена');
+
+    // Dual-read bridge: if link-table tagFilters has data, treat it as source-of-truth for legacy filterTags.
+    if (collection.tagFilters?.length) {
+      collection.filterTags = collection.tagFilters.map((tf) => tf.tag.slug);
+    }
+
     return collection;
   }
 
@@ -191,6 +198,18 @@ export class AdminCollectionsController {
     const existing = await this.prisma.collection.findUnique({ where: { slug: body.slug } });
     if (existing) throw new ConflictException(`Slug "${body.slug}" уже существует`);
 
+    const tagFiltersInput = (body as unknown as { tagFilters?: Array<{ tagId: string; position?: number }> }).tagFilters;
+    const legacyFilterTagsInput = body.filterTags;
+
+    if (tagFiltersInput?.length) {
+      await this.writeValidation.validateCollectionTagFilterIds(
+        tagFiltersInput.map((t) => t.tagId),
+        'admin.collections.create.tagFilters',
+      );
+    } else if (legacyFilterTagsInput?.length) {
+      await this.writeValidation.validateCollectionFilterTagSlugs(legacyFilterTagsInput, 'admin.collections.create.filterTags');
+    }
+
     const collection = await this.prisma.collection.create({
       data: {
         slug: body.slug,
@@ -199,7 +218,8 @@ export class AdminCollectionsController {
         cityId: body.cityId || null,
         heroImage: body.heroImage || null,
         description: body.description || null,
-        filterTags: body.filterTags || [],
+        // legacy mirror (canonical is tagFiltersInput when provided)
+        filterTags: legacyFilterTagsInput || [],
         filterCategory: body.filterCategory || null,
         filterSubcategory: body.filterSubcategory || null,
         filterAudience: body.filterAudience || null,
@@ -219,7 +239,29 @@ export class AdminCollectionsController {
       },
     });
 
-    return collection;
+    if (tagFiltersInput?.length) {
+      await this.prisma.collectionTagFilter.createMany({
+        data: tagFiltersInput.map((tf, i) => ({
+          collectionId: collection.id,
+          tagId: tf.tagId,
+          position: tf.position ?? i,
+          priority: 0,
+        })),
+        skipDuplicates: true,
+      });
+      // Mirror canonical normalized filters into legacy slug[] for compatibility
+      const tags = await this.prisma.tag.findMany({
+        where: { id: { in: tagFiltersInput.map((t) => t.tagId) } },
+        select: { id: true, slug: true },
+      });
+      const byId = new Map(tags.map((t) => [t.id, t.slug] as const));
+      await this.prisma.collection.update({
+        where: { id: collection.id },
+        data: { filterTags: tagFiltersInput.map((t) => byId.get(t.tagId) ?? '').filter(Boolean) },
+      });
+    }
+
+    return this.get(collection.id);
   }
 
   @Patch(':id')
@@ -256,6 +298,45 @@ export class AdminCollectionsController {
       }
     }
 
+    const tagFiltersInput = (body as unknown as { tagFilters?: Array<{ tagId: string; position?: number }> }).tagFilters;
+
+    if (tagFiltersInput !== undefined) {
+      await this.writeValidation.validateCollectionTagFilterIds(
+        tagFiltersInput.map((t) => t.tagId),
+        'admin.collections.update.tagFilters',
+      );
+    } else if (body.filterTags !== undefined) {
+      await this.writeValidation.validateCollectionFilterTagSlugs(body.filterTags, 'admin.collections.update.filterTags');
+    }
+
+    // Canonical write: if tagFiltersInput is provided, rewrite link table and mirror to legacy slug[]
+    if (tagFiltersInput !== undefined) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.collectionTagFilter.deleteMany({ where: { collectionId: id } });
+        if (tagFiltersInput.length) {
+          await tx.collectionTagFilter.createMany({
+            data: tagFiltersInput.map((tf, i) => ({
+              collectionId: id,
+              tagId: tf.tagId,
+              position: tf.position ?? i,
+              priority: 0,
+            })),
+          });
+        }
+
+        const tags = tagFiltersInput.length
+          ? await tx.tag.findMany({ where: { id: { in: tagFiltersInput.map((t) => t.tagId) } }, select: { id: true, slug: true } })
+          : [];
+        const byId = new Map(tags.map((t) => [t.id, t.slug] as const));
+        const legacySlugs = tagFiltersInput.map((t) => byId.get(t.tagId) ?? '').filter(Boolean);
+
+        await tx.collection.update({
+          where: { id },
+          data: { filterTags: legacySlugs },
+        });
+      });
+    }
+
     const result = await this.prisma.collection.updateMany({
       where: { id, version: Number(version) },
       data: {
@@ -265,7 +346,7 @@ export class AdminCollectionsController {
         ...(body.cityId !== undefined && { cityId: body.cityId || null }),
         ...(body.heroImage !== undefined && { heroImage: body.heroImage || null }),
         ...(body.description !== undefined && { description: body.description || null }),
-        ...(body.filterTags !== undefined && { filterTags: body.filterTags }),
+        ...(body.filterTags !== undefined && tagFiltersInput === undefined && { filterTags: body.filterTags }),
         ...(body.filterCategory !== undefined && { filterCategory: body.filterCategory || null }),
         ...(body.filterSubcategory !== undefined && { filterSubcategory: body.filterSubcategory || null }),
         ...(body.filterAudience !== undefined && { filterAudience: body.filterAudience || null }),

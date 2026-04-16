@@ -26,6 +26,7 @@ import type {
 import type { SeoAuditContext, SeoAuditEventInput } from './seo-audit-rules';
 import { runAllRules } from './seo-audit-rules';
 import { countEntityIssues, runCityRules, runVenueRules } from './seo-audit-entity-rules';
+import { runArticleRules, runCollectionRules, runLandingRules } from './seo-audit-content-rules';
 import { SubcategoryPolicyService } from '../../subcategories/subcategory-policy.service';
 
 export interface SeoAuditEventsParams {
@@ -43,10 +44,19 @@ export interface SeoAuditEventsParams {
 export class SeoAuditService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: CacheService,
-  ) {}
+    cache?: CacheService,
+  ) {
+    // Test-friendly: allow constructing service without DI container.
+    // In prod Nest injects CacheService; in unit tests we can omit it and run uncached.
+    this.cache =
+      cache ??
+      ({
+        getOrSet: async (_k: string, _ttl: number, fn: () => Promise<unknown>) => fn(),
+      } as unknown as CacheService);
+  }
 
-  private buildCacheKey(prefix: string, parts: Record<string, string | number | boolean | null | undefined>): string {
+  private readonly cache: CacheService;
+private buildCacheKey(prefix: string, parts: Record<string, string | number | boolean | null | undefined>): string {
     const entries = Object.entries(parts)
       .filter(([, v]) => v !== undefined && v !== null && v !== '')
       .sort(([a], [b]) => a.localeCompare(b));
@@ -134,12 +144,86 @@ export class SeoAuditService {
         this.getVenuesAudit({ onlyIssues: 'true', page: '1', limit: '1000' }),
       ]);
 
+      // Content entities: minimal cheap counts (DB-level), keep stable semantics for existing EVENT/VENUE/CITY.
+      const [articlesTotal, articlesMetaTitleMissing, articlesMetaDescMissing, articlesPublishedWithoutSeo] = await Promise.all([
+        this.prisma.article.count({ where: { status: { not: 'ARCHIVED' as any } } }),
+        this.prisma.article.count({ where: { status: { not: 'ARCHIVED' as any }, OR: [{ metaTitle: null }, { metaTitle: { equals: '' } }] } }),
+        this.prisma.article.count({ where: { status: { not: 'ARCHIVED' as any }, OR: [{ metaDescription: null }, { metaDescription: { equals: '' } }] } }),
+        this.prisma.article.count({
+          where: {
+            status: 'PUBLISHED' as any,
+            OR: [
+              { metaTitle: null },
+              { metaTitle: { equals: '' } },
+              { metaDescription: null },
+              { metaDescription: { equals: '' } },
+            ],
+          },
+        }),
+      ]);
+
+      const [landingsTotal, landingsMetaTitleMissing, landingsMetaDescMissing, landingsFilterTagMissing, landingsPublishedWithoutSeo] = await Promise.all([
+        this.prisma.landingPage.count({ where: { isDeleted: false } }),
+        this.prisma.landingPage.count({ where: { isDeleted: false, OR: [{ metaTitle: null }, { metaTitle: { equals: '' } }] } }),
+        this.prisma.landingPage.count({ where: { isDeleted: false, OR: [{ metaDescription: null }, { metaDescription: { equals: '' } }] } }),
+        this.prisma.landingPage.count({ where: { isDeleted: false, filterTagId: null } }),
+        this.prisma.landingPage.count({
+          where: {
+            isDeleted: false,
+            status: 'ACTIVE' as any,
+            OR: [
+              { metaTitle: null },
+              { metaTitle: { equals: '' } },
+              { metaDescription: null },
+              { metaDescription: { equals: '' } },
+            ],
+          },
+        }),
+      ]);
+
+      const [collectionsTotal, collectionsMetaTitleMissing, collectionsMetaDescMissing, collectionsPublishedWithoutSeo] = await Promise.all([
+        this.prisma.collection.count({ where: { isDeleted: false } }),
+        this.prisma.collection.count({ where: { isDeleted: false, OR: [{ metaTitle: null }, { metaTitle: { equals: '' } }] } }),
+        this.prisma.collection.count({ where: { isDeleted: false, OR: [{ metaDescription: null }, { metaDescription: { equals: '' } }] } }),
+        this.prisma.collection.count({
+          where: {
+            isDeleted: false,
+            status: 'ACTIVE' as any,
+            OR: [
+              { metaTitle: null },
+              { metaTitle: { equals: '' } },
+              { metaDescription: null },
+              { metaDescription: { equals: '' } },
+            ],
+          },
+        }),
+      ]);
+      const [collectionsNoTagFilters, collectionsNoLegacyTagSlugs] = await Promise.all([
+        this.prisma.collection.count({ where: { isDeleted: false, tagFilters: { none: {} } } }),
+        this.prisma.collection.count({ where: { isDeleted: false, filterTags: { equals: [] } } }),
+      ]);
+      const collectionsTagFiltersMissing = Math.min(collectionsNoTagFilters, collectionsNoLegacyTagSlugs);
+
       const issueBuckets: Array<{ issueCode: string; severity: UnifiedSeoSeverity; total: number; entityType: UnifiedSeoEntityType }> = [
         { issueCode: 'NO_PHOTO', severity: 'WARN', total: noPhoto, entityType: 'EVENT' },
         { issueCode: 'NO_PRICE', severity: 'ERROR', total: noPrice, entityType: 'EVENT' },
         { issueCode: 'NO_FUTURE_SESSIONS', severity: 'ERROR', total: noFutureSessions, entityType: 'EVENT' },
         { issueCode: 'NO_SUBCATEGORY', severity: 'WARN', total: noSubcategory, entityType: 'EVENT' },
         { issueCode: 'TOO_MANY_SUBCATEGORIES', severity: 'WARN', total: tooManyLinks, entityType: 'EVENT' },
+
+        { issueCode: 'META_TITLE_MISSING', severity: 'WARN', total: articlesMetaTitleMissing, entityType: 'ARTICLE' },
+        { issueCode: 'META_DESC_MISSING', severity: 'WARN', total: articlesMetaDescMissing, entityType: 'ARTICLE' },
+        { issueCode: 'PUBLISHED_WITHOUT_SEO', severity: 'ERROR', total: articlesPublishedWithoutSeo, entityType: 'ARTICLE' },
+
+        { issueCode: 'META_TITLE_MISSING', severity: 'WARN', total: landingsMetaTitleMissing, entityType: 'LANDING' },
+        { issueCode: 'META_DESC_MISSING', severity: 'WARN', total: landingsMetaDescMissing, entityType: 'LANDING' },
+        { issueCode: 'FILTER_TAG_MISSING', severity: 'WARN', total: landingsFilterTagMissing, entityType: 'LANDING' },
+        { issueCode: 'PUBLISHED_WITHOUT_SEO', severity: 'ERROR', total: landingsPublishedWithoutSeo, entityType: 'LANDING' },
+
+        { issueCode: 'META_TITLE_MISSING', severity: 'WARN', total: collectionsMetaTitleMissing, entityType: 'COLLECTION' },
+        { issueCode: 'META_DESC_MISSING', severity: 'WARN', total: collectionsMetaDescMissing, entityType: 'COLLECTION' },
+        { issueCode: 'TAG_FILTERS_MISSING', severity: 'WARN', total: collectionsTagFiltersMissing, entityType: 'COLLECTION' },
+        { issueCode: 'PUBLISHED_WITHOUT_SEO', severity: 'ERROR', total: collectionsPublishedWithoutSeo, entityType: 'COLLECTION' },
       ];
 
       const byIssueCode = issueBuckets
@@ -159,11 +243,41 @@ export class SeoAuditService {
       const venueWarnings = venuesAudit.summary.issuesBySeverity.WARN;
       const venueInfo = venuesAudit.summary.issuesBySeverity.INFO;
 
+      const articleErrors = articlesPublishedWithoutSeo;
+      const articleWarnings = articlesMetaTitleMissing + articlesMetaDescMissing;
+      const articleInfo = 0;
+
+      const landingErrors = landingsPublishedWithoutSeo;
+      const landingWarnings = landingsMetaTitleMissing + landingsMetaDescMissing + landingsFilterTagMissing;
+      const landingInfo = 0;
+
+      const collectionErrors = collectionsPublishedWithoutSeo;
+      const collectionWarnings = collectionsMetaTitleMissing + collectionsMetaDescMissing + collectionsTagFiltersMissing;
+      const collectionInfo = 0;
+
       const totals = {
-        errors: eventErrors + cityErrors + venueErrors,
-        warnings: eventWarnings + cityWarnings + venueWarnings,
-        info: eventInfo + cityInfo + venueInfo,
-        issues: eventErrors + eventWarnings + eventInfo + cityErrors + cityWarnings + cityInfo + venueErrors + venueWarnings + venueInfo,
+        errors: eventErrors + cityErrors + venueErrors + articleErrors + landingErrors + collectionErrors,
+        warnings: eventWarnings + cityWarnings + venueWarnings + articleWarnings + landingWarnings + collectionWarnings,
+        info: eventInfo + cityInfo + venueInfo + articleInfo + landingInfo + collectionInfo,
+        issues:
+          eventErrors +
+          eventWarnings +
+          eventInfo +
+          cityErrors +
+          cityWarnings +
+          cityInfo +
+          venueErrors +
+          venueWarnings +
+          venueInfo +
+          articleErrors +
+          articleWarnings +
+          articleInfo +
+          landingErrors +
+          landingWarnings +
+          landingInfo +
+          collectionErrors +
+          collectionWarnings +
+          collectionInfo,
       };
 
       return {
@@ -172,6 +286,9 @@ export class SeoAuditService {
           { entityType: 'EVENT', total: eventErrors + eventWarnings + eventInfo, errors: eventErrors, warnings: eventWarnings, info: eventInfo },
           { entityType: 'CITY', total: cityErrors + cityWarnings + cityInfo, errors: cityErrors, warnings: cityWarnings, info: cityInfo },
           { entityType: 'VENUE', total: venueErrors + venueWarnings + venueInfo, errors: venueErrors, warnings: venueWarnings, info: venueInfo },
+          { entityType: 'ARTICLE', total: articleErrors + articleWarnings + articleInfo, errors: articleErrors, warnings: articleWarnings, info: articleInfo },
+          { entityType: 'LANDING', total: landingErrors + landingWarnings + landingInfo, errors: landingErrors, warnings: landingWarnings, info: landingInfo },
+          { entityType: 'COLLECTION', total: collectionErrors + collectionWarnings + collectionInfo, errors: collectionErrors, warnings: collectionWarnings, info: collectionInfo },
         ],
         byIssueCode,
       };
@@ -242,6 +359,214 @@ export class SeoAuditService {
         }
       }
       return { items, total: items.length, page: res.page, pages: res.pages };
+    }
+
+    if (entityType === 'ARTICLE') {
+      const page = Math.max(1, parseInt(params.page || '1', 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(params.limit || '50', 10) || 50));
+      const onlyIssues = params.onlyIssues !== 'false';
+
+      const where: Prisma.ArticleWhereInput = { status: { not: 'ARCHIVED' as any } };
+      if (params.search?.trim()) {
+        const q = params.search.trim();
+        where.OR = [{ title: { contains: q, mode: 'insensitive' } }, { slug: { contains: q, mode: 'insensitive' } }];
+      }
+
+      const [total, rows] = await Promise.all([
+        this.prisma.article.count({ where }),
+        this.prisma.article.findMany({
+          where,
+          select: { id: true, title: true, slug: true, metaTitle: true, metaDescription: true, status: true, updatedAt: true },
+          orderBy: { updatedAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+      ]);
+
+      const items: UnifiedSeoIssueListItemDto[] = [];
+      for (const a of rows) {
+        const issuesForEntity = runArticleRules({
+          status: a.status as any,
+          metaTitle: a.metaTitle,
+          metaDescription: a.metaDescription,
+        });
+
+        const filtered = issuesForEntity.filter((i) => {
+          if (params.issueCode && i.code !== params.issueCode) return false;
+          if (params.severity && i.severity !== params.severity) return false;
+          return true;
+        });
+
+        if (onlyIssues && filtered.length === 0) continue;
+
+        for (const i of filtered) {
+          items.push({
+            entityType: 'ARTICLE',
+            entityId: a.id,
+            entityTitle: a.title,
+            entitySlug: a.slug,
+            issueCode: i.code,
+            severity: i.severity,
+            message: i.message,
+            updatedAt: a.updatedAt,
+          });
+        }
+      }
+
+      return {
+        items,
+        total: onlyIssues ? items.length : total,
+        page,
+        pages: onlyIssues ? 1 : Math.ceil(total / limit),
+      };
+    }
+
+    if (entityType === 'LANDING') {
+      const page = Math.max(1, parseInt(params.page || '1', 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(params.limit || '50', 10) || 50));
+      const onlyIssues = params.onlyIssues !== 'false';
+
+      const where: Prisma.LandingPageWhereInput = { isDeleted: false };
+      if (params.search?.trim()) {
+        const q = params.search.trim();
+        where.OR = [{ title: { contains: q, mode: 'insensitive' } }, { slug: { contains: q, mode: 'insensitive' } }];
+      }
+      if (params.cityId) where.cityId = params.cityId;
+
+      const [total, rows] = await Promise.all([
+        this.prisma.landingPage.count({ where }),
+        this.prisma.landingPage.findMany({
+          where,
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            status: true,
+            metaTitle: true,
+            metaDescription: true,
+            filterTagId: true,
+            updatedAt: true,
+            city: { select: { name: true } },
+          },
+          orderBy: { updatedAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+      ]);
+
+      const items: UnifiedSeoIssueListItemDto[] = [];
+      for (const l of rows) {
+        const issuesForEntity = runLandingRules({
+          status: l.status as any,
+          metaTitle: l.metaTitle,
+          metaDescription: l.metaDescription,
+          filterTagId: l.filterTagId,
+        });
+
+        const filtered = issuesForEntity.filter((i) => {
+          if (params.issueCode && i.code !== params.issueCode) return false;
+          if (params.severity && i.severity !== params.severity) return false;
+          return true;
+        });
+
+        if (onlyIssues && filtered.length === 0) continue;
+
+        for (const i of filtered) {
+          items.push({
+            entityType: 'LANDING',
+            entityId: l.id,
+            entityTitle: l.title,
+            entitySlug: l.slug,
+            cityName: l.city?.name ?? null,
+            issueCode: i.code,
+            severity: i.severity,
+            message: i.message,
+            updatedAt: l.updatedAt,
+          });
+        }
+      }
+
+      return {
+        items,
+        total: onlyIssues ? items.length : total,
+        page,
+        pages: onlyIssues ? 1 : Math.ceil(total / limit),
+      };
+    }
+
+    if (entityType === 'COLLECTION') {
+      const page = Math.max(1, parseInt(params.page || '1', 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(params.limit || '50', 10) || 50));
+      const onlyIssues = params.onlyIssues !== 'false';
+
+      const where: Prisma.CollectionWhereInput = { isDeleted: false };
+      if (params.search?.trim()) {
+        const q = params.search.trim();
+        where.OR = [{ title: { contains: q, mode: 'insensitive' } }, { slug: { contains: q, mode: 'insensitive' } }];
+      }
+      if (params.cityId) where.cityId = params.cityId;
+
+      const [total, rows] = await Promise.all([
+        this.prisma.collection.count({ where }),
+        this.prisma.collection.findMany({
+          where,
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            status: true,
+            metaTitle: true,
+            metaDescription: true,
+            filterTags: true,
+            updatedAt: true,
+            city: { select: { name: true } },
+            _count: { select: { tagFilters: true } },
+          },
+          orderBy: { updatedAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+      ]);
+
+      const items: UnifiedSeoIssueListItemDto[] = [];
+      for (const c of rows) {
+        const issuesForEntity = runCollectionRules({
+          status: String(c.status ?? ''),
+          metaTitle: c.metaTitle,
+          metaDescription: c.metaDescription,
+          tagFiltersCount: c._count.tagFilters,
+          legacyFilterTagsCount: Array.isArray(c.filterTags) ? c.filterTags.length : 0,
+        });
+
+        const filtered = issuesForEntity.filter((i) => {
+          if (params.issueCode && i.code !== params.issueCode) return false;
+          if (params.severity && i.severity !== params.severity) return false;
+          return true;
+        });
+
+        if (onlyIssues && filtered.length === 0) continue;
+
+        for (const i of filtered) {
+          items.push({
+            entityType: 'COLLECTION',
+            entityId: c.id,
+            entityTitle: c.title,
+            entitySlug: c.slug,
+            cityName: c.city?.name ?? null,
+            issueCode: i.code,
+            severity: i.severity,
+            message: i.message,
+            updatedAt: c.updatedAt,
+          });
+        }
+      }
+
+      return {
+        items,
+        total: onlyIssues ? items.length : total,
+        page,
+        pages: onlyIssues ? 1 : Math.ceil(total / limit),
+      };
     }
 
     // EVENT (soft operational issues + taxonomy issues, links-first with legacy fallback)
@@ -417,6 +742,71 @@ export class SeoAuditService {
         updatedAt: v.updatedAt,
       }));
       return { entityType: 'VENUE', entityId: v.id, issues };
+    }
+
+    if (entityType === 'ARTICLE') {
+      const a = await this.prisma.article.findUnique({
+        where: { id: params.entityId },
+        select: { id: true, slug: true, title: true, metaTitle: true, metaDescription: true, status: true, updatedAt: true },
+      });
+      if (!a) return { entityType: 'ARTICLE', entityId: params.entityId, issues: [] };
+      const issues = runArticleRules({ status: a.status as any, metaTitle: a.metaTitle, metaDescription: a.metaDescription }).map((i) => ({
+        entityType: 'ARTICLE' as const,
+        entityId: a.id,
+        entityTitle: a.title,
+        entitySlug: a.slug,
+        issueCode: i.code,
+        severity: i.severity,
+        message: i.message,
+        updatedAt: a.updatedAt,
+      }));
+      return { entityType: 'ARTICLE', entityId: a.id, issues };
+    }
+
+    if (entityType === 'LANDING') {
+      const l = await this.prisma.landingPage.findUnique({
+        where: { id: params.entityId },
+        select: { id: true, slug: true, title: true, status: true, metaTitle: true, metaDescription: true, filterTagId: true, updatedAt: true, city: { select: { name: true } } },
+      });
+      if (!l) return { entityType: 'LANDING', entityId: params.entityId, issues: [] };
+      const issues = runLandingRules({ status: l.status as any, metaTitle: l.metaTitle, metaDescription: l.metaDescription, filterTagId: l.filterTagId }).map((i) => ({
+        entityType: 'LANDING' as const,
+        entityId: l.id,
+        entityTitle: l.title,
+        entitySlug: l.slug,
+        cityName: l.city?.name ?? null,
+        issueCode: i.code,
+        severity: i.severity,
+        message: i.message,
+        updatedAt: l.updatedAt,
+      }));
+      return { entityType: 'LANDING', entityId: l.id, issues };
+    }
+
+    if (entityType === 'COLLECTION') {
+      const c = await this.prisma.collection.findUnique({
+        where: { id: params.entityId },
+        select: { id: true, slug: true, title: true, status: true, metaTitle: true, metaDescription: true, filterTags: true, updatedAt: true, city: { select: { name: true } }, _count: { select: { tagFilters: true } } },
+      });
+      if (!c) return { entityType: 'COLLECTION', entityId: params.entityId, issues: [] };
+      const issues = runCollectionRules({
+        status: String(c.status ?? ''),
+        metaTitle: c.metaTitle,
+        metaDescription: c.metaDescription,
+        tagFiltersCount: c._count.tagFilters,
+        legacyFilterTagsCount: Array.isArray(c.filterTags) ? c.filterTags.length : 0,
+      }).map((i) => ({
+        entityType: 'COLLECTION' as const,
+        entityId: c.id,
+        entityTitle: c.title,
+        entitySlug: c.slug,
+        cityName: c.city?.name ?? null,
+        issueCode: i.code,
+        severity: i.severity,
+        message: i.message,
+        updatedAt: c.updatedAt,
+      }));
+      return { entityType: 'COLLECTION', entityId: c.id, issues };
     }
 
     // EVENT

@@ -1,4 +1,4 @@
-import { calendarDayFromIso, getFirstPriceKopecks, getCityTimezone } from '@daibilet/shared';
+﻿import { calendarDayFromIso, getFirstPriceKopecks, getCityTimezone } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DateMode, LandingStatus, Prisma } from '@/prisma-client';
 
@@ -254,7 +254,15 @@ export class LandingService {
 
     const resolveCityLanding = async (lp: typeof landing): Promise<{ ids: string[]; items: ResolvedEventItem[] }> => {
       if (!lp.cityId || !lp.city) return { ids: [], items: [] };
-      const tag = await this.prisma.tag.findFirst({ where: { slug: lp.filterTag, isActive: true } });
+      const tag = lp.filterTagId
+        ? await this.prisma.tag.findUnique({
+            where: { id: lp.filterTagId },
+            select: { id: true, slug: true },
+          })
+        : await this.prisma.tag.findFirst({
+            where: { slug: lp.filterTag, isActive: true },
+            select: { id: true, slug: true },
+          });
       const now = new Date();
       const where = buildLandingEventsWhere({
         cityId: lp.cityId,

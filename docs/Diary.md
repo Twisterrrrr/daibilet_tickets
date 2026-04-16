@@ -5499,3 +5499,22 @@ Tripster — лидер рынка экскурсий в России. Прям�
 
 #### Проблемы
 - Нет.
+
+---
+
+### 2026-04-16 — Orders: Order mirror layer (bridge/read-model)
+
+#### Наблюдения
+- В проекте уже есть мощный transactional-контур (`CheckoutSession`, `PaymentIntent`, `FulfillmentItem`, `RefundRequest`) и внешние источники продаж (TicketsCloud mirror, teplohod письма), но нет единого плоского read‑слоя «продажи» для UI.
+- Реальная точка перехода оплаты в PAID находится в очереди: YooKassa webhook → `FulfillmentProcessor` → `PaymentService.markPaid(...)`.
+
+#### Решения
+- В Prisma введён `Order` как **projection/read-model**, а не замена checkout: enums `OrderSource/OrderStatus/OrderIngestionSource`, поля bridge (`checkoutSessionId`, `paymentIntentId`, `packageId`), `sourcePayload` для трассировки.
+- Реализованы `OrderStatusMapper`, `OrderProjectionService`, `OrderReadService`; ingestion hook’и:
+  - checkout create (`CheckoutService.createCheckoutSession`) → PENDING projection;
+  - YooKassa `payment.succeeded` (через `FulfillmentProcessor` после `markPaid`) → PAID projection;
+  - TicketsCloud mirror sync → external projection.
+- Добавлен repair CLI `scripts/rebuild-orders-from-checkout.ts` (best‑effort пересборка).
+
+#### Проблемы
+- `titleSnapshot` для internal‑заказа пока берётся из `offersSnapshot[0].eventTitle` с fallback `'Order'` — это временное решение до richer title/event linking.

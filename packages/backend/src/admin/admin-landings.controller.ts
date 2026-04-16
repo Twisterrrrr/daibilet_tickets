@@ -26,7 +26,7 @@ import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
 import { LandingMaterializerService } from '../landing/landing-materializer.service';
 import { LandingService } from '../landing/landing.service';
-import { CreateLandingDto, UpdateLandingDto } from './dto/admin.dto';
+import { CreateLandingDto, UpdateLandingDto } from './dto/admin.dto';import { AdminContentWriteValidationService } from './admin-content-write-validation.service';
 import {
   AdditionalFiltersSchema,
   SeasonalPayloadSchema,
@@ -51,6 +51,7 @@ export class AdminLandingsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly writeValidation: AdminContentWriteValidationService,
     private readonly materializer: LandingMaterializerService,
     private readonly landings: LandingService,
   ) {}
@@ -90,7 +91,7 @@ export class AdminLandingsController {
         include: {
           city: { select: { slug: true, name: true } },
           parentLanding: { select: { id: true, slug: true, title: true, landingType: true } },
-          filterTagRef: { select: { id: true, slug: true, name: true } },
+          filterTagRef: { select: { id: true, slug: true, name: true, isActive: true } },
         },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
         ...paginationArgs(pg),
@@ -113,7 +114,7 @@ export class AdminLandingsController {
       include: {
         city: { select: { slug: true, name: true } },
         parentLanding: { select: { id: true, slug: true, title: true, landingType: true } },
-        filterTagRef: { select: { id: true, slug: true, name: true } },
+        filterTagRef: { select: { id: true, slug: true, name: true, isActive: true } },
         childLandings: {
           where: { isDeleted: false },
           include: { city: { select: { slug: true, name: true } } },
@@ -158,11 +159,12 @@ export class AdminLandingsController {
     // Для publish-guard’ов нужен id; в create пока запрещаем сразу активировать HUB/MULTI_CITY без child’ов.
     await this.validateLandingRules(data as unknown as Record<string, unknown>);
     this.validateJsonFields(data as unknown as Record<string, unknown>);
-    // Эволюция: если пришёл filterTagId, но filterTag не заполнен (или пустой) — подставим slug.
-    if ((data as any).filterTagId && !(data as any).filterTag) {
-      const tag = await this.prisma.tag.findUnique({ where: { id: String((data as any).filterTagId) }, select: { slug: true } });
-      if (tag?.slug) (data as any).filterTag = tag.slug;
-    }
+
+    // filterTag validation + dual-write bridge (slug <-> id)
+    const resolved = await this.writeValidation.validateLandingFilterTag(data as unknown as { filterTagId?: unknown; filterTag?: unknown }, 'admin.landings.create.filterTag');
+    if (resolved.filterTagId) (data as unknown as Record<string, unknown>).filterTagId = resolved.filterTagId;
+    if (resolved.filterTag) (data as unknown as Record<string, unknown>).filterTag = resolved.filterTag;
+
     const prismaData = {
       ...data,
       additionalFilters: data.additionalFilters ? toJsonValue(data.additionalFilters) : undefined,
@@ -171,7 +173,7 @@ export class AdminLandingsController {
       queryConfig: data.queryConfig ? toJsonValue(data.queryConfig) : undefined,
       status: data.status ?? (data.isActive ? LandingStatus.ACTIVE : LandingStatus.DRAFT),
     };
-    return this.prisma.landingPage.create({ data: prismaData as any });
+    return this.prisma.landingPage.create({ data: prismaData as never });
   }
 
   @Patch(':id')
@@ -180,6 +182,12 @@ export class AdminLandingsController {
     const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, city: _city, version: _version, ...clean } = data as Record<string, unknown>;
 
     this.validateJsonFields(clean);
+
+    if (clean.filterTagId !== undefined || clean.filterTag !== undefined) {
+      const resolved = await this.writeValidation.validateLandingFilterTag(clean as { filterTagId?: unknown; filterTag?: unknown }, 'admin.landings.update.filterTag');
+      clean.filterTagId = resolved.filterTagId;
+      clean.filterTag = resolved.filterTag;
+    }
 
     const beforeForRules = await this.prisma.landingPage.findUnique({ where: { id }, include: { city: { select: { id: true } } } });
     if (!beforeForRules) throw new BadRequestException('Landing not found');

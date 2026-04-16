@@ -69,6 +69,13 @@
 | `landings-multicity-family-foundation` | **Landings (эволюция домена):** формализовать “topic hub / multi-city family / city landing” (parent-child, preview resolved, canonical policy) поверх текущих `/cities/:citySlug/:landingSlug` и хабов (`/river-cruises`, `/salute-9-may`) | Высокий | `[x]` **14.04.2026** |
 | `content-links-fk-evolution` | **Контентные связи (эволюция):** `Article↔Landing/Collection` через M2M link‑таблицы с `position/priority`, `LandingPage.filterTagId` (FK на Tag) параллельно slug, `Collection↔Tag` через join‑таблицу; dual‑read + backfill | Высокий | `[x]` **14.04.2026** |
 
+### Orders foundation — unified Order mirror (2026‑04)
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `order-mirror-layer-mvp` | **Order mirror layer (read-model):** Prisma `Order` + `OrderProjectionService` (checkout PENDING, payment PAID, TC mirror), безопасные try/catch hook’и, repair CLI для пересборки | Критический | `[x]` **16.04.2026** |
+| `order-mirror-layer-ui-next` | **Follow-up:** `/account/orders` + `/admin/orders` на базе `OrderReadService` (фильтры/поиск), wiring refund workflow (ручной MVP) | Высокий | `[ ]` |
+
 ### Event + Sessions — ядро (приоритет эпика)
 
 | ID / якорь | Задача | Приоритет | Статус |

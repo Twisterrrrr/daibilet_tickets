@@ -127,6 +127,22 @@ export interface TcOrderSet {
   [key: string]: unknown;
 }
 
+/** Ответ GET /v2/resources/orders (список заказов). См. ticketscloud docs «Работа со списком заказов». */
+export interface TcOrdersListPagination {
+  page: number;
+  page_size: number;
+  total: number;
+}
+
+export interface TcOrdersListResponse {
+  data: unknown[];
+  pagination?: TcOrdersListPagination;
+  refs?: Record<string, unknown>;
+}
+
+/** Ответ GET /v2/resources/refund_requests. См. «Работа со списком возвратов». */
+export type TcRefundRequestsListResponse = TcOrdersListResponse;
+
 // ============================================================
 // TC gRPC Event (упрощённый)
 // ============================================================

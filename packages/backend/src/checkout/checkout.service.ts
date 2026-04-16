@@ -7,6 +7,7 @@ import { TcApiService } from '../catalog/tc-api.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PromoCodeService } from '../pricing/promo-code.service';
+import { OrderProjectionService } from '../orders/order-projection.service';
 import { partitionCart, PaymentFlowType, resolvePaymentFlow, SnapshotLineItem } from './cart-partitioning';
 import {
   calculateExpiresAt,
@@ -33,6 +34,7 @@ export class CheckoutService {
     private readonly mailService: MailService,
     private readonly config: ConfigService,
     private readonly promoCodes: PromoCodeService,
+    private readonly orderProjection: OrderProjectionService,
   ) {}
 
   /** Domain/host from APP_URL for vendor_data.source (e.g. daibilet.ru). */
@@ -744,6 +746,12 @@ export class CheckoutService {
           totalPrice: Math.round(session.totalPrice ? session.totalPrice / 100 : 0),
         })
         .catch((e) => this.logger.error('Order email failed: ' + e.message));
+    }
+
+    try {
+      await this.orderProjection.projectFromCheckoutSession(session.id);
+    } catch (e) {
+      this.logger.warn('Order projection (PENDING) failed', e as Error);
     }
 
     return {

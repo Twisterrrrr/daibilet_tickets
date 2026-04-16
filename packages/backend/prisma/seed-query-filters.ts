@@ -8,9 +8,9 @@ import path from 'path';
 
 config({ path: path.resolve(process.cwd(), '../../.env') });
 
-import { PrismaClient } from '@prisma/client';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
-const prisma = new PrismaClient();
+const { prisma, pool } = createScriptPrismaClient();
 
 interface QueryFilterDef {
   type: string;
@@ -70,4 +70,7 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });

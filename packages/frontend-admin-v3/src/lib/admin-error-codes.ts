@@ -87,4 +87,24 @@ export const adminErrorCodes: Record<string, AdminErrorUiMeta> = {
     title: 'Слишком много записей для предпросмотра',
     description: 'Уменьшите размер выборки.',
   },
+
+  // --- Articles ↔ Landings/Collections links (relation editor) ---
+  DUPLICATE_LANDING_LINKS: { title: 'Дубли в связанных лендингах', description: 'Один и тот же лендинг нельзя добавить дважды.' },
+  LANDING_LINK_TARGET_NOT_FOUND: { title: 'Лендинг не найден', description: 'Один из выбранных лендингов отсутствует или был удалён.' },
+  LANDING_LINK_TARGET_DELETED: { title: 'Лендинг удалён', description: 'Нельзя привязать удалённый лендинг.' },
+  DUPLICATE_COLLECTION_LINKS: { title: 'Дубли в связанных подборках', description: 'Одну и ту же подборку нельзя добавить дважды.' },
+  COLLECTION_LINK_TARGET_NOT_FOUND: { title: 'Подборка не найдена', description: 'Одна из выбранных подборок отсутствует или была удалена.' },
+  COLLECTION_LINK_TARGET_DELETED: { title: 'Подборка удалена', description: 'Нельзя привязать удалённую подборку.' },
+
+  // --- Landing.filterTag (normalized) ---
+  FILTER_TAG_ID_NOT_FOUND: { title: 'Тег не найден', description: 'Выбранный tagId не существует.' },
+  FILTER_TAG_ID_INVALID: { title: 'Тег недоступен', description: 'Тег удалён или не активен — выберите другой.' },
+  FILTER_TAG_SLUG_NOT_FOUND: { title: 'Тег не найден по slug', description: 'Проверьте slug или выберите тег через поиск.' },
+  FILTER_TAG_SLUG_AMBIGUOUS: { title: 'Slug тега неоднозначен', description: 'Выберите тег через поиск (по id).' },
+  FILTER_TAG_SLUG_INVALID: { title: 'Тег недоступен по slug', description: 'Тег удалён или не активен — выберите другой.' },
+
+  // --- Collection.tagFilters (normalized) ---
+  DUPLICATE_TAG_FILTERS: { title: 'Дубли в тегах фильтра', description: 'Один и тот же тег нельзя добавить дважды.' },
+  TAG_FILTER_IDS_NOT_FOUND: { title: 'Теги не найдены', description: 'Один или несколько выбранных тегов не существуют.' },
+  TAG_FILTER_IDS_INVALID: { title: 'Теги недоступны', description: 'Один или несколько тегов удалены или не активны.' },
 };

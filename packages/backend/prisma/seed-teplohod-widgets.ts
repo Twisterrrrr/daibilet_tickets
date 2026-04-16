@@ -16,7 +16,7 @@
  *   npx tsx prisma/seed-teplohod-widgets.ts file.xlsx --inspect   # показать структуру
  * По умолчанию: prisma/teplohod-widgets.json
  */
-import { PrismaClient } from '@prisma/client';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import * as XLSX from 'xlsx';
@@ -33,7 +33,7 @@ if (envPath) {
   }
 }
 
-const prisma = new PrismaClient();
+const { prisma, pool } = createScriptPrismaClient();
 
 const EVENT_COL_PATTERNS = [/^id$/i, /^event_?id$/i, /^event\s*id$/i, /^tep$/i, /^прогулк/i, /^№\s*\d*$/i];
 const WIDGET_COL_PATTERNS = [/data-?id/i, /^widget/i, /виджет/i, /^widget_id$/i, /data_id/i];
@@ -247,4 +247,7 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });

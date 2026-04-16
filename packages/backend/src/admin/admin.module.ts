@@ -1,4 +1,4 @@
-import { BullModule } from '@nestjs/bullmq';
+﻿import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module';
@@ -84,7 +84,7 @@ import { EventOverrideService } from './event-override.service';
 import { EventTagRulesService } from './event-tag-rules.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
 import { OperationLatencyTrackerService } from '../common/operation-latency-tracker.service';
-import { SeoAuditService } from './seo-audit/seo-audit.service';
+import { SeoAuditService } from './seo-audit/seo-audit.service';import { AdminContentWriteValidationService } from './admin-content-write-validation.service';
 
 @Module({
   imports: [
@@ -108,7 +108,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
       { name: QUEUE_ANALYTICS_PREAGG },
     ),
   ],
-  providers: [
+  providers: [    AdminContentWriteValidationService,
     OperationLatencyTrackerService,
     AnalyticsService,
     AnalyticsPreaggProcessor,

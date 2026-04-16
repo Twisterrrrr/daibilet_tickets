@@ -8,12 +8,10 @@ import { Calendar, ChevronDown, ChevronRight, Clock, MapPin, Shield, Users, X, T
 import { useState } from 'react';
 
 import { AddToCartButton } from '@/components/ui/AddToCartButton';
-import { BuyButton } from '@/components/ui/BuyModal';
 import { EventCard, type EventCardVM } from '@/components/ui/EventCard';
 import { RequestOfferForm } from '@/components/ui/RequestOfferForm';
 import { RatingBadge, ReviewSection } from '@/components/ui/ReviewSection';
-import { TcSessionSlot, TcWidgetButton } from '@/components/ui/TcWidget';
-import { TepWidgetEmbed } from '@/components/ui/TepWidget';
+import { TcSessionSlot } from '@/components/ui/TcWidget';
 import { shortenAddressToStreet } from '@/lib/address';
 import { isPastOpenDateExhibition } from '@/lib/event-ended';
 
@@ -975,7 +973,7 @@ function BuyCard({
   buyUrl: _buyUrl,
   hasActiveSessions: _hasActiveSessions,
   categoryLabel: _categoryLabel,
-  venueName,
+  venueName: _venueName,
   primaryOffer,
 }: {
   event: EventDetail;
@@ -985,7 +983,6 @@ function BuyCard({
   venueName: string | null;
   primaryOffer?: EventOfferLite;
 }) {
-  const [buyModalOpen, setBuyModalOpen] = useState(false);
   const [preselectedSessionId, setPreselectedSessionId] = useState<string | null>(null);
 
   if (isPastOpenDateExhibition(event)) {
@@ -1024,25 +1021,8 @@ function BuyCard({
 
   const widgetProvider = primaryOffer?.widgetProvider || primaryOffer?.source || event.source;
   const isTepWidget = widgetProvider === 'TEPLOHOD' || event.source === 'TEPLOHOD';
-  const widgetPayload: Record<string, unknown> = (primaryOffer?.widgetPayload as Record<string, unknown>) ?? {};
-  const offerEventId =
-    (typeof widgetPayload.externalEventId === 'string' ? widgetPayload.externalEventId : null) ||
-    primaryOffer?.externalEventId ||
-    event.tcEventId;
-  const offerMetaId =
-    (typeof widgetPayload.metaEventId === 'string' ? widgetPayload.metaEventId : null) ||
-    primaryOffer?.metaEventId ||
-    event.tcMetaEventId;
   const offerDeeplink = primaryOffer?.deeplink;
   const offerSource = primaryOffer?.source || event.source;
-
-  const tepWidgetId = (typeof widgetPayload.tepWidgetId === 'string' ? widgetPayload.tepWidgetId : null) ?? null;
-  const tepEventId =
-    (typeof widgetPayload.tepEventId === 'string' ? widgetPayload.tepEventId : null) ??
-    primaryOffer?.externalEventId?.match?.(/^tep-(\d+)$/)?.[1] ??
-    (typeof event.tcData === 'object' && event.tcData != null && 'id' in event.tcData
-      ? String((event.tcData as { id?: unknown }).id ?? '')
-      : null);
   const offerBadge = primaryOffer?.badge;
 
   const allOffers = (event.offers ?? []).filter((o) => o.status === 'ACTIVE');
@@ -1059,9 +1039,8 @@ function BuyCard({
   }
   const showFromPrefix = allPrices.size > 1;
 
-  const handleOpenBuyModal = (sessionId: string | null) => {
+  const handleSelectSession = (sessionId: string | null) => {
     setPreselectedSessionId(sessionId);
-    setBuyModalOpen(true);
   };
 
   const firstSessionPrices =
@@ -1114,36 +1093,28 @@ function BuyCard({
                       : (offer as EventOffer & { operator?: { name?: string } }).operator?.name ?? 'Дайбилет'}
                 </span>
               </div>
-              {offer.source === 'TEPLOHOD' && offer.deeplink ? (
-                <a
-                  href={offer.deeplink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-600"
-                >
-                  Купить
-                </a>
-              ) : offer.purchaseType === 'WIDGET' && offer.externalEventId ? (
-                <TcWidgetButton tcEventId={offer.externalEventId} tcMetaEventId={offer.metaEventId} compact>
-                  Купить
-                </TcWidgetButton>
-              ) : offer.purchaseType === 'REDIRECT' && offer.deeplink ? (
-                <a
-                  href={offer.deeplink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-700"
-                >
-                  Купить
-                </a>
-              ) : offer.purchaseType === 'REQUEST' ? (
+              {offer.purchaseType === 'REQUEST' ? (
                 <a
                   href="#request-form"
                   className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600"
                 >
                   Заявка
                 </a>
-              ) : null}
+              ) : (
+                <AddToCartButton
+                  eventId={event.id}
+                  offerId={offer.id}
+                  eventTitle={event.title}
+                  eventSlug={event.slug}
+                  imageUrl={event.imageUrl ?? undefined}
+                  priceFrom={offer.priceFrom ?? event.priceFrom ?? 0}
+                  purchaseType={offer.purchaseType ?? 'WIDGET'}
+                  source={offer.source ?? 'INTERNAL'}
+                  deeplink={offer.deeplink ?? undefined}
+                  badge={offer.badge ?? undefined}
+                  className="rounded-lg px-3 py-1.5 text-xs"
+                />
+              )}
             </div>
           ))}
         </div>
@@ -1237,7 +1208,7 @@ function BuyCard({
                     <button
                       key={session.id}
                       type="button"
-                      onClick={() => handleOpenBuyModal(session.id)}
+                      onClick={() => handleSelectSession(session.id)}
                       className="w-full rounded-lg border border-slate-200 bg-white text-left transition hover:border-primary-200 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-200"
                     >
                       <StaticSessionRow session={session} />
@@ -1253,96 +1224,28 @@ function BuyCard({
         </div>
       )}
 
-      {/* Основная кнопка покупки — после списка сеансов */}
+      {/* Основная кнопка покупки — canonical путь через /checkout (фиксирует CheckoutSession в БД) */}
       {isRequest ? (
         primaryOffer ? <RequestOfferForm eventId={event.id} offerId={primaryOffer.id} /> : null
-      ) : isTepWidget && (tepWidgetId || tepEventId || primaryOffer?.externalEventId) ? (
-        <TepWidgetEmbed
-          tepWidgetId={tepWidgetId}
-          tepEventId={tepEventId}
-          externalEventId={primaryOffer?.externalEventId}
-        />
-      ) : offerEventId ? (
+      ) : primaryOffer ? (
         <div className="mt-5">
-          {isWidget && !isManualEvent ? (
-            <TcWidgetButton tcEventId={offerEventId} tcMetaEventId={offerMetaId}>
-              Купить билет
-            </TcWidgetButton>
-          ) : isManualEvent && (event.sessions?.length ?? 0) > 0 ? (
-            <BuyButton
-              eventTitle={event.title}
-              eventImage={event.imageUrl}
-              tcEventId={offerEventId}
-              source="TC"
-              sessions={(event.sessions || []).map((s) => ({
-                ...s,
-                prices: (s.prices || []).map((p: { type?: string; price?: number; description?: string }) => ({
-                  name: p.type === 'adult' ? 'Взрослый билет' : p.type === 'child' ? 'Детский билет' : p.type === 'concession' ? 'Льготный билет' : p.type ?? 'Стандарт',
-                  price: p.price ?? 0,
-                  setId: s.id,
-                  amount: 1,
-                  amountVacant: s.availableTickets ?? 0,
-                  description:
-                    p.type === 'adult'
-                      ? 'без льгот'
-                      : p.type === 'child'
-                        ? 'от 3 до 14 включительно'
-                        : p.type === 'concession'
-                          ? 'школьники от 15 лет, студенты, пенсионеры и пр. льготные категории'
-                          : (p as { description?: string }).description ?? undefined,
-                })),
-              }))}
-              address={event.address ?? undefined}
-              venueName={venueName ?? undefined}
-              priceFrom={event.priceFrom ?? 0}
-              isOpen={buyModalOpen}
-              onOpenChange={(open) => {
-                setBuyModalOpen(open);
-                if (open) setPreselectedSessionId(null);
-              }}
-              initialSessionId={preselectedSessionId}
-            />
-          ) : purchaseType === 'REDIRECT' && offerDeeplink ? (
-            <a
-              href={offerDeeplink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
-            >
-              Купить на {offerSource === 'TEPLOHOD' ? 'teplohod.info' : 'сайте оператора'}
-            </a>
-          ) : (
-            <BuyButton
-              eventTitle={event.title}
-              eventImage={event.imageUrl}
-              tcEventId={offerEventId}
-              source={offerSource === 'TEPLOHOD' ? 'TEPLOHOD' : 'TC'}
-              sessions={(event.sessions || []).map((s) => ({
-                ...s,
-                prices: (s.prices || []).map((p: { type?: string; price?: number }) => ({
-                  name: p.type ?? 'Стандарт',
-                  price: p.price ?? 0,
-                  setId: s.id,
-                  amount: 1,
-                  amountVacant: s.availableTickets ?? 0,
-                })),
-              }))}
-              address={event.address ?? undefined}
-              venueName={venueName ?? undefined}
-              priceFrom={event.priceFrom ?? 0}
-            />
-          )}
-        </div>
-      ) : primaryOffer?.deeplink && purchaseType === 'REDIRECT' ? (
-        <div className="mt-5">
-          <a
-            href={primaryOffer.deeplink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
-          >
-            Купить на сайте оператора
-          </a>
+          <AddToCartButton
+            eventId={event.id}
+            offerId={primaryOffer.id}
+            sessionId={preselectedSessionId ?? undefined}
+            eventTitle={event.title}
+            eventSlug={event.slug}
+            imageUrl={event.imageUrl ?? undefined}
+            priceFrom={primaryOffer.priceFrom ?? event.priceFrom ?? 0}
+            purchaseType={purchaseType ?? primaryOffer.purchaseType ?? 'WIDGET'}
+            source={offerSource ?? primaryOffer.source ?? 'INTERNAL'}
+            deeplink={offerDeeplink ?? primaryOffer.deeplink ?? undefined}
+            badge={offerBadge ?? primaryOffer.badge ?? undefined}
+            className="rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
+          />
+          <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            Покупка проходит через оформление заказа на сайте — так заказ гарантированно фиксируется и появляется в ЛК/админке.
+          </div>
         </div>
       ) : (
         <button
@@ -1353,26 +1256,7 @@ function BuyCard({
         </button>
       )}
 
-      {primaryOffer &&
-        purchaseType !== 'WIDGET' &&
-        !isRequest &&
-        offerSource !== 'TC' &&
-        offerSource !== 'TEPLOHOD' && (
-          <div className="mt-3">
-            <AddToCartButton
-              eventId={event.id}
-              offerId={primaryOffer.id}
-              eventTitle={event.title}
-              eventSlug={event.slug}
-              imageUrl={event.imageUrl ?? undefined}
-              priceFrom={primaryOffer.priceFrom ?? event.priceFrom ?? 0}
-              purchaseType={purchaseType ?? 'WIDGET'}
-              source={offerSource ?? 'TC'}
-              deeplink={typeof offerDeeplink === 'string' ? offerDeeplink : undefined}
-              badge={typeof offerBadge === 'string' ? offerBadge : undefined}
-            />
-          </div>
-        )}
+      {/* Доп. CTA больше не нужен: основной checkout-CTA выше. */}
 
       <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
         <Shield className="h-4 w-4 text-emerald-500" />

@@ -149,7 +149,7 @@ export interface SeoAuditVenuesResponseDto {
 
 // ─── Unified (soft) read-model ───────────────────────────────────────────────
 
-export type UnifiedSeoEntityType = 'EVENT' | 'VENUE' | 'CITY';
+export type UnifiedSeoEntityType = 'EVENT' | 'VENUE' | 'CITY' | 'ARTICLE' | 'LANDING' | 'COLLECTION';
 
 export type UnifiedSeoSeverity = 'ERROR' | 'WARN' | 'INFO';
 

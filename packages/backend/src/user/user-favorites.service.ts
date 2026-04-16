@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -28,10 +28,17 @@ export class UserFavoritesService {
   async getSlugs(userId: string): Promise<string[]> {
     const favs = await this.prisma.userFavorite.findMany({
       where: { userId },
-      select: { eventSlug: true },
+      select: {
+        eventSlug: true,
+        eventId: true,
+        event: { select: { slug: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
-    return favs.map((f) => f.eventSlug);
+
+    // Dual-read: если есть FK eventId и связанный event.slug — это источник правды.
+    // Fallback: legacy eventSlug.
+    return favs.map((f) => f.event?.slug ?? f.eventSlug);
   }
 
   async add(userId: string, slug: string): Promise<string[]> {

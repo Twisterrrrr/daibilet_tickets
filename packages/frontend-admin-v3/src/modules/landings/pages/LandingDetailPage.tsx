@@ -4,6 +4,7 @@ import { HubReadinessPanel } from '@/components/shared/hub-readiness/HubReadines
 import { PageHeader } from '@/components/shared/page-header/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { adminApi } from '@/api/client';
 import { slugifyFromTitle } from '@/modules/articles/utils/slugify';
 import { getAdminErrorDisplay } from '@/lib/get-admin-error-message';
@@ -19,6 +20,14 @@ import {
   type AdminLandingDetail,
   type AdminLandingResolvedEventsResponse,
 } from '@/modules/landings/api/landings';
+
+type TagPickerItem = {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  isDeleted: boolean;
+};
 
 export function LandingDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -65,12 +74,13 @@ export function LandingDetailPage() {
 
   const [queryConfigText, setQueryConfigText] = React.useState<string>('');
   const [queryConfigError, setQueryConfigError] = React.useState<string | null>(null);
+  const [banner, setBanner] = React.useState<string | null>(null);
   React.useEffect(() => {
-    if (!draft) return;
-    const next = draft.queryConfig ?? null;
+    if (!detailQ.data) return;
+    const next = detailQ.data.queryConfig ?? null;
     setQueryConfigText(next ? JSON.stringify(next, null, 2) : '');
     setQueryConfigError(null);
-  }, [draft?.id]);
+  }, [detailQ.data]);
 
   const parseQueryConfigFromText = (text: string): { value: Record<string, unknown> | null; error: string | null } => {
     if (!text.trim()) return { value: null, error: null };
@@ -108,7 +118,8 @@ export function LandingDetailPage() {
   const [blocksErr, setBlocksErr] = React.useState<Record<string, string | null>>({});
 
   React.useEffect(() => {
-    if (!draft) return;
+    if (!detailQ.data) return;
+    const draft = detailQ.data;
     setBlocksJson({
       howToChoose: draft.howToChoose ? JSON.stringify(draft.howToChoose, null, 2) : '',
       infoBlocks: draft.infoBlocks ? JSON.stringify(draft.infoBlocks, null, 2) : '',
@@ -120,7 +131,7 @@ export function LandingDetailPage() {
       additionalFilters: draft.additionalFilters ? JSON.stringify(draft.additionalFilters, null, 2) : '',
     });
     setBlocksErr({});
-  }, [draft?.id]);
+  }, [detailQ.data]);
 
   const parseJsonText = (text: string): { value: unknown; error: string | null } => {
     if (!text.trim()) return { value: null, error: null };
@@ -174,7 +185,7 @@ export function LandingDetailPage() {
       }
       const gate = canActivateFromPreview();
       if (!gate.ok) throw new Error(gate.reason);
-      return patchAdminLanding(draft.id, {
+      const payload: Parameters<typeof patchAdminLanding>[1] = {
         version: draft.version,
         title: draft.title,
         slug: draft.slug,
@@ -185,15 +196,17 @@ export function LandingDetailPage() {
         heroText: draft.heroText ?? null,
         legalText: draft.legalText ?? null,
         templateType: draft.templateType,
-        howToChoose: (parsedBlocks.howToChoose.value as any) ?? null,
-        infoBlocks: (parsedBlocks.infoBlocks.value as any) ?? null,
-        faq: (parsedBlocks.faq.value as any) ?? null,
-        reviews: (parsedBlocks.reviews.value as any) ?? null,
-        stats: (parsedBlocks.stats.value as any) ?? null,
-        relatedLinks: (parsedBlocks.relatedLinks.value as any) ?? null,
-        seasonalPayload: (parsedBlocks.seasonalPayload.value as any) ?? null,
+        howToChoose: (parsedBlocks.howToChoose.value as unknown[] | null) ?? null,
+        infoBlocks: (parsedBlocks.infoBlocks.value as unknown[] | null) ?? null,
+        faq: (parsedBlocks.faq.value as unknown[] | null) ?? null,
+        reviews: (parsedBlocks.reviews.value as unknown[] | null) ?? null,
+        stats: (parsedBlocks.stats.value as Record<string, unknown> | null) ?? null,
+        relatedLinks: (parsedBlocks.relatedLinks.value as unknown[] | null) ?? null,
+        seasonalPayload: (parsedBlocks.seasonalPayload.value as Record<string, unknown> | null) ?? null,
+        // Canonical for admin: filterTagId. Keep legacy slug mirrored for compatibility.
+        filterTagId: draft.filterTagId ?? null,
         filterTag: draft.filterTag,
-        additionalFilters: (parsedBlocks.additionalFilters.value as any) ?? null,
+        additionalFilters: (parsedBlocks.additionalFilters.value as Record<string, unknown> | null) ?? null,
         collectionId: draft.collectionId ?? null,
         selectionMode: draft.selectionMode,
         eventSourceType: draft.eventSourceType,
@@ -206,10 +219,13 @@ export function LandingDetailPage() {
         isIndexable: Boolean(draft.isIndexable),
         isActive: Boolean(draft.isActive),
         status: draft.status,
-      } as any);
+      };
+      return patchAdminLanding(draft.id, payload);
     },
     onSuccess: async (next) => {
       setDraft(next);
+      setBanner('Сохранено');
+      window.setTimeout(() => setBanner(null), 3000);
       // Синхронизируем textarea после сохранения
       setQueryConfigText(next.queryConfig ? JSON.stringify(next.queryConfig, null, 2) : '');
       setQueryConfigError(null);
@@ -228,6 +244,10 @@ export function LandingDetailPage() {
       await qc.invalidateQueries({ queryKey: ['admin-landing-detail', id] });
       await qc.invalidateQueries({ queryKey: ['admin-landing-resolved-events', id] });
     },
+    onError: (e: unknown) => {
+      const d = getAdminErrorDisplay(e);
+      setBanner(`${d.title}${d.description ? `\n${d.description}` : ''}`);
+    },
   });
 
   const createM = useMutation({
@@ -236,7 +256,13 @@ export function LandingDetailPage() {
       return createAdminLanding(draft);
     },
     onSuccess: (created) => {
+      setBanner('Создано');
+      window.setTimeout(() => setBanner(null), 3000);
       navigate(`/admin-v3/landings/${created.id}`);
+    },
+    onError: (e: unknown) => {
+      const d = getAdminErrorDisplay(e);
+      setBanner(`${d.title}${d.description ? `\n${d.description}` : ''}`);
     },
   });
 
@@ -277,6 +303,8 @@ export function LandingDetailPage() {
       seasonalPayload: null,
 
       filterTag: '',
+      filterTagId: null,
+      filterTagRef: null,
       additionalFilters: null,
       collectionId: null,
       selectionMode: 'CUSTOM',
@@ -308,6 +336,11 @@ export function LandingDetailPage() {
             </div>
           }
         />
+        {banner ? (
+          <div className="whitespace-pre-wrap rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30">
+            {banner}
+          </div>
+        ) : null}
         <div className="rounded-lg border bg-card p-5 space-y-4">
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             Title
@@ -334,7 +367,7 @@ export function LandingDetailPage() {
               className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
               value={cur.landingType}
               onChange={(e) => {
-                const landingType = e.target.value as any;
+                const landingType = e.target.value as AdminLandingDetail['landingType'];
                 setDraft({
                   ...cur,
                   landingType,
@@ -380,14 +413,30 @@ export function LandingDetailPage() {
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            filterTag
-            <input
-              className="h-9 rounded-md border bg-background px-2 font-mono text-sm text-foreground"
-              value={cur.filterTag}
-              onChange={(e) => setDraft({ ...cur, filterTag: e.target.value })}
-            />
-          </label>
+
+          <LandingFilterTagEditor
+            filterTagId={cur.filterTagId ?? null}
+            filterTagSlug={cur.filterTag ?? ''}
+            filterTagRef={
+              cur.filterTagRef
+                ? {
+                    id: cur.filterTagRef.id,
+                    name: cur.filterTagRef.name,
+                    slug: cur.filterTagRef.slug,
+                    isActive: Boolean(cur.filterTagRef.isActive),
+                    isDeleted: Boolean(cur.filterTagRef.isDeleted ?? false),
+                  }
+                : null
+            }
+            onChange={(next) => {
+              setDraft({
+                ...cur,
+                filterTagId: next.filterTagId,
+                filterTag: next.filterTagSlug,
+                filterTagRef: next.filterTagRef,
+              });
+            }}
+          />
         </div>
       </div>
     );
@@ -435,6 +484,11 @@ export function LandingDetailPage() {
           </div>
         }
       />
+      {banner ? (
+        <div className="whitespace-pre-wrap rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30">
+          {banner}
+        </div>
+      ) : null}
 
       <HubReadinessPanel title="Лендинг (hub readiness)" snapshot={draft.hubReadiness} />
 
@@ -457,7 +511,7 @@ export function LandingDetailPage() {
               <select
                 className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
                 value={draft.status}
-                onChange={(e) => setDraft({ ...draft, status: e.target.value as any })}
+                onChange={(e) => setDraft({ ...draft, status: e.target.value as AdminLandingDetail['status'] })}
               >
                 <option value="DRAFT">DRAFT</option>
                 <option value="ACTIVE">ACTIVE</option>
@@ -501,7 +555,7 @@ export function LandingDetailPage() {
               className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
               value={draft.landingType}
               onChange={(e) => {
-                const landingType = e.target.value as any;
+                const landingType = e.target.value as AdminLandingDetail['landingType'];
                 setDraft({
                   ...draft,
                   landingType,
@@ -550,21 +604,43 @@ export function LandingDetailPage() {
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            filterTag
-            <input
-              className="h-9 rounded-md border bg-background px-2 font-mono text-sm text-foreground"
-              value={draft.filterTag ?? ''}
-              onChange={(e) => setDraft({ ...draft, filterTag: e.target.value })}
-            />
-          </label>
+          {!draft.filterTagId && !draft.filterTagRef && draft.filterTag ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30">
+              Найден legacy <span className="font-mono">filterTag</span> (slug) без resolved тега. Выберите canonical тег ниже и сохраните — backend
+              привяжет <span className="font-mono">filterTagId</span>.
+            </div>
+          ) : null}
+
+          <LandingFilterTagEditor
+            filterTagId={draft.filterTagId ?? null}
+            filterTagSlug={draft.filterTag ?? ''}
+            filterTagRef={
+              draft.filterTagRef
+                ? {
+                    id: draft.filterTagRef.id,
+                    name: draft.filterTagRef.name,
+                    slug: draft.filterTagRef.slug,
+                    isActive: Boolean(draft.filterTagRef.isActive),
+                    isDeleted: Boolean(draft.filterTagRef.isDeleted ?? false),
+                  }
+                : null
+            }
+            onChange={(next) => {
+              setDraft({
+                ...draft,
+                filterTagId: next.filterTagId,
+                filterTag: next.filterTagSlug,
+                filterTagRef: next.filterTagRef,
+              });
+            }}
+          />
 
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             templateType
             <select
               className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
               value={draft.templateType}
-              onChange={(e) => setDraft({ ...draft, templateType: e.target.value as any })}
+              onChange={(e) => setDraft({ ...draft, templateType: e.target.value as AdminLandingDetail['templateType'] })}
             >
               <option value="GENERIC_CARDS">GENERIC_CARDS</option>
               <option value="COMPARISON_TABLE">COMPARISON_TABLE</option>
@@ -622,7 +698,7 @@ export function LandingDetailPage() {
                 const p = parseJsonText(text);
                 setBlocksErr((m) => ({ ...m, howToChoose: p.error }));
               }}
-              placeholder={`[\n  { \"title\": \"Как выбрать маршрут\", \"text\": \"Советы по выбору…\" }\n]`}
+              placeholder={`[\n  { "title": "Как выбрать маршрут", "text": "Советы по выбору…" }\n]`}
             />
           </label>
           {blocksErr.howToChoose ? <div className="text-xs text-rose-700">JSON error: {blocksErr.howToChoose}</div> : null}
@@ -638,7 +714,7 @@ export function LandingDetailPage() {
                 const p = parseJsonText(text);
                 setBlocksErr((m) => ({ ...m, infoBlocks: p.error }));
               }}
-              placeholder={`[\n  { \"title\": \"Скидки\", \"text\": \"…\" },\n  { \"title\": \"Причалы\", \"text\": \"…\" }\n]`}
+              placeholder={`[\n  { "title": "Скидки", "text": "…" },\n  { "title": "Причалы", "text": "…" }\n]`}
             />
           </label>
           {blocksErr.infoBlocks ? <div className="text-xs text-rose-700">JSON error: {blocksErr.infoBlocks}</div> : null}
@@ -654,7 +730,7 @@ export function LandingDetailPage() {
                 const p = parseJsonText(text);
                 setBlocksErr((m) => ({ ...m, faq: p.error }));
               }}
-              placeholder={`[\n  { \"question\": \"Сколько длится прогулка?\", \"answer\": \"…\" }\n]`}
+              placeholder={`[\n  { "question": "Сколько длится прогулка?", "answer": "…" }\n]`}
             />
           </label>
           {blocksErr.faq ? <div className="text-xs text-rose-700">JSON error: {blocksErr.faq}</div> : null}
@@ -670,7 +746,7 @@ export function LandingDetailPage() {
                 const p = parseJsonText(text);
                 setBlocksErr((m) => ({ ...m, reviews: p.error }));
               }}
-              placeholder={`[\n  { \"text\": \"Отлично!\", \"author\": \"Анна\", \"rating\": 5 }\n]`}
+              placeholder={`[\n  { "text": "Отлично!", "author": "Анна", "rating": 5 }\n]`}
             />
           </label>
           {blocksErr.reviews ? <div className="text-xs text-rose-700">JSON error: {blocksErr.reviews}</div> : null}
@@ -686,7 +762,7 @@ export function LandingDetailPage() {
                 const p = parseJsonText(text);
                 setBlocksErr((m) => ({ ...m, stats: p.error }));
               }}
-              placeholder={`{ \"soldTickets\": 12000, \"avgRating\": 4.8 }`}
+              placeholder={`{ "soldTickets": 12000, "avgRating": 4.8 }`}
             />
           </label>
           {blocksErr.stats ? <div className="text-xs text-rose-700">JSON error: {blocksErr.stats}</div> : null}
@@ -702,7 +778,7 @@ export function LandingDetailPage() {
                 const p = parseJsonText(text);
                 setBlocksErr((m) => ({ ...m, relatedLinks: p.error }));
               }}
-              placeholder={`[\n  { \"title\": \"Салют 9 мая\", \"href\": \"/salute-9-may\" }\n]`}
+              placeholder={`[\n  { "title": "Салют 9 мая", "href": "/salute-9-may" }\n]`}
             />
           </label>
           {blocksErr.relatedLinks ? <div className="text-xs text-rose-700">JSON error: {blocksErr.relatedLinks}</div> : null}
@@ -718,7 +794,7 @@ export function LandingDetailPage() {
                 const p = parseJsonText(text);
                 setBlocksErr((m) => ({ ...m, seasonalPayload: p.error }));
               }}
-              placeholder={`{\n  \"seasonWindow\": { \"startMonthDay\": \"03-01\", \"endMonthDay\": \"05-09\" }\n}`}
+              placeholder={`{\n  "seasonWindow": { "startMonthDay": "03-01", "endMonthDay": "05-09" }\n}`}
             />
           </label>
           {blocksErr.seasonalPayload ? <div className="text-xs text-rose-700">JSON error: {blocksErr.seasonalPayload}</div> : null}
@@ -734,7 +810,7 @@ export function LandingDetailPage() {
                 const p = parseJsonText(text);
                 setBlocksErr((m) => ({ ...m, additionalFilters: p.error }));
               }}
-              placeholder={`{ \"columns\": [\"price\",\"rating\"], \"hideIncomparable\": true, \"maxRows\": 10 }`}
+              placeholder={`{ "columns": ["price","rating"], "hideIncomparable": true, "maxRows": 10 }`}
             />
           </label>
           {blocksErr.additionalFilters ? <div className="text-xs text-rose-700">JSON error: {blocksErr.additionalFilters}</div> : null}
@@ -748,7 +824,7 @@ export function LandingDetailPage() {
             <select
               className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
               value={draft.eventSourceType}
-              onChange={(e) => setDraft({ ...draft, eventSourceType: e.target.value as any })}
+              onChange={(e) => setDraft({ ...draft, eventSourceType: e.target.value as AdminLandingDetail['eventSourceType'] })}
             >
               <option value="PRIMARY_COLLECTION">PRIMARY_COLLECTION</option>
               <option value="AUTO_QUERY">AUTO_QUERY</option>
@@ -895,6 +971,120 @@ export function LandingDetailPage() {
   );
 }
 
+function LandingFilterTagEditor(props: {
+  filterTagId: string | null;
+  filterTagSlug: string;
+  filterTagRef: TagPickerItem | null;
+  onChange: (next: { filterTagId: string | null; filterTagSlug: string; filterTagRef: TagPickerItem | null }) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [q, setQ] = React.useState('');
+  const [debounced, setDebounced] = React.useState('');
+  React.useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(q.trim()), 250);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
+  const tagsQ = useQuery({
+    queryKey: ['admin-tags-lookup', debounced],
+    queryFn: async (): Promise<TagPickerItem[]> => {
+      if (!debounced) return [];
+      const res = await adminApi.get<{
+        items: Array<{ id: string; name: string; slug: string; isActive: boolean; isDeleted: boolean }>;
+      }>(`/admin/tags?search=${encodeURIComponent(debounced)}&limit=20`);
+      return (res.items ?? []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        slug: t.slug,
+        isActive: Boolean(t.isActive),
+        isDeleted: Boolean(t.isDeleted),
+      }));
+    },
+    enabled: open && debounced.length >= 2,
+  });
+
+  const selectedLabel = props.filterTagRef
+    ? `${props.filterTagRef.name} · ${props.filterTagRef.slug}`
+    : props.filterTagSlug
+      ? `(legacy) ${props.filterTagSlug}`
+      : '—';
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-muted-foreground">filterTag (normalized)</div>
+        <div className="flex items-center gap-2">
+          {props.filterTagRef && !props.filterTagRef.isActive ? <Badge variant="warning">inactive</Badge> : null}
+          {props.filterTagRef && props.filterTagRef.isDeleted ? <Badge variant="danger">deleted</Badge> : null}
+        </div>
+      </div>
+
+      <div className="rounded-md border px-2 py-2 text-sm">
+        <div className="truncate">{selectedLabel}</div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Input placeholder="Поиск тегов…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Button type="button" variant="outline" onClick={() => setOpen((v) => !v)}>
+          {open ? 'Закрыть' : 'Найти'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => props.onChange({ filterTagId: null, filterTagSlug: '', filterTagRef: null })}
+        >
+          Очистить
+        </Button>
+      </div>
+
+      {open ? (
+        <div className="rounded-md border p-2">
+          {debounced.length < 2 ? (
+            <div className="text-sm text-muted-foreground">Введите минимум 2 символа</div>
+          ) : tagsQ.isLoading ? (
+            <div className="text-sm text-muted-foreground">Поиск…</div>
+          ) : tagsQ.isError ? (
+            <div className="text-sm text-red-600">Ошибка поиска</div>
+          ) : (tagsQ.data ?? []).length === 0 ? (
+            <div className="text-sm text-muted-foreground">Ничего не найдено</div>
+          ) : (
+            <div className="space-y-1">
+              {(tagsQ.data ?? []).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="w-full rounded-md border px-2 py-2 text-left hover:bg-muted"
+                  onClick={() => {
+                    props.onChange({
+                      filterTagId: t.id,
+                      filterTagSlug: t.slug,
+                      filterTagRef: t,
+                    });
+                    setOpen(false);
+                    setQ('');
+                    setDebounced('');
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{t.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">{t.slug}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {!t.isActive ? <Badge variant="warning">inactive</Badge> : null}
+                      {t.isDeleted ? <Badge variant="danger">deleted</Badge> : null}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CreateChildVariantPanel({
   parent,
   cities,
@@ -910,7 +1100,7 @@ function CreateChildVariantPanel({
 
   React.useEffect(() => {
     setTitle(parent.title ? `${parent.title}` : '');
-  }, [parent.id]);
+  }, [parent.id, parent.title]);
 
   const createChildM = useMutation({
     mutationFn: async () => {

@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-04-14 (добавлен `Chat-Support.md`)
+> Последнее обновление: 2026-04-16 (Order mirror layer + hooks)
 
 ## Миссия
 
@@ -192,6 +192,17 @@ KV (`AppSetting`) используем только для “параметро
   - доступные действия — через `derivePurchaseActions`,
   - наличие «артефакта билета» (что реально можно открыть) нормализуется helper’ом `computeTicketAvailable` и сервисом `TicketCapabilityService.getTicketCapability`, который собирает артефакты билета/ваучера поверх CheckoutSession/fulfillment.
 - **Тесты:** unit‑тесты для capability‑слоя (`purchase-display.util`, `ticket-capability.service`, `purchase-read.service`) и mini-e2e для `/account/purchases`, `/account/orders`, `/account/orders/:id` (в т.ч. Forbidden), `/account/tickets`, `/checkout/track/:shortCode`.
+
+### Orders: Order mirror layer (bridge/read‑model, 2026‑04)
+
+- **Цель:** добавить плоскую унифицированную модель продаж `Order` (internal + external) как **read‑model**, не заменяя `CheckoutSession`/`PaymentIntent`/`FulfillmentItem`.
+- **Принципы:** idempotent проекции; ошибки проекции не ломают core flow (try/catch + log only); минимальный дифф к существующей архитектуре.
+- **Схема (Prisma):** `Order` + enums `OrderSource` / `OrderStatus` / `OrderIngestionSource` + поля bridge (`checkoutSessionId`, `paymentIntentId`, `packageId`) и `sourcePayload` для трассировки.
+- **Ingestion hooks (MVP):**
+  - `CheckoutService.createCheckoutSession` → `OrderProjectionService.projectFromCheckoutSession(sessionId)` (PENDING/initial).
+  - YooKassa `payment.succeeded` (через `FulfillmentProcessor` после `markPaid`) → `projectFromCheckoutSession(sessionId)` (PAID transition).
+  - TicketsCloud mirror sync (`TcOrdersMirrorSyncService`) → `upsertFromTcMirror(...)` (external projection).
+- **Repair path:** CLI `scripts/rebuild-orders-from-checkout.ts` для best‑effort пересборки проекции по `CheckoutSession`.
 
 ## Интеграции
 

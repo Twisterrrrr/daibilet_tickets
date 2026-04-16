@@ -3,19 +3,20 @@
  * Upsert по @@unique([code, type]); slug в update — намеренно (выравнивание SEO-путей под политику).
  * См. docs/Architecture.md § routing policy subcategories.
  */
-import type { Prisma, PrismaClient } from '@prisma/client';
-import {
+import { SubcategoryLayer, SubcategoryType } from '../../src/prisma-client';
+import type {
+  PrismaClient,
   SubcategoryLandingMode,
-  SubcategoryLayer,
-  SubcategoryType,
-} from '@prisma/client';
+  SubcategoryLayer as SubcategoryLayerT,
+  SubcategoryType as SubcategoryTypeT,
+} from '../../src/prisma-client';
 
 type SeedRow = {
   code: string;
   slug: string;
   nameRu: string;
-  type: SubcategoryType;
-  layer: SubcategoryLayer;
+  type: SubcategoryTypeT;
+  layer: SubcategoryLayerT;
   parentCode?: string;
   isActive?: boolean;
   isLandingEnabled?: boolean;
@@ -206,40 +207,50 @@ const SUBCATEGORIES: SeedRow[] = [
   { code: 'KIDS', slug: 'kids', nameRu: 'С детьми', type: 'UNIVERSAL', layer: 'SECONDARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 95 },
 ];
 
-async function upsertAll(tx: Prisma.TransactionClient) {
+async function upsertAll(tx: PrismaClient) {
   for (const item of SUBCATEGORIES) {
     const landingMode = item.landingMode ?? SubcategoryLandingMode.DISABLED;
     const isLandingEnabled = item.isLandingEnabled ?? false;
-    await tx.subcategory.upsert({
-      where: { code_type: { code: item.code, type: item.type } },
-      create: {
-        code: item.code,
-        slug: item.slug,
-        nameRu: item.nameRu,
-        type: item.type,
-        layer: item.layer,
-        parentId: null,
-        isActive: item.isActive ?? true,
-        isLandingEnabled,
-        landingMode,
-        landingTopicKey: item.landingTopicKey ?? null,
-        sortOrder: item.sortOrder ?? 0,
-      },
-      update: {
-        slug: item.slug,
-        nameRu: item.nameRu,
-        layer: item.layer,
-        isActive: item.isActive ?? true,
-        isLandingEnabled,
-        landingMode,
-        landingTopicKey: item.landingTopicKey ?? null,
-        sortOrder: item.sortOrder ?? 0,
-      },
-    });
+    try {
+      await tx.subcategory.upsert({
+        where: { code_type: { code: item.code, type: item.type } },
+        create: {
+          code: item.code,
+          slug: item.slug,
+          nameRu: item.nameRu,
+          type: item.type,
+          layer: item.layer,
+          parentId: null,
+          isActive: item.isActive ?? true,
+          isLandingEnabled,
+          landingMode,
+          landingTopicKey: item.landingTopicKey ?? null,
+          sortOrder: item.sortOrder ?? 0,
+        },
+        update: {
+          slug: item.slug,
+          nameRu: item.nameRu,
+          layer: item.layer,
+          isActive: item.isActive ?? true,
+          isLandingEnabled,
+          landingMode,
+          landingTopicKey: item.landingTopicKey ?? null,
+          sortOrder: item.sortOrder ?? 0,
+        },
+      });
+    } catch (e: unknown) {
+      // On some databases older data may already occupy the slug with a different code/type.
+      // For seeds we skip such rows to keep the run non-blocking and idempotent.
+      if (typeof e === 'object' && e && 'code' in e && (e as { code?: unknown }).code === 'P2002') {
+        console.warn(`⚠ Subcategory slug already exists (${item.slug}) — skipping canonical seed row code=${item.code} type=${item.type}`);
+        continue;
+      }
+      throw e;
+    }
   }
 }
 
-async function linkParents(tx: Prisma.TransactionClient) {
+async function linkParents(tx: PrismaClient) {
   for (const item of SUBCATEGORIES) {
     if (!item.parentCode) continue;
     const parent = await tx.subcategory.findFirst({
@@ -256,7 +267,7 @@ async function linkParents(tx: Prisma.TransactionClient) {
   }
 }
 
-async function deactivateLegacyPrimaryEventOnly(tx: Prisma.TransactionClient) {
+async function deactivateLegacyPrimaryEventOnly(tx: PrismaClient) {
   const allowedCodes = SUBCATEGORIES.filter((s) => s.type === 'EVENT_ONLY' && s.layer === 'PRIMARY' && (s.isActive ?? true)).map((s) => s.code);
   await tx.subcategory.updateMany({
     where: {
@@ -269,10 +280,11 @@ async function deactivateLegacyPrimaryEventOnly(tx: Prisma.TransactionClient) {
 }
 
 export async function seedCanonicalSubcategories(prisma: PrismaClient): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    await upsertAll(tx);
-    await linkParents(tx);
-    await deactivateLegacyPrimaryEventOnly(tx);
-  });
+  // Intentionally not wrapped in a single DB transaction:
+  // if historical data violates unique constraints (e.g. slug already occupied),
+  // we want to be able to skip that row and continue seeding.
+  await upsertAll(prisma);
+  await linkParents(prisma);
+  await deactivateLegacyPrimaryEventOnly(prisma);
   console.warn(`  ✓ Canonical subcategories whitelist (${SUBCATEGORIES.length} rows, landingMode + hierarchy)`);
 }

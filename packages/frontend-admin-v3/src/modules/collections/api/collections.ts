@@ -80,7 +80,16 @@ export type AdminCollectionDetail = {
   excludedEventIds?: string[];
   queryConfig?: unknown | null;
   items?: AdminCollectionItem[];
+  // legacy + normalized tag filters
+  filterTags?: string[];
+  tagFilters?: Array<{
+    tagId: string;
+    position: number;
+    tag: { id: string; slug: string; name: string; isActive?: boolean; isDeleted?: boolean };
+  }>;
 };
+
+export type AdminCollectionTagFilterUpsert = { tagId: string; position?: number };
 
 export async function fetchAdminCollectionDetail(id: string): Promise<AdminCollectionDetail> {
   return adminApi.get<AdminCollectionDetail>(`/admin/collections/${encodeURIComponent(id)}`);
@@ -104,7 +113,8 @@ export async function patchAdminCollection(
       | 'metaTitle'
       | 'metaDescription'
       | 'queryConfig'
-    >
+      | 'filterTags'
+    > & { tagFilters?: AdminCollectionTagFilterUpsert[] }
   > & { version: number },
 ): Promise<AdminCollectionDetail> {
   return adminApi.patch<AdminCollectionDetail>(`/admin/collections/${encodeURIComponent(id)}`, body);

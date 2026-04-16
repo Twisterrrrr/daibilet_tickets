@@ -51,6 +51,14 @@ export type AdminLandingDetail = AdminLandingListRow & {
 
   // selection (legacy + new)
   filterTag: string;
+  filterTagId?: string | null;
+  filterTagRef?: {
+    id: string;
+    name: string;
+    slug: string;
+    isActive: boolean;
+    isDeleted?: boolean;
+  } | null;
   additionalFilters: Record<string, unknown> | null;
   collectionId: string | null;
   selectionMode: 'COLLECTION' | 'CUSTOM';

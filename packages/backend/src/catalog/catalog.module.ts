@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 
 import { EventOverrideService } from '../admin/event-override.service';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { LandingModule } from '../landing/landing.module';
 import { ReviewCapabilityService } from '../review/review-capability.service';
 import { EventQualityService } from './event-quality.service';
@@ -12,6 +13,8 @@ import { CategoryMappingService } from './category-mapping.service';
 import { FuzzyDedupService } from './fuzzy-dedup.service';
 import { RegionService } from './region.service';
 import { ReviewService } from './review.service';
+import { TcOrdersMirrorSyncService } from './tc-orders-mirror-sync.service';
+import { TcRefundRequestsMirrorSyncService } from './tc-refund-requests-mirror-sync.service';
 import { TcApiService } from './tc-api.service';
 import { TcGrpcService } from './tc-grpc.service';
 import { TcSyncService } from './tc-sync.service';
@@ -44,7 +47,7 @@ import { CatalogAuditService } from './catalog-audit.service';
 import { CatalogPolicyService } from './catalog-policy.service';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule],
+  imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule, IntegrationsModule],
   controllers: [CatalogController, SubcategoryCollectionsController, SubcategoryLandingsController],
   providers: [
     CatalogService,
@@ -52,6 +55,8 @@ import { CatalogPolicyService } from './catalog-policy.service';
     ReviewService,
     ReviewCapabilityService,
     TcApiService,
+    TcOrdersMirrorSyncService,
+    TcRefundRequestsMirrorSyncService,
     TcGrpcService,
     TcSyncService,
     TepApiService,
@@ -90,6 +95,8 @@ import { CatalogPolicyService } from './catalog-policy.service';
     ReviewService,
     ReviewCapabilityService,
     TcApiService,
+    TcOrdersMirrorSyncService,
+    TcRefundRequestsMirrorSyncService,
     TcGrpcService,
     TcSyncService,
     TepApiService,
