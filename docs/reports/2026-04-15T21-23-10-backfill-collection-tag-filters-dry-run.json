@@ -1,0 +1,20 @@
+{
+  "startedAt": "2026-04-15T18:23:09.938Z",
+  "finishedAt": "2026-04-15T18:23:10.398Z",
+  "dryRun": true,
+  "script": "backfill-collection-tag-filters",
+  "report": {
+    "scanned": 3,
+    "matched": 3,
+    "created": 0,
+    "updated": 0,
+    "skipped": 3,
+    "unresolvedCount": 0,
+    "errorCount": 0
+  },
+  "unresolved": [],
+  "errors": [],
+  "notes": [
+    "Default: dry-run. Writes happen only with --apply."
+  ]
+}

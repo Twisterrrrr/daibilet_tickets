@@ -1,0 +1,35 @@
+{
+  "startedAt": "2026-04-15T18:06:25.317Z",
+  "finishedAt": "2026-04-15T18:06:25.772Z",
+  "dryRun": true,
+  "script": "backfill-landing-filter-tag-id",
+  "report": {
+    "scanned": 2,
+    "matched": 2,
+    "created": 0,
+    "updated": 1,
+    "skipped": 0,
+    "unresolvedCount": 1,
+    "errorCount": 0
+  },
+  "unresolved": [
+    {
+      "type": "slug_not_found",
+      "message": "LandingPage.filterTag slug was not resolved to Tag",
+      "source_record_ref": {
+        "entity": "LandingPage",
+        "id": "a2a8c803-fa49-4bf4-9030-de3fd18ae0a3"
+      },
+      "field": "filterTag",
+      "legacy_value": "missing-legacy-tag",
+      "target_hint": {
+        "entity": "Tag",
+        "slug": "missing-legacy-tag"
+      }
+    }
+  ],
+  "errors": [],
+  "notes": [
+    "Default: dry-run. Writes happen only with --apply."
+  ]
+}

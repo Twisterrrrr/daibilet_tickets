@@ -1,0 +1,25 @@
+{
+  "startedAt": "2026-04-15T17:23:47.384Z",
+  "finishedAt": "2026-04-15T17:23:47.866Z",
+  "dryRun": true,
+  "script": "backfill-user-favorites-event-id",
+  "report": {
+    "scanned": 0,
+    "matched": 0,
+    "created": 0,
+    "updated": 0,
+    "skipped": 0,
+    "unresolvedCount": 0,
+    "errorCount": 1
+  },
+  "unresolved": [],
+  "errors": [
+    {
+      "code": "UNHANDLED",
+      "message": "\nInvalid `prisma.userFavorite.findMany()` invocation in\nF:\\coding\\SPBBOATS\\packages\\backend\\scripts\\backfill-user-favorites-event-id.ts:29:44\n\n  26 \n  27 try {    console.log(JSON.stringify({ script: rep.script, dryRun: cli.dryRun, apply: cli.apply }));\n  28 \n→ 29   const favs = await prisma.userFavorite.findMany(\nThe column `user_favorites.eventId` does not exist in the current database."
+    }
+  ],
+  "notes": [
+    "Default: dry-run. Writes happen only with --apply."
+  ]
+}

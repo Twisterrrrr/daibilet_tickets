@@ -1,0 +1,25 @@
+{
+  "startedAt": "2026-04-15T17:21:23.046Z",
+  "finishedAt": "2026-04-15T17:21:23.493Z",
+  "dryRun": true,
+  "script": "backfill-article-related-links",
+  "report": {
+    "scanned": 0,
+    "matched": 0,
+    "created": 0,
+    "updated": 0,
+    "skipped": 0,
+    "unresolvedCount": 0,
+    "errorCount": 1
+  },
+  "unresolved": [],
+  "errors": [
+    {
+      "code": "UNHANDLED",
+      "message": "\nInvalid `prisma.article.findMany()` invocation in\nF:\\coding\\SPBBOATS\\packages\\backend\\scripts\\backfill-article-related-links.ts:33:43\n\n  30 \n  31 // stdout guard-rail    console.log(JSON.stringify({ script: rep.script, dryRun: cli.dryRun, apply: cli.apply }));\n  32 \n→ 33 const articles = await prisma.article.findMany(\n"
+    }
+  ],
+  "notes": [
+    "Default: dry-run. Writes happen only with --apply."
+  ]
+}

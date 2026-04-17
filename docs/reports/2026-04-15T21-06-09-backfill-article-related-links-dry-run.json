@@ -1,0 +1,49 @@
+{
+  "startedAt": "2026-04-15T18:06:09.322Z",
+  "finishedAt": "2026-04-15T18:06:09.829Z",
+  "dryRun": true,
+  "script": "backfill-article-related-links",
+  "report": {
+    "scanned": 4,
+    "matched": 4,
+    "created": 2,
+    "updated": 0,
+    "skipped": 1,
+    "unresolvedCount": 2,
+    "errorCount": 0
+  },
+  "unresolved": [
+    {
+      "type": "target_deleted",
+      "message": "Collection target isDeleted=true",
+      "source_record_ref": {
+        "entity": "Article",
+        "id": "7b8aab73-1cf3-45b1-a4f4-e61ce4edba0a"
+      },
+      "field": "relatedCollectionIds",
+      "legacy_value": "d4e84272-7a0c-4019-b180-41d381fdec53",
+      "target_hint": {
+        "entity": "Collection",
+        "id": "d4e84272-7a0c-4019-b180-41d381fdec53"
+      }
+    },
+    {
+      "type": "legacy_id_not_found",
+      "message": "Article.relatedLandingIds id was not resolved to LandingPage",
+      "source_record_ref": {
+        "entity": "Article",
+        "id": "b9fd3bb4-1fa1-4669-8925-15a411d6b2fc"
+      },
+      "field": "relatedLandingIds",
+      "legacy_value": "00000000-0000-0000-0000-000000000001",
+      "target_hint": {
+        "entity": "LandingPage",
+        "id": "00000000-0000-0000-0000-000000000001"
+      }
+    }
+  ],
+  "errors": [],
+  "notes": [
+    "Default: dry-run. Writes happen only with --apply."
+  ]
+}
