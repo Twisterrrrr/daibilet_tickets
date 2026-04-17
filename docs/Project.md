@@ -45,6 +45,14 @@
 - **Блок программы площадки:** используется read-model `GET /venues/:slug/program`; presentation-layer группирует элементы в `featured/current/upcoming` через helper `buildVenueProgramGroups` без изменения domain/read-model.
 - **SEO-ready основа:** описание для метаданных venue выбирается через template-aware `buildVenueTemplateSections` с fallback на legacy и существующий `getSeoMeta`.
 
+## Venue geo + Trip routes (эволюция 2026‑04)
+
+- **Инвариант dual-read:** публичные строки **`district` / `metro`** остаются в API как сейчас, но заполняются из справочников (`District` / `MetroStation`) при наличии FK; иначе — fallback на legacy строки в `Venue`.
+- **Справочники:** `District` и `MetroStation` уникальны в рамках города (`@@unique([cityId, slug])`); админские CRUD — `GET/POST/PATCH/DELETE` под `/admin/geo/*`.
+- **Операторский флаг:** `Venue.isHiddenGem` — витринный бейдж «секретное место» (не влияет на публикацию).
+- **Маршруты:** `RoutePoint` описывает упорядоченные точки маршрута с XOR‑привязкой к `Venue` **или** `Event`; админ API — `/admin/routes/:routeId/points` + `/admin/route-points/:id` + reorder.
+- **SEO aliases (только 301):** короткие пути `/event/:slug` → `/events/:slug` и `/place/:slug` → `/venues/:slug` в `packages/frontend/next.config.ts` (каноника `/events` и `/venues` не меняется).
+
 ## Архитектура
 
 | Слой | Технология | Каталог |
@@ -349,7 +357,7 @@ KV (`AppSetting`) используем только для “параметро
   - Может применяться отдельно от `isActive`.
 - **User** — пользователь сайта (регистрация/вход). Избранное в UserFavorite (eventSlug).
 - **ApiKey** — API-ключ для Partner B2B API: SHA-256 хеш (не храним оригинал), prefix (8 символов для UI), rateLimit, ipWhitelist, expiresAt.
-- **Venue** — место (музей, галерея, арт-пространство). VenueType enum (MUSEUM/GALLERY/ART_SPACE/EXHIBITION_HALL/THEATER/PALACE/PARK). Содержит: openingHours (JSON), priceFrom, rating, galleryUrls, address/metro/lat/lng, operatorId (партнёр), опционально **venueTemplateData** (JSON контента PDP из админки). Soft delete, optimistic lock.
+- **Venue** — место (музей, галерея, арт-пространство, а также точки общепита как отдельные типы). `VenueType` расширен значениями **RESTAURANT/CAFE/BAR/FASTFOOD** (помимо MUSEUM/GALLERY/ART_SPACE/EXHIBITION_HALL/THEATER/PALACE/PARK). Содержит: openingHours (JSON), priceFrom, rating, galleryUrls, address/**metro**/lat/lng (legacy-строки), опциональные FK **`districtId`/`metroStationId`** на справочники, **`isHiddenGem`**, operatorId (партнёр), опционально **venueTemplateData** (JSON контента PDP из админки). Soft delete, optimistic lock.
   - **Публичный PDP (template MVP):** ответ детальной площадки (`GET /api/v1/venues/:slug`, preview по id) дополняется нормализованным полем **`template`** типа `VenuePublicTemplate` в `VenueDetail` (`@daibilet/shared`): `parseVenueTemplateData` + маппинг в секции (`intro`, `gallery`, `visitInfo`, `collections`, `permanentExposition`, `accessibility`, `faq`, `eventsCopy`). Для типов **MUSEUM**, **ART_SPACE**, **GALLERY** включён template-aware рендер на витрине с fallback на legacy-поля; остальные типы — legacy-only, если template не задан. Реализация: `VenueService.buildVenuePublicDto`, фронт `buildVenueTemplateSections` + `VenuePageView`, meta description в `app/venues/[slug]/page.tsx`. Тесты контракта: `packages/backend/src/venue/__tests__/venue-template-public.contract.spec.ts`.
 - **Subcategory** — новый универсальный справочник подкатегорий (`SubcategoryType`: `UNIVERSAL | EVENT_ONLY | VENUE_ONLY`) с иерархией до 2 уровней через `parentId` и флагами `isActive`/`isLandingEnabled`; используется M:N связями:
   - `EventSubcategoryLink` (`eventId`, `subcategoryId`);
@@ -366,8 +374,10 @@ KV (`AppSetting`) используем только для “параметро
 - **Collections Engine + SEO по подкатегории (MVP):** автоматические подборки событий и площадок по `Subcategory.code`, без второго классификатора. Публичные **авто**-SEO-страницы (`landingMode = AUTO`) строятся только при `isLandingEnabled` **и** достаточном количестве элементов (env-пороги); выдача событий для лендинга идёт **только** через тот же отбор, что и у подборки (`CatalogService.getEvents`). Режим **`TOPIC_HUB`** + `landingTopicKey` привязывает таксономию к уже существующему тематическому хабу (без дублирующего generic-URL). **Routing policy:** сегмент `/cities/{city}/{slug}` — зарезервированное пространство; **материализованный** `LandingPage` имеет **более высокий приоритет**, чем автогенерация по подкатегории; канонический whitelist и иерархия — `prisma/seeds/subcategories-canonical.seed.ts`. См. `docs/Architecture.md` §3.4–3.4.1.
 - **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate. Шаблоны страниц — `docs/Reference.md` § PageTemplateSpecs.
 - **EventOffer расширен**: venueId для прямых офферов к месту (без привязки к Event).
+- **District** — район внутри города (FK `cityId`, `name/slug`, уникальность `(cityId, slug)`).
+- **MetroStation** — станция метро внутри города (FK `cityId`, `name/slug`, опционально `lineName/lineColor`, уникальность `(cityId, slug)`).
 - **Location** — причал, площадка, точка встречи (каркас, Фаза 2)
-- **Route** — маршрут с POI (каркас, Фаза 2)
+- **Route** — маршрут (POI/hub контент); детализация точек — **`RoutePoint`** (порядок `order`, XOR `venueId`/`eventId`).
 
 ### Классификация при синхронизации
 

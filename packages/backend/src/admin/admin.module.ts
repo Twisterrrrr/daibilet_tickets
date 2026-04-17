@@ -1,4 +1,4 @@
-﻿import { BullModule } from '@nestjs/bullmq';
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module';
@@ -49,6 +49,9 @@ import { AdminSupportController } from './admin-support.controller';
 import { AdminTagsController } from './admin-tags.controller';
 import { AdminUpsellsController } from './admin-upsells.controller';
 import { AdminVenuesController } from './admin-venues.controller';
+import { AdminGeoController } from './admin-geo.controller';
+import { AdminRoutePointsController } from './admin-route-points.controller';
+import { AdminRoutesController } from './admin-routes.controller';
 import { AdminWidgetsController } from './admin-widgets.controller';
 import { AdminUploadController } from './admin-upload.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
@@ -151,6 +154,9 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';import { AdminCo
     AdminSuppliersController,
     AdminModerationController,
     AdminVenuesController,
+    AdminGeoController,
+    AdminRoutesController,
+    AdminRoutePointsController,
     AdminWidgetsController,
     AdminCollectionsController,
     AdminSupportController,

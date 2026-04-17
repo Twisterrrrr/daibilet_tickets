@@ -4,6 +4,28 @@
 
 ---
 
+## 17.04.2026 — Venue geo + Trip routes (District/Metro FK, RoutePoint, hidden gem, SEO aliases)
+
+### Наблюдения
+
+- Для площадок нужна **нормализованная география** (район/метро) без «ломания» существующих строковых полей и публичных DTO.
+- Для Trip Planner важен минимальный контур **Route → ordered points**, где точка ссылается либо на `Venue`, либо на `Event` (ровно одно).
+- Для SEO полезны **короткие входы** `/event/*` и `/place/*`, но каноника должна оставаться `/events/*` и `/venues/*`.
+
+### Решения
+
+- **Prisma:** расширен `VenueType` (food-типы), добавлены `Venue.isHiddenGem`, FK `districtId`/`metroStationId`, модели `District`/`MetroStation`, `RoutePoint` + связь `Route.points` (миграция `20260417183000_venue_geo_routepoint_evolution`).
+- **Backend:** admin CRUD для geo-словарей и `RoutePoint` (валидация city-consistency для FK и XOR для точек), dual-read строк `metro`/`district` в публичном и admin read-model.
+- **Admin V3:** фильтр/редактирование hidden gem, селекторы района/метро по городу, экран geo-словарей, MVP редактор точек маршрута.
+- **Frontend (витрина):** бейдж hidden gem, JSON-LD для food-типов, 301 редиректы short-alias → canonical в `next.config.ts`.
+- **Скрипты:** `scripts/geo-bootstrap-minimal.ts`, `scripts/geo-normalize-report.ts`, `scripts/geo-backfill-venue-fk.ts` (dry-run по умолчанию).
+- **Тесты:** vitest на label resolver, XOR, admin venues list args (обновлены под новый query `isHiddenGem`), smoke на строки redirect rules.
+- **Миграции БД:** применение через `pnpm exec prisma migrate deploy` в каталоге `packages/backend`. Локально: PostgreSQL из `docker compose` (сервис `postgres`, порт **5433**). В журнал `_prisma_migrations` попали обе папки: `20260417183000_venue_geo_routepoint_evolution` и `20260417190000_venue_geo_routepoint_evolution` (последовательно, без конфликтов).
+
+### Проблемы
+
+- `prisma migrate dev` без запущенной БД недоступен; для локали использовать **docker-compose Postgres** и **`migrate deploy`** (или подключение к staging).
+
 ## 14.04.2026 — Hub readiness framework (City / Venue / Landing, без таблицы Hub)
 
 ### Наблюдения

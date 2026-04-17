@@ -11,6 +11,9 @@ import { SubcategoryAssignmentService } from '../../subcategories/subcategory-as
 import { SubcategoryPolicyService } from '../../subcategories/subcategory-policy.service';
 import { VenueAdminSummaryService } from '../venue-admin-summary.service';
 import { AdminVenuesController } from '../admin-venues.controller';
+import { VenueModerationMetricsService } from '../../catalog/venue-moderation-metrics.service';
+import { VenueAutoModerationService } from '../../catalog/venue-auto-moderation.service';
+import { VenueTrustService } from '../../catalog/venue-trust.service';
 
 function createController(prisma: PrismaService) {
   return new AdminVenuesController(
@@ -21,6 +24,9 @@ function createController(prisma: PrismaService) {
     {} as PublishGateService,
     {} as VenueImportService,
     {} as VenueLifecycleService,
+    {} as VenueModerationMetricsService,
+    {} as VenueAutoModerationService,
+    {} as VenueTrustService,
   );
 }
 
@@ -35,6 +41,7 @@ describe('AdminVenuesController.list', () => {
       undefined,
       '1',
       '20',
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -73,6 +80,7 @@ describe('AdminVenuesController.list', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       'confidenceScore',
       'asc',
     );
@@ -102,6 +110,7 @@ describe('AdminVenuesController.list', () => {
       undefined,
       undefined,
       'true',
+      undefined,
       'confidenceScore',
       'desc',
     );
@@ -131,6 +140,7 @@ describe('AdminVenuesController.list', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       'confidenceScore',
       'desc',
     );
@@ -149,6 +159,7 @@ describe('AdminVenuesController.list', () => {
       undefined,
       '1',
       '20',
+      undefined,
       undefined,
       undefined,
       undefined,

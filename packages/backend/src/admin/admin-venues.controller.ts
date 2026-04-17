@@ -253,6 +253,27 @@ export class AdminVenuesController {
     private readonly venueTrust: VenueTrustService,
   ) {}
 
+  private async assertVenueGeoRefsBelongToCity(args: {
+    venueCityId: string;
+    districtId?: string;
+    metroStationId?: string;
+  }): Promise<void> {
+    const { venueCityId, districtId, metroStationId } = args;
+    if (districtId) {
+      const d = await this.prisma.district.findUnique({ where: { id: districtId }, select: { id: true, cityId: true } });
+      if (!d) throw new BadRequestException('districtId: district не найден');
+      if (d.cityId !== venueCityId) throw new BadRequestException('districtId: district принадлежит другому городу');
+    }
+    if (metroStationId) {
+      const m = await this.prisma.metroStation.findUnique({
+        where: { id: metroStationId },
+        select: { id: true, cityId: true },
+      });
+      if (!m) throw new BadRequestException('metroStationId: station не найдена');
+      if (m.cityId !== venueCityId) throw new BadRequestException('metroStationId: station принадлежит другому городу');
+    }
+  }
+
   @Get()
   @Roles('ADMIN', 'EDITOR', 'VIEWER')
   async list(
@@ -266,6 +287,7 @@ export class AdminVenuesController {
     @Query('importSource') importSource?: string,
     @Query('sourceType') sourceType?: string,
     @Query('needsReview') needsReview?: string,
+    @Query('isHiddenGem') isHiddenGem?: string,
     @Query('sort') sort?: string,
     @Query('order') order?: string,
     @Query('includeDecisionHints') includeDecisionHints?: string,
@@ -292,6 +314,8 @@ export class AdminVenuesController {
       ...(sourceType && { sourceType: sourceType as VenueSourceType }),
       ...(needsReview === 'true' && { needsReview: true }),
       ...(needsReview === 'false' && { needsReview: false }),
+      ...(isHiddenGem === 'true' && { isHiddenGem: true }),
+      ...(isHiddenGem === 'false' && { isHiddenGem: false }),
       ...(search && {
         OR: [
           { title: { contains: search, mode: 'insensitive' } },
@@ -313,6 +337,8 @@ export class AdminVenuesController {
         include: {
           city: { select: { id: true, name: true, slug: true } },
           mergeTarget: { select: { id: true, title: true, slug: true } },
+          districtRef: { select: { id: true, name: true, slug: true } },
+          metroStationRef: { select: { id: true, name: true, slug: true, lineName: true, lineColor: true } },
           _count: { select: { events: true, offers: true, mergedFrom: true } },
         },
       }),
@@ -401,6 +427,7 @@ export class AdminVenuesController {
           rating: Number(v.rating),
           isActive: v.isActive,
           isFeatured: v.isFeatured,
+          isHiddenGem: v.isHiddenGem,
           lifecycleStatus: v.lifecycleStatus,
           isPublished: v.isPublished,
           sourceType: v.sourceType,
@@ -408,6 +435,18 @@ export class AdminVenuesController {
           externalVenueId: v.externalVenueId,
           needsReview: v.needsReview,
           isVenuePageWhitelisted: v.isVenuePageWhitelisted,
+          districtRef: v.districtRef ? { id: v.districtRef.id, name: v.districtRef.name, slug: v.districtRef.slug } : null,
+          metroStationRef: v.metroStationRef
+            ? {
+                id: v.metroStationRef.id,
+                name: v.metroStationRef.name,
+                slug: v.metroStationRef.slug,
+                lineName: v.metroStationRef.lineName,
+                lineColor: v.metroStationRef.lineColor,
+              }
+            : null,
+          district: v.districtRef?.name ?? v.district ?? null,
+          metro: v.metroStationRef?.name ?? v.metro ?? null,
           eventsCount: v._count.events,
           relatedEventsCount: v._count.events,
           activeEventsCount,
@@ -666,6 +705,8 @@ export class AdminVenuesController {
       include: {
         city: { select: { id: true, name: true, slug: true } },
         operator: { select: { id: true, name: true, slug: true } },
+        districtRef: { select: { id: true, name: true, slug: true } },
+        metroStationRef: { select: { id: true, name: true, slug: true, lineName: true, lineColor: true } },
         events: {
           where: { isActive: true },
           orderBy: [{ isPermanent: 'desc' }, { createdAt: 'desc' }],
@@ -738,6 +779,8 @@ export class AdminVenuesController {
       ...venue,
       rating: Number(venue.rating),
       externalRating: venue.externalRating ? Number(venue.externalRating) : null,
+      district: venue.districtRef?.name ?? venue.district ?? null,
+      metro: venue.metroStationRef?.name ?? venue.metro ?? null,
       displayAddress,
       readiness,
       hubReadiness,
@@ -850,6 +893,12 @@ export class AdminVenuesController {
       this.validateForPublish(body);
     }
 
+    await this.assertVenueGeoRefsBelongToCity({
+      venueCityId: body.cityId,
+      districtId: body.districtId,
+      metroStationId: body.metroStationId,
+    });
+
     const venue = await this.prisma.venue.create({
       data: {
         slug,
@@ -866,6 +915,9 @@ export class AdminVenuesController {
         lng: body.lng ? Number(body.lng) : null,
         metro: body.metro || null,
         district: body.district || null,
+        districtId: body.districtId || null,
+        metroStationId: body.metroStationId || null,
+        isHiddenGem: body.isHiddenGem ?? false,
         phone: body.phone || null,
         email: body.email || null,
         website: body.website || null,
@@ -959,6 +1011,12 @@ export class AdminVenuesController {
     const existing = await this.prisma.venue.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Venue not found');
 
+    await this.assertVenueGeoRefsBelongToCity({
+      venueCityId: existing.cityId,
+      districtId: body.districtId,
+      metroStationId: body.metroStationId,
+    });
+
     if (body.isActive === true) {
       const merged = {
         title: body.title ?? existing.title,
@@ -1000,6 +1058,9 @@ export class AdminVenuesController {
         ...(body.lng !== undefined && { lng: body.lng ? Number(body.lng) : null }),
         ...(body.metro !== undefined && { metro: body.metro || null }),
         ...(body.district !== undefined && { district: body.district || null }),
+        ...(body.districtId !== undefined && { districtId: body.districtId || null }),
+        ...(body.metroStationId !== undefined && { metroStationId: body.metroStationId || null }),
+        ...(body.isHiddenGem !== undefined && { isHiddenGem: body.isHiddenGem }),
         ...(body.phone !== undefined && { phone: body.phone || null }),
         ...(body.email !== undefined && { email: body.email || null }),
         ...(body.website !== undefined && { website: body.website || null }),

@@ -6,9 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   fetchAdminVenueDetail,
+  fetchAdminGeoDistricts,
+  fetchAdminGeoMetroStations,
   fetchSimilarDrafts,
   fetchVenueAdminSummary,
   fetchVenueSubcategoriesAdmin,
+  patchAdminVenue,
   type AdminVenueCandidateRow,
   type AdminVenueDetail,
 } from '@/modules/venues/api/candidates';
@@ -90,6 +93,14 @@ export function VenueDetailPage() {
   const [approveOpen, setApproveOpen] = React.useState(false);
   const [mergeOpen, setMergeOpen] = React.useState(false);
   const [rejectOpen, setRejectOpen] = React.useState(false);
+  const [geoSaving, setGeoSaving] = React.useState(false);
+  const [geoError, setGeoError] = React.useState<string | null>(null);
+  const [geoSavedAt, setGeoSavedAt] = React.useState<string | null>(null);
+  const [geoForm, setGeoForm] = React.useState(() => ({
+    districtId: '',
+    metroStationId: '',
+    isHiddenGem: false,
+  }));
 
   const detailQ = useQuery({
     queryKey: ['admin-venue-detail-page', id],
@@ -133,6 +144,42 @@ export function VenueDetailPage() {
   const siteBase = (import.meta as unknown as { env?: { VITE_PUBLIC_SITE_URL?: string } }).env
     ?.VITE_PUBLIC_SITE_URL?.replace(/\/$/, '');
 
+  const v = detailQ.data;
+  const cityId = v?.city?.id ?? null;
+
+  React.useEffect(() => {
+    if (!v) return;
+    setGeoForm({
+      districtId: v.districtId ?? '',
+      metroStationId: v.metroStationId ?? '',
+      isHiddenGem: v.isHiddenGem ?? false,
+    });
+    setGeoError(null);
+    setGeoSavedAt(null);
+  }, [v?.id, v?.version]);
+
+  const districtsQ = useQuery({
+    queryKey: ['admin-geo-districts', cityId],
+    queryFn: async () => {
+      if (!cityId) return [];
+      const res = await fetchAdminGeoDistricts({ cityId });
+      return res.items ?? [];
+    },
+    enabled: Boolean(cityId),
+    staleTime: 60_000,
+  });
+
+  const metroQ = useQuery({
+    queryKey: ['admin-geo-metro', cityId],
+    queryFn: async () => {
+      if (!cityId) return [];
+      const res = await fetchAdminGeoMetroStations({ cityId });
+      return res.items ?? [];
+    },
+    enabled: Boolean(cityId),
+    staleTime: 60_000,
+  });
+
   if (!id) {
     return <ErrorState title="Некорректный ID" description="Не указан идентификатор площадки." />;
   }
@@ -148,7 +195,6 @@ export function VenueDetailPage() {
     );
   }
 
-  const v = detailQ.data;
   if (!v) return <LoadingState label="Загрузка…" />;
 
   const row = detailToCandidateRow(v);
@@ -303,6 +349,98 @@ export function VenueDetailPage() {
             <Field label="Широта / долгота" value={v.lat != null && v.lng != null ? `${v.lat}, ${v.lng}` : '—'} />
             <Field label="Метро" value={v.metro ?? '—'} />
             <Field label="Район" value={v.district ?? '—'} />
+          </div>
+
+          <div className="mt-6 rounded-md border bg-background p-4">
+            <div className="font-medium">Нормализованная география</div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1">
+                <span className="text-xs text-muted-foreground">Район (District)</span>
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  value={geoForm.districtId}
+                  onChange={(e) => setGeoForm((s) => ({ ...s, districtId: e.target.value }))}
+                >
+                  <option value="">—</option>
+                  {(districtsQ.data ?? []).map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1">
+                <span className="text-xs text-muted-foreground">Метро (MetroStation)</span>
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  value={geoForm.metroStationId}
+                  onChange={(e) => setGeoForm((s) => ({ ...s, metroStationId: e.target.value }))}
+                >
+                  <option value="">—</option>
+                  {(metroQ.data ?? []).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                      {m.lineName ? ` · ${m.lineName}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={geoForm.isHiddenGem}
+                  onChange={(e) => setGeoForm((s) => ({ ...s, isHiddenGem: e.target.checked }))}
+                />
+                <span>Hidden gem</span>
+              </label>
+            </div>
+
+            {geoError ? <div className="mt-3 text-sm text-destructive">{geoError}</div> : null}
+            {geoSavedAt ? <div className="mt-3 text-xs text-muted-foreground">Сохранено: {geoSavedAt}</div> : null}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={geoSaving}
+                onClick={async () => {
+                  setGeoSaving(true);
+                  setGeoError(null);
+                  setGeoSavedAt(null);
+                  try {
+                    await patchAdminVenue(id, {
+                      version: v.version,
+                      districtId: geoForm.districtId || null,
+                      metroStationId: geoForm.metroStationId || null,
+                      isHiddenGem: geoForm.isHiddenGem,
+                    });
+                    invalidateVenue();
+                    setGeoSavedAt(new Date().toLocaleString('ru-RU'));
+                  } catch (e) {
+                    setGeoError(e instanceof Error ? e.message : 'Ошибка сохранения');
+                  } finally {
+                    setGeoSaving(false);
+                  }
+                }}
+              >
+                {geoSaving ? 'Сохранение…' : 'Сохранить'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={geoSaving}
+                onClick={() =>
+                  setGeoForm({
+                    districtId: v.districtId ?? '',
+                    metroStationId: v.metroStationId ?? '',
+                    isHiddenGem: v.isHiddenGem ?? false,
+                  })
+                }
+              >
+                Сбросить
+              </Button>
+            </div>
           </div>
         </section>
       ) : null}

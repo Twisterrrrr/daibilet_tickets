@@ -14,6 +14,7 @@ import {
   compareUpcoming,
   computeWindowOpenDate,
 } from './venue-program.logic';
+import { resolveDistrictLabel, resolveMetroLabel } from './venue-geo.labels';
 
 @Injectable()
 export class VenueService {
@@ -49,6 +50,8 @@ export class VenueService {
         take: limit,
         include: {
           city: { select: { name: true, slug: true } },
+          districtRef: { select: { name: true } },
+          metroStationRef: { select: { name: true } },
         },
       }),
       this.prisma.venue.count({ where }),
@@ -64,11 +67,13 @@ export class VenueService {
         imageUrl: v.imageUrl,
         city: v.city,
         address: v.address,
-        metro: v.metro,
+        metro: resolveMetroLabel({ legacyMetro: v.metro, stationName: v.metroStationRef?.name ?? null }),
+        district: resolveDistrictLabel({ legacyDistrict: v.district, districtName: v.districtRef?.name ?? null }),
         priceFrom: v.priceFrom,
         rating: Number(v.rating),
         reviewCount: v.reviewCount,
         isFeatured: v.isFeatured,
+        isHiddenGem: v.isHiddenGem,
       })),
       total,
       page,
@@ -82,6 +87,8 @@ export class VenueService {
       where: { slug, isActive: true, isDeleted: false },
       include: {
         city: { select: { name: true, slug: true } },
+        districtRef: { select: { name: true, slug: true } },
+        metroStationRef: { select: { name: true, slug: true, lineName: true } },
         operator: { select: { id: true, name: true, slug: true, logo: true } },
         offers: {
           where: { status: 'ACTIVE' },
@@ -278,6 +285,8 @@ export class VenueService {
       where: { id, isDeleted: false },
       include: {
         city: { select: { name: true, slug: true } },
+        districtRef: { select: { name: true, slug: true } },
+        metroStationRef: { select: { name: true, slug: true, lineName: true } },
         operator: { select: { id: true, name: true, slug: true, logo: true } },
         offers: {
           where: { status: 'ACTIVE' },
@@ -344,6 +353,9 @@ export class VenueService {
       lng: number | null;
       metro: string | null;
       district: string | null;
+      isHiddenGem: boolean;
+      districtRef?: { name: string; slug: string } | null;
+      metroStationRef?: { name: string; slug: string; lineName: string | null } | null;
       phone: string | null;
       email: string | null;
       website: string | null;
@@ -434,6 +446,15 @@ export class VenueService {
       }
     }
 
+    const metroLabel = resolveMetroLabel({
+      legacyMetro: venue.metro,
+      stationName: venue.metroStationRef?.name ?? null,
+    });
+    const districtLabel = resolveDistrictLabel({
+      legacyDistrict: venue.district,
+      districtName: venue.districtRef?.name ?? null,
+    });
+
     return {
       id: venue.id,
       cityId: venue.cityId,
@@ -450,8 +471,9 @@ export class VenueService {
       address: venue.address,
       lat: venue.lat,
       lng: venue.lng,
-      metro: venue.metro,
-      district: venue.district,
+      metro: metroLabel,
+      district: districtLabel,
+      isHiddenGem: venue.isHiddenGem,
       phone: venue.phone,
       email: venue.email,
       website: venue.website,

@@ -85,6 +85,21 @@ export class CreateVenueDto {
   @IsString()
   district?: string;
 
+  @ApiPropertyOptional({ description: 'FK: District (должен принадлежать тому же городу, что и venue)' })
+  @IsOptional()
+  @IsUUID()
+  districtId?: string;
+
+  @ApiPropertyOptional({ description: 'FK: MetroStation (должен принадлежать тому же городу, что и venue)' })
+  @IsOptional()
+  @IsUUID()
+  metroStationId?: string;
+
+  @ApiPropertyOptional({ description: 'Local favorite / hidden gem (operator flag)' })
+  @IsOptional()
+  @IsBoolean()
+  isHiddenGem?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

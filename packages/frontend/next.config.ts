@@ -38,6 +38,9 @@ const nextConfig: NextConfig = {
   /** Салют: хаб остаётся /salute-9-may; городские страницы — канон в /cities */
   async redirects() {
     return [
+      // Короткие алиасы → канонические URL (301). Canonical policy не меняем.
+      { source: '/event/:slug', destination: '/events/:slug', permanent: true },
+      { source: '/place/:slug', destination: '/venues/:slug', permanent: true },
       { source: '/salute-9-may/spb', destination: '/cities/saint-petersburg/salute-9-may', permanent: true },
       { source: '/salute-9-may/:citySlug', destination: '/cities/:citySlug/salute-9-may', permanent: true },
     ];

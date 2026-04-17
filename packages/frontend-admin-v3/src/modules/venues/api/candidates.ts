@@ -40,6 +40,7 @@ export type AdminVenueCandidateRow = {
   rating: number;
   isActive: boolean;
   isFeatured: boolean;
+  isHiddenGem?: boolean;
   lifecycleStatus: VenueLifecycleStatus;
   isPublished: boolean;
   sourceType: VenueSourceType;
@@ -65,6 +66,11 @@ export type AdminVenueCandidateRow = {
   rawAddress: string | null;
   /** Канонический адрес для списка (сервер: address → raw → normalized). */
   displayAddress: string | null;
+  /** Dual-read: ref -> legacy string */
+  district?: string | null;
+  metro?: string | null;
+  districtRef?: { id: string; name: string; slug: string } | null;
+  metroStationRef?: { id: string; name: string; slug: string; lineName?: string | null; lineColor?: string | null } | null;
   normalizedName: string | null;
   normalizedAddress: string | null;
   confidenceScore: number | null;
@@ -97,6 +103,11 @@ export type AdminVenueDetail = {
   lng?: number | null;
   metro?: string | null;
   district?: string | null;
+  districtId?: string | null;
+  metroStationId?: string | null;
+  isHiddenGem?: boolean;
+  districtRef?: { id: string; name: string; slug: string } | null;
+  metroStationRef?: { id: string; name: string; slug: string; lineName?: string | null; lineColor?: string | null } | null;
   venueTemplateData?: unknown;
   /** Legacy JSON с витрины / импорта — участвуют в сборке шаблона PDP */
   highlights?: unknown;
@@ -318,6 +329,7 @@ export async function fetchAdminVenuesList(params: {
   order?: 'asc' | 'desc';
   hasMergeTarget?: boolean;
   venuePageWhitelist?: boolean;
+  isHiddenGem?: boolean;
   /** GET readinessStatus — фильтр на стороне БД (см. backend venueReadinessListWhere) */
   readinessStatus?: 'READY' | 'NEEDS_WORK' | 'NEEDS_REVIEW' | 'BLOCKED';
 }): Promise<PaginatedVenues> {
@@ -338,9 +350,54 @@ export async function fetchAdminVenuesList(params: {
   if (params.hasMergeTarget === false) sp.set('hasMergeTarget', 'false');
   if (params.venuePageWhitelist === true) sp.set('venuePageWhitelist', 'true');
   if (params.venuePageWhitelist === false) sp.set('venuePageWhitelist', 'false');
+  if (params.isHiddenGem === true) sp.set('isHiddenGem', 'true');
+  if (params.isHiddenGem === false) sp.set('isHiddenGem', 'false');
   if (params.readinessStatus) sp.set('readinessStatus', params.readinessStatus);
 
   return adminApi.get<PaginatedVenues>(`/admin/venues?${sp.toString()}`);
+}
+
+export type AdminGeoDistrict = {
+  id: string;
+  cityId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+};
+
+export type AdminGeoMetroStation = {
+  id: string;
+  cityId: string;
+  name: string;
+  slug: string;
+  lineName: string | null;
+  lineColor: string | null;
+};
+
+export async function fetchAdminGeoDistricts(params: { cityId?: string; q?: string }) {
+  const sp = new URLSearchParams();
+  if (params.cityId) sp.set('cityId', params.cityId);
+  if (params.q) sp.set('q', params.q);
+  return adminApi.get<{ items: AdminGeoDistrict[] }>(`/admin/geo/districts?${sp.toString()}`);
+}
+
+export async function fetchAdminGeoMetroStations(params: { cityId?: string; q?: string }) {
+  const sp = new URLSearchParams();
+  if (params.cityId) sp.set('cityId', params.cityId);
+  if (params.q) sp.set('q', params.q);
+  return adminApi.get<{ items: AdminGeoMetroStation[] }>(`/admin/geo/metro-stations?${sp.toString()}`);
+}
+
+export async function patchAdminVenue(
+  id: string,
+  body: {
+    version: number;
+    districtId?: string | null;
+    metroStationId?: string | null;
+    isHiddenGem?: boolean;
+  },
+) {
+  return adminApi.patch<AdminVenueDetail>(`/admin/venues/${id}`, body);
 }
 
 export async function fetchVenueCandidates(params: {

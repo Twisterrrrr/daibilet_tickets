@@ -1,7 +1,7 @@
 import {
   formatPrice,
   VENUE_TYPE_LABELS,
-  type VenueType,
+  VenueType,
   type VenueListItem,
   type VenueDetail,
   type VenueProgramResponse,
@@ -111,6 +111,12 @@ export function VenuePageView({ venue, program = null }: VenuePageViewProps) {
   const typeLabel = VENUE_TYPE_LABELS[venue.venueType as VenueType] || venue.venueType;
   const openNow = isOpenNow(hours);
   const hasNoQueue = (venue.features || []).includes('no_queue');
+  const foodVenueTypes = new Set<VenueType>([
+    VenueType.RESTAURANT,
+    VenueType.CAFE,
+    VenueType.BAR,
+    VenueType.FASTFOOD,
+  ]);
 
   const allExhibitions = (venue.exhibitions ?? []) as VenueExhibition[];
   const highlights: string[] = templateSections.highlights;
@@ -138,8 +144,9 @@ export function VenuePageView({ venue, program = null }: VenuePageViewProps) {
 
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type':
-      venue.venueType === 'MUSEUM'
+    '@type': foodVenueTypes.has(venue.venueType as VenueType)
+      ? 'Restaurant'
+      : venue.venueType === 'MUSEUM'
         ? 'Museum'
         : venue.venueType === 'GALLERY'
           ? 'Museum'
@@ -248,6 +255,11 @@ export function VenuePageView({ venue, program = null }: VenuePageViewProps) {
                 <span className="px-2.5 py-1 bg-white/15 backdrop-blur rounded-full text-xs font-medium">
                   {typeLabel}
                 </span>
+                {venue.isHiddenGem ? (
+                  <span className="px-2.5 py-1 bg-fuchsia-500/25 border border-fuchsia-300/30 backdrop-blur rounded-full text-xs font-semibold">
+                    Секретное место
+                  </span>
+                ) : null}
                 {openNow && (
                   <span className="px-2.5 py-1 bg-emerald-500/90 rounded-full text-xs font-semibold flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />

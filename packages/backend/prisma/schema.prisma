@@ -212,6 +212,11 @@ enum VenueType {
   THEATER // Театр
   PALACE // Дворец / Усадьба
   PARK // Парк / Заповедник
+  // Food & nightlife (manual now, import-ready later)
+  RESTAURANT
+  CAFE
+  BAR
+  FASTFOOD
 }
 
 /// Импортируемые и ручные площадки: DRAFT → модерация → ACTIVE; MERGED → каноническая цель в mergeTargetId
@@ -412,19 +417,19 @@ enum CreatedByType {
 // ========================
 
 model AdminUser {
-  id               String    @id @default(uuid()) @db.Uuid
-  email            String    @unique
-  passwordHash     String
-  name             String
-  role             AdminRole @default(EDITOR)
-  isActive         Boolean   @default(true)
-  refreshTokenHash String? // хеш refresh token для инвалидации
+  id                     String    @id @default(uuid()) @db.Uuid
+  email                  String    @unique
+  passwordHash           String
+  name                   String
+  role                   AdminRole @default(EDITOR)
+  isActive               Boolean   @default(true)
+  refreshTokenHash       String? // хеш refresh token для инвалидации
   /// SHA-256 hex одноразового токена сброса пароля (сырой токен нигде не храним)
-  passwordResetTokenHash   String?
-  passwordResetExpiresAt     DateTime?
-  lastLoginAt      DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  lastLoginAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   venueModerationDecisions VenueModerationDecision[]
 
@@ -464,15 +469,15 @@ model User {
 }
 
 model UserFavorite {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
+  id        String  @id @default(uuid()) @db.Uuid
+  userId    String  @db.Uuid
   /// Legacy: slug события; предпочтительно заполнять eventId (dual-write) для FK-целостности.
   eventSlug String
-  eventId   String?  @db.Uuid
+  eventId   String? @db.Uuid
 
   createdAt DateTime @default(now())
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventSlug])
@@ -506,24 +511,24 @@ model AuditLog {
 // ========================
 
 model City {
-  id              String   @id @default(uuid()) @db.Uuid
-  slug            String   @unique
-  name            String
-  description     String?  @db.Text
-  heroImage       String?
-  lat             Decimal? @db.Decimal(10, 7)
-  lng             Decimal? @db.Decimal(10, 7)
-  timezone        String   @default("Europe/Moscow")
-  metaTitle       String?
-  metaDescription String?  @db.Text
-  isFeatured      Boolean  @default(false)
-  isActive        Boolean  @default(true)
+  id               String               @id @default(uuid()) @db.Uuid
+  slug             String               @unique
+  name             String
+  description      String?              @db.Text
+  heroImage        String?
+  lat              Decimal?             @db.Decimal(10, 7)
+  lng              Decimal?             @db.Decimal(10, 7)
+  timezone         String               @default("Europe/Moscow")
+  metaTitle        String?
+  metaDescription  String?              @db.Text
+  isFeatured       Boolean              @default(false)
+  isActive         Boolean              @default(true)
   /// Город задуман как основная географическая точка входа в каталог (витринный city hub).
-  isCatalogHub       Boolean               @default(false)
-  catalogHubStatus   CityCatalogHubStatus  @default(DISABLED)
-  version         Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  isCatalogHub     Boolean              @default(false)
+  catalogHubStatus CityCatalogHubStatus @default(DISABLED)
+  version          Int                  @default(0)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   events       Event[]
   venues       Venue[]
@@ -539,6 +544,8 @@ model City {
   regionLinks   RegionCity[]
 
   promoPlacementBlocks PromoPlacementBlock[]
+  districts            District[]
+  metroStations        MetroStation[]
 
   @@map("cities")
 }
@@ -746,14 +753,14 @@ model Event {
   refundPolicyMode EventRefundPolicyMode? @default(INHERIT_SUPPLIER)
   refundPolicyText String?                @db.Text
 
-  city                 City                  @relation(fields: [cityId], references: [id])
-  venue                Venue?                @relation("VenueEvents", fields: [venueId], references: [id])
-  startLocation        Location?             @relation("EventStartLocation", fields: [startLocationId], references: [id])
-  endLocation          Location?             @relation("EventEndLocation", fields: [endLocationId], references: [id])
-  operator             Operator?             @relation(fields: [operatorId], references: [id])
+  city                 City                   @relation(fields: [cityId], references: [id])
+  venue                Venue?                 @relation("VenueEvents", fields: [venueId], references: [id])
+  startLocation        Location?              @relation("EventStartLocation", fields: [startLocationId], references: [id])
+  endLocation          Location?              @relation("EventEndLocation", fields: [endLocationId], references: [id])
+  operator             Operator?              @relation(fields: [operatorId], references: [id])
   /// Поставщик/продавец (B2B); не путать с operatorId (маршрут/перевозчик). Dual-write: supplierId дублирует смысл operator там, где совпадают.
-  supplier             Operator?             @relation("EventSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
-  route                Route?                @relation(fields: [routeId], references: [id])
+  supplier             Operator?              @relation("EventSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
+  route                Route?                 @relation(fields: [routeId], references: [id])
   userFavorites        UserFavorite[]
   offers               EventOffer[]
   sessions             EventSession[]
@@ -773,6 +780,7 @@ model Event {
   subcategoryLinks     EventSubcategoryLink[]
   dailyStats           DailyEventStats[]
   providerLinks        EventProviderLink[]
+  routePoints          RoutePoint[]
 
   @@unique([source, tcEventId])
   @@index([source, tcEventId])
@@ -837,8 +845,8 @@ model EventSession {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  event        Event              @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  offer        EventOffer?        @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  event         Event                      @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  offer         EventOffer?                @relation(fields: [offerId], references: [id], onDelete: SetNull)
   packageItems  PackageItem[]
   orderRequests OrderRequest[]
   stats         EventSessionStats?
@@ -962,7 +970,7 @@ model ProviderWebhookLog {
 
 /// Аккаунт партнёрской интеграции. credentialsJson не отдавать в API без mask.
 model ProviderAccountConfig {
-  id                        String                   @id @default(uuid()) @db.Uuid
+  id                        String                     @id @default(uuid()) @db.Uuid
   provider                  TicketProviderCode
   protocolType              ProviderProtocolType
   operationalClass          ProviderOperationalClass
@@ -970,11 +978,11 @@ model ProviderAccountConfig {
   environment               ProviderAccountEnvironment
   sandboxBaseUrl            String?
   productionBaseUrl         String?
-  requiresClientCertificate Boolean                  @default(false)
+  requiresClientCertificate Boolean                    @default(false)
   credentialsJson           Json?
   settingsJson              Json?
-  createdAt                 DateTime                 @default(now())
-  updatedAt                 DateTime                 @updatedAt
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
 
   @@index([provider, environment])
   @@map("provider_account_configs")
@@ -1114,39 +1122,39 @@ model EventOverride {
 // ========================
 
 model Tag {
-  id              String      @id @default(uuid()) @db.Uuid
-  slug            String      @unique
+  id              String              @id @default(uuid()) @db.Uuid
+  slug            String              @unique
   name            String
   nameEn          String?
   category        TagCategory
-  description     String?     @db.Text
+  description     String?             @db.Text
   heroImage       String?
   metaTitle       String?
-  metaDescription String?     @db.Text
+  metaDescription String?             @db.Text
   /// Стабильный идентификатор справочника (используется как основа для будущих SEO/Routing).
   /// На этапе миграции поле nullable, чтобы не ломать существующие строки.
-  code            String?     @unique
+  code            String?             @unique
   tagKind         TagKind?
   structuralGroup StructuralTagGroup?
-  isActive        Boolean     @default(true)
-  isDeleted       Boolean     @default(false)
+  isActive        Boolean             @default(true)
+  isDeleted       Boolean             @default(false)
   deletedAt       DateTime?
-  isFeatured      Boolean     @default(false)
-  sortOrder       Int         @default(0)
-  version         Int         @default(0)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  isFeatured      Boolean             @default(false)
+  sortOrder       Int                 @default(0)
+  version         Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
-  events      EventTag[]
-  articleTags ArticleTag[]
+  events                  EventTag[]
+  articleTags             ArticleTag[]
   /// LandingPage.filterTagId (эволюция: FK поверх legacy filterTag slug)
-  landingPagesAsFilterTag LandingPage[] @relation("LandingFilterTag")
+  landingPagesAsFilterTag LandingPage[]         @relation("LandingFilterTag")
   /// Collection tag filters (эволюция: FK поверх legacy filterTags slug[])
-  collectionTagFilters CollectionTagFilter[]
+  collectionTagFilters    CollectionTagFilter[]
 
-  @@map("tags")
   @@index([tagKind])
   @@index([structuralGroup])
+  @@map("tags")
 }
 
 model EventTag {
@@ -1154,9 +1162,9 @@ model EventTag {
   tagId   String @db.Uuid
 
   /// Кто назначил/пересчитал тег (для будущего аудита/мягких ограничений).
-  assignedBy        String?                  @db.Uuid
-  assignmentSource  EventTagAssignmentSource?
-  createdAt         DateTime                 @default(now())
+  assignedBy       String?                   @db.Uuid
+  assignmentSource EventTagAssignmentSource?
+  createdAt        DateTime                  @default(now())
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
@@ -1194,7 +1202,7 @@ model Package {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  city               City               @relation(fields: [cityId], references: [id])
+  city               City                @relation(fields: [cityId], references: [id])
   items              PackageItem[]
   voucher            Voucher?
   externalOrderLinks ExternalOrderLink[]
@@ -1223,9 +1231,9 @@ model PackageItem {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
-  package            Package           @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  event              Event             @relation(fields: [eventId], references: [id])
-  session            EventSession      @relation(fields: [sessionId], references: [id])
+  package            Package             @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  event              Event               @relation(fields: [eventId], references: [id])
+  session            EventSession        @relation(fields: [sessionId], references: [id])
   externalOrderLinks ExternalOrderLink[]
 
   @@index([packageId])
@@ -1282,30 +1290,34 @@ enum ArticleStatus {
 }
 
 model Article {
-  id              String    @id @default(uuid()) @db.Uuid
-  slug            String    @unique
-  title           String
-  content         String    @db.Text // Markdown
-  excerpt         String?
-  cityId          String?   @db.Uuid
-  coverImage      String?
-  metaTitle       String?
-  metaDescription String?   @db.Text
-  status          ArticleStatus @default(DRAFT)
-  /** UUID лендингов (landing_pages.id) */
-  relatedLandingIds   String[] @default([]) @db.Uuid
-  /** UUID подборок (collections.id) */
-  relatedCollectionIds String[] @default([]) @db.Uuid
-  publishedAt     DateTime?
-  version         Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                   String        @id @default(uuid()) @db.Uuid
+  slug                 String        @unique
+  title                String
+  content              String        @db.Text // Markdown
+  excerpt              String?
+  cityId               String?       @db.Uuid
+  coverImage           String?
+  metaTitle            String?
+  metaDescription      String?       @db.Text
+  status               ArticleStatus @default(DRAFT)
+  /**
+   * UUID лендингов (landing_pages.id)
+   */
+  relatedLandingIds    String[]      @default([]) @db.Uuid
+  /**
+   * UUID подборок (collections.id)
+   */
+  relatedCollectionIds String[]      @default([]) @db.Uuid
+  publishedAt          DateTime?
+  version              Int           @default(0)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
-  city          City?          @relation(fields: [cityId], references: [id])
-  articleEvents ArticleEvent[]
-  articleTags   ArticleTag[]
+  city            City?                   @relation(fields: [cityId], references: [id])
+  articleEvents   ArticleEvent[]
+  articleTags     ArticleTag[]
   /// Эволюция связей: M2M с позициями/приоритетом (вместо String[] без FK)
-  landingLinks   ArticleLandingLink[]
+  landingLinks    ArticleLandingLink[]
   collectionLinks ArticleCollectionLink[]
 
   promoPlacementBlocks       PromoPlacementBlock[]
@@ -1346,12 +1358,12 @@ model ArticleLandingLink {
   landingId String @db.Uuid
 
   /// Позиция в UI (0..N). Чем меньше — тем выше.
-  position Int @default(0)
+  position  Int      @default(0)
   /// Доп. приоритет (можно использовать как tie-breaker).
-  priority Int @default(0)
+  priority  Int      @default(0)
   createdAt DateTime @default(now())
 
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article Article     @relation(fields: [articleId], references: [id], onDelete: Cascade)
   landing LandingPage @relation(fields: [landingId], references: [id], onDelete: Cascade)
 
   @@id([articleId, landingId])
@@ -1362,14 +1374,14 @@ model ArticleLandingLink {
 
 /// Article ↔ Collection (позиции/приоритеты для перелинковки/виджетов)
 model ArticleCollectionLink {
-  articleId String @db.Uuid
+  articleId    String @db.Uuid
   collectionId String @db.Uuid
 
-  position Int @default(0)
-  priority Int @default(0)
+  position  Int      @default(0)
+  priority  Int      @default(0)
   createdAt DateTime @default(now())
 
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article    Article    @relation(fields: [articleId], references: [id], onDelete: Cascade)
   collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
 
   @@id([articleId, collectionId])
@@ -1418,67 +1430,71 @@ model ComboPage {
 // ========================
 
 model LandingPage {
-  id                String    @id @default(uuid()) @db.Uuid
-  /** Сегмент URL; уникальность только в паре с городом (@@unique([cityId, slug])). */
-  slug              String
+  id                   String                 @id @default(uuid()) @db.Uuid
+  /**
+   * Сегмент URL; уникальность только в паре с городом (@@unique([cityId, slug])).
+   */
+  slug                 String
   /// CITY лендинги обязаны иметь cityId; HUB/MULTI_CITY — должны быть null (валидация на backend).
-  cityId            String?   @db.Uuid
-  landingType       LandingType @default(CITY)
-  parentLandingId   String?   @db.Uuid
-  collectionId      String?   @db.Uuid
-  selectionMode     LandingSelectionMode @default(CUSTOM)
-  eventSourceType   LandingEventSourceType @default(PRIMARY_COLLECTION)
-  queryConfig       Json?
-  filterTag         String // slug тега для фильтрации событий
+  cityId               String?                @db.Uuid
+  landingType          LandingType            @default(CITY)
+  parentLandingId      String?                @db.Uuid
+  collectionId         String?                @db.Uuid
+  selectionMode        LandingSelectionMode   @default(CUSTOM)
+  eventSourceType      LandingEventSourceType @default(PRIMARY_COLLECTION)
+  queryConfig          Json?
+  filterTag            String // slug тега для фильтрации событий
   /// Эволюция: FK на Tag (параллельно legacy filterTag slug)
-  filterTagId       String?  @db.Uuid
-  additionalFilters Json? // {category?, source?, minDuration?, maxDuration?, features[]?}
-  rankingJson       Json?
-  /** SEASONAL_EVENT и др.: { viewpoints?: [{name, description, isFree}], tips?: string[] } */
-  seasonalPayload   Json?
-  title             String // H1
-  subtitle          String?
-  heroText          String?   @db.Text
-  templateType      LandingTemplateType @default(GENERIC_CARDS)
-  howToChoose       Json? // [{title, text}]
-  infoBlocks        Json? // [{title, text}]
-  faq               Json? // [{question, answer}]
-  reviews           Json? // [{text, author, rating}]
-  stats             Json? // {soldTickets, avgRating}
-  relatedLinks      Json? // [{title, href}]
-  relatedArticleIds   String[] @db.Uuid @default([])
-  relatedCollectionIds String[] @db.Uuid @default([])
-  legalText         String?   @db.Text
-  metaTitle         String?
-  metaDescription   String?   @db.Text
-  canonicalUrl      String?
-  status            LandingStatus @default(DRAFT)
-  showInCollections Boolean   @default(false)
-  isIndexable       Boolean   @default(true)
-  isActive          Boolean   @default(true)
-  isDeleted         Boolean   @default(false)
-  deletedAt         DateTime?
-  version           Int       @default(0)
-  sortOrder         Int       @default(0)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  filterTagId          String?                @db.Uuid
+  additionalFilters    Json? // {category?, source?, minDuration?, maxDuration?, features[]?}
+  rankingJson          Json?
+  /**
+   * SEASONAL_EVENT и др.: { viewpoints?: [{name, description, isFree}], tips?: string[] }
+   */
+  seasonalPayload      Json?
+  title                String // H1
+  subtitle             String?
+  heroText             String?                @db.Text
+  templateType         LandingTemplateType    @default(GENERIC_CARDS)
+  howToChoose          Json? // [{title, text}]
+  infoBlocks           Json? // [{title, text}]
+  faq                  Json? // [{question, answer}]
+  reviews              Json? // [{text, author, rating}]
+  stats                Json? // {soldTickets, avgRating}
+  relatedLinks         Json? // [{title, href}]
+  relatedArticleIds    String[]               @default([]) @db.Uuid
+  relatedCollectionIds String[]               @default([]) @db.Uuid
+  legalText            String?                @db.Text
+  metaTitle            String?
+  metaDescription      String?                @db.Text
+  canonicalUrl         String?
+  status               LandingStatus          @default(DRAFT)
+  showInCollections    Boolean                @default(false)
+  isIndexable          Boolean                @default(true)
+  isActive             Boolean                @default(true)
+  isDeleted            Boolean                @default(false)
+  deletedAt            DateTime?
+  version              Int                    @default(0)
+  sortOrder            Int                    @default(0)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
-  city       City?        @relation(fields: [cityId], references: [id])
-  collection Collection? @relation(fields: [collectionId], references: [id])
-  filterTagRef Tag?      @relation("LandingFilterTag", fields: [filterTagId], references: [id], onDelete: SetNull)
-  parentLanding LandingPage? @relation("LandingParentChild", fields: [parentLandingId], references: [id])
-  childLandings LandingPage[] @relation("LandingParentChild")
+  city          City?                @relation(fields: [cityId], references: [id])
+  collection    Collection?          @relation(fields: [collectionId], references: [id])
+  filterTagRef  Tag?                 @relation("LandingFilterTag", fields: [filterTagId], references: [id], onDelete: SetNull)
+  parentLanding LandingPage?         @relation("LandingParentChild", fields: [parentLandingId], references: [id])
+  childLandings LandingPage[]        @relation("LandingParentChild")
   /// Эволюция связей: M2M к статьям с позициями/приоритетом (вместо Article.relatedLandingIds без FK)
-  articleLinks ArticleLandingLink[]
+  articleLinks  ArticleLandingLink[]
 
   promoPlacementBlocks       PromoPlacementBlock[]
   promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetLanding")
 
+  @@unique([cityId, slug])
   @@index([cityId])
   @@index([status, showInCollections])
   @@index([collectionId])
   @@index([filterTagId])
-  @@unique([cityId, slug])
   @@map("landing_pages")
 }
 
@@ -1525,29 +1541,29 @@ model Collection {
   eventCountCached   Int?
   previewGeneratedAt DateTime?
   /// Первая публикация (для витрины и SEO)
-  publishedAt DateTime?
+  publishedAt        DateTime?
   /// Контракт AUTO/HYBRID: фильтры и лимиты (валидация на backend)
-  queryConfig Json?
-  isActive  Boolean   @default(true)
-  isDeleted Boolean   @default(false)
-  deletedAt DateTime?
-  sortOrder Int       @default(0)
-  version   Int       @default(0)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  queryConfig        Json?
+  isActive           Boolean                  @default(true)
+  isDeleted          Boolean                  @default(false)
+  deletedAt          DateTime?
+  sortOrder          Int                      @default(0)
+  version            Int                      @default(0)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 
-  city     City?             @relation(fields: [cityId], references: [id])
-  landings LandingPage[]
-  items    CollectionItem[]
+  city         City?                   @relation(fields: [cityId], references: [id])
+  landings     LandingPage[]
+  items        CollectionItem[]
   /// Эволюция связей: M2M к статьям с позициями/приоритетом (вместо String[] без FK на стороне Article)
   articleLinks ArticleCollectionLink[]
 
   promoPlacementBlocks       PromoPlacementBlock[]
   promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetCollection")
 
+  @@unique([cityId, slug])
   @@index([cityId])
   @@index([status, sourceType])
-  @@unique([cityId, slug])
   @@index([isActive, isDeleted])
   @@map("collections")
 }
@@ -1557,8 +1573,8 @@ model CollectionTagFilter {
   collectionId String @db.Uuid
   tagId        String @db.Uuid
 
-  position Int @default(0)
-  priority Int @default(0)
+  position  Int      @default(0)
+  priority  Int      @default(0)
   createdAt DateTime @default(now())
 
   collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
@@ -1693,6 +1709,11 @@ model Venue {
   lng               Float?
   metro             String? // "Адмиралтейская"
   district          String?
+  /// Эволюция географии: справочники (dual-read с legacy строками metro/district)
+  districtId        String?                @map("district_id") @db.Uuid
+  metroStationId    String?                @map("metro_station_id") @db.Uuid
+  /// Operator flag: local favorite / hidden gem (не влияет на публикацию)
+  isHiddenGem       Boolean                @default(false) @map("is_hidden_gem")
   phone             String?
   email             String?
   website           String?
@@ -1724,23 +1745,26 @@ model Venue {
   createdById       String?                @db.Uuid
 
   /// Статус жизненного цикла (импорт / модерация / merge)
-  lifecycleStatus VenueLifecycleStatus @default(ACTIVE) @map("lifecycle_status")
+  lifecycleStatus        VenueLifecycleStatus @default(ACTIVE) @map("lifecycle_status")
   /// Публичная SEO-страница /venues/:slug (только при ACTIVE + модерации контента)
-  isPublished     Boolean              @default(true) @map("is_published")
-  sourceType      VenueSourceType      @default(MANUAL) @map("source_type")
-  importSource    VenueImportSource?   @map("import_source")
-  externalVenueId String?              @map("external_venue_id")
-  rawName         String?              @map("raw_name")
-  rawAddress      String?              @map("raw_address")
-  normalizedName  String               @map("normalized_name")
-  normalizedAddress String?            @map("normalized_address")
-  mergeTargetId   String?              @map("merge_target_id") @db.Uuid
-  confidenceScore Float?               @map("confidence_score")
-  needsReview     Boolean              @default(false) @map("needs_review")
+  isPublished            Boolean              @default(true) @map("is_published")
+  sourceType             VenueSourceType      @default(MANUAL) @map("source_type")
+  importSource           VenueImportSource?   @map("import_source")
+  externalVenueId        String?              @map("external_venue_id")
+  rawName                String?              @map("raw_name")
+  rawAddress             String?              @map("raw_address")
+  normalizedName         String               @map("normalized_name")
+  normalizedAddress      String?              @map("normalized_address")
+  mergeTargetId          String?              @map("merge_target_id") @db.Uuid
+  confidenceScore        Float?               @map("confidence_score")
+  needsReview            Boolean              @default(false) @map("needs_review")
   /// Обход порога по количеству событий для публикации страницы площадки
-  isVenuePageWhitelisted Boolean       @default(false) @map("is_venue_page_whitelisted")
+  isVenuePageWhitelisted Boolean              @default(false) @map("is_venue_page_whitelisted")
   /// Уровень витринной страницы площадки (NONE / BASIC / HUB).
-  venuePageMode VenuePageMode @default(NONE) @map("venue_page_mode")
+  venuePageMode          VenuePageMode        @default(NONE) @map("venue_page_mode")
+
+  districtRef     District?     @relation(fields: [districtId], references: [id], onDelete: SetNull)
+  metroStationRef MetroStation? @relation(fields: [metroStationId], references: [id], onDelete: SetNull)
 
   mergeTarget Venue?  @relation("VenueMerge", fields: [mergeTargetId], references: [id], onDelete: Restrict)
   mergedFrom  Venue[] @relation("VenueMerge")
@@ -1748,15 +1772,17 @@ model Venue {
   moderationDecisions VenueModerationDecision[]
   moderationSignals   VenueModerationSignal[]
 
-  city                 City                  @relation(fields: [cityId], references: [id])
-  operator             Operator?             @relation("VenueOperator", fields: [operatorId], references: [id])
-  events               Event[]               @relation("VenueEvents")
-  offers               EventOffer[]          @relation("VenueOffers")
+  city                 City                   @relation(fields: [cityId], references: [id])
+  operator             Operator?              @relation("VenueOperator", fields: [operatorId], references: [id])
+  events               Event[]                @relation("VenueEvents")
+  offers               EventOffer[]           @relation("VenueOffers")
   reviews              Review[]
   promoBlockVenues     PromoBlockVenue[]
   promoCollectionItems PromoCollectionItem[]
   subcategoryLinks     VenueSubcategoryLink[]
+  routePoints          RoutePoint[]
 
+  @@unique([cityId, importSource, externalVenueId])
   @@index([cityId])
   @@index([venueType])
   @@index([slug])
@@ -1764,34 +1790,76 @@ model Venue {
   @@index([lifecycleStatus])
   @@index([cityId, lifecycleStatus])
   @@index([importSource, externalVenueId])
-  @@unique([cityId, importSource, externalVenueId])
+  @@index([districtId])
+  @@index([metroStationId])
   @@map("venues")
+}
+
+// ========================
+// Geo dictionaries (admin-managed)
+// ========================
+
+model District {
+  id          String   @id @default(uuid()) @db.Uuid
+  cityId      String   @db.Uuid
+  name        String
+  slug        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  city   City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  venues Venue[]
+
+  @@unique([cityId, slug])
+  @@index([cityId])
+  @@index([slug])
+  @@map("districts")
+}
+
+model MetroStation {
+  id        String   @id @default(uuid()) @db.Uuid
+  cityId    String   @db.Uuid
+  name      String
+  slug      String
+  lineName  String?
+  lineColor String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  city   City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  venues Venue[]
+
+  @@unique([cityId, slug])
+  @@index([cityId])
+  @@index([slug])
+  @@map("metro_stations")
 }
 
 /// Профиль доверия и лимитов авто-модерации по источнику импорта (Stage 5).
 model ImportSourceModerationProfile {
-  importSource VenueImportSource @id @map("import_source")
-  trustLevel VenueModerationTrustLevel @default(LOW) @map("trust_level")
-  autoApproveEnabled Boolean @default(false) @map("auto_approve_enabled")
-  autoMergeEnabled Boolean @default(false) @map("auto_merge_enabled")
-  maxAutoActionsPerDay Int @default(20) @map("max_auto_actions_per_day")
+  importSource         VenueImportSource         @id @map("import_source")
+  trustLevel           VenueModerationTrustLevel @default(LOW) @map("trust_level")
+  autoApproveEnabled   Boolean                   @default(false) @map("auto_approve_enabled")
+  autoMergeEnabled     Boolean                   @default(false) @map("auto_merge_enabled")
+  maxAutoActionsPerDay Int                       @default(20) @map("max_auto_actions_per_day")
   /// Kill-switch для конкретного import source.
-  disabled Boolean @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  disabled             Boolean                   @default(false)
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
 
   @@map("import_source_moderation_profiles")
 }
 
 /// История решений модерации импортных площадок (traceability + аналитика).
 model VenueModerationDecision {
-  id           String                    @id @default(cuid())
-  venueId      String                    @db.Uuid
+  id           String                     @id @default(cuid())
+  venueId      String                     @db.Uuid
   action       VenueModerationAction
   reasonCode   VenueModerationReasonCode?
   reasonText   String?
-  actorAdminId String?                   @db.Uuid
-  createdAt    DateTime                  @default(now())
+  actorAdminId String?                    @db.Uuid
+  createdAt    DateTime                   @default(now())
   metadata     Json?
 
   venue      Venue      @relation(fields: [venueId], references: [id], onDelete: Cascade)
@@ -1807,14 +1875,14 @@ model VenueModerationDecision {
 
 /// Детерминированные сигналы для аналитики / будущего обучения (без ML).
 model VenueModerationSignal {
-  id                String               @id @default(cuid())
-  venueId           String               @db.Uuid
+  id                String                @id @default(cuid())
+  venueId           String                @db.Uuid
   action            VenueModerationAction
   decisionHint      String?
   /// Совпадение рекомендации и действия (MERGE↔MERGE, APPROVE↔APPROVE, REJECT↔REJECT для соответствующих hint).
-  wasHintAccepted   Boolean              @default(false)
+  wasHintAccepted   Boolean               @default(false)
   /// Пользователь выбрал иное действие, чем «прямая» рекомендация (напр. APPROVE при MERGE_RECOMMENDED).
-  wasHintOverridden Boolean              @default(false)
+  wasHintOverridden Boolean               @default(false)
   confidenceScore   Float?
   needsReview       Boolean?
   duplicatesCount   Int?
@@ -1822,8 +1890,8 @@ model VenueModerationSignal {
   addressSimilarity Float?
   sameCity          Boolean?
   importSource      VenueImportSource?
-  targetVenueId     String?              @db.Uuid
-  createdAt         DateTime             @default(now())
+  targetVenueId     String?               @db.Uuid
+  createdAt         DateTime              @default(now())
 
   venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
 
@@ -1835,26 +1903,26 @@ model VenueModerationSignal {
 }
 
 model Subcategory {
-  id               String            @id @default(uuid()) @db.Uuid
-  slug             String            @unique
+  id               String                 @id @default(uuid()) @db.Uuid
+  slug             String                 @unique
   /// Стабильный код справочника (совпадает с EventSubcategory / API primaryCode в рамках type). Уникальность: code + type.
   code             String
   nameRu           String
-  type             SubcategoryType   @default(UNIVERSAL)
-  layer            SubcategoryLayer  @default(SECONDARY)
-  parentId         String?                  @db.Uuid
-  isActive         Boolean                  @default(true)
-  isLandingEnabled Boolean                  @default(false)
+  type             SubcategoryType        @default(UNIVERSAL)
+  layer            SubcategoryLayer       @default(SECONDARY)
+  parentId         String?                @db.Uuid
+  isActive         Boolean                @default(true)
+  isLandingEnabled Boolean                @default(false)
   /// AUTO: generic `/cities/{city}/{slug}`; TOPIC_HUB: канонический тематический хаб (`landingTopicKey`); DISABLED: без auto-SEO-роута.
-  landingMode      SubcategoryLandingMode    @default(DISABLED)
+  landingMode      SubcategoryLandingMode @default(DISABLED)
   /// Ключ тематического хаба (например `river-cruises` → `/river-cruises/{citySlug}`).
   landingTopicKey  String?
-  sortOrder        Int                      @default(0)
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  sortOrder        Int                    @default(0)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
-  parent     Subcategory?          @relation("SubcategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children   Subcategory[]         @relation("SubcategoryTree")
+  parent     Subcategory?           @relation("SubcategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Subcategory[]          @relation("SubcategoryTree")
   eventLinks EventSubcategoryLink[]
   venueLinks VenueSubcategoryLink[]
 
@@ -2030,9 +2098,9 @@ model PromoBlock {
 }
 
 model PromoPlacementBlock {
-  id            String          @id @default(uuid()) @db.Uuid
-  title         String
-  status        PromoBlockStatus @default(DRAFT)
+  id     String           @id @default(uuid()) @db.Uuid
+  title  String
+  status PromoBlockStatus @default(DRAFT)
 
   placementZone PromoPlacementZone
   pageScopeType PromoPageScopeType @default(GLOBAL)
@@ -2050,10 +2118,10 @@ model PromoPlacementBlock {
 
   // target (what to promote)
   targetType         PromoTargetType
-  targetEventId      String? @db.Uuid
-  targetCollectionId String? @db.Uuid
-  targetLandingId    String? @db.Uuid
-  targetArticleId    String? @db.Uuid
+  targetEventId      String?         @db.Uuid
+  targetCollectionId String?         @db.Uuid
+  targetLandingId    String?         @db.Uuid
+  targetArticleId    String?         @db.Uuid
 
   targetEvent      Event?       @relation(fields: [targetEventId], references: [id])
   targetCollection Collection?  @relation("PromoPlacementTargetCollection", fields: [targetCollectionId], references: [id])
@@ -2267,7 +2335,7 @@ model Operator {
 
   events                  Event[]
   eventsAsSupplier        Event[]                  @relation("EventSupplier")
-  paymentIntentsSupplier  PaymentIntent[]        @relation("PaymentIntentSupplier")
+  paymentIntentsSupplier  PaymentIntent[]          @relation("PaymentIntentSupplier")
   venues                  Venue[]                  @relation("VenueOperator")
   reviews                 Review[]
   offers                  EventOffer[]
@@ -2277,11 +2345,11 @@ model Operator {
   reviewDisputes          ReviewDispute[]          @relation("DisputeOperator")
   supplierPayoutRequests  SupplierPayoutRequest[]
 
-  supplierReports    SupplierReport[]
+  supplierReports     SupplierReport[]
   supplierSettlements SupplierSettlement[]
-  supplierDocuments  SupplierDocument[]
-  supplierDisputes   SupplierDispute[]
-  supplierDailyStats SupplierDailyStat[]
+  supplierDocuments   SupplierDocument[]
+  supplierDisputes    SupplierDispute[]
+  supplierDailyStats  SupplierDailyStat[]
 
   legalProfile SupplierLegalProfile?
   edoProfile   SupplierEdoProfile?
@@ -2313,21 +2381,21 @@ model SupplierLegalProfile {
   id         String @id @default(cuid())
   operatorId String @unique @db.Uuid
 
-  legalName      String
-  legalAddress   String?
-  inn            String?
-  kpp            String?
-  ogrn           String?
-  taxMode        TaxMode                    @default(OSNO)
-  isVatPayer     Boolean                    @default(false)
-  defaultVatRate Decimal?                   @db.Decimal(5, 2)
-  signerFullName String?
-  signerPosition String?
-  financeEmail   String?
-  docsEmail      String?
-  generateInvoiceDocuments Boolean                  @default(false)
-  closingDocumentMode      ClosingDocumentMode      @default(UPD)
-  status         SupplierLegalProfileStatus @default(DRAFT)
+  legalName                String
+  legalAddress             String?
+  inn                      String?
+  kpp                      String?
+  ogrn                     String?
+  taxMode                  TaxMode                    @default(OSNO)
+  isVatPayer               Boolean                    @default(false)
+  defaultVatRate           Decimal?                   @db.Decimal(5, 2)
+  signerFullName           String?
+  signerPosition           String?
+  financeEmail             String?
+  docsEmail                String?
+  generateInvoiceDocuments Boolean                    @default(false)
+  closingDocumentMode      ClosingDocumentMode        @default(UPD)
+  status                   SupplierLegalProfileStatus @default(DRAFT)
 
   verifiedBy       String?   @db.Uuid
   verifiedAt       DateTime?
@@ -2446,8 +2514,33 @@ model Route {
   updatedAt        DateTime @updatedAt
 
   events Event[]
+  points RoutePoint[]
 
   @@map("routes")
+}
+
+model RoutePoint {
+  id              String   @id @default(uuid()) @db.Uuid
+  routeId         String   @db.Uuid
+  order           Int
+  venueId         String?  @db.Uuid
+  eventId         String?  @db.Uuid
+  durationMinutes Int?
+  description     String?  @db.Text
+  titleOverride   String?
+  isOptional      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  route Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  venue Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@unique([routeId, order])
+  @@index([routeId])
+  @@index([venueId])
+  @@index([eventId])
+  @@map("route_points")
 }
 
 // ========================
@@ -2700,10 +2793,10 @@ enum CheckoutStatus {
 }
 
 model CheckoutSession {
-  id                             String            @id @default(uuid()) @db.Uuid
-  shortCode                      String            @unique // "CS-XXXX" для UI
+  id                             String              @id @default(uuid()) @db.Uuid
+  shortCode                      String              @unique // "CS-XXXX" для UI
   /// Покупатель (ЛК): если заказ оформлен авторизованным пользователем
-  userId                         String?           @db.Uuid
+  userId                         String?             @db.Uuid
   cartSnapshot                   Json // Снимок корзины из localStorage
   validatedSnapshot              Json? // Результат validate (актуальные цены/наличие)
   offersSnapshot                 Json? // Immutable: данные офферов на момент оформления (title, price, type, deeplink, widgetPayload)
@@ -2714,7 +2807,7 @@ model CheckoutSession {
   customerName                   String?
   customerEmail                  String?
   customerPhone                  String?
-  status                         CheckoutStatus    @default(STARTED)
+  status                         CheckoutStatus      @default(STARTED)
   totalPrice                     Int? // Итого в копейках
   expiresAt                      DateTime? // TTL для soft-reserve
   completedAt                    DateTime? // Когда сессия завершена (для аналитики)
@@ -2724,9 +2817,9 @@ model CheckoutSession {
   referrer                       String?
   userAgent                      String?
   ip                             String?
-  createdAt                      DateTime          @default(now())
-  updatedAt                      DateTime          @updatedAt
-  user                           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt                      DateTime            @default(now())
+  updatedAt                      DateTime            @updatedAt
+  user                           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   orderRequests                  OrderRequest[]
   paymentIntents                 PaymentIntent[]
   fulfillmentItems               FulfillmentItem[]
@@ -2841,12 +2934,12 @@ model PaymentIntent {
   updatedAt         DateTime      @updatedAt
 
   // === Split Payment (маркетплейс) ===
-  supplierId     String?  @db.Uuid
+  supplierId     String?   @db.Uuid
   supplier       Operator? @relation("PaymentIntentSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
   grossAmount    Int? // Полная сумма от клиента (копейки)
   platformFee    Int? // Комиссия платформы (копейки)
   supplierAmount Int? // Сумма поставщику (копейки)
-  commissionRate Decimal? @db.Decimal(5, 4) // Ставка на момент транзакции
+  commissionRate Decimal?  @db.Decimal(5, 4) // Ставка на момент транзакции
   splitPaymentId String? // ID split-платежа YooKassa
 
   checkoutSession CheckoutSession @relation(fields: [checkoutSessionId], references: [id])
@@ -2939,21 +3032,21 @@ model FulfillmentItem {
 
 /// Заявка на возврат по одной позиции FulfillmentItem (MVP).
 model RefundRequest {
-  id                  String               @id @default(uuid()) @db.Uuid
-  fulfillmentItemId   String               @db.Uuid
-  paymentIntentId     String               @db.Uuid
-  amount              Int
-  currency            String               @default("RUB")
-  reason              RefundRequestReason  @default(OTHER)
-  reasonNote          String?              @db.Text
-  status              RefundRequestStatus  @default(CREATED)
-  createdByType       RefundCreatedByType  @default(ADMIN)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  processedAt         DateTime?
+  id                String              @id @default(uuid()) @db.Uuid
+  fulfillmentItemId String              @db.Uuid
+  paymentIntentId   String              @db.Uuid
+  amount            Int
+  currency          String              @default("RUB")
+  reason            RefundRequestReason @default(OTHER)
+  reasonNote        String?             @db.Text
+  status            RefundRequestStatus @default(CREATED)
+  createdByType     RefundCreatedByType @default(ADMIN)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  processedAt       DateTime?
 
   fulfillmentItem FulfillmentItem @relation(fields: [fulfillmentItemId], references: [id], onDelete: Restrict)
-  paymentIntent     PaymentIntent   @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  paymentIntent   PaymentIntent   @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
 
   @@index([fulfillmentItemId])
   @@index([paymentIntentId])
@@ -2963,38 +3056,38 @@ model RefundRequest {
 
 /// Плоский mirror-заказ (internal + external), не core checkout entity.
 model Order {
-  id                String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  source            OrderSource
+  source          OrderSource
   /// Идентификатор заказа во внешней системе (TicketsCloud order.id, Teplohod номер и т.п.)
-  externalOrderId   String?
+  externalOrderId String?
 
-  status            OrderStatus
+  status OrderStatus
 
-  userId            String?  @db.Uuid
-  email             String?
-  phone             String?
+  userId String? @db.Uuid
+  email  String?
+  phone  String?
 
-  eventId           String?  @db.Uuid
-  titleSnapshot     String
-  dateSnapshot      DateTime?
+  eventId       String?   @db.Uuid
+  titleSnapshot String
+  dateSnapshot  DateTime?
 
   /// Сумма в копейках (если известна)
-  amount            Int?
-  currency          String?
+  amount   Int?
+  currency String?
 
-  purchasedAt       DateTime?
-  ingestionSource   OrderIngestionSource?
+  purchasedAt     DateTime?
+  ingestionSource OrderIngestionSource?
 
-  checkoutSessionId String?  @db.Uuid
-  packageId         String?  @db.Uuid
-  paymentIntentId   String?  @db.Uuid
+  checkoutSessionId String? @db.Uuid
+  packageId         String? @db.Uuid
+  paymentIntentId   String? @db.Uuid
 
-  sourcePayload     Json?
-  notes             String?
+  sourcePayload Json?
+  notes         String?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([source, externalOrderId])
   @@index([checkoutSessionId])
@@ -3197,8 +3290,8 @@ enum ChatAuthorType {
 }
 
 model ChatConversation {
-  id        String                 @id @default(uuid()) @db.Uuid
-  status    ChatConversationStatus @default(OPEN)
+  id     String                 @id @default(uuid()) @db.Uuid
+  status ChatConversationStatus @default(OPEN)
 
   // Guest info (optional). For authenticated users use userId.
   guestName  String?
@@ -3230,12 +3323,12 @@ model ChatConversation {
 }
 
 model ChatMessage {
-  id             String        @id @default(uuid()) @db.Uuid
-  conversationId String        @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
+  conversationId String         @db.Uuid
   authorType     ChatAuthorType
   authorName     String?
   // for admin messages (optional)
-  authorAdminId String? @db.Uuid
+  authorAdminId  String?        @db.Uuid
 
   text      String   @db.Text
   createdAt DateTime @default(now())
@@ -3644,12 +3737,12 @@ model SupplierDispute {
 }
 
 model SupplierDocument {
-  id         String                 @id @default(cuid())
-  operatorId String                 @db.Uuid
-  reportId   String?
+  id           String                 @id @default(cuid())
+  operatorId   String                 @db.Uuid
+  reportId     String?
   settlementId String?
-  type       SupplierDocumentType
-  status     SupplierDocumentStatus @default(DRAFT)
+  type         SupplierDocumentType
+  status       SupplierDocumentStatus @default(DRAFT)
 
   title       String
   payloadJson Json?
@@ -3660,14 +3753,14 @@ model SupplierDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  operator Operator        @relation(fields: [operatorId], references: [id])
-  report   SupplierReport? @relation(fields: [reportId], references: [id])
+  operator   Operator            @relation(fields: [operatorId], references: [id])
+  report     SupplierReport?     @relation(fields: [reportId], references: [id])
   settlement SupplierSettlement? @relation(fields: [settlementId], references: [id])
 
   template        SupplierDocumentTemplate?        @relation(fields: [templateId], references: [id])
   templateVersion SupplierDocumentTemplateVersion? @relation(fields: [templateVersionId], references: [id])
 
-  files       SupplierDocumentFile[]
+  files         SupplierDocumentFile[]
   edoDeliveries EdoDelivery[]
 
   @@index([operatorId])
@@ -3704,18 +3797,18 @@ model SupplierSettlement {
 
 /// P4: Профиль поставщика в ЭДО (привязка к оператору и провайдеру).
 model SupplierEdoProfile {
-  id         String          @id @default(cuid())
-  operatorId String          @unique @db.Uuid
-  provider   EdoProviderType
-  boxId      String?
-  inn        String
-  kpp        String?
-  isActive   Boolean         @default(true)
+  id           String          @id @default(cuid())
+  operatorId   String          @unique @db.Uuid
+  provider     EdoProviderType
+  boxId        String?
+  inn          String
+  kpp          String?
+  isActive     Boolean         @default(true)
   settingsJson Json?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
-  operator  Operator      @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  operator   Operator      @relation(fields: [operatorId], references: [id], onDelete: Cascade)
   deliveries EdoDelivery[]
 
   @@map("supplier_edo_profiles")
@@ -3723,25 +3816,25 @@ model SupplierEdoProfile {
 
 /// P4: История отправки документа в ЭДО.
 model EdoDelivery {
-  id                    String            @id @default(cuid())
-  supplierDocumentId    String
-  supplierEdoProfileId  String
-  provider              EdoProviderType
-  providerDeliveryId    String?
-  status                EdoDeliveryStatus @default(PENDING)
-  errorCode             String?
-  errorMessage          String?           @db.Text
-  sentAt                DateTime?
-  deliveredAt           DateTime?
-  signedAt              DateTime?
-  rejectedAt            DateTime?
-  lastStatusAt          DateTime?
-  initiatedByAdminUserId String?          @db.Uuid
-  metaJson              Json?
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  id                     String            @id @default(cuid())
+  supplierDocumentId     String
+  supplierEdoProfileId   String
+  provider               EdoProviderType
+  providerDeliveryId     String?
+  status                 EdoDeliveryStatus @default(PENDING)
+  errorCode              String?
+  errorMessage           String?           @db.Text
+  sentAt                 DateTime?
+  deliveredAt            DateTime?
+  signedAt               DateTime?
+  rejectedAt             DateTime?
+  lastStatusAt           DateTime?
+  initiatedByAdminUserId String?           @db.Uuid
+  metaJson               Json?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
-  document SupplierDocument    @relation(fields: [supplierDocumentId], references: [id], onDelete: Restrict)
+  document   SupplierDocument   @relation(fields: [supplierDocumentId], references: [id], onDelete: Restrict)
   edoProfile SupplierEdoProfile @relation(fields: [supplierEdoProfileId], references: [id], onDelete: Restrict)
 
   @@index([supplierDocumentId])

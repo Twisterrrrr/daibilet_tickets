@@ -78,6 +78,7 @@ type VenuesListUrlFilters = {
   sourceType: '' | VenueSourceType;
   importSource: '' | VenueImportSource;
   needsReviewOnly: boolean;
+  hiddenGemOnly: boolean;
   hasMergeTarget: '' | 'yes' | 'no';
   whitelist: '' | 'yes' | 'no';
   sort: 'updatedAt' | 'confidenceScore';
@@ -93,6 +94,7 @@ export function VenuesListPage() {
       sourceType: '',
       importSource: '',
       needsReviewOnly: false,
+      hiddenGemOnly: false,
       hasMergeTarget: '',
       whitelist: '',
       sort: 'updatedAt',
@@ -105,6 +107,7 @@ export function VenuesListPage() {
         sourceType: readEnum(sp, 'sourceType', ['' as const, 'MANUAL', 'IMPORTED'], ''),
         importSource: readEnum(sp, 'importSource', ['' as const, 'TICKETSCLOUD', 'TEPLOHOD'], ''),
         needsReviewOnly: readBool01(sp, 'needsReviewOnly') ?? false,
+        hiddenGemOnly: readBool01(sp, 'hiddenGemOnly') ?? false,
         hasMergeTarget: readEnum(sp, 'hasMergeTarget', ['' as const, 'yes', 'no'], ''),
         whitelist: readEnum(sp, 'whitelist', ['' as const, 'yes', 'no'], ''),
         sort: readEnum(sp, 'sort', ['updatedAt' as const, 'confidenceScore'], 'updatedAt'),
@@ -117,6 +120,7 @@ export function VenuesListPage() {
       setOrDelete(sp, 'sourceType', state.sourceType);
       setOrDelete(sp, 'importSource', state.importSource);
       setBool01(sp, 'needsReviewOnly', state.needsReviewOnly, false);
+      setBool01(sp, 'hiddenGemOnly', state.hiddenGemOnly, false);
       setOrDelete(sp, 'hasMergeTarget', state.hasMergeTarget);
       setOrDelete(sp, 'whitelist', state.whitelist);
       setOrDelete(sp, 'readinessStatus', state.readinessStatus);
@@ -158,6 +162,7 @@ export function VenuesListPage() {
         sourceType: vf.sourceType || undefined,
         importSource: vf.importSource || undefined,
         needsReview: vf.needsReviewOnly ? true : undefined,
+        isHiddenGem: vf.hiddenGemOnly ? true : undefined,
         hasMergeTarget: vf.hasMergeTarget === 'yes' ? true : vf.hasMergeTarget === 'no' ? false : undefined,
         venuePageWhitelist: vf.whitelist === 'yes' ? true : vf.whitelist === 'no' ? false : undefined,
         readinessStatus: vf.readinessStatus || undefined,
@@ -329,6 +334,17 @@ export function VenuesListPage() {
             Требует проверки
           </label>
           <label className="mt-1 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={vf.hiddenGemOnly}
+              onChange={(e) => {
+                setVf({ hiddenGemOnly: e.target.checked }, { history: 'replace' });
+                list.setPageReplace(1);
+              }}
+            />
+            Hidden gems
+          </label>
+          <label className="mt-1 flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Merge target</span>
             <select
               className="h-8 rounded-md border border-input bg-background px-1 text-xs"
@@ -422,7 +438,8 @@ function VenueListRow({ row }: { row: AdminVenueCandidateRow }) {
   const signals = row.readinessKeySignals ?? [];
   const active = row.activeEventsCount ?? 0;
   const future = row.futureEventsCount ?? 0;
-  const rel = row.relatedEventsCount ?? row.eventsCount;  return (
+  const rel = row.relatedEventsCount ?? row.eventsCount;
+  return (
     <tr className="border-b last:border-0 hover:bg-muted/30">
       <td className="align-top px-3 py-3">
         <div className="font-medium leading-snug">
@@ -433,6 +450,8 @@ function VenueListRow({ row }: { row: AdminVenueCandidateRow }) {
         <div className="mt-0.5 text-xs text-muted-foreground">
           {row.city.name}
           {row.displayAddress ? ` · ${row.displayAddress}` : ''}
+          {row.district ? ` · ${row.district}` : ''}
+          {row.metro ? ` · м. ${row.metro}` : ''}
         </div>
         <div className="mt-1 font-mono text-[11px] text-muted-foreground">{row.slug}</div>
       </td>
@@ -442,6 +461,14 @@ function VenueListRow({ row }: { row: AdminVenueCandidateRow }) {
             {rs ?? '—'}
           </Badge>
           <Badge variant="default">{venueLifecycleLabelRu(row.lifecycleStatus)}</Badge>
+          {row.isHiddenGem ? (
+            <Badge
+              variant="outline"
+              className="border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-800 dark:text-fuchsia-200"
+            >
+              Hidden gem
+            </Badge>
+          ) : null}
           {row.needsReview ? (
             <Badge variant="outline" className="border-amber-500/50">
               Проверка

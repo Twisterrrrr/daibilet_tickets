@@ -79,6 +79,15 @@ const StaffUsersListPage = React.lazy(() =>
 );
 const LogsPage = React.lazy(() => import('@/modules/logs/pages/LogsPage').then((m) => ({ default: m.LogsPage })));
 const SettingsPage = React.lazy(() => import('@/modules/settings/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const GeoDictionariesPage = React.lazy(() =>
+  import('@/modules/geo/pages/GeoDictionariesPage').then((m) => ({ default: m.GeoDictionariesPage })),
+);
+const RoutesListPage = React.lazy(() =>
+  import('@/modules/routes/pages/RoutesListPage').then((m) => ({ default: m.RoutesListPage })),
+);
+const RoutePointsPage = React.lazy(() =>
+  import('@/modules/routes/pages/RoutePointsPage').then((m) => ({ default: m.RoutePointsPage })),
+);
 const ModerationPage = React.lazy(() =>
   import('@/modules/moderation/pages/ModerationPage').then((m) => ({ default: m.ModerationPage })),
 );
@@ -106,6 +115,9 @@ export default function App() {
 
               <Route path="cities" element={<CitiesListPage />} />
               <Route path="cities/:id" element={<CityDetailPage />} />
+
+              <Route path="routes" element={<RoutesListPage />} />
+              <Route path="routes/:routeId/points" element={<RoutePointsPage />} />
 
               <Route path="suppliers" element={<SuppliersListPage />} />
               <Route path="suppliers/:id" element={<SupplierDetailPage />} />
@@ -140,6 +152,7 @@ export default function App() {
               <Route path="tickets" element={<TicketsPage />} />
               <Route path="tickets/:id" element={<SupportTicketDetailPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="geo" element={<GeoDictionariesPage />} />
               <Route path="logs" element={<LogsPage />} />
               <Route
                 path="moderation"

@@ -303,6 +303,10 @@ export enum VenueType {
   THEATER = 'THEATER',
   PALACE = 'PALACE',
   PARK = 'PARK',
+  RESTAURANT = 'RESTAURANT',
+  CAFE = 'CAFE',
+  BAR = 'BAR',
+  FASTFOOD = 'FASTFOOD',
 }
 
 export enum DateMode {
@@ -318,6 +322,10 @@ export const VENUE_TYPE_LABELS: Record<VenueType, string> = {
   [VenueType.THEATER]: 'Театр',
   [VenueType.PALACE]: 'Дворец',
   [VenueType.PARK]: 'Парк',
+  [VenueType.RESTAURANT]: 'Ресторан',
+  [VenueType.CAFE]: 'Кафе',
+  [VenueType.BAR]: 'Бар',
+  [VenueType.FASTFOOD]: 'Фастфуд',
 };
 
 export const DATE_MODE_LABELS: Record<DateMode, string> = {
@@ -363,6 +371,22 @@ export const VENUE_COMMISSION_DEFAULTS: Record<VenueType, VenueCommissionConfig>
   [VenueType.PARK]: {
     defaultRate: 15,
     label: 'Парк — ориентир 15%',
+  },
+  [VenueType.RESTAURANT]: {
+    defaultRate: 18,
+    label: 'Ресторан — ориентир 18%',
+  },
+  [VenueType.CAFE]: {
+    defaultRate: 18,
+    label: 'Кафе — ориентир 18%',
+  },
+  [VenueType.BAR]: {
+    defaultRate: 18,
+    label: 'Бар — ориентир 18%',
+  },
+  [VenueType.FASTFOOD]: {
+    defaultRate: 18,
+    label: 'Фастфуд — ориентир 18%',
   },
 };
 
@@ -885,6 +909,7 @@ export interface VenueListItem {
   rating: number;
   reviewCount: number;
   isFeatured?: boolean;
+  isHiddenGem?: boolean;
 }
 
 export interface VenueDetail extends VenueListItem {
