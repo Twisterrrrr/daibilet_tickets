@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { EventOverrideService } from '../admin/event-override.service';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { LandingModule } from '../landing/landing.module';
+import { OrdersModule } from '../orders/orders.module';
 import { ReviewCapabilityService } from '../review/review-capability.service';
 import { EventQualityService } from './event-quality.service';
 import { QUEUE_EMAILS } from '../queue/queue.constants';
@@ -47,7 +48,7 @@ import { CatalogAuditService } from './catalog-audit.service';
 import { CatalogPolicyService } from './catalog-policy.service';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule, IntegrationsModule],
+  imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule, IntegrationsModule, OrdersModule],
   controllers: [CatalogController, SubcategoryCollectionsController, SubcategoryLandingsController],
   providers: [
     CatalogService,
