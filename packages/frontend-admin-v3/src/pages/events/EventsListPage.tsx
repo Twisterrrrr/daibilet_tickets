@@ -12,6 +12,9 @@ import { EventsTable } from '@/modules/events/components/table/EventsTable';
 import { topGroupLabels, type TopGroup } from '@/config/top-groups';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
+import { readBool01, readEnum, readInt, readString } from '@/shared/url-state/parse';
+import { setBool01, setOrDelete } from '@/shared/url-state/serialize';
+import { useUrlState } from '@/shared/url-state/useUrlState';
 
 type CityOption = { slug: string; name: string };
 
@@ -64,9 +67,89 @@ const STATUSES: Array<{ id: string; label: string }> = [
   { id: 'hidden', label: 'Скрытые (override)' },
 ];
 
+function readIntOrNull(sp: URLSearchParams, key: string): number | null {
+  const raw = sp.get(key);
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.floor(n) : null;
+}
+
+type EventsListUrlExtras = {
+  quick: string;
+  section: '' | TopGroup;
+  subcategory: string;
+  hasNoSubcategory: boolean;
+  hasMultipleSubcategories: boolean;
+  isPast: boolean;
+  isArchived: boolean;
+  pastDays: number | null;
+  sortBy: 'updatedAt' | 'title' | 'city' | 'source';
+  sortDir: 'asc' | 'desc';
+  operator: string;
+  hasFutureSessions: '' | 'true' | 'false';
+  hasCategoryPrices: '' | 'true' | 'false';
+  filtersOpen: boolean;
+};
+
 export function EventsListPage() {
   const list = useListPageState();
   const qc = useQueryClient();
+  const { state: ef, setState: setEf, reset: resetEf } = useUrlState<EventsListUrlExtras>({
+    defaults: {
+      quick: 'all',
+      section: '',
+      subcategory: '',
+      hasNoSubcategory: false,
+      hasMultipleSubcategories: false,
+      isPast: false,
+      isArchived: false,
+      pastDays: null,
+      sortBy: 'updatedAt',
+      sortDir: 'desc',
+      operator: '',
+      hasFutureSessions: '',
+      hasCategoryPrices: '',
+      filtersOpen: true,
+    },
+    parse: (sp) => ({
+      quick: readString(sp, 'quick', 'all'),
+      section: readString(sp, 'section', '') as '' | TopGroup,
+      subcategory: readString(sp, 'subcategory', ''),
+      hasNoSubcategory: readBool01(sp, 'hasNoSubcategory') ?? false,
+      hasMultipleSubcategories: readBool01(sp, 'hasMultipleSubcategories') ?? false,
+      isPast: readBool01(sp, 'isPast') ?? false,
+      isArchived: readBool01(sp, 'isArchived') ?? false,
+      pastDays: readIntOrNull(sp, 'pastDays'),
+      sortBy: readEnum(sp, 'sortBy', ['updatedAt' as const, 'title', 'city', 'source'], 'updatedAt'),
+      sortDir: readEnum(sp, 'sortDir', ['asc' as const, 'desc'], 'desc'),
+      operator: readString(sp, 'operator', ''),
+      hasFutureSessions: readEnum(sp, 'hasFutureSessions', ['' as const, 'true', 'false'], ''),
+      hasCategoryPrices: readEnum(sp, 'hasCategoryPrices', ['' as const, 'true', 'false'], ''),
+      filtersOpen: (readBool01(sp, 'filtersOpen') ?? true) === true,
+    }),
+    serialize: (s, sp) => {
+      setOrDelete(sp, 'quick', s.quick !== 'all' ? s.quick : '');
+      setOrDelete(sp, 'section', s.section);
+      setOrDelete(sp, 'subcategory', s.subcategory);
+      setBool01(sp, 'hasNoSubcategory', s.hasNoSubcategory, false);
+      setBool01(sp, 'hasMultipleSubcategories', s.hasMultipleSubcategories, false);
+      setBool01(sp, 'isPast', s.isPast, false);
+      setBool01(sp, 'isArchived', s.isArchived, false);
+      if (s.pastDays != null) sp.set('pastDays', String(s.pastDays));
+      else sp.delete('pastDays');
+      if (s.sortBy !== 'updatedAt') sp.set('sortBy', s.sortBy);
+      else sp.delete('sortBy');
+      if (s.sortDir !== 'desc') sp.set('sortDir', s.sortDir);
+      else sp.delete('sortDir');
+      setOrDelete(sp, 'operator', s.operator);
+      setOrDelete(sp, 'hasFutureSessions', s.hasFutureSessions);
+      setOrDelete(sp, 'hasCategoryPrices', s.hasCategoryPrices);
+      // filtersOpen: omit when open=true; write 0 when closed
+      if (s.filtersOpen) sp.delete('filtersOpen');
+      else sp.set('filtersOpen', '0');
+      return sp;
+    },
+  });
 
   const [batchOpen, setBatchOpen] = React.useState<boolean>(false);
   const [batchConfirmOpen, setBatchConfirmOpen] = React.useState<boolean>(false);
@@ -78,20 +161,20 @@ export function EventsListPage() {
   const [batchError, setBatchError] = React.useState<string | null>(null);
   const [batchResult, setBatchResult] = React.useState<BatchArchiveDryRunResult | null>(null);
 
-  const [quick, setQuick] = React.useState<string>('all');
-  const [section, setSection] = React.useState<'' | TopGroup>('');
-  const [subcategory, setSubcategory] = React.useState<string>('');
-  const [hasNoSubcategory, setHasNoSubcategory] = React.useState<boolean>(false);
-  const [hasMultipleSubcategories, setHasMultipleSubcategories] = React.useState<boolean>(false);
-  const [showPast, setShowPast] = React.useState<boolean>(false);
-  const [showArchived, setShowArchived] = React.useState<boolean>(false);
-  const [pastDays, setPastDays] = React.useState<number | null>(null);
-  const [filtersOpen, setFiltersOpen] = React.useState<boolean>(true);
-  const [sortBy, setSortBy] = React.useState<'updatedAt' | 'title' | 'city' | 'source'>('updatedAt');
-  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
-  const [operatorSlug, setOperatorSlug] = React.useState<string>('');
-  const [hasFutureSessionsFilter, setHasFutureSessionsFilter] = React.useState<'' | 'true' | 'false'>('');
-  const [hasCategoryPricesFilter, setHasCategoryPricesFilter] = React.useState<'' | 'true' | 'false'>('');
+  const quick = ef.quick;
+  const section = ef.section;
+  const subcategory = ef.subcategory;
+  const hasNoSubcategory = ef.hasNoSubcategory;
+  const hasMultipleSubcategories = ef.hasMultipleSubcategories;
+  const showPast = ef.isPast;
+  const showArchived = ef.isArchived;
+  const pastDays = ef.pastDays;
+  const filtersOpen = ef.filtersOpen;
+  const sortBy = ef.sortBy;
+  const sortDir = ef.sortDir;
+  const operatorSlug = ef.operator;
+  const hasFutureSessionsFilter = ef.hasFutureSessions;
+  const hasCategoryPricesFilter = ef.hasCategoryPrices;
   const [columnsOpen, setColumnsOpen] = React.useState<boolean>(false);
   const [visibleCols, setVisibleCols] = React.useState<string[]>(() => {
     try {
@@ -151,6 +234,9 @@ export function EventsListPage() {
   const active =
     effectiveStatus === 'active' ? 'true' : effectiveStatus === 'inactive' ? 'false' : undefined;
   const hidden = effectiveStatus === 'hidden' ? 'true' : undefined;
+  const missingImage = quick === 'noImage' ? 'true' : undefined;
+  const hasOverride = quick === 'override' ? 'true' : undefined;
+  const issuesPreset = quick === 'apiIssues' ? ('api' as const) : undefined;
 
   const query = useQuery({
     queryKey: [
@@ -161,6 +247,9 @@ export function EventsListPage() {
         pageSize: list.pageSize,
         active,
         hidden,
+        missingImage,
+        hasOverride,
+        issuesPreset,
         city: list.city,
         section,
         subcategory,
@@ -180,6 +269,9 @@ export function EventsListPage() {
         limit: list.pageSize,
         active,
         hidden,
+        missingImage,
+        hasOverride,
+        issuesPreset,
         city: list.city || undefined,
         section: section || undefined,
         subcategory: subcategory || undefined,
@@ -213,15 +305,12 @@ export function EventsListPage() {
   }
 
   function onSort(nextBy: 'updatedAt' | 'title' | 'city' | 'source') {
-    setSortBy((prev) => {
-      if (prev === nextBy) {
-        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-        return prev;
-      }
-      setSortDir('desc');
-      return nextBy;
-    });
-    list.setPage(1);
+    if (sortBy === nextBy) {
+      setEf({ sortDir: sortDir === 'asc' ? 'desc' : 'asc' }, { history: 'replace' });
+    } else {
+      setEf({ sortBy: nextBy, sortDir: 'desc' }, { history: 'replace' });
+    }
+    list.setPageReplace(1);
   }
 
   const quickItems: QuickFilterItem[] = [
@@ -230,10 +319,10 @@ export function EventsListPage() {
     { id: 'archived', label: 'Архив' },
     { id: 'past7', label: 'Прошедшие 7 дней' },
     { id: 'past30', label: 'Прошедшие 30 дней' },
-    { id: 'apiIssues', label: 'Ошибки API', disabled: true },
-    { id: 'seoIssues', label: 'SEO-проблемы', disabled: true },
-    { id: 'override', label: 'Override', disabled: true },
-    { id: 'noImage', label: 'Без фото', disabled: true },
+    { id: 'apiIssues', label: 'Критичные проблемы (gate)' },
+    { id: 'seoIssues', label: 'Не индексируется' },
+    { id: 'override', label: 'Есть override' },
+    { id: 'noImage', label: 'Без фото' },
   ];
 
   const items = query.data?.items ?? [];
@@ -550,29 +639,46 @@ export function EventsListPage() {
         items={quickItems}
         activeId={quick}
         onChange={(id) => {
-          setQuick(id);
+          setEf({ quick: id }, { history: 'replace' });
           if (id === 'archived') {
-            setShowArchived(true);
-            setShowPast(false);
-            setPastDays(null);
+            setEf(
+              { isArchived: true, isPast: false, pastDays: null, hasFutureSessions: '', hasCategoryPrices: '' },
+              { history: 'replace' },
+            );
           } else if (id === 'past7') {
-            setShowArchived(false);
-            setShowPast(true);
-            setPastDays(7);
+            setEf(
+              { isArchived: false, isPast: true, pastDays: 7, hasFutureSessions: '', hasCategoryPrices: '' },
+              { history: 'replace' },
+            );
           } else if (id === 'past30') {
-            setShowArchived(false);
-            setShowPast(true);
-            setPastDays(30);
+            setEf(
+              { isArchived: false, isPast: true, pastDays: 30, hasFutureSessions: '', hasCategoryPrices: '' },
+              { history: 'replace' },
+            );
           } else if (id === 'active') {
-            setShowArchived(false);
-            setShowPast(false);
-            setPastDays(null);
+            setEf(
+              { isArchived: false, isPast: false, pastDays: null, hasFutureSessions: '', hasCategoryPrices: '' },
+              { history: 'replace' },
+            );
+          } else if (id === 'seoIssues') {
+            setEf(
+              {
+                isArchived: false,
+                isPast: false,
+                pastDays: null,
+                // Interpret "SEO issues" minimally as "not indexable" => no future sessions.
+                hasFutureSessions: 'false',
+                hasCategoryPrices: '',
+              },
+              { history: 'replace' },
+            );
           } else {
-            setShowArchived(false);
-            setShowPast(false);
-            setPastDays(null);
+            setEf(
+              { isArchived: false, isPast: false, pastDays: null, hasFutureSessions: '', hasCategoryPrices: '' },
+              { history: 'replace' },
+            );
           }
-          list.setPage(1);
+          list.setPageReplace(1);
         }}
       />
 
@@ -580,7 +686,7 @@ export function EventsListPage() {
         <button
           type="button"
           className="flex w-full items-center justify-between gap-3 text-left"
-          onClick={() => setFiltersOpen((v) => !v)}
+          onClick={() => setEf({ filtersOpen: !filtersOpen }, { history: 'replace' })}
           aria-expanded={filtersOpen}
         >
           <div className="text-sm font-medium">Фильтры</div>
@@ -589,6 +695,19 @@ export function EventsListPage() {
 
         {filtersOpen ? (
           <div className="mt-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  list.reset();
+                  resetEf({ history: 'replace' });
+                }}
+              >
+                Сбросить все фильтры
+              </Button>
+            </div>
             <FilterBar>
               <FilterField label="Поиск">
                 <SearchInput
@@ -615,8 +734,8 @@ export function EventsListPage() {
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   value={operatorSlug}
                   onChange={(e) => {
-                    setOperatorSlug(e.target.value);
-                    list.setPage(1);
+                    setEf({ operator: e.target.value }, { history: 'replace' });
+                    list.setPageReplace(1);
                   }}
                 >
                   <option value="">Все</option>
@@ -646,8 +765,8 @@ export function EventsListPage() {
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   value={hasFutureSessionsFilter}
                   onChange={(e) => {
-                    setHasFutureSessionsFilter(e.target.value as '' | 'true' | 'false');
-                    list.setPage(1);
+                    setEf({ hasFutureSessions: e.target.value as '' | 'true' | 'false' }, { history: 'replace' });
+                    list.setPageReplace(1);
                   }}
                 >
                   <option value="">Все</option>
@@ -660,8 +779,8 @@ export function EventsListPage() {
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   value={hasCategoryPricesFilter}
                   onChange={(e) => {
-                    setHasCategoryPricesFilter(e.target.value as '' | 'true' | 'false');
-                    list.setPage(1);
+                    setEf({ hasCategoryPrices: e.target.value as '' | 'true' | 'false' }, { history: 'replace' });
+                    list.setPageReplace(1);
                   }}
                 >
                   <option value="">Все</option>
@@ -674,8 +793,8 @@ export function EventsListPage() {
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   value={section}
                   onChange={(e) => {
-                    setSection(e.target.value as '' | TopGroup);
-                    list.setPage(1);
+                    setEf({ section: e.target.value as '' | TopGroup }, { history: 'replace' });
+                    list.setPageReplace(1);
                   }}
                 >
                   {TOP_GROUPS.map((g) => (
@@ -690,8 +809,8 @@ export function EventsListPage() {
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   value={subcategory}
                   onChange={(e) => {
-                    setSubcategory(e.target.value);
-                    list.setPage(1);
+                    setEf({ subcategory: e.target.value }, { history: 'replace' });
+                    list.setPageReplace(1);
                   }}
                 >
                   <option value="">Все</option>
@@ -714,9 +833,11 @@ export function EventsListPage() {
                       checked={hasNoSubcategory}
                       onChange={(e) => {
                         const next = e.target.checked;
-                        setHasNoSubcategory(next);
-                        if (next) setHasMultipleSubcategories(false);
-                        list.setPage(1);
+                        setEf(
+                          { hasNoSubcategory: next, hasMultipleSubcategories: next ? false : hasMultipleSubcategories },
+                          { history: 'replace' },
+                        );
+                        list.setPageReplace(1);
                       }}
                     />
                     Да
@@ -731,9 +852,11 @@ export function EventsListPage() {
                       checked={hasMultipleSubcategories}
                       onChange={(e) => {
                         const next = e.target.checked;
-                        setHasMultipleSubcategories(next);
-                        if (next) setHasNoSubcategory(false);
-                        list.setPage(1);
+                        setEf(
+                          { hasMultipleSubcategories: next, hasNoSubcategory: next ? false : hasNoSubcategory },
+                          { history: 'replace' },
+                        );
+                        list.setPageReplace(1);
                       }}
                     />
                     Да

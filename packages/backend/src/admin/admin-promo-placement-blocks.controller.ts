@@ -7,6 +7,7 @@ import { AuditInterceptor } from './audit.interceptor';
 import { AdminPromoPlacementBlocksService } from './admin-promo-placement-blocks.service';
 import {
   AdminPromoPlacementBlocksQueryDto,
+  AdminPromoPlacementResolvedPreviewQueryDto,
   CreatePromoPlacementBlockDto,
   UpdatePromoPlacementBlockDto,
 } from './dto/admin-promo-placement-block.dto';
@@ -27,6 +28,14 @@ export class AdminPromoPlacementBlocksController {
   @Get(':id')
   async getById(@Param('id') id: string) {
     return this.service.getById(id);
+  }
+
+  @Get(':id/resolved-preview')
+  async resolvedPreview(
+    @Param('id') id: string,
+    @Query() query: AdminPromoPlacementResolvedPreviewQueryDto,
+  ) {
+    return this.service.resolvedPreview(id, query);
   }
 
   @Post()

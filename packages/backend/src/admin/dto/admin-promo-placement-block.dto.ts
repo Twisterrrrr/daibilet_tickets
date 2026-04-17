@@ -82,6 +82,55 @@ export class AdminPromoPlacementBlocksQueryDto {
   @IsOptional()
   @IsEnum(['asc', 'desc'] as const)
   order?: 'asc' | 'desc';
+
+  @ApiPropertyOptional({
+    description: 'Computed readiness filter (operator-facing)',
+    enum: ['READY', 'EMPTY', 'SCHEDULED', 'EXPIRED', 'INACTIVE', 'MISCONFIGURED'] as const,
+  })
+  @IsOptional()
+  @IsEnum(['READY', 'EMPTY', 'SCHEDULED', 'EXPIRED', 'INACTIVE', 'MISCONFIGURED'] as const)
+  readiness?: 'READY' | 'EMPTY' | 'SCHEDULED' | 'EXPIRED' | 'INACTIVE' | 'MISCONFIGURED';
+
+  @ApiPropertyOptional({
+    description: 'SEO issues only (diagnostics, not a blocker). Currently applies to EVENT targets.',
+    enum: ['0', '1'] as const,
+  })
+  @IsOptional()
+  @IsEnum(['0', '1'] as const)
+  seoOnly?: '0' | '1';
+}
+
+export class AdminPromoPlacementResolvedPreviewQueryDto {
+  @ApiProperty({ enum: PromoPageScopeType })
+  @IsEnum(PromoPageScopeType)
+  pageScopeType!: PromoPageScopeType;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  cityId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  landingId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  collectionId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  articleId?: string;
+
+  @ApiPropertyOptional({ description: 'How many resolved items to return (top N)' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
 }
 
 export class CreatePromoPlacementBlockDto {

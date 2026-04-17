@@ -151,7 +151,7 @@
 
 | Когда | Фокус |
 |--------|--------|
-| **Сейчас** | **Canonical Venues:** реализовать список `/admin-v3/venues` (сейчас заглушка), расширить карточку; параллельно — **стабильность импорта** TC/Teplohod. **Venue candidates:** крупные пункты (2.2, 3.1, 2.3) закрыты; при необходимости — **2.1** (confidence/sorting UX). **Events:** вкладки цен/расписания, явный publish + выравнивание с quality gate. |
+| **Сейчас** | **Canonical Venues:** довести карточку до DoD (actions active/published + supplier/geo по API); параллельно — **стабильность импорта** TC/Teplohod. **Venue candidates:** крупные пункты (2.2, 3.1, 2.3) закрыты; при необходимости — **2.1** (confidence/sorting UX). **Events:** явный publish/unpublish (через quality gate) + UX по quick-filters/quality. |
 | **Затем** | **Canonical Venues** довести до DoD (связи, supplier read-only, поля) |
 | **Затем** | **Events** до production + **quality gate** на публикации |
 | **Затем** | Запуск витрины / итерации по данным |
@@ -170,10 +170,13 @@ _Последнее обновление: 2026-04-13 — по состоянию
 | Область | Статус |
 |--------|--------|
 | **`/admin-v3/venues/candidates`** | Рабочий поток: фильтры, similar batch, single approve / merge / reject, **batch approve через preview** и `items` + `expectedUpdatedAt`, batch reject с **reasonCode/reasonText**, decision hints, отображение stale в UI. |
-| **`/admin-v3/venues` (список)** | **`StubPage`** — критичный пробел для Фазы 1 (canonical venues list). |
+| **`/admin-v3/venues` (список)** | Реализовано: таблица + фильтры/сортировки + readiness/hub snapshot. |
 | **`/admin-v3/venues/:id`** | Базовая **read-only** карточка (поля, город, источник, публикация), ссылки на **события площадки** и **префильтр кандидатов**. Нет блока **supplier**, нет **geo**, нет полноценных **actions** по active/published на карточке. |
-| **`/admin-v3/events`** | Список развит (фильтры, batch archive и т.д.). |
-| **`/admin-v3/events/:id`** | Summary/readiness/**качество**, ссылка на **venue**, сохранение **архива** и **подкатегорий**. Вкладки **«Цены»**, **«Расписание»**, **«Техническое»** — **заглушки**. Явного UI **publish/unpublish / isActive** в карточке не видно (есть отображение `publishStatus`). |
+| **`/admin-v3/events`** | Список развит (фильтры, batch archive и т.д.). **URL-state** для quick-filters и доп. фильтров — ✅ (можно шарить ссылку / back-forward). |
+| **`/admin-v3/events/:id`** | Summary/readiness/**качество**, связь с **venue**, сохранение **архива** и **подкатегорий**. Добавлены явные **publish/unpublish** (через quality gate) с отображением результата gate/quality. |
+| **`/admin-v3/promo-blocks`** | Управление витриной: list + create/edit + delete, **toggle active** из списка, порядок (priority/sortOrder), scope/таргетинг и AUTO-подбор (selectionMode/auto*). |
+| **`/admin-v3/moderation`** | Очередь как entry-point по events: URL-state (status/sort/page), deep-links в event/supplier, быстрые approve/reject + «Открыть». |
+| **`/admin-v3/reviews`** | Операционный экран: фильтр status, URL-state (tab/status/eventId/page), deep-links в event/venue, approve/reject/delete, supplier responses, disputes. |
 | **Импорт (backend)** | Сервисы вроде `venue-import` и интеграции с источниками есть; **операционная стабильность** sync TC/Teplohod проверяется прогонами, не только кодом. |
 
 ### Чеклист (актуализировать в начале спринта)
@@ -191,13 +194,14 @@ _Последнее обновление: 2026-04-13 — по состоянию
 
 **3. Canonical Venues — следующий крупный блок**
 
-- [ ] Заменить заглушку: реальный **`/admin-v3/venues`** (таблица, поиск/фильтры минимум).
+- [x] Реальный **`/admin-v3/venues`** (таблица, поиск/фильтры минимум).
 - [ ] Доработать **`/admin-v3/venues/:id`**: **supplier (read-only)**, **geo** (если есть в API), действия по **active / published** согласно контракту backend.
 
 **4. Events — до production по roadmap**
 
-- [ ] Реализовать вкладки **Цены** и **Расписание** (сейчас заглушки) — минимум для контроля витрины.
-- [ ] Явные **publish / unpublish** и/или **`isActive`** — по API; согласовать с **readiness** и правилами публикации.
+- [ ] Реализовать вкладки **Цены** и **Расписание** (минимум для контроля витрины; если уже есть — добить до DoD).
+- [x] Явные **publish / unpublish** — через `/admin/events/:id/publish` + `/admin/events/:id/unpublish`, с отображением gate/quality результата.
+- [x] **Events list filters:** quick-filters и доп. фильтры синхронизированы с URL (init + update + reset).
 - [ ] **Quality gate:** нет venue / нет цены / нет будущих сессий → нельзя опубликовать (единые правила UI + backend).
 
 ---

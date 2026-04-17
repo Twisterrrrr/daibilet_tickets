@@ -137,6 +137,7 @@ export enum EventSubcategory {
   CONTEMPORARY = 'CONTEMPORARY',
   // EVENT
   CONCERT = 'CONCERT',
+  JAZZ = 'JAZZ',
   SHOW = 'SHOW',
   STANDUP = 'STANDUP',
   THEATER = 'THEATER',
@@ -739,6 +740,7 @@ export const SUBCATEGORY_LABELS: Record<EventSubcategory, string> = {
   [EventSubcategory.CONTEMPORARY]: 'Современное искусство',
   // EVENT
   [EventSubcategory.CONCERT]: 'Концерт',
+  [EventSubcategory.JAZZ]: 'Джаз',
   [EventSubcategory.SHOW]: 'Шоу',
   [EventSubcategory.STANDUP]: 'Стендап',
   [EventSubcategory.THEATER]: 'Театр',
@@ -772,6 +774,7 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<EventCategory, EventSubcategory[]
   ],
   [EventCategory.EVENT]: [
     EventSubcategory.CONCERT,
+    EventSubcategory.JAZZ,
     EventSubcategory.SHOW,
     EventSubcategory.STANDUP,
     EventSubcategory.THEATER,
@@ -820,6 +823,7 @@ export const QUICK_FILTERS: Record<string, QuickFilter[]> = {
   ],
   EVENT: [
     { id: 'concert', emoji: '🎵', label: 'Концерты', params: { subcategory: 'CONCERT' } },
+    { id: 'jazz', emoji: '🎷', label: 'Джаз', params: { subcategory: 'JAZZ' } },
     { id: 'theater', emoji: '🎭', label: 'Театр', params: { subcategory: 'THEATER' } },
     { id: 'standup', emoji: '😂', label: 'Стендап', params: { subcategory: 'STANDUP' } },
     { id: 'show', emoji: '🎪', label: 'Шоу', params: { subcategory: 'SHOW' } },

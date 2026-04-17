@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useListPageState } from '@/hooks/useListPageState';
 import { fetchAdminSuppliersList, type AdminSupplierListItem } from '@/modules/suppliers/api/suppliers';
+import { readBool01, readEnum } from '@/shared/url-state/parse';
+import { setBool01, setOrDelete } from '@/shared/url-state/serialize';
+import { useUrlState } from '@/shared/url-state/useUrlState';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link } from 'react-router-dom';
@@ -26,6 +29,15 @@ const TRUST: Array<{ id: '' | '0' | '1' | '2' | '3'; label: string }> = [
   { id: '2', label: 'VERIFIED (2)' },
   { id: '3', label: 'TRUSTED (3)' },
 ];
+
+type SuppliersListUrlFilters = {
+  readinessStatus: '' | 'READY' | 'NEEDS_WORK' | 'BLOCKED';
+  trustLevel: '' | '0' | '1' | '2' | '3';
+  isActive: '' | 'yes' | 'no';
+  hasBlockedEvents: boolean;
+  hasNoUsers: boolean;
+  hasLegalIssue: boolean;
+};
 
 function formatDt(iso: string): string {
   const d = new Date(iso);
@@ -47,12 +59,33 @@ function readinessBadgeClass(s: string | undefined): string {
 
 export function SuppliersListPage() {
   const list = useListPageState();
-  const [readinessStatus, setReadinessStatus] = React.useState<'' | 'READY' | 'NEEDS_WORK' | 'BLOCKED'>('');
-  const [trustLevel, setTrustLevel] = React.useState<'' | '0' | '1' | '2' | '3'>('');
-  const [isActive, setIsActive] = React.useState<'' | 'yes' | 'no'>('');
-  const [hasBlockedEvents, setHasBlockedEvents] = React.useState(false);
-  const [hasNoUsers, setHasNoUsers] = React.useState(false);
-  const [hasLegalIssue, setHasLegalIssue] = React.useState(false);
+  const { state: sf, setState: setSf } = useUrlState<SuppliersListUrlFilters>({
+    defaults: {
+      readinessStatus: '',
+      trustLevel: '',
+      isActive: '',
+      hasBlockedEvents: false,
+      hasNoUsers: false,
+      hasLegalIssue: false,
+    },
+    parse: (sp) => ({
+      readinessStatus: readEnum(sp, 'readinessStatus', ['' as const, 'READY', 'NEEDS_WORK', 'BLOCKED'], ''),
+      trustLevel: readEnum(sp, 'trustLevel', ['' as const, '0', '1', '2', '3'], ''),
+      isActive: readEnum(sp, 'isActive', ['' as const, 'yes', 'no'], ''),
+      hasBlockedEvents: readBool01(sp, 'hasBlockedEvents') ?? false,
+      hasNoUsers: readBool01(sp, 'hasNoUsers') ?? false,
+      hasLegalIssue: readBool01(sp, 'hasLegalIssue') ?? false,
+    }),
+    serialize: (state, sp) => {
+      setOrDelete(sp, 'readinessStatus', state.readinessStatus);
+      setOrDelete(sp, 'trustLevel', state.trustLevel);
+      setOrDelete(sp, 'isActive', state.isActive);
+      setBool01(sp, 'hasBlockedEvents', state.hasBlockedEvents, false);
+      setBool01(sp, 'hasNoUsers', state.hasNoUsers, false);
+      setBool01(sp, 'hasLegalIssue', state.hasLegalIssue, false);
+      return sp;
+    },
+  });
 
   const q = useQuery({
     queryKey: [
@@ -61,12 +94,7 @@ export function SuppliersListPage() {
         q: list.debouncedQ,
         page: list.page,
         pageSize: list.pageSize,
-        readinessStatus,
-        trustLevel,
-        isActive,
-        hasBlockedEvents,
-        hasNoUsers,
-        hasLegalIssue,
+        ...sf,
       },
     ],
     queryFn: () =>
@@ -74,12 +102,12 @@ export function SuppliersListPage() {
         page: list.page,
         limit: list.pageSize,
         search: list.debouncedQ || undefined,
-        readinessStatus: readinessStatus || undefined,
-        trustLevel: trustLevel === '' ? undefined : Number(trustLevel),
-        isActive: isActive === 'yes' ? true : isActive === 'no' ? false : undefined,
-        hasBlockedEvents: hasBlockedEvents || undefined,
-        hasNoUsers: hasNoUsers || undefined,
-        hasLegalIssue: hasLegalIssue || undefined,
+        readinessStatus: sf.readinessStatus || undefined,
+        trustLevel: sf.trustLevel === '' ? undefined : Number(sf.trustLevel),
+        isActive: sf.isActive === 'yes' ? true : sf.isActive === 'no' ? false : undefined,
+        hasBlockedEvents: sf.hasBlockedEvents || undefined,
+        hasNoUsers: sf.hasNoUsers || undefined,
+        hasLegalIssue: sf.hasLegalIssue || undefined,
       }),
     placeholderData: (p) => p,
   });
@@ -113,10 +141,10 @@ export function SuppliersListPage() {
         <FilterField label="Готовность">
           <select
             className="h-9 w-full min-w-[160px] rounded-md border border-input bg-background px-2 text-sm"
-            value={readinessStatus}
+            value={sf.readinessStatus}
             onChange={(e) => {
-              setReadinessStatus((e.target.value || '') as typeof readinessStatus);
-              list.setPage(1);
+              setSf({ readinessStatus: (e.target.value || '') as typeof sf.readinessStatus }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             {READINESS.map((x) => (
@@ -129,10 +157,10 @@ export function SuppliersListPage() {
         <FilterField label="Trust level">
           <select
             className="h-9 w-full min-w-[140px] rounded-md border border-input bg-background px-2 text-sm"
-            value={trustLevel}
+            value={sf.trustLevel}
             onChange={(e) => {
-              setTrustLevel((e.target.value || '') as typeof trustLevel);
-              list.setPage(1);
+              setSf({ trustLevel: (e.target.value || '') as typeof sf.trustLevel }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             {TRUST.map((x) => (
@@ -145,10 +173,10 @@ export function SuppliersListPage() {
         <FilterField label="Активность">
           <select
             className="h-9 w-full min-w-[120px] rounded-md border border-input bg-background px-2 text-sm"
-            value={isActive}
+            value={sf.isActive}
             onChange={(e) => {
-              setIsActive(e.target.value as '' | 'yes' | 'no');
-              list.setPage(1);
+              setSf({ isActive: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             <option value="">Все</option>
@@ -161,10 +189,10 @@ export function SuppliersListPage() {
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
-                checked={hasBlockedEvents}
+                checked={sf.hasBlockedEvents}
                 onChange={() => {
-                  setHasBlockedEvents((v) => !v);
-                  list.setPage(1);
+                  setSf({ hasBlockedEvents: !sf.hasBlockedEvents }, { history: 'replace' });
+                  list.setPageReplace(1);
                 }}
               />
               Есть REJECTED события
@@ -172,10 +200,10 @@ export function SuppliersListPage() {
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
-                checked={hasNoUsers}
+                checked={sf.hasNoUsers}
                 onChange={() => {
-                  setHasNoUsers((v) => !v);
-                  list.setPage(1);
+                  setSf({ hasNoUsers: !sf.hasNoUsers }, { history: 'replace' });
+                  list.setPageReplace(1);
                 }}
               />
               Нет пользователей кабинета
@@ -183,10 +211,10 @@ export function SuppliersListPage() {
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
-                checked={hasLegalIssue}
+                checked={sf.hasLegalIssue}
                 onChange={() => {
-                  setHasLegalIssue((v) => !v);
-                  list.setPage(1);
+                  setSf({ hasLegalIssue: !sf.hasLegalIssue }, { history: 'replace' });
+                  list.setPageReplace(1);
                 }}
               />
               Юр. профиль с проблемами
@@ -249,9 +277,7 @@ function SupplierListRow({ row }: { row: AdminSupplierListItem }) {
   const score = row.readinessScore;
   const signals = row.readinessKeySignals ?? [];
   const st = row.stats;
-  const eventsHref = `/admin-v3/events?operator=${encodeURIComponent(row.slug)}`;
-
-  return (
+  const eventsHref = `/admin-v3/events?operator=${encodeURIComponent(row.slug)}`;  return (
     <tr className="border-b last:border-0 hover:bg-muted/30">
       <td className="align-top px-3 py-3">
         <div className="font-medium leading-snug">

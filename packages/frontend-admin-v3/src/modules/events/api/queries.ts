@@ -47,6 +47,9 @@ export type AdminEventsListParams = {
   source?: string;
   active?: 'true' | 'false';
   hidden?: 'true' | 'false';
+  missingImage?: 'true';
+  hasOverride?: 'true';
+  issuesPreset?: 'api';
   section?: 'events' | 'excursions' | 'museums' | 'activities' | 'entertainment';
   subcategory?: string;
   hasNoSubcategory?: 'true' | 'false';
@@ -72,6 +75,9 @@ export async function fetchAdminEventsList(params: AdminEventsListParams) {
   if (params.source) sp.set('source', params.source);
   if (params.active) sp.set('active', params.active);
   if (params.hidden) sp.set('hidden', params.hidden);
+  if (params.missingImage) sp.set('missingImage', params.missingImage);
+  if (params.hasOverride) sp.set('hasOverride', params.hasOverride);
+  if (params.issuesPreset) sp.set('issuesPreset', params.issuesPreset);
   if (params.section) sp.set('section', params.section);
   if (params.subcategory) sp.set('subcategory', params.subcategory);
   if (params.hasNoSubcategory) sp.set('hasNoSubcategory', params.hasNoSubcategory);

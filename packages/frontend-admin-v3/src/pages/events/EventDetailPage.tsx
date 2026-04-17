@@ -17,9 +17,16 @@ import { EventMediaTab } from '@/modules/events/components/detail/EventMediaTab'
 import { EventReadinessPanel } from '@/modules/events/components/detail/EventReadinessPanel';
 import { EventScheduleTab } from '@/modules/events/components/detail/EventScheduleTab';
 import { adminApi } from '@/api/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link, useParams } from 'react-router-dom';
+
+type PublishGateCheck = { code: string; status: 'OK' | 'WARNING' | 'BLOCKING'; message: string };
+type PublishGateResult = { result: 'OK' | 'WARNING' | 'BLOCKING'; checks: PublishGateCheck[] };
+
+type PublishEventResult =
+  | { ok: true; gate: PublishGateResult; issues: unknown[] }
+  | { ok: false; gate: PublishGateResult; issues: Array<{ code: string; message: string }> };
 
 export function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -59,6 +66,34 @@ export function EventDetailPage() {
   if (!e) return <LoadingState label="Загрузка события…" />;
   const readiness = summary.data?.readiness;
   const lastSyncAt = summary.data?.integration.lastSyncAt;
+
+  const [publishPanelOpen, setPublishPanelOpen] = React.useState<boolean>(false);
+
+  const publishM = useMutation({
+    mutationFn: async () => {
+      return adminApi.post<PublishEventResult>(`/admin/events/${eventId}/publish`, {});
+    },
+    onSuccess: async () => {
+      setPublishPanelOpen(true);
+      await qc.invalidateQueries({ queryKey: ['admin-event', eventId] });
+      await qc.invalidateQueries({ queryKey: ['admin-event-summary', eventId] });
+      await qc.invalidateQueries({ queryKey: ['admin-events'] });
+    },
+  });
+
+  const unpublishM = useMutation({
+    mutationFn: async () => {
+      return adminApi.post<{ ok: true }>(`/admin/events/${eventId}/unpublish`, {});
+    },
+    onSuccess: async () => {
+      setPublishPanelOpen(false);
+      await qc.invalidateQueries({ queryKey: ['admin-event', eventId] });
+      await qc.invalidateQueries({ queryKey: ['admin-event-summary', eventId] });
+      await qc.invalidateQueries({ queryKey: ['admin-events'] });
+    },
+  });
+
+  const isPublishedInCatalog = (e.override?.editorStatus ?? null) === 'PUBLISHED' || e.publishStatus === 'PUBLISHED';
 
   const [isArchivedDraft, setIsArchivedDraft] = React.useState<boolean>(Boolean(e.isArchived));
   React.useEffect(() => {
@@ -181,6 +216,29 @@ export function EventDetailPage() {
             <Button type="button" variant="outline" asChild>
               <Link to="/admin-v3/events">К списку</Link>
             </Button>
+            {isPublishedInCatalog ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={publishM.isPending || unpublishM.isPending}
+                onClick={() => {
+                  if (!confirm('Снять событие с публикации в каталоге?')) return;
+                  unpublishM.mutate();
+                }}
+                title="Снять публикацию: событие перестанет попадать в витринный каталог"
+              >
+                {unpublishM.isPending ? 'Снимаю…' : 'Снять публикацию'}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                disabled={publishM.isPending || unpublishM.isPending}
+                onClick={() => publishM.mutate()}
+                title="Опубликовать в каталог (пройдёт quality gate)"
+              >
+                {publishM.isPending ? 'Публикую…' : 'Опубликовать'}
+              </Button>
+            )}
             <Button type="button" variant="outline" asChild>
               <a href={previewUrl} target="_blank" rel="noreferrer">
                 Публичная страница
@@ -191,6 +249,61 @@ export function EventDetailPage() {
       />
 
       <SummaryStrip items={summaryItems} />
+
+      {publishM.isError ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {publishM.error instanceof Error ? publishM.error.message : 'Ошибка публикации'}
+        </div>
+      ) : null}
+      {unpublishM.isError ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {unpublishM.error instanceof Error ? unpublishM.error.message : 'Ошибка снятия публикации'}
+        </div>
+      ) : null}
+
+      {publishPanelOpen && publishM.data ? (
+        <div className="rounded-lg border bg-card p-5 text-sm space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-medium">Публикация</div>
+            {'ok' in publishM.data && publishM.data.ok ? (
+              <Badge variant="info">OK</Badge>
+            ) : (
+              <Badge variant="warning">Нельзя опубликовать</Badge>
+            )}
+            <Badge variant="outline">{publishM.data.gate.result}</Badge>
+          </div>
+
+          <div>
+            <div className="text-xs font-medium text-muted-foreground">Gate checks</div>
+            <ul className="mt-2 list-inside list-disc text-xs">
+              {publishM.data.gate.checks.map((c) => (
+                <li key={c.code}>
+                  <span className="font-mono">{c.code}</span> — {c.status}: {c.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {'ok' in publishM.data && !publishM.data.ok && publishM.data.issues?.length ? (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">Quality issues</div>
+              <ul className="mt-2 list-inside list-disc text-xs">
+                {publishM.data.issues.map((i) => (
+                  <li key={`${i.code}:${i.message}`}>
+                    <span className="font-mono">{i.code}</span> — {i.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => setPublishPanelOpen(false)}>
+              Скрыть
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <DetailTabs
         value={tab}

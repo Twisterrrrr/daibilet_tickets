@@ -283,6 +283,9 @@ export class AdminEventsController {
     @Query('operator') operatorSlug?: string,
     @Query('hasFutureSessions') hasFutureSessions?: string,
     @Query('hasCategoryPrices') hasCategoryPrices?: string,
+    @Query('missingImage') missingImage?: string,
+    @Query('hasOverride') hasOverride?: string,
+    @Query('issuesPreset') issuesPreset?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
     const andParts: Prisma.EventWhereInput[] = [{ isDeleted: false }];
@@ -310,6 +313,22 @@ export class AdminEventsController {
     } else if (hidden === 'false') {
       andParts.push({
         OR: [{ override: null }, { override: { isHidden: false } }],
+      });
+    }
+
+    const hasOv = hasOverride === '1' || hasOverride === 'true' || hasOverride === 'yes';
+    if (hasOv) {
+      andParts.push({ NOT: { override: null } });
+    }
+
+    const missingImg =
+      missingImage === '1' || missingImage === 'true' || missingImage === 'yes';
+    if (missingImg) {
+      // Effective image is (override.imageUrl ?? event.imageUrl)
+      // Missing iff event.imageUrl is null AND (override is null OR override.imageUrl is null)
+      andParts.push({
+        imageUrl: null,
+        OR: [{ override: null }, { override: { imageUrl: null } }],
       });
     }
 
@@ -414,6 +433,20 @@ export class AdminEventsController {
           none: futureSessionsWhere,
           some: { startsAt: { gte: from, lt: now } },
         },
+      });
+    }
+
+    const preset = (issuesPreset ?? '').trim().toLowerCase();
+    if (preset === 'api') {
+      // Operational issues that block a storefront-safe publish.
+      andParts.push({
+        OR: [
+          { venueId: null },
+          { subcategoryLinks: { none: {} } },
+          { offers: { none: { isDeleted: false, status: OfferStatus.ACTIVE, priceFrom: { gt: 0 } } } },
+          { sessions: { none: futureSessionsWhereActive } },
+          { imageUrl: null, OR: [{ override: null }, { override: { imageUrl: null } }] },
+        ],
       });
     }
 
@@ -1972,6 +2005,44 @@ export class AdminEventsController {
     });
 
     return { ok: true, issues: [], gate };
+  }
+
+  /**
+   * Снять событие с публикации в каталоге (перевести editorStatus в NEEDS_REVIEW).
+   *
+   * POST /admin/events/:id/unpublish
+   */
+  @Post(':id/unpublish')
+  @Roles('ADMIN')
+  async unpublishEvent(@Param('id') eventId: string, @Request() req: { user: { id: string } }) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true },
+    });
+    if (!event) {
+      throw new NotFoundException('Событие не найдено');
+    }
+
+    await this.prisma.eventOverride.upsert({
+      where: { eventId },
+      create: {
+        eventId,
+        editorStatus: 'NEEDS_REVIEW',
+        updatedBy: req.user.id,
+        needsReviewAt: new Date(),
+      },
+      update: {
+        editorStatus: 'NEEDS_REVIEW',
+        updatedBy: req.user.id,
+        needsReviewAt: new Date(),
+      },
+    });
+
+    await this.audit.log(req.user.id, 'UPDATE', 'EventUnpublish', eventId, undefined, {
+      editorStatus: 'NEEDS_REVIEW',
+    });
+
+    return { ok: true };
   }
 
   private async getSessionWithEvent(sessionId: string) {

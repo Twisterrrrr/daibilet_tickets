@@ -58,6 +58,7 @@ const SUBCATEGORIES: SeedRow[] = [
   { code: 'QUESTS', slug: 'quests', nameRu: 'Квесты', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 85 },
 
   { code: 'CONCERT', slug: 'concerts', nameRu: 'Концерты', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 110 },
+  { code: 'JAZZ', slug: 'jazz', nameRu: 'Джаз', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 112 },
   { code: 'THEATER', slug: 'theater', nameRu: 'Театр', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 115 },
   { code: 'SHOW', slug: 'shows', nameRu: 'Шоу', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 120 },
   { code: 'STANDUP', slug: 'standup', nameRu: 'Стендап', type: 'EVENT_ONLY', layer: 'PRIMARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 130 },

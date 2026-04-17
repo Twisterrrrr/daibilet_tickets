@@ -58,6 +58,7 @@ export const navigation: NavSection[] = [
       { label: 'Подборки', to: 'collections', icon: FolderOpen, feature: null },
       { label: 'Лендинги', to: 'landings', icon: LayoutTemplate, feature: null },
       { label: 'Промо-блоки', to: 'promo-blocks', icon: BarChart3, feature: null },
+      { label: 'Промо-размещения', to: 'promo-placement-blocks', icon: BarChart3, feature: null },
     ],
   },
   {

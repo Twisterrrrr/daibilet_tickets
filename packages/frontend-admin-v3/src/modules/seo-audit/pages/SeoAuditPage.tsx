@@ -6,16 +6,62 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { adminApi } from '@/api/client';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { readEnum, readInt, readString } from '@/shared/url-state/parse';
+import { setOrDelete } from '@/shared/url-state/serialize';
+import { useUrlState } from '@/shared/url-state/useUrlState';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link } from 'react-router-dom';
 
 export function SeoAuditPage() {
-  const [entityType, setEntityType] = React.useState<'EVENT' | 'VENUE' | 'CITY' | 'ARTICLE' | 'LANDING' | 'COLLECTION'>('EVENT');
-  const [q, setQ] = React.useState('');
-  const [issueCode, setIssueCode] = React.useState('');
-  const [severity, setSeverity] = React.useState<'ALL' | 'ERROR' | 'WARN' | 'INFO'>('ALL');
-  const [page, setPage] = React.useState(1);
+  const { state, setState } = useUrlState({
+    defaults: {
+      tab: 'EVENT' as 'EVENT' | 'VENUE' | 'CITY' | 'ARTICLE' | 'LANDING' | 'COLLECTION',
+      q: '',
+      issueCode: '',
+      severity: 'ALL' as 'ALL' | 'ERROR' | 'WARN' | 'INFO',
+      page: 1,
+    },
+    parse: (sp) => ({
+      tab: readEnum(
+        sp,
+        'tab',
+        ['EVENT' as const, 'VENUE', 'CITY', 'ARTICLE', 'LANDING', 'COLLECTION'],
+        'EVENT',
+      ),
+      q: readString(sp, 'q', ''),
+      issueCode: readString(sp, 'issueCode', ''),
+      severity: readEnum(sp, 'severity', ['ALL' as const, 'ERROR', 'WARN', 'INFO'], 'ALL'),
+      page: readInt(sp, 'page', 1),
+    }),
+    serialize: (s, sp) => {
+      if (s.tab !== 'EVENT') sp.set('tab', s.tab);
+      else sp.delete('tab');
+      setOrDelete(sp, 'issueCode', s.issueCode);
+      if (s.severity !== 'ALL') sp.set('severity', s.severity);
+      else sp.delete('severity');
+      if (s.page !== 1) sp.set('page', String(s.page));
+      else sp.delete('page');
+      // `q` is managed via debounced effect below (still serialize here for reset/back/forward)
+      setOrDelete(sp, 'q', s.q);
+      return sp;
+    },
+  });
+
+  const entityType = state.tab;
+  const [qInput, setQInput] = React.useState(state.q);
+  const debouncedQ = useDebouncedValue(qInput, 250);
+  React.useEffect(() => setQInput(state.q), [state.q]);
+  React.useEffect(() => {
+    if (debouncedQ === state.q) return;
+    setState({ q: debouncedQ, page: 1 }, { history: 'replace' });
+  }, [debouncedQ, setState, state.q]);
+
+  const q = qInput;
+  const issueCode = state.issueCode;
+  const severity = state.severity;
+  const page = state.page;
   const limit = 50;
 
   const summary = useQuery({
@@ -30,14 +76,14 @@ export function SeoAuditPage() {
   });
 
   const issues = useQuery({
-    queryKey: ['seo-audit-unified-issues', { entityType, q, issueCode, severity, page, limit }],
+    queryKey: ['seo-audit-unified-issues', { entityType, q: debouncedQ, issueCode, severity, page, limit }],
     queryFn: async () => {
       const sp = new URLSearchParams();
       sp.set('entityType', entityType);
       sp.set('onlyIssues', 'true');
       sp.set('page', String(page));
       sp.set('limit', String(limit));
-      if (q.trim()) sp.set('search', q.trim());
+      if (debouncedQ.trim()) sp.set('search', debouncedQ.trim());
       if (issueCode.trim()) sp.set('issueCode', issueCode.trim());
       if (severity !== 'ALL') sp.set('severity', severity);
       return adminApi.get<{
@@ -109,8 +155,7 @@ export function SeoAuditPage() {
               className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={entityType}
               onChange={(e) => {
-                setEntityType(e.target.value as any);
-                setPage(1);
+                setState({ tab: e.target.value as any, page: 1 }, { history: 'push' });
               }}
             >
               <option value="EVENT">EVENT</option>
@@ -123,8 +168,8 @@ export function SeoAuditPage() {
             <Input
               value={q}
               onChange={(e) => {
-                setQ(e.target.value);
-                setPage(1);
+                setQInput(e.target.value);
+                setState({ page: 1 }, { history: 'replace' });
               }}
               placeholder="Поиск по названию/slug…"
               className="h-9 w-[320px]"
@@ -132,8 +177,7 @@ export function SeoAuditPage() {
             <Input
               value={issueCode}
               onChange={(e) => {
-                setIssueCode(e.target.value);
-                setPage(1);
+                setState({ issueCode: e.target.value, page: 1 }, { history: 'replace' });
               }}
               placeholder="issueCode (например NO_PRICE)"
               className="h-9 w-[260px] font-mono text-xs"
@@ -142,8 +186,7 @@ export function SeoAuditPage() {
               className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={severity}
               onChange={(e) => {
-                setSeverity(e.target.value as any);
-                setPage(1);
+                setState({ severity: e.target.value as any, page: 1 }, { history: 'replace' });
               }}
             >
               <option value="ALL">Все severity</option>
@@ -161,8 +204,7 @@ export function SeoAuditPage() {
                     type="button"
                     className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
                     onClick={() => {
-                      setIssueCode(c.issueCode);
-                      setPage(1);
+                      setState({ issueCode: c.issueCode, page: 1 }, { history: 'replace' });
                     }}
                     title={`Всего: ${c.total}`}
                   >
@@ -228,7 +270,13 @@ export function SeoAuditPage() {
                 Страница {issues.data.page} / {issues.data.pages} · {issues.data.items.length} items
               </div>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setState({ page: Math.max(1, page - 1) }, { history: 'push' })}
+                >
                   Назад
                 </Button>
                 <Button
@@ -236,7 +284,7 @@ export function SeoAuditPage() {
                   variant="outline"
                   size="sm"
                   disabled={issues.data.pages > 0 ? page >= issues.data.pages : issues.data.items.length < limit}
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => setState({ page: page + 1 }, { history: 'push' })}
                 >
                   Вперёд
                 </Button>

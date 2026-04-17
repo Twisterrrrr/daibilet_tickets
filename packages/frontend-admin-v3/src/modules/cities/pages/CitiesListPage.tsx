@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useListPageState } from '@/hooks/useListPageState';
 import { fetchAdminCitiesList, fetchAdminRegionOptions, type AdminCityListItem } from '@/modules/cities/api/cities';
+import { readBool01, readEnum, readString } from '@/shared/url-state/parse';
+import { setBool01, setOrDelete } from '@/shared/url-state/serialize';
+import { useUrlState } from '@/shared/url-state/useUrlState';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link } from 'react-router-dom';
@@ -18,6 +21,16 @@ const READINESS: Array<{ id: '' | 'READY' | 'NEEDS_WORK' | 'BLOCKED'; label: str
   { id: 'NEEDS_WORK', label: 'Нужна доработка' },
   { id: 'BLOCKED', label: 'Заблокировано' },
 ];
+
+type CityListUrlFilters = {
+  readinessStatus: '' | 'READY' | 'NEEDS_WORK' | 'BLOCKED';
+  regionId: string;
+  isActive: '' | 'yes' | 'no';
+  hasEvents: boolean;
+  hasVenues: boolean;
+  hasLandings: boolean;
+  hasSeo: boolean;
+};
 
 function formatDt(iso: string): string {
   const d = new Date(iso);
@@ -39,13 +52,36 @@ function readinessBadgeClass(s: string | undefined): string {
 
 export function CitiesListPage() {
   const list = useListPageState();
-  const [readinessStatus, setReadinessStatus] = React.useState<'' | 'READY' | 'NEEDS_WORK' | 'BLOCKED'>('');
-  const [regionId, setRegionId] = React.useState('');
-  const [isActive, setIsActive] = React.useState<'' | 'yes' | 'no'>('');
-  const [hasEvents, setHasEvents] = React.useState(false);
-  const [hasVenues, setHasVenues] = React.useState(false);
-  const [hasLandings, setHasLandings] = React.useState(false);
-  const [hasSeo, setHasSeo] = React.useState(false);
+  const { state: cf, setState: setCf } = useUrlState<CityListUrlFilters>({
+    defaults: {
+      readinessStatus: '',
+      regionId: '',
+      isActive: '',
+      hasEvents: false,
+      hasVenues: false,
+      hasLandings: false,
+      hasSeo: false,
+    },
+    parse: (sp) => ({
+      readinessStatus: readEnum(sp, 'readinessStatus', ['' as const, 'READY', 'NEEDS_WORK', 'BLOCKED'], ''),
+      regionId: readString(sp, 'regionId', ''),
+      isActive: readEnum(sp, 'isActive', ['' as const, 'yes', 'no'], ''),
+      hasEvents: readBool01(sp, 'hasEvents') ?? false,
+      hasVenues: readBool01(sp, 'hasVenues') ?? false,
+      hasLandings: readBool01(sp, 'hasLandings') ?? false,
+      hasSeo: readBool01(sp, 'hasSeo') ?? false,
+    }),
+    serialize: (state, sp) => {
+      setOrDelete(sp, 'readinessStatus', state.readinessStatus);
+      setOrDelete(sp, 'regionId', state.regionId);
+      setOrDelete(sp, 'isActive', state.isActive);
+      setBool01(sp, 'hasEvents', state.hasEvents, false);
+      setBool01(sp, 'hasVenues', state.hasVenues, false);
+      setBool01(sp, 'hasLandings', state.hasLandings, false);
+      setBool01(sp, 'hasSeo', state.hasSeo, false);
+      return sp;
+    },
+  });
 
   const regionsQ = useQuery({
     queryKey: ['admin-city-region-options'],
@@ -60,13 +96,7 @@ export function CitiesListPage() {
         q: list.debouncedQ,
         page: list.page,
         pageSize: list.pageSize,
-        readinessStatus,
-        regionId,
-        isActive,
-        hasEvents,
-        hasVenues,
-        hasLandings,
-        hasSeo,
+        ...cf,
       },
     ],
     queryFn: () =>
@@ -74,13 +104,13 @@ export function CitiesListPage() {
         page: list.page,
         limit: list.pageSize,
         search: list.debouncedQ || undefined,
-        readinessStatus: readinessStatus || undefined,
-        regionId: regionId || undefined,
-        isActive: isActive === 'yes' ? true : isActive === 'no' ? false : undefined,
-        hasEvents: hasEvents || undefined,
-        hasVenues: hasVenues || undefined,
-        hasLandings: hasLandings || undefined,
-        hasSeo: hasSeo || undefined,
+        readinessStatus: cf.readinessStatus || undefined,
+        regionId: cf.regionId || undefined,
+        isActive: cf.isActive === 'yes' ? true : cf.isActive === 'no' ? false : undefined,
+        hasEvents: cf.hasEvents || undefined,
+        hasVenues: cf.hasVenues || undefined,
+        hasLandings: cf.hasLandings || undefined,
+        hasSeo: cf.hasSeo || undefined,
       }),
     placeholderData: (p) => p,
   });
@@ -121,10 +151,10 @@ export function CitiesListPage() {
         <FilterField label="Регион">
           <select
             className="h-9 w-full min-w-[180px] rounded-md border border-input bg-background px-2 text-sm"
-            value={regionId}
+            value={cf.regionId}
             onChange={(e) => {
-              setRegionId(e.target.value);
-              list.setPage(1);
+              setCf({ regionId: e.target.value }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             <option value="">Все</option>
@@ -138,10 +168,10 @@ export function CitiesListPage() {
         <FilterField label="Готовность">
           <select
             className="h-9 w-full min-w-[160px] rounded-md border border-input bg-background px-2 text-sm"
-            value={readinessStatus}
+            value={cf.readinessStatus}
             onChange={(e) => {
-              setReadinessStatus((e.target.value || '') as typeof readinessStatus);
-              list.setPage(1);
+              setCf({ readinessStatus: (e.target.value || '') as typeof cf.readinessStatus }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             {READINESS.map((x) => (
@@ -154,10 +184,10 @@ export function CitiesListPage() {
         <FilterField label="Публикация">
           <select
             className="h-9 w-full min-w-[120px] rounded-md border border-input bg-background px-2 text-sm"
-            value={isActive}
+            value={cf.isActive}
             onChange={(e) => {
-              setIsActive(e.target.value as '' | 'yes' | 'no');
-              list.setPage(1);
+              setCf({ isActive: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             <option value="">Все</option>
@@ -168,19 +198,47 @@ export function CitiesListPage() {
         <FilterField label="Быстрые фильтры">
           <div className="flex flex-col gap-1 text-xs">
             <label className="flex cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={hasEvents} onChange={() => { setHasEvents((v) => !v); list.setPage(1); }} />
+              <input
+                type="checkbox"
+                checked={cf.hasEvents}
+                onChange={() => {
+                  setCf({ hasEvents: !cf.hasEvents }, { history: 'replace' });
+                  list.setPageReplace(1);
+                }}
+              />
               Есть события
             </label>
             <label className="flex cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={hasVenues} onChange={() => { setHasVenues((v) => !v); list.setPage(1); }} />
+              <input
+                type="checkbox"
+                checked={cf.hasVenues}
+                onChange={() => {
+                  setCf({ hasVenues: !cf.hasVenues }, { history: 'replace' });
+                  list.setPageReplace(1);
+                }}
+              />
               Есть площадки
             </label>
             <label className="flex cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={hasLandings} onChange={() => { setHasLandings((v) => !v); list.setPage(1); }} />
+              <input
+                type="checkbox"
+                checked={cf.hasLandings}
+                onChange={() => {
+                  setCf({ hasLandings: !cf.hasLandings }, { history: 'replace' });
+                  list.setPageReplace(1);
+                }}
+              />
               Есть лендинги
             </label>
             <label className="flex cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={hasSeo} onChange={() => { setHasSeo((v) => !v); list.setPage(1); }} />
+              <input
+                type="checkbox"
+                checked={cf.hasSeo}
+                onChange={() => {
+                  setCf({ hasSeo: !cf.hasSeo }, { history: 'replace' });
+                  list.setPageReplace(1);
+                }}
+              />
               Заполнен SEO meta
             </label>
           </div>
@@ -247,9 +305,7 @@ function CityListRow({ row, siteBase }: { row: AdminCityListItem; siteBase?: str
   const venuesHref = `/admin-v3/venues?city=${encodeURIComponent(row.slug)}`;
   const landingsHref = `/admin-v3/landings?city=${encodeURIComponent(row.slug)}`;
   const publicPath = `/cities/${encodeURIComponent(row.slug)}`;
-  const publicAbs = siteBase ? `${siteBase}${publicPath}` : null;
-
-  return (
+  const publicAbs = siteBase ? `${siteBase}${publicPath}` : null;  return (
     <tr className="border-b last:border-0 hover:bg-muted/30">
       <td className="align-top px-3 py-3">
         <div className="font-medium leading-snug">

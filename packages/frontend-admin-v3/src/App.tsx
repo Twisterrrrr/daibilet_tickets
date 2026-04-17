@@ -38,6 +38,7 @@ const LandingsListPage = React.lazy(() => import('@/modules/landings/pages/Landi
 const LandingDetailPage = React.lazy(() => import('@/modules/landings/pages/LandingDetailPage').then((m) => ({ default: m.LandingDetailPage })));
 
 const TagsListPage = React.lazy(() => import('@/modules/tags/pages/TagsListPage').then((m) => ({ default: m.TagsListPage })));
+const TagDetailPage = React.lazy(() => import('@/modules/tags/pages/TagDetailPage').then((m) => ({ default: m.TagDetailPage })));
 const SeoAuditPage = React.lazy(() => import('@/modules/seo-audit/pages/SeoAuditPage').then((m) => ({ default: m.SeoAuditPage })));
 const SubcategoriesListPage = React.lazy(() =>
   import('@/modules/subcategories/pages/SubcategoriesListPage').then((m) => ({ default: m.SubcategoriesListPage })),
@@ -55,6 +56,9 @@ const ChatDetailPage = React.lazy(() => import('@/modules/chat/pages/ChatDetailP
 const ReviewsListPage = React.lazy(() => import('@/modules/reviews/pages/ReviewsListPage').then((m) => ({ default: m.ReviewsListPage })));
 const PromoBlocksListPage = React.lazy(() =>
   import('@/modules/promo-blocks/pages/PromoBlocksListPage').then((m) => ({ default: m.PromoBlocksListPage })),
+);
+const PromoPlacementBlocksListPage = React.lazy(() =>
+  import('@/modules/promo-placement-blocks/pages/PromoPlacementBlocksListPage').then((m) => ({ default: m.PromoPlacementBlocksListPage })),
 );
 const TicketsPage = React.lazy(() => import('@/modules/tickets/pages/TicketsPage').then((m) => ({ default: m.TicketsPage })));
 const SupportTicketDetailPage = React.lazy(() =>
@@ -116,11 +120,13 @@ export default function App() {
               <Route path="landings/:id" element={<LandingDetailPage />} />
 
               <Route path="tags" element={<TagsListPage />} />
+              <Route path="tags/:id" element={<TagDetailPage />} />
               <Route path="seo-audit" element={<SeoAuditPage />} />
               <Route path="subcategories" element={<SubcategoriesListPage />} />
               <Route path="subcategories/new" element={<SubcategoryCreatePage />} />
               <Route path="subcategories/:id" element={<SubcategoryDetailPage />} />
             <Route path="promo-blocks" element={<PromoBlocksListPage />} />
+              <Route path="promo-placement-blocks" element={<PromoPlacementBlocksListPage />} />
 
               <Route path="customers" element={<SiteUsersListPage />} />
               <Route path="orders" element={<CheckoutOrdersListPage />} />

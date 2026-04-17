@@ -63,4 +63,3 @@ export function TicketsPage() {
 }
 
 export default TicketsPage;
-

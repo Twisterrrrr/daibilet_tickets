@@ -126,6 +126,7 @@
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
 | `import-auto-subcategory-links` | Импорт (TC/TEP): автопроставление подкатегорий в `event_subcategory_links` (links-first), чтобы модерация начиналась с “разумного дефолта”, а не с ручной посадки | Высокий | `[x]` **06.04.2026** |
+| `legacy-subcategory-links-parity` | **Сверка legacy vs links:** read-only `pnpm --filter @daibilet/backend run data:validate-legacy-subcategory-links` (`scripts/validate-legacy-subcategory-links.ts`) — множество `events.subcategories` должно совпадать с множеством `Subcategory.code` по `event_subcategory_links`. **DoD перед удалением legacy-поля:** на целевой БД отчёт = `mismatch: 0`, `eventsWithInvalidLegacyEnum: 0`; при расхождениях — `data:backfill-legacy-subcategory-links --apply`, повторная сверка, только затем отдельная миграция на links-only read + drop колонки. | Критический | `[~]` |
 | `admin-v3-shell` | Admin V3 (легковесная оболочка): Events List/Detail, сортировка/колонки, мультиселект, links-first подкатегории | Высокий | `[x]` **13.04.2026** |
 | `catalog-primary-matrix-finalize` | Финальная матрица PRIMARY (event-only) + 5 derived sections: canonical seed + coverage в section-map + legacy inactive compat | Критический | `[x]` **13.04.2026** |
 | `import-mapping-modules` | Import mapping (TC/TEP) → canonical PRIMARY (после keyword классификатора, до fallback) | Высокий | `[x]` **13.04.2026** |
@@ -134,13 +135,61 @@
 | `legacy-classification-fix` | Приведение legacy-событий к новой модели (скрипты reclassify / backfill — отдельный план) | Средний | `[ ]` |
 | `G-data-cleanup` | Программа G: trim links и legacy-classification — см. Epic G в архиве | Низкий | `[~]` |
 
+### Admin V3 — Launch Core (B): доводка операционного UX (17.04.2026)
+
+> Эти пункты — «доказательство Launch Core»: URL-state, возможность шарить ссылки, операционные toggles и deep-links.
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `admin-v3-events-filters-url-state` | **Events list:** quick-filters и доп. фильтры синхронизированы с URL (init from URL + update URL + reset) | Критический | `[x]` **17.04.2026** |
+| `admin-v3-promo-blocks-storefront-control` | **Promo blocks:** toggle active из списка + поля scope/таргетинга + AUTO-подбор (selectionMode/autoSort/autoLimit) + deep-link на collection | Высокий | `[x]` **17.04.2026** |
+| `admin-v3-moderation-hub-ux` | **Moderation:** URL-state (status/sort/page) + deep-links в event и supplier + тип колонки | Высокий | `[x]` **17.04.2026** |
+| `admin-v3-reviews-operational-ux` | **Reviews:** URL-state (tab/status/eventId/page) + deep-links в event/venue + больше контекста в строке | Средний | `[x]` **17.04.2026** |
+
+### Сводка готовности Admin V3 по разделам (17.04.2026)
+
+> Цель таблицы — “операторская правда”: что реально работает, где есть URL‑state/стейты/мутации, где ещё скорее MVP.  
+> Важно: **SEO‑сигналы и диагностика не являются publish‑blocker’ами** (они информируют).
+
+| Раздел | Роут(ы) | Статус | URL‑state | Основной сценарий | Примечания / пробелы |
+|--------|---------|--------|----------|-------------------|----------------------|
+| Dashboard | `/admin-v3/dashboard` | ✅ DONE (базово) | — | обзор | полезность метрик — эволюционно |
+| Events | `/admin-v3/events`, `/admin-v3/events/:id` | ✅ DONE | ✅ list | list+detail, publish/unpublish+gate | follow-up: edit pricing/content (см. выше) |
+| Venues | `/admin-v3/venues`, `/admin-v3/venues/:id` | ✅ DONE (core) | ✅ list | list+detail | дальнейшая полировка readiness/merge summary — по мере надобности |
+| Venue candidates | `/admin-v3/venues/candidates` | ✅/⚠️ PARTIAL | ✅ | merge/approve/reject | зависит от “batch/preview/confidence” внутри страницы |
+| Venue automation | `/admin-v3/venues/automation` | ⚠️ PARTIAL | — | вспомогательный экран | не критично для launch-core |
+| Venue analytics | `/admin-v3/venues/analytics` | ⚠️ PARTIAL | — | вспомогательный экран | не критично для launch-core |
+| Cities | `/admin-v3/cities`, `/admin-v3/cities/:id` | ✅ DONE | ✅ list | list+detail | — |
+| Suppliers (light) | `/admin-v3/suppliers`, `/admin-v3/suppliers/:id` | ✅ DONE (light) | ✅ list | list+detail | — |
+| Collections | `/admin-v3/collections`, `/admin-v3/collections/:id` | ⚠️ PARTIAL | ⚠️ частично | list+detail | мерчендайзинг/паблишинг — в рамках контракта |
+| Articles | `/admin-v3/articles`, `/admin-v3/articles/:id` | ⚠️ PARTIAL | ⚠️ частично | list+edit | полнота publish/SEO/validation — проверять точечно |
+| Landings | `/admin-v3/landings`, `/admin-v3/landings/:id` | ⚠️ PARTIAL | ⚠️ частично | list+detail | hub/preview/resolved — эволюционно |
+| Promo blocks (legacy cards) | `/admin-v3/promo-blocks` | ⚠️ PARTIAL | ✅ (q) | CRUD карточек/коллекций | это не control-plane размещений |
+| Promo placements (control plane) | `/admin-v3/promo-placement-blocks` | ✅ DONE (Stage 3) | ✅ | placement+scope+window+resolver | readiness/diagnostics, resolved preview, conflicts, SEO signals (не блокеры) |
+| SEO Audit | `/admin-v3/seo-audit` | ✅ DONE | ✅ | issues list + фильтры | интеграция health badges — follow-up |
+| Subcategories | `/admin-v3/subcategories/*` | ⚠️ PARTIAL | ⚠️ частично | list+create+detail | зависит от контракта редактора/правил |
+| Tags | `/admin-v3/tags`, `/admin-v3/tags/:id` | ✅ DONE | — | CRUD + unlink/delete | — |
+| Reviews | `/admin-v3/reviews` | ⚠️ PARTIAL | ✅ | list+actions | модерационный сценарий есть, полировка — по метрикам оператора |
+| Moderation | `/admin-v3/moderation` | ⚠️ PARTIAL | ✅ | queue + approve/reject | **feature‑gated** (`MODERATION`) |
+| Chat | `/admin-v3/chat`, `/admin-v3/chat/:id` | ⚠️ PARTIAL | — | list+detail+reply | стейты пока проще (не `LoadingState/ErrorState`) |
+| Tickets | `/admin-v3/tickets`, `/admin-v3/tickets/:id` | ⚠️ PARTIAL | — | list+detail | стейты/фильтры/URL‑state — follow-up |
+| Customers | `/admin-v3/customers` | ⚠️ PARTIAL | — | list | фильтры/деталка — follow-up |
+| Orders | `/admin-v3/orders`, `/admin-v3/orders/:id` | ⚠️ PARTIAL | — | list+detail | фильтры/URL‑state — follow-up |
+| Refunds | `/admin-v3/refunds` | ⚠️ PARTIAL | — | list+approve/reject | фильтры/URL‑state — follow-up |
+| Logs | `/admin-v3/logs` | ⚠️ PARTIAL | — | audit list | фильтры пока локальные (не в URL) |
+| Settings | `/admin-v3/settings` | ⚠️ PARTIAL (MVP) | — | flags + seo/system KV | guardrails/структура — follow-up |
+| Staff users | `/admin-v3/staff-users` | ⚠️ PARTIAL | — | list | **feature‑gated** (`USERS`) |
+| Sales | `/admin-v3/sales` | ⛔ STUB | — | — | **feature‑gated** (`SALES`) |
+| Finance | `/admin-v3/finance` | ⛔ STUB | — | — | **feature‑gated** (`FINANCE`) |
+| Reports | `/admin-v3/reports` | ⛔ STUB | — | — | **feature‑gated** (`REPORTS`) |
+
 ### Settings (Admin V3) — управление системой (MVP)
 
 Источник архитектуры: `docs/Project.md` § “Settings (Admin V3) — управление системой”.
 
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
-| `settings-scope-and-sections` | Зафиксировать разделы Settings и границы “управление системой vs каталог/контент/операционка”; навигация `/admin-v3/settings/*` | Высокий | `[ ]` |
+| `settings-scope-and-sections` | Зафиксировать разделы Settings и границы “управление системой vs каталог/контент/операционка”; навигация `/admin-v3/settings/*` | Высокий | `[~]` |
 | `settings-rbac-admin-users` | RBAC: листинг/роль/активация `AdminUser`; magic-link сброс пароля; anti-lockout последнего **ADMIN/OWNER**; роль `OWNER` в Prisma. Создание пользователей из UI и роль MANAGER в enum — отдельно | Критический | `[~]` **14.04.2026** |
 | `settings-feature-flags` | Feature Flags: модель + API + таблица в UI; включение/скрытие разделов Admin V3 на флагах | Критический | `[x]` **14.04.2026** |
 | `settings-appsetting-kv` | KV `AppSetting` + ключи `seo` / `system` (merge PATCH, baseUrl из формы отклоняется) | Высокий | `[x]` **14.04.2026** |
@@ -168,7 +217,7 @@
 | `seo-audit-backend-read-model` | Backend: read‑модель SEO Audit (summary + issues list + entity issues), без автоисправлений; issue groups/severity; базовые фильтры (entityType/severity/group/issueCode/search) | Высокий | `[ ]` |
 | `seo-audit-cache-on-the-fly` | MVP: on-the-fly вычисление + Redis cache TTL 60–120s (`seo:audit:<entityType>:<filters>`), без snapshot/cron | Высокий | `[ ]` |
 | `seo-audit-taxonomy-rules` | Taxonomy-aware rules: completeness (нет subcategory/topic) + misuse (type mismatch, inactive in use, too many) + unused taxonomy | Высокий | `[ ]` |
-| `admin-v3-seo-audit-ui` | Admin V3 UI: `/admin-v3/seo-audit` (summary + issues table + фильтры), deep links в сущности | Высокий | `[ ]` |
+| `admin-v3-seo-audit-ui` | Admin V3 UI: `/admin-v3/seo-audit` (summary + issues table + фильтры), deep links в сущности | Высокий | `[x]` **17.04.2026** |
 | `entity-health-badges` | Интеграция: health badge / issues count на страницах сущностей (events/venues/landings/collections/articles) + переходы в filtered audit | Средний | `[ ]` |
 | `seo-audit-indexability-policy` | Политика publish vs index: blockers (NO_LOCATION/NO_ACTIVE_OFFER/INVALID_STATE) vs audit soft; состояние `canPublish=true` + `isIndexable=false` обязательно | Высокий | `[ ]` |
 

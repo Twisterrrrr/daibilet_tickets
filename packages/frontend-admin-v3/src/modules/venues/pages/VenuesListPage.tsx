@@ -16,6 +16,9 @@ import {
   type VenueSourceType,
 } from '@/modules/venues/api/candidates';
 import { venueLifecycleLabelRu, VENUE_LIFECYCLE_LABEL_RU } from '@/modules/venues/utils/venue-lifecycle-labels';
+import { readBool01, readEnum } from '@/shared/url-state/parse';
+import { setBool01, setOrDelete } from '@/shared/url-state/serialize';
+import { useUrlState } from '@/shared/url-state/useUrlState';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link } from 'react-router-dom';
@@ -70,19 +73,60 @@ function readinessBadgeClass(s: string | undefined): string {
   }
 }
 
+type VenuesListUrlFilters = {
+  lifecycle: '' | VenueLifecycleStatus;
+  sourceType: '' | VenueSourceType;
+  importSource: '' | VenueImportSource;
+  needsReviewOnly: boolean;
+  hasMergeTarget: '' | 'yes' | 'no';
+  whitelist: '' | 'yes' | 'no';
+  sort: 'updatedAt' | 'confidenceScore';
+  order: 'asc' | 'desc';
+  readinessStatus: '' | 'READY' | 'NEEDS_WORK' | 'NEEDS_REVIEW' | 'BLOCKED';
+};
+
 export function VenuesListPage() {
   const list = useListPageState();
-  const [lifecycle, setLifecycle] = React.useState<'' | VenueLifecycleStatus>('');
-  const [sourceType, setSourceType] = React.useState<'' | VenueSourceType>('');
-  const [importSource, setImportSource] = React.useState<'' | VenueImportSource>('');
-  const [needsReviewOnly, setNeedsReviewOnly] = React.useState(false);
-  const [hasMergeTarget, setHasMergeTarget] = React.useState<'' | 'yes' | 'no'>('');
-  const [whitelist, setWhitelist] = React.useState<'' | 'yes' | 'no'>('');
-  const [sort, setSort] = React.useState<'updatedAt' | 'confidenceScore'>('updatedAt');
-  const [order, setOrder] = React.useState<'asc' | 'desc'>('desc');
-  const [readinessStatus, setReadinessStatus] = React.useState<
-    '' | 'READY' | 'NEEDS_WORK' | 'NEEDS_REVIEW' | 'BLOCKED'
-  >('');
+  const { state: vf, setState: setVf, reset: resetVf } = useUrlState<VenuesListUrlFilters>({
+    defaults: {
+      lifecycle: '',
+      sourceType: '',
+      importSource: '',
+      needsReviewOnly: false,
+      hasMergeTarget: '',
+      whitelist: '',
+      sort: 'updatedAt',
+      order: 'desc',
+      readinessStatus: '',
+    },
+    parse: (sp) => {
+      return {
+        lifecycle: readEnum(sp, 'lifecycle', ['' as const, 'DRAFT', 'ACTIVE', 'MERGED', 'REJECTED'], ''),
+        sourceType: readEnum(sp, 'sourceType', ['' as const, 'MANUAL', 'IMPORTED'], ''),
+        importSource: readEnum(sp, 'importSource', ['' as const, 'TICKETSCLOUD', 'TEPLOHOD'], ''),
+        needsReviewOnly: readBool01(sp, 'needsReviewOnly') ?? false,
+        hasMergeTarget: readEnum(sp, 'hasMergeTarget', ['' as const, 'yes', 'no'], ''),
+        whitelist: readEnum(sp, 'whitelist', ['' as const, 'yes', 'no'], ''),
+        sort: readEnum(sp, 'sort', ['updatedAt' as const, 'confidenceScore'], 'updatedAt'),
+        order: readEnum(sp, 'order', ['asc' as const, 'desc'], 'desc'),
+        readinessStatus: readEnum(sp, 'readinessStatus', ['' as const, 'READY', 'NEEDS_WORK', 'NEEDS_REVIEW', 'BLOCKED'], ''),
+      };
+    },
+    serialize: (state, sp) => {
+      setOrDelete(sp, 'lifecycle', state.lifecycle);
+      setOrDelete(sp, 'sourceType', state.sourceType);
+      setOrDelete(sp, 'importSource', state.importSource);
+      setBool01(sp, 'needsReviewOnly', state.needsReviewOnly, false);
+      setOrDelete(sp, 'hasMergeTarget', state.hasMergeTarget);
+      setOrDelete(sp, 'whitelist', state.whitelist);
+      setOrDelete(sp, 'readinessStatus', state.readinessStatus);
+      if (state.sort !== 'updatedAt') sp.set('sort', state.sort);
+      else sp.delete('sort');
+      if (state.order !== 'desc') sp.set('order', state.order);
+      else sp.delete('order');
+      return sp;
+    },
+  });
 
   const citiesQ = useQuery({
     queryKey: ['admin-cities-options'],
@@ -101,15 +145,7 @@ export function VenuesListPage() {
         page: list.page,
         pageSize: list.pageSize,
         city: list.city,
-        lifecycle,
-        sourceType,
-        importSource,
-        needsReviewOnly,
-        hasMergeTarget,
-        whitelist,
-        sort,
-        order,
-        readinessStatus,
+        ...vf,
       },
     ],
     queryFn: () =>
@@ -118,15 +154,15 @@ export function VenuesListPage() {
         limit: list.pageSize,
         search: list.debouncedQ || undefined,
         citySlug: list.city || undefined,
-        lifecycleStatus: lifecycle || undefined,
-        sourceType: sourceType || undefined,
-        importSource: importSource || undefined,
-        needsReview: needsReviewOnly ? true : undefined,
-        hasMergeTarget: hasMergeTarget === 'yes' ? true : hasMergeTarget === 'no' ? false : undefined,
-        venuePageWhitelist: whitelist === 'yes' ? true : whitelist === 'no' ? false : undefined,
-        readinessStatus: readinessStatus || undefined,
-        sort,
-        order,
+        lifecycleStatus: vf.lifecycle || undefined,
+        sourceType: vf.sourceType || undefined,
+        importSource: vf.importSource || undefined,
+        needsReview: vf.needsReviewOnly ? true : undefined,
+        hasMergeTarget: vf.hasMergeTarget === 'yes' ? true : vf.hasMergeTarget === 'no' ? false : undefined,
+        venuePageWhitelist: vf.whitelist === 'yes' ? true : vf.whitelist === 'no' ? false : undefined,
+        readinessStatus: vf.readinessStatus || undefined,
+        sort: vf.sort,
+        order: vf.order,
       }),
     placeholderData: (p) => p,
   });
@@ -193,10 +229,10 @@ export function VenuesListPage() {
         <FilterField label="Статус ЖЦ">
           <select
             className="h-9 w-full min-w-[140px] rounded-md border border-input bg-background px-2 text-sm"
-            value={lifecycle}
+            value={vf.lifecycle}
             onChange={(e) => {
-              setLifecycle((e.target.value || '') as '' | VenueLifecycleStatus);
-              list.setPage(1);
+              setVf({ lifecycle: (e.target.value || '') as '' | VenueLifecycleStatus }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             {LIFECYCLE.map((x) => (
@@ -209,10 +245,10 @@ export function VenuesListPage() {
         <FilterField label="Готовность (БД)">
           <select
             className="h-9 w-full min-w-[160px] rounded-md border border-input bg-background px-2 text-sm"
-            value={readinessStatus}
+            value={vf.readinessStatus}
             onChange={(e) => {
-              setReadinessStatus((e.target.value || '') as typeof readinessStatus);
-              list.setPage(1);
+              setVf({ readinessStatus: (e.target.value || '') as typeof vf.readinessStatus }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             {READINESS.map((x) => (
@@ -225,10 +261,10 @@ export function VenuesListPage() {
         <FilterField label="Источник">
           <select
             className="h-9 w-full min-w-[120px] rounded-md border border-input bg-background px-2 text-sm"
-            value={sourceType}
+            value={vf.sourceType}
             onChange={(e) => {
-              setSourceType((e.target.value || '') as '' | VenueSourceType);
-              list.setPage(1);
+              setVf({ sourceType: (e.target.value || '') as '' | VenueSourceType }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             {SOURCE.map((x) => (
@@ -241,10 +277,10 @@ export function VenuesListPage() {
         <FilterField label="Импорт">
           <select
             className="h-9 w-full min-w-[130px] rounded-md border border-input bg-background px-2 text-sm"
-            value={importSource}
+            value={vf.importSource}
             onChange={(e) => {
-              setImportSource((e.target.value || '') as '' | VenueImportSource);
-              list.setPage(1);
+              setVf({ importSource: (e.target.value || '') as '' | VenueImportSource }, { history: 'replace' });
+              list.setPageReplace(1);
             }}
           >
             {IMPORT.map((x) => (
@@ -258,10 +294,10 @@ export function VenuesListPage() {
           <div className="flex gap-1">
             <select
               className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
-              value={sort}
+              value={vf.sort}
               onChange={(e) => {
-                setSort(e.target.value as 'updatedAt' | 'confidenceScore');
-                list.setPage(1);
+                setVf({ sort: e.target.value as 'updatedAt' | 'confidenceScore' }, { history: 'replace' });
+                list.setPageReplace(1);
               }}
             >
               <option value="updatedAt">По дате обновления</option>
@@ -269,10 +305,10 @@ export function VenuesListPage() {
             </select>
             <select
               className="h-9 w-[88px] rounded-md border border-input bg-background px-2 text-sm"
-              value={order}
+              value={vf.order}
               onChange={(e) => {
-                setOrder(e.target.value as 'asc' | 'desc');
-                list.setPage(1);
+                setVf({ order: e.target.value as 'asc' | 'desc' }, { history: 'replace' });
+                list.setPageReplace(1);
               }}
             >
               <option value="desc">↓</option>
@@ -284,10 +320,10 @@ export function VenuesListPage() {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={needsReviewOnly}
+              checked={vf.needsReviewOnly}
               onChange={(e) => {
-                setNeedsReviewOnly(e.target.checked);
-                list.setPage(1);
+                setVf({ needsReviewOnly: e.target.checked }, { history: 'replace' });
+                list.setPageReplace(1);
               }}
             />
             Требует проверки
@@ -296,10 +332,10 @@ export function VenuesListPage() {
             <span className="text-muted-foreground">Merge target</span>
             <select
               className="h-8 rounded-md border border-input bg-background px-1 text-xs"
-              value={hasMergeTarget}
+              value={vf.hasMergeTarget}
               onChange={(e) => {
-                setHasMergeTarget(e.target.value as '' | 'yes' | 'no');
-                list.setPage(1);
+                setVf({ hasMergeTarget: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+                list.setPageReplace(1);
               }}
             >
               <option value="">—</option>
@@ -311,10 +347,10 @@ export function VenuesListPage() {
             <span className="text-muted-foreground">SEO whitelist</span>
             <select
               className="h-8 rounded-md border border-input bg-background px-1 text-xs"
-              value={whitelist}
+              value={vf.whitelist}
               onChange={(e) => {
-                setWhitelist(e.target.value as '' | 'yes' | 'no');
-                list.setPage(1);
+                setVf({ whitelist: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+                list.setPageReplace(1);
               }}
             >
               <option value="">—</option>
@@ -386,9 +422,7 @@ function VenueListRow({ row }: { row: AdminVenueCandidateRow }) {
   const signals = row.readinessKeySignals ?? [];
   const active = row.activeEventsCount ?? 0;
   const future = row.futureEventsCount ?? 0;
-  const rel = row.relatedEventsCount ?? row.eventsCount;
-
-  return (
+  const rel = row.relatedEventsCount ?? row.eventsCount;  return (
     <tr className="border-b last:border-0 hover:bg-muted/30">
       <td className="align-top px-3 py-3">
         <div className="font-medium leading-snug">
