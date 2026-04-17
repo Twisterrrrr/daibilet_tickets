@@ -45,7 +45,7 @@ type ComparisonReason =
 type ComparisonToWinner = { outcome: ComparisonOutcome; reasons: ComparisonReason[] };
 type RankExplanation = { primaryOrderingFactor: 'PRIORITY' | 'SORT_ORDER' | 'UPDATED_AT' };
 
-function uniqReasons(r: ReadinessReason[]): ReadinessReason[] {
+function uniqReasons<T extends string>(r: T[]): T[] {
   return Array.from(new Set(r));
 }
 
@@ -78,8 +78,9 @@ export class AdminPromoPlacementBlocksService {
       // Operator convenience filter: SEO issues only (diagnostics).
       // SQL-safe, minimal, and intentionally scoped to EVENT targets for now.
       // NOTE: WEAK_DESC (length-based) is not included here intentionally to keep DB filtering reliable.
+      const prevAnd = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
       where.AND = [
-        ...(where.AND ?? []),
+        ...prevAnd,
         {
           targetType: PromoTargetType.EVENT,
           targetEventId: { not: null },
@@ -143,12 +144,14 @@ export class AdminPromoPlacementBlocksService {
           {
             targetType: PromoTargetType.COLLECTION,
             targetCollectionId: { not: null },
-            targetCollection: { isDeleted: false, isActive: true, status: CollectionStatus.PUBLISHED },
+            // CollectionStatus does not have PUBLISHED; ACTIVE is the publishable state.
+            targetCollection: { isDeleted: false, isActive: true, status: CollectionStatus.ACTIVE },
           },
           {
             targetType: PromoTargetType.LANDING,
             targetLandingId: { not: null },
-            targetLanding: { isDeleted: false, isActive: true, status: LandingStatus.PUBLISHED },
+            // LandingStatus does not have PUBLISHED; ACTIVE is the publishable state.
+            targetLanding: { isDeleted: false, isActive: true, status: LandingStatus.ACTIVE },
           },
           {
             targetType: PromoTargetType.ARTICLE,
@@ -196,11 +199,11 @@ export class AdminPromoPlacementBlocksService {
               { targetType: PromoTargetType.EVENT, targetEvent: { OR: [{ isDeleted: true }, { isActive: false }] } },
               {
                 targetType: PromoTargetType.COLLECTION,
-                targetCollection: { OR: [{ isDeleted: true }, { isActive: false }, { status: { not: CollectionStatus.PUBLISHED } }] },
+                targetCollection: { OR: [{ isDeleted: true }, { isActive: false }, { status: { not: CollectionStatus.ACTIVE } }] },
               },
               {
                 targetType: PromoTargetType.LANDING,
-                targetLanding: { OR: [{ isDeleted: true }, { isActive: false }, { status: { not: LandingStatus.PUBLISHED } }] },
+                targetLanding: { OR: [{ isDeleted: true }, { isActive: false }, { status: { not: LandingStatus.ACTIVE } }] },
               },
               { targetType: PromoTargetType.ARTICLE, targetArticle: { OR: [{ status: { not: 'PUBLISHED' } }, { publishedAt: null }] } },
             ],
@@ -222,7 +225,8 @@ export class AdminPromoPlacementBlocksService {
                   : // READY
                     { status: PromoBlockStatus.PUBLISHED, ...windowActive, AND: [scopeComplete, targetConfigured, targetPublishable] };
 
-      where.AND = [...(where.AND ?? []), readinessWhere];
+      const prevAnd = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+      where.AND = [...prevAnd, readinessWhere];
     }
 
     const sortField = query.sort ?? 'updatedAt';
@@ -715,16 +719,16 @@ export class AdminPromoPlacementBlocksService {
 
   private toListItem(
     r: Prisma.PromoPlacementBlockGetPayload<{
-    include: {
-      city: { select: { id: true; name: true; slug: true } };
-      landing: { select: { id: true; title: true; slug: true; city: { select: { slug: true; name: true } } } };
-      collection: { select: { id: true; title: true; slug: true } };
-      article: { select: { id: true; title: true; slug: true } };
-      targetEvent: { select: { id: true; title: true; slug: true } };
-      targetCollection: { select: { id: true; title: true; slug: true } };
-      targetLanding: { select: { id: true; title: true; slug: true } };
-      targetArticle: { select: { id: true; title: true; slug: true } };
-    };
+      include: {
+        city: { select: { id: true; name: true; slug: true } };
+        landing: { select: { id: true; title: true; slug: true; city: { select: { slug: true; name: true } } } };
+        collection: { select: { id: true; title: true; slug: true } };
+        article: { select: { id: true; title: true; slug: true } };
+        targetEvent: { select: { id: true; title: true; slug: true; isActive: true; isDeleted: true } };
+        targetCollection: { select: { id: true; title: true; slug: true; status: true; isActive: true; isDeleted: true } };
+        targetLanding: { select: { id: true; title: true; slug: true; status: true; isActive: true; isDeleted: true; city: { select: { slug: true; name: true } } } };
+        targetArticle: { select: { id: true; title: true; slug: true; status: true; publishedAt: true } };
+      };
   }>,
     seo?: SeoSignals,
   ) {
@@ -774,10 +778,20 @@ export class AdminPromoPlacementBlocksService {
         landing: { select: { id: true; title: true; slug: true; city: { select: { id: true; slug: true; name: true } } } };
         collection: { select: { id: true; title: true; slug: true } };
         article: { select: { id: true; title: true; slug: true } };
-        targetEvent: { select: { id: true; title: true; slug: true } };
-        targetCollection: { select: { id: true; title: true; slug: true } };
-        targetLanding: { select: { id: true; title: true; slug: true; city: { select: { slug: true; name: true } } } };
-        targetArticle: { select: { id: true; title: true; slug: true } };
+        targetEvent: { select: { id: true; title: true; slug: true; isActive: true; isDeleted: true } };
+        targetCollection: { select: { id: true; title: true; slug: true; status: true; isActive: true; isDeleted: true } };
+        targetLanding: {
+          select: {
+            id: true;
+            title: true;
+            slug: true;
+            status: true;
+            isActive: true;
+            isDeleted: true;
+            city: { select: { slug: true; name: true } };
+          };
+        };
+        targetArticle: { select: { id: true; title: true; slug: true; status: true; publishedAt: true } };
       };
     }>,
     seo?: SeoSignals,
@@ -882,14 +896,14 @@ export class AdminPromoPlacementBlocksService {
               r.targetCollection &&
                 !r.targetCollection.isDeleted &&
                 r.targetCollection.isActive &&
-                r.targetCollection.status === CollectionStatus.PUBLISHED,
+                r.targetCollection.status === CollectionStatus.ACTIVE,
             )
           : r.targetType === PromoTargetType.LANDING
             ? Boolean(
                 r.targetLanding &&
                   !r.targetLanding.isDeleted &&
                   r.targetLanding.isActive &&
-                  r.targetLanding.status === LandingStatus.PUBLISHED,
+                  r.targetLanding.status === LandingStatus.ACTIVE,
               )
             : Boolean(r.targetArticle && r.targetArticle.status === 'PUBLISHED' && r.targetArticle.publishedAt);
 
@@ -1045,14 +1059,18 @@ export class AdminPromoPlacementBlocksService {
   }
 
   private buildPreview(
-    r: Prisma.PromoPlacementBlockGetPayload<{
-      include: {
-        targetEvent: { select: { id: true; title: true; slug: true } };
-        targetCollection: { select: { id: true; title: true; slug: true } };
-        targetLanding: { select: { id: true; title: true; slug: true; city: { select: { slug: true } } } };
-        targetArticle: { select: { id: true; title: true; slug: true } };
-      };
-    }>,
+    r: {
+      title: string;
+      customTitle: string | null;
+      customSubtitle: string | null;
+      customImageUrl: string | null;
+      ctaLabel: string | null;
+      targetType: PromoTargetType;
+      targetEvent?: { id: string; title: string; slug: string } | null;
+      targetCollection?: { id: string; title: string; slug: string } | null;
+      targetLanding?: { id: string; title: string; slug: string; city?: { slug: string } | null } | null;
+      targetArticle?: { id: string; title: string; slug: string } | null;
+    },
   ) {
     const displayTitle =
       (r.customTitle ?? '').trim() ||
