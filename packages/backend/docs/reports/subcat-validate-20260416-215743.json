@@ -1,0 +1,461 @@
+{
+  "generatedAt": "2026-04-16T18:57:52.934Z",
+  "eventsChecked": 41,
+  "ok": 8,
+  "mismatch": 33,
+  "eventsWithInvalidLegacyEnum": 0,
+  "legacyOnlyEvents": 33,
+  "linksOnlyEvents": 0,
+  "mismatches": [
+    {
+      "eventId": "077923dd-446a-4932-a166-3b532e46484e",
+      "slug": "seed-salute-enhancer-s3",
+      "legacyCodes": [
+        "COMBINED",
+        "GASTRO"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "COMBINED",
+        "GASTRO"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "1ebdac15-b415-4206-baed-088af602652a",
+      "slug": "seed-salute-enhancer-s9",
+      "legacyCodes": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "1f74ca2e-54f5-422a-bb7d-cc415d1b9bb5",
+      "slug": "fixture-night-jazz",
+      "legacyCodes": [
+        "JAZZ"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "JAZZ"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "281400e3-28d0-4175-a834-5507da72efd3",
+      "slug": "seed-salute-enhancer-s1",
+      "legacyCodes": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "290e811a-4934-44e0-9d94-f6170abfcf15",
+      "slug": "seed-salute-enhancer-s6",
+      "legacyCodes": [
+        "BUS"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "BUS"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "3020ee3f-46de-4e36-b808-5f165797ef45",
+      "slug": "seed-uzhin-kruiz-klassika-msk",
+      "legacyCodes": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "36c0fd8c-6666-481f-89e1-6bb3f7c1cc99",
+      "slug": "event-without-venue",
+      "legacyCodes": [
+        "SHOW"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "SHOW"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "3ad013ad-3a13-4c06-a06c-dd42053f586d",
+      "slug": "fixture-broken-without-venue",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "3c70e520-7d10-4db1-a0ad-80784921f15c",
+      "slug": "seed-salute-enhancer-s10",
+      "legacyCodes": [
+        "BUS"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "BUS"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "4c826540-d33a-4627-bb80-7fd7f3a2a0bf",
+      "slug": "seed-salute-enhancer-s4",
+      "legacyCodes": [
+        "EXTREME"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "EXTREME"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "63b9c10d-cfa1-45db-ac69-339166189569",
+      "slug": "fixture-broken-without-offers",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "63f8473d-04b2-4071-8c7b-b5b1c6e1013e",
+      "slug": "fixture-moscow-museum",
+      "legacyCodes": [
+        "MUSEUM_CLASSIC"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "MUSEUM_CLASSIC"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "712ef4af-b999-4aef-8b14-e62e9f4c9300",
+      "slug": "seed-salute-enhancer-s7",
+      "legacyCodes": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "74055a05-874d-411c-9a41-c49e93449c12",
+      "slug": "seed-salute-enhancer-s8",
+      "legacyCodes": [
+        "COMBINED",
+        "GASTRO"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "COMBINED",
+        "GASTRO"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "84da8aa3-0073-403c-b9d5-a8565c019240",
+      "slug": "fixture-inactive-event",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "862bb2bb-318a-4319-8b59-2cb9c87abd77",
+      "slug": "seed-salute-enhancer-s5",
+      "legacyCodes": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "8eab24df-cb7b-47d9-b3d7-f06436c7b650",
+      "slug": "event-inactive",
+      "legacyCodes": [
+        "WALKING"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "WALKING"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "9275cd81-eee2-4398-a40a-5451a79ca5f7",
+      "slug": "seed-uzhin-kruiz-furshet-msk",
+      "legacyCodes": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "92f70372-7be3-461d-bb1d-fd903c0390a3",
+      "slug": "fixture-kids-sailor",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "94b2b04d-83ad-4661-a9f2-4ad941d2eb28",
+      "slug": "night-jazz-on-water",
+      "legacyCodes": [
+        "CONCERT"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "CONCERT"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "9ff6a4d4-22f7-425d-94ae-2d6b43b1e213",
+      "slug": "quality-no-future-sessions-demo",
+      "legacyCodes": [
+        "EXHIBITION",
+        "WALKING"
+      ],
+      "linkCodes": [
+        "EXHIBITION"
+      ],
+      "onlyLegacy": [
+        "WALKING"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "a83658a4-3333-47c2-94da-ef809a8cc8ea",
+      "slug": "day-walking-tour-test",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "aca8e7a0-136c-4c3e-92fb-86d85f6aea70",
+      "slug": "kids-sailor-program",
+      "legacyCodes": [
+        "SHOW"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "SHOW"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "b09fdb49-b8f1-40b3-ab6f-b074c3846922",
+      "slug": "fixture-thin-no-future-sessions",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "bcf03bba-936f-46cc-93b2-14cb56ef38a1",
+      "slug": "seed-salute-enhancer-s2",
+      "legacyCodes": [
+        "BUS"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "BUS"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "bdf03ff9-a0a5-4cdf-ac55-d06e3b430553",
+      "slug": "test-event-buyer-account",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "c213a59e-4bf6-4f2c-a1c8-febd2ed55870",
+      "slug": "event-without-offers",
+      "legacyCodes": [
+        "MUSEUM_CLASSIC"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "MUSEUM_CLASSIC"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "cd11f4f6-77f7-480d-9200-b4cc34e47d73",
+      "slug": "river-walk-neva",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "d83366f1-fe30-475f-ada9-9f58a8ba48ee",
+      "slug": "fixture-neva-cruise",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "e651554b-50fc-4d36-83df-28337238f6e4",
+      "slug": "seed-salute-enhancer-s12",
+      "legacyCodes": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "GASTRO",
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "e75f0e04-e6e8-4f11-a9ff-3b154ba106ba",
+      "slug": "night-cruise-neva-test",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "e9a2843a-1953-4889-a618-9d4574082a30",
+      "slug": "seed-salute-enhancer-s11",
+      "legacyCodes": [
+        "EXTREME"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "EXTREME"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    },
+    {
+      "eventId": "f78bdfa8-801d-47d2-a332-97536baf6228",
+      "slug": "seed-nochnye-mosty-dvortsovyy-spb",
+      "legacyCodes": [
+        "RIVER"
+      ],
+      "linkCodes": [],
+      "onlyLegacy": [
+        "RIVER"
+      ],
+      "onlyLinks": [],
+      "invalidLegacyValues": []
+    }
+  ]
+}
