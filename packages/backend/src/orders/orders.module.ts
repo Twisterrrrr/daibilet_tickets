@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { CheckoutModule } from '../checkout/checkout.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -8,7 +8,7 @@ import { OrderReadService } from './order-read.service';
 import { OrderStatusMapper } from './order-status.mapper';
 
 @Module({
-  imports: [CheckoutModule, PrismaModule],
+  imports: [forwardRef(() => CheckoutModule), PrismaModule],
   controllers: [OrdersController],
   providers: [OrderProjectionService, OrderReadService, OrderStatusMapper],
   exports: [OrderProjectionService, OrderReadService, OrderStatusMapper],

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { CatalogModule } from '../catalog/catalog.module';
 import { UserModule } from '../user/user.module';
@@ -21,7 +21,7 @@ import { RefundService } from './refund.service';
 import { WebhookIdempotencyService } from './webhook-idempotency.service';
 
 @Module({
-  imports: [CatalogModule, MailModule, PricingModule, UserModule, SupplierModule],
+  imports: [forwardRef(() => CatalogModule), MailModule, PricingModule, UserModule, SupplierModule],
   controllers: [CheckoutController],
   providers: [
     CheckoutService,

@@ -1,5 +1,5 @@
 import { BullModule } from '@nestjs/bullmq';
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { EventOverrideService } from '../admin/event-override.service';
 import { IntegrationsModule } from '../integrations/integrations.module';
@@ -48,7 +48,7 @@ import { CatalogAuditService } from './catalog-audit.service';
 import { CatalogPolicyService } from './catalog-policy.service';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule, IntegrationsModule, OrdersModule],
+  imports: [BullModule.registerQueue({ name: QUEUE_EMAILS }), LandingModule, IntegrationsModule, forwardRef(() => OrdersModule)],
   controllers: [CatalogController, SubcategoryCollectionsController, SubcategoryLandingsController],
   providers: [
     CatalogService,
