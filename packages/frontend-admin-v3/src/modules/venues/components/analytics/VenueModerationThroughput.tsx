@@ -5,12 +5,12 @@ export function VenueModerationThroughput({ data }: { data: VenueModerationMetri
   const t = data.throughput;
   const items = [
     { label: 'Среднее время до 1-го решения', value: formatMs(t.timeToFirstDecisionAvgMs) },
-    { label: 'p50', value: formatMs(t.timeToFirstDecisionP50Ms) },
-    { label: 'p95', value: formatMs(t.timeToFirstDecisionP95Ms) },
+    { label: 'Медиана (p50)', value: formatMs(t.timeToFirstDecisionP50Ms) },
+    { label: 'Перцентиль 95 (p95)', value: formatMs(t.timeToFirstDecisionP95Ms) },
   ];
   return (
     <div className="rounded-lg border bg-card p-4">
-      <div className="text-sm font-medium">Throughput (до первого решения)</div>
+      <div className="text-sm font-medium">Пропускная способность (до первого решения)</div>
       <p className="mt-1 text-xs text-muted-foreground">
         Учитываются площадки, у которых дата первого решения попадает в выбранный диапазон.
       </p>

@@ -1,8 +1,9 @@
 import { adminApi } from '@/api/client';
 import { PageHeader } from '@/components/shared/page-header/PageHeader';
-import { FilterBar, FilterField } from '@/components/shared/filters/FilterBar';
+import { FilterBar, FilterField, FilterFieldsGrid } from '@/components/shared/filters/FilterBar';
 import { SearchInput } from '@/components/shared/filters/SearchInput';
 import { DataTableShell } from '@/components/shared/table/DataTableShell';
+import { TableHorizontalScroll } from '@/components/shared/table/TableHorizontalScroll';
 import { ErrorState } from '@/components/shared/states/ErrorState';
 import { LoadingState } from '@/components/shared/states/LoadingState';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,9 @@ const IMPORT: Array<{ id: '' | VenueImportSource; label: string }> = [
   { id: 'TICKETSCLOUD', label: 'TicketsCloud' },
   { id: 'TEPLOHOD', label: 'Теплоход' },
 ];
+
+const FILTER_SELECT =
+  'h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm';
 
 function formatDt(iso: string): string {
   const d = new Date(iso);
@@ -177,7 +181,7 @@ export function VenuesListPage() {
   const totalPages = Math.max(1, Math.ceil(total / list.pageSize));
 
   if (venuesQ.isLoading && !venuesQ.data) {
-    return <LoadingState label="Загрузка площадок…" />;
+    return <LoadingState variant="table" label="Загрузка площадок…" />;
   }
   if (venuesQ.isError) {
     return (
@@ -210,171 +214,176 @@ export function VenuesListPage() {
       />
 
       <FilterBar>
-        <FilterField label="Поиск">
-          <SearchInput
-            value={list.q}
-            onChange={(e) => list.setQ(e.target.value)}
-            placeholder="Название, адрес…"
-          />
-        </FilterField>
-        <FilterField label="Город">
-          <select
-            className="h-9 w-full min-w-[160px] rounded-md border border-input bg-background px-2 text-sm"
-            value={list.city}
-            onChange={(e) => list.setCity(e.target.value)}
-          >
-            <option value="">Все</option>
-            {(citiesQ.data ?? []).map((c) => (
-              <option key={c.slug} value={c.slug}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Статус ЖЦ">
-          <select
-            className="h-9 w-full min-w-[140px] rounded-md border border-input bg-background px-2 text-sm"
-            value={vf.lifecycle}
-            onChange={(e) => {
-              setVf({ lifecycle: (e.target.value || '') as '' | VenueLifecycleStatus }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            {LIFECYCLE.map((x) => (
-              <option key={x.id || 'all'} value={x.id}>
-                {x.label}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Готовность (БД)">
-          <select
-            className="h-9 w-full min-w-[160px] rounded-md border border-input bg-background px-2 text-sm"
-            value={vf.readinessStatus}
-            onChange={(e) => {
-              setVf({ readinessStatus: (e.target.value || '') as typeof vf.readinessStatus }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            {READINESS.map((x) => (
-              <option key={x.id || 'all'} value={x.id}>
-                {x.label}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Источник">
-          <select
-            className="h-9 w-full min-w-[120px] rounded-md border border-input bg-background px-2 text-sm"
-            value={vf.sourceType}
-            onChange={(e) => {
-              setVf({ sourceType: (e.target.value || '') as '' | VenueSourceType }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            {SOURCE.map((x) => (
-              <option key={x.id || 'all'} value={x.id}>
-                {x.label}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Импорт">
-          <select
-            className="h-9 w-full min-w-[130px] rounded-md border border-input bg-background px-2 text-sm"
-            value={vf.importSource}
-            onChange={(e) => {
-              setVf({ importSource: (e.target.value || '') as '' | VenueImportSource }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            {IMPORT.map((x) => (
-              <option key={x.id || 'all'} value={x.id}>
-                {x.label}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Сортировка">
-          <div className="flex gap-1">
-            <select
-              className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
-              value={vf.sort}
-              onChange={(e) => {
-                setVf({ sort: e.target.value as 'updatedAt' | 'confidenceScore' }, { history: 'replace' });
-                list.setPageReplace(1);
-              }}
-            >
-              <option value="updatedAt">По дате обновления</option>
-              <option value="confidenceScore">По уверенности</option>
-            </select>
-            <select
-              className="h-9 w-[88px] rounded-md border border-input bg-background px-2 text-sm"
-              value={vf.order}
-              onChange={(e) => {
-                setVf({ order: e.target.value as 'asc' | 'desc' }, { history: 'replace' });
-                list.setPageReplace(1);
-              }}
-            >
-              <option value="desc">↓</option>
-              <option value="asc">↑</option>
-            </select>
-          </div>
-        </FilterField>
-        <FilterField label="Флаги">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={vf.needsReviewOnly}
-              onChange={(e) => {
-                setVf({ needsReviewOnly: e.target.checked }, { history: 'replace' });
-                list.setPageReplace(1);
-              }}
+        <FilterFieldsGrid>
+          <FilterField label="Поиск" className="sm:col-span-2 lg:col-span-2">
+            <SearchInput
+              value={list.q}
+              onChange={(e) => list.setQ(e.target.value)}
+              placeholder="Название, адрес…"
             />
-            Требует проверки
-          </label>
-          <label className="mt-1 flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={vf.hiddenGemOnly}
-              onChange={(e) => {
-                setVf({ hiddenGemOnly: e.target.checked }, { history: 'replace' });
-                list.setPageReplace(1);
-              }}
-            />
-            Hidden gems
-          </label>
-          <label className="mt-1 flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Merge target</span>
+          </FilterField>
+          <FilterField label="Город">
+            <select className={FILTER_SELECT} value={list.city} onChange={(e) => list.setCity(e.target.value)}>
+              <option value="">Все</option>
+              {(citiesQ.data ?? []).map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField label="Статус ЖЦ">
             <select
-              className="h-8 rounded-md border border-input bg-background px-1 text-xs"
-              value={vf.hasMergeTarget}
+              className={FILTER_SELECT}
+              value={vf.lifecycle}
               onChange={(e) => {
-                setVf({ hasMergeTarget: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+                setVf({ lifecycle: (e.target.value || '') as '' | VenueLifecycleStatus }, { history: 'replace' });
                 list.setPageReplace(1);
               }}
             >
-              <option value="">—</option>
-              <option value="yes">Есть</option>
-              <option value="no">Нет</option>
+              {LIFECYCLE.map((x) => (
+                <option key={x.id || 'all'} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
             </select>
-          </label>
-          <label className="mt-1 flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">SEO whitelist</span>
+          </FilterField>
+          <FilterField label="Готовность (БД)">
             <select
-              className="h-8 rounded-md border border-input bg-background px-1 text-xs"
-              value={vf.whitelist}
+              className={FILTER_SELECT}
+              value={vf.readinessStatus}
               onChange={(e) => {
-                setVf({ whitelist: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+                setVf({ readinessStatus: (e.target.value || '') as typeof vf.readinessStatus }, { history: 'replace' });
                 list.setPageReplace(1);
               }}
             >
-              <option value="">—</option>
-              <option value="yes">Да</option>
-              <option value="no">Нет</option>
+              {READINESS.map((x) => (
+                <option key={x.id || 'all'} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
             </select>
-          </label>
-        </FilterField>
+          </FilterField>
+          <FilterField label="Источник">
+            <select
+              className={FILTER_SELECT}
+              value={vf.sourceType}
+              onChange={(e) => {
+                setVf({ sourceType: (e.target.value || '') as '' | VenueSourceType }, { history: 'replace' });
+                list.setPageReplace(1);
+              }}
+            >
+              {SOURCE.map((x) => (
+                <option key={x.id || 'all'} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField label="Импорт">
+            <select
+              className={FILTER_SELECT}
+              value={vf.importSource}
+              onChange={(e) => {
+                setVf({ importSource: (e.target.value || '') as '' | VenueImportSource }, { history: 'replace' });
+                list.setPageReplace(1);
+              }}
+            >
+              {IMPORT.map((x) => (
+                <option key={x.id || 'all'} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField label="Сортировка">
+            <div className="flex min-w-0 gap-2">
+              <select
+                className={`${FILTER_SELECT} min-w-0 flex-1`}
+                value={vf.sort}
+                onChange={(e) => {
+                  setVf({ sort: e.target.value as 'updatedAt' | 'confidenceScore' }, { history: 'replace' });
+                  list.setPageReplace(1);
+                }}
+              >
+                <option value="updatedAt">По дате обновления</option>
+                <option value="confidenceScore">По уверенности</option>
+              </select>
+              <select
+                className={`${FILTER_SELECT} w-[5.5rem] shrink-0`}
+                title="Порядок"
+                aria-label="Порядок сортировки"
+                value={vf.order}
+                onChange={(e) => {
+                  setVf({ order: e.target.value as 'asc' | 'desc' }, { history: 'replace' });
+                  list.setPageReplace(1);
+                }}
+              >
+                <option value="desc">↓ Новые</option>
+                <option value="asc">↑ Старые</option>
+              </select>
+            </div>
+          </FilterField>
+        </FilterFieldsGrid>
+
+        <div className="mt-3 border-t border-border/60 pt-3">
+          <FilterFieldsGrid className="gap-y-3 lg:grid-cols-6">
+            <div className="flex min-w-0 flex-col justify-center rounded-lg border border-dashed border-border/80 bg-muted/15 px-3 py-2 sm:col-span-2 lg:col-span-2">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <label className="flex min-w-0 cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={vf.needsReviewOnly}
+                    onChange={(e) => {
+                      setVf({ needsReviewOnly: e.target.checked }, { history: 'replace' });
+                      list.setPageReplace(1);
+                    }}
+                  />
+                  Требует проверки
+                </label>
+                <label className="flex min-w-0 cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={vf.hiddenGemOnly}
+                    onChange={(e) => {
+                      setVf({ hiddenGemOnly: e.target.checked }, { history: 'replace' });
+                      list.setPageReplace(1);
+                    }}
+                  />
+                  Особые места
+                </label>
+              </div>
+            </div>
+            <FilterField label="Цель слияния">
+              <select
+                className={FILTER_SELECT}
+                value={vf.hasMergeTarget}
+                onChange={(e) => {
+                  setVf({ hasMergeTarget: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+                  list.setPageReplace(1);
+                }}
+              >
+                <option value="">Все</option>
+                <option value="yes">Есть цель слияния</option>
+                <option value="no">Нет</option>
+              </select>
+            </FilterField>
+            <FilterField label="Белый список SEO">
+              <select
+                className={FILTER_SELECT}
+                value={vf.whitelist}
+                onChange={(e) => {
+                  setVf({ whitelist: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+                  list.setPageReplace(1);
+                }}
+              >
+                <option value="">Все</option>
+                <option value="yes">В белом списке</option>
+                <option value="no">Не в белом списке</option>
+              </select>
+            </FilterField>
+          </FilterFieldsGrid>
+        </div>
       </FilterBar>
 
       <DataTableShell>
@@ -403,7 +412,7 @@ export function VenuesListPage() {
             </Button>
           </div>
         </div>
-        <div className="overflow-x-auto p-2">
+        <TableHorizontalScroll innerClassName="p-2">
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="border-b bg-muted/40 text-left text-xs font-medium uppercase text-muted-foreground">
               <tr>
@@ -426,7 +435,7 @@ export function VenuesListPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </TableHorizontalScroll>
       </DataTableShell>
     </div>
   );
@@ -466,7 +475,7 @@ function VenueListRow({ row }: { row: AdminVenueCandidateRow }) {
               variant="outline"
               className="border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-800 dark:text-fuchsia-200"
             >
-              Hidden gem
+              Особое место
             </Badge>
           ) : null}
           {row.needsReview ? (

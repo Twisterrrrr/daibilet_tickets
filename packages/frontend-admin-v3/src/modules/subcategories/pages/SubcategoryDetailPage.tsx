@@ -6,6 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchAdminSubcategory, fetchAdminSubcategoryUsage, updateAdminSubcategory } from '../api/subcategories.api';
+import {
+  SUBCATEGORY_LANDING_MODE_LABEL,
+  SUBCATEGORY_LAYER_LABEL,
+  SUBCATEGORY_TYPE_LABEL,
+} from '../lib/subcategory-ui-labels';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -91,37 +96,37 @@ export function SubcategoryDetailPage() {
           <div className="text-sm font-medium">Основное</div>
           <div className="mt-4 grid gap-3">
             <div className="grid gap-2">
-              <div className="text-xs font-medium text-muted-foreground">Name (RU)</div>
+              <div className="text-xs font-medium text-muted-foreground">Название (RU)</div>
               <Input value={draft.nameRu} onChange={(e) => setDraft((p: any) => ({ ...p, nameRu: e.target.value }))} />
             </div>
             <div className="grid gap-2">
-              <div className="text-xs font-medium text-muted-foreground">Slug</div>
+              <div className="text-xs font-medium text-muted-foreground">Слаг</div>
               <Input value={draft.slug} onChange={(e) => setDraft((p: any) => ({ ...p, slug: e.target.value }))} className="font-mono" />
             </div>
             <div className="grid gap-2">
-              <div className="text-xs font-medium text-muted-foreground">Code</div>
+              <div className="text-xs font-medium text-muted-foreground">Код</div>
               <Input value={draft.code} onChange={(e) => setDraft((p: any) => ({ ...p, code: e.target.value }))} className="font-mono" />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <div className="text-xs font-medium text-muted-foreground">Type</div>
+                <div className="text-xs font-medium text-muted-foreground">Тип</div>
                 <select className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm" value={draft.type} onChange={(e) => setDraft((p: any) => ({ ...p, type: e.target.value }))}>
-                  <option value="EVENT_ONLY">EVENT_ONLY</option>
-                  <option value="VENUE_ONLY">VENUE_ONLY</option>
-                  <option value="UNIVERSAL">UNIVERSAL</option>
+                  <option value="EVENT_ONLY">{SUBCATEGORY_TYPE_LABEL.EVENT_ONLY}</option>
+                  <option value="VENUE_ONLY">{SUBCATEGORY_TYPE_LABEL.VENUE_ONLY}</option>
+                  <option value="UNIVERSAL">{SUBCATEGORY_TYPE_LABEL.UNIVERSAL}</option>
                 </select>
               </div>
               <div className="grid gap-2">
-                <div className="text-xs font-medium text-muted-foreground">Layer</div>
+                <div className="text-xs font-medium text-muted-foreground">Слой</div>
                 <select className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm" value={draft.layer} onChange={(e) => setDraft((p: any) => ({ ...p, layer: e.target.value }))}>
-                  <option value="PRIMARY">PRIMARY</option>
-                  <option value="SECONDARY">SECONDARY</option>
+                  <option value="PRIMARY">{SUBCATEGORY_LAYER_LABEL.PRIMARY}</option>
+                  <option value="SECONDARY">{SUBCATEGORY_LAYER_LABEL.SECONDARY}</option>
                 </select>
               </div>
             </div>
 
             <div className="grid gap-2">
-              <div className="text-xs font-medium text-muted-foreground">sortOrder</div>
+              <div className="text-xs font-medium text-muted-foreground">Порядок сортировки</div>
               <Input
                 value={String(draft.sortOrder ?? 0)}
                 onChange={(e) => setDraft((p: any) => ({ ...p, sortOrder: Number(e.target.value) || 0 }))}
@@ -132,7 +137,7 @@ export function SubcategoryDetailPage() {
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={draft.isActive} onChange={(e) => setDraft((p: any) => ({ ...p, isActive: e.target.checked }))} />
-                <span>Active</span>
+                <span>Активна</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -140,20 +145,20 @@ export function SubcategoryDetailPage() {
                   checked={draft.isLandingEnabled}
                   onChange={(e) => setDraft((p: any) => ({ ...p, isLandingEnabled: e.target.checked }))}
                 />
-                <span>Landing enabled</span>
+                <span>Лендинг включён</span>
               </label>
             </div>
 
             <div className="grid gap-2">
-              <div className="text-xs font-medium text-muted-foreground">landingMode</div>
+              <div className="text-xs font-medium text-muted-foreground">Режим лендинга</div>
               <select className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm" value={draft.landingMode} onChange={(e) => setDraft((p: any) => ({ ...p, landingMode: e.target.value }))}>
-                <option value="DISABLED">DISABLED</option>
-                <option value="AUTO">AUTO</option>
-                <option value="TOPIC_HUB">TOPIC_HUB</option>
+                <option value="DISABLED">{SUBCATEGORY_LANDING_MODE_LABEL.DISABLED}</option>
+                <option value="AUTO">{SUBCATEGORY_LANDING_MODE_LABEL.AUTO}</option>
+                <option value="TOPIC_HUB">{SUBCATEGORY_LANDING_MODE_LABEL.TOPIC_HUB}</option>
               </select>
             </div>
             <div className="grid gap-2">
-              <div className="text-xs font-medium text-muted-foreground">landingTopicKey</div>
+              <div className="text-xs font-medium text-muted-foreground">Ключ темы лендинга</div>
               <Input
                 value={draft.landingTopicKey ?? ''}
                 onChange={(e) => setDraft((p: any) => ({ ...p, landingTopicKey: e.target.value || null }))}
@@ -165,25 +170,31 @@ export function SubcategoryDetailPage() {
         </div>
 
         <div className="rounded-lg border bg-card p-5">
-          <div className="text-sm font-medium">Usage</div>
+          <div className="text-sm font-medium">Использование</div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>events: {row.usage?.eventsCount ?? '—'}</span>
+            <span>событий: {row.usage?.eventsCount ?? '—'}</span>
             <span>·</span>
-            <span>venues: {row.usage?.venuesCount ?? '—'}</span>
+            <span>площадок: {row.usage?.venuesCount ?? '—'}</span>
           </div>
 
           <div className="mt-4 flex items-center gap-2">
             <Button type="button" variant={usageTab === 'EVENT' ? 'default' : 'outline'} size="sm" onClick={() => { setUsageTab('EVENT'); setUsagePage(1); }}>
-              Events
+              События
             </Button>
             <Button type="button" variant={usageTab === 'VENUE' ? 'default' : 'outline'} size="sm" onClick={() => { setUsageTab('VENUE'); setUsagePage(1); }}>
-              Venues
+              Площадки
             </Button>
           </div>
 
           <div className="mt-4">
-            {usage.isLoading ? <LoadingState label="Загрузка usage…" /> : null}
-            {usage.isError ? <ErrorState title="Не удалось загрузить usage" description={usage.error instanceof Error ? usage.error.message : 'Ошибка'} onRetry={() => usage.refetch()} /> : null}
+            {usage.isLoading ? <LoadingState label="Загрузка использования…" /> : null}
+            {usage.isError ? (
+              <ErrorState
+                title="Не удалось загрузить использование"
+                description={usage.error instanceof Error ? usage.error.message : 'Ошибка'}
+                onRetry={() => usage.refetch()}
+              />
+            ) : null}
             {usage.data ? (
               <div className="space-y-2">
                 {usage.data.items.length === 0 ? (

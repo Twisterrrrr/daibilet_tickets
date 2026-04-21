@@ -15,7 +15,14 @@ export type AdminEventListItem = {
   _count?: { sessions?: number; tags?: number; offers?: number };
   override?: { isHidden?: boolean; editorStatus?: string | null } | null;
   sectionsDerived?: Array<{ slug: 'events' | 'excursions' | 'museums' | 'activities' | 'entertainment'; name: string }>;
-  subcategoriesCanonical?: Array<{ id: string; slug: string; name: string; isActive?: boolean }>;
+  subcategoriesCanonical?: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    isActive?: boolean;
+    layer?: 'PRIMARY' | 'SECONDARY';
+    subcategoryType?: 'UNIVERSAL' | 'EVENT_ONLY' | 'VENUE_ONLY';
+  }>;
   lastSessionAt?: string | null;
   nextSessionAt?: string | null;
   futureSessionsCount?: number;

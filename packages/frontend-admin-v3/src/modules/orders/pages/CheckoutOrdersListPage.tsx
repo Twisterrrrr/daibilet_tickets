@@ -25,7 +25,7 @@ export function CheckoutOrdersListPage() {
     <div className="space-y-6">
       <PageHeader
         title="Заказы"
-        subtitle="Checkout-сессии: внутренний checkout и виджеты (всё в одной таблице)"
+        subtitle="Сессии оформления заказа: встроенная касса и виджеты (одна таблица)"
       />
       {q.isLoading ? (
         <p className="text-sm text-muted-foreground">Загрузка…</p>

@@ -169,7 +169,7 @@ export function ReviewsListPage() {
         </Button>
         {tab === 'reviews' && (reviewsQ.data?.pendingCount != null) ? (
           <div className="ml-auto text-xs text-muted-foreground">
-            Pending: <span className="tabular-nums text-foreground">{reviewsQ.data.pendingCount}</span>
+            На модерации: <span className="tabular-nums text-foreground">{reviewsQ.data.pendingCount}</span>
           </div>
         ) : null}
       </div>
@@ -178,21 +178,21 @@ export function ReviewsListPage() {
         <div className="rounded-lg border bg-card p-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="space-y-1">
-              <span className="text-xs text-muted-foreground">status</span>
+              <span className="text-xs text-muted-foreground">Статус</span>
               <select
                 className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                 value={status}
                 onChange={(e) => { setStatus(e.target.value); setPage(1); }}
               >
                 <option value="">Все</option>
-                <option value="PENDING">PENDING</option>
-                <option value="APPROVED">APPROVED</option>
-                <option value="REJECTED">REJECTED</option>
-                <option value="HIDDEN">HIDDEN</option>
+                <option value="PENDING">На модерации (PENDING)</option>
+                <option value="APPROVED">Одобрено (APPROVED)</option>
+                <option value="REJECTED">Отклонено (REJECTED)</option>
+                <option value="HIDDEN">Скрыто (HIDDEN)</option>
               </select>
             </label>
             <label className="space-y-1 sm:col-span-2">
-              <span className="text-xs text-muted-foreground">eventId (опционально)</span>
+              <span className="text-xs text-muted-foreground">ID события (необязательно)</span>
               <Input value={eventId} onChange={(e) => { setEventId(e.target.value); setPage(1); }} placeholder="UUID события" />
             </label>
           </div>
@@ -242,7 +242,7 @@ export function ReviewsListPage() {
           <DisputesTable
             items={(disputesQ.data?.items ?? []) as DisputeRow[]}
             onResolve={(id) => {
-              const status = prompt('Статус решения (например KEEP/HIDE/DELETE)', 'KEEP') ?? '';
+              const status = prompt('Код решения для API: KEEP, HIDE или DELETE', 'KEEP') ?? '';
               if (!status.trim()) return;
               const comment = prompt('Комментарий решения (опционально)', '') ?? '';
               resolveDisputeM.mutate({ id, status: status.trim(), decisionComment: comment.trim() || undefined });

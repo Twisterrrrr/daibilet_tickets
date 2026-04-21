@@ -33,7 +33,7 @@ export function TicketsPage() {
                 <th className="px-3 py-2">Код</th>
                 <th className="px-3 py-2">Тема</th>
                 <th className="px-3 py-2">Статус</th>
-                <th className="px-3 py-2">Email</th>
+                <th className="px-3 py-2">Эл. почта</th>
                 <th className="px-3 py-2">Создан</th>
               </tr>
             </thead>

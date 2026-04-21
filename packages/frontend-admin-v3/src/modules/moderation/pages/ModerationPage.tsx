@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/shared/page-header/PageHeader';
 import { DataTableShell } from '@/components/shared/table/DataTableShell';
+import { TableHorizontalScroll } from '@/components/shared/table/TableHorizontalScroll';
 import { ErrorState } from '@/components/shared/states/ErrorState';
 import { LoadingState } from '@/components/shared/states/LoadingState';
 import { Button } from '@/components/ui/button';
@@ -108,12 +109,12 @@ export function ModerationPage() {
     <div className="space-y-6">
       <PageHeader
         title="Модерация"
-        subtitle="Единая точка входа: очередь модерации событий (PENDING_REVIEW / AUTO_APPROVED)"
+        subtitle="Единая точка входа: очередь модерации событий (на проверке и авто-одобренные)"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {pending != null ? (
               <Badge variant="outline" className="text-xs">
-                pending: {pending}
+                в очереди: {pending}
               </Badge>
             ) : null}
             <Button type="button" variant="outline" onClick={() => { void q.refetch(); void countQ.refetch(); }}>
@@ -126,31 +127,31 @@ export function ModerationPage() {
       <div className="rounded-lg border bg-card p-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">status</span>
+            <span className="text-xs text-muted-foreground">Статус</span>
             <select
               className="h-9 w-full rounded-md border bg-background px-3 text-sm"
               value={status}
               onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             >
-              <option value="">PENDING_REVIEW + AUTO_APPROVED</option>
-              <option value="PENDING_REVIEW">PENDING_REVIEW</option>
-              <option value="AUTO_APPROVED">AUTO_APPROVED</option>
-              <option value="REJECTED">REJECTED</option>
+              <option value="">На проверке и авто-одобренные</option>
+              <option value="PENDING_REVIEW">На проверке (PENDING_REVIEW)</option>
+              <option value="AUTO_APPROVED">Авто-одобрено (AUTO_APPROVED)</option>
+              <option value="REJECTED">Отклонено (REJECTED)</option>
             </select>
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">sort</span>
+            <span className="text-xs text-muted-foreground">Сортировка</span>
             <select
               className="h-9 w-full rounded-md border bg-background px-3 text-sm"
               value={sortBy}
               onChange={(e) => { setSortBy(e.target.value as any); setPage(1); }}
             >
-              <option value="trust_asc">trust asc (приоритет)</option>
-              <option value="created_desc">created desc</option>
+              <option value="trust_asc">Сначала низкий trust (приоритет)</option>
+              <option value="created_desc">Сначала новые по дате</option>
             </select>
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">limit</span>
+            <span className="text-xs text-muted-foreground">Лимит</span>
             <Input value={String(limit)} readOnly />
           </label>
         </div>
@@ -179,7 +180,7 @@ export function ModerationPage() {
           </div>
         }
       >
-        <div className="overflow-x-auto">
+        <TableHorizontalScroll>
           <table className="w-full min-w-[980px] text-sm">
             <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
               <tr>
@@ -214,7 +215,7 @@ export function ModerationPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </TableHorizontalScroll>
       </DataTableShell>
     </div>
   );
@@ -234,14 +235,14 @@ function ModerationRow({
   return (
     <tr className="border-b">
       <td className="px-4 py-3 align-top text-xs text-muted-foreground">
-        <Badge variant="outline">EVENT</Badge>
+        <Badge variant="outline">Событие</Badge>
       </td>
       <td className="px-4 py-3 align-top">
         <Link className="font-medium text-primary hover:underline" to={`/admin-v3/events/${it.id}`}>
           {it.title}
         </Link>
         <div className="mt-1 text-xs text-muted-foreground">
-          {it.city?.name ?? '—'} · offers: {it._count?.offers ?? 0}
+          {it.city?.name ?? '—'} · предложений: {it._count?.offers ?? 0}
         </div>
         <div className="mt-1 font-mono text-[11px] text-muted-foreground">{it.slug}</div>
       </td>

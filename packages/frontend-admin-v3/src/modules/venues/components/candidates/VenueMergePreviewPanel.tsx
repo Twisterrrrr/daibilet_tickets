@@ -7,6 +7,7 @@ import {
   mergeSimilarityLabelText,
 } from '@/modules/venues/utils/merge-preview-labels';
 import { venueDecisionHintReasonLabel } from '@/modules/venues/utils/venue-decision-hint-labels';
+import { venueLifecycleLabelRu } from '@/modules/venues/utils/venue-lifecycle-labels';
 
 function SourceLine({
   sourceType,
@@ -49,7 +50,7 @@ export function VenueMergePreviewPanel({ preview }: Props) {
           <SourceLine sourceType={c.sourceType} importSource={c.importSource} />
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">Статус:</span>
-            <Badge variant="outline">{c.lifecycleStatus}</Badge>
+            <Badge variant="outline">{venueLifecycleLabelRu(c.lifecycleStatus)}</Badge>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Уверенность:</span>
@@ -62,7 +63,7 @@ export function VenueMergePreviewPanel({ preview }: Props) {
                     conf.level === 'HIGH' ? 'success' : conf.level === 'MEDIUM' ? 'warning' : 'outline'
                   }
                 >
-                  {conf.level}
+                  {conf.level === 'HIGH' ? 'высокая' : conf.level === 'MEDIUM' ? 'средняя' : conf.level === 'LOW' ? 'низкая' : conf.level}
                 </Badge>
                 {conf.percent ? (
                   <span className="text-xs tabular-nums text-muted-foreground">{conf.percent}</span>
@@ -85,7 +86,7 @@ export function VenueMergePreviewPanel({ preview }: Props) {
           <SourceLine sourceType={t.sourceType} importSource={t.importSource} />
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">Статус:</span>
-            <Badge variant="outline">{t.lifecycleStatus}</Badge>
+            <Badge variant="outline">{venueLifecycleLabelRu(t.lifecycleStatus)}</Badge>
             {t.isPublished ? (
               <Badge variant="info" className="text-xs">
                 опубликована

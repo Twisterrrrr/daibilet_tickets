@@ -6,6 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchAdminSubcategories, type AdminSubcategoryRow } from '../api/subcategories.api';
+import {
+  SUBCATEGORY_LAYER_LABEL,
+  landingEnabledBadgeLabel,
+  subcategoryActiveLabel,
+  subcategoryLandingModeLabel,
+  subcategoryTypeLabel,
+} from '../lib/subcategory-ui-labels';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link } from 'react-router-dom';
@@ -51,26 +58,31 @@ export function SubcategoriesListPage() {
       <DataTableShell
         toolbar={
           <div className="flex flex-wrap items-center gap-2">
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск (slug/code/name)..." className="h-9 w-[320px]" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Поиск по коду, слагу или названию…"
+              className="h-9 w-[320px]"
+            />
             <select
               className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={forEntity}
               onChange={(e) => setForEntity(e.target.value as any)}
             >
-              <option value="event">Events</option>
-              <option value="venue">Venues</option>
+              <option value="event">События</option>
+              <option value="venue">Площадки</option>
             </select>
             <select
               className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={layer}
               onChange={(e) => setLayer(e.target.value as any)}
             >
-              <option value="PRIMARY">PRIMARY</option>
-              <option value="SECONDARY">SECONDARY</option>
+              <option value="PRIMARY">{SUBCATEGORY_LAYER_LABEL.PRIMARY}</option>
+              <option value="SECONDARY">{SUBCATEGORY_LAYER_LABEL.SECONDARY}</option>
             </select>
             <label className="ml-2 flex items-center gap-2 text-sm">
               <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
-              <span>Include inactive</span>
+              <span>Показать неактивные</span>
             </label>
           </div>
         }
@@ -85,14 +97,14 @@ export function SubcategoriesListPage() {
             <table className="w-full min-w-[1100px] text-sm">
               <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3 text-left">Name</th>
-                  <th className="px-4 py-3 text-left">Slug / Code</th>
-                  <th className="px-4 py-3 text-center">Type</th>
-                  <th className="px-4 py-3 text-center">Hierarchy</th>
-                  <th className="px-4 py-3 text-center">Landing</th>
-                  <th className="px-4 py-3 text-center">Usage</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-center">Actions</th>
+                  <th className="px-4 py-3 text-left">Название</th>
+                  <th className="px-4 py-3 text-left">Слаг / код</th>
+                  <th className="px-4 py-3 text-center">Тип</th>
+                  <th className="px-4 py-3 text-center">Иерархия</th>
+                  <th className="px-4 py-3 text-center">Лендинг</th>
+                  <th className="px-4 py-3 text-center">Использование</th>
+                  <th className="px-4 py-3 text-center">Статус</th>
+                  <th className="px-4 py-3 text-center">Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -102,7 +114,7 @@ export function SubcategoriesListPage() {
                       <div className="font-medium">{r.nameRu}</div>
                       {r.parent ? (
                         <div className="mt-1 text-xs text-muted-foreground">
-                          parent: <span className="font-mono">{r.parent.slug}</span>
+                          родитель: <span className="font-mono">{r.parent.slug}</span>
                         </div>
                       ) : null}
                     </td>
@@ -111,22 +123,28 @@ export function SubcategoriesListPage() {
                       <div className="mt-1 font-mono text-xs text-muted-foreground">{r.code}</div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Badge variant="outline">{r.type}</Badge>
+                      <Badge variant="outline">{subcategoryTypeLabel(r.type)}</Badge>
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-muted-foreground">
-                      {r.parent ? 'child' : 'root'} · {Array.isArray(r.children) ? r.children.length : 0} children
+                      {r.parent ? 'дочерняя' : 'корень'} · дочерних: {Array.isArray(r.children) ? r.children.length : 0}
                     </td>
                     <td className="px-4 py-3 text-center text-xs">
-                      <div>{r.isLandingEnabled ? <Badge variant="info">enabled</Badge> : <Badge variant="outline">off</Badge>}</div>
-                      <div className="mt-1 font-mono text-[11px] text-muted-foreground">{r.landingMode}</div>
+                      <div>
+                        {r.isLandingEnabled ? (
+                          <Badge variant="info">{landingEnabledBadgeLabel(true)}</Badge>
+                        ) : (
+                          <Badge variant="outline">{landingEnabledBadgeLabel(false)}</Badge>
+                        )}
+                      </div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">{subcategoryLandingModeLabel(r.landingMode)}</div>
                     </td>
                     <td className="px-4 py-3 text-center text-xs">
                       <div className="text-muted-foreground">
-                        events: {r.usage?.eventsCount ?? '—'} · venues: {r.usage?.venuesCount ?? '—'}
+                        событий: {r.usage?.eventsCount ?? '—'} · площадок: {r.usage?.venuesCount ?? '—'}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Badge variant={r.isActive ? 'success' : 'outline'}>{r.isActive ? 'ACTIVE' : 'INACTIVE'}</Badge>
+                      <Badge variant={r.isActive ? 'success' : 'outline'}>{subcategoryActiveLabel(r.isActive)}</Badge>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <Button type="button" variant="outline" size="sm" asChild>

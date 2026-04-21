@@ -1,7 +1,8 @@
 import { PageHeader } from '@/components/shared/page-header/PageHeader';
-import { FilterBar, FilterField } from '@/components/shared/filters/FilterBar';
+import { FilterBar, FilterField, FilterFieldsGrid } from '@/components/shared/filters/FilterBar';
 import { SearchInput } from '@/components/shared/filters/SearchInput';
 import { DataTableShell } from '@/components/shared/table/DataTableShell';
+import { TableHorizontalScroll } from '@/components/shared/table/TableHorizontalScroll';
 import { ErrorState } from '@/components/shared/states/ErrorState';
 import { LoadingState } from '@/components/shared/states/LoadingState';
 import { Button } from '@/components/ui/button';
@@ -45,15 +46,20 @@ export function TagsListPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Теги" subtitle="Taxonomy / SEO routing: теги, группы, связи с событиями и статьями" />
+      <PageHeader
+        title="Теги"
+        subtitle="Классификация и маршрутизация тегов для SEO: группы, связи с событиями и статьями"
+      />
 
       <FilterBar>
-        <FilterField label="Поиск">
-          <SearchInput value={list.q} onChange={(e) => list.setQ(e.target.value)} placeholder="Название, slug…" />
-        </FilterField>
-        <FilterField label="Категория">
-          <InputSelect value={category} onChange={(v) => { setCategory(v); list.setPage(1); }} />
-        </FilterField>
+        <FilterFieldsGrid>
+          <FilterField label="Поиск" className="sm:col-span-2">
+            <SearchInput value={list.q} onChange={(e) => list.setQ(e.target.value)} placeholder="Название, slug…" />
+          </FilterField>
+          <FilterField label="Категория">
+            <InputSelect value={category} onChange={(v) => { setCategory(v); list.setPage(1); }} />
+          </FilterField>
+        </FilterFieldsGrid>
       </FilterBar>
 
       <DataTableShell>
@@ -70,7 +76,7 @@ export function TagsListPage() {
             </Button>
           </div>
         </div>
-        <div className="overflow-x-auto p-2">
+        <TableHorizontalScroll innerClassName="p-2">
           <table className="w-full min-w-[980px] text-sm">
             <thead className="border-b bg-muted/40 text-left text-xs font-medium uppercase text-muted-foreground">
               <tr>
@@ -92,7 +98,7 @@ export function TagsListPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </TableHorizontalScroll>
       </DataTableShell>
     </div>
   );
@@ -118,7 +124,7 @@ function TagRow({ row }: { row: AdminTagListItem }) {
         </div>
       </td>
       <td className="align-top px-3 py-3 text-xs text-muted-foreground">
-        Events: {row._count?.events ?? '—'} · Articles: {row._count?.articleTags ?? '—'}
+        События: {row._count?.events ?? '—'} · статьи: {row._count?.articleTags ?? '—'}
       </td>
       <td className="align-top px-3 py-3">
         <div className="flex flex-col gap-1">
@@ -139,13 +145,13 @@ function InputSelect({ value, onChange }: { value: string; onChange: (v: string)
       onChange={(e) => onChange(e.target.value)}
     >
       <option value="">Все</option>
-      <option value="CITY">CITY</option>
-      <option value="TOPIC">TOPIC</option>
-      <option value="SUBTOPIC">SUBTOPIC</option>
-      <option value="FORMAT">FORMAT</option>
-      <option value="VENUE">VENUE</option>
-      <option value="EVENT">EVENT</option>
-      <option value="GENERIC">GENERIC</option>
+      <option value="CITY">Город (CITY)</option>
+      <option value="TOPIC">Тема (TOPIC)</option>
+      <option value="SUBTOPIC">Подтема (SUBTOPIC)</option>
+      <option value="FORMAT">Формат (FORMAT)</option>
+      <option value="VENUE">Площадка (VENUE)</option>
+      <option value="EVENT">Событие (EVENT)</option>
+      <option value="GENERIC">Общий (GENERIC)</option>
     </select>
   );
 }

@@ -20,7 +20,7 @@ export function VenueTemplatePreviewPanel({ sections }: { sections: BuiltVenueTe
 
       {(sections.heroTitle || sections.introLead) && (
         <section>
-          <h3 className="text-sm font-semibold">Hero / интро</h3>
+          <h3 className="text-sm font-semibold">Главный блок и вступление</h3>
           {sections.heroTitle ? <p className="mt-1 text-sm font-medium">{sections.heroTitle}</p> : null}
           {sections.introLead ? <p className="mt-2 text-sm text-muted-foreground">{sections.introLead}</p> : null}
         </section>

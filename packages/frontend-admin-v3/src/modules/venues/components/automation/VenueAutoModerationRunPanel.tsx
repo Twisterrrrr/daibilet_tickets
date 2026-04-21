@@ -32,7 +32,7 @@ export function VenueAutoModerationRunPanel() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">limit</span>
+          <span className="text-muted-foreground">Лимит</span>
           <Input
             id="run-limit"
             type="number"
@@ -49,7 +49,7 @@ export function VenueAutoModerationRunPanel() {
               checked={onlyHigh}
               onChange={(e) => setOnlyHigh(e.target.checked)}
             />
-            onlyHighConfidence
+            только высокая уверенность
           </label>
         </div>
       </div>

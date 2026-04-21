@@ -1,3 +1,4 @@
+import { TableHorizontalScroll } from '@/components/shared/table/TableHorizontalScroll';
 import { EmptyState } from '@/components/shared/states/EmptyState';
 import { ErrorState } from '@/components/shared/states/ErrorState';
 import { LoadingState } from '@/components/shared/states/LoadingState';
@@ -77,6 +78,8 @@ function mapRow(e: AdminEventListItem, health: EventHealthRow | undefined): Even
       slug: x.slug,
       name: x.name,
       isActive: (x as { isActive?: boolean }).isActive,
+      layer: (x as { layer?: 'PRIMARY' | 'SECONDARY' }).layer,
+      subcategoryType: (x as { subcategoryType?: 'UNIVERSAL' | 'EVENT_ONLY' | 'VENUE_ONLY' }).subcategoryType,
     })),
   };
 }
@@ -113,7 +116,7 @@ export function EventsTable({
   if (loading) {
     return (
       <div className="p-4">
-        <LoadingState />
+        <LoadingState variant="table" label="Загрузка событий…" />
       </div>
     );
   }
@@ -140,7 +143,7 @@ export function EventsTable({
   const someOnPageSelected = selectedOnPageCount > 0 && !allOnPageSelected;
 
   return (
-    <div className="overflow-x-auto">
+    <TableHorizontalScroll>
       <table className="w-full min-w-[1180px] text-sm">
         <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
           <tr>
@@ -190,7 +193,7 @@ export function EventsTable({
             ) : null}
             {visibleCols.includes('quality') ? <th className="px-4 py-3 text-center">Качество</th> : null}
             {visibleCols.includes('issues') ? <th className="px-4 py-3 text-center">Проблемы</th> : null}
-            {visibleCols.includes('override') ? <th className="px-4 py-3 text-center">Override</th> : null}
+            {visibleCols.includes('override') ? <th className="px-4 py-3 text-center">Перекрытие</th> : null}
             <th className="px-4 py-3 text-center">Действия</th>
           </tr>
         </thead>
@@ -210,7 +213,7 @@ export function EventsTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableHorizontalScroll>
   );
 }
 

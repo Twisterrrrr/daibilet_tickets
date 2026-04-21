@@ -12,10 +12,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
+import { LandingContentBlocksPanel } from '@/modules/landings/components/LandingContentBlocksPanel';
+import { LandingDiagnosticsPanel } from '@/modules/landings/components/LandingDiagnosticsPanel';
 import {
   createAdminLanding,
   fetchAdminLandingDetail,
   fetchAdminLandingResolvedEvents,
+  fetchAdminLandingThemes,
   patchAdminLanding,
   type AdminLandingDetail,
   type AdminLandingResolvedEventsResponse,
@@ -59,12 +62,16 @@ export function LandingDetailPage() {
       const res = await adminApi.get<{ items: Array<{ id: string; title: string; slug: string; landingType: string }> }>(
         '/admin/landings?landingType=MULTI_CITY&limit=200',
       );
-      const res2 = await adminApi.get<{ items: Array<{ id: string; title: string; slug: string; landingType: string }> }>(
-        '/admin/landings?landingType=HUB&limit=200',
-      );
-      return [...(res.items ?? []), ...(res2.items ?? [])];
+      return res.items ?? [];
     },
   });
+
+  const themesQ = useQuery({
+    queryKey: ['admin-landing-themes'],
+    queryFn: fetchAdminLandingThemes,
+  });
+
+  const [landingEditTab, setLandingEditTab] = React.useState<'all' | 'composition' | 'diagnostics'>('all');
 
   const resolvedQ = useQuery<AdminLandingResolvedEventsResponse>({
     queryKey: ['admin-landing-resolved-events', id],
@@ -158,7 +165,7 @@ export function LandingDetailPage() {
         (c) => c.landingType === 'CITY' && c.status === 'ACTIVE' && c.isActive && c.isIndexable,
       ).length;
       if (liveChildren <= 0) {
-        return { ok: false as const, reason: 'HUB/MULTI_CITY нельзя активировать без живых городских вариантов.' };
+        return { ok: false as const, reason: 'MULTI_CITY нельзя активировать без живых городских вариантов.' };
       }
     }
     return { ok: true as const };
@@ -215,6 +222,18 @@ export function LandingDetailPage() {
         relatedCollectionIds: Array.isArray(draft.relatedCollectionIds) ? draft.relatedCollectionIds : [],
         metaTitle: draft.metaTitle ?? null,
         metaDescription: draft.metaDescription ?? null,
+        themeId: draft.themeId ?? null,
+        heroTitle: draft.heroTitle ?? null,
+        heroSubtitle: draft.heroSubtitle ?? null,
+        heroBadge: draft.heroBadge ?? null,
+        heroImageUrl: draft.heroImageUrl ?? null,
+        heroMobileImageUrl: draft.heroMobileImageUrl ?? null,
+        layoutVariant: draft.layoutVariant ?? null,
+        surfaceVariant: draft.surfaceVariant ?? null,
+        seoH1: draft.seoH1 ?? null,
+        seoTitle: draft.seoTitle ?? null,
+        seoDescription: draft.seoDescription ?? null,
+        ogImageUrl: draft.ogImageUrl ?? null,
         canonicalUrl: draft.canonicalUrl ?? null,
         isIndexable: Boolean(draft.isIndexable),
         isActive: Boolean(draft.isActive),
@@ -243,6 +262,7 @@ export function LandingDetailPage() {
       await qc.invalidateQueries({ queryKey: ['admin-landings'] });
       await qc.invalidateQueries({ queryKey: ['admin-landing-detail', id] });
       await qc.invalidateQueries({ queryKey: ['admin-landing-resolved-events', id] });
+      await qc.invalidateQueries({ queryKey: ['admin-landing-seo-audit', id] });
     },
     onError: (e: unknown) => {
       const d = getAdminErrorDisplay(e);
@@ -316,6 +336,21 @@ export function LandingDetailPage() {
 
       relatedArticleIds: [],
       relatedCollectionIds: [],
+
+      themeId: null,
+      theme: null,
+      contentBlocks: [],
+      heroTitle: null,
+      heroSubtitle: null,
+      heroBadge: null,
+      heroImageUrl: null,
+      heroMobileImageUrl: null,
+      layoutVariant: null,
+      surfaceVariant: null,
+      seoH1: null,
+      seoTitle: null,
+      seoDescription: null,
+      ogImageUrl: null,
     };
     const cur = draft ?? init;
     if (!draft) setDraft(cur);
@@ -377,7 +412,6 @@ export function LandingDetailPage() {
               }}
             >
               <option value="CITY">CITY</option>
-              <option value="HUB">HUB</option>
               <option value="MULTI_CITY">MULTI_CITY</option>
             </select>
           </label>
@@ -490,9 +524,42 @@ export function LandingDetailPage() {
         </div>
       ) : null}
 
-      <HubReadinessPanel title="Лендинг (hub readiness)" snapshot={draft.hubReadiness} />
+      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+        <Button
+          type="button"
+          variant={landingEditTab === 'all' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setLandingEditTab('all')}
+        >
+          Все поля
+        </Button>
+        <Button
+          type="button"
+          variant={landingEditTab === 'composition' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setLandingEditTab('composition')}
+        >
+          Композиция (блоки)
+        </Button>
+        <Button
+          type="button"
+          variant={landingEditTab === 'diagnostics' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setLandingEditTab('diagnostics')}
+        >
+          Диагностика
+        </Button>
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {landingEditTab === 'diagnostics' ? (
+        <LandingDiagnosticsPanel landingId={draft.id} />
+      ) : landingEditTab === 'composition' ? (
+        <LandingContentBlocksPanel landingId={draft.id} blocks={draft.contentBlocks ?? []} />
+      ) : (
+        <>
+          <HubReadinessPanel title="Лендинг (hub readiness)" snapshot={draft.hubReadiness} />
+
+          <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg border bg-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">Статус</div>
@@ -507,15 +574,15 @@ export function LandingDetailPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-              status
+              Статус
               <select
                 className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
                 value={draft.status}
                 onChange={(e) => setDraft({ ...draft, status: e.target.value as AdminLandingDetail['status'] })}
               >
-                <option value="DRAFT">DRAFT</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="ARCHIVED">ARCHIVED</option>
+                <option value="DRAFT">Черновик</option>
+                <option value="ACTIVE">Опубликовано</option>
+                <option value="ARCHIVED">Архив</option>
               </select>
             </label>
             <label className="flex items-center gap-2 text-sm pt-6">
@@ -524,7 +591,7 @@ export function LandingDetailPage() {
                 checked={Boolean(draft.isActive)}
                 onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
               />
-              Active
+              Активен на витрине
             </label>
           </div>
 
@@ -565,7 +632,6 @@ export function LandingDetailPage() {
               }}
             >
               <option value="CITY">CITY</option>
-              <option value="HUB">HUB</option>
               <option value="MULTI_CITY">MULTI_CITY</option>
             </select>
           </label>
@@ -650,6 +716,66 @@ export function LandingDetailPage() {
           </label>
 
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Тема (LandingTheme, опционально)
+            <select
+              className="h-9 min-w-[240px] rounded-md border bg-background px-2 text-sm text-foreground"
+              value={draft.themeId ?? ''}
+              onChange={(e) => {
+                const themeId = e.target.value || null;
+                const opt = (themesQ.data ?? []).find((t) => t.id === themeId);
+                setDraft({
+                  ...draft,
+                  themeId,
+                  theme: opt
+                    ? { id: opt.id, slug: opt.slug, name: opt.name, isActive: true }
+                    : null,
+                });
+              }}
+            >
+              <option value="">—</option>
+              {(themesQ.data ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} · {t.slug}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="pt-2 text-sm font-medium">Hero (публичный renderer)</div>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            heroTitle
+            <input
+              className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
+              value={draft.heroTitle ?? ''}
+              onChange={(e) => setDraft({ ...draft, heroTitle: e.target.value || null })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            heroSubtitle
+            <input
+              className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
+              value={draft.heroSubtitle ?? ''}
+              onChange={(e) => setDraft({ ...draft, heroSubtitle: e.target.value || null })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            heroBadge
+            <input
+              className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
+              value={draft.heroBadge ?? ''}
+              onChange={(e) => setDraft({ ...draft, heroBadge: e.target.value || null })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            heroImageUrl
+            <input
+              className="h-9 rounded-md border bg-background px-2 font-mono text-sm text-foreground"
+              value={draft.heroImageUrl ?? ''}
+              onChange={(e) => setDraft({ ...draft, heroImageUrl: e.target.value || null })}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             canonicalUrl
             <input
               className="h-9 rounded-md border bg-background px-2 font-mono text-sm text-foreground"
@@ -673,6 +799,40 @@ export function LandingDetailPage() {
               className="min-h-[90px] rounded-md border bg-background px-2 py-2 text-sm text-foreground"
               value={draft.metaDescription ?? ''}
               onChange={(e) => setDraft({ ...draft, metaDescription: e.target.value || null })}
+            />
+          </label>
+
+          <div className="pt-2 text-sm font-medium">SEO (расширенные поля)</div>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            seoH1
+            <input
+              className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
+              value={draft.seoH1 ?? ''}
+              onChange={(e) => setDraft({ ...draft, seoH1: e.target.value || null })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            seoTitle
+            <input
+              className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
+              value={draft.seoTitle ?? ''}
+              onChange={(e) => setDraft({ ...draft, seoTitle: e.target.value || null })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            seoDescription
+            <textarea
+              className="min-h-[70px] rounded-md border bg-background px-2 py-2 text-sm text-foreground"
+              value={draft.seoDescription ?? ''}
+              onChange={(e) => setDraft({ ...draft, seoDescription: e.target.value || null })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            ogImageUrl
+            <input
+              className="h-9 rounded-md border bg-background px-2 font-mono text-sm text-foreground"
+              value={draft.ogImageUrl ?? ''}
+              onChange={(e) => setDraft({ ...draft, ogImageUrl: e.target.value || null })}
             />
           </label>
 
@@ -967,6 +1127,8 @@ export function LandingDetailPage() {
           />
         </div>
       ) : null}
+        </>
+      )}
     </div>
   );
 }

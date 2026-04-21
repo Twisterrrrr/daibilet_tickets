@@ -34,6 +34,8 @@ export type AdminEventDetail = {
   durationMinutes?: number | null;
   minAge?: number | null;
   meetingPoint?: string | null;
+  vesselName?: string | null;
+  experienceFormat?: string | null;
   refundPolicyText?: string | null;
   ageMin?: number | null;
   city?: { slug: string; name: string } | null;
@@ -54,9 +56,25 @@ export type AdminEventDetail = {
   };
   mediaSummary?: { hasCover: boolean; galleryCount: number };
   nextSessionAt?: string | null;
-  override?: { isHidden?: boolean; editorStatus?: string | null; imageUrl?: string | null } | null;
+  override?: {
+    isHidden?: boolean;
+    editorStatus?: string | null;
+    imageUrl?: string | null;
+    contentTemplateData?: unknown;
+  } | null;
+  /** Каталоговый тип события (определяет допустимые PRIMARY-подкатегории). */
+  category?: 'EXCURSION' | 'MUSEUM' | 'EVENT' | 'ACTIVITY' | 'ENTERTAINMENT';
   sectionsDerived?: Array<{ slug: 'events' | 'excursions' | 'museums' | 'activities' | 'entertainment'; name: string }>;
-  subcategoriesCanonical?: Array<{ id: string; slug: string; name: string; isActive?: boolean }>;
+  subcategoriesCanonical?: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    isActive?: boolean;
+    /** Слой подкатегории в БД (PRIMARY / SECONDARY). */
+    layer?: 'PRIMARY' | 'SECONDARY';
+    /** Prisma Subcategory.type — UNIVERSAL / EVENT_ONLY / VENUE_ONLY. */
+    subcategoryType?: 'UNIVERSAL' | 'EVENT_ONLY' | 'VENUE_ONLY';
+  }>;
   lastSessionAt?: string | null;
   isPast?: boolean;
   isArchived?: boolean;

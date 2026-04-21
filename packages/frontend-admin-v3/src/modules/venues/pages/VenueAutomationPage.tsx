@@ -18,7 +18,7 @@ export function VenueAutomationPage() {
     <div className="space-y-8">
       <PageHeader
         title="Авто-модерация площадок"
-        subtitle="Dry-run, ограниченный запуск, уровни доверия по источникам. Сначала наблюдение, затем осторожная автоматизация."
+        subtitle="Пробный прогон без изменений, ограниченный запуск, уровни доверия по источникам. Сначала наблюдение, затем осторожная автоматизация."
       />
 
       <VenueAutoModerationDryRun />
@@ -29,7 +29,7 @@ export function VenueAutomationPage() {
         {trustQ.isLoading ? <LoadingState label="Загрузка профилей…" /> : null}
         {trustQ.isError ? (
           <ErrorState
-            title="Не удалось загрузить trust"
+            title="Не удалось загрузить профили доверия"
             description={trustQ.error instanceof Error ? trustQ.error.message : 'Ошибка'}
             onRetry={() => trustQ.refetch()}
           />

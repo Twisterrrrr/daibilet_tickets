@@ -9,9 +9,34 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const inboxTotal = inbox.data?.total ?? 0;
   return (
     <div className="flex h-full flex-col">
-      <div className={cn('flex items-center gap-2 px-3 py-3', collapsed ? 'justify-center' : '')}>
-        <div className="h-8 w-8 rounded-lg bg-sidebar-accent" />
-        {collapsed ? null : <div className="text-sm font-semibold">Admin V3</div>}
+      <div
+        className={cn(
+          'border-b border-sidebar-border px-3 pb-4 pt-5',
+          collapsed ? 'flex justify-center px-2' : '',
+        )}
+      >
+        <div className={cn('flex min-w-0 items-center gap-2', collapsed && 'justify-center')}>
+          <div
+            className="flex h-10 w-[3.35rem] shrink-0 items-center justify-center text-[hsl(50_96%_58%)]"
+            aria-hidden
+          >
+            <svg
+              className="block h-[calc(2.9rem*9/15)] w-[2.9rem] -rotate-45"
+              viewBox="0 0 24 24"
+              preserveAspectRatio="none"
+              fill="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+            </svg>
+          </div>
+          {collapsed ? null : (
+            <div className="min-w-0">
+              <div className="text-[1.05rem] font-bold uppercase tracking-tight text-sidebar-foreground">DAIBILET</div>
+              <p className="mt-0.5 text-small text-sidebar-foreground/65">Админ-панель · v3</p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-2 pb-4">
@@ -32,8 +57,10 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
                       end={item.end}
                       className={({ isActive }) =>
                         cn(
-                          'flex items-center gap-2 rounded-md px-2 py-2 text-sm outline-none transition hover:bg-sidebar-accent',
-                          isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground',
+                          'flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium outline-none transition',
+                          isActive
+                            ? 'bg-primary/10 font-semibold text-primary shadow-[inset_3px_0_0_0_hsl(var(--primary))]'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent',
                           collapsed ? 'justify-center' : '',
                         )
                       }

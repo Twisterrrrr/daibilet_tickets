@@ -43,49 +43,49 @@ type UrlState = {
 
 const STATUS: Array<{ id: '' | PromoPlacementBlockStatus; label: string }> = [
   { id: '', label: 'Все' },
-  { id: 'DRAFT', label: 'DRAFT' },
-  { id: 'PUBLISHED', label: 'PUBLISHED' },
-  { id: 'ARCHIVED', label: 'ARCHIVED' },
+  { id: 'DRAFT', label: 'Черновик' },
+  { id: 'PUBLISHED', label: 'Опубликовано' },
+  { id: 'ARCHIVED', label: 'Архив' },
 ];
 
 const ZONES: Array<{ id: '' | PromoPlacementZone; label: string }> = [
   { id: '', label: 'Все зоны' },
-  { id: 'HOME_HERO', label: 'HOME_HERO' },
-  { id: 'HOME_FEATURED', label: 'HOME_FEATURED' },
-  { id: 'CITY_HERO', label: 'CITY_HERO' },
-  { id: 'CITY_BELOW_HERO', label: 'CITY_BELOW_HERO' },
-  { id: 'LANDING_HERO', label: 'LANDING_HERO' },
-  { id: 'LANDING_INLINE', label: 'LANDING_INLINE' },
-  { id: 'ARTICLE_INLINE', label: 'ARTICLE_INLINE' },
-  { id: 'COLLECTION_INLINE', label: 'COLLECTION_INLINE' },
-  { id: 'CATALOG_INLINE', label: 'CATALOG_INLINE' },
+  { id: 'HOME_HERO', label: 'Главная — первый экран' },
+  { id: 'HOME_FEATURED', label: 'Главная — рекомендации' },
+  { id: 'CITY_HERO', label: 'Город — первый экран' },
+  { id: 'CITY_BELOW_HERO', label: 'Город — под первым экраном' },
+  { id: 'LANDING_HERO', label: 'Лендинг — первый экран' },
+  { id: 'LANDING_INLINE', label: 'Лендинг — в тексте' },
+  { id: 'ARTICLE_INLINE', label: 'Статья — в тексте' },
+  { id: 'COLLECTION_INLINE', label: 'Подборка — в тексте' },
+  { id: 'CATALOG_INLINE', label: 'Каталог — в тексте' },
 ];
 
 const SCOPES: Array<{ id: '' | PromoPageScopeType; label: string }> = [
-  { id: '', label: 'Все scope' },
-  { id: 'GLOBAL', label: 'GLOBAL' },
-  { id: 'CITY', label: 'CITY' },
-  { id: 'LANDING', label: 'LANDING' },
-  { id: 'COLLECTION', label: 'COLLECTION' },
-  { id: 'ARTICLE', label: 'ARTICLE' },
+  { id: '', label: 'Все области' },
+  { id: 'GLOBAL', label: 'Весь сайт' },
+  { id: 'CITY', label: 'Город' },
+  { id: 'LANDING', label: 'Лендинг' },
+  { id: 'COLLECTION', label: 'Подборка' },
+  { id: 'ARTICLE', label: 'Статья' },
 ];
 
 const TARGETS: Array<{ id: '' | PromoTargetType; label: string }> = [
-  { id: '', label: 'Все targets' },
-  { id: 'EVENT', label: 'EVENT' },
-  { id: 'COLLECTION', label: 'COLLECTION' },
-  { id: 'LANDING', label: 'LANDING' },
-  { id: 'ARTICLE', label: 'ARTICLE' },
+  { id: '', label: 'Все типы цели' },
+  { id: 'EVENT', label: 'Событие' },
+  { id: 'COLLECTION', label: 'Подборка' },
+  { id: 'LANDING', label: 'Лендинг' },
+  { id: 'ARTICLE', label: 'Статья' },
 ];
 
 const READINESS: Array<{ id: '' | PromoPlacementReadinessStatus; label: string }> = [
   { id: '', label: 'Любая готовность' },
-  { id: 'READY', label: 'READY' },
-  { id: 'EMPTY', label: 'EMPTY' },
-  { id: 'SCHEDULED', label: 'SCHEDULED' },
-  { id: 'EXPIRED', label: 'EXPIRED' },
-  { id: 'INACTIVE', label: 'INACTIVE' },
-  { id: 'MISCONFIGURED', label: 'MISCONFIGURED' },
+  { id: 'READY', label: 'Готово' },
+  { id: 'EMPTY', label: 'Пусто' },
+  { id: 'SCHEDULED', label: 'Запланировано' },
+  { id: 'EXPIRED', label: 'Истекло' },
+  { id: 'INACTIVE', label: 'Неактивно' },
+  { id: 'MISCONFIGURED', label: 'Ошибка настроек' },
 ];
 
 function fmtDt(iso: string | null | undefined): string {
@@ -361,12 +361,12 @@ export function PromoPlacementBlocksListPage() {
     },
   });
 
-  if (q.isLoading && !q.data) return <LoadingState label="Загрузка promo placements…" />;
+  if (q.isLoading && !q.data) return <LoadingState label="Загрузка промо-размещений…" />;
   if (q.isError) {
     const meta = q.error ? getAdminErrorDisplay(q.error) : null;
     return (
       <ErrorState
-        title={meta?.title ?? 'Не удалось загрузить promo placements'}
+        title={meta?.title ?? 'Не удалось загрузить промо-размещения'}
         description={meta?.description ?? meta?.rawMessage}
         onRetry={() => q.refetch()}
       />
@@ -976,7 +976,7 @@ export function PromoPlacementBlocksListPage() {
                       ) : null}
                     </div>
                   ) : previewLoadedOnce && previewQ.isError ? (
-                    <div className="mt-3 text-sm text-destructive">Не удалось загрузить preview</div>
+                    <div className="mt-3 text-sm text-destructive">Не удалось загрузить предпросмотр</div>
                   ) : null}
                 </div>
               ) : null}

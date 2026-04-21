@@ -8,11 +8,11 @@ export type MergeSimilarityLabel =
 export function mergeSimilarityLabelText(label: MergeSimilarityLabel): string {
   switch (label) {
     case 'HIGH':
-      return 'HIGH';
+      return 'высокая';
     case 'MEDIUM':
-      return 'MEDIUM';
+      return 'средняя';
     case 'LOW':
-      return 'LOW';
+      return 'низкая';
     case 'NONE':
       return '—';
     default:

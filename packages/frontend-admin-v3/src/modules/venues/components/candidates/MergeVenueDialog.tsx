@@ -101,7 +101,7 @@ export function MergeVenueDialog({ open, onOpenChange, row, onSuccess }: Props) 
         )}
 
         <div className="space-y-3 border-t pt-3">
-          <div className="text-sm font-medium">Предпросмотр merge</div>
+          <div className="text-sm font-medium">Предпросмотр объединения</div>
           {!selected ? (
             <p className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
               Выберите площадку для объединения

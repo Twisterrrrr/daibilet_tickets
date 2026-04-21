@@ -147,13 +147,12 @@ function EventIdentityCell({ item, onOpen }: { item: EventListRowData; onOpen?: 
       </div>
 
       {item.subcategories?.length ? (
-        <div className="flex flex-wrap gap-1.5">
-          {item.subcategories.slice(0, 3).map((sub) => (
+        <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto pr-0.5">
+          {item.subcategories.map((sub) => (
             <Badge key={sub} variant="outline" className="font-normal">
               {sub}
             </Badge>
           ))}
-          {item.subcategories.length > 3 ? <Badge variant="outline">+{item.subcategories.length - 3}</Badge> : null}
         </div>
       ) : null}
     </div>

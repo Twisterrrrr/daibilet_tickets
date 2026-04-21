@@ -370,22 +370,22 @@ export function CollectionDetailPage() {
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-              Status
+              Статус
               <select
                 className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
                 value={draft.status}
                 onChange={(e) => setDraft({ ...draft, status: e.target.value })}
               >
-                <option value="DRAFT">DRAFT</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="ARCHIVED">ARCHIVED</option>
+                <option value="DRAFT">Черновик</option>
+                <option value="ACTIVE">Активна</option>
+                <option value="ARCHIVED">Архив</option>
               </select>
             </label>
           </div>
 
           {draft.sourceType !== 'MANUAL' ? (
             <div className="rounded-md border bg-muted/20 p-3">
-              <div className="text-xs font-medium text-muted-foreground">Resolved preview (top 30)</div>
+              <div className="text-xs font-medium text-muted-foreground">Предпросмотр элементов (до 30)</div>
               {resolvedQ.isLoading ? (
                 <div className="mt-2 text-sm text-muted-foreground">Загрузка…</div>
               ) : resolvedQ.isError ? (

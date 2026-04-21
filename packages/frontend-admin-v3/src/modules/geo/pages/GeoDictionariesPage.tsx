@@ -90,7 +90,7 @@ export function GeoDictionariesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="География" subtitle="Справочники районов и метро (эволюция от строк в Venue)" />
+      <PageHeader title="География" subtitle="Справочники районов и метро (переход от строк в карточке площадки)" />
 
       <section className="rounded-lg border bg-card p-4">
         <div className="grid gap-3 sm:grid-cols-3">
@@ -127,19 +127,19 @@ export function GeoDictionariesPage() {
           <div className="grid gap-2 sm:grid-cols-4">
             <input
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-              placeholder="name"
+              placeholder="Название"
               value={districtDraft.name}
               onChange={(e) => setDistrictDraft((s) => ({ ...s, name: e.target.value }))}
             />
             <input
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-              placeholder="slug"
+              placeholder="Слаг"
               value={districtDraft.slug}
               onChange={(e) => setDistrictDraft((s) => ({ ...s, slug: e.target.value }))}
             />
             <input
               className="h-9 rounded-md border border-input bg-background px-2 text-sm sm:col-span-2"
-              placeholder="description (optional)"
+              placeholder="Описание (необязательно)"
               value={districtDraft.description}
               onChange={(e) => setDistrictDraft((s) => ({ ...s, description: e.target.value }))}
             />
@@ -191,10 +191,10 @@ export function GeoDictionariesPage() {
               <table className="w-full text-sm">
                 <thead className="border-b text-left text-xs font-medium uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-2 py-2">name</th>
-                    <th className="px-2 py-2">slug</th>
-                    <th className="px-2 py-2">description</th>
-                    <th className="w-24 px-2 py-2">actions</th>
+                    <th className="px-2 py-2">Название</th>
+                    <th className="px-2 py-2">Слаг</th>
+                    <th className="px-2 py-2">Описание</th>
+                    <th className="w-24 px-2 py-2">Действия</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -241,25 +241,25 @@ export function GeoDictionariesPage() {
           <div className="grid gap-2 sm:grid-cols-4">
             <input
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-              placeholder="name"
+              placeholder="Название"
               value={metroDraft.name}
               onChange={(e) => setMetroDraft((s) => ({ ...s, name: e.target.value }))}
             />
             <input
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-              placeholder="slug"
+              placeholder="Слаг"
               value={metroDraft.slug}
               onChange={(e) => setMetroDraft((s) => ({ ...s, slug: e.target.value }))}
             />
             <input
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-              placeholder="lineName"
+              placeholder="Линия (название)"
               value={metroDraft.lineName}
               onChange={(e) => setMetroDraft((s) => ({ ...s, lineName: e.target.value }))}
             />
             <input
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-              placeholder="lineColor"
+              placeholder="Цвет линии"
               value={metroDraft.lineColor}
               onChange={(e) => setMetroDraft((s) => ({ ...s, lineColor: e.target.value }))}
             />
@@ -312,11 +312,11 @@ export function GeoDictionariesPage() {
               <table className="w-full text-sm">
                 <thead className="border-b text-left text-xs font-medium uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-2 py-2">name</th>
-                    <th className="px-2 py-2">slug</th>
-                    <th className="px-2 py-2">line</th>
-                    <th className="px-2 py-2">color</th>
-                    <th className="w-24 px-2 py-2">actions</th>
+                    <th className="px-2 py-2">Название</th>
+                    <th className="px-2 py-2">Слаг</th>
+                    <th className="px-2 py-2">Линия</th>
+                    <th className="px-2 py-2">Цвет</th>
+                    <th className="w-24 px-2 py-2">Действия</th>
                   </tr>
                 </thead>
                 <tbody>

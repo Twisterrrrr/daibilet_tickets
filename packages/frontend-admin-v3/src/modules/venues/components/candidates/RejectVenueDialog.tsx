@@ -62,7 +62,7 @@ export function RejectVenueDialog({ open, onOpenChange, row, onSuccess }: Props)
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Отклонить импортную площадку</DialogTitle>
-          <DialogDescription>Статус REJECTED, публикация будет снята.</DialogDescription>
+          <DialogDescription>Статус «отклонено», публикация будет снята.</DialogDescription>
         </DialogHeader>
         {row ? <p className="text-sm font-medium">{row.title}</p> : null}
         <VenueRejectReasonFields

@@ -11,11 +11,11 @@ export function VenueModerationWarnings({ data }: { data: VenueModerationMetrics
       </p>
       <dl className="mt-3 grid gap-2 sm:grid-cols-2">
         <div>
-          <dt className="text-xs text-muted-foreground">Slug collision rate</dt>
+          <dt className="text-xs text-muted-foreground">Доля конфликтов slug</dt>
           <dd className="text-lg font-semibold tabular-nums">{formatSharePct(w.slugCollisionRate)}</dd>
         </div>
         <div>
-          <dt className="text-xs text-muted-foreground">Stale state rate</dt>
+          <dt className="text-xs text-muted-foreground">Доля «устаревших» состояний</dt>
           <dd className="text-lg font-semibold tabular-nums">{formatSharePct(w.staleStateRate)}</dd>
         </div>
       </dl>

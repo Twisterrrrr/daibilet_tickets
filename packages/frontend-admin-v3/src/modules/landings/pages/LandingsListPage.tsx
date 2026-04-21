@@ -77,7 +77,7 @@ export function LandingsListPage() {
   const statusVariant = (s: string): 'default' | 'outline' | 'warning' =>
     s === 'ACTIVE' ? 'default' : s === 'ARCHIVED' ? 'outline' : 'warning';
 
-  const typeLabel = (t: string) => (t === 'HUB' ? 'HUB' : t === 'MULTI_CITY' ? 'MULTI_CITY' : 'CITY');
+  const typeLabel = (t: string) => (t === 'MULTI_CITY' ? 'MULTI_CITY' : 'CITY');
 
   return (
     <div className="space-y-6">
@@ -124,7 +124,6 @@ export function LandingsListPage() {
               >
                 <option value="">Все</option>
                 <option value="CITY">CITY</option>
-                <option value="HUB">HUB</option>
                 <option value="MULTI_CITY">MULTI_CITY</option>
               </select>
             </label>
@@ -138,7 +137,7 @@ export function LandingsListPage() {
                 <option value="">Все</option>
                 <option value="DRAFT">DRAFT</option>
                 <option value="ACTIVE">ACTIVE</option>
-                <option value="ARCHIVED">ARCHIVED</option>
+                <option value="ARCHIVED">Архив</option>
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">

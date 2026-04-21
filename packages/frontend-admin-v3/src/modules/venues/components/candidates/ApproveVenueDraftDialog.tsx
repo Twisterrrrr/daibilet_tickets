@@ -116,7 +116,7 @@ export function ApproveVenueDraftDialog({ open, onOpenChange, row, onSuccess }: 
               <Input className="mt-1" value={address} onChange={(e) => setAddress(e.target.value)} />
             </label>
             <label className="block text-sm">
-              <span className="text-muted-foreground">Slug</span>
+              <span className="text-muted-foreground">Слаг</span>
               <Input className="mt-1 font-mono text-sm" value={slug} onChange={(e) => setSlug(e.target.value)} />
             </label>
             <label className="flex items-center gap-2 text-sm">
@@ -125,7 +125,7 @@ export function ApproveVenueDraftDialog({ open, onOpenChange, row, onSuccess }: 
             </label>
             {detailQ.data ? (
               <div className="rounded-md border bg-muted/40 p-3 text-xs">
-                <div className="font-medium">Нормализация (preview)</div>
+                <div className="font-medium">Нормализация (предпросмотр)</div>
                 <div className="mt-1 font-mono text-[11px] text-muted-foreground">
                   name: {detailQ.data.normalizedName ?? '—'}
                 </div>

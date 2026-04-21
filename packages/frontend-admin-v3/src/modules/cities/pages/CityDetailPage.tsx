@@ -178,7 +178,7 @@ export function CityDetailPage() {
               <span className="text-xs text-muted-foreground">Название</span>
               <Input value={v.name} onChange={(e) => setDraft({ ...v, name: e.target.value })} />
             </label>
-            <Field label="Slug (только чтение)">
+            <Field label="Слаг (только чтение)">
               <span className="font-mono text-xs">{v.slug}</span>
             </Field>
             <label className="flex items-center gap-2">
@@ -271,7 +271,7 @@ export function CityDetailPage() {
       {tab === 'media' ? (
         <section className="rounded-lg border bg-card p-5 text-sm space-y-3">
           <label className="block space-y-1">
-            <span className="text-xs text-muted-foreground">Hero / обложка (URL)</span>
+            <span className="text-xs text-muted-foreground">Главное изображение (URL)</span>
             <Input value={v.heroImage ?? ''} onChange={(e) => setDraft({ ...v, heroImage: e.target.value })} />
           </label>
           {v.heroImage ? (
@@ -289,11 +289,11 @@ export function CityDetailPage() {
         <section className="rounded-lg border bg-card p-5 text-sm space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1">
-              <span className="text-xs text-muted-foreground">metaTitle</span>
+              <span className="text-xs text-muted-foreground">Заголовок страницы (meta title)</span>
               <Input value={v.metaTitle ?? ''} onChange={(e) => setDraft({ ...v, metaTitle: e.target.value })} />
             </label>
             <label className="space-y-1">
-              <span className="text-xs text-muted-foreground">metaDescription</span>
+              <span className="text-xs text-muted-foreground">Описание (meta description)</span>
               <Input value={v.metaDescription ?? ''} onChange={(e) => setDraft({ ...v, metaDescription: e.target.value })} />
             </label>
           </div>
@@ -428,7 +428,7 @@ export function CityDetailPage() {
                 onChange={(e) => setDraft({ ...v, lng: e.target.value === '' ? null : e.target.value })}
               />
             </label>
-            <Field label="Версия (optimistic lock)">
+            <Field label="Версия (оптимистичная блокировка)">
               <span>{v.version ?? '—'}</span>
             </Field>
             <Field label="Создан">

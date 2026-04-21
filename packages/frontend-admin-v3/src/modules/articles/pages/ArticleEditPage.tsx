@@ -272,9 +272,9 @@ export function ArticleEditPage() {
               value={status}
               onChange={(e) => setStatus(e.target.value as ArticleStatus)}
             >
-              <option value="DRAFT">DRAFT</option>
-              <option value="PUBLISHED">PUBLISHED</option>
-              <option value="ARCHIVED">ARCHIVED</option>
+              <option value="DRAFT">Черновик</option>
+              <option value="PUBLISHED">Опубликовано</option>
+              <option value="ARCHIVED">Архив</option>
             </select>
           </label>
         </section>

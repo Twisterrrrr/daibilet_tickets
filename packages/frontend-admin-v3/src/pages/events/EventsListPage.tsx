@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/shared/page-header/PageHeader';
-import { FilterBar, FilterField } from '@/components/shared/filters/FilterBar';
+import { FilterField, FilterFieldsGrid } from '@/components/shared/filters/FilterBar';
 import { QuickFilters, type QuickFilterItem } from '@/components/shared/filters/QuickFilters';
 import { SearchInput } from '@/components/shared/filters/SearchInput';
 import { DataTableShell } from '@/components/shared/table/DataTableShell';
@@ -64,7 +64,7 @@ const STATUSES: Array<{ id: string; label: string }> = [
   { id: '', label: 'Все' },
   { id: 'active', label: 'Активные' },
   { id: 'inactive', label: 'Неактивные' },
-  { id: 'hidden', label: 'Скрытые (override)' },
+  { id: 'hidden', label: 'Скрытые (ручное скрытие)' },
 ];
 
 function readIntOrNull(sp: URLSearchParams, key: string): number | null {
@@ -202,7 +202,7 @@ export function EventsListPage() {
       });
       setBatchResult(res);
     } catch (e) {
-      setBatchError(e instanceof Error ? e.message : 'Ошибка dry-run');
+      setBatchError(e instanceof Error ? e.message : 'Ошибка пробного прогона');
       setBatchResult(null);
     } finally {
       setBatchRunning(false);
@@ -224,7 +224,7 @@ export function EventsListPage() {
       setBatchConfirmText('');
       await qc.invalidateQueries({ queryKey: ['admin-events'] });
     } catch (e) {
-      setBatchError(e instanceof Error ? e.message : 'Ошибка execute');
+      setBatchError(e instanceof Error ? e.message : 'Ошибка выполнения');
     } finally {
       setBatchRunning(false);
     }
@@ -321,7 +321,7 @@ export function EventsListPage() {
     { id: 'past30', label: 'Прошедшие 30 дней' },
     { id: 'apiIssues', label: 'Критичные проблемы (gate)' },
     { id: 'seoIssues', label: 'Не индексируется' },
-    { id: 'override', label: 'Есть override' },
+    { id: 'override', label: 'Есть перекрытие слоя' },
     { id: 'noImage', label: 'Без фото' },
   ];
 
@@ -417,7 +417,7 @@ export function EventsListPage() {
           className="fixed inset-0 z-40"
           role="dialog"
           aria-modal="true"
-          aria-label="Batch-архивирование (dry-run)"
+          aria-label="Массовое архивирование (пробный прогон)"
           onClick={(e) => {
             const target = e.target as HTMLElement | null;
             if (target?.dataset?.overlay === '1') setBatchOpen(false);
@@ -464,7 +464,7 @@ export function EventsListPage() {
                   />
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-muted-foreground">Лимит (take)</div>
+                  <div className="text-xs font-medium text-muted-foreground">Лимит записей</div>
                   <input
                     type="number"
                     min={1}
@@ -521,7 +521,7 @@ export function EventsListPage() {
                     }
                   }}
                 >
-                  Copy ids
+                  Скопировать ID
                 </Button>
               </div>
 
@@ -539,7 +539,8 @@ export function EventsListPage() {
                       <>
                         Найдено: <span className="tabular-nums text-foreground">{batchResult.count}</span>
                         {' · '}
-                        Диапазон lastSessionAt: <span className="text-foreground">{summarizeLastSessionRange(batchResult.items ?? [])}</span>
+                        Диапазон дат последнего сеанса:{' '}
+                        <span className="text-foreground">{summarizeLastSessionRange(batchResult.items ?? [])}</span>
                         {batchResult.dryRun === false ? (
                           <>
                             {' · '}
@@ -560,8 +561,8 @@ export function EventsListPage() {
                         <tr>
                           <th className="px-3 py-2 text-left">ID</th>
                           <th className="px-3 py-2 text-left">Название</th>
-                          <th className="px-3 py-2 text-left">Source</th>
-                          <th className="px-3 py-2 text-left">Last session</th>
+                          <th className="px-3 py-2 text-left">Источник</th>
+                          <th className="px-3 py-2 text-left">Последний сеанс</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -584,13 +585,15 @@ export function EventsListPage() {
                     ) : null}
                   </div>
                 ) : (
-                  <div className="mt-3 text-sm text-muted-foreground">Запусти dry-run, чтобы увидеть кандидатов.</div>
+                  <div className="mt-3 text-sm text-muted-foreground">
+                    Запустите пробный прогон без изменений, чтобы увидеть кандидатов.
+                  </div>
                 )}
               </div>
             </div>
 
             {batchConfirmOpen ? (
-              <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Подтверждение batch-архива">
+              <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Подтверждение массового архивирования">
                 <div
                   className="absolute inset-0 bg-black/40"
                   onClick={() => {
@@ -605,7 +608,7 @@ export function EventsListPage() {
                       Кандидатов: <span className="tabular-nums text-foreground">{batchResult?.count ?? 0}</span>
                     </div>
                     <div className="mt-2">
-                      Для подтверждения введи <span className="font-mono text-foreground">ARCHIVE</span>.
+                      Для подтверждения введите <span className="font-mono text-foreground">ARCHIVE</span> латиницей.
                     </div>
                   </div>
                   <input
@@ -708,12 +711,12 @@ export function EventsListPage() {
                 Сбросить все фильтры
               </Button>
             </div>
-            <FilterBar>
-              <FilterField label="Поиск">
+            <FilterFieldsGrid>
+              <FilterField label="Поиск" className="sm:col-span-2 lg:col-span-2">
                 <SearchInput
                   value={list.q}
                   onChange={(e) => list.setQ(e.target.value)}
-                  placeholder="Поиск по названию / slug / external ID"
+                  placeholder="Название, адрес в URL или внешний ID"
                 />
               </FilterField>
               <FilterField label="Статус">
@@ -760,34 +763,6 @@ export function EventsListPage() {
                   ))}
                 </select>
               </FilterField>
-              <FilterField label="Будущие сеансы">
-                <select
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  value={hasFutureSessionsFilter}
-                  onChange={(e) => {
-                    setEf({ hasFutureSessions: e.target.value as '' | 'true' | 'false' }, { history: 'replace' });
-                    list.setPageReplace(1);
-                  }}
-                >
-                  <option value="">Все</option>
-                  <option value="true">Есть</option>
-                  <option value="false">Нет</option>
-                </select>
-              </FilterField>
-              <FilterField label="Категории и цены">
-                <select
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  value={hasCategoryPricesFilter}
-                  onChange={(e) => {
-                    setEf({ hasCategoryPrices: e.target.value as '' | 'true' | 'false' }, { history: 'replace' });
-                    list.setPageReplace(1);
-                  }}
-                >
-                  <option value="">Все</option>
-                  <option value="true">Есть цена</option>
-                  <option value="false">Нет цены</option>
-                </select>
-              </FilterField>
               <FilterField label="Категория">
                 <select
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -821,54 +796,145 @@ export function EventsListPage() {
                   ))}
                 </select>
               </FilterField>
-            </FilterBar>
+            </FilterFieldsGrid>
 
-            <div className="rounded-md border bg-background p-3">
-              <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground">Без подкатегории</div>
-                  <label className="mt-1 flex h-9 items-center gap-2 rounded-md border bg-card px-3 text-sm shadow-sm">
-                    <input
-                      type="checkbox"
-                      checked={hasNoSubcategory}
-                      onChange={(e) => {
-                        const next = e.target.checked;
-                        setEf(
-                          { hasNoSubcategory: next, hasMultipleSubcategories: next ? false : hasMultipleSubcategories },
-                          { history: 'replace' },
-                        );
-                        list.setPageReplace(1);
-                      }}
-                    />
-                    Да
-                  </label>
-                </div>
+            <div className="mt-4 flex flex-col gap-4 border-t border-border/80 pt-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="text-xs font-medium text-muted-foreground">Будущие сеансы</span>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="rounded border-input"
+                    checked={hasFutureSessionsFilter === 'true'}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setEf(
+                        {
+                          hasFutureSessions: on
+                            ? 'true'
+                            : hasFutureSessionsFilter === 'true'
+                              ? ''
+                              : hasFutureSessionsFilter,
+                        },
+                        { history: 'replace' },
+                      );
+                      list.setPageReplace(1);
+                    }}
+                  />
+                  Есть
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="rounded border-input"
+                    checked={hasFutureSessionsFilter === 'false'}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setEf(
+                        {
+                          hasFutureSessions: on
+                            ? 'false'
+                            : hasFutureSessionsFilter === 'false'
+                              ? ''
+                              : hasFutureSessionsFilter,
+                        },
+                        { history: 'replace' },
+                      );
+                      list.setPageReplace(1);
+                    }}
+                  />
+                  Нет
+                </label>
+              </div>
 
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground">&gt; 1 подкатегории</div>
-                  <label className="mt-1 flex h-9 items-center gap-2 rounded-md border bg-card px-3 text-sm shadow-sm">
-                    <input
-                      type="checkbox"
-                      checked={hasMultipleSubcategories}
-                      onChange={(e) => {
-                        const next = e.target.checked;
-                        setEf(
-                          { hasMultipleSubcategories: next, hasNoSubcategory: next ? false : hasNoSubcategory },
-                          { history: 'replace' },
-                        );
-                        list.setPageReplace(1);
-                      }}
-                    />
-                    Да
-                  </label>
-                </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="text-xs font-medium text-muted-foreground">Категории и цены</span>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="rounded border-input"
+                    checked={hasCategoryPricesFilter === 'true'}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setEf(
+                        {
+                          hasCategoryPrices: on
+                            ? 'true'
+                            : hasCategoryPricesFilter === 'true'
+                              ? ''
+                              : hasCategoryPricesFilter,
+                        },
+                        { history: 'replace' },
+                      );
+                      list.setPageReplace(1);
+                    }}
+                  />
+                  Есть цена
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="rounded border-input"
+                    checked={hasCategoryPricesFilter === 'false'}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setEf(
+                        {
+                          hasCategoryPrices: on
+                            ? 'false'
+                            : hasCategoryPricesFilter === 'false'
+                              ? ''
+                              : hasCategoryPricesFilter,
+                        },
+                        { history: 'replace' },
+                      );
+                      list.setPageReplace(1);
+                    }}
+                  />
+                  Нет цены
+                </label>
+              </div>
 
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground">Проблемы</div>
-                  <div className="mt-1 flex h-9 items-center justify-between rounded-md border bg-card px-3 text-sm shadow-sm text-muted-foreground">
-                    <span>Ошибки API / SEO-проблемы</span>
-                    <span className="text-xs">Скоро</span>
-                  </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium leading-none">
+                  <input
+                    type="checkbox"
+                    className="rounded border-input"
+                    checked={hasNoSubcategory}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setEf(
+                        { hasNoSubcategory: next, hasMultipleSubcategories: next ? false : hasMultipleSubcategories },
+                        { history: 'replace' },
+                      );
+                      list.setPageReplace(1);
+                    }}
+                  />
+                  Без подкатегории
+                </label>
+
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium leading-none">
+                  <input
+                    type="checkbox"
+                    className="rounded border-input"
+                    checked={hasMultipleSubcategories}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setEf(
+                        { hasMultipleSubcategories: next, hasNoSubcategory: next ? false : hasNoSubcategory },
+                        { history: 'replace' },
+                      );
+                      list.setPageReplace(1);
+                    }}
+                  />
+                  &gt; 1 подкатегории
+                </label>
+
+                <div className="flex min-w-[min(100%,280px)] flex-1 flex-wrap items-center justify-between gap-2 rounded-md border border-dashed bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                  <span>Ошибки API / SEO-проблемы</span>
+                  <Badge variant="outline" className="text-xs">
+                    Скоро
+                  </Badge>
                 </div>
               </div>
             </div>
@@ -959,7 +1025,7 @@ export function EventsListPage() {
                 ['quality', 'Качество'],
                 ['status', 'Статус'],
                 ['issues', 'Проблемы'],
-                ['override', 'Override'],
+                ['override', 'Перекрытие'],
               ].map(([key, label]) => (
                 <label key={key} className="flex items-center gap-2 text-sm">
                   <input

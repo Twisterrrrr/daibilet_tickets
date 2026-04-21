@@ -293,7 +293,7 @@ export function VenueDetailPage() {
         <div className="text-sm text-muted-foreground">Загрузка сводки готовности…</div>
       ) : null}
 
-      <HubReadinessPanel title="Страница площадки (hub-слой)" snapshot={v.hubReadiness} />
+      <HubReadinessPanel title="Страница площадки (хаб-слой)" snapshot={v.hubReadiness} />
 
       <div className="flex flex-wrap gap-1 border-b pb-2">
         {(Object.keys(TAB_LABEL) as TabId[]).map((k) => (
@@ -313,7 +313,7 @@ export function VenueDetailPage() {
         <section className="rounded-lg border bg-card p-5 text-sm">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Название" value={v.title} />
-            <Field label="Slug" value={v.slug ?? '—'} />
+            <Field label="Слаг (URL)" value={v.slug ?? '—'} />
             <Field label="Город" value={`${v.city.name} (${v.city.slug})`} />
             <Field label="Тип площадки" value={v.venueType ?? '—'} />
             <Field label="Жизненный цикл" value={venueLifecycleLabelRu(v.lifecycleStatus)} />
@@ -331,7 +331,7 @@ export function VenueDetailPage() {
               }
             />
             <Field
-              label="SEO whitelist страницы"
+              label="Страница в белом списке SEO"
               value={v.isVenuePageWhitelisted ? 'Да' : 'Нет'}
             />
             <Field label="Внешний ID" value={v.externalVenueId ?? '—'} />
@@ -343,7 +343,7 @@ export function VenueDetailPage() {
         <section className="rounded-lg border bg-card p-5 text-sm">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Адрес (канон.)" value={v.address ?? '—'} />
-            <Field label="Для UI (displayAddress)" value={v.displayAddress ?? '—'} />
+            <Field label="Адрес для отображения" value={v.displayAddress ?? '—'} />
             <Field label="Нормализованный" value={v.normalizedAddress ?? '—'} />
             <Field label="Сырой (импорт)" value={v.rawAddress ?? '—'} />
             <Field label="Широта / долгота" value={v.lat != null && v.lng != null ? `${v.lat}, ${v.lng}` : '—'} />
@@ -515,7 +515,7 @@ export function VenueDetailPage() {
                   value={String(summaryQ.data.storefront.eventsWithFutureSlotsCount)}
                 />
                 <Field
-                  label="Доля READY (выборка)"
+                  label="Доля готовых (выборка)"
                   value={
                     summaryQ.data.storefront.readyRatio != null
                       ? `${Math.round(summaryQ.data.storefront.readyRatio * 100)}% (${summaryQ.data.storefront.readyDataQuality})`
@@ -556,7 +556,7 @@ export function VenueDetailPage() {
               ) : null}
             </>
           ) : (
-            <ErrorState title="Нет сводки" description="Не удалось загрузить /summary" />
+            <ErrorState title="Нет сводки" description="Не удалось загрузить сводку" />
           )}
         </section>
       ) : null}
@@ -564,10 +564,10 @@ export function VenueDetailPage() {
       {tab === 'moderation' ? (
         <section className="rounded-lg border bg-card p-5 text-sm space-y-4">
           <div className="grid gap-2 sm:grid-cols-2">
-            <Field label="confidenceScore" value={v.confidenceScore != null ? String(v.confidenceScore) : '—'} />
-            <Field label="needsReview" value={v.needsReview ? 'Да' : 'Нет'} />
+            <Field label="Уверенность (score)" value={v.confidenceScore != null ? String(v.confidenceScore) : '—'} />
+            <Field label="Требует проверки" value={v.needsReview ? 'Да' : 'Нет'} />
             <Field
-              label="mergeTargetId"
+              label="ID цели слияния"
               value={
                 v.mergeTargetId ? (
                   <Link className="text-primary hover:underline" to={`/admin-v3/venues/${v.mergeTargetId}`}>
@@ -609,11 +609,11 @@ export function VenueDetailPage() {
 
       {tab === 'seo' ? (
         <section className="rounded-lg border bg-card p-5 text-sm space-y-3">
-          <Field label="metaTitle" value={v.metaTitle ?? '—'} />
-          <Field label="metaDescription" value={v.metaDescription ?? '—'} />
-          <Field label="Slug (публичный ключ)" value={v.slug ?? '—'} />
+          <Field label="Заголовок (мета)" value={v.metaTitle ?? '—'} />
+          <Field label="Описание (мета)" value={v.metaDescription ?? '—'} />
+          <Field label="Слаг (публичный ключ)" value={v.slug ?? '—'} />
           <Field
-            label="Публичный URL (preview)"
+            label="Публичный URL (предпросмотр)"
             value={publicAbs ?? publicPath ?? '—'}
           />
           <p className="text-xs text-muted-foreground">

@@ -6,11 +6,11 @@ export function VenueModerationKpiCards({ data }: { data: VenueModerationMetrics
   const cards = [
     { label: 'Утверждено', value: counts.approvedTotal },
     { label: 'Отклонено', value: counts.rejectedTotal },
-    { label: 'Merge', value: counts.mergedTotal },
-    { label: 'Approve rate', value: formatSharePct(rates.approveRate) },
-    { label: 'Reject rate', value: formatSharePct(rates.rejectRate) },
-    { label: 'Merge rate', value: formatSharePct(rates.mergeRate) },
-    { label: 'DRAFT всего', value: volume.draftsTotal },
+    { label: 'Объединений', value: counts.mergedTotal },
+    { label: 'Доля утверждений', value: formatSharePct(rates.approveRate) },
+    { label: 'Доля отклонений', value: formatSharePct(rates.rejectRate) },
+    { label: 'Доля объединений', value: formatSharePct(rates.mergeRate) },
+    { label: 'Черновиков всего', value: volume.draftsTotal },
     { label: 'Модерировано (решений)', value: volume.moderatedTotal },
   ];
   return (

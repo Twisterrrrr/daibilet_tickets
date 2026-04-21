@@ -1,6 +1,7 @@
 import { AdminShell } from '@/app/layout/AdminShell';
 import { QueryProvider } from '@/app/providers/query-provider';
 import { FeatureRoute } from '@/lib/guards/FeatureRoute';
+import { RequireAuth } from '@/lib/guards/RequireAuth';
 import { FeatureDisabledPage } from '@/pages/feature-disabled/FeatureDisabledPage';
 import { StubPage } from '@/pages/_stub/StubPage';
 import * as React from 'react';
@@ -92,6 +93,11 @@ const ModerationPage = React.lazy(() =>
   import('@/modules/moderation/pages/ModerationPage').then((m) => ({ default: m.ModerationPage })),
 );
 
+const LoginPage = React.lazy(() => import('@/pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })));
+const ForgotPasswordPage = React.lazy(() =>
+  import('@/pages/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })),
+);
+
 export default function App() {
   return (
     <QueryProvider>
@@ -100,7 +106,11 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/admin-v3/dashboard" replace />} />
 
-            <Route path="/admin-v3" element={<AdminShell />}>
+            <Route path="/admin-v3/login" element={<LoginPage />} />
+            <Route path="/admin-v3/forgot-password" element={<ForgotPasswordPage />} />
+
+            <Route path="/admin-v3" element={<RequireAuth />}>
+              <Route element={<AdminShell />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
 
@@ -199,6 +209,7 @@ export default function App() {
               <Route path="feature-disabled" element={<FeatureDisabledPage />} />
 
               <Route path="*" element={<Navigate to="dashboard" replace />} />
+              </Route>
             </Route>
           </Routes>
         </React.Suspense>

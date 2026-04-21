@@ -17,11 +17,11 @@ export function VenueSourceQualityTable({ data }: { data: VenueModerationMetrics
           <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
             <th className="px-3 py-2">Источник</th>
             <th className="px-3 py-2">Всего решений</th>
-            <th className="px-3 py-2">Approve</th>
-            <th className="px-3 py-2">Reject</th>
-            <th className="px-3 py-2">Merge</th>
-            <th className="px-3 py-2">Needs review %</th>
-            <th className="px-3 py-2">Avg confidence</th>
+            <th className="px-3 py-2">Утверждено</th>
+            <th className="px-3 py-2">Отклонено</th>
+            <th className="px-3 py-2">Объединено</th>
+            <th className="px-3 py-2">Нужна проверка, %</th>
+            <th className="px-3 py-2">Средн. уверенность</th>
           </tr>
         </thead>
         <tbody>

@@ -1,10 +1,11 @@
+import { logoutAndRedirect } from '@/api/client';
 import { Breadcrumbs } from '@/app/layout/Breadcrumbs';
 import { cn } from '@/shared/lib/cn';
-import { ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, LogOut, Search } from 'lucide-react';
 
 export function Topbar({
-  collapsed,
-  onToggleSidebar,
+  collapsed: _collapsed,
+  onToggleSidebar: _onToggleSidebar,
   topbarCollapsed,
   onToggleTopbar,
 }: {
@@ -14,23 +15,18 @@ export function Topbar({
   onToggleTopbar: () => void;
 }) {
   return (
-    <header
-      className={cn('sticky top-0 z-20 border-b bg-background/80 backdrop-blur', topbarCollapsed ? 'cursor-pointer' : '')}
-      onClick={(e) => {
-        // Сворачиваем/разворачиваем только по клику в "пустое место",
-        // чтобы не ломать кнопки/ссылки/инпуты.
-        const target = e.target as HTMLElement | null;
-        const interactive = target?.closest?.('button,a,input,select,textarea,[role="button"]');
-        if (interactive) return;
-        onToggleTopbar();
-      }}
-      aria-label="Шапка админки"
-    >
-      <div className={cn('mx-auto w-full max-w-[1400px] px-4', topbarCollapsed ? 'py-1.5' : '')}>
+    <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
+      <div className={cn('mx-auto w-full max-w-content px-4 sm:px-8', topbarCollapsed ? 'py-1.5' : '')}>
         {topbarCollapsed ? (
-          <div className="flex items-center justify-end">
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          </div>
+          <button
+            type="button"
+            className="flex w-full min-h-11 items-center justify-end gap-2 rounded-md px-2 text-sm text-muted-foreground transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => onToggleTopbar()}
+            aria-expanded={false}
+            aria-label="Развернуть шапку"
+          >
+            <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+          </button>
         ) : (
           <div className="flex h-14 items-center gap-3">
             <Breadcrumbs className="min-w-0 flex-1" />
@@ -47,15 +43,23 @@ export function Topbar({
               </span>
             </button>
 
-            <div className="h-9 w-9 rounded-full border bg-card" aria-label="User menu (stub)" />
+            <button
+              type="button"
+              onClick={() => {
+                void logoutAndRedirect();
+              }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border bg-card px-2.5 text-sm text-muted-foreground shadow-sm hover:bg-muted"
+              title="Выйти"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Выйти</span>
+            </button>
 
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleTopbar();
-              }}
+              onClick={() => onToggleTopbar()}
               className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-sm hover:bg-muted"
+              aria-expanded
               aria-label="Свернуть шапку"
               title="Свернуть шапку"
             >
@@ -67,4 +71,3 @@ export function Topbar({
     </header>
   );
 }
-

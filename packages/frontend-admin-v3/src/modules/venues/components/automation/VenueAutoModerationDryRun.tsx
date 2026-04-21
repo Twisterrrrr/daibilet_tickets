@@ -34,11 +34,11 @@ export function VenueAutoModerationDryRun() {
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-muted-foreground">from (ISO date)</span>
-          <Input id="dry-from" value={from} onChange={(e) => setFrom(e.target.value)} placeholder="optional" />
+          <Input id="dry-from" value={from} onChange={(e) => setFrom(e.target.value)} placeholder="необязательно" />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-muted-foreground">to (ISO date)</span>
-          <Input id="dry-to" value={to} onChange={(e) => setTo(e.target.value)} placeholder="optional" />
+          <Input id="dry-to" value={to} onChange={(e) => setTo(e.target.value)} placeholder="необязательно" />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-muted-foreground">limit</span>

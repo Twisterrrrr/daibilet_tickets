@@ -49,10 +49,10 @@ export function EventMainCell({ item }: { item: EventRowItem }) {
                 key={`sub-${s.id}`}
                 variant={s.isActive === false ? 'warning' : 'outline'}
                 className="max-w-[180px] truncate"
-                title={s.isActive === false ? 'legacy / неактивна' : undefined}
+                title={s.isActive === false ? 'устаревшая / неактивна' : undefined}
               >
                 {s.name}
-                {s.isActive === false ? <span className="ml-1 text-[10px]">legacy</span> : null}
+                {s.isActive === false ? <span className="ml-1 text-[10px]">устар.</span> : null}
               </Badge>
             ))}
             {sec.extra + sub.extra > 0 ? (

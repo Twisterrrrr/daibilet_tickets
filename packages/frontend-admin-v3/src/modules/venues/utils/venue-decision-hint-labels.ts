@@ -1,7 +1,7 @@
 import type { VenueDecisionHint } from '@/modules/venues/api/candidates';
 
 const HINT_LABEL: Record<VenueDecisionHint, string> = {
-  MERGE_RECOMMENDED: 'Рекомендуется merge',
+  MERGE_RECOMMENDED: 'Рекомендуется объединение',
   APPROVE_AS_NEW: 'Можно как новую',
   NEEDS_REVIEW: 'Нужна проверка',
   REJECT_RECOMMENDED: 'Рекомендуется отклонить',

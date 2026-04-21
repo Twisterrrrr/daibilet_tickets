@@ -35,6 +35,13 @@ export type EventRowItem = {
   sessionsCount?: number | null;
 
   sectionsDerived?: Array<{ slug: string; name: string }>;
-  subcategoriesCanonical?: Array<{ id: string; slug: string; name: string; isActive?: boolean }>;
+  subcategoriesCanonical?: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    isActive?: boolean;
+    layer?: 'PRIMARY' | 'SECONDARY';
+    subcategoryType?: 'UNIVERSAL' | 'EVENT_ONLY' | 'VENUE_ONLY';
+  }>;
 };
 

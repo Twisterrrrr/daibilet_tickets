@@ -19,7 +19,7 @@ export function AdminShell() {
   });
 
   return (
-    <div className="min-h-svh bg-background">
+    <div className="min-h-svh bg-page">
       <div className="flex min-h-svh">
         <aside className="relative sticky top-0 hidden h-svh shrink-0 md:block">
           <div
@@ -67,9 +67,11 @@ export function AdminShell() {
               }
             }}
           />
-          <main className="mx-auto w-full max-w-[1400px] px-6 py-8">
-            <div className="animate-in-page">
-              <Outlet />
+          <main className="min-w-0 flex-1">
+            <div className="mx-auto w-full max-w-content px-6 pb-16 pt-8 sm:px-8 sm:pb-20 sm:pt-10">
+              <div className="animate-in-page">
+                <Outlet />
+              </div>
             </div>
           </main>
         </div>

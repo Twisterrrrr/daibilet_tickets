@@ -20,12 +20,35 @@ const PT_LABEL: Record<string, string> = {
   SENIOR: 'Льготный',
 };
 
+const OFFER_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: 'Активна',
+  HIDDEN: 'Скрыта',
+  DISABLED: 'Отключена',
+};
+
+/** Значения из комментария к полю EventOffer.availabilityMode в схеме. */
+const AVAILABILITY_MODE_LABEL: Record<string, string> = {
+  UNKNOWN: 'неизвестно',
+  LIMITED: 'ограничено',
+  SOLD_OUT: 'распродано',
+  BY_API: 'по API',
+};
+
 function categoryDisplayName(row: { name: string; purchaseType: string }): string {
   const raw = row.name?.trim();
   if (raw && raw !== row.purchaseType) {
     return raw;
   }
   return PT_LABEL[row.purchaseType] ?? row.purchaseType;
+}
+
+function offerStatusLabel(status: string): string {
+  return OFFER_STATUS_LABEL[status] ?? status;
+}
+
+function availabilityModeLabel(mode: string | null): string {
+  if (mode == null || mode === '') return '—';
+  return AVAILABILITY_MODE_LABEL[mode] ?? mode;
 }
 
 export function EventCategoryPricesTab({ detail }: { detail: AdminEventDetail }) {
@@ -62,10 +85,10 @@ export function EventCategoryPricesTab({ detail }: { detail: AdminEventDetail })
               </td>
               <td className="px-4 py-3 tabular-nums">{formatRubFromKopecks(row.priceFromKopecks)}</td>
               <td className="px-4 py-3 text-center">
-                <Badge variant="outline">{row.status}</Badge>
+                <Badge variant="outline">{offerStatusLabel(row.status)}</Badge>
               </td>
               <td className="px-4 py-3 text-center tabular-nums text-muted-foreground">{row.sessionsLinkedCount}</td>
-              <td className="px-4 py-3 text-center text-muted-foreground">{row.availabilityMode ?? '—'}</td>
+              <td className="px-4 py-3 text-center text-muted-foreground">{availabilityModeLabel(row.availabilityMode)}</td>
               <td className="px-4 py-3 text-center">
                 {row.isSellableHint ? (
                   <Badge variant="success">да</Badge>

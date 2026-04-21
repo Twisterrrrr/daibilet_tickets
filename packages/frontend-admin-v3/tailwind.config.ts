@@ -7,6 +7,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        page: 'hsl(var(--bg-page) / <alpha-value>)',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -55,6 +56,19 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+      },
+      fontSize: {
+        h1: ['1.875rem', { lineHeight: '2.25rem', letterSpacing: '-0.02em', fontWeight: '600' }],
+        h2: ['1.375rem', { lineHeight: '1.75rem', letterSpacing: '-0.015em', fontWeight: '600' }],
+        section: ['1.0625rem', { lineHeight: '1.5rem', fontWeight: '600' }],
+        body: ['0.9375rem', { lineHeight: '1.55rem', fontWeight: '400' }],
+        small: ['0.8125rem', { lineHeight: '1.45rem', fontWeight: '400' }],
+      },
+      maxWidth: {
+        content: 'var(--content-max-width)',
+      },
+      boxShadow: {
+        soft: 'var(--shadow-soft)',
       },
     },
   },

@@ -117,9 +117,9 @@ export function VenueModerationAnalyticsPage() {
                 <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
                   <th className="px-3 py-2">Источник</th>
                   <th className="px-3 py-2">Всего</th>
-                  <th className="px-3 py-2">A / R / M</th>
-                  <th className="px-3 py-2">Needs review</th>
-                  <th className="px-3 py-2">Avg conf.</th>
+                  <th className="px-3 py-2">Утв. / Откл. / Объед.</th>
+                  <th className="px-3 py-2">Нужна проверка</th>
+                  <th className="px-3 py-2">Средн. уверенность</th>
                   <th className="px-3 py-2">Топ причин отказа</th>
                 </tr>
               </thead>

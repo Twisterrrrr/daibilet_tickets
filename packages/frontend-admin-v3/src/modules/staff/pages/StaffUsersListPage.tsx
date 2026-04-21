@@ -23,7 +23,7 @@ export function StaffUsersListPage() {
             <thead className="border-b bg-muted/40 text-left text-xs">
               <tr>
                 <th className="px-3 py-2">Имя</th>
-                <th className="px-3 py-2">Email</th>
+                <th className="px-3 py-2">Эл. почта</th>
                 <th className="px-3 py-2">Роль</th>
                 <th className="px-3 py-2">Активен</th>
               </tr>

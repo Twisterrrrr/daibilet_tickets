@@ -30,7 +30,7 @@ export function SiteUsersListPage() {
             <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">Имя</th>
-                <th className="px-3 py-2">Email</th>
+                <th className="px-3 py-2">Эл. почта</th>
                 <th className="px-3 py-2">Заказов</th>
                 <th className="px-3 py-2">Регистрация</th>
               </tr>

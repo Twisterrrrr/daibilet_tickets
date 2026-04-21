@@ -8,9 +8,9 @@ export function VenueDecisionHintStats({ data }: { data: VenueModerationMetricsD
   const { decisionHints, hintAcceptance } = data;
   return (
     <div className="space-y-4 rounded-lg border bg-card p-4">
-      <div className="text-sm font-medium">Decision hints</div>
+      <div className="text-sm font-medium">Подсказки для решения</div>
       <p className="text-xs text-muted-foreground">
-        С подсказкой (не NO_HINT): <strong>{decisionHints.totalWithHint}</strong>
+        С подсказкой (не «без подсказки»): <strong>{decisionHints.totalWithHint}</strong>
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -18,10 +18,10 @@ export function VenueDecisionHintStats({ data }: { data: VenueModerationMetricsD
             <tr className="border-b text-left text-xs text-muted-foreground">
               <th className="py-2 pr-2">Тип</th>
               <th className="py-2 pr-2">Сигналов</th>
-              <th className="py-2 pr-2">Accepted</th>
-              <th className="py-2 pr-2">Rejected</th>
-              <th className="py-2 pr-2">Overridden</th>
-              <th className="py-2">Acceptance rate</th>
+              <th className="py-2 pr-2">Принято</th>
+              <th className="py-2 pr-2">Отклонено</th>
+              <th className="py-2 pr-2">Переопределено</th>
+              <th className="py-2">Доля принятия</th>
             </tr>
           </thead>
           <tbody>
@@ -37,7 +37,7 @@ export function VenueDecisionHintStats({ data }: { data: VenueModerationMetricsD
                   <td className="py-2 pr-2 tabular-nums">{row.rejected}</td>
                   <td className="py-2 pr-2 tabular-nums">{row.overridden}</td>
                   <td className="py-2 text-xs">
-                    acc {formatSharePct(accRate)} · ovr {formatSharePct(ovrRate)}
+                    принято {formatSharePct(accRate)} · переопр. {formatSharePct(ovrRate)}
                   </td>
                 </tr>
               );
@@ -46,8 +46,8 @@ export function VenueDecisionHintStats({ data }: { data: VenueModerationMetricsD
         </table>
       </div>
       <div className="text-xs text-muted-foreground">
-        По счётчикам: MERGE_RECOMMENDED {decisionHints.byHint.MERGE_RECOMMENDED}, APPROVE_AS_NEW{' '}
-        {decisionHints.byHint.APPROVE_AS_NEW}, NEEDS_REVIEW {decisionHints.byHint.NEEDS_REVIEW}, REJECT_RECOMMENDED{' '}
+        Распределение сигналов: объединение — {decisionHints.byHint.MERGE_RECOMMENDED}, новая карточка —{' '}
+        {decisionHints.byHint.APPROVE_AS_NEW}, нужна проверка — {decisionHints.byHint.NEEDS_REVIEW}, отклонение —{' '}
         {decisionHints.byHint.REJECT_RECOMMENDED}
       </div>
     </div>

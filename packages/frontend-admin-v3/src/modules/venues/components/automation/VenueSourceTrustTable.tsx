@@ -7,13 +7,13 @@ export function VenueSourceTrustTable({ rows }: { rows: ImportSourceTrustRow[] }
         <thead className="border-b bg-muted/40 text-left text-xs font-medium uppercase text-muted-foreground">
           <tr>
             <th className="px-3 py-2">Источник</th>
-            <th className="px-3 py-2">Trust (профиль)</th>
+            <th className="px-3 py-2">Доверие (профиль)</th>
             <th className="px-3 py-2">Предложено</th>
-            <th className="px-3 py-2">Авто approve</th>
-            <th className="px-3 py-2">Авто merge</th>
-            <th className="px-3 py-2">Reject rate</th>
-            <th className="px-3 py-2">Hint merge</th>
-            <th className="px-3 py-2">Hint approve</th>
+            <th className="px-3 py-2">Автоутверждение</th>
+            <th className="px-3 py-2">Автообъединение</th>
+            <th className="px-3 py-2">Доля отклонений</th>
+            <th className="px-3 py-2">Подсказка: объединение</th>
+            <th className="px-3 py-2">Подсказка: утверждение</th>
           </tr>
         </thead>
         <tbody>

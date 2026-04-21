@@ -49,8 +49,8 @@ export function VenueAnalyticsFilterBar({
           onChange={(e) => onImportSourceChange((e.target.value || '') as VenueImportSourceFilter)}
         >
           <option value="">Все</option>
-          <option value="TICKETSCLOUD">Ticketscloud</option>
-          <option value="TEPLOHOD">Teplohod</option>
+          <option value="TICKETSCLOUD">TicketsCloud</option>
+          <option value="TEPLOHOD">Теплоход</option>
         </select>
       </label>
       <Button type="button" size="sm" onClick={() => onApply()}>

@@ -135,7 +135,7 @@ export function ArticlesListPage() {
                 <option value="">Активные (без архива)</option>
                 <option value="DRAFT">DRAFT</option>
                 <option value="PUBLISHED">PUBLISHED</option>
-                <option value="ARCHIVED">ARCHIVED</option>
+                <option value="ARCHIVED">Архив</option>
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">

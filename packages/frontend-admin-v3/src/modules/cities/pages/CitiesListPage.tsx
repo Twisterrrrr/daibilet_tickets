@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/shared/page-header/PageHeader';
-import { FilterBar, FilterField } from '@/components/shared/filters/FilterBar';
+import { FilterBar, FilterField, FilterFieldsGrid } from '@/components/shared/filters/FilterBar';
 import { SearchInput } from '@/components/shared/filters/SearchInput';
 import { DataTableShell } from '@/components/shared/table/DataTableShell';
 import { ErrorState } from '@/components/shared/states/ErrorState';
@@ -21,6 +21,9 @@ const READINESS: Array<{ id: '' | 'READY' | 'NEEDS_WORK' | 'BLOCKED'; label: str
   { id: 'NEEDS_WORK', label: 'Нужна доработка' },
   { id: 'BLOCKED', label: 'Заблокировано' },
 ];
+
+const FILTER_SELECT =
+  'h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm';
 
 type CityListUrlFilters = {
   readinessStatus: '' | 'READY' | 'NEEDS_WORK' | 'BLOCKED';
@@ -145,59 +148,62 @@ export function CitiesListPage() {
       />
 
       <FilterBar>
-        <FilterField label="Поиск">
-          <SearchInput value={list.q} onChange={(e) => list.setQ(e.target.value)} placeholder="Название, slug…" />
-        </FilterField>
-        <FilterField label="Регион">
-          <select
-            className="h-9 w-full min-w-[180px] rounded-md border border-input bg-background px-2 text-sm"
-            value={cf.regionId}
-            onChange={(e) => {
-              setCf({ regionId: e.target.value }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            <option value="">Все</option>
-            {(regionsQ.data ?? []).map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Готовность">
-          <select
-            className="h-9 w-full min-w-[160px] rounded-md border border-input bg-background px-2 text-sm"
-            value={cf.readinessStatus}
-            onChange={(e) => {
-              setCf({ readinessStatus: (e.target.value || '') as typeof cf.readinessStatus }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            {READINESS.map((x) => (
-              <option key={x.id || 'all'} value={x.id}>
-                {x.label}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Публикация">
-          <select
-            className="h-9 w-full min-w-[120px] rounded-md border border-input bg-background px-2 text-sm"
-            value={cf.isActive}
-            onChange={(e) => {
-              setCf({ isActive: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            <option value="">Все</option>
-            <option value="yes">Видим</option>
-            <option value="no">Скрыт</option>
-          </select>
-        </FilterField>
-        <FilterField label="Быстрые фильтры">
-          <div className="flex flex-col gap-1 text-xs">
-            <label className="flex cursor-pointer items-center gap-2">
+        <FilterFieldsGrid className="xl:grid-cols-5">
+          <FilterField label="Поиск" className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
+            <SearchInput value={list.q} onChange={(e) => list.setQ(e.target.value)} placeholder="Название, адрес в URL…" />
+          </FilterField>
+          <FilterField label="Регион">
+            <select
+              className={FILTER_SELECT}
+              value={cf.regionId}
+              onChange={(e) => {
+                setCf({ regionId: e.target.value }, { history: 'replace' });
+                list.setPageReplace(1);
+              }}
+            >
+              <option value="">Все</option>
+              {(regionsQ.data ?? []).map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField label="Готовность">
+            <select
+              className={FILTER_SELECT}
+              value={cf.readinessStatus}
+              onChange={(e) => {
+                setCf({ readinessStatus: (e.target.value || '') as typeof cf.readinessStatus }, { history: 'replace' });
+                list.setPageReplace(1);
+              }}
+            >
+              {READINESS.map((x) => (
+                <option key={x.id || 'all'} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField label="Публикация">
+            <select
+              className={FILTER_SELECT}
+              value={cf.isActive}
+              onChange={(e) => {
+                setCf({ isActive: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+                list.setPageReplace(1);
+              }}
+            >
+              <option value="">Все</option>
+              <option value="yes">Видим</option>
+              <option value="no">Скрыт</option>
+            </select>
+          </FilterField>
+        </FilterFieldsGrid>
+
+        <div className="mt-3 w-full border-t border-border/60 pt-3">
+          <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-dashed border-border/80 bg-muted/15 px-3 py-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={cf.hasEvents}
@@ -208,7 +214,7 @@ export function CitiesListPage() {
               />
               Есть события
             </label>
-            <label className="flex cursor-pointer items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={cf.hasVenues}
@@ -219,7 +225,7 @@ export function CitiesListPage() {
               />
               Есть площадки
             </label>
-            <label className="flex cursor-pointer items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={cf.hasLandings}
@@ -230,7 +236,7 @@ export function CitiesListPage() {
               />
               Есть лендинги
             </label>
-            <label className="flex cursor-pointer items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={cf.hasSeo}
@@ -239,10 +245,10 @@ export function CitiesListPage() {
                   list.setPageReplace(1);
                 }}
               />
-              Заполнен SEO meta
+              Заполнены мета-теги для SEO
             </label>
           </div>
-        </FilterField>
+        </div>
       </FilterBar>
 
       <DataTableShell>
@@ -299,9 +305,7 @@ function CityListRow({ row, siteBase }: { row: AdminCityListItem; siteBase?: str
   const score = row.readinessScore;
   const signals = row.readinessKeySignals ?? [];
   const st = row.stats;
-  const flags = row.flags;
-
-  const eventsHref = `/admin-v3/events?city=${encodeURIComponent(row.slug)}`;
+  const flags = row.flags;  const eventsHref = `/admin-v3/events?city=${encodeURIComponent(row.slug)}`;
   const venuesHref = `/admin-v3/venues?city=${encodeURIComponent(row.slug)}`;
   const landingsHref = `/admin-v3/landings?city=${encodeURIComponent(row.slug)}`;
   const publicPath = `/cities/${encodeURIComponent(row.slug)}`;
@@ -342,7 +346,7 @@ function CityListRow({ row, siteBase }: { row: AdminCityListItem; siteBase?: str
       </td>
       <td className="align-top px-3 py-3 text-xs">
         <div>Описание: {flags.hasDescription ? 'да' : 'нет'}</div>
-        <div>SEO meta: {flags.hasSeo ? 'да' : 'нет'}</div>
+        <div>Мета-теги: {flags.hasSeo ? 'да' : 'нет'}</div>
         <div>Обложка: {flags.hasCover ? 'да' : 'нет'}</div>
         <div className="mt-1 text-muted-foreground">Обновлено: {formatDt(row.updatedAt)}</div>
       </td>

@@ -11,6 +11,13 @@ export const topGroupLabels: Record<TopGroup, string> = {
 /** Канонический derived mapping: subcategorySlug -> topGroup */
 export const subcategoryTopGroup: Record<string, TopGroup> = {
   concerts: 'events',
+  jazz: 'events',
+  opera: 'events',
+  ballet: 'events',
+  'open-air': 'events',
+  conference: 'events',
+  meetup: 'events',
+  'seasonal-events': 'events',
   theater: 'events',
   shows: 'events',
   standup: 'events',
@@ -25,6 +32,7 @@ export const subcategoryTopGroup: Record<string, TopGroup> = {
   'night-tours': 'excursions',
   'city-tours': 'excursions',
   'private-tours': 'excursions',
+  'group-tours': 'excursions',
 
   museums: 'museums',
   exhibitions: 'museums',
@@ -35,12 +43,28 @@ export const subcategoryTopGroup: Record<string, TopGroup> = {
   cycling: 'activities',
   outdoor: 'activities',
   'sport-events': 'activities',
+  'shooting-range-events': 'activities',
+  'ice-skating-primary': 'activities',
+  'skiing-primary': 'activities',
+  'yoga-fitness': 'activities',
+  'wellness-spa': 'activities',
+  'team-building-primary': 'activities',
+  'hiking-primary': 'activities',
+  tracking: 'activities',
 
   quests: 'entertainment',
   attractions: 'entertainment',
   interactive: 'entertainment',
   'kids-activities': 'entertainment',
   'game-zones': 'entertainment',
+  zoo: 'entertainment',
+  aquarium: 'entertainment',
+  circus: 'entertainment',
+  cinema: 'entertainment',
+  'nightclub-primary': 'entertainment',
+  'vr-arcade': 'entertainment',
+  'bowling-ent': 'entertainment',
+  'food-court-ent': 'entertainment',
 };
 
 export function deriveTopGroupFromSubcategorySlug(slug: string | null | undefined): TopGroup | null {

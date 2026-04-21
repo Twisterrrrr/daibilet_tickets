@@ -3,6 +3,7 @@ import { ErrorState } from '@/components/shared/states/ErrorState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createAdminSubcategory } from '../api/subcategories.api';
+import { SUBCATEGORY_LAYER_LABEL, SUBCATEGORY_TYPE_LABEL } from '../lib/subcategory-ui-labels';
 import { useMutation } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -50,39 +51,39 @@ export function SubcategoryCreatePage() {
 
       <div className="grid gap-4 rounded-lg border bg-card p-5 sm:max-w-[720px]">
         <div className="grid gap-2">
-          <div className="text-xs font-medium text-muted-foreground">Slug</div>
-          <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="walking-excursion" />
+          <div className="text-xs font-medium text-muted-foreground">Слаг</div>
+          <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="naberezhnaya-progulka" />
         </div>
         <div className="grid gap-2">
-          <div className="text-xs font-medium text-muted-foreground">Code</div>
-          <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="WALKING" className="font-mono" />
+          <div className="text-xs font-medium text-muted-foreground">Код</div>
+          <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="NABEREZHNAYA" className="font-mono" />
         </div>
         <div className="grid gap-2">
-          <div className="text-xs font-medium text-muted-foreground">Name (RU)</div>
+          <div className="text-xs font-medium text-muted-foreground">Название (RU)</div>
           <Input value={nameRu} onChange={(e) => setNameRu(e.target.value)} placeholder="Пешеходные экскурсии" />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-2">
-            <div className="text-xs font-medium text-muted-foreground">Type</div>
+            <div className="text-xs font-medium text-muted-foreground">Тип</div>
             <select
               className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={type}
               onChange={(e) => setType(e.target.value)}
             >
-              <option value="EVENT_ONLY">EVENT_ONLY</option>
-              <option value="VENUE_ONLY">VENUE_ONLY</option>
-              <option value="UNIVERSAL">UNIVERSAL</option>
+              <option value="EVENT_ONLY">{SUBCATEGORY_TYPE_LABEL.EVENT_ONLY}</option>
+              <option value="VENUE_ONLY">{SUBCATEGORY_TYPE_LABEL.VENUE_ONLY}</option>
+              <option value="UNIVERSAL">{SUBCATEGORY_TYPE_LABEL.UNIVERSAL}</option>
             </select>
           </div>
           <div className="grid gap-2">
-            <div className="text-xs font-medium text-muted-foreground">Layer</div>
+            <div className="text-xs font-medium text-muted-foreground">Слой</div>
             <select
               className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={layer}
               onChange={(e) => setLayer(e.target.value)}
             >
-              <option value="PRIMARY">PRIMARY</option>
-              <option value="SECONDARY">SECONDARY</option>
+              <option value="PRIMARY">{SUBCATEGORY_LAYER_LABEL.PRIMARY}</option>
+              <option value="SECONDARY">{SUBCATEGORY_LAYER_LABEL.SECONDARY}</option>
             </select>
           </div>
         </div>

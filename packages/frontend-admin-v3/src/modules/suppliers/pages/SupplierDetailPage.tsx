@@ -161,11 +161,11 @@ export function SupplierDetailPage() {
             <Field label="Название">
               <span>{v.name}</span>
             </Field>
-            <Field label="Slug">
+            <Field label="Слаг (URL)">
               <span className="font-mono text-xs">{v.slug}</span>
             </Field>
             <label className="space-y-1">
-              <span className="text-xs text-muted-foreground">Trust level (0–3)</span>
+              <span className="text-xs text-muted-foreground">Уровень доверия (0–3)</span>
               <Input
                 type="number"
                 min={0}
@@ -191,7 +191,7 @@ export function SupplierDetailPage() {
                 checked={Boolean(v.isActive)}
                 onChange={(e) => setDraft({ ...v, isActive: e.target.checked })}
               />
-              Активен (isActive)
+              Активен
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -204,10 +204,10 @@ export function SupplierDetailPage() {
                   })
                 }
               />
-              Приостановить обмен (SUSPENDED)
+              Приостановить обмен
             </label>
             <label className="space-y-1 sm:col-span-2">
-              <span className="text-xs text-muted-foreground">YooKassa sub-merchant ID</span>
+              <span className="text-xs text-muted-foreground">Идентификатор субмерчанта YooKassa</span>
               <Input
                 value={v.yookassaAccountId ?? ''}
                 onChange={(e) => setDraft({ ...v, yookassaAccountId: e.target.value || null })}
@@ -260,7 +260,7 @@ export function SupplierDetailPage() {
           </p>
           {lhFull ? (
             <div className="rounded-md bg-muted/40 p-3 text-xs">
-              <div>Listing health (полный): score {lhFull.score}</div>
+              <div>Качество листинга (полное): балл {lhFull.score}</div>
               <div className="mt-1 text-muted-foreground">Проблем: {lhFull.issues.length} · событий в разборе: {lhFull.byEvent.length}</div>
             </div>
           ) : null}
@@ -315,7 +315,7 @@ export function SupplierDetailPage() {
             <Field label="Заказов (оплачено)">
               <span>{v.financials?.totalOrders ?? '—'}</span>
             </Field>
-            <Field label="Выручка (gross)">
+            <Field label="Выручка (валовая)">
               <span>{String(v.financials?.grossRevenue ?? '—')}</span>
             </Field>
             <Field label="Комиссия платформы">
@@ -327,7 +327,7 @@ export function SupplierDetailPage() {
             <Field label="Режим расчётов">
               <span>{v.settlementMode ?? '—'}</span>
             </Field>
-            <Field label="Payment mode">
+            <Field label="Режим оплаты">
               <span>{v.paymentMode ?? '—'}</span>
             </Field>
           </div>
@@ -394,16 +394,16 @@ export function SupplierDetailPage() {
       {tab === 'quality' ? (
         <section className="rounded-lg border bg-card p-5 text-sm space-y-3">
           <div className="grid gap-2 sm:grid-cols-2">
-            <Field label="Trust score">
+            <Field label="Балл доверия">
               <span>{v.trust?.score != null ? String(v.trust.score) : '—'}</span>
             </Field>
-            <Field label="Эффективный score">
+            <Field label="Эффективный балл">
               <span>{v.trust?.effectiveScore != null ? String(v.trust.effectiveScore) : '—'}</span>
             </Field>
-            <Field label="Trust level">
+            <Field label="Уровень доверия">
               <span>{v.trustLevel}</span>
             </Field>
-            <Field label="Catalog (компонента)">
+            <Field label="Каталог (компонент)">
               <span>{v.trust?.catalog != null ? String(v.trust.catalog) : '—'}</span>
             </Field>
           </div>

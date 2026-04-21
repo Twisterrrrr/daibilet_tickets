@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/shared/page-header/PageHeader';
-import { FilterBar, FilterField } from '@/components/shared/filters/FilterBar';
+import { FilterBar, FilterField, FilterFieldsGrid } from '@/components/shared/filters/FilterBar';
 import { SearchInput } from '@/components/shared/filters/SearchInput';
 import { DataTableShell } from '@/components/shared/table/DataTableShell';
 import { ErrorState } from '@/components/shared/states/ErrorState';
@@ -24,11 +24,14 @@ const READINESS: Array<{ id: '' | 'READY' | 'NEEDS_WORK' | 'BLOCKED'; label: str
 
 const TRUST: Array<{ id: '' | '0' | '1' | '2' | '3'; label: string }> = [
   { id: '', label: 'Все уровни' },
-  { id: '0', label: 'NEW (0)' },
-  { id: '1', label: 'BASIC (1)' },
-  { id: '2', label: 'VERIFIED (2)' },
-  { id: '3', label: 'TRUSTED (3)' },
+  { id: '0', label: 'Новый (0)' },
+  { id: '1', label: 'Базовый (1)' },
+  { id: '2', label: 'Проверен (2)' },
+  { id: '3', label: 'Надёжный (3)' },
 ];
+
+const FILTER_SELECT =
+  'h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm';
 
 type SuppliersListUrlFilters = {
   readinessStatus: '' | 'READY' | 'NEEDS_WORK' | 'BLOCKED';
@@ -135,58 +138,61 @@ export function SuppliersListPage() {
       />
 
       <FilterBar>
-        <FilterField label="Поиск">
-          <SearchInput value={list.q} onChange={(e) => list.setQ(e.target.value)} placeholder="Название, email, ИНН…" />
-        </FilterField>
-        <FilterField label="Готовность">
-          <select
-            className="h-9 w-full min-w-[160px] rounded-md border border-input bg-background px-2 text-sm"
-            value={sf.readinessStatus}
-            onChange={(e) => {
-              setSf({ readinessStatus: (e.target.value || '') as typeof sf.readinessStatus }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            {READINESS.map((x) => (
-              <option key={x.id || 'all'} value={x.id}>
-                {x.label}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Trust level">
-          <select
-            className="h-9 w-full min-w-[140px] rounded-md border border-input bg-background px-2 text-sm"
-            value={sf.trustLevel}
-            onChange={(e) => {
-              setSf({ trustLevel: (e.target.value || '') as typeof sf.trustLevel }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            {TRUST.map((x) => (
-              <option key={x.id || 'all'} value={x.id}>
-                {x.label}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Активность">
-          <select
-            className="h-9 w-full min-w-[120px] rounded-md border border-input bg-background px-2 text-sm"
-            value={sf.isActive}
-            onChange={(e) => {
-              setSf({ isActive: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
-              list.setPageReplace(1);
-            }}
-          >
-            <option value="">Все</option>
-            <option value="yes">Активен</option>
-            <option value="no">Выключен</option>
-          </select>
-        </FilterField>
-        <FilterField label="Быстрые фильтры">
-          <div className="flex flex-col gap-1 text-xs">
-            <label className="flex cursor-pointer items-center gap-2">
+        <FilterFieldsGrid className="xl:grid-cols-5">
+          <FilterField label="Поиск" className="sm:col-span-2 lg:col-span-2 xl:col-span-2">
+            <SearchInput value={list.q} onChange={(e) => list.setQ(e.target.value)} placeholder="Название, email, ИНН…" />
+          </FilterField>
+          <FilterField label="Готовность">
+            <select
+              className={FILTER_SELECT}
+              value={sf.readinessStatus}
+              onChange={(e) => {
+                setSf({ readinessStatus: (e.target.value || '') as typeof sf.readinessStatus }, { history: 'replace' });
+                list.setPageReplace(1);
+              }}
+            >
+              {READINESS.map((x) => (
+                <option key={x.id || 'all'} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField label="Уровень доверия">
+            <select
+              className={FILTER_SELECT}
+              value={sf.trustLevel}
+              onChange={(e) => {
+                setSf({ trustLevel: (e.target.value || '') as typeof sf.trustLevel }, { history: 'replace' });
+                list.setPageReplace(1);
+              }}
+            >
+              {TRUST.map((x) => (
+                <option key={x.id || 'all'} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField label="Активность">
+            <select
+              className={FILTER_SELECT}
+              value={sf.isActive}
+              onChange={(e) => {
+                setSf({ isActive: e.target.value as '' | 'yes' | 'no' }, { history: 'replace' });
+                list.setPageReplace(1);
+              }}
+            >
+              <option value="">Все</option>
+              <option value="yes">Активен</option>
+              <option value="no">Выключен</option>
+            </select>
+          </FilterField>
+        </FilterFieldsGrid>
+
+        <div className="mt-3 w-full border-t border-border/60 pt-3">
+          <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-dashed border-border/80 bg-muted/15 px-3 py-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={sf.hasBlockedEvents}
@@ -195,9 +201,9 @@ export function SuppliersListPage() {
                   list.setPageReplace(1);
                 }}
               />
-              Есть REJECTED события
+              Есть отклонённые события
             </label>
-            <label className="flex cursor-pointer items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={sf.hasNoUsers}
@@ -208,7 +214,7 @@ export function SuppliersListPage() {
               />
               Нет пользователей кабинета
             </label>
-            <label className="flex cursor-pointer items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={sf.hasLegalIssue}
@@ -220,7 +226,7 @@ export function SuppliersListPage() {
               Юр. профиль с проблемами
             </label>
           </div>
-        </FilterField>
+        </div>
       </FilterBar>
 
       <DataTableShell>
@@ -250,7 +256,7 @@ export function SuppliersListPage() {
                 <th className="px-3 py-3">Поставщик</th>
                 <th className="px-3 py-3">Готовность</th>
                 <th className="px-3 py-3">Каталог / доступ</th>
-                <th className="px-3 py-3">Trust / финансы</th>
+                <th className="px-3 py-3">Доверие и финансы</th>
                 <th className="w-44 px-3 py-3">Действия</th>
               </tr>
             </thead>
@@ -315,7 +321,7 @@ function SupplierListRow({ row }: { row: AdminSupplierListItem }) {
         </div>
       </td>
       <td className="align-top px-3 py-3 text-xs">
-        <div>Trust: L{row.trustLevel}</div>
+        <div>Доверие: ур. {row.trustLevel}</div>
         <div>Качество каталога (proxy): {row.listingHealthScore}</div>
         <div>Комиссия: {row.commissionRate != null ? `${Math.round(Number(row.commissionRate) * 10000) / 100}%` : '—'}</div>
         <div className="mt-1 text-muted-foreground">Обновлено: {formatDt(row.updatedAt)}</div>
