@@ -322,4 +322,3 @@ type LandingQueryConfig = {
 
 - Публичный read-path для `Route`/`RoutePoint`: оставляем **только admin** до появления продуктовой страницы, или нужен публичный endpoint сразу?
 - Нужны ли ограничения на `durationMinutes`/обязательность `titleOverride` для editorial UX?
-

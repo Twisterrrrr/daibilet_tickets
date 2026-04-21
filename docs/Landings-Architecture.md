@@ -2,6 +2,8 @@
 
 ## Role
 
+> **Эволюция модели (2026‑04):** целевая **композиция страницы** (блоки, темы `LandingTheme`, типы **CITY / MULTI_CITY** без отдельного типа HUB в продукте, SEO audit read-model) описана в **[Landing-Composition-System.md](Landing-Composition-System.md)**. Раздел ниже про «Global HUB» сохраняет **URL и SEO‑интент**; при реализации миграций термин **HUB как `LandingType`** заменяется на **`MULTI_CITY`** — см. §7 того документа.
+
 Landing is a city-bound marketing presentation over the same selection foundation as collections.
 
 - Collection = selection engine surface

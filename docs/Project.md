@@ -1,6 +1,6 @@
 # Project — Дайбилет (daibilet.ru)
 
-> Последнее обновление: 2026-04-16 (Order mirror layer + hooks)
+> Последнее обновление: 2026-04-20 (питание как `contentTemplateData.catering`, фасеты лендингов)
 
 ## Миссия
 
@@ -27,6 +27,8 @@
 - **Личный кабинет покупателя / Buyer Account**: `BuyerAccountSpecs.md`.
 - **Система доверия поставщикам / Supplier Trust System**: `archive/specs/SupplierTrustSpec.md`.
 - **Посадочные страницы и хабы (включая сезонные лендинги)**: `Landings-Architecture.md`.
+- **Композиция лендингов (блоки, темы, CITY/MULTI_CITY, SEO audit, публичный renderer)**: `Landing-Composition-System.md`.
+- **Паритет узкого гастро-лендинга (эталон Lovable ↔ витрина `/cities/...`)**: `lovable-dinner-cruise-landing-parity.md`.
 - **B2B / внешние ticket providers (capability foundation)**: `TicketProviderCapabilityFoundation.md`, матрица: `TicketProviderCapabilityMatrix.md`, подготовка Wave 1 (Radario/Qtickets, env + HTTP): `Wave1-Radario-Qtickets-Prep.md`.
 - **Дорожная карта (3 спринта × 2 недели: каталог/редакция → admin-v2/ЛК → поставщик + YooKassa + SEO)**: `Roadmap-3-Sprints-Catalog-Admin-Supplier.md`.
 - **Событие + сеансы (продуктовый контракт эпика Event, admin + supplier; Venue как отдельная сущность — в том же файле §6–7):** `Event-Sessions-Product-Contract.md`.
@@ -50,7 +52,7 @@
 - **Инвариант dual-read:** публичные строки **`district` / `metro`** остаются в API как сейчас, но заполняются из справочников (`District` / `MetroStation`) при наличии FK; иначе — fallback на legacy строки в `Venue`.
 - **Справочники:** `District` и `MetroStation` уникальны в рамках города (`@@unique([cityId, slug])`); админские CRUD — `GET/POST/PATCH/DELETE` под `/admin/geo/*`.
 - **Операторский флаг:** `Venue.isHiddenGem` — витринный бейдж «секретное место» (не влияет на публикацию).
-- **Маршруты:** `RoutePoint` описывает упорядоченные точки маршрута с XOR‑привязкой к `Venue` **или** `Event`; админ API — `/admin/routes/:routeId/points` + `/admin/route-points/:id` + reorder.
+- **Маршруты (нормализованный слой):** `Route` может принадлежать событию (`Route.eventId`, уникально, 1:1 MVP). `RoutePoint` имеет `targetType` (`VENUE` | `EVENT`) и XOR FK на `Venue` или `Event`; порядок — `order`, уникален в рамках `routeId`. Legacy‑связь `Event.routeId` сохранена; при сохранении из карточки события выставляются оба поля. **Админ (событие):** `GET/PUT/DELETE /api/v1/admin/events/:eventId/route` — атомарная замена точек. **Публично:** блок `route` в `GET /api/v1/catalog/events/:slug` только если `Route.isPublished`; точки с неактивными целями отфильтровываются. Старые эндпоинты `/admin/routes/*` / точки по `routeId` остаются для низкоуровневого редактирования.
 - **SEO aliases (только 301):** короткие пути `/event/:slug` → `/events/:slug` и `/place/:slug` → `/venues/:slug` в `packages/frontend/next.config.ts` (каноника `/events` и `/venues` не меняется).
 
 ## Архитектура
@@ -84,6 +86,7 @@
   - **Derived section:** вычисляется **только** через `section-map` по slug PRIMARY подкатегории; для любого события section должен резолвиться через канонику/compat mapping.
   - **UI‑правило:** не предлагать неактивные/legacy подкатегории в выборе, но **показывать** их если они уже стоят у события (read‑only, с пометкой legacy).
 - **Событие (операционный стандарт V3, 2026‑04):** список и деталь опираются на обогащённые admin DTO (`readinessSummary`, расписание, минимальная цена, поставщик/площадка). Коммерческий слой в интерфейсе именуется **«Категории и цены»**; данные по-прежнему маппятся из **`EventOffer`** без переименования persistence. Вкладка **«Расписание»** в V3 — **read-only** просмотр слотов (в т.ч. горизонт до 365 дней, остаток мест, `isActive`). См. `docs/Diary.md` за 14.04.2026.
+- **Речные / ужины (контентная типизация):** питание и меню не храним в `Event` как «каталожную истину»; вместо этого используем типизированный блок **`EventOverride.contentTemplateData.catering`** (`enabled`, `type`, `includedInPrice`, `menuMarkdown`). Это позволяет делать узкие лендинги (ужины, гастро) без раздувания модели события и без “самолёта” в админке.
 
 #### Settings (Admin V3) — управление системой (scope 2026‑04)
 

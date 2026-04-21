@@ -21,6 +21,12 @@
 | [Tags-Architecture.md](Tags-Architecture.md) | Архитектура тегов и SEO-routing |
 | [SeoAudit-Taxonomy-MasterPlan.md](SeoAudit-Taxonomy-MasterPlan.md) | Master plan: Taxonomy (Subcategories) + SEO Audit как единый слой качества |
 | [UX-Parity-Backlog.md](UX-Parity-Backlog.md) | UI-system enforcement и статус UX parity |
+| [ui-scope.md](ui-scope.md) | Разделение Admin/Catalog UI vs Public Landing UI |
+| [design-system.md](design-system.md) | Дизайн-система публичных лендингов (простор, CTA, hero) |
+| [lovable-parity.md](lovable-parity.md) | Паритет с эталоном Lovable, анти-паттерны |
+| [landing-reference-pages.md](landing-reference-pages.md) | Эталонные маршруты Lovable для лендингов |
+| [daibilet-shell-integration.md](daibilet-shell-integration.md) | Header/footer вокруг лендинга |
+| [page-anatomy.md](page-anatomy.md) | Анатомия публичного лендинга |
 | [admin-v3-grand-master-plan.md](admin-v3-grand-master-plan.md) | Admin V3: стратегия по фазам 0–8 и Stages A–F |
 | [admin-v3-roadmap.md](admin-v3-roadmap.md) | Admin V3: тактический roadmap к запуску витрины (TC + Teplohod) |
 | [RegressionChecklist.md](RegressionChecklist.md) | Чек-лист перед merge |

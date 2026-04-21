@@ -4,6 +4,61 @@
 
 ---
 
+## 18.04.2026 — Landing composition Phase A/B (Prisma, blocks, SEO audit API)
+
+### Наблюдения
+
+- Реализация «как Lovable» требует данных в БД и API до массовой переработки Next `page.tsx`.
+- Тип `HUB` в `LandingType` дублировал `MULTI_CITY` и усложнял контракты.
+
+### Решения
+
+- **Prisma:** `LandingTheme`, `LandingContentBlock` + `LandingBlockType`, `LandingCanonicalMode`; расширен `LandingPage` (hero/SEO/canonical/theme/blocks relation); `LandingType`: только `CITY` | `MULTI_CITY`; миграция [`20260420110000_landing_composition_phase_a`](packages/backend/prisma/migrations/20260420110000_landing_composition_phase_a/migration.sql) (HUB → MULTI_CITY, partial unique на `slug` при `cityId` null).
+- **Backend:** публичные ответы [`getCatalogByCityAndSlug`](packages/backend/src/landing/landing.service.ts) / [`getCatalogHubBySlug`](packages/backend/src/landing/landing.service.ts) дополнены `blocks` и полями hero/SEO; [`LandingSeoAuditService`](packages/backend/src/landing/landing-seo-audit.service.ts) + `GET /admin/landings/:id/seo-audit`; админ `GET /admin/landings/:id` включает `theme` и `contentBlocks`.
+- **Admin V3:** убраны опции/фильтры `HUB`; тип родителя — только `MULTI_CITY`.
+- **Тесты:** [`landing-seo-audit.service.spec.ts`](packages/backend/src/landing/__tests__/landing-seo-audit.service.spec.ts).
+- **Док:** [`Landing-Composition-System.md`](docs/Landing-Composition-System.md) — инвариант MULTI_CITY vs CITY feed, домены SEO audit.
+
+### Проблемы
+
+- Phase C–E (полный редактор блоков в V3, публичный `LandingRenderer`, миграция страниц `river-cruises` и др.) — впереди; применить миграцию на стенде: `npx prisma migrate deploy` в `packages/backend`.
+
+## 20.04.2026 — Речные лендинги: «Питание» как типизированный блок + фасеты‑иконки
+
+### Наблюдения
+
+- Поля меню/питания на уровне `Event` плохо масштабируются: это часто **контентный слой** (для конкретного интента лендинга), а не “истина каталога”.
+- Иконки в тулбаре (еда/музыка/гид/аудиогид/палуба) по смыслу — **фасеты‑фильтры** и должны отсеивать события без свойства (AND).
+
+### Решения
+
+- **Питание:** перенесено в `EventOverride.contentTemplateData.catering` (`enabled`, `type`, `includedInPrice`, `menuMarkdown`) и добавлен узкий admin endpoint `PATCH /admin/events/:id/catering` с ограничением на подкатегорию `river-excursion`.
+- **Схема:** удалены колонки `events.menuKind`/`events.menuSummary` (миграция `20260420170000_drop_event_menu_fields`), оставлены `Event.vesselName` и `Event.experienceFormat` как поля таблицы сравнения для речных.
+- **Лендинг:** таблица/фильтр «Питание» строятся по `catering` (тип питания) и `menuMarkdown` (превью меню); JSON‑LD `FoodEvent` использует plain‑text из Markdown.
+- **Фасеты‑иконки:** исправлена передача `subcategories`/`shortDescription` из variants лендинга в derived модели (салютный тулбар), чтобы клики по иконкам реально фильтровали выдачу.
+
+### Проблемы
+
+- Поле `experienceFormat` требует отдельного продуктового решения: оставлять ли в `Event` как “канон” для всех лендингов, или переносить в landing‑level enrichment/typing.
+
+## 17.04.2026 — Landing Composition System (целевая модель блоков и CITY/MULTI_CITY)
+
+### Наблюдения
+
+- «Глянцевый» UX как у референсных прототипов требует **управляемой композиции**, а не правок отдельных `page.tsx`.
+- Отдельный тип **HUB** в продуктовой модели смешивает роль URL с ролью данных; верхнеуровневые тематические страницы (`/river-cruises`, …) логичнее описывать как **`MULTI_CITY`** с полями layout/canonical/indexability.
+- Источник выборки для лендинга не должен расходиться с подборкой из‑за **`collectionId` как второй правды** — до unified filter engine приоритет у **тегов + `additionalFilters`** (`buildLandingEventsWhere`).
+
+### Решения
+
+- Добавлен документ **`docs/Landing-Composition-System.md`**: `LandingTheme`, `LandingContentBlock`, enum блоков, разделение admin/public DTO, SEO audit read-model, этапы rollout, согласование с `Landings-Architecture.md` (термин Global HUB → MULTI_CITY при миграции типов).
+- В **`Project.md`**, **`Tasktracker.md`** (`landing-composition-system`, уточнение `v2-landing-slug-policy`) зафиксированы ссылки и бэклог.
+- **`docs/lovable-dinner-cruise-landing-parity.md`:** вынесен построчный чеклист (head/hero/фильтры/таблица/блоки/данные API) для query-scoped лендинга в духе Lovable; зафиксированы пробелы (`menuKind`/`menuSummary`/`experienceFormat`, JSON-LD `FoodEvent`, крошки vs вертикаль) и критерии приёмки MVP в §11; якорь `landing-lovable-dinner-parity-doc` в трекере.
+
+### Проблемы
+
+- Реализация (Prisma + API + Admin V3 + renderer) — отдельный эпик; текущая схема `LandingPage` с `landingType: HUB` потребует миграции при принятии решения об enum.
+
 ## 17.04.2026 — Venue geo + Trip routes (District/Metro FK, RoutePoint, hidden gem, SEO aliases)
 
 ### Наблюдения

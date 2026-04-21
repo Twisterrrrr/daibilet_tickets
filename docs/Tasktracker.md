@@ -64,10 +64,14 @@
 | `v2-shared-ui-primitives` | Вынести List / Detail / SectionCard / Tabs / PageHeader в `@daibilet/shared-ui`; новые экраны admin-v2 и supplier-v2 — на общих примитивах | Высокий | `[ ]` |
 | `v2-detail-page-contract` | Зафиксировать и выровнять контракт DetailPage (`PageHeader + Tabs + Data + States`) по всем новым карточкам | Средний | `[ ]` |
 | `v2-blueprint-runtime` | Blueprint: `queries` / `relations` / `actions` + связь с fetching, RBAC и UI state (не только текст для людей) | Средний | `[ ]` |
-| `v2-landing-slug-policy` | Политика slug: canonical **city + slug**, редиректы, уникальность и SEO при нескольких `LandingPage` на тему; согласовать с `Landings-Architecture.md` | Высокий | `[ ]` |
+| `v2-landing-slug-policy` | Политика slug: canonical **city + slug**, редиректы, уникальность и SEO при нескольких `LandingPage` на тему; согласовать с `Landings-Architecture.md` и **`Landing-Composition-System.md`** (canonical CITY vs MULTI_CITY) | Высокий | `[ ]` |
+| `landing-composition-system` | **Композиция лендингов:** Prisma `LandingTheme` + `LandingContentBlock`, типы CITY/MULTI_CITY (без отдельного HUB), Admin V3 вкладки, public `LandingRenderer`, SEO audit read-model; источник выборки — фильтры (`buildLandingEventsWhere`), не `collectionId` как вторая правда — см. `Landing-Composition-System.md` §2–10 | Высокий | `[ ]` |
 | `v2-marketing-api-gate` | Маркетинг и мультилендинги: не подключать прод-API без стандарта DTO, кеширования и нормализации на клиенте | Критический | `[ ]` |
 | `landings-multicity-family-foundation` | **Landings (эволюция домена):** формализовать “topic hub / multi-city family / city landing” (parent-child, preview resolved, canonical policy) поверх текущих `/cities/:citySlug/:landingSlug` и хабов (`/river-cruises`, `/salute-9-may`) | Высокий | `[x]` **14.04.2026** |
 | `content-links-fk-evolution` | **Контентные связи (эволюция):** `Article↔Landing/Collection` через M2M link‑таблицы с `position/priority`, `LandingPage.filterTagId` (FK на Tag) параллельно slug, `Collection↔Tag` через join‑таблицу; dual‑read + backfill | Высокий | `[x]` **14.04.2026** |
+| `landing-lovable-dinner-parity-doc` | **Док:** чеклист паритета эталона Lovable («ужин на теплоходе») ↔ `LandingClient` / `ComparisonTable` / `FilterBar`, пробелы по данным и SEO — `lovable-dinner-cruise-landing-parity.md`; реализация колонок «Меню»/«Формат», JSON-LD — отдельные задачи по критериям §11 документа | Средний | `[x]` **17.04.2026** |
+| `landing-river-dinner-catering` | **Речные / ужины:** питание как типизированный блок `EventOverride.contentTemplateData.catering` (есть питание, тип питания, включено в стоимость, меню), вывод в таблицу/фильтры лендинга | Высокий | `[x]` **20.04.2026** |
+| `landing-toolbar-facets-filtering` | **Лендинги:** пиктограммы‑фасеты работают как фильтры (AND): при клике отсекаются варианты без свойства; для салютного тулбара исправить передачу `subcategories`/`shortDescription` в derived services | Средний | `[x]` **20.04.2026** |
 
 ### Orders foundation — unified Order mirror (2026‑04)
 
