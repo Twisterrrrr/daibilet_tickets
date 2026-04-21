@@ -534,13 +534,13 @@ export function PromoPlacementBlocksListPage() {
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="border-b bg-muted/40 text-left text-xs font-medium uppercase text-muted-foreground">
               <tr>
-                <th className="px-3 py-3">Placement</th>
-                <th className="px-3 py-3">Scope</th>
-                <th className="px-3 py-3">Target</th>
-                <th className="px-3 py-3">Window</th>
-                <th className="px-3 py-3">Order</th>
-                <th className="px-3 py-3">Readiness</th>
-                <th className="w-48 px-3 py-3 text-right">Actions</th>
+                <th className="px-3 py-3">Размещение</th>
+                <th className="px-3 py-3">Скоуп</th>
+                <th className="px-3 py-3">Цель</th>
+                <th className="px-3 py-3">Окно</th>
+                <th className="px-3 py-3">Порядок</th>
+                <th className="px-3 py-3">Готовность</th>
+                <th className="w-48 px-3 py-3 text-right">Действия</th>
               </tr>
             </thead>
             <tbody>

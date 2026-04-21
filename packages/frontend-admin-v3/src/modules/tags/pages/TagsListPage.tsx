@@ -145,13 +145,10 @@ function InputSelect({ value, onChange }: { value: string; onChange: (v: string)
       onChange={(e) => onChange(e.target.value)}
     >
       <option value="">Все</option>
-      <option value="CITY">Город (CITY)</option>
-      <option value="TOPIC">Тема (TOPIC)</option>
-      <option value="SUBTOPIC">Подтема (SUBTOPIC)</option>
-      <option value="FORMAT">Формат (FORMAT)</option>
-      <option value="VENUE">Площадка (VENUE)</option>
-      <option value="EVENT">Событие (EVENT)</option>
-      <option value="GENERIC">Общий (GENERIC)</option>
+      <option value="THEME">Тема (THEME)</option>
+      <option value="AUDIENCE">Аудитория (AUDIENCE)</option>
+      <option value="SEASON">Сезон (SEASON)</option>
+      <option value="SPECIAL">Спец. (SPECIAL)</option>
     </select>
   );
 }

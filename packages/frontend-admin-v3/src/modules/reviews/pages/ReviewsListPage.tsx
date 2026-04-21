@@ -273,10 +273,10 @@ function ReviewsTable({
       <table className="w-full min-w-[980px] text-sm">
         <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
           <tr>
-            <th className="px-4 py-3 text-left">Entity</th>
-            <th className="px-4 py-3 text-left">Review</th>
-            <th className="px-4 py-3 text-center">Status</th>
-            <th className="px-4 py-3 text-center">Actions</th>
+            <th className="px-4 py-3 text-left">Сущность</th>
+            <th className="px-4 py-3 text-left">Отзыв</th>
+            <th className="px-4 py-3 text-center">Статус</th>
+            <th className="px-4 py-3 text-center">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -332,10 +332,10 @@ function ReviewsTable({
                       </Button>
                     ) : null}
                     <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onApprove(r.id)}>
-                      Approve
+                      Принять
                     </Button>
                     <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onReject(r.id)}>
-                      Reject
+                      Отклонить
                     </Button>
                     <Button
                       type="button"
@@ -347,7 +347,7 @@ function ReviewsTable({
                         onDelete(r.id);
                       }}
                     >
-                      Delete
+                      Удалить
                     </Button>
                   </div>
                 </td>
@@ -376,9 +376,9 @@ function SupplierResponsesTable({
       <table className="w-full min-w-[820px] text-sm">
         <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
           <tr>
-            <th className="px-4 py-3 text-left">Response</th>
-            <th className="px-4 py-3 text-center">Status</th>
-            <th className="px-4 py-3 text-center">Actions</th>
+            <th className="px-4 py-3 text-left">Ответ</th>
+            <th className="px-4 py-3 text-center">Статус</th>
+            <th className="px-4 py-3 text-center">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -401,10 +401,10 @@ function SupplierResponsesTable({
                 <td className="px-4 py-3 text-center align-top">
                   <div className="flex flex-wrap justify-center gap-2">
                     <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onApprove(r.id)}>
-                      Approve
+                      Принять
                     </Button>
                     <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onReject(r.id)}>
-                      Reject
+                      Отклонить
                     </Button>
                   </div>
                 </td>
@@ -431,9 +431,9 @@ function DisputesTable({
       <table className="w-full min-w-[760px] text-sm">
         <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
           <tr>
-            <th className="px-4 py-3 text-left">Dispute</th>
-            <th className="px-4 py-3 text-center">Status</th>
-            <th className="px-4 py-3 text-center">Actions</th>
+            <th className="px-4 py-3 text-left">Оспаривание</th>
+            <th className="px-4 py-3 text-center">Статус</th>
+            <th className="px-4 py-3 text-center">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -455,7 +455,7 @@ function DisputesTable({
                 </td>
                 <td className="px-4 py-3 text-center align-top">
                   <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onResolve(d.id)}>
-                    Resolve
+                    Разрешить
                   </Button>
                 </td>
               </tr>

@@ -10,6 +10,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+const TAG_CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'THEME', label: 'Тема (THEME)' },
+  { value: 'AUDIENCE', label: 'Аудитория (AUDIENCE)' },
+  { value: 'SEASON', label: 'Сезон (SEASON)' },
+  { value: 'SPECIAL', label: 'Спец. (SPECIAL)' },
+];
+
 export function TagDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
@@ -87,7 +94,7 @@ export function TagDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={v.name}
-        subtitle={`Tag · ${v.slug}`}
+        subtitle={`Тег · ${v.slug}`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" asChild>
@@ -128,8 +135,18 @@ export function TagDetailPage() {
             <Input value={v.slug} onChange={(e) => setDraft({ ...v, slug: e.target.value })} />
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">category</span>
-            <Input value={v.category} onChange={(e) => setDraft({ ...v, category: e.target.value })} />
+            <span className="text-xs text-muted-foreground">Категория</span>
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+              value={v.category}
+              onChange={(e) => setDraft({ ...v, category: e.target.value })}
+            >
+              {TAG_CATEGORY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="space-y-1">
             <span className="text-xs text-muted-foreground">tagKind</span>
@@ -176,7 +193,7 @@ export function TagDetailPage() {
                 unlinkM.mutate();
               }}
             >
-              {unlinkM.isPending ? '…' : 'Unlink from events'}
+              {unlinkM.isPending ? '…' : 'Отвязать от событий'}
             </Button>
           </div>
           {unlinkM.data ? (

@@ -269,10 +269,10 @@ function ModerationRow({
             <Link to={`/admin-v3/events/${encodeURIComponent(it.id)}`}>Открыть</Link>
           </Button>
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onApprove}>
-            Approve
+            Принять
           </Button>
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onReject}>
-            Reject
+            Отклонить
           </Button>
         </div>
       </td>
