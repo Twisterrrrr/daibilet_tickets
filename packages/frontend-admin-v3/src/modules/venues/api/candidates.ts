@@ -334,6 +334,8 @@ export async function fetchAdminVenuesList(params: {
   readinessStatus?: 'READY' | 'NEEDS_WORK' | 'NEEDS_REVIEW' | 'BLOCKED';
 }): Promise<PaginatedVenues> {
   const sp = new URLSearchParams();
+  // Venues list page does not require heavy computed read-model fields; request a lighter payload.
+  sp.set('lite', '1');
   sp.set('limit', String(params.limit ?? 25));
   if (params.page != null) sp.set('page', String(params.page));
   if (params.search) sp.set('search', params.search);

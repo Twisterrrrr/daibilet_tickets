@@ -1,36 +1,6 @@
-# Admin V3 — план миграции (Shell + UI-kit + phased migration)
+# Moved
 
-Цель: сделать **новый облегчённый Admin V3** поверх текущего проекта **без переписывания backend**, с поэтапной миграцией экранов из **V1**. V1 не удаляем, держим как fallback.
-
-## 0) Что уже есть в репозитории
-
-### Legacy Admin (V1): `packages/frontend-admin`
-
-- **Shell / Layout**:
-  - `packages/frontend-admin/src/components/layout/Layout.tsx` — topbar + sidebar provider + outlet, общий контейнер.
-  - `packages/frontend-admin/src/components/layout/AdminSidebar.tsx` — меню, роли, бейджи (например чат).
-  - `packages/frontend-admin/src/components/layout/CommandPalette.tsx` — Ctrl/Cmd+K по `ALL_NAV_ITEMS`.
-- **Routing**:
-  - `packages/frontend-admin/src/App.tsx` — `BrowserRouter`, nested layout route, `ProtectedRoute`, `DisabledRoute`, lazy для части страниц.
-- **Navigation config**:
-  - `packages/frontend-admin/src/config/nav.ts` — `NAV_SECTIONS`, `ALL_NAV_ITEMS`.
-- **Feature flags (env → flags)**:
-  - `packages/frontend-admin/src/config/flags.ts` — `VITE_LEGACY_SHOW_*` (`showCatalog/showContent/showEvents/showOrders/showOps`).
-  - Применение:
-    - sidebar visibility: `config/nav.ts` фильтрует items
-    - route gating: `App.tsx` подменяет page на `DisabledRoute` (redirect на `/`)
-- **Таблицы/списки**:
-  - `packages/frontend-admin/src/components/ui/DataTable.tsx` — TanStack Table, но типизация местами слабая (`any` в `SortableHeader`)
-  - На части страниц есть **снежинки**: кастомные таблицы/фильтры/состояния, особенно в доменных разделах.
-
-**Важно (техдолг V1, который нельзя тащить в V3):**
-- **Несогласованность**: nav скрывает раздел, но глубинные роуты местами остаются объявленными без gating.
-- **Разнородность list-паттернов**: TanStack DataTable vs hand-rolled таблицы/фильтры.
-- **Смешанная ответственность**: логика списков/фильтров/колонок часто живёт в страницах, а не в конфиге/хуках.
-
-### Admin V2 (UX-референс): `packages/frontend-admin-v2`
-
-V2 используем **как ориентир UX и “мягкости”**, но не копируем буквально.
+Этот документ объединён в [`Implementation-Guide.md`](Implementation-Guide.md).
 
 Ключевые эталонные файлы:
 - **Ритм и контейнер**: `packages/frontend-admin-v2/src/shared/ui/page-container.tsx` (max-width + отступы `px-6/8`, `pt-8/10`, `pb-16/20`).

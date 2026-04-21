@@ -31,10 +31,7 @@ Then:
 
 | Документ | Назначение |
 |----------|------------|
-| [docs/ui-scope.md](docs/ui-scope.md) | Разделение Admin/Catalog vs Public Landing |
-| [docs/design-system.md](docs/design-system.md) | Публичные лендинги: простор, иерархия, CTA |
-| [docs/lovable-parity.md](docs/lovable-parity.md) | Паритет с эталоном Lovable |
-| [docs/landing-reference-pages.md](docs/landing-reference-pages.md) | Набор эталонных маршрутов |
-| [docs/daibilet-shell-integration.md](docs/daibilet-shell-integration.md) | Header/footer вокруг лендинга |
+| [docs/product/landings.md](docs/product/landings.md) | Лендинги: композиция/инварианты/каноника |
+| [docs/archive/legacy-folders/landings/](docs/archive/legacy-folders/landings/) | Исторические reference/parity/anatomy/shell docs |
 
-При конфликте приоритетов см. `docs/ui-scope.md`.
+При конфликте приоритетов см. `docs/product/landings.md` (а исторические правила — в `docs/archive/legacy-folders/landings/`).

@@ -3,7 +3,7 @@
 > **Зафиксировано:** 2026-04-03.  
 > Цель плана: минимизировать риск, дать быстрый продуктовый эффект и параллельно довести админку и личные кабинеты до состояния «можно жить».
 
-Связанные документы: `Project.md`, `Tasktracker.md`, `finance.md`, `Landings-Architecture.md`, `Catalog-Classification-Policy.md`.
+Связанные документы: `Project.md`, `Tasktracker.md`, `finance.md`, `landings/Landings-Architecture.md`, `Catalog-Classification-Policy.md`.
 
 ---
 

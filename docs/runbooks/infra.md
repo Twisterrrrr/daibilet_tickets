@@ -189,6 +189,53 @@ bash scripts/bootstrap-staging.sh
 - **Cache:** Redis; namespace flush через POST /admin/settings/ops/cache/flush.
 - **Sync:** BullMQ; full/incremental jobs; progress через GET /admin/settings/ops/sync/progress.
 
+### Admin RBAC policy (V3) — быстрый контракт прав
+
+**Источник истины:** backend guards (`JwtAuthGuard` + `RolesGuard`) и декораторы `@Roles(...)` в `packages/backend/src/admin/*`. UI-гейты (feature flags / скрытие пунктов меню) — **не security**, только UX.
+
+**Роли (иерархия):** `OWNER ≥ ADMIN ≥ EDITOR ≥ VIEWER` (если endpoint требует `ADMIN`, то `OWNER` тоже проходит).
+
+#### Принцип
+
+- **VIEWER**: только read‑контур (и безопасные “счётчики”), без PII/чувствительных write.
+- **EDITOR**: контент и операционные write в каталог/контент (events/venues/landings/collections/articles), но без “системного управления”.
+- **ADMIN/OWNER**: ops‑кнопки, настройки системы, массовые/опасные операции.
+
+#### 10 опасных операций (минимальные роли)
+
+| Операция | Endpoint | Минимальная роль |
+|---------|----------|------------------|
+| Full sync | `POST /api/v1/admin/settings/ops/sync/full` | `ADMIN` |
+| Incremental sync | `POST /api/v1/admin/settings/ops/sync/incremental` | `ADMIN` |
+| Retag | `POST /api/v1/admin/settings/ops/retag` | `ADMIN` |
+| Retag + materialize | `POST /api/v1/admin/settings/ops/retag-and-materialize` | `ADMIN` |
+| Cache flush | `POST /api/v1/admin/settings/ops/cache/flush` | `ADMIN` |
+| Auto‑moderation RUN (venues) | `POST /api/v1/admin/venues/auto-moderation/run` | `ADMIN` |
+| Auto‑moderation DRY‑RUN (venues) | `POST /api/v1/admin/venues/auto-moderation/dry-run` | `EDITOR` |
+| Batch approve venues | `POST /api/v1/admin/venues/batch/approve` | `EDITOR` |
+| Batch reject venues | `POST /api/v1/admin/venues/batch/reject` | `EDITOR` |
+| Bulk update events | `PATCH /api/v1/admin/events/bulk-update` | `EDITOR` |
+
+#### PII / support (всегда ограничивать)
+
+- **Chat**: `GET/POST /api/v1/admin/chat/*` → `ADMIN, EDITOR`
+- **Tickets**: `GET/PATCH /api/v1/admin/support/tickets*` → `ADMIN, EDITOR`
+- **Inbox count**: `GET /api/v1/admin/support/inbox-count` → `VIEWER+` (только счётчики)
+
+### P0 hardening: dangerous ops (минимальный набор guardrails)
+
+Ниже — практичный чеклист для этапа “Admin V3 core hardening” (без привязки к конкретным UI-экранам).
+
+- **Dry-run по умолчанию**: любые массовые/разрушающие операции должны иметь безопасный режим (`dryRun=true`), а “выполнение” требовать явного подтверждения (флаг/токен/двухшаговый UI).
+- **Audit trail**: actor (id/role), target ids, режим (dryRun/execute), outcome (ok/error), requestId; без PII/секретов в payload.
+- **Rate-limit**: per-user для тяжёлых write-эндпоинтов (dedup merge, auto-moderation run, bulk updates, materialize).
+- **Idempotency keys**: для операций с внешними эффектами (refund processing, checkout confirm/reject, publish/unpublish где применимо).
+- **Экспорт/аудит**: CSV/export и audit log — только для ролей с явным доступом; по возможности — redaction полей.
+
+#### “Dangerous ops” (ориентир)
+
+1. Dedup/merge (events, venues)\n+2. Publish/unpublish\n+3. Bulk session operations\n+4. Offers CRUD/merge/clone\n+5. Auto-moderation RUN\n+6. Landings materialize\n+7. Feature flags mutations\n+8. Refund processing\n+9. Checkout request confirm\n+10. Admin cache flush / sync full (ops)
+
 ### Observability (production)
 
 - **GET /admin/ops/metrics** — счётчики платежей, `rates`, алерты по порогам, статистика Redis-кэша (`hits`/`misses`/`hitRate`), блок `latency` (в т.ч. `byMetric` и отдельно analytics-tabs / catalog-consistency), `system.uptime` и `timestamp`.
@@ -301,9 +348,9 @@ npx prisma migrate dev
 
 | Runbook | Назначение |
 |---------|------------|
-| [Runbook-Production-SSL-Deploy.md](Runbook-Production-SSL-Deploy.md) | Prod SSL/deploy |
+| [runbooks/Runbook-Production-SSL-Deploy.md](runbooks/Runbook-Production-SSL-Deploy.md) | Prod SSL/deploy |
 | [Runbook-CatalogSync.md](Runbook-CatalogSync.md) | Sync каталога |
-| [rollout-tags-runbook.md](rollout-tags-runbook.md) | Tags rollout |
+| [runbooks/rollout-tags-runbook.md](runbooks/rollout-tags-runbook.md) | Tags rollout |
 
 ---
 

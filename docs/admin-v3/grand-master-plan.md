@@ -1,6 +1,6 @@
 # Grand Master Plan — Admin V3
 
-**Назначение:** единая стратегическая дорожная карта Admin V3 по доменам и фазам. Детальный чеклист запуска витрины (TC + Teplohod) и текущий фокус — в [`admin-v3-roadmap.md`](./admin-v3-roadmap.md).
+**Назначение:** единая стратегическая дорожная карта Admin V3 по доменам и фазам. Текущий путь (Now/Next/Later) — в `docs/DIRECTION.md`.
 
 **Принцип очередности (всегда):**
 
@@ -149,6 +149,28 @@
 
 ---
 
+## 11.1 Тактический путь на 4–6 недель (Admin V3 first)
+
+Это конкретизация под текущую стратегию: **стартуем с Admin V3 без Supplier self‑service и без finance UI**, а затем возвращаемся к ним по мере необходимости.
+
+### Неделя 1: стабилизация control-plane
+
+- Fix/guardrails для **dangerous ops** (publish/unpublish, materialize, auto-moderation run, refunds, feature flags).\n+- Перф: `lite=1` для списков, явные DTO на read-heavy endpoints, baseline замеры.
+
+### Неделя 2–3: Supplier MVP (V3-style)
+
+- Минимальный кабинет поставщика как **тонкий V3-style слой** (не реанимация Supplier V1):\n+  - список событий/площадок поставщика (read-first)\n+  - карточка сущности с readiness/quality и ссылками в Admin V3\n+  - минимальные safe actions только если потребуется\n+- Расширение опциями только по нужде (интеграции/команда/финансы — позже, отдельными фазами).
+
+### Неделя 4–6: schedule / sessions operations
+
+- Сеансы как операционный контур: read-only обзор → bulk-операции → edit/create там, где это реально нужно.\n+- Приоритет: безопасные и обратимые действия, с аудитом.
+
+#### Стратегия (без преждевременного “Event Master”)
+
+- **Шаг 1 — Read-only**: обзор будущих сеансов, “пустые” события (нет future), базовые флаги качества, быстрые deep-links в событие.\n+- **Шаг 2 — Bulk**: pause/resume/stop/cancel в рамках строгих предикатов (только будущие, только нераспроданные, только ограниченные источники), с dry-run и аудитом.\n+- **Шаг 3 — Edit/Create**: точечное редактирование сеанса и пакетное создание только там, где без этого нельзя (в первую очередь MANUAL/операторские сценарии).
+
+DoD фазы: оператор может держать расписание “чистым” без SQL/скриптов и без массовых регрессий.
+
 ## 12. Критичность до запуска витрины
 
 **Обязательно до launch-core:** venue candidates, canonical venues, events, cities, suppliers light, minimal publish/readiness.
@@ -201,9 +223,9 @@ Admin V3 «состоялась», если:
 
 ## Связанные документы
 
-- [`admin-v3-roadmap.md`](./admin-v3-roadmap.md) — тактический roadmap к запуску витрины (TC + Teplohod), чеклисты, текущий фокус.
-- [`admin-v3-plan.md`](./admin-v3-plan.md) — план миграции shell/UI из V1.
-- [`admin-v3-routing.md`](./admin-v3-routing.md) — маршруты V3.
+- `docs/DIRECTION.md` — текущий путь (Now/Next/Later) и что сознательно отложено.
+- `docs/Tasktracker.md` — актуальный трекер задач и статусы.
+- `docs/runbooks/infra.md` — эксплуатация, RBAC, ops.
 
 ## Notes: Articles (public contract)
 

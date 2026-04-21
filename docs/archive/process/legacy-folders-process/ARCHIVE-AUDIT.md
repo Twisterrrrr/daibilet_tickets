@@ -47,7 +47,7 @@
 | finance.md | Buyer/Supplier/Admin финансы |
 | BuyerAccountSpecs.md | ЛК покупателя |
 | Architecture.md | Каталог, лендинги, topic definitions |
-| Landings-Architecture.md | Архитектура лендингов |
+| landings/Landings-Architecture.md | Архитектура лендингов |
 | Collections-Architecture.md | Архитектура подборок |
 | Tags-Architecture.md | Теги и SEO-routing |
 | UX-Parity-Backlog.md | UI parity |

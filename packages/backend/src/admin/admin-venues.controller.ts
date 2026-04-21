@@ -294,8 +294,10 @@ export class AdminVenuesController {
     @Query('hasMergeTarget') hasMergeTarget?: string,
     @Query('venuePageWhitelist') venuePageWhitelist?: string,
     @Query('readinessStatus') readinessStatus?: string,
+    @Query('lite') lite?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit: limit || '20' });
+    const liteMode = lite === '1' || lite === 'true' || lite === 'yes';
     const { sort: sortField, order: orderDir } = parseVenueListSortQuery(sort, order);
     // Cursor-pagination требует предсказуемого порядка; кастомный sort только в offset-режиме (page).
     const orderBy = pg.cursor
@@ -336,9 +338,11 @@ export class AdminVenuesController {
         ...paginationArgs(pg),
         include: {
           city: { select: { id: true, name: true, slug: true } },
-          mergeTarget: { select: { id: true, title: true, slug: true } },
-          districtRef: { select: { id: true, name: true, slug: true } },
-          metroStationRef: { select: { id: true, name: true, slug: true, lineName: true, lineColor: true } },
+          ...(liteMode ? {} : { mergeTarget: { select: { id: true, title: true, slug: true } } }),
+          ...(liteMode ? {} : { districtRef: { select: { id: true, name: true, slug: true } } }),
+          ...(liteMode
+            ? {}
+            : { metroStationRef: { select: { id: true, name: true, slug: true, lineName: true, lineColor: true } } }),
           _count: { select: { events: true, offers: true, mergedFrom: true } },
         },
       }),
@@ -350,13 +354,15 @@ export class AdminVenuesController {
     const nextCursor = hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null;
 
     const venueIdsPage = pageItems.map((v) => v.id);
-    const [eventStats, storefrontEv] = await Promise.all([
-      loadVenueListEventStats(this.prisma, venueIdsPage),
-      loadVenueStorefrontEventCounts(this.prisma, venueIdsPage),
-    ]);
+    const [eventStats, storefrontEv] = liteMode
+      ? [null, null]
+      : await Promise.all([
+          loadVenueListEventStats(this.prisma, venueIdsPage),
+          loadVenueStorefrontEventCounts(this.prisma, venueIdsPage),
+        ]);
 
     let hints: Record<string, { decisionHint: string; decisionHintReasons: string[] }> = {};
-    if (includeDecisionHints === 'true' && pageItems.length > 0) {
+    if (!liteMode && includeDecisionHints === 'true' && pageItems.length > 0) {
       const hintRows = pageItems
         .filter((v) => v.lifecycleStatus === 'DRAFT' && v.sourceType === 'IMPORTED')
         .map((v) => ({
@@ -377,7 +383,7 @@ export class AdminVenuesController {
 
     return {
       items: pageItems.map((v) => {
-        const h = hints[v.id];
+        const h = liteMode ? undefined : hints[v.id];
         const displayAddress = venueDisplayAddress(v);
         const readiness = computeVenueAdminReadiness({
           lifecycleStatus: v.lifecycleStatus,
@@ -394,29 +400,31 @@ export class AdminVenuesController {
           isVenuePageWhitelisted: v.isVenuePageWhitelisted,
           isPublished: v.isPublished,
         });
-        const activeEventsCount = eventStats.activeEventsByVenue.get(v.id) ?? 0;
-        const futureEventsCount = eventStats.futureEventsByVenue.get(v.id) ?? 0;
-        const storefrontActiveEvents = storefrontEv.get(v.id) ?? 0;
-        const hubReadiness = buildVenueHubReadinessSnapshot({
-          venueId: v.id,
-          slug: v.slug,
-          title: v.title,
-          cityId: v.cityId,
-          citySlug: v.city?.slug ?? null,
-          venuePageMode: v.venuePageMode,
-          isActive: v.isActive,
-          isPublished: v.isPublished,
-          lifecycleStatus: v.lifecycleStatus,
-          mergeTargetId: v.mergeTargetId,
-          address: v.address,
-          displayAddress,
-          metaTitle: v.metaTitle,
-          metaDescription: v.metaDescription,
-          description: v.description,
-          imageUrl: v.imageUrl,
-          storefrontActiveEvents,
-          siteBaseUrl: this.publicSiteBase,
-        });
+        const activeEventsCount = eventStats ? eventStats.activeEventsByVenue.get(v.id) ?? 0 : 0;
+        const futureEventsCount = eventStats ? eventStats.futureEventsByVenue.get(v.id) ?? 0 : 0;
+        const storefrontActiveEvents = storefrontEv ? storefrontEv.get(v.id) ?? 0 : 0;
+        const hubReadiness = liteMode
+          ? null
+          : buildVenueHubReadinessSnapshot({
+              venueId: v.id,
+              slug: v.slug,
+              title: v.title,
+              cityId: v.cityId,
+              citySlug: v.city?.slug ?? null,
+              venuePageMode: v.venuePageMode,
+              isActive: v.isActive,
+              isPublished: v.isPublished,
+              lifecycleStatus: v.lifecycleStatus,
+              mergeTargetId: v.mergeTargetId,
+              address: v.address,
+              displayAddress,
+              metaTitle: v.metaTitle,
+              metaDescription: v.metaDescription,
+              description: v.description,
+              imageUrl: v.imageUrl,
+              storefrontActiveEvents,
+              siteBaseUrl: this.publicSiteBase,
+            });
         return {
           id: v.id,
           slug: v.slug,
@@ -435,16 +443,18 @@ export class AdminVenuesController {
           externalVenueId: v.externalVenueId,
           needsReview: v.needsReview,
           isVenuePageWhitelisted: v.isVenuePageWhitelisted,
-          districtRef: v.districtRef ? { id: v.districtRef.id, name: v.districtRef.name, slug: v.districtRef.slug } : null,
-          metroStationRef: v.metroStationRef
-            ? {
-                id: v.metroStationRef.id,
-                name: v.metroStationRef.name,
-                slug: v.metroStationRef.slug,
-                lineName: v.metroStationRef.lineName,
-                lineColor: v.metroStationRef.lineColor,
-              }
-            : null,
+          districtRef:
+            !liteMode && v.districtRef ? { id: v.districtRef.id, name: v.districtRef.name, slug: v.districtRef.slug } : null,
+          metroStationRef:
+            !liteMode && v.metroStationRef
+              ? {
+                  id: v.metroStationRef.id,
+                  name: v.metroStationRef.name,
+                  slug: v.metroStationRef.slug,
+                  lineName: v.metroStationRef.lineName,
+                  lineColor: v.metroStationRef.lineColor,
+                }
+              : null,
           district: v.districtRef?.name ?? v.district ?? null,
           metro: v.metroStationRef?.name ?? v.metro ?? null,
           eventsCount: v._count.events,
@@ -458,7 +468,7 @@ export class AdminVenuesController {
           readinessScore: readiness.score,
           readinessKeySignals: readiness.keySignals,
           hubReadiness,
-          mergeTargetSummary: v.mergeTarget
+          mergeTargetSummary: !liteMode && v.mergeTarget
             ? { id: v.mergeTarget.id, title: v.mergeTarget.title, slug: v.mergeTarget.slug }
             : null,
           updatedAt: v.updatedAt,

@@ -1,5 +1,7 @@
 # Project — Дайбилет (daibilet.ru)
 
+> **Активный «один экран» про систему сейчас:** [`PROJECT-FOUNDATION.md`](PROJECT-FOUNDATION.md). Этот файл остаётся **расширенной справкой** (миссия, длинные разделы, исторические детали) и постепенно сокращается по мере переноса смысла в foundation / architecture / domains.
+
 > Последнее обновление: 2026-04-20 (питание как `contentTemplateData.catering`, фасеты лендингов)
 
 ## Миссия
@@ -20,22 +22,23 @@
 
 ## Центральные документы
 
-- **Архитектура проекта**: `Project.md` (этот файл).
-- **Классификация каталога / publish-gate (category + subcategories)**: `Catalog-Classification-Policy.md`.
-- **Taxonomy + SEO Audit (единый слой структуры и качества каталога)**: `SeoAudit-Taxonomy-MasterPlan.md`.
-- **Финансы (Buyer + Supplier + Admin)**: `finance.md`.
-- **Личный кабинет покупателя / Buyer Account**: `BuyerAccountSpecs.md`.
-- **Система доверия поставщикам / Supplier Trust System**: `archive/specs/SupplierTrustSpec.md`.
-- **Посадочные страницы и хабы (включая сезонные лендинги)**: `Landings-Architecture.md`.
-- **Композиция лендингов (блоки, темы, CITY/MULTI_CITY, SEO audit, публичный renderer)**: `Landing-Composition-System.md`.
-- **Паритет узкого гастро-лендинга (эталон Lovable ↔ витрина `/cities/...`)**: `lovable-dinner-cruise-landing-parity.md`.
-- **B2B / внешние ticket providers (capability foundation)**: `TicketProviderCapabilityFoundation.md`, матрица: `TicketProviderCapabilityMatrix.md`, подготовка Wave 1 (Radario/Qtickets, env + HTTP): `Wave1-Radario-Qtickets-Prep.md`.
-- **Дорожная карта (3 спринта × 2 недели: каталог/редакция → admin-v2/ЛК → поставщик + YooKassa + SEO)**: `Roadmap-3-Sprints-Catalog-Admin-Supplier.md`.
-- **Событие + сеансы (продуктовый контракт эпика Event, admin + supplier; Venue как отдельная сущность — в том же файле §6–7):** `Event-Sessions-Product-Contract.md`.
-- **Admin V3 (легковесная оболочка поверх текущего backend):** `admin-v3-plan.md`, `admin-v3-routing.md`, `admin-v3-ux.md`, `admin-v3-components.md`.
-- **Чат и поддержка (витрина + тикеты + Admin V3):** `Chat-Support.md` — инвентаризация API, UI, inbox-бейджа, пробелов (закрытие диалога, userId в виджете, Telegram-заготовка).
-- **Логи (Admin V3, аудит/инциденты):** `Logs.md` — MVP на AuditLog + план расширения (платежи/вебхуки/провайдеры).
-- **Каталог: derived sections (5 разделов) и маппинг PRIMARY → section:** `catalog-sections-backend.md`.
+- **Foundation / что за система сейчас:** `PROJECT-FOUNDATION.md`.
+- **Direction / текущий путь (Now/Next/Later):** `DIRECTION.md`.
+- **Архитектура (вход):** `ARCHITECTURE.md` (деталь инвариантов: `core/architecture.md`).
+- **Roadmap / фазы (вход):** `ROADMAP.md` (детали задач: `Tasktracker.md`).
+- **Архитектура проекта (расширенно):** `Project.md` (этот файл).
+- **Классификация каталога / publish-gate (category + subcategories)**: `core/classification.md`.
+- **Taxonomy (таксономия) / слой структуры каталога**: `core/taxonomy.md`.
+- **Финансы (Buyer + Supplier + Admin)**: `product/finance.md` (сейчас **не приоритет** для UI; см. `DIRECTION.md`).
+- **Личный кабинет покупателя / Buyer Account**: `archive/legacy-root/product_old/BuyerAccountSpecs.md` (legacy reference).
+- **Система доверия поставщикам / Supplier Trust System**: `archive/specs/SupplierTrustSpec.md` (legacy spec / reference).
+- **Посадочные страницы и хабы (лендинги / композиция / canonical policy)**: `product/landings.md`.
+- **B2B / импорт и провайдеры**: `core/ingestion.md` (исторические материалы: `archive/integrations/legacy-folders-integrations/`).
+- **Дорожная карта (legacy)**: `archive/legacy-root/product_old/Roadmap-3-Sprints-Catalog-Admin-Supplier.md`.
+- **Событие + сеансы (продуктовый контракт)**: `core/events.md`.
+- **Admin V3 (легковесная оболочка поверх текущего backend):** `admin-v3/grand-master-plan.md`.
+- **Чат и поддержка (legacy инвентарь):** `archive/legacy-root/product_old/Chat-Support.md`.
+- **Инфраструктура / Prisma / деплой / gates**: `runbooks/infra.md`.
 
 Перечисленные выше документы (включая дорожную карту спринтов) образуют «центр тяжести»; остальные спецификации — детализация или архив и должны ссылаться на них при изменениях.
 
@@ -67,13 +70,22 @@
 | Кэш/очереди | Redis 7 + BullMQ | — |
 | Инфраструктура | Docker Compose, Nginx, Certbot, pnpm workspaces | корень |
 
+## Admin list endpoints — `lite=1` (performance contract)
+
+Для read-heavy списков в Admin V3 введён opt-in query‑param **`lite=1`** для admin list-эндпоинтов.
+
+- **Цель**: уменьшить payload, сериализацию и количество join’ов/вложенных include там, где таблица списка не рендерит “глубокие” поля.
+- **Правило совместимости**: по умолчанию (без `lite`) ответ остаётся полным/как раньше; `lite` — только оптимизация.
+- **Использование**: страницы списков Admin V3 ставят `lite=1` в запросе.
+- **Baseline**: скрипт `scripts/admin-events-baseline.mjs` измеряет latency/bytes для `GET /admin/events`.
+
 ### Admin V2 и ЛК поставщика V2 — роль в продукте
 
 - **Интерфейс управления, не «перенос legacy»:** V2 — тонкий слой списков, карточек и integration blueprints; параллельно качаются **каталог**, **SEO/лендинги** и **B2B API**.
 - **Три слоя смысла:** **ядро** — каталог + API; **growth** — лендинги (в т.ч. topic hub, агрегация нескольких `LandingPage` по slug), маркетинговая зона в админке; **интеграция** — партнёры поверх API.
 - **ComboPage:** не переносить в V2 до **единой корзины** — иначе фиксируются две логики (страница программы и checkout); после корзины комбо логичнее как слой поверх одной модели покупки.
 - **Контракты UI:** **DetailPage** = `PageHeader + Tabs + Data + States`; **Supplier** — те же UX-паттерны, что у админа, с **RBAC** и другим API. Новые и перерабатываемые экраны **обязаны** опираться на примитивы **`@daibilet/shared-ui`** по мере их появления (admin-v2 и supplier-v2 — композиция, не второй UI-kit).
-- **Лендинги и slug:** каноническая пара для публичной витрины — **город + slug** (модель `LandingPage`, публичный контракт в `Landings-Architecture.md`). При агрегации тем по slug нужны осознанные **canonical URL**, редиректы с дублей и правила SEO; уникальность в БД при подключении API — отдельное решение.
+- **Лендинги и slug:** каноническая пара для публичной витрины — **город + slug** (модель `LandingPage`). Политика canonical URL/редиректов/уникальности — в `product/landings.md` (история: `archive/product/landings/legacy-folders-landings/`).
 - **Осознанный долг:** стандарт DTO и нормализация на клиенте, стратегия кеширования/инвалидации, evolution blueprint из текста в runtime (связь с data fetching, правами и состоянием UI). Детальный пофазный план — внутренний roadmap (`admin_v2_roadmap_*.plan.md` в Cursor).
 
 ### Admin V3 — цель и границы (2026‑04)
@@ -85,7 +97,7 @@
   - **Legacy fallback:** `Event.subcategories[]` используется только для чтения старых данных при отсутствии links.
   - **Derived section:** вычисляется **только** через `section-map` по slug PRIMARY подкатегории; для любого события section должен резолвиться через канонику/compat mapping.
   - **UI‑правило:** не предлагать неактивные/legacy подкатегории в выборе, но **показывать** их если они уже стоят у события (read‑only, с пометкой legacy).
-- **Событие (операционный стандарт V3, 2026‑04):** список и деталь опираются на обогащённые admin DTO (`readinessSummary`, расписание, минимальная цена, поставщик/площадка). Коммерческий слой в интерфейсе именуется **«Категории и цены»**; данные по-прежнему маппятся из **`EventOffer`** без переименования persistence. Вкладка **«Расписание»** в V3 — **read-only** просмотр слотов (в т.ч. горизонт до 365 дней, остаток мест, `isActive`). См. `docs/Diary.md` за 14.04.2026.
+- **Событие (операционный стандарт V3, 2026‑04):** список и деталь опираются на обогащённые admin DTO (`readinessSummary`, расписание, минимальная цена, поставщик/площадка). Коммерческий слой в интерфейсе именуется **«Категории и цены»**; данные по-прежнему маппятся из **`EventOffer`** без переименования persistence. Вкладка **«Расписание»** в V3 — **read-only** просмотр слотов (в т.ч. горизонт до 365 дней, остаток мест, `isActive`). См. `process/Diary.md` за 14.04.2026.
 - **Речные / ужины (контентная типизация):** питание и меню не храним в `Event` как «каталожную истину»; вместо этого используем типизированный блок **`EventOverride.contentTemplateData.catering`** (`enabled`, `type`, `includedInPrice`, `menuMarkdown`). Это позволяет делать узкие лендинги (ужины, гастро) без раздувания модели события и без “самолёта” в админке.
 
 #### Settings (Admin V3) — управление системой (scope 2026‑04)
@@ -374,8 +386,8 @@ KV (`AppSetting`) используем только для “параметро
   - **Удаление**: базовый сценарий — soft deprecate через `isActive=false`; физическое удаление подкатегорий допускается только для ошибочных/мусорных записей.
 
 > Примечание по совместимости: `EventSubcategory` (enum) остаётся как **legacy‑слой** для старых данных и части override‑логики, но целевая модель классификации и модерации в админке — **links-first**.
-- **Collections Engine + SEO по подкатегории (MVP):** автоматические подборки событий и площадок по `Subcategory.code`, без второго классификатора. Публичные **авто**-SEO-страницы (`landingMode = AUTO`) строятся только при `isLandingEnabled` **и** достаточном количестве элементов (env-пороги); выдача событий для лендинга идёт **только** через тот же отбор, что и у подборки (`CatalogService.getEvents`). Режим **`TOPIC_HUB`** + `landingTopicKey` привязывает таксономию к уже существующему тематическому хабу (без дублирующего generic-URL). **Routing policy:** сегмент `/cities/{city}/{slug}` — зарезервированное пространство; **материализованный** `LandingPage` имеет **более высокий приоритет**, чем автогенерация по подкатегории; канонический whitelist и иерархия — `prisma/seeds/subcategories-canonical.seed.ts`. См. `docs/Architecture.md` §3.4–3.4.1.
-- **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate. Шаблоны страниц — `docs/Reference.md` § PageTemplateSpecs.
+- **Collections Engine + SEO по подкатегории (MVP):** автоматические подборки событий и площадок по `Subcategory.code`, без второго классификатора. Публичные **авто**-SEO-страницы (`landingMode = AUTO`) строятся только при `isLandingEnabled` **и** достаточном количестве элементов (env-пороги); выдача событий для лендинга идёт **только** через тот же отбор, что и у подборки (`CatalogService.getEvents`). Режим **`TOPIC_HUB`** + `landingTopicKey` привязывает таксономию к уже существующему тематическому хабу (без дублирующего generic-URL). **Routing policy:** сегмент `/cities/{city}/{slug}` — зарезервированное пространство; **материализованный** `LandingPage` имеет **более высокий приоритет**, чем автогенерация по подкатегории; канонический whitelist и иерархия — `prisma/seeds/subcategories-canonical.seed.ts`. См. `core/Architecture.md` §3.4–3.4.1.
+- **Event расширен**: venueId (FK к Venue), dateMode (SCHEDULED/OPEN_DATE), isPermanent, endDate. Шаблоны страниц — `core/Reference.md` § PageTemplateSpecs.
 - **EventOffer расширен**: venueId для прямых офферов к месту (без привязки к Event).
 - **District** — район внутри города (FK `cityId`, `name/slug`, уникальность `(cityId, slug)`).
 - **MetroStation** — станция метро внутри города (FK `cityId`, `name/slug`, опционально `lineName/lineColor`, уникальность `(cityId, slug)`).
@@ -425,7 +437,7 @@ KV (`AppSetting`) используем только для “параметро
 ## Соглашения
 
 - REST API: `/api/v1`
-- Observability: `docs/Reference.md` §2 — requestId, PII masking. Catalog cache metrics: GET /admin/ops/metrics (hits, misses, hitRate). Admin ops: flush по namespace, resync с прогрессом — см. [AdminSystem.md](AdminSystem.md).
+- Observability: `core/Reference.md` §2 — requestId, PII masking. Catalog cache metrics: GET /admin/ops/metrics (hits, misses, hitRate). Admin ops: flush по namespace, resync с прогрессом — см. [AdminSystem.md](AdminSystem.md).
 - Цены в копейках (целое число)
 - Даты — ISO 8601, UTC в БД, локальные при отображении
 - Slug — транслитерация кириллицы
@@ -544,7 +556,7 @@ KV (`AppSetting`) используем только для “параметро
 
 ### Где зафиксировано целевое решение
 
-- `docs/SeoAudit-Taxonomy-MasterPlan.md` — master plan для связки Taxonomy + SEO Audit, правила и rollout по фазам.
+- `core/taxonomy.md` — таксономия и master plan слоя структуры (SEO‑часть постепенно выносится в `product/seo.md`).
   - Примечание: документ описывает **целевую спецификацию**; реализация должна быть эволюционной и не ломать текущие контракты (links‑first `Subcategory`, publish‑gate, materialize‑слой).
 
 ### Глобальные мульти-события (одно шоу в разных городах)

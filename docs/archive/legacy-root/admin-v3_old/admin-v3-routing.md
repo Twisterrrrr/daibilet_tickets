@@ -1,17 +1,6 @@
-# Admin V3 — роутинг, base path и feature flags
+# Moved
 
-## 1) Где живёт V3
-
-- Пакет: `packages/frontend-admin-v3`
-- Префикс (mount point): **`/admin-v3/*`**
-- Router basename зафиксирован в `packages/frontend-admin-v3/src/App.tsx`:
-  - `const BASENAME = '/admin-v3'`
-  - `BrowserRouter basename={BASENAME}`
-
-## 2) Структура маршрутов (MVP)
-
-Реализованы как каркас (часть страниц — заглушки):
-- `/dashboard`
+Этот документ объединён в [`Implementation-Guide.md`](Implementation-Guide.md).
 - `/events`, `/events/:id`
 - `/venues`, `/venues/:id`
 - `/cities`, `/cities/:id`

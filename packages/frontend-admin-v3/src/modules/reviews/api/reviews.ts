@@ -19,6 +19,8 @@ export async function fetchAdminReviews(params: { page: number; limit: number; s
   const sp = new URLSearchParams();
   sp.set('page', String(params.page));
   sp.set('limit', String(params.limit));
+  // List page does not render photos; request a lighter payload.
+  sp.set('lite', '1');
   if (params.status) sp.set('status', params.status);
   if (params.eventId) sp.set('eventId', params.eventId);
   return adminApi.get<Paginated<AdminReviewRow> & { pendingCount?: number }>(`/admin/reviews?${sp.toString()}`);

@@ -31,7 +31,7 @@
 
 Итог: **универсальная модель композиции** + **вариативность данных** в блоках и полях шаблона закрывают «особенности» без плоджения типов сущностей.
 
-Документ [`Landings-Architecture.md`](Landings-Architecture.md) в разделе «Global HUB» описывает **роутинг и SEO‑интент**; тип **`HUB` в Prisma при эволюции заменяется на `MULTI_CITY`** — см. §7.
+Документ [`landings/Landings-Architecture.md`](landings/Landings-Architecture.md) в разделе «Global HUB» описывает **роутинг и SEO‑интент**; тип **`HUB` в Prisma при эволюции заменяется на `MULTI_CITY`** — см. §7.
 
 ---
 
@@ -182,7 +182,7 @@ model LandingContentBlock {
 
 ---
 
-## 7. Совместимость с [`Landings-Architecture.md`](Landings-Architecture.md)
+## 7. Совместимость с [`landings/Landings-Architecture.md`](landings/Landings-Architecture.md)
 
 | Старый термин в документе | Целевая модель |
 |---------------------------|----------------|
@@ -304,7 +304,7 @@ model LandingContentBlock {
 
 ## 12. Связанные документы
 
-- [`Landings-Architecture.md`](Landings-Architecture.md) — текущий роутинг, материалайзер, сезонность.
+- [`landings/Landings-Architecture.md`](landings/Landings-Architecture.md) — текущий роутинг, материалайзер, сезонность.
 - [`Collections-Architecture.md`](Collections-Architecture.md) — подборки vs лендинги.
 - [`Tags-Architecture.md`](Tags-Architecture.md) — теги и назначение на события.
 - [`SeoAudit-Taxonomy-MasterPlan.md`](SeoAudit-Taxonomy-MasterPlan.md) — общий SEO‑аудит.

@@ -290,8 +290,10 @@ export class AdminEventsController {
     @Query('missingImage') missingImage?: string,
     @Query('hasOverride') hasOverride?: string,
     @Query('issuesPreset') issuesPreset?: string,
+    @Query('lite') lite?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
+    const liteMode = lite === '1' || lite === 'true' || lite === 'yes';
     const andParts: Prisma.EventWhereInput[] = [{ isDeleted: false }];
     if (city) andParts.push({ city: { slug: city } });
     if (category) {
@@ -499,26 +501,29 @@ export class AdminEventsController {
       hasMultipleSubcategories === 'false' ||
       hasMultipleSubcategories === 'no';
     if (hasMulti) {
+      const preWhere: Prisma.EventWhereInput = andParts.length === 1 ? andParts[0]! : { AND: andParts };
       const groups = await this.prisma.eventSubcategoryLink.groupBy({
         by: ['eventId'],
+        where: { event: preWhere },
         _count: { _all: true },
+        having: { eventId: { _count: { gt: 1 } } } as unknown as Prisma.EventSubcategoryLinkScalarWhereWithAggregatesInput,
       });
-      const rows = groups as unknown as Array<{ eventId: string; _count: { _all: number } }>;
-      const ids = rows.filter((g) => g._count._all > 1).map((g) => g.eventId);
+      const rows = groups as unknown as Array<{ eventId: string }>;
+      const ids = rows.map((g) => g.eventId);
       andParts.push({ id: { in: ids.length ? ids : ['00000000-0000-0000-0000-000000000000'] } });
     } else if (hasMultiExplicitFalse) {
-      const groupsEq1 = await this.prisma.eventSubcategoryLink.groupBy({
+      const preWhere: Prisma.EventWhereInput = andParts.length === 1 ? andParts[0]! : { AND: andParts };
+      const groups = await this.prisma.eventSubcategoryLink.groupBy({
         by: ['eventId'],
+        where: { event: preWhere },
         _count: { _all: true },
+        having: { eventId: { _count: { gt: 1 } } } as unknown as Prisma.EventSubcategoryLinkScalarWhereWithAggregatesInput,
       });
-      const rowsEq1 = groupsEq1 as unknown as Array<{ eventId: string; _count: { _all: number } }>;
-      const idsEq1 = rowsEq1.filter((g) => g._count._all === 1).map((g) => g.eventId);
-      andParts.push({
-        OR: [
-          { subcategoryLinks: { none: {} } },
-          { id: { in: idsEq1.length ? idsEq1 : ['00000000-0000-0000-0000-000000000000'] } },
-        ],
-      });
+      const rows = groups as unknown as Array<{ eventId: string }>;
+      const idsMulti = rows.map((g) => g.eventId);
+      if (idsMulti.length) {
+        andParts.push({ NOT: { id: { in: idsMulti } } });
+      }
     }
 
     const where: Prisma.EventWhereInput = andParts.length === 1 ? andParts[0]! : { AND: andParts };
@@ -537,17 +542,36 @@ export class AdminEventsController {
     const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          category: true,
+          source: true,
+          rating: true,
+          isActive: true,
+          updatedAt: true,
+          imageUrl: true,
+          priceFrom: true,
+          subcategories: true,
           city: { select: { slug: true, name: true } },
           venue: { select: { id: true, title: true, slug: true } },
           operator: { select: { id: true, name: true, slug: true } },
-          _count: { select: { sessions: true, tags: true, offers: true } },
-          override: true,
-          subcategoryLinks: {
-            include: {
-              subcategory: { select: { id: true, slug: true, nameRu: true, isActive: true, layer: true, type: true } },
-            },
-          },
+          _count: { select: { sessions: true, tags: true, offers: true, subcategoryLinks: true } },
+          override: { select: { isHidden: true, editorStatus: true, imageUrl: true } },
+          ...(liteMode
+            ? {}
+            : {
+                subcategoryLinks: {
+                  select: {
+                    eventId: true,
+                    subcategoryId: true,
+                    subcategory: {
+                      select: { id: true, slug: true, nameRu: true, isActive: true, layer: true, type: true },
+                    },
+                  },
+                },
+              }),
         },
         orderBy,
         ...paginationArgs(pg),
@@ -623,18 +647,20 @@ export class AdminEventsController {
     }
 
     const items = result.items.map((e) => {
-      const allSubcats = (e.subcategoryLinks ?? [])
-        .map((l) => l.subcategory)
-        .filter(
-          (s): s is {
-            id: string;
-            slug: string;
-            nameRu: string;
-            isActive: boolean;
-            layer: SubcategoryLayer;
-            type: SubcategoryType;
-          } => Boolean(s),
-        );
+      const allSubcats = liteMode
+        ? []
+        : (((e as unknown as { subcategoryLinks?: Array<{ subcategory: unknown }> }).subcategoryLinks ?? [])
+            .map((l) => l.subcategory) as Array<unknown>)
+            .filter(
+              (s): s is {
+                id: string;
+                slug: string;
+                nameRu: string;
+                isActive: boolean;
+                layer: SubcategoryLayer;
+                type: SubcategoryType;
+              } => Boolean(s),
+            );
 
       const lastSessionAt = lastSessionAtByEventId.get(e.id) ?? null;
       const derivedIsPast = lastSessionAt ? lastSessionAt < now : false;
@@ -653,7 +679,10 @@ export class AdminEventsController {
       const effImage = e.override?.imageUrl ?? e.imageUrl;
       const hasImage = Boolean(effImage);
       const hasPricedOffer = (offerMin != null && offerMin > 0) || (e.priceFrom != null && e.priceFrom > 0);
-      const linksCount = (e.subcategoryLinks ?? []).length;
+      const linksCount =
+        typeof (e._count as { subcategoryLinks?: number } | undefined)?.subcategoryLinks === 'number'
+          ? ((e._count as { subcategoryLinks?: number }).subcategoryLinks ?? 0)
+          : (e.subcategoryLinks ?? []).length;
       const legacyCount = Array.isArray(e.subcategories) ? e.subcategories.length : 0;
       const quickHealth = computeAdminEventQuickHealth({
         hasImage,
@@ -669,18 +698,30 @@ export class AdminEventsController {
       });
 
       return {
-        ...e,
+        id: e.id,
+        title: e.title,
+        slug: e.slug,
+        category: e.category,
+        source: e.source,
+        rating: e.rating as unknown as number,
+        isActive: e.isActive,
+        updatedAt: e.updatedAt,
+        city: e.city,
+        override: e.override,
+        _count: e._count,
         supplier: e.operator ? { id: e.operator.id, name: e.operator.name, slug: e.operator.slug } : null,
         venueShort: e.venue ? { id: e.venue.id, name: e.venue.title, slug: e.venue.slug } : null,
-        subcategoriesCanonical: allSubcats.map((s) => ({
-          id: s.id,
-          slug: s.slug,
-          name: s.nameRu,
-          isActive: s.isActive,
-          layer: s.layer,
-          subcategoryType: s.type,
-        })),
-        sectionsDerived: deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
+        subcategoriesCanonical: liteMode
+          ? []
+          : allSubcats.map((s) => ({
+              id: s.id,
+              slug: s.slug,
+              name: s.nameRu,
+              isActive: s.isActive,
+              layer: s.layer,
+              subcategoryType: s.type,
+            })),
+        sectionsDerived: liteMode ? [] : deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
         lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
         nextSessionAt: nextFutureAt ? nextFutureAt.toISOString() : null,
         futureSessionsCount,

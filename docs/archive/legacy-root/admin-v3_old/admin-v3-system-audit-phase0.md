@@ -1,27 +1,6 @@
-# Admin V3 System Audit — Phase 0
+# Moved
 
-Дата: 2026-04-15
-Скоуп: Admin V3 (packages/frontend-admin-v3) + Backend (packages/backend) + Public frontend (packages/frontend)
-Цель: карта модулей/эндпоинтов/моделей, пробелы, ordered backlog под Phase C → B → D → A.
-
----
-
-## 0) Executive summary
-
-- Admin V3 роутинг: ключевые разделы подключены в packages/frontend-admin-v3/src/App.tsx (включая articles, venues/*, orders, refunds, customers, subcategories/*).
-- Backend админ-контур: покрывает все основные домены (events/venues/cities/suppliers/articles/collections/landings/orders/checkout/refunds/site-users/users/seo-audit/dashboard/settings).
-- Public: /blog → /articles уже редиректит; sitemap-articles выдаёт /articles/:slug.
-- Phase C: в Prisma уже есть эволюционные модели/поля для миграции с legacy:
-  - ArticleLandingLink / ArticleCollectionLink (M2M) при сохранённых legacy Article.relatedLandingIds / relatedCollectionIds.
-  - LandingPage.filterTagId (FK) при сохранённом legacy filterTag (slug).
-  - CollectionTagFilter (M2M) при сохранённом legacy Collection.filterTags (slug[]).
-  - UserFavorite.eventId (FK) при сохранённом legacy eventSlug.
-- SEO пробел: packages/frontend/src/app/sitemaps/sitemap-cities-catalog/route.ts пустой.
-- UI пробелы: есть StubPage зоны: settings, tags, promo-blocks.
-
----
-
-## 1) Матрица готовности по блокам
+Этот документ объединён в [`Implementation-Guide.md`](Implementation-Guide.md).
 
 Легенда:
 - READY — рабочий UI + полноценный backend read/CRUD.

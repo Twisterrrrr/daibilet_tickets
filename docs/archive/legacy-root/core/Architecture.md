@@ -184,7 +184,7 @@ Event: core columns + contentTemplateData; Venue: core + venueTemplateData; Sche
 - **Единый экран «Мои покупки»:** GET /account/purchases возвращает список purchase records с типами карточек (INTERNAL_TICKET, EXTERNAL_VOUCHER, BOOKING_CONFIRMATION, AWAITING_PAYMENT, MANUAL_CONFIRMATION). Presentation layer — агрегат по CheckoutSession + PaymentIntent + FulfillmentItem; доменная модель не объединяет сущности. Импортированные события (виджет/редирект) отображаются как EXTERNAL_VOUCHER / BOOKING_CONFIRMATION. Агрегация реализована через `PurchaseReadService` и чистый маппер read‑model в `PurchaseListItemDto`.
 - **Модель владения:** Заказ = CheckoutSession с опциональным `userId` (FK → User). В ЛК пользователь видит только заказы с `userId = current user`. Гостевой трекинг по shortCode остаётся публичным (`GET /orders/:id`, `GET /checkout/track/:shortCode`).
 - **Связь с checkout:** При создании CheckoutSession (POST /checkout/session) при наличии JWT пользователя в сессию записывается `userId`. Guest flow не меняется.
-- **Точка интеграции YooKassa:** В метаданных платежа заложить `metadata.orderId`, `metadata.userId` для маппинга webhook → заказ и пользователь. См. `docs/BuyerAccountSpecs.md`.
+- **Точка интеграции YooKassa:** В метаданных платежа заложить `metadata.orderId`, `metadata.userId` для маппинга webhook → заказ и пользователь. См. `../product/BuyerAccountSpecs.md`.
 
 **Domain mapping (фактическая реализация):**
 

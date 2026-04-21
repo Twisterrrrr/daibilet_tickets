@@ -76,6 +76,8 @@ export type AdminEventsListParams = {
 
 export async function fetchAdminEventsList(params: AdminEventsListParams) {
   const sp = new URLSearchParams();
+  // List page does not render canonical subcategory details; request a lighter payload.
+  sp.set('lite', '1');
   if (params.q) sp.set('search', params.q);
   if (params.city) sp.set('city', params.city);
   if (params.category) sp.set('category', params.category);

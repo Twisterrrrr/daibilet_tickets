@@ -29,7 +29,7 @@ GET /api/v1/catalog. category=MUSEUM → Venue; EXCURSION|EVENT → Event. Catal
 
 ### Venue PDP — поле `template` в публичной деталке (24.03.2026)
 
-**Эндпоинты:** `GET /api/v1/venues/:slug`, предпросмотр `GET /api/v1/preview/venues/:id` (тот же shape `VenueDetail`). **Доп. поле:** опциональный объект **`template`** (`VenuePublicTemplate` в `@daibilet/shared`): нормализованные секции из `venueTemplateData` + fallback на legacy (`description`, `shortDescription`, `galleryUrls`, `openingHours`, `faq`, `highlights`). **Типы площадок с template-aware витриной (MVP):** `MUSEUM`, `ART_SPACE`, `GALLERY`, `EXHIBITION_HALL`. **Доп. ключи JSON (помимо полей из `getVenueTemplateSpecs`):** `introTitle` (подзаголовок H1), `highlights` / `templateHighlights`, `amenities` / `amenitiesNote`, `amenitiesList` / `amenityList`. Подробнее: `Project.md` (модель Venue), `Diary.md` за 24.03.2026.
+**Эндпоинты:** `GET /api/v1/venues/:slug`, предпросмотр `GET /api/v1/preview/venues/:id` (тот же shape `VenueDetail`). **Доп. поле:** опциональный объект **`template`** (`VenuePublicTemplate` в `@daibilet/shared`): нормализованные секции из `venueTemplateData` + fallback на legacy (`description`, `shortDescription`, `galleryUrls`, `openingHours`, `faq`, `highlights`). **Типы площадок с template-aware витриной (MVP):** `MUSEUM`, `ART_SPACE`, `GALLERY`, `EXHIBITION_HALL`. **Доп. ключи JSON (помимо полей из `getVenueTemplateSpecs`):** `introTitle` (подзаголовок H1), `highlights` / `templateHighlights`, `amenities` / `amenitiesNote`, `amenitiesList` / `amenityList`. Подробнее: `Project.md` (модель Venue), `process/Diary.md` за 24.03.2026.
 
 ---
 
@@ -45,7 +45,7 @@ GET /api/v1/catalog. category=MUSEUM → Venue; EXCURSION|EVENT → Event. Catal
   - `GET /admin/dashboard/analytics-tabs`: ключ Redis `analytics:{sinceDays}:{sha256(filters)[0:16]}`, TTL 60–180s (env `CACHE_TTL_ANALYTICS_TABS` внутри клампа), успешные ответы только; обход: `nocache=1` / `ANALYTICS_TABS_DEBUG=1` / `ANALYTICS_TABS_CACHE_BYPASS=1`. `sinceDays` только 7 | 14 | 30 (иное → 7).
   - `GET /admin/catalog/consistency`: ключ `catalog:consistency`, TTL 60–120s (env в клампе). Мягкий бюджет на тяжёлый блок selection по умолчанию **1s** (`CATALOG_CONSISTENCY_BUDGET_MS`, `0` = без таймаута); при таймауте — частичный ответ с `degraded: true`.
 - **Sentry:** при `SENTRY_DSN` и 5xx; `requestId` в tags.
-- **RBAC / security:** `docs/RBAC-Matrix.md`, чек-лист ответов `docs/Security-Test-Matrix.md`.
+- **RBAC / security:** `security/RBAC-Matrix.md`, чек-лист ответов `security/Security-Test-Matrix.md`.
 
 ---
 

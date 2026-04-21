@@ -129,7 +129,7 @@
 
 ## 9. Ссылки
 
-- `docs/Security-Test-Matrix.md` — эндпоинты, роли, ожидаемые коды.
+- `Security-Test-Matrix.md` — эндпоинты, роли, ожидаемые коды.
 - `packages/backend/src/auth/roles.guard.ts`
 - `packages/backend/src/supplier/supplier.guard.ts`
 - `packages/backend/src/common/guards/operator-scope.guard.ts`

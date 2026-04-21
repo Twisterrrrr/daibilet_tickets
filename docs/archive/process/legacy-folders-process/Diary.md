@@ -17,7 +17,7 @@
 - **Backend:** публичные ответы [`getCatalogByCityAndSlug`](packages/backend/src/landing/landing.service.ts) / [`getCatalogHubBySlug`](packages/backend/src/landing/landing.service.ts) дополнены `blocks` и полями hero/SEO; [`LandingSeoAuditService`](packages/backend/src/landing/landing-seo-audit.service.ts) + `GET /admin/landings/:id/seo-audit`; админ `GET /admin/landings/:id` включает `theme` и `contentBlocks`.
 - **Admin V3:** убраны опции/фильтры `HUB`; тип родителя — только `MULTI_CITY`.
 - **Тесты:** [`landing-seo-audit.service.spec.ts`](packages/backend/src/landing/__tests__/landing-seo-audit.service.spec.ts).
-- **Док:** [`Landing-Composition-System.md`](docs/Landing-Composition-System.md) — инвариант MULTI_CITY vs CITY feed, домены SEO audit.
+- **Док:** [`Landing-Composition-System.md`](../Landing-Composition-System.md) — инвариант MULTI_CITY vs CITY feed, домены SEO audit.
 
 ### Проблемы
 
@@ -51,9 +51,9 @@
 
 ### Решения
 
-- Добавлен документ **`docs/Landing-Composition-System.md`**: `LandingTheme`, `LandingContentBlock`, enum блоков, разделение admin/public DTO, SEO audit read-model, этапы rollout, согласование с `Landings-Architecture.md` (термин Global HUB → MULTI_CITY при миграции типов).
+- Добавлен документ **`docs/Landing-Composition-System.md`**: `LandingTheme`, `LandingContentBlock`, enum блоков, разделение admin/public DTO, SEO audit read-model, этапы rollout, согласование с `docs/landings/Landings-Architecture.md` (термин Global HUB → MULTI_CITY при миграции типов).
 - В **`Project.md`**, **`Tasktracker.md`** (`landing-composition-system`, уточнение `v2-landing-slug-policy`) зафиксированы ссылки и бэклог.
-- **`docs/lovable-dinner-cruise-landing-parity.md`:** вынесен построчный чеклист (head/hero/фильтры/таблица/блоки/данные API) для query-scoped лендинга в духе Lovable; зафиксированы пробелы (`menuKind`/`menuSummary`/`experienceFormat`, JSON-LD `FoodEvent`, крошки vs вертикаль) и критерии приёмки MVP в §11; якорь `landing-lovable-dinner-parity-doc` в трекере.
+- **`docs/landings/lovable-dinner-cruise-landing-parity.md`:** вынесен построчный чеклист (head/hero/фильтры/таблица/блоки/данные API) для query-scoped лендинга в духе Lovable; зафиксированы пробелы (`menuKind`/`menuSummary`/`experienceFormat`, JSON-LD `FoodEvent`, крошки vs вертикаль) и критерии приёмки MVP в §11; якорь `landing-lovable-dinner-parity-doc` в трекере.
 
 ### Проблемы
 
@@ -112,7 +112,7 @@
 
 - Backend: расширен `GET /admin/audit` фильтрами `q`, `from`, `to`.
 - Admin V3: добавлен пункт меню **Система → Логи** и страница `/admin-v3/logs` со списком `AuditLog` + фильтры и раскрытие `before/after`.
-- Док: добавлен `docs/Logs.md` как источник правды по scope и плану расширения (платежи/вебхуки/провайдеры).
+- Док: добавлен `../runbooks/Logs.md` как источник правды по scope и плану расширения (платежи/вебхуки/провайдеры).
 
 ### Проблемы
 
@@ -499,7 +499,7 @@
 
 ### Решения
 
-- Зафиксирован документ `docs/Roadmap-3-Sprints-Catalog-Admin-Supplier.md` (спринт 1: фильтры/URL/TZ, MVP событий/сеансов, 3 SEO-статьи; спринт 2: dual-run и паритет v2; спринт 3: supplier + YooKassa E2E на staging, 10–20 статей). В `Project.md` и `Tasktracker.md` добавлены ссылки; в Tasktracker — договорённость помечать задачи якорями `roadmap-s1`…`s3` при разбивке.
+- Зафиксирован документ `product/Roadmap-3-Sprints-Catalog-Admin-Supplier.md` (спринт 1: фильтры/URL/TZ, MVP событий/сеансов, 3 SEO-статьи; спринт 2: dual-run и паритет v2; спринт 3: supplier + YooKassa E2E на staging, 10–20 статей). В `Project.md` и `Tasktracker.md` добавлены ссылки; в Tasktracker — договорённость помечать задачи якорями `roadmap-s1`…`s3` при разбивке.
 
 ### Проблемы
 
@@ -515,7 +515,7 @@
 
 ### Решения
 
-- Добавлены `ticket-provider-json-fetch.ts` (таймаут, JSON, `TicketProviderHttpError`), `ProviderIntegrationNotConfiguredError` (503), `RadarioIntegrationEnv` + `RadarioHttpService`, `QticketsIntegrationEnv` + `QticketsHttpService`; модуль `IntegrationsModule` импортирует `ConfigModule`, сервисы экспортируются. Документ `docs/Wave1-Radario-Qtickets-Prep.md` с таблицей env и чеклистом онбординга. Тесты: `wave1-radario-qtickets-http-prep.spec.ts`.
+- Добавлены `ticket-provider-json-fetch.ts` (таймаут, JSON, `TicketProviderHttpError`), `ProviderIntegrationNotConfiguredError` (503), `RadarioIntegrationEnv` + `RadarioHttpService`, `QticketsIntegrationEnv` + `QticketsHttpService`; модуль `IntegrationsModule` импортирует `ConfigModule`, сервисы экспортируются. Документ `integrations/Wave1-Radario-Qtickets-Prep.md` с таблицей env и чеклистом онбординга. Тесты: `wave1-radario-qtickets-http-prep.spec.ts`.
 
 ### Проблемы
 
@@ -535,7 +535,7 @@
 - Встраивание: новый модуль `packages/backend/src/integrations/` (дескрипторы, registry, routing, клиентский слой REST/SOAP scaffold, persistence, admin read + входной webhook `POST /api/v1/webhooks/providers/:code`, при отсутствии webhooks у провайдера — **204** + лог `NO_OP_UNSUPPORTED`). Prisma: миграция `20260403154025_ticket_provider_capability_foundation`, `Event.defaultProvider`, связи `EventProviderLink` / `EventSessionProviderLink`, `ExternalOrderLink` (`status` + `integrationState`), `ExternalTicket`, `ProviderWebhookLog`, `ProviderAccountConfig` (`environment` SANDBOX/PRODUCTION).
 - `EventProviderLinkService`: при `isPrimary=true` сброс прочих primary в транзакции. Admin: `GET .../admin/integrations/providers`, `routing/debug?eventId=`, `external-orders`, `provider-webhooks`, `GET .../admin/events/:id/providers`.
 - Legacy: `Event.source` и `tcEventId` **не удаляются**; fallback маршрутизации: `MANUAL` → `MANUAL`, `TC` → `TICKETS_CLOUD`, `TEPLOHOD` → `TEPLOHOD`. Решения по возможностям — только через `ProviderDescriptor` + `assertCapability`.
-- Документация: `docs/TicketProviderCapabilityFoundation.md`, `docs/TicketProviderCapabilityMatrix.md`; тесты: `src/integrations/__tests__/*`.
+- Документация: `integrations/TicketProviderCapabilityFoundation.md`, `integrations/TicketProviderCapabilityMatrix.md`; тесты: `src/integrations/__tests__/*`.
 
 ### Проблемы
 
@@ -579,7 +579,7 @@
 - В `packages/shared` добавлен/расширен `moscow-calendar.ts` и реэкспорт из `index.ts`: `dateToMoscowISO`, `getMoscowTodayISO`, `getMoscowTomorrowISO`, плюс существующий `moscowCalendarDayFromIso`.
 - `FilterBar` использует эти хелперы для подписей дат; блок сортировки переведён на **tablist** с нижней полосой у активного значения.
 - `DateRibbon`: в календаре-попапе выделение даты и смена отображаемого месяца только для **кастомной** даты (как в прототипе city-landing-enhancer).
-- Документировано в `docs/Landings-Architecture.md` (публичные маршруты, режимы `landingTimeSlotMode`, таблица хабов).
+- Документировано в `docs/landings/Landings-Architecture.md` (публичные маршруты, режимы `landingTimeSlotMode`, таблица хабов).
 - Проверки: `npx tsc --noEmit` (frontend, backend, shared по необходимости), `npx eslint` на `packages/frontend/src`, `packages/frontend-supplier/src`, `packages/shared/src` — без предупреждений.
 
 ### Проблемы
@@ -690,7 +690,7 @@
 ### Решения
 
 - **Step E — статус ACCEPT / DONE** (зафиксировано в `docs/Tasktracker.md`): матрицы, support, тесты guards/invite/scope, UI-гейтинг по меню.
-- `docs/RBAC-Matrix.md` + `docs/Security-Test-Matrix.md`.
+- `security/RBAC-Matrix.md` + `security/Security-Test-Matrix.md`.
 - `AdminSupportController`: все GET/PATCH/POST — `@Roles('ADMIN', 'EDITOR')`.
 - `AdminCatalogConsistencyController`: явный `@Roles('ADMIN', 'EDITOR', 'VIEWER')` на `GET consistency`.
 - UI: `frontend-admin` / `frontend-supplier` — фильтрация навигации по роли из JWT; **это второй слой**, не замена guards (источник истины — API).
@@ -5417,7 +5417,7 @@ Tripster — лидер рынка экскурсий в России. Прям�
 - Текущая модель `LandingPage` описывает city‑bound лендинг и общий selection‑принцип; но “семейство темы” (родитель → варианты по городам) пока не оформлено как доменная конструкция, из‑за чего редактору сложнее управлять мультилендингами и SEO‑каноникализацией.
 
 #### Решения
-1. **Зафиксировать целевой паттерн** “Global hub / Multi‑city family / City landing” как эволюцию домена без ломки текущих контрактов и роутинга (документировано в `docs/Landings-Architecture.md`).
+1. **Зафиксировать целевой паттерн** “Global hub / Multi‑city family / City landing” как эволюцию домена без ломки текущих контрактов и роутинга (документировано в `docs/landings/Landings-Architecture.md`).
 2. **Инварианты SEO**:
    - city landing каноникалится на самого себя;
    - hub/family не каноникалится в child и наоборот;

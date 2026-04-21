@@ -75,10 +75,12 @@ export class AdminLandingsController {
     @Query('showInCollections') showInCollections?: string,
     @Query('landingType') landingType?: 'CITY' | 'MULTI_CITY',
     @Query('eventSourceType') eventSourceType?: 'AUTO_QUERY' | 'PRIMARY_COLLECTION' | 'MIXED',
+    @Query('lite') lite?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    const liteMode = lite === '1' || lite === 'true' || lite === 'yes';
     const where: Record<string, unknown> = { isDeleted: false };
     if (search) {
       where.OR = [
@@ -100,8 +102,12 @@ export class AdminLandingsController {
         where,
         include: {
           city: { select: { slug: true, name: true } },
-          parentLanding: { select: { id: true, slug: true, title: true, landingType: true } },
-          filterTagRef: { select: { id: true, slug: true, name: true, isActive: true } },
+          ...(liteMode
+            ? {}
+            : {
+                parentLanding: { select: { id: true, slug: true, title: true, landingType: true } },
+                filterTagRef: { select: { id: true, slug: true, name: true, isActive: true } },
+              }),
         },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
         ...paginationArgs(pg),

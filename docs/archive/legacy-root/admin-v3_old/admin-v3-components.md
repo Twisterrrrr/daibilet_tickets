@@ -1,23 +1,6 @@
-# Admin V3 — компоненты и паттерны
+# Moved
 
-Этот документ фиксирует “строительные блоки” Admin V3 и правила их применения. Цель — **стандартизировать UX**, чтобы новые экраны собирались быстро и одинаково.
-
-## 1) UI-kit (V3)
-
-Расположение: `packages/frontend-admin-v3/src/components/`.
-
-### Базовые UI примитивы
-- `components/ui/button.tsx` — `Button` с variants (`default/secondary/outline/ghost/destructive`).
-- `components/ui/input.tsx` — `Input` (единая высота, border/ring).
-- `components/ui/badge.tsx` — `Badge` (tone variants: default/success/warning/danger/info/outline).
-
-### Общие компоненты
-- `components/shared/page-header/PageHeader.tsx` — заголовок страницы + subtitle + meta + actions.
-- `components/shared/filters/FilterBar.tsx` — “плита фильтров” + `FilterField`.
-- `components/shared/filters/SearchInput.tsx` — поисковый инпут с иконкой.
-- `components/shared/filters/QuickFilters.tsx` — ряд быстрых фильтров (buttons).
-- `components/shared/table/DataTableShell.tsx` — оболочка списка: toolbar + table + footer.
-- States:
+Этот документ объединён в [`Implementation-Guide.md`](Implementation-Guide.md).
   - `components/shared/states/LoadingState.tsx`
   - `components/shared/states/EmptyState.tsx`
   - `components/shared/states/ErrorState.tsx`
