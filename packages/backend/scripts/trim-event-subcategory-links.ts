@@ -1,5 +1,6 @@
 /**
- * Сжатие EventSubcategoryLink до 3 на событие (оставляет 3 самых ранних по createdAt).
+ * Сжатие EventSubcategoryLink до лимита на событие (оставляет самые ранние по createdAt).
+ * Лимит должен совпадать с `SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES` (сейчас 512).
  * Запуск из packages/backend: `pnpm data:trim-subcategory-links` (dry-run) или `--apply`.
  */
 import { config as dotenvConfig } from 'dotenv';
@@ -10,7 +11,7 @@ import { PrismaClient } from '@prisma/client';
 dotenvConfig({ path: path.resolve(process.cwd(), '../../.env') });
 
 const prisma = new PrismaClient();
-const MAX = 3;
+const MAX = 512;
 
 async function main() {
   const apply = process.argv.includes('--apply');

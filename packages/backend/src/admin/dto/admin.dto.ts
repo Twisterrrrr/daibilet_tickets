@@ -267,6 +267,7 @@ export * from './admin-event-summary.dto';
 export * from './admin-venue.dto';
 export * from './admin-venue-summary.dto';
 export * from './admin-landing.dto';
+export * from './admin-landing-content-block.dto';
 export * from './admin-combo.dto';
 export * from './admin-article.dto';
 export * from './admin-settings.dto';

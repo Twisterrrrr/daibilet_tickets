@@ -129,6 +129,8 @@ export class TepSyncService {
     // safe defaults
     if (category === EventCategory.MUSEUM) return EventSubcategory.MUSEUM_CLASSIC;
     if (category === EventCategory.EXCURSION) return EventSubcategory.WALKING;
+    if (category === EventCategory.ACTIVITY) return EventSubcategory.EXTREME;
+    if (category === EventCategory.ENTERTAINMENT) return EventSubcategory.ROOFTOP;
     return EventSubcategory.SHOW;
   }
 
@@ -1031,7 +1033,7 @@ export class TepSyncService {
       return { category: EventCategory.EVENT, subcategories: [EventSubcategory.FESTIVAL], audience, minAge: 6 };
 
     if (this.hasTep(text, ['танк', 'танке', 'квадроцикл', 'стрельб', 'экстрим', 'броневик']))
-      return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.EXTREME], audience, minAge: 16 };
+      return { category: EventCategory.ACTIVITY, subcategories: [EventSubcategory.EXTREME], audience, minAge: 16 };
     if (this.hasTep(text, ['автобус', 'bus', 'hop-on', 'hop on']) || (this.hasTep(text, ['обзорн']) && !isWater))
       return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.BUS], audience, minAge: 0 };
 

@@ -12,8 +12,7 @@ export const EVENT_PRIMARY_CODES_BY_CATEGORY: Record<EventCategory, readonly str
     'CITY_TOURS',
     'PRIVATE_TOURS',
     'GASTRO',
-    'ROOFTOP',
-    'EXTREME',
+    'GROUP_TOURS',
   ],
   MUSEUM: [
     'MUSEUM_CLASSIC',
@@ -26,6 +25,7 @@ export const EVENT_PRIMARY_CODES_BY_CATEGORY: Record<EventCategory, readonly str
   ],
   EVENT: [
     'CONCERT',
+    'JAZZ',
     'THEATER',
     'SHOW',
     'STANDUP',
@@ -35,7 +35,46 @@ export const EVENT_PRIMARY_CODES_BY_CATEGORY: Record<EventCategory, readonly str
     'IMMERSIVE_SHOWS',
     'MASTERCLASS',
     'PARTY',
+    'OPERA',
+    'BALLET',
+    'OPEN_AIR_PRIMARY',
+    'CONFERENCE_PRIMARY',
+    'MEETUP_PRIMARY',
+    'SEASONAL_EVENT_PRIMARY',
+  ],
+  ACTIVITY: [
+    'WATER_SPORTS',
+    'CYCLING',
+    'OUTDOOR_ACTIVITIES',
+    'KARTING',
+    'CLIMBING',
+    'EXTREME',
     'SPORT_EVENTS',
+    'SHOOTING_RANGE',
+    'ICE_SKATING',
+    'SKIING',
+    'YOGA_FITNESS',
+    'WELLNESS_SPA',
+    'TEAM_BUILDING',
+    'HIKING',
+    'TRACKING',
+  ],
+  ENTERTAINMENT: [
+    'QUESTS',
+    'ROOFTOP',
+    'INTERACTIVE_ENT',
+    'KIDS_ACTIVITIES',
+    'GAME_ZONES',
+    'ATTRACTIONS',
+    'ESCAPE_ROOMS',
+    'ZOO',
+    'AQUARIUM',
+    'CIRCUS',
+    'CINEMA',
+    'NIGHTCLUB',
+    'VR_ARCADE',
+    'BOWLING_ENT',
+    'FOOD_COURT_ENT',
   ],
 };
 
@@ -50,7 +89,11 @@ export const VENUE_PRIMARY_CODES: readonly string[] = [
   'THEATER',
 ];
 
-export const MAX_SECONDARY_SUBCATEGORIES = 3;
+/** Событие: 1 PRIMARY + до N SECONDARY; сумма связей ≤ `SubcategoryPolicyService.MAX_EVENT_SUBCATEGORIES` (512 − 1). */
+export const MAX_SECONDARY_SUBCATEGORIES_EVENT = 511;
+
+/** Площадка: 1 PRIMARY + до N SECONDARY; сумма связей ≤ `SubcategoryPolicyService.MAX_VENUE_SUBCATEGORIES` (сейчас 4). */
+export const MAX_SECONDARY_SUBCATEGORIES_VENUE = 3;
 
 /** Стартовый набор SECONDARY UNIVERSAL (расширяется через админку). FAMILY — slug family-friendly в seed. */
 export const SEED_SECONDARY_UNIVERSAL: ReadonlyArray<{

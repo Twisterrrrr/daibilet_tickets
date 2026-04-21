@@ -32,6 +32,7 @@ import { AdminDiagnosticsService } from './admin-diagnostics.service';
 import { AdminEventsController } from './admin-events.controller';
 import { AdminExternalReviewsController } from './admin-external-reviews.controller';
 import { AdminLandingsController } from './admin-landings.controller';
+import { AdminLandingThemesController } from './admin-landing-themes.controller';
 import { AdminModerationController } from './admin-moderation.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminOrdersController } from './admin-orders.controller';
@@ -52,6 +53,8 @@ import { AdminVenuesController } from './admin-venues.controller';
 import { AdminGeoController } from './admin-geo.controller';
 import { AdminRoutePointsController } from './admin-route-points.controller';
 import { AdminRoutesController } from './admin-routes.controller';
+import { AdminEventRouteController } from './admin-event-route.controller';
+import { AdminEventRouteService } from '../routes/admin-event-route.service';
 import { AdminWidgetsController } from './admin-widgets.controller';
 import { AdminUploadController } from './admin-upload.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
@@ -130,13 +133,16 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';import { AdminCo
     AdminPromoPlacementBlocksService,
     AdminPromoCollectionsService,
     AdminUsersService,
+    AdminEventRouteService,
   ],
   controllers: [
     AdminDashboardController,
     AdminCitiesController,
     AdminEventsController,
+    AdminEventRouteController,
     AdminTagsController,
     AdminLandingsController,
+    AdminLandingThemesController,
     AdminCombosController,
     AdminArticlesController,
     AdminOrdersController,

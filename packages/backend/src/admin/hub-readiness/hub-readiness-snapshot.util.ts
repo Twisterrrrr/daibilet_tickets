@@ -361,7 +361,7 @@ export type LandingHubSnapshotInput = {
   landingId: string;
   slug: string;
   title: string;
-  landingType: 'HUB' | 'CITY' | 'MULTI_CITY';
+  landingType: 'CITY' | 'MULTI_CITY';
   status: string;
   isDeleted: boolean;
   isActive: boolean;

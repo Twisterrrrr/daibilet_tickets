@@ -6,6 +6,7 @@ import {
   EventCategory,
   EventSource,
   EventSubcategory,
+  LandingStatus,
   LocationType,
   Prisma,
   TagCategory,
@@ -26,6 +27,7 @@ import { RefundPolicyResolutionService } from './refund-policy-resolution.servic
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 import { resolveEventSubcategoryPresentation } from '../subcategories/subcategory-public.mapper';
 import { CatalogGuardService, type CatalogGuardOfferSlice } from './catalog-guard.service';
+import { loadPublicEventRouteBlock } from '../routes/public-event-route.mapper';
 
 /** Сократить адрес до улицы и номера: "Дворцовая наб., 18, Санкт-Петербург" → "Дворцовая наб., 18" */
 function shortenAddressToStreet(addr: string | null | undefined): string {
@@ -184,7 +186,7 @@ export class CatalogService {
             },
           },
           landingPages: {
-            where: { isActive: true },
+            where: { isActive: true, isDeleted: false, status: LandingStatus.ACTIVE },
             orderBy: { sortOrder: 'asc' },
             select: { slug: true, title: true },
           },
@@ -475,7 +477,7 @@ export class CatalogService {
           },
         },
         landingPages: {
-          where: { isActive: true },
+          where: { isActive: true, isDeleted: false, status: LandingStatus.ACTIVE },
           orderBy: { sortOrder: 'asc' },
           select: { slug: true, title: true, subtitle: true },
         },
@@ -1798,8 +1800,11 @@ export class CatalogService {
       new Map(legacyTagItems.map((item) => [item.id || `${item.name}:${item.code ?? ''}`, item])).values(),
     );
 
+    const route = await loadPublicEventRouteBlock(this.prisma, eventForPublic.id);
+
     return {
       ...overridden,
+      route,
       rating: displayRating,
       address: overridden.address ? shortenAddressToStreet(overridden.address) : overridden.address,
       primaryOffer,

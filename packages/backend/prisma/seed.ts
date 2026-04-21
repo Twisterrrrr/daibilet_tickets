@@ -74,6 +74,27 @@ async function main() {
   });
   console.log('  ✓ Test admin/support accounts created');
 
+  // --- Global feature flags (Admin Settings, checkout FeatureFlagService) ---
+  await prisma.featureFlag.upsert({
+    where: {
+      key_scope_scopeValue: {
+        key: 'disable_external_offers',
+        scope: 'global',
+        scopeValue: null,
+      },
+    },
+    update: {},
+    create: {
+      key: 'disable_external_offers',
+      scope: 'global',
+      scopeValue: null,
+      enabled: false,
+      description:
+        'Global: постепенно отключать EXTERNAL офферы. Переопределения: scope=city/category — см. FeatureFlagService.',
+    },
+  });
+  console.log('  ✓ Global feature flag: disable_external_offers');
+
   // --- Test frontend Users (buyers) ---
   const userPasswordHash = await bcrypt.hash('TestUser123!', 10);
   const users = [

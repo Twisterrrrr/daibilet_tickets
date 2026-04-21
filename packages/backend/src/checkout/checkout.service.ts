@@ -1,5 +1,13 @@
 import { resolvePurchaseType } from '@daibilet/shared';
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@/prisma-client';
 
@@ -34,6 +42,7 @@ export class CheckoutService {
     private readonly mailService: MailService,
     private readonly config: ConfigService,
     private readonly promoCodes: PromoCodeService,
+    @Inject(forwardRef(() => OrderProjectionService))
     private readonly orderProjection: OrderProjectionService,
   ) {}
 

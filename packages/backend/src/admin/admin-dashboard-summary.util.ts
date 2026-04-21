@@ -147,7 +147,7 @@ export async function buildDashboardSummary(params: {
       where: {
         isDeleted: false,
         status: 'ACTIVE',
-        landingType: { in: ['HUB', 'MULTI_CITY'] },
+        landingType: 'MULTI_CITY',
       },
     }),
     prisma.city.findMany({

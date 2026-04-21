@@ -33,8 +33,11 @@ const LEGACY_SLUG_TO_EVENT_SUBCODE: Record<string, string> = Object.fromEntries(
 
 @Injectable()
 export class SubcategoryPolicyService {
-  /** До 3 подкатегорий на событие (жёсткий publish gate). */
-  static readonly MAX_EVENT_SUBCATEGORIES = 3;
+  /**
+   * Технический потолок числа связей на событие (защита от ошибок/злоупотреблений в одном запросе).
+   * Не продуктовое «N подкатегорий»: в модели есть PRIMARY под выбранную категорию и отдельно общие SECONDARY (UNIVERSAL и др.).
+   */
+  static readonly MAX_EVENT_SUBCATEGORIES = 512;
   static readonly MAX_VENUE_SUBCATEGORIES = 4;
 
   /**

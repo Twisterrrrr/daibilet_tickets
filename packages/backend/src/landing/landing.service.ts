@@ -1,8 +1,9 @@
-﻿import { calendarDayFromIso, getFirstPriceKopecks, getCityTimezone } from '@daibilet/shared';
+import { calendarDayFromIso, getFirstPriceKopecks, getCityTimezone } from '@daibilet/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, LandingStatus, Prisma } from '@/prisma-client';
+import { DateMode, EventSubcategory, LandingStatus, Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveEventSubcategoryPresentation } from '../subcategories/subcategory-public.mapper';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
 import { buildLandingEventsWhere } from './landing-event-filter.helper';
 
@@ -100,10 +101,61 @@ export class LandingService {
               where: { isActive: true, startsAt: { gte: now } },
               orderBy: { startsAt: 'asc' },
             },
+            override: {
+              select: {
+                contentTemplateData: true,
+              },
+            },
+            subcategoryLinks: {
+              select: {
+                subcategory: { select: { code: true, nameRu: true, layer: true } },
+              },
+            },
           },
           orderBy: { rating: 'desc' },
         })
       : [];
+
+    const mapLandingVariantEvent = (event: (typeof events)[number]) => {
+      const pres = resolveEventSubcategoryPresentation(
+        event.subcategoryLinks as Parameters<typeof resolveEventSubcategoryPresentation>[0],
+        (event.subcategories ?? []) as EventSubcategory[],
+      );
+      const catering =
+        event.override?.contentTemplateData &&
+        typeof event.override.contentTemplateData === 'object' &&
+        (event.override.contentTemplateData as Record<string, unknown>).catering &&
+        typeof (event.override.contentTemplateData as Record<string, unknown>).catering === 'object'
+          ? ((event.override.contentTemplateData as Record<string, unknown>).catering as Record<string, unknown>)
+          : null;
+      return {
+        id: event.id,
+        title: event.title,
+        slug: event.slug,
+        address: event.address,
+        durationMinutes: event.durationMinutes,
+        imageUrl: event.imageUrl,
+        tcEventId: event.tcEventId ?? '',
+        source: event.source,
+        rating: Number(event.rating),
+        reviewCount: event.reviewCount,
+        priceFrom: event.priceFrom,
+        shortDescription: event.shortDescription ?? null,
+        subcategories: pres.subcategories,
+        primarySubcategory: pres.primarySubcategory,
+        vesselName: event.vesselName ?? null,
+        experienceFormat: event.experienceFormat ?? null,
+        catering: catering
+          ? {
+              enabled: Boolean(catering.enabled),
+              type: typeof catering.type === 'string' ? catering.type : null,
+              includedInPrice:
+                typeof catering.includedInPrice === 'boolean' ? catering.includedInPrice : null,
+              menuMarkdown: typeof catering.menuMarkdown === 'string' ? catering.menuMarkdown : null,
+            }
+          : { enabled: false, type: null, includedInPrice: null, menuMarkdown: null },
+      };
+    };
 
     // Строим "варианты" — плоский список сессий + OPEN_DATE события без сессий
     interface LandingVariant {
@@ -113,19 +165,7 @@ export class LandingService {
       availableTickets: number | null;
       prices: Prisma.JsonValue;
       isOpenDate: boolean;
-      event: {
-        id: string;
-        title: string;
-        slug: string;
-        address: string | null;
-        durationMinutes: number | null;
-        imageUrl: string | null;
-        tcEventId: string;
-        source: string;
-        rating: unknown;
-        reviewCount: number;
-        priceFrom: number | null;
-      };
+      event: ReturnType<typeof mapLandingVariantEvent>;
     }
 
     const variants: LandingVariant[] = events.flatMap((event) => {
@@ -139,19 +179,7 @@ export class LandingService {
             availableTickets: null as number | null,
             prices: null as Prisma.JsonValue,
             isOpenDate: true as boolean,
-            event: {
-              id: event.id,
-              title: event.title,
-              slug: event.slug,
-              address: event.address,
-              durationMinutes: event.durationMinutes,
-              imageUrl: event.imageUrl,
-              tcEventId: event.tcEventId ?? '',
-              source: event.source,
-              rating: event.rating,
-              reviewCount: event.reviewCount,
-              priceFrom: event.priceFrom,
-            },
+            event: mapLandingVariantEvent(event),
           },
         ];
       }
@@ -162,19 +190,7 @@ export class LandingService {
         availableTickets: session.availableTickets as number | null,
         prices: session.prices as Prisma.JsonValue,
         isOpenDate: false,
-        event: {
-          id: event.id,
-          title: event.title,
-          slug: event.slug,
-          address: event.address,
-          durationMinutes: event.durationMinutes,
-          imageUrl: event.imageUrl,
-          tcEventId: event.tcEventId ?? '',
-          source: event.source,
-          rating: event.rating,
-          reviewCount: event.reviewCount,
-          priceFrom: event.priceFrom,
-        },
+        event: mapLandingVariantEvent(event),
       }));
     });
 
@@ -199,12 +215,47 @@ export class LandingService {
       .map((v) => calendarDayFromIso((v.startsAt as Date).toISOString(), landingTz));
     const uniqueDates = [...new Set(allDates)].filter((d): d is string => Boolean(d)).sort();
 
+    const experienceFormats = [
+      ...new Set(events.map((e) => e.experienceFormat).filter((x): x is string => Boolean(x))),
+    ].sort();
+    const cateringTypes = [
+      ...new Set(
+        variants
+          .map((v) => (v.event as { catering?: { enabled?: boolean; type?: string | null } }).catering)
+          .filter((c): c is { enabled: boolean; type: string | null } => Boolean(c))
+          .filter((c) => c.enabled && typeof c.type === 'string' && c.type.trim().length > 0)
+          .map((c) => c.type!.trim()),
+      ),
+    ].sort();
+
     const filters = {
       piers,
       priceRange: allPrices.length ? [Math.min(...allPrices), Math.max(...allPrices)] : [0, 0],
       dateRange: uniqueDates.length ? [uniqueDates[0], uniqueDates[uniqueDates.length - 1]] : [],
       dates: uniqueDates,
+      menuKinds: cateringTypes,
+      experienceFormats,
     };
+
+    /** Блоки композиции (публичный renderer); пустой массив — обратная совместимость. */
+    const compositionBlocks = await this.prisma.landingContentBlock.findMany({
+      where: { landingPageId: landing.id, isEnabled: true },
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        id: true,
+        type: true,
+        variant: true,
+        title: true,
+        subtitle: true,
+        eyebrow: true,
+        body: true,
+        richTextJson: true,
+        payload: true,
+        assetUrl: true,
+        mobileAssetUrl: true,
+        sortOrder: true,
+      },
+    });
 
     return {
       landing: {
@@ -217,6 +268,14 @@ export class LandingService {
         filterTag: tag?.slug ?? landing.filterTag,
         additionalFilters: landing.additionalFilters,
         heroText: landing.heroText,
+        heroTitle: landing.heroTitle,
+        heroSubtitle: landing.heroSubtitle,
+        heroBadge: landing.heroBadge,
+        heroImageUrl: landing.heroImageUrl,
+        heroMobileImageUrl: landing.heroMobileImageUrl,
+        layoutVariant: landing.layoutVariant,
+        surfaceVariant: landing.surfaceVariant,
+        landingType: landing.landingType,
         seasonalPayload: landing.seasonalPayload,
         howToChoose: landing.howToChoose,
         infoBlocks: landing.infoBlocks,
@@ -227,8 +286,14 @@ export class LandingService {
         legalText: landing.legalText,
         metaTitle: landing.metaTitle,
         metaDescription: landing.metaDescription,
+        seoH1: landing.seoH1,
+        seoTitle: landing.seoTitle,
+        seoDescription: landing.seoDescription,
+        ogImageUrl: landing.ogImageUrl,
+        canonicalMode: landing.canonicalMode,
         city: landing.city,
       },
+      blocks: compositionBlocks,
       variants,
       filters,
       total: variants.length,
@@ -360,7 +425,7 @@ export class LandingService {
       where: {
         slug,
         isDeleted: false,
-        landingType: { in: ['HUB', 'MULTI_CITY'] },
+        landingType: 'MULTI_CITY',
         OR: [{ status: LandingStatus.ACTIVE }, { isActive: true }],
       },
       select: {
@@ -369,10 +434,22 @@ export class LandingService {
         title: true,
         subtitle: true,
         heroText: true,
+        heroTitle: true,
+        heroSubtitle: true,
+        heroBadge: true,
+        heroImageUrl: true,
+        heroMobileImageUrl: true,
+        layoutVariant: true,
+        surfaceVariant: true,
         landingType: true,
         metaTitle: true,
         metaDescription: true,
+        seoH1: true,
+        seoTitle: true,
+        seoDescription: true,
+        ogImageUrl: true,
         canonicalUrl: true,
+        canonicalMode: true,
         status: true,
         isIndexable: true,
         isActive: true,
@@ -394,6 +471,26 @@ export class LandingService {
     });
 
     if (!landing) throw new NotFoundException(`Лендинг "${slug}" не найден`);
+
+    /** MULTI_CITY: блоки композиции; полный каталожный feed не обязателен (см. Landing-Composition-System). */
+    const compositionBlocks = await this.prisma.landingContentBlock.findMany({
+      where: { landingPageId: landing.id, isEnabled: true },
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        id: true,
+        type: true,
+        variant: true,
+        title: true,
+        subtitle: true,
+        eyebrow: true,
+        body: true,
+        richTextJson: true,
+        payload: true,
+        assetUrl: true,
+        mobileAssetUrl: true,
+        sortOrder: true,
+      },
+    });
 
     const variants = (landing.childLandings ?? [])
       .map((c) => {
@@ -418,14 +515,27 @@ export class LandingService {
         title: landing.title,
         subtitle: landing.subtitle,
         heroText: landing.heroText,
+        heroTitle: landing.heroTitle,
+        heroSubtitle: landing.heroSubtitle,
+        heroBadge: landing.heroBadge,
+        heroImageUrl: landing.heroImageUrl,
+        heroMobileImageUrl: landing.heroMobileImageUrl,
+        layoutVariant: landing.layoutVariant,
+        surfaceVariant: landing.surfaceVariant,
         landingType: landing.landingType,
         metaTitle: landing.metaTitle,
         metaDescription: landing.metaDescription,
+        seoH1: landing.seoH1,
+        seoTitle: landing.seoTitle,
+        seoDescription: landing.seoDescription,
+        ogImageUrl: landing.ogImageUrl,
         canonicalUrl: landing.canonicalUrl,
+        canonicalMode: landing.canonicalMode,
         status: landing.status,
         isIndexable: landing.isIndexable,
         isActive: landing.isActive,
       },
+      blocks: compositionBlocks,
       variants,
       total: variants.length,
     };

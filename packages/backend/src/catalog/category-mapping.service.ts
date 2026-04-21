@@ -72,6 +72,32 @@ export class CategoryMappingService {
       ) {
         return EventCategory.EVENT;
       }
+
+      // Активный отдых / спорт (не речная экскурсия)
+      if (
+        s.includes('картинг') ||
+        s.includes('скалодром') ||
+        s.includes('байк') ||
+        s.includes('велосипед') ||
+        s.includes('сапборд') ||
+        s.includes('сап ') ||
+        s.includes('кайт')
+      ) {
+        return EventCategory.ACTIVITY;
+      }
+
+      // Развлечения / интерактив
+      if (
+        s.includes('квест') ||
+        s.includes('эскейп') ||
+        s.includes('escape') ||
+        s.includes('аттракцион') ||
+        s.includes('игров') ||
+        s.includes('vr ') ||
+        s.includes(' vr')
+      ) {
+        return EventCategory.ENTERTAINMENT;
+      }
     }
 
     return null;

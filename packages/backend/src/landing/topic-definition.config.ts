@@ -12,6 +12,10 @@ export interface TopicDefinitionCity {
   slug: string;
   filterTag: string;
   minEvents: number;
+  /** Опционально: минимум будущих сеансов (подключить в материалайзере позже). */
+  minUpcomingSessions?: number;
+  /** Сезонность дублирует/дополняет seasonalPayload на лендинге. */
+  seasonality?: { start?: string; end?: string };
 }
 
 export interface TopicDefinitionCollection {

@@ -14,6 +14,7 @@ import {
 } from '@/prisma-client';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -27,6 +28,7 @@ import {
   IsString,
   IsUrl,
   IsUUID,
+  MaxLength,
   Min,
   ValidateIf,
   ValidateNested,
@@ -786,7 +788,91 @@ export class OverrideEventDto {
   subcategoriesOverride?: EventSubcategory[];
 }
 
+/** PATCH /admin/events/:id/media — обложка (override) и галерея (Event.galleryUrls) */
+export class PatchEventMediaDto {
+  @ApiPropertyOptional({
+    description: 'Обложка в слое редактора (EventOverride.imageUrl). Пустая строка — сбросить override-обложку.',
+  })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Полный список URL галереи на модели Event' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  galleryUrls?: string[];
+}
+
 // ─── Venue Settings ────────────────────────────────────────────────
+
+/** Поля таблицы сравнения для речных событий (храним на Event). */
+export class EventLandingTableFacetsDto {
+  @ApiPropertyOptional({ description: 'Название судна для колонки «теплоход» (без парсинга из title)' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  @MaxLength(160)
+  vesselName?: string | null;
+
+  @ApiPropertyOptional({ enum: ['CLASSIC', 'ROMANTIC', 'VIP', 'PANORAMIC'] })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
+  @IsIn(['CLASSIC', 'ROMANTIC', 'VIP', 'PANORAMIC'])
+  experienceFormat?: string | null;
+}
+
+/** Питание для речных событий (храним в EventOverride.contentTemplateData.catering). */
+export class EventCateringDto {
+  @ApiPropertyOptional({ description: 'Есть питание' })
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @ApiPropertyOptional({
+    enum: [
+      'BREAKFAST',
+      'LUNCH',
+      'DINNER',
+      'BRUNCH',
+      'SUPPER',
+      'BUFFET',
+      'SNACKS',
+      'TASTING',
+      'BAR',
+      'OTHER',
+    ],
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
+  @IsIn([
+    'BREAKFAST',
+    'LUNCH',
+    'DINNER',
+    'BRUNCH',
+    'SUPPER',
+    'BUFFET',
+    'SNACKS',
+    'TASTING',
+    'BAR',
+    'OTHER',
+  ])
+  type?: string | null;
+
+  @ApiPropertyOptional({ description: 'Включено в стоимость' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsBoolean()
+  includedInPrice?: boolean | null;
+
+  @ApiPropertyOptional({ description: 'Меню (Markdown, с тулбаром в админке)' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  @MaxLength(5000)
+  menuMarkdown?: string | null;
+}
 
 export class VenueSettingsDto {
   @ApiPropertyOptional()

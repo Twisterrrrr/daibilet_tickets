@@ -15,7 +15,7 @@ export class CatalogLandingsController {
   }
 
   @Get('landings/hub/:slug')
-  @ApiOperation({ summary: 'HUB/MULTI_CITY лендинг по slug (без города)' })
+  @ApiOperation({ summary: 'MULTI_CITY лендинг по slug (без города)' })
   getHubLanding(@Param('slug') slug: string) {
     return this.landingService.getCatalogHubBySlug(slug);
   }

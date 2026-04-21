@@ -10,6 +10,7 @@ import type {
   SubcategoryLayer as SubcategoryLayerT,
   SubcategoryType as SubcategoryTypeT,
 } from '../../src/prisma-client';
+import { TAXONOMY_EXPANSION_ROWS } from './subcategories-taxonomy-expansion';
 
 type SeedRow = {
   code: string;
@@ -193,19 +194,21 @@ const SUBCATEGORIES: SeedRow[] = [
   { code: 'FAMILY', slug: 'semeynye', nameRu: 'Семейные', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'CONTEXT', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 420 },
   { code: 'ROMANTIC', slug: 'romanticheskie', nameRu: 'Романтические', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'CONTEXT', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 430 },
   { code: 'DAYTIME', slug: 'dnevnye', nameRu: 'Дневные', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'CONTEXT', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 440 },
-  { code: 'PREMIUM', slug: 'premium', nameRu: 'Премиум', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'CONTEXT', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 450 },
+  { code: 'PREMIUM', slug: 'premium', nameRu: 'Премиум', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'CONTEXT', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 450 },
 
   { code: 'HISTORY', slug: 'istoricheskie', nameRu: 'Исторические', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'THEME', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 510 },
   { code: 'ARCHITECTURE', slug: 'arhitektura', nameRu: 'Архитектура', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'THEME', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 520 },
   { code: 'ART', slug: 'iskusstvo', nameRu: 'Искусство', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'THEME', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 530 },
-  { code: 'MYSTIC', slug: 'mistika', nameRu: 'Мистика', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'THEME', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 540 },
+  { code: 'MYSTIC', slug: 'mistika', nameRu: 'Мистика', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'THEME', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 540 },
   { code: 'WAR_HISTORY', slug: 'voennaya-istoriya', nameRu: 'Военная история', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'THEME', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 550 },
 
   { code: 'INDOOR', slug: 'v-pomeshchenii', nameRu: 'В помещении', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'FORMAT', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 610 },
   { code: 'OUTDOOR', slug: 'na-ulice', nameRu: 'На улице', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'FORMAT', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 620 },
   { code: 'INTERACTIVE', slug: 'interaktiv', nameRu: 'Интерактивные', type: 'UNIVERSAL', layer: 'SECONDARY', parentCode: 'FORMAT', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 630 },
 
-  { code: 'KIDS', slug: 'kids', nameRu: 'С детьми', type: 'UNIVERSAL', layer: 'SECONDARY', isLandingEnabled: false, landingMode: 'DISABLED', sortOrder: 95 },
+  { code: 'KIDS', slug: 'kids', nameRu: 'С детьми', type: 'UNIVERSAL', layer: 'SECONDARY', isLandingEnabled: true, landingMode: 'AUTO', sortOrder: 95 },
+
+  ...TAXONOMY_EXPANSION_ROWS,
 ];
 
 async function upsertAll(tx: PrismaClient) {

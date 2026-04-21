@@ -123,7 +123,7 @@ export class EventQualityService {
       if (secondaries.length === 0) {
         issues.push({
           code: 'MISSING_SECONDARY_SUBCATEGORY',
-          message: 'Добавьте до трёх дополнительных подкатегорий (SECONDARY) для витрины и SEO.',
+          message: 'Добавьте дополнительные подкатегории (SECONDARY) для витрины и SEO.',
           field: 'subcategories',
           ownership: 'local',
         });
@@ -131,7 +131,7 @@ export class EventQualityService {
       if (links.length > maxSub) {
         issues.push({
           code: 'TOO_MANY_SUBCATEGORIES',
-          message: `Слишком много связей подкатегорий (максимум ${maxSub}: 1 основной + 3 доп.).`,
+          message: `Слишком много связей подкатегорий (максимум ${maxSub}, обычно 1 PRIMARY + до ${maxSub - 1} SECONDARY).`,
           field: 'subcategories',
           ownership: 'local',
         });

@@ -27,7 +27,9 @@ enum EventSource {
 enum EventCategory {
   EXCURSION // Экскурсии
   MUSEUM // Музеи и выставки
-  EVENT // Мероприятия (концерты, шоу, театр, спорт, фестивали)
+  EVENT // Мероприятия (концерты, шоу, театр, фестивали и т.д.)
+  ACTIVITY // Активный отдых (спорт на воде/суше, экстрим, картинг и т.д.)
+  ENTERTAINMENT // Развлечения (квесты, аттракционы, интерактив, эскейпы и т.д.)
 }
 
 enum EventAudience {
@@ -184,6 +186,12 @@ enum SubcategoryLandingMode {
   TOPIC_HUB
 }
 
+/// Цель точки маршрута (FK XOR: venue XOR event)
+enum RoutePointTargetType {
+  VENUE
+  EVENT
+}
+
 /// Режим наследования правил возврата/обмена (Venue)
 enum VenueRefundPolicyMode {
   INHERIT_SUPPLIER
@@ -298,9 +306,42 @@ enum LandingStatus {
 }
 
 enum LandingType {
-  HUB
   CITY
   MULTI_CITY
+}
+
+/// Блоки композиции публичного лендинга (Admin → public renderer).
+enum LandingBlockType {
+  HERO
+  TRUST_BADGES
+  VALUE_PROPS
+  QUICK_FILTERS
+  FEATURED_VARIANTS
+  SCHEDULE_PREVIEW
+  CITY_GRID
+  CATEGORY_CHIPS
+  INFO_ICONS
+  STORY
+  HIGHLIGHTS
+  ITINERARY
+  PRICING
+  FAQ
+  REVIEWS
+  GALLERY
+  COMPARISON
+  RELATED_LANDINGS
+  RELATED_COLLECTIONS
+  RELATED_ARTICLES
+  CTA_BANNER
+  SEO_TEXT
+  RAW_RICH_TEXT
+}
+
+/// Режим канонического URL относительно связанного лендинга.
+enum LandingCanonicalMode {
+  SELF
+  ALTERNATE
+  PASS_THROUGH
 }
 
 /// Режим городского каталожного хаба (intent + конфигурация витрины).
@@ -744,6 +785,8 @@ model Event {
   endLocationId   String? @db.Uuid
   operatorId      String? @db.Uuid
   routeId         String? @db.Uuid
+  /// Маршрут, привязанный к событию как владелец (1:1 MVP, см. Route.eventId)
+  eventOwnedRoute Route?  @relation("RouteOwnerRelation")
 
   // --- Core structured fields (гибридная модель PageTemplateSpecs) ---
   meetingPoint     String?                @db.Text // Точка сбора
@@ -753,6 +796,11 @@ model Event {
   refundPolicyMode EventRefundPolicyMode? @default(INHERIT_SUPPLIER)
   refundPolicyText String?                @db.Text
 
+  /// Речные прогулки: структурированные фасеты для таблицы сравнения (публичный read-model).
+  /// Питание (тип + меню) хранится в `EventOverride.contentTemplateData.catering`, а не в событии.
+  vesselName       String?
+  experienceFormat String?
+
   city                 City                   @relation(fields: [cityId], references: [id])
   venue                Venue?                 @relation("VenueEvents", fields: [venueId], references: [id])
   startLocation        Location?              @relation("EventStartLocation", fields: [startLocationId], references: [id])
@@ -760,7 +808,7 @@ model Event {
   operator             Operator?              @relation(fields: [operatorId], references: [id])
   /// Поставщик/продавец (B2B); не путать с operatorId (маршрут/перевозчик). Dual-write: supplierId дублирует смысл operator там, где совпадают.
   supplier             Operator?              @relation("EventSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
-  route                Route?                 @relation(fields: [routeId], references: [id])
+  route                Route?                 @relation("EventCatalogRouteLink", fields: [routeId], references: [id], onDelete: SetNull)
   userFavorites        UserFavorite[]
   offers               EventOffer[]
   sessions             EventSession[]
@@ -1426,6 +1474,57 @@ model ComboPage {
 }
 
 // ========================
+// Тематика лендингов (переиспользование между CITY / MULTI_CITY)
+// ========================
+
+model LandingTheme {
+  id               String   @id @default(uuid()) @db.Uuid
+  slug             String   @unique
+  name             String
+  title            String?
+  subtitle         String?
+  defaultHeroTitle String?
+  defaultHeroBody  String?  @db.Text
+  defaultSeoTitle  String?
+  defaultSeoDesc   String?  @db.Text
+  coverImageUrl    String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  landingPages LandingPage[]
+
+  @@map("landing_themes")
+}
+
+/// Управляемые блоки страницы (композиция UX; не источник выборки событий).
+model LandingContentBlock {
+  id              String           @id @default(uuid()) @db.Uuid
+  landingPageId   String           @db.Uuid
+  type            LandingBlockType
+  variant         String?
+  title           String?
+  subtitle        String?
+  eyebrow         String?
+  body            String?          @db.Text
+  richTextJson    Json?
+  payload         Json?
+  /// URL или storage-key обложки блока (без FK на Media в MVP).
+  assetUrl        String?
+  mobileAssetUrl  String?
+  isEnabled       Boolean          @default(true)
+  sortOrder       Int              @default(0)
+  visibilityRules Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  landingPage LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+
+  @@index([landingPageId, sortOrder])
+  @@map("landing_content_blocks")
+}
+
+// ========================
 // Посадочные страницы (лендинги)
 // ========================
 
@@ -1435,10 +1534,13 @@ model LandingPage {
    * Сегмент URL; уникальность только в паре с городом (@@unique([cityId, slug])).
    */
   slug                 String
-  /// CITY лендинги обязаны иметь cityId; HUB/MULTI_CITY — должны быть null (валидация на backend).
+  /// CITY лендинги обязаны иметь cityId; MULTI_CITY — cityId null (валидация на backend).
   cityId               String?                @db.Uuid
   landingType          LandingType            @default(CITY)
+  /// Тематика кластера (общие дефолты hero/SEO); не задаёт выборку событий.
+  themeId              String?                @db.Uuid
   parentLandingId      String?                @db.Uuid
+  /// Связь с подборкой: навигация/контент, не альтернативный selection engine.
   collectionId         String?                @db.Uuid
   selectionMode        LandingSelectionMode   @default(CUSTOM)
   eventSourceType      LandingEventSourceType @default(PRIMARY_COLLECTION)
@@ -1454,6 +1556,14 @@ model LandingPage {
   seasonalPayload      Json?
   title                String // H1
   subtitle             String?
+  /// Структурированный hero (публичный renderer); при null используются title/subtitle/heroText.
+  heroTitle            String?
+  heroSubtitle         String?
+  heroBadge            String?
+  heroImageUrl         String?
+  heroMobileImageUrl   String?
+  layoutVariant        String?
+  surfaceVariant       String?
   heroText             String?                @db.Text
   templateType         LandingTemplateType    @default(GENERIC_CARDS)
   howToChoose          Json? // [{title, text}]
@@ -1467,7 +1577,16 @@ model LandingPage {
   legalText            String?                @db.Text
   metaTitle            String?
   metaDescription      String?                @db.Text
+  /// Предпочтительные SEO-поля; если null — fallback на metaTitle/metaDescription в read-model.
+  seoH1                String?
+  seoTitle             String?
+  seoDescription       String?                @db.Text
+  ogImageUrl           String?
   canonicalUrl         String?
+  canonicalMode        LandingCanonicalMode   @default(SELF)
+  /// Целевой лендинг для SEO-связи CITY ↔ MULTI_CITY (не parent topic).
+  canonicalLandingId   String?                @db.Uuid
+  publishedAt          DateTime?
   status               LandingStatus          @default(DRAFT)
   showInCollections    Boolean                @default(false)
   isIndexable          Boolean                @default(true)
@@ -1480,10 +1599,14 @@ model LandingPage {
   updatedAt            DateTime               @updatedAt
 
   city          City?                @relation(fields: [cityId], references: [id])
+  theme         LandingTheme?        @relation(fields: [themeId], references: [id], onDelete: SetNull)
   collection    Collection?          @relation(fields: [collectionId], references: [id])
   filterTagRef  Tag?                 @relation("LandingFilterTag", fields: [filterTagId], references: [id], onDelete: SetNull)
   parentLanding LandingPage?         @relation("LandingParentChild", fields: [parentLandingId], references: [id])
   childLandings LandingPage[]        @relation("LandingParentChild")
+  canonicalLanding LandingPage?    @relation("LandingCanonical", fields: [canonicalLandingId], references: [id], onDelete: SetNull)
+  canonicalFor     LandingPage[]    @relation("LandingCanonical")
+  contentBlocks    LandingContentBlock[]
   /// Эволюция связей: M2M к статьям с позициями/приоритетом (вместо Article.relatedLandingIds без FK)
   articleLinks  ArticleLandingLink[]
 
@@ -1495,6 +1618,8 @@ model LandingPage {
   @@index([status, showInCollections])
   @@index([collectionId])
   @@index([filterTagId])
+  @@index([themeId])
+  @@index([canonicalLandingId])
   @@map("landing_pages")
 }
 
@@ -2510,21 +2635,30 @@ model Route {
   pointsOfInterest String[]
   estimatedMinutes Int?
   isActive         Boolean  @default(true)
+  /// Событие-владелец маршрута (MVP: не более одного Route на событие)
+  eventId          String?  @unique @db.Uuid
+  title            String?
+  summary          String?  @db.Text
+  isPublished      Boolean  @default(false) @map("is_published")
+  version          Int      @default(1)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  events Event[]
-  points RoutePoint[]
+  catalogLinkedEvents Event[] @relation("EventCatalogRouteLink")
+  ownerEvent            Event?  @relation("RouteOwnerRelation", fields: [eventId], references: [id], onDelete: Cascade)
+  points                RoutePoint[]
 
+  @@index([eventId])
   @@map("routes")
 }
 
 model RoutePoint {
-  id              String   @id @default(uuid()) @db.Uuid
-  routeId         String   @db.Uuid
-  order           Int
-  venueId         String?  @db.Uuid
-  eventId         String?  @db.Uuid
+  id           String               @id @default(uuid()) @db.Uuid
+  routeId      String               @db.Uuid
+  order        Int
+  targetType   RoutePointTargetType
+  venueId      String?              @db.Uuid
+  eventId      String?              @db.Uuid
   durationMinutes Int?
   description     String?  @db.Text
   titleOverride   String?
@@ -2538,6 +2672,7 @@ model RoutePoint {
 
   @@unique([routeId, order])
   @@index([routeId])
+  @@index([routeId, order])
   @@index([venueId])
   @@index([eventId])
   @@map("route_points")

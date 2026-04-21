@@ -5,7 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 import {
   EVENT_PRIMARY_CODES_BY_CATEGORY,
-  MAX_SECONDARY_SUBCATEGORIES,
+  MAX_SECONDARY_SUBCATEGORIES_EVENT,
+  MAX_SECONDARY_SUBCATEGORIES_VENUE,
   VENUE_PRIMARY_CODES,
 } from './subcategory-assignment.constants';
 
@@ -64,9 +65,9 @@ export class SubcategoryAssignmentService {
     }
 
     const secUnique = Array.from(new Set((secondaryCodes ?? []).filter(Boolean)));
-    if (secUnique.length > MAX_SECONDARY_SUBCATEGORIES) {
+    if (secUnique.length > MAX_SECONDARY_SUBCATEGORIES_EVENT) {
       throw new BadRequestException(
-        `Не более ${MAX_SECONDARY_SUBCATEGORIES} дополнительных подкатегорий (secondaryCodes)`,
+        `Не более ${MAX_SECONDARY_SUBCATEGORIES_EVENT} дополнительных подкатегорий (secondaryCodes)`,
       );
     }
 
@@ -139,9 +140,9 @@ export class SubcategoryAssignmentService {
     }
 
     const secUnique = Array.from(new Set((secondaryCodes ?? []).filter(Boolean)));
-    if (secUnique.length > MAX_SECONDARY_SUBCATEGORIES) {
+    if (secUnique.length > MAX_SECONDARY_SUBCATEGORIES_VENUE) {
       throw new BadRequestException(
-        `Не более ${MAX_SECONDARY_SUBCATEGORIES} дополнительных подкатегорий (secondaryCodes)`,
+        `Не более ${MAX_SECONDARY_SUBCATEGORIES_VENUE} дополнительных подкатегорий (secondaryCodes)`,
       );
     }
 

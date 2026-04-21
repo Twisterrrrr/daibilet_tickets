@@ -31,6 +31,7 @@ import {
   TagKind,
   EventTagAssignmentSource,
   SubcategoryLayer,
+  SubcategoryType,
 } from '@/prisma-client';
 import type { Response } from 'express';
 
@@ -64,10 +65,13 @@ import {
   EventAdminSummaryDto,
   ExternalRatingDto,
   OverrideEventDto,
+  PatchEventMediaDto,
   PatchEventOfferDto,
   UpdateEventOfferDto,
   VenueSettingsDto,
   BulkUpdateEventsDto,
+  EventLandingTableFacetsDto,
+  EventCateringDto,
 } from './dto/admin.dto';
 import { EventOverrideService } from './event-override.service';
 import { EventAdminSummaryService } from './event-admin-summary.service';
@@ -541,7 +545,7 @@ export class AdminEventsController {
           override: true,
           subcategoryLinks: {
             include: {
-              subcategory: { select: { id: true, slug: true, nameRu: true, isActive: true } },
+              subcategory: { select: { id: true, slug: true, nameRu: true, isActive: true, layer: true, type: true } },
             },
           },
         },
@@ -621,7 +625,16 @@ export class AdminEventsController {
     const items = result.items.map((e) => {
       const allSubcats = (e.subcategoryLinks ?? [])
         .map((l) => l.subcategory)
-        .filter((s): s is { id: string; slug: string; nameRu: string; isActive: boolean } => Boolean(s));
+        .filter(
+          (s): s is {
+            id: string;
+            slug: string;
+            nameRu: string;
+            isActive: boolean;
+            layer: SubcategoryLayer;
+            type: SubcategoryType;
+          } => Boolean(s),
+        );
 
       const lastSessionAt = lastSessionAtByEventId.get(e.id) ?? null;
       const derivedIsPast = lastSessionAt ? lastSessionAt < now : false;
@@ -659,7 +672,14 @@ export class AdminEventsController {
         ...e,
         supplier: e.operator ? { id: e.operator.id, name: e.operator.name, slug: e.operator.slug } : null,
         venueShort: e.venue ? { id: e.venue.id, name: e.venue.title, slug: e.venue.slug } : null,
-        subcategoriesCanonical: allSubcats.map((s) => ({ id: s.id, slug: s.slug, name: s.nameRu, isActive: s.isActive })),
+        subcategoriesCanonical: allSubcats.map((s) => ({
+          id: s.id,
+          slug: s.slug,
+          name: s.nameRu,
+          isActive: s.isActive,
+          layer: s.layer,
+          subcategoryType: s.type,
+        })),
         sectionsDerived: deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
         lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
         nextSessionAt: nextFutureAt ? nextFutureAt.toISOString() : null,
@@ -2255,7 +2275,7 @@ export class AdminEventsController {
         override: true,
         subcategoryLinks: {
           include: {
-            subcategory: { select: { id: true, slug: true, nameRu: true, isActive: true } },
+            subcategory: { select: { id: true, slug: true, nameRu: true, isActive: true, layer: true, type: true } },
           },
         },
       },
@@ -2263,7 +2283,16 @@ export class AdminEventsController {
 
     const allSubcats = (event.subcategoryLinks ?? [])
       .map((l) => l.subcategory)
-      .filter((s): s is { id: string; slug: string; nameRu: string; isActive: boolean } => Boolean(s));
+      .filter(
+        (s): s is {
+          id: string;
+          slug: string;
+          nameRu: string;
+          isActive: boolean;
+          layer: SubcategoryLayer;
+          type: SubcategoryType;
+        } => Boolean(s),
+      );
 
     const lastSession = await this.prisma.eventSession.aggregate({
       where: { eventId: id },
@@ -2315,7 +2344,14 @@ export class AdminEventsController {
         hasCover: Boolean(effCover),
         galleryCount: Array.isArray(event.galleryUrls) ? event.galleryUrls.length : 0,
       },
-      subcategoriesCanonical: allSubcats.map((s) => ({ id: s.id, slug: s.slug, name: s.nameRu, isActive: s.isActive })),
+      subcategoriesCanonical: allSubcats.map((s) => ({
+        id: s.id,
+        slug: s.slug,
+        name: s.nameRu,
+        isActive: s.isActive,
+        layer: s.layer,
+        subcategoryType: s.type,
+      })),
       sectionsDerived: deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
       lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
       nextSessionAt: nextFutureSession?.startsAt.toISOString() ?? null,
@@ -2528,6 +2564,38 @@ export class AdminEventsController {
     const result = await this.overrideService.upsert(id, data as unknown as Record<string, unknown>, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
+  }
+
+  /**
+   * Обложка (override.imageUrl) и галерея (event.galleryUrls).
+   *
+   * PATCH /admin/events/:id/media
+   */
+  @Patch(':id/media')
+  @Roles('ADMIN', 'EDITOR')
+  async patchEventMedia(
+    @Param('id') id: string,
+    @Body() body: PatchEventMediaDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    const event = await this.prisma.event.findUnique({ where: { id }, select: { id: true } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    if (body.galleryUrls !== undefined) {
+      await this.prisma.event.update({
+        where: { id },
+        data: { galleryUrls: body.galleryUrls },
+      });
+    }
+
+    if (body.imageUrl !== undefined) {
+      const normalized = body.imageUrl.trim() === '' ? null : body.imageUrl.trim();
+      await this.overrideService.upsert(id, { imageUrl: normalized } as unknown as Record<string, unknown>, req.user.id);
+      await this.cacheInvalidation.invalidateOverride(id);
+    }
+
+    await this.cacheInvalidation.invalidateEventById(id);
+    return { ok: true };
   }
 
   /**
@@ -2874,6 +2942,117 @@ export class AdminEventsController {
     });
     await this.cacheInvalidation.invalidateEventById(id);
     return updated;
+  }
+
+  /**
+   * Узкие фасеты для лендингов с таблицей сравнения (речные / гастро-круизы).
+   * PATCH /admin/events/:id/landing-table-facets
+   */
+  @Patch(':id/landing-table-facets')
+  @Roles('ADMIN', 'EDITOR')
+  async updateLandingTableFacets(@Param('id') id: string, @Body() data: EventLandingTableFacetsDto) {
+    const event = await this.prisma.event.findUnique({ where: { id } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    const riverLink = await this.prisma.eventSubcategoryLink.findFirst({
+      where: { eventId: id, subcategory: { slug: 'river-excursion' } },
+      select: { eventId: true },
+    });
+    if (!riverLink) {
+      throw new BadRequestException(
+        'Фасеты таблицы лендинга (теплоход, меню, формат) доступны только для событий с подкатегорией «Речные прогулки» (river-excursion).',
+      );
+    }
+
+    const norm = (s: string | null | undefined) => {
+      if (s === undefined) return undefined;
+      if (s === null) return null;
+      const t = String(s).trim();
+      return t === '' ? null : t;
+    };
+
+    const updated = await this.prisma.event.update({
+      where: { id },
+      data: {
+        ...(data.vesselName !== undefined && { vesselName: norm(data.vesselName) }),
+        ...(data.experienceFormat !== undefined && { experienceFormat: norm(data.experienceFormat) }),
+      },
+      select: {
+        id: true,
+        vesselName: true,
+        experienceFormat: true,
+      },
+    });
+    await this.cacheInvalidation.invalidateEventById(id);
+    return updated;
+  }
+
+  /**
+   * Питание (тип, включено ли в стоимость, меню) — хранится в override.contentTemplateData.catering.
+   * PATCH /admin/events/:id/catering
+   */
+  @Patch(':id/catering')
+  @Roles('ADMIN', 'EDITOR')
+  async updateCatering(
+    @Param('id') id: string,
+    @Body() data: EventCateringDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    const event = await this.prisma.event.findUnique({ where: { id } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    const riverLink = await this.prisma.eventSubcategoryLink.findFirst({
+      where: { eventId: id, subcategory: { slug: 'river-excursion' } },
+      select: { eventId: true },
+    });
+    if (!riverLink) {
+      throw new BadRequestException(
+        'Блок «Питание» доступен только для событий с подкатегорией «Речные прогулки» (river-excursion).',
+      );
+    }
+
+    const prev = await this.prisma.eventOverride.findUnique({
+      where: { eventId: id },
+      select: { contentTemplateData: true },
+    });
+    const prevCtd =
+      prev?.contentTemplateData && typeof prev.contentTemplateData === 'object'
+        ? (prev.contentTemplateData as Record<string, unknown>)
+        : {};
+
+    const normStr = (s: string | null | undefined) => {
+      if (s === undefined) return undefined;
+      if (s === null) return null;
+      const t = String(s).trim();
+      return t === '' ? null : t;
+    };
+
+    const nextCatering: Record<string, unknown> = {
+      ...(typeof prevCtd.catering === 'object' && prevCtd.catering != null
+        ? (prevCtd.catering as Record<string, unknown>)
+        : {}),
+      ...(data.enabled !== undefined && { enabled: Boolean(data.enabled) }),
+      ...(data.type !== undefined && { type: normStr(data.type) }),
+      ...(data.includedInPrice !== undefined && { includedInPrice: data.includedInPrice }),
+      ...(data.menuMarkdown !== undefined && { menuMarkdown: normStr(data.menuMarkdown) }),
+    };
+
+    const updated = await this.prisma.eventOverride.upsert({
+      where: { eventId: id },
+      create: {
+        eventId: id,
+        updatedBy: req.user.id,
+        contentTemplateData: { ...prevCtd, catering: nextCatering } as Prisma.InputJsonValue,
+      },
+      update: {
+        updatedBy: req.user.id,
+        contentTemplateData: { ...prevCtd, catering: nextCatering } as Prisma.InputJsonValue,
+      },
+      select: { eventId: true, contentTemplateData: true },
+    });
+
+    await this.cacheInvalidation.invalidateEventById(id);
+    return { ok: true, override: updated };
   }
 
   // --- External rating (ручной ввод из Яндекс/2GIS) ---

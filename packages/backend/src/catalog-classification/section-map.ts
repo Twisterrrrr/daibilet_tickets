@@ -7,6 +7,13 @@ import type { SectionSlug } from './classification.types';
 export const SUBCATEGORY_SECTION: Record<string, SectionSlug> = {
   // events
   concerts: 'events',
+  jazz: 'events',
+  opera: 'events',
+  ballet: 'events',
+  'open-air': 'events',
+  conference: 'events',
+  meetup: 'events',
+  'seasonal-events': 'events',
   theater: 'events',
   shows: 'events',
   standup: 'events',
@@ -25,6 +32,7 @@ export const SUBCATEGORY_SECTION: Record<string, SectionSlug> = {
   'night-tours': 'excursions',
   'city-tours': 'excursions',
   'private-tours': 'excursions',
+  'group-tours': 'excursions',
   'gastro-tours': 'excursions',
 
   // museums
@@ -44,6 +52,14 @@ export const SUBCATEGORY_SECTION: Record<string, SectionSlug> = {
   'sport-events': 'activities',
   karting: 'activities',
   climbing: 'activities',
+  'shooting-range-events': 'activities',
+  'ice-skating-primary': 'activities',
+  'skiing-primary': 'activities',
+  'yoga-fitness': 'activities',
+  'wellness-spa': 'activities',
+  'team-building-primary': 'activities',
+  'hiking-primary': 'activities',
+  tracking: 'activities',
 
   // entertainment
   quests: 'entertainment',
@@ -53,6 +69,14 @@ export const SUBCATEGORY_SECTION: Record<string, SectionSlug> = {
   'game-zones': 'entertainment',
   rooftop: 'entertainment',
   'escape-rooms': 'entertainment',
+  zoo: 'entertainment',
+  aquarium: 'entertainment',
+  circus: 'entertainment',
+  cinema: 'entertainment',
+  'nightclub-primary': 'entertainment',
+  'vr-arcade': 'entertainment',
+  'bowling-ent': 'entertainment',
+  'food-court-ent': 'entertainment',
 
   // legacy slugs (compat): keep derived section for existing records
   'gastro-ekskursii': 'excursions',

@@ -2,6 +2,7 @@ import { EventCategory } from '@/prisma-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { MAX_SECONDARY_SUBCATEGORIES_EVENT } from '../subcategory-assignment.constants';
 import { SubcategoryAssignmentService } from '../subcategory-assignment.service';
 
 describe('SubcategoryAssignmentService', () => {
@@ -61,16 +62,15 @@ describe('SubcategoryAssignmentService', () => {
     });
   });
 
-  it('rejects >3 secondary', async () => {
+  it('rejects secondary over event limit', async () => {
     prisma.event.findUnique.mockResolvedValue({
       id: 'e1',
       category: EventCategory.EXCURSION,
       override: null,
     });
     prisma.subcategory.findFirst.mockResolvedValue({ id: 'p1' });
-    await expect(
-      service.assignEventSubcategories('e1', 'RIVER', ['A', 'B', 'C', 'D']),
-    ).rejects.toThrow();
+    const tooMany = Array.from({ length: MAX_SECONDARY_SUBCATEGORIES_EVENT + 1 }, (_, i) => `C${i}`);
+    await expect(service.assignEventSubcategories('e1', 'RIVER', tooMany)).rejects.toThrow();
   });
 
   it('rejects wrong primary for category', async () => {

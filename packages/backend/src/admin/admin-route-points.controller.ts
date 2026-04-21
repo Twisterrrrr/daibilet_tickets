@@ -1,12 +1,14 @@
 import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { UseGuards } from '@nestjs/common';
+
+import { RoutePointTargetType } from '@/prisma-client';
 
 import { assertRoutePointXor } from './route-point.validation';
 
@@ -16,6 +18,10 @@ class CreateRoutePointDto {
   @IsInt()
   @Min(0)
   order?: number;
+
+  @IsOptional()
+  @IsEnum(RoutePointTargetType)
+  targetType?: RoutePointTargetType;
 
   @IsOptional()
   @IsUUID()
@@ -45,6 +51,10 @@ class CreateRoutePointDto {
 }
 
 class UpdateRoutePointDto {
+  @IsOptional()
+  @IsEnum(RoutePointTargetType)
+  targetType?: RoutePointTargetType;
+
   @IsOptional()
   @IsUUID()
   venueId?: string | null;
@@ -117,6 +127,10 @@ export class AdminRoutePointsController {
   @Roles('ADMIN', 'EDITOR')
   async create(@Param('routeId') routeId: string, @Body() body: CreateRoutePointDto) {
     assertRoutePointXor({ venueId: body.venueId, eventId: body.eventId });
+    const targetType =
+      body.targetType ??
+      (body.venueId ? RoutePointTargetType.VENUE : body.eventId ? RoutePointTargetType.EVENT : undefined);
+    if (!targetType) throw new BadRequestException('targetType or venueId/eventId required');
 
     const created = await this.prisma.$transaction(async (tx) => {
       const route = await tx.route.findUnique({ where: { id: routeId }, select: { id: true } });
@@ -131,6 +145,7 @@ export class AdminRoutePointsController {
         data: {
           routeId,
           order: nextOrder,
+          targetType,
           venueId: body.venueId ?? null,
           eventId: body.eventId ?? null,
           durationMinutes: body.durationMinutes !== undefined ? Number(body.durationMinutes) : null,
@@ -147,18 +162,29 @@ export class AdminRoutePointsController {
   @Patch('route-points/:id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() body: UpdateRoutePointDto) {
-    const existing = await this.prisma.routePoint.findUnique({ where: { id }, select: { id: true } });
+    const existing = await this.prisma.routePoint.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('RoutePoint not found');
 
-    const nextVenueId = body.venueId !== undefined ? body.venueId : undefined;
-    const nextEventId = body.eventId !== undefined ? body.eventId : undefined;
-    if (nextVenueId !== undefined || nextEventId !== undefined) {
-      assertRoutePointXor({ venueId: nextVenueId ?? null, eventId: nextEventId ?? null });
+    const mergedVenue = body.venueId !== undefined ? body.venueId : existing.venueId;
+    const mergedEvent = body.eventId !== undefined ? body.eventId : existing.eventId;
+    if (body.venueId !== undefined || body.eventId !== undefined) {
+      assertRoutePointXor({ venueId: mergedVenue ?? null, eventId: mergedEvent ?? null });
     }
+
+    const nextTargetType =
+      body.targetType ??
+      (body.venueId !== undefined || body.eventId !== undefined
+        ? mergedVenue
+          ? RoutePointTargetType.VENUE
+          : mergedEvent
+            ? RoutePointTargetType.EVENT
+            : undefined
+        : undefined);
 
     return this.prisma.routePoint.update({
       where: { id },
       data: {
+        ...(nextTargetType !== undefined && { targetType: nextTargetType }),
         ...(body.venueId !== undefined && { venueId: body.venueId }),
         ...(body.eventId !== undefined && { eventId: body.eventId }),
         ...(body.durationMinutes !== undefined && {

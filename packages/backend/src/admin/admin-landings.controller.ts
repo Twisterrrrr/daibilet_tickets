@@ -5,6 +5,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -25,8 +26,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditService } from './audit.service';
 import { LandingMaterializerService } from '../landing/landing-materializer.service';
+import { LandingSeoAuditService } from '../landing/landing-seo-audit.service';
 import { LandingService } from '../landing/landing.service';
-import { CreateLandingDto, UpdateLandingDto } from './dto/admin.dto';import { AdminContentWriteValidationService } from './admin-content-write-validation.service';
+import {
+  CreateLandingContentBlockDto,
+  CreateLandingDto,
+  ReorderLandingContentBlocksDto,
+  UpdateLandingContentBlockDto,
+  UpdateLandingDto,
+} from './dto/admin.dto';
+import { AdminContentWriteValidationService } from './admin-content-write-validation.service';
 import {
   AdditionalFiltersSchema,
   SeasonalPayloadSchema,
@@ -54,6 +63,7 @@ export class AdminLandingsController {
     private readonly writeValidation: AdminContentWriteValidationService,
     private readonly materializer: LandingMaterializerService,
     private readonly landings: LandingService,
+    private readonly landingSeoAudit: LandingSeoAuditService,
   ) {}
 
   @Get()
@@ -63,7 +73,7 @@ export class AdminLandingsController {
     @Query('status') status?: LandingStatus,
     @Query('templateType') templateType?: LandingTemplateType,
     @Query('showInCollections') showInCollections?: string,
-    @Query('landingType') landingType?: 'HUB' | 'CITY' | 'MULTI_CITY',
+    @Query('landingType') landingType?: 'CITY' | 'MULTI_CITY',
     @Query('eventSourceType') eventSourceType?: 'AUTO_QUERY' | 'PRIMARY_COLLECTION' | 'MIXED',
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
@@ -107,14 +117,132 @@ export class AdminLandingsController {
     return this.landings.resolveAdminResolvedEvents(id);
   }
 
+  @Post(':id/blocks/reorder')
+  @Roles('ADMIN', 'EDITOR')
+  async reorderBlocks(@Param('id') landingId: string, @Body() body: ReorderLandingContentBlocksDto) {
+    const landing = await this.prisma.landingPage.findFirst({ where: { id: landingId, isDeleted: false } });
+    if (!landing) throw new NotFoundException('Лендинг не найден');
+
+    const [matching, totalBlocks] = await Promise.all([
+      this.prisma.landingContentBlock.count({
+        where: { landingPageId: landingId, id: { in: body.orderedIds } },
+      }),
+      this.prisma.landingContentBlock.count({ where: { landingPageId: landingId } }),
+    ]);
+    if (matching !== body.orderedIds.length || totalBlocks !== body.orderedIds.length) {
+      throw new BadRequestException({
+        code: 'BLOCK_REORDER_INVALID',
+        message: 'Список id должен содержать все блоки лендинга ровно один раз',
+      });
+    }
+
+    await this.prisma.$transaction(
+      body.orderedIds.map((blockId, index) =>
+        this.prisma.landingContentBlock.updateMany({
+          where: { id: blockId, landingPageId: landingId },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
+    return { success: true };
+  }
+
+  @Post(':id/blocks')
+  @Roles('ADMIN', 'EDITOR')
+  async createBlock(@Param('id') landingId: string, @Body() dto: CreateLandingContentBlockDto) {
+    const landing = await this.prisma.landingPage.findFirst({ where: { id: landingId, isDeleted: false } });
+    if (!landing) throw new NotFoundException('Лендинг не найден');
+
+    const maxSort = await this.prisma.landingContentBlock.aggregate({
+      where: { landingPageId: landingId },
+      _max: { sortOrder: true },
+    });
+    const nextOrder = dto.sortOrder ?? (maxSort._max.sortOrder ?? -1) + 1;
+
+    return this.prisma.landingContentBlock.create({
+      data: {
+        landingPageId: landingId,
+        type: dto.type,
+        variant: dto.variant ?? null,
+        title: dto.title ?? null,
+        subtitle: dto.subtitle ?? null,
+        eyebrow: dto.eyebrow ?? null,
+        body: dto.body ?? null,
+        richTextJson: dto.richTextJson != null ? toJsonValue(dto.richTextJson) : undefined,
+        payload: dto.payload != null ? toJsonValue(dto.payload) : undefined,
+        assetUrl: dto.assetUrl ?? null,
+        mobileAssetUrl: dto.mobileAssetUrl ?? null,
+        isEnabled: dto.isEnabled ?? true,
+        sortOrder: nextOrder,
+        visibilityRules: dto.visibilityRules != null ? toJsonValue(dto.visibilityRules) : undefined,
+      },
+    });
+  }
+
+  @Patch(':id/blocks/:blockId')
+  @Roles('ADMIN', 'EDITOR')
+  async updateBlock(
+    @Param('id') landingId: string,
+    @Param('blockId') blockId: string,
+    @Body() dto: UpdateLandingContentBlockDto,
+  ) {
+    const found = await this.prisma.landingContentBlock.findFirst({
+      where: { id: blockId, landingPageId: landingId },
+    });
+    if (!found) throw new NotFoundException('Блок не найден');
+
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.richTextJson !== undefined) data.richTextJson = dto.richTextJson != null ? toJsonValue(dto.richTextJson) : null;
+    if (dto.payload !== undefined) data.payload = dto.payload != null ? toJsonValue(dto.payload) : null;
+    if (dto.visibilityRules !== undefined) data.visibilityRules = dto.visibilityRules != null ? toJsonValue(dto.visibilityRules) : null;
+
+    return this.prisma.landingContentBlock.update({
+      where: { id: blockId },
+      data: data as never,
+    });
+  }
+
+  @Delete(':id/blocks/:blockId')
+  @Roles('ADMIN', 'EDITOR')
+  async deleteBlock(@Param('id') landingId: string, @Param('blockId') blockId: string) {
+    const found = await this.prisma.landingContentBlock.findFirst({
+      where: { id: blockId, landingPageId: landingId },
+    });
+    if (!found) throw new NotFoundException('Блок не найден');
+
+    await this.prisma.landingContentBlock.delete({ where: { id: blockId } });
+    return { success: true };
+  }
+
+  @Get(':id/seo-audit')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async getSeoAudit(@Param('id') id: string) {
+    const resolved = await this.landings.resolveAdminResolvedEvents(id);
+    const audit = await this.landingSeoAudit.auditLandingPage(id, resolved.total);
+    return {
+      ...audit,
+      matchedEventsCount: resolved.total,
+      domains: {
+        metadata: ['NO_SEO_TITLE', 'NO_SEO_DESCRIPTION', 'TITLE_TOO_LONG', 'DESCRIPTION_TOO_LONG', 'MISSING_OG_IMAGE'],
+        canonicalIndexability: ['CANONICAL_MISSING', 'CANONICAL_CONFLICT', 'INDEXABLE_WITH_THIN_CONTENT'],
+        sourceCompleteness: ['NO_MATCHED_EVENTS', 'LOW_EVENT_COUNT'],
+        contentCompleteness: ['NO_HERO', 'NO_VISIBLE_BLOCKS', 'NO_FAQ', 'NO_SEO_TEXT'],
+        intentCollision: ['CITY_MULTI_CITY_INTENT_COLLISION'],
+        relatedLinks: ['BROKEN_RELATED_LINK'],
+      },
+    };
+  }
+
   @Get(':id')
   async get(@Param('id') id: string) {
     const landing = await this.prisma.landingPage.findUniqueOrThrow({
       where: { id },
       include: {
         city: { select: { slug: true, name: true } },
+        theme: { select: { id: true, slug: true, name: true, isActive: true } },
         parentLanding: { select: { id: true, slug: true, title: true, landingType: true } },
         filterTagRef: { select: { id: true, slug: true, name: true, isActive: true } },
+        contentBlocks: { orderBy: { sortOrder: 'asc' } },
         childLandings: {
           where: { isDeleted: false },
           include: { city: { select: { slug: true, name: true } } },
@@ -156,7 +284,7 @@ export class AdminLandingsController {
   @Post()
   @Roles('ADMIN', 'EDITOR')
   async create(@Body() data: CreateLandingDto) {
-    // Для publish-guard’ов нужен id; в create пока запрещаем сразу активировать HUB/MULTI_CITY без child’ов.
+    // Для publish-guard’ов нужен id; в create пока запрещаем сразу активировать MULTI_CITY без child’ов.
     await this.validateLandingRules(data as unknown as Record<string, unknown>);
     this.validateJsonFields(data as unknown as Record<string, unknown>);
 
@@ -362,10 +490,10 @@ export class AdminLandingsController {
         if (!parent || parent.isDeleted) {
           throw new BadRequestException({ code: 'INVALID_PARENT_LANDING', message: 'Родительский лендинг не найден' });
         }
-        if (!['HUB', 'MULTI_CITY'].includes(String(parent.landingType))) {
+        if (parent.landingType !== 'MULTI_CITY') {
           throw new BadRequestException({
             code: 'LANDING_PARENT_TYPE_INVALID',
-            message: 'Родитель должен быть HUB или MULTI_CITY',
+            message: 'Родитель должен быть MULTI_CITY',
           });
         }
       }
@@ -381,7 +509,7 @@ export class AdminLandingsController {
           });
         }
       }
-    } else if (landingType === 'HUB' || landingType === 'MULTI_CITY') {
+    } else if (landingType === 'MULTI_CITY') {
       if (cityId) {
         throw new BadRequestException({ code: 'LANDING_CITY_FORBIDDEN', message: `${landingType} лендинг: cityId запрещён` });
       }
@@ -396,16 +524,16 @@ export class AdminLandingsController {
         where: {
           isDeleted: false,
           slug,
-          landingType: { in: ['HUB', 'MULTI_CITY'] },
+          landingType: 'MULTI_CITY',
           ...(selfId ? { id: { not: selfId } } : {}),
         },
         select: { id: true },
       });
       if (conflict) {
-        throw new ConflictException({ code: 'LANDING_SLUG_CONFLICT', message: 'Slug уже занят (HUB/MULTI_CITY)' });
+        throw new ConflictException({ code: 'LANDING_SLUG_CONFLICT', message: 'Slug уже занят (MULTI_CITY)' });
       }
 
-      // Publish/activate guard: HUB/MULTI_CITY нельзя активировать/публиковать без живых child-вариантов.
+      // Publish/activate guard: MULTI_CITY нельзя активировать/публиковать без живых child-вариантов.
       const wantsActive = status === LandingStatus.ACTIVE || isActive === true;
       if (wantsActive) {
         const landingId = selfId ?? String(raw.id ?? '');
@@ -423,7 +551,7 @@ export class AdminLandingsController {
         if (liveChildren <= 0) {
           throw new ConflictException({
             code: 'LANDING_PUBLISH_EMPTY_RESULTS',
-            message: 'Нельзя активировать HUB/MULTI_CITY без живых городских вариантов',
+            message: 'Нельзя активировать MULTI_CITY без живых городских вариантов',
           });
         }
       }

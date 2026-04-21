@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { LandingEventSourceType, LandingSelectionMode, LandingStatus, LandingTemplateType, LandingType } from '@/prisma-client';
+import {
+  LandingCanonicalMode,
+  LandingEventSourceType,
+  LandingSelectionMode,
+  LandingStatus,
+  LandingTemplateType,
+  LandingType,
+} from '@/prisma-client';
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
 
@@ -19,7 +26,7 @@ export class CreateLandingDto {
   @IsEnum(LandingType)
   landingType?: LandingType;
 
-  @ApiPropertyOptional({ description: 'Родительский HUB/MULTI_CITY (только для CITY)' })
+  @ApiPropertyOptional({ description: 'Родительский MULTI_CITY (только для CITY)' })
   @IsOptional()
   @IsUUID()
   parentLandingId?: string | null;
@@ -48,6 +55,46 @@ export class CreateLandingDto {
   @IsOptional()
   @IsString()
   heroText?: string;
+
+  @ApiPropertyOptional({ description: 'Тематика лендинга (FK landing_themes)' })
+  @IsOptional()
+  @IsUUID()
+  themeId?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  heroTitle?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  heroSubtitle?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  heroBadge?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  heroImageUrl?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  heroMobileImageUrl?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  layoutVariant?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  surfaceVariant?: string | null;
 
   @ApiPropertyOptional({ description: 'JSON: [{title, text}]' })
   @IsOptional()
@@ -135,6 +182,36 @@ export class CreateLandingDto {
   @IsOptional()
   @IsString()
   metaDescription?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  seoH1?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  seoTitle?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  seoDescription?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  ogImageUrl?: string | null;
+
+  @ApiPropertyOptional({ enum: LandingCanonicalMode })
+  @IsOptional()
+  @IsEnum(LandingCanonicalMode)
+  canonicalMode?: LandingCanonicalMode;
+
+  @ApiPropertyOptional({ description: 'SEO-связь с другим лендингом' })
+  @IsOptional()
+  @IsUUID()
+  canonicalLandingId?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()
