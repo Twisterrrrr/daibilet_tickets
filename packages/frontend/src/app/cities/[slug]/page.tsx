@@ -261,7 +261,16 @@ export default async function CityPage({ params }: Props) {
           <div className="flex items-end justify-between">
             <div>
               <h2 className="text-2xl font-bold text-slate-900">Музеи и искусство</h2>
-              <p className="mt-1 text-sm text-slate-500">Музеи, галереи и арт-пространства</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Музеи, галереи и арт-пространства с билетами в каталоге.
+                {info?.mustSee && info.mustSee.length > 0 ? (
+                  <>
+                    {' '}
+                    Площади, виды и другие символы города без отдельного музейного билета — в блоке «Что обязательно
+                    посетить» выше.
+                  </>
+                ) : null}
+              </p>
             </div>
             <Link
               href={`/cities/${slug}/museums`}

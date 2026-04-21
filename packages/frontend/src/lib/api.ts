@@ -17,6 +17,7 @@ import type {
 import type {
   ArticleDetail,
   ArticleListItem,
+  CatalogHubLandingResponse,
   CityDetail,
   CollectionDetailResponse,
   FeaturedLandingItem,
@@ -401,7 +402,7 @@ export const api = {
     fetchApi<LandingPageResponse>(`/catalog/landings/${encodeURIComponent(citySlug)}/${encodeURIComponent(slug)}`),
 
   getCatalogHubLandingBySlug: (slug: string) =>
-    fetchApi<unknown>(`/catalog/landings/hub/${encodeURIComponent(slug)}`),
+    fetchApi<CatalogHubLandingResponse>(`/catalog/landings/hub/${encodeURIComponent(slug)}`),
 
   /** Резолв: TOPIC_HUB → редирект на тематический хаб; AUTO → можно запрашивать published payload */
   getSubcategoryLandingRoute: (citySlug: string, subcategorySlug: string) =>

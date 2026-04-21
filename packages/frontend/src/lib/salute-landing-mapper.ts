@@ -30,7 +30,7 @@ export function variantsToSaluteEventListItems(
       slug: v.event.slug,
       title: v.event.title,
       category: EventCategory.EXCURSION,
-      subcategories: [] as EventSubcategory[],
+      subcategories: (v.event.subcategories ?? []) as EventSubcategory[],
       audience: EventAudience.FAMILY,
       imageUrl: v.event.imageUrl ?? null,
       priceFrom: getVariantPriceKop(v),
@@ -41,7 +41,21 @@ export function variantsToSaluteEventListItems(
       totalAvailableTickets: v.availableTickets,
       nextSessionAt: v.startsAt,
       address: v.event.address ?? null,
+      shortDescription: v.event.shortDescription ?? null,
     }));
+}
+
+/**
+ * Средняя оценка для чипа в hero: агрегат лендинга, иначе по событиям, иначе 4.7.
+ */
+export function saluteHeroAvgRating(events: EventListItem[], statsAvg?: number | null): number {
+  if (typeof statsAvg === 'number' && statsAvg > 0) {
+    return Math.round(statsAvg * 10) / 10;
+  }
+  const rated = events.filter((e) => Number(e.rating) > 0);
+  if (rated.length === 0) return 4.7;
+  const sum = rated.reduce((s, e) => s + Number(e.rating), 0);
+  return Math.round((sum / rated.length) * 10) / 10;
 }
 
 export function buildSaluteFilterOptionsFromEvents(
@@ -69,6 +83,16 @@ type SeasonalPayloadShape = {
   tips?: string[];
 };
 
+/**
+ * Убирает «сегодня» из H1 салюта: событие привязано к 9 мая, не к «сегодня» в календарном смысле.
+ */
+export function sanitizeSaluteHeroTitle(raw: string): string {
+  return raw
+    .replace(/\s*сегодня/giu, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function catalogLandingToSaluteContent(
   landing: LandingPageResponse['landing'],
   citySlug: string,
@@ -77,7 +101,9 @@ export function catalogLandingToSaluteContent(
   const payload = landing.seasonalPayload as SeasonalPayloadShape | null | undefined;
 
   return {
-    heroTitle: typeof landing.title === 'string' ? landing.title : fb.heroTitle,
+    heroTitle: sanitizeSaluteHeroTitle(
+      typeof landing.title === 'string' ? landing.title : (fb.heroTitle ?? ''),
+    ),
     heroSubtitle: typeof landing.subtitle === 'string' ? landing.subtitle : fb.heroSubtitle,
     seoTitle: typeof landing.metaTitle === 'string' ? landing.metaTitle : fb.seoTitle,
     seoDescription: typeof landing.metaDescription === 'string' ? landing.metaDescription : fb.seoDescription,

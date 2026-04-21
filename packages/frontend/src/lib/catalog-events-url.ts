@@ -120,10 +120,15 @@ export function landingFilterSortToCatalogSort(landingSort: string): string {
  * Чипы времени лендинга → `timeOfDay` каталога (грубое соответствие; ночные слоты мостов → `night`).
  */
 export function landingTimeSlotToCatalogTimeOfDay(
-  timeSlotMode: 'night' | 'evening' | 'hidden',
+  timeSlotMode: 'night' | 'evening' | 'dinner' | 'hidden',
   timeSlot: string,
 ): string | null {
   if (!timeSlot || timeSlotMode === 'hidden') return null;
+  if (timeSlotMode === 'dinner') {
+    if (timeSlot === 'sunset') return 'evening';
+    if (timeSlot === 'night') return 'night';
+    return null;
+  }
   if (timeSlotMode === 'evening') return 'evening';
   return 'night';
 }

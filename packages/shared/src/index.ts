@@ -108,6 +108,8 @@ export enum EventCategory {
   EXCURSION = 'EXCURSION',
   MUSEUM = 'MUSEUM',
   EVENT = 'EVENT',
+  ACTIVITY = 'ACTIVITY',
+  ENTERTAINMENT = 'ENTERTAINMENT',
 }
 
 export enum EventAudience {
@@ -733,6 +735,8 @@ export const CATEGORY_LABELS: Record<EventCategory, string> = {
   [EventCategory.EXCURSION]: 'Экскурсии',
   [EventCategory.MUSEUM]: 'Музеи и Арт',
   [EventCategory.EVENT]: 'Мероприятия',
+  [EventCategory.ACTIVITY]: 'Активный отдых',
+  [EventCategory.ENTERTAINMENT]: 'Развлечения',
 };
 
 /** Аудитория → человекочитаемое название */
@@ -783,8 +787,6 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<EventCategory, EventSubcategory[]
     EventSubcategory.COMBINED,
     EventSubcategory.QUEST,
     EventSubcategory.GASTRO,
-    EventSubcategory.ROOFTOP,
-    EventSubcategory.EXTREME,
   ],
   [EventCategory.MUSEUM]: [
     EventSubcategory.MUSEUM_CLASSIC,
@@ -807,6 +809,8 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<EventCategory, EventSubcategory[]
     EventSubcategory.MASTERCLASS,
     EventSubcategory.PARTY,
   ],
+  [EventCategory.ACTIVITY]: [EventSubcategory.EXTREME],
+  [EventCategory.ENTERTAINMENT]: [EventSubcategory.ROOFTOP, EventSubcategory.QUEST],
 };
 
 // --- Quick Filters per Category/Audience (витрина) ---

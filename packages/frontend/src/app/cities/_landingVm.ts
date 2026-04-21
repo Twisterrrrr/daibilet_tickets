@@ -4,6 +4,13 @@
 
 import type { LandingPageResponse } from '@/lib/api.types';
 
+function parsePrimarySubcategory(raw: unknown): { code: string; nameRu: string } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.code !== 'string' || typeof o.nameRu !== 'string') return null;
+  return { code: o.code, nameRu: o.nameRu };
+}
+
 /** Нормализатор: в массив по умолчанию */
 function toArray<T>(x: T[] | null | undefined | unknown): T[] {
   return Array.isArray(x) ? (x as T[]) : [];
@@ -37,6 +44,18 @@ export interface LandingVariant {
     rating: number;
     reviewCount: number;
     priceFrom?: number;
+    shortDescription?: string | null;
+    /** Коды подкатегорий (EventSubcategory) для фасетов/иконок */
+    subcategories?: string[];
+    primarySubcategory?: { code: string; nameRu: string } | null;
+    vesselName?: string;
+    experienceFormat?: string;
+    catering?: {
+      enabled: boolean;
+      type?: string | null;
+      includedInPrice?: boolean | null;
+      menuMarkdown?: string | null;
+    };
   };
 }
 
@@ -46,6 +65,8 @@ export interface LandingFilters {
   priceRange: [number, number];
   dateRange: string[];
   dates: string[];
+  menuKinds: string[];
+  experienceFormats: string[];
 }
 
 function toVariant(x: unknown): LandingVariant | null {
@@ -83,13 +104,45 @@ function toVariant(x: unknown): LandingVariant | null {
       rating: typeof e.rating === 'number' ? e.rating : 0,
       reviewCount: typeof e.reviewCount === 'number' ? e.reviewCount : 0,
       priceFrom: typeof e.priceFrom === 'number' ? e.priceFrom : undefined,
+      shortDescription: typeof e.shortDescription === 'string' ? e.shortDescription : null,
+      subcategories: Array.isArray(e.subcategories)
+        ? e.subcategories.filter((c): c is string => typeof c === 'string')
+        : [],
+      primarySubcategory: parsePrimarySubcategory(e.primarySubcategory),
+      vesselName: typeof e.vesselName === 'string' ? e.vesselName : undefined,
+      experienceFormat: typeof e.experienceFormat === 'string' ? e.experienceFormat : undefined,
+      catering:
+        e.catering && typeof e.catering === 'object'
+          ? {
+              enabled: Boolean((e.catering as Record<string, unknown>).enabled),
+              type:
+                typeof (e.catering as Record<string, unknown>).type === 'string'
+                  ? ((e.catering as Record<string, unknown>).type as string)
+                  : null,
+              includedInPrice:
+                typeof (e.catering as Record<string, unknown>).includedInPrice === 'boolean'
+                  ? ((e.catering as Record<string, unknown>).includedInPrice as boolean)
+                  : null,
+              menuMarkdown:
+                typeof (e.catering as Record<string, unknown>).menuMarkdown === 'string'
+                  ? ((e.catering as Record<string, unknown>).menuMarkdown as string)
+                  : null,
+            }
+          : { enabled: false, type: null, includedInPrice: null, menuMarkdown: null },
     },
   };
 }
 
 function toFilters(x: unknown): LandingFilters {
   if (!x || typeof x !== 'object') {
-    return { piers: [], priceRange: [0, Number.POSITIVE_INFINITY], dateRange: [], dates: [] };
+    return {
+      piers: [],
+      priceRange: [0, Number.POSITIVE_INFINITY],
+      dateRange: [],
+      dates: [],
+      menuKinds: [],
+      experienceFormats: [],
+    };
   }
   const r = x as Record<string, unknown>;
   const piers = toArray(r.piers).filter((p): p is string => typeof p === 'string');
@@ -100,7 +153,9 @@ function toFilters(x: unknown): LandingFilters {
       : [0, Number.POSITIVE_INFINITY];
   const dateRange = toArray(r.dateRange).filter((d): d is string => typeof d === 'string');
   const dates = toArray(r.dates).filter((d): d is string => typeof d === 'string');
-  return { piers, priceRange, dateRange, dates };
+  const menuKinds = toArray(r.menuKinds).filter((x): x is string => typeof x === 'string');
+  const experienceFormats = toArray(r.experienceFormats).filter((x): x is string => typeof x === 'string');
+  return { piers, priceRange, dateRange, dates, menuKinds, experienceFormats };
 }
 
 export interface HowToChooseItemVM {
@@ -224,8 +279,8 @@ export function getLandingCitySlug(item: { city?: unknown; slug: string }): stri
   return c?.slug ?? null;
 }
 
-/** Режим чипов времени в фильтрах: ночные мосты / вечерние круизы / скрыть (дневные экскурсии). */
-export type LandingTimeSlotMode = 'night' | 'evening' | 'hidden';
+/** Режим чипов времени в фильтрах: ночные мосты / вечерние круизы / закат+ночь (ужин) / скрыть. */
+export type LandingTimeSlotMode = 'night' | 'evening' | 'dinner' | 'hidden';
 
 const NIGHT_BRIDGE_LANDING_SLUGS = new Set(['nochnye-mosty']);
 
@@ -241,8 +296,57 @@ const HIDE_TIME_SLOT_LANDING_SLUGS = new Set([
   'salute-9-may',
 ]);
 
-export function landingTimeSlotMode(landingSlug: string): LandingTimeSlotMode {
+export function landingTimeSlotMode(
+  landingSlug: string,
+  opts?: { surfaceVariant?: string | null; hasGastroFacets?: boolean },
+): LandingTimeSlotMode {
+  if (
+    opts?.surfaceVariant === 'GASTRO_TABLE' ||
+    opts?.surfaceVariant === 'DINNER_CRUISE' ||
+    opts?.hasGastroFacets
+  ) {
+    return 'dinner';
+  }
   if (NIGHT_BRIDGE_LANDING_SLUGS.has(landingSlug)) return 'night';
   if (HIDE_TIME_SLOT_LANDING_SLUGS.has(landingSlug)) return 'hidden';
   return 'evening';
+}
+
+/** Есть ли в сыром ответе каталога поля гастро-фасетов (до toLandingVM). */
+export function rawCatalogVariantsHaveGastroFacets(variants: unknown): boolean {
+  if (!Array.isArray(variants)) return false;
+  return variants.some((v) => {
+    if (!v || typeof v !== 'object') return false;
+    const ev = (v as { event?: unknown }).event;
+    if (!ev || typeof ev !== 'object') return false;
+    const e = ev as Record<string, unknown>;
+    const c = e.catering;
+    const catering =
+      c && typeof c === 'object' ? (c as Record<string, unknown>) : null;
+    return Boolean(
+      e.experienceFormat ??
+        e.vesselName ??
+        (catering ? catering.enabled ?? catering.type ?? catering.menuMarkdown : null),
+    );
+  });
+}
+
+export function shouldShowGastroComparisonColumns(
+  templateType: LandingVM['templateType'],
+  surfaceVariant: string | null | undefined,
+  variants: LandingVariant[],
+): boolean {
+  const table = templateType === 'COMPARISON_TABLE' || templateType === 'HYBRID';
+  if (!table) return false;
+  if (surfaceVariant === 'GASTRO_TABLE' || surfaceVariant === 'DINNER_CRUISE') return true;
+  return variants.some(
+    (v) =>
+      Boolean(
+        v.event.experienceFormat ||
+          v.event.vesselName ||
+          v.event.catering?.enabled ||
+          v.event.catering?.type ||
+          v.event.catering?.menuMarkdown,
+      ),
+  );
 }

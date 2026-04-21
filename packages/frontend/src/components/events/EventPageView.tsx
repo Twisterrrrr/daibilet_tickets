@@ -408,6 +408,47 @@ export function EventPageView({ event }: EventPageViewProps) {
               refundPolicyResolved={(event as unknown as { refundPolicyResolved?: string | null }).refundPolicyResolved}
             />
 
+            {/* Маршрут (нормализованный Route / RoutePoint), только при публикации */}
+            {event.route && event.route.points.length > 0 ? (
+              <section className="space-y-4" aria-labelledby="event-route-heading">
+                <h2 id="event-route-heading" className="text-lg font-bold text-slate-900">
+                  {event.route.title?.trim() || 'Маршрут'}
+                </h2>
+                {event.route.summary ? (
+                  <p className="text-sm leading-relaxed text-slate-600">{event.route.summary}</p>
+                ) : null}
+                {/* TODO: schema.org TouristTrip / structured route — follow-up */}
+                <ol className="list-decimal space-y-4 pl-5 text-slate-800">
+                  {event.route.points.map((pt, i) => (
+                    <li key={`${pt.order}-${i}`} className="marker:font-semibold">
+                      <div className="font-medium text-slate-900">
+                        {pt.title}
+                        {pt.isOptional ? (
+                          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal text-slate-600">
+                            по желанию
+                          </span>
+                        ) : null}
+                      </div>
+                      {pt.description ? (
+                        <p className="mt-1 text-sm leading-relaxed text-slate-600">{pt.description}</p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                        {pt.durationMinutes != null ? (
+                          <span className="text-slate-500">{pt.durationMinutes} мин</span>
+                        ) : null}
+                        <Link
+                          href={pt.target.href}
+                          className="font-medium text-primary-600 underline-offset-2 hover:underline"
+                        >
+                          {pt.target.title}
+                        </Link>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
+
             {/* legacy templateData: program, cast, hall (из EventOverride) */}
             {event.templateData && <TemplateDataBlocks templateData={event.templateData} />}
 

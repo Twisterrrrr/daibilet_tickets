@@ -3,13 +3,18 @@
 import Link from 'next/link';
 
 import { calendarDayFromIso, type EventListItem, getCityTimezone } from '@daibilet/shared';
-import { Shield, Star, TrendingUp } from 'lucide-react';
+import { Eye, Lightbulb, MapPin, Shield, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { FilterBar } from '@/components/landing/FilterBar';
+import { FilterBar, type FilterState } from '@/components/landing/FilterBar';
+import {
+  DEFAULT_SALUTE_FACETS,
+  matchesSaluteToolbarFacets,
+} from '@/lib/salute-service-amenities';
 import type { CatalogEventsUrlParams } from '@/lib/catalog-events-url';
 import { FaqSection } from '@/components/landing/FaqSection';
 import { HowToChoose, InfoBlocks, ReviewsSection } from '@/components/landing/ContentSections';
+import { pluralExcursionsRu } from '@/components/landing/SaluteLandingHero';
 import { SaluteTripCard } from '@/components/landing/SaluteTripCard';
 
 type CityLite = { id: string; slug: string; name: string } | null;
@@ -71,13 +76,24 @@ const ENHANCER_FALLBACK_REVIEWS: Array<{ text: string; author: string; rating: n
   },
 ];
 
-function StatChip({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
-      {icon}
-      {label}
-    </div>
-  );
+function matchesSaluteTransport(e: EventListItem, transport: string | undefined): boolean {
+  if (!transport || transport === 'any') return true;
+  const blob = `${e.title} ${e.primarySubcategory?.nameRu ?? ''} ${e.primarySubcategory?.code ?? ''}`.toLowerCase();
+  switch (transport) {
+    case 'river':
+      return /теплоход|речн|нева|водн|круиз|канал|прогул|паром|яхт|судно|борта?|палуб/i.test(blob);
+    case 'bus':
+      return /автобус/i.test(blob);
+    case 'auto':
+      return (
+        /(минивэн|джип|vip|легков)/i.test(blob) ||
+        (/авто/i.test(blob) && !/автобус/i.test(blob))
+      );
+    case 'moto':
+      return /мото|байк/i.test(blob);
+    default:
+      return true;
+  }
 }
 
 function pickOptimalSaluteIndex(events: EventListItem[]): number | null {
@@ -121,18 +137,22 @@ export function SaluteLandingPage({
 }) {
   const ianaTimeZone = useMemo(() => getCityTimezone(city?.slug ?? null), [city?.slug]);
 
-  const [filters, setFilters] = useState<{
-    date: string;
-    timeSlot: string;
-    pier: string;
-    maxPrice: number | null;
-    showSoldOut: boolean;
-    sort: string;
-  }>({ date: '', timeSlot: '', pier: '', maxPrice: null, showSoldOut: false, sort: 'time' });
+  const [filters, setFilters] = useState<FilterState>({
+    date: '',
+    timeSlot: '',
+    pier: '',
+    maxPrice: null,
+    showSoldOut: false,
+    sort: 'price',
+    transport: 'any',
+    facets: { ...DEFAULT_SALUTE_FACETS },
+  });
 
   const filtered = useMemo(() => {
     let out = events;
     if (filters.pier) out = out.filter((e) => (e.address || '').includes(filters.pier));
+    out = out.filter((e) => matchesSaluteTransport(e, filters.transport));
+    out = out.filter((e) => matchesSaluteToolbarFacets(e, filters.facets));
     if (filters.maxPrice) out = out.filter((e) => (e.priceFrom ?? 0) <= filters.maxPrice!);
     if (filters.date) {
       out = out.filter((e) => {
@@ -153,76 +173,23 @@ export function SaluteLandingPage({
 
   const bestIdx = useMemo(() => pickOptimalSaluteIndex(filtered), [filtered]);
 
-  const h1Fallback = city ? `Салют 9 мая в ${city.name} 2026 — где смотреть и лучшие варианты` : 'Салют 9 мая 2026 в России';
-  const h1 = content.heroTitle ?? h1Fallback;
-  const subtitle = city
-    ? content.heroSubtitle ??
-      'Подборка вариантов по городу: теплоходы, рестораны, крыши и обзорные точки. Сравните цены и время.'
-    : 'Выберите город и сравните варианты: теплоходы, рестораны, крыши и обзорные точки.';
-
   const withSession = useMemo(() => filtered.filter((e) => e.nextSessionAt), [filtered]);
-
-  const avgRating = useMemo(() => {
-    const rated = events.filter((e) => Number(e.rating) > 0);
-    if (rated.length === 0) return 4.7;
-    const sum = rated.reduce((s, e) => s + Number(e.rating), 0);
-    return Math.round((sum / rated.length) * 10) / 10;
-  }, [events]);
 
   const reviewItems = content.reviews?.length ? content.reviews : ENHANCER_FALLBACK_REVIEWS;
 
-  const excursionWord = (n: number) => {
-    if (n === 1) return 'экскурсия';
-    if (n >= 2 && n <= 4) return 'экскурсии';
-    return 'экскурсий';
-  };
-
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-2xl sm:rounded-3xl gradient-hero-lovable text-white shadow-lg">
-        <div className="px-5 py-12 sm:px-8 sm:py-16 md:py-20">
-          <nav className="flex flex-wrap items-center gap-2 text-sm text-white/75">
-            <Link href="/" className="transition-colors hover:text-white">
-              Главная
-            </Link>
-            <span>/</span>
-            <Link href="/salute-9-may" className="transition-colors hover:text-white">
-              Салют 9 мая
-            </Link>
-            {city ? (
-              <>
-                <span>/</span>
-                <span className="text-white">{city.name}</span>
-              </>
-            ) : null}
-          </nav>
-
-          <h1 className="mt-5 max-w-4xl text-3xl font-extrabold leading-tight tracking-tight md:text-4xl lg:text-5xl">
-            {h1}
-          </h1>
-          <p className="mt-4 max-w-3xl text-base leading-relaxed text-white/85 md:text-lg">{subtitle}</p>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            <StatChip icon={<TrendingUp className="h-4 w-4" />} label={`${events.length} ${excursionWord(events.length)}`} />
-            <StatChip icon={<Shield className="h-4 w-4" />} label="8 340+ продано" />
-            <StatChip icon={<Star className="h-4 w-4" />} label={`${avgRating} / 5`} />
-          </div>
-        </div>
-      </section>
-
       {(content.introText ||
         content.relatedLinks?.length ||
         content.viewpoints?.length ||
         content.tips?.length) && (
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+        <section className="space-y-8">
           {content.introText ? (
-            <div className="prose prose-slate max-w-none">
-              <p className="text-slate-700">{content.introText}</p>
-            </div>
+            <p className="max-w-3xl text-lg leading-relaxed text-slate-600">{content.introText}</p>
           ) : null}
 
           {content.relatedLinks?.length ? (
-            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               {content.relatedLinks.map((l) => (
                 <Link
                   key={l.href}
@@ -238,54 +205,72 @@ export function SaluteLandingPage({
             </div>
           ) : null}
 
-          {content.viewpoints?.length ? (
-            <div className="mt-6">
-              <h2 className="text-lg font-bold text-slate-900">Где смотреть</h2>
-              <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-                {content.viewpoints.map((v) => (
-                  <li
-                    key={v.name}
-                    className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm leading-relaxed text-slate-700"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-bold text-slate-900">{v.name}</span>
-                      <span
-                        className={
-                          v.isFree
-                            ? 'rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800'
-                            : 'rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-700'
-                        }
-                      >
-                        {v.isFree ? 'Бесплатно' : 'Билет'}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-slate-600">{v.description}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+          {content.viewpoints?.length || content.tips?.length ? (
+            <div className="grid gap-6 md:grid-cols-2">
+              {content.viewpoints?.length ? (
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    <Eye className="h-5 w-5 shrink-0 text-primary-600" aria-hidden />
+                    Лучшие точки обзора
+                  </div>
+                  <ul className="space-y-3">
+                    {content.viewpoints.map((v) => (
+                      <li key={v.name} className="flex items-start gap-3">
+                        <MapPin className="mt-1 h-4 w-4 shrink-0 text-primary-600" aria-hidden />
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-slate-900">{v.name}</span>
+                            <span
+                              className={
+                                v.isFree
+                                  ? 'rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-xs font-medium text-emerald-700'
+                                  : 'rounded-md bg-primary-600/10 px-1.5 py-0.5 text-xs font-medium text-primary-700'
+                              }
+                            >
+                              {v.isFree ? 'Бесплатно' : 'Билет'}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-sm text-slate-600">{v.description}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
-          {content.tips?.length ? (
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5">
-              <h2 className="text-base font-bold text-slate-900">Советы</h2>
-              <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
-                {content.tips.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
+              {content.tips?.length ? (
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    <Lightbulb className="h-5 w-5 shrink-0 text-primary-600" aria-hidden />
+                    Советы
+                  </div>
+                  <ul className="space-y-3">
+                    {content.tips.map((t, i) => (
+                      <li key={i} className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-600/10 text-xs font-bold text-primary-700">
+                          {i + 1}
+                        </span>
+                        <span className="text-sm text-slate-600">{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </section>
       )}
 
       <section id="variants" className="space-y-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="text-2xl font-bold text-slate-900 md:text-3xl">
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-x-6">
+          <h2 className="min-w-0 text-2xl font-bold leading-tight text-slate-900 md:text-3xl">
             Расписание экскурсий{city ? ` — ${city.name}` : ''}
           </h2>
           {city ? (
-            <Link href="/salute-9-may" className="text-sm font-semibold text-primary-700 hover:text-primary-800">
+            <Link
+              href="/salute-9-may"
+              className="shrink-0 justify-self-end text-sm font-semibold text-primary-700 hover:text-primary-800 sm:pt-0.5"
+            >
               Все города →
             </Link>
           ) : null}
@@ -297,6 +282,8 @@ export function SaluteLandingPage({
           dates={filterOptions.dates}
           ianaTimeZone={ianaTimeZone}
           timeSlotMode="hidden"
+          toolbarLayout
+          saluteCitySlug={city?.slug ?? null}
           onFilterChange={setFilters}
           catalogEventsContext={
             city?.slug
@@ -308,18 +295,22 @@ export function SaluteLandingPage({
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-slate-600">
             {withSession.length > 0
-              ? `${withSession.length} ${excursionWord(withSession.length)}`
-              : 'Нет экскурсий по выбранным фильтрам'}
+              ? pluralExcursionsRu(withSession.length)
+              : 'Ничего не найдено по фильтрам'}
           </span>
           {bestIdx !== null ? (
-            <span className="text-xs font-medium text-primary-700">Оптимальный выбор выделен</span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-700">
+              <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" aria-hidden />
+              Оптимальный выбор выделен
+            </span>
           ) : null}
         </div>
 
         <div className="space-y-3">
           {withSession.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center">
-              <p className="text-slate-600">Попробуйте изменить фильтры</p>
+              <p className="text-slate-800">Ничего не найдено по фильтрам</p>
+              <p className="mt-2 text-sm text-slate-600">Попробуйте изменить фильтры</p>
             </div>
           ) : (
             withSession.map((e, i) => {
@@ -340,7 +331,7 @@ export function SaluteLandingPage({
 
         {filtered.filter((e) => (e.totalAvailableTickets ?? 0) > 0).length < 3 && city ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-slate-800">
-            <div className="text-sm font-bold">Мало вариантов в каталоге</div>
+            <div className="text-sm font-bold">Мало предложений в каталоге</div>
             <div className="mt-1 text-sm text-slate-700">
               Пока в каталоге мало предложений. Ниже — универсальные советы и точки с бесплатным обзором из гида по городу.
             </div>
@@ -353,7 +344,18 @@ export function SaluteLandingPage({
         ) : null}
       </section>
 
-      {content.howToChoose?.length ? <HowToChoose items={content.howToChoose} /> : null}
+      {content.howToChoose?.length ? (
+        <HowToChoose
+          items={content.howToChoose}
+          layout="steps"
+          title="Как выбрать предложение на салют"
+          subtitle={
+            content.howToChoose.length === 4
+              ? '4 простых шага к лучшему празднику'
+              : 'Ориентиры при выборе формата'
+          }
+        />
+      ) : null}
       {content.infoBlocks?.length ? <InfoBlocks items={content.infoBlocks} /> : null}
       {content.faq?.length ? <FaqSection items={content.faq} /> : null}
       <ReviewsSection items={reviewItems} />

@@ -73,6 +73,12 @@
   .gradient-hero {
     background: linear-gradient(135deg, hsl(220 55% 15%) 0%, hsl(220 50% 20%) 50%, hsl(220 45% 25%) 100%);
   }
+  /* Салют / Lovable: насыщенный королевский синий, светлее к центру — без «траурного» тёмно-серого */
+  .gradient-salute-hero {
+    background:
+      radial-gradient(ellipse 120% 90% at 50% 20%, hsl(224 82% 52% / 0.45) 0%, transparent 55%),
+      linear-gradient(180deg, hsl(224 76% 46%) 0%, hsl(224 72% 36%) 55%, hsl(226 68% 28%) 100%);
+  }
   .gradient-gold {
     background: linear-gradient(135deg, hsl(40 95% 55%) 0%, hsl(42 100% 70%) 100%);
   }

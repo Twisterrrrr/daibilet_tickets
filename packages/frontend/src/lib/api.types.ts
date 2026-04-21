@@ -11,6 +11,26 @@ import type {
   TagItem,
 } from '@daibilet/shared';
 
+/** Публичный маршрут события (нормализованный Route / RoutePoint), только если опубликован на витрине */
+export type PublicEventRouteBlock = {
+  title: string | null;
+  summary: string | null;
+  points: Array<{
+    order: number;
+    title: string;
+    description: string | null;
+    durationMinutes: number | null;
+    isOptional: boolean;
+    targetType: 'VENUE' | 'EVENT';
+    target: {
+      title: string;
+      slug: string;
+      href: string;
+      imageUrl?: string | null;
+    };
+  }>;
+};
+
 /** EventDetail с расширениями API (tcData, primaryOffer, venue, externalRating и т.д.) */
 export type EventDetailFrontend = SharedEventDetail & {
   tcData?: unknown;
@@ -28,6 +48,8 @@ export type EventDetailFrontend = SharedEventDetail & {
   refundPolicyResolved?: string | null;
   /** Для OPEN_DATE: дата окончания периода (временные выставки); с бэкенда как ISO */
   endDate?: string | null;
+  /** Маршрут (опционально); null если нет или не опубликован */
+  route?: PublicEventRouteBlock | null;
 };
 
 /** SEO meta (GET /seo/:entityType/:entityId) */
@@ -204,8 +226,71 @@ export interface LandingItem {
   [key: string]: unknown;
 }
 
+/** Дочерний городской лендинг в ответе MULTI_CITY hub (GET /catalog/landings/hub/:slug) */
+export interface CatalogHubLandingVariant {
+  id: string;
+  slug: string;
+  title: string | null;
+  status?: string;
+  isIndexable?: boolean;
+  isActive?: boolean;
+  city: { id: string; slug: string; name: string };
+  canonicalPath: string;
+}
+
+/** GET /catalog/landings/hub/:slug — мультилендинг без привязки к городу */
+export interface CatalogHubLandingResponse {
+  landing: {
+    id: string;
+    slug: string;
+    title?: string | null;
+    subtitle?: string | null;
+    heroText?: string | null;
+    heroTitle?: string | null;
+    heroSubtitle?: string | null;
+    heroBadge?: string | null;
+    heroImageUrl?: string | null;
+    heroMobileImageUrl?: string | null;
+    layoutVariant?: string | null;
+    surfaceVariant?: string | null;
+    landingType?: string;
+    metaTitle?: string | null;
+    metaDescription?: string | null;
+    seoH1?: string | null;
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    ogImageUrl?: string | null;
+    canonicalUrl?: string | null;
+    canonicalMode?: string | null;
+    status?: string;
+    isIndexable?: boolean;
+    isActive?: boolean;
+  };
+  blocks: LandingCompositionBlockPublic[];
+  variants: CatalogHubLandingVariant[];
+  total: number;
+}
+
+/** Публичный блок композиции (GET catalog landing → `blocks`) */
+export interface LandingCompositionBlockPublic {
+  id: string;
+  type: string;
+  variant?: string | null;
+  title?: string | null;
+  subtitle?: string | null;
+  eyebrow?: string | null;
+  body?: string | null;
+  richTextJson?: unknown;
+  payload?: unknown;
+  assetUrl?: string | null;
+  mobileAssetUrl?: string | null;
+  sortOrder?: number;
+}
+
 /** Landing page response (GET /catalog/landings/:city/:slug) — landing, variants, filters, total */
 export interface LandingPageResponse {
+  /** Управляемые блоки композиции (отдельно от legacy JSON полей в `landing`) */
+  blocks?: LandingCompositionBlockPublic[];
   landing: LandingItem & {
     templateType?: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
     /** Slug тега отбора событий (публичный каталог: `?tag=`). */
@@ -223,8 +308,12 @@ export interface LandingPageResponse {
     reviews?: unknown[];
     relatedLinks?: unknown[];
     legalText?: string | null;
-    /** Сезонный лендинг: точки обзора, советы */
-    seasonalPayload?: { viewpoints?: unknown[]; tips?: string[] } | null;
+    /** Сезонный лендинг: точки обзора, советы; опционально крошка на вертикаль (гастро и др.) */
+    seasonalPayload?: {
+      viewpoints?: unknown[];
+      tips?: string[];
+      verticalBreadcrumb?: { label: string; href: string };
+    } | null;
   };
   variants?: unknown[];
   filters?: unknown[];
