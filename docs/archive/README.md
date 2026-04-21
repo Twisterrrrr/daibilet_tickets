@@ -2,24 +2,28 @@
 
 Устаревшие спецификации и исторические документы. **Не источник актуальной архитектуры.**
 
-| Папка/файл | Описание |
-|------------|----------|
-| [pr-specs/](pr-specs/) | PR4.1–4.3 SEO specs |
-| [specs/](specs/) | Phase-архитектуры, AdminSystem, SEO, ContentModel, PromoBlocks и др. |
-| [old-specs/](old-specs/) | TopicDefinition, PageTemplateSpecs, AdminOps и др. |
-| [ReviewModuleAudit.md](ReviewModuleAudit.md) | Pre-implementation аудит модуля отзывов (MVP реализован) |
-| [Diary.md](Diary.md) | Исторический дневник (актуальный — `../Diary.md`) |
-| [rollout-tags-20260323.md](rollout-tags-20260323.md) | Артефакт Tags Sprint A rollout (2026-03-23) |
-| PR-C*.md | Checkout/C0–C7 спецификации |
-| [Gate0-Gate1.md](Gate0-Gate1.md) | Полный чеклист Gates (объединено в Operations.md) |
-| Task10-*.md | Спеки Task 10 Admin Intelligence (завершён) |
-| [DevelopmentScenario.md](DevelopmentScenario.md) | Этапы A/B/C (выполнены) |
-| [PopularDirectionsBlueprint.md](PopularDirectionsBlueprint.md) | Реализовано (Wave B Phase 6) |
-| [BuyerAccountAudit.md](BuyerAccountAudit.md) | Аудит (результат в BuyerAccountSpecs) |
-| [Admin-Health-Dashboard-Design.md](Admin-Health-Dashboard-Design.md) | Дизайн Phase 5+ |
-| [SupplierAccount.md](SupplierAccount.md) | Виджет статуса финансов |
-| [EDO-Implementation-Plan.md](EDO-Implementation-Plan.md) | План реализован |
-| [Tags-3-Sprint-Plan.md](Tags-3-Sprint-Plan.md) | Спринты завершены |
-| [Runbook-Staging-HTTPS.md](Runbook-Staging-HTTPS.md) | Staging SSL |
+## Правило архива (важно)
+
+- **Archive ≠ source of truth**. Если документ в `docs/archive/**`, он не должен определять текущую архитектуру/контракты.
+- **Исключение**: если на него **ссылаются** активные документы (`docs/*` вне `archive`) как на обязательный чеклист/контракт — его нужно либо:
+  1) **Promote** (перенести/суммировать в активный раздел), либо
+  2) оставить в archive, но добавить явную метку “legacy, но всё ещё используется”, указав причину.
+- **Приоритет (активный контур)**: `docs/PROJECT-FOUNDATION.md` → канон из раздела Source of Truth в нём (`SYSTEM`, `PRODUCT`, `ARCHITECTURE`, …) → `docs/runbooks/*` → доменные `docs/core|product|admin-v3/*`. `docs/DIRECTION.md` — deprecated. Старый монолит: `docs/archive/deprecated-active-merged/Project.md.full-backup-2026-04-22.md`.
+
+## Структура архива (по принадлежности)
+
+Архив разложен по “полкам” (зеркалит активные разделы). Внутри некоторых полок есть `merged/` — удобные “сборники” ссылок, чтобы не читать десятки файлов.
+
+| Раздел | Назначение | Примеры / сборники |
+|-------|------------|--------------------|
+| `core/` | Доменные контракты и инварианты (история) | `core/merged/Checkout-History.md`, `core/tags/merged/Tags-Rollout-History.md` |
+| `runbooks/` | Ops / deploy / SSL / foundation (история) | `runbooks/merged/SSL-and-HTTPS-Runbooks.md` |
+| `security/` | RBAC матрицы, security-checklists (история) | `security/legacy-folders-security/` |
+| `integrations/` | Провайдеры/импорт/матрицы возможностей (история) | `integrations/legacy-folders-integrations/` |
+| `product/` | Продуктовые спеки (история) | `product/landings/merged/Landings-Legacy-Reference.md` |
+| `admin-v3/` | История Admin V3 / admin intelligence | `admin-v3/merged/Task10-Admin-Intelligence.md` |
+| `process/` | Процесс/дневники/QA (история) | `process/legacy-folders-process/` |
+| `reports/` | Разовые отчёты/аудиты/артефакты | `reports/ui-audit/` |
+| `specs/`, `old-specs/`, `pr-specs/`, `legacy-root/` | Большие спеки и капсула времени | держим как reference; не канон |
 
 Актуальная документация: [../README.md](../README.md)

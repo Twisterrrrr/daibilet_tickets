@@ -1,10 +1,10 @@
 # Tasktracker — Агрегатор билетов + Trip Planner
 
-> **Структура (25.03.2026):** сверху — **только незакрытые** задачи по логическим группам; внизу — **архив закрытых** эпиков и справочные разделы. См. также `Reference.md`, `Operations.md`, `Diary.md`.
+> **Структура (25.03.2026):** сверху — **только незакрытые** задачи по логическим группам; внизу — **архив закрытых** эпиков и справочные разделы. См. также `core/architecture.md` и `runbooks/infra.md`.
 
 ### Дорожная карта 6 недель (03.04.2026)
 
-Единый план спринтов (фильтры/редакция → v2-паритет → поставщик + YooKassa + контент): **[Roadmap-3-Sprints-Catalog-Admin-Supplier.md](Roadmap-3-Sprints-Catalog-Admin-Supplier.md)**.  
+Единый план спринтов (legacy): **[Roadmap-3-Sprints-Catalog-Admin-Supplier.md](archive/legacy-root/product_old/Roadmap-3-Sprints-Catalog-Admin-Supplier.md)**.  
 Ниже — прежний бэклог; при планировании спринта выносить пункты из roadmap в строки таблиц с якорем `roadmap-s1` / `s2` / `s3`.
 
 ### Исполнение roadmap (спринты 1–3) — прогресс
@@ -28,7 +28,7 @@
 
 ## Поддержка: чат + тикеты (inbox, Admin V3)
 
-Источник правды по сделанному и долгу: **`Chat-Support.md`**.
+Источник правды по сделанному и долгу (legacy инвентарь): **`archive/legacy-root/product_old/Chat-Support.md`**.
 
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
@@ -42,7 +42,7 @@
 
 ## Логи (Admin V3)
 
-Источник правды: **`Logs.md`**.
+Источник правды: см. `runbooks/infra.md` (инфраструктура/эксплуатация) и `reports/` (одноразовые аудиты).
 
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
@@ -57,15 +57,15 @@
 
 ### Admin / Supplier V2 — архитектурный долг (roadmap 04.2026)
 
-Стратегия и контракты: `Project.md` § Admin V2 и ЛК поставщика V2; детализация фаз — план Cursor `admin_v2_roadmap_*.plan.md`.
+Стратегия и контракты: [`PRODUCT.md`](PRODUCT.md) § Admin V2/V3 и [`future/SUPPLIER.md`](future/SUPPLIER.md); legacy полный текст — `archive/deprecated-active-merged/Project.md.full-backup-2026-04-22.md` § Admin V2; детализация фаз — план Cursor `admin_v2_roadmap_*.plan.md`.
 
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
 | `v2-shared-ui-primitives` | Вынести List / Detail / SectionCard / Tabs / PageHeader в `@daibilet/shared-ui`; новые экраны admin-v2 и supplier-v2 — на общих примитивах | Высокий | `[ ]` |
 | `v2-detail-page-contract` | Зафиксировать и выровнять контракт DetailPage (`PageHeader + Tabs + Data + States`) по всем новым карточкам | Средний | `[ ]` |
 | `v2-blueprint-runtime` | Blueprint: `queries` / `relations` / `actions` + связь с fetching, RBAC и UI state (не только текст для людей) | Средний | `[ ]` |
-| `v2-landing-slug-policy` | Политика slug: canonical **city + slug**, редиректы, уникальность и SEO при нескольких `LandingPage` на тему; согласовать с `Landings-Architecture.md` и **`Landing-Composition-System.md`** (canonical CITY vs MULTI_CITY) | Высокий | `[ ]` |
-| `landing-composition-system` | **Композиция лендингов:** Prisma `LandingTheme` + `LandingContentBlock`, типы CITY/MULTI_CITY (без отдельного HUB), Admin V3 вкладки, public `LandingRenderer`, SEO audit read-model; источник выборки — фильтры (`buildLandingEventsWhere`), не `collectionId` как вторая правда — см. `Landing-Composition-System.md` §2–10 | Высокий | `[ ]` |
+| `v2-landing-slug-policy` | Политика slug: canonical **city + slug**, редиректы, уникальность и SEO при нескольких `LandingPage` на тему; согласовать с `product/landings.md` | Высокий | `[ ]` |
+| `landing-composition-system` | **Композиция лендингов:** Prisma `LandingTheme` + `LandingContentBlock`, типы CITY/MULTI_CITY (без отдельного HUB), Admin V3 вкладки, public `LandingRenderer`, SEO audit read-model; источник выборки — фильтры (`buildLandingEventsWhere`), не `collectionId` как вторая правда — см. `product/landings.md` | Высокий | `[ ]` |
 | `v2-marketing-api-gate` | Маркетинг и мультилендинги: не подключать прод-API без стандарта DTO, кеширования и нормализации на клиенте | Критический | `[ ]` |
 | `landings-multicity-family-foundation` | **Landings (эволюция домена):** формализовать “topic hub / multi-city family / city landing” (parent-child, preview resolved, canonical policy) поверх текущих `/cities/:citySlug/:landingSlug` и хабов (`/river-cruises`, `/salute-9-may`) | Высокий | `[x]` **14.04.2026** |
 | `content-links-fk-evolution` | **Контентные связи (эволюция):** `Article↔Landing/Collection` через M2M link‑таблицы с `position/priority`, `LandingPage.filterTagId` (FK на Tag) параллельно slug, `Collection↔Tag` через join‑таблицу; dual‑read + backfill | Высокий | `[x]` **14.04.2026** |
@@ -84,9 +84,9 @@
 
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
-| `event-core-create-scheduled-sessions` | **P0 эпика:** механика создания/редактирования **Event** + **расписание (sessions)** в режиме **SCHEDULED** (разовый слот + повторяющаяся сетка, таблица+календарь, квоты слота); согласование с admin/supplier API и публикацией; общий UX admin+supplier. См. `Event-Sessions-Product-Contract.md` §11 | Критический | `[ ]` |
-| `admin-v3-events-entity-v1` | **Admin V3:** единый стандарт сущности Event — list/detail, обогащение `GET /admin/events` и `GET /admin/events/:id`, вкладка «Категории и цены» (presentation поверх `EventOffer`), готовность, фильтры; терминология без «офферов» в UI. См. `docs/Diary.md` 14.04.2026 | Высокий | `[x]` **14.04.2026** |
-| `admin-v3-events-schedule-readonly` | **Admin V3:** вкладка «Расписание» — read-only обзор слотов (горизонт до 365 дней, «осталось» мест, пауза через `isActive` в DTO сеанса, опционально отменённые). См. `docs/Diary.md` (запись того же дня про расписание) | Средний | `[x]` **14.04.2026** |
+| `event-core-create-scheduled-sessions` | **P0 эпика:** механика создания/редактирования **Event** + **расписание (sessions)** в режиме **SCHEDULED** (разовый слот + повторяющаяся сетка, таблица+календарь, квоты слота); согласование с admin/supplier API и публикацией; общий UX admin+supplier. См. `core/events.md` §11 | Критический | `[ ]` |
+| `admin-v3-events-entity-v1` | **Admin V3:** единый стандарт сущности Event — list/detail, обогащение `GET /admin/events` и `GET /admin/events/:id`, вкладка «Категории и цены» (presentation поверх `EventOffer`), готовность, фильтры; терминология без «офферов» в UI. См. `admin-v3/grand-master-plan.md` | Высокий | `[x]` **14.04.2026** |
+| `admin-v3-events-schedule-readonly` | **Admin V3:** вкладка «Расписание» — read-only обзор слотов (горизонт до 365 дней, «осталось» мест, пауза через `isActive` в DTO сеанса, опционально отменённые). См. `admin-v3/grand-master-plan.md` | Средний | `[x]` **14.04.2026** |
 | `admin-v3-venues-readiness-sql` | **Admin V3:** площадки — `readinessStatus` на SQL для `GET /admin/venues`, общий util русских лейблов ЖЦ; маршруты candidates/automation/analytics; бэклог: E2E при появлении контура, merge summary с `validateVenueForPublish` | Средний | `[x]` **14.04.2026** |
 | `venue-geo-routepoint-evolution` | **Venue geo + routes:** Prisma — `District`/`MetroStation`, FK на `Venue`, `RoutePoint` для `Route`, расширение `VenueType` + `isHiddenGem`; backend — admin CRUD + city-consistency + dual-read публичных строк metro/district; Admin V3 — geo словари + селекторы + RoutePoint editor MVP; витрина — бейдж hidden gem + food JSON-LD; Next — 301 `/event/:slug`→`/events/:slug`, `/place/:slug`→`/venues/:slug`; скрипты bootstrap/report/backfill | Высокий | `[x]` **17.04.2026** |
 | `admin-v3-events-edit-pricing-ui` | **Follow-up:** редактирование строк «Категории и цены» из V3 (создание/правка offer) с сохранением legacy API и RBAC | Высокий | `[ ]` |
@@ -96,7 +96,7 @@
 
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
-| `seed-scenario-venue-events` | **Сценарный сид** (отдельно от базового): `packages/backend/prisma/seed-scenarios.ts`, запуск `pnpm --filter @daibilet/backend db:seed:scenarios`. Площадки-хабы, `Event` с явными `venueId`, `OPEN_DATE` / `SCHEDULED`, офферы, сеансы, quality-кейсы; UX-метаданные (oldPrice, weekday, groupSize, лимиты) пока в `EventOffer.externalData` — не продуктовый контракт. См. `Event-Sessions-Product-Contract.md` §12 | Высокий | `[x]` **03.04.2026** |
+| `seed-scenario-venue-events` | **Сценарный сид** (отдельно от базового): `packages/backend/prisma/seed-scenarios.ts`, запуск `pnpm --filter @daibilet/backend db:seed:scenarios`. Площадки-хабы, `Event` с явными `venueId`, `OPEN_DATE` / `SCHEDULED`, офферы, сеансы, quality-кейсы; UX-метаданные (oldPrice, weekday, groupSize, лимиты) пока в `EventOffer.externalData` — не продуктовый контракт. См. `core/events.md` §12 | Высокий | `[x]` **03.04.2026** |
 
 ### Прайсинг / категории билетов и программа площадки — долг (подсветка `seed-scenarios`)
 
@@ -115,12 +115,12 @@
 
 | Трек | Статус | Комментарий |
 |------|--------|-------------|
-| REST core foundation (registry, routing, Prisma, admin read, webhooks 204) | `[x]` **03.04.2026** | `packages/backend/src/integrations/`, миграция `20260403154025_ticket_provider_capability_foundation`, см. `docs/TicketProviderCapabilityFoundation.md` |
-| Wave 1 prep: Radario/Qtickets env + `ticketProviderJsonFetch` + HTTP-сервисы | `[x]` **03.04.2026** | `docs/Wave1-Radario-Qtickets-Prep.md`, `RadarioHttpService` / `QticketsHttpService` |
+| REST core foundation (registry, routing, Prisma, admin read, webhooks 204) | `[x]` **03.04.2026** | Контекст и инварианты: `core/ingestion.md` (исторические материалы: `archive/integrations/legacy-folders-integrations/`) |
+| Wave 1 prep: Radario/Qtickets env + `ticketProviderJsonFetch` + HTTP-сервисы | `[x]` **03.04.2026** | См. `archive/integrations/legacy-folders-integrations/` |
 | Live Radario adapter | `[ ]` Высокий | HTTP + заказы по спецификации |
 | Live Qtickets adapter | `[ ]` Высокий | |
 | Live Intickets или Edinoe Pole | `[ ]` Средний | После документов |
-| TicketNet SOAP client + mapper | `[ ]` Средний | `integrations/clients/soap-client.ts` |
+| TicketNet SOAP client + mapper | `[ ]` Средний | См. `core/ingestion.md` (и исторические материалы в `archive/integrations/legacy-folders-integrations/`) |
 | Yandex / Mos.ru / Lanit secure onboarding | `[ ]` Средний | Сертификаты, подпись, `ProviderSignatureService` |
 | Checkout `createExternalOrder` + `ExternalOrderLink` | `[ ]` Критический | TODO в `checkout.service.ts`; без ломания текущего TC flow |
 | Reconcile jobs | `[ ]` Средний | Зависшие `integrationState` |
@@ -150,6 +150,15 @@
 | `admin-v3-promo-blocks-storefront-control` | **Promo blocks:** toggle active из списка + поля scope/таргетинга + AUTO-подбор (selectionMode/autoSort/autoLimit) + deep-link на collection | Высокий | `[x]` **17.04.2026** |
 | `admin-v3-moderation-hub-ux` | **Moderation:** URL-state (status/sort/page) + deep-links в event и supplier + тип колонки | Высокий | `[x]` **17.04.2026** |
 | `admin-v3-reviews-operational-ux` | **Reviews:** URL-state (tab/status/eventId/page) + deep-links в event/venue + больше контекста в строке | Средний | `[x]` **17.04.2026** |
+
+### Admin V3 — Performance (read-heavy lists)
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `admin-v3-events-list-perf-hasMulti` | **P0:** `GET /admin/events` — фильтр `hasMultipleSubcategories` не должен сканировать всю link-таблицу; ограничение по фильтрам списка + `having count(*)>1` | Критический | `[x]` **21.04.2026** |
+| `admin-v3-events-list-dto-select` | **P0:** `GET /admin/events` — list-ответ на явный DTO (без `...e`) + Prisma `select` вместо `include` для снижения payload/сериализации | Высокий | `[x]` **21.04.2026** |
+| `admin-v3-list-lite-mode` | **P1:** `lite=1` для admin list-эндпоинтов (Events/Venues/Landings/Reviews) + включение на страницах списков в Admin V3 | Высокий | `[x]` **21.04.2026** |
+| `admin-v3-events-list-baseline` | **P1:** baseline замера `GET /admin/events` (latency/bytes) скриптом `scripts/admin-events-baseline.mjs` | Средний | `[x]` **21.04.2026** |
 
 ### Сводка готовности Admin V3 по разделам (17.04.2026)
 
@@ -190,7 +199,7 @@
 
 ### Settings (Admin V3) — управление системой (MVP)
 
-Источник архитектуры: `docs/Project.md` § “Settings (Admin V3) — управление системой”.
+Источник архитектуры: [`SYSTEM.md`](SYSTEM.md) § Settings; legacy раздел — `archive/deprecated-active-merged/Project.md.full-backup-2026-04-22.md` § Settings (Admin V3).
 
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
@@ -211,11 +220,11 @@
 
 - **Сделано:** роль `OWNER` в `AdminRole`; magic-link сброс пароля (`POST /auth/admin/forgot-password`, `reset-password`), шаблон письма, инвалидация refresh при сбросе; поля `passwordReset*` у `AdminUser`; anti-lockout последнего активного ADMIN/OWNER при `PATCH /admin/users/:id`; иерархия в `RolesGuard`; KV `AppSetting` + `GET/PATCH /admin/settings/app/seo|system` (merge PATCH, без `baseUrl` в SEO); формы SEO/System на странице Settings; страницы `/forgot-password`, `/reset-password`; миграция `20260414180000_admin_password_reset_and_app_settings`.
 - **Осталось:** зафиксировать scope разделов Settings и навигацию (`settings-scope-and-sections`); создание `AdminUser` из UI и/или роль `MANAGER` в enum (`settings-rbac-admin-users`); интеграции / платежи / уведомления / агрегатор (`settings-integrations*` …); audit log по изменениям Settings; явные OpenAPI-ответы для новых эндпоинтов; на проде — `prisma migrate deploy`, env `ADMIN_APP_URL` для ссылок в письмах.
-- **См. также:** запись в `docs/Diary.md` (14.04.2026 — Admin: magic-link, anti-lockout, AppSetting).
+- **См. также:** контекст решений в `archive/process/legacy-folders-process/Diary.md` (история).
 
 ### Качество витрины / SEO Audit (Taxonomy-aware)
 
-Спецификация и rollout: `docs/SeoAudit-Taxonomy-MasterPlan.md` (Taxonomy задаёт структуру, SEO Audit проверяет соответствие и качество).
+Спецификация и rollout: `core/taxonomy.md` (Taxonomy задаёт структуру, SEO Audit проверяет соответствие и качество).
 
 | ID / якорь | Задача | Приоритет | Статус |
 |--------|-----------|-----------|--------|
@@ -267,7 +276,7 @@
 - [ ] **Критический:** SEO-описания для ТОП-10 площадок (venues).
 - [ ] **Высокий:** Тематические лендинги (ночные экскурсии, музеи с детьми и т.д.).
 - [ ] **Средний:** Контентный план — 30 статей (ArticlePlanner).
-- [ ] **Средний** (3+ мес): Детальная страница venue «Музеи» — режим, галерея, выставки (`Reference.md` §1).
+- [ ] **Средний** (3+ мес): Детальная страница venue «Музеи» — режим, галерея, выставки (`core/Reference.md` §1).
 - [ ] **Средний:** Нормализация location/venue (venueId или meetingPoint/address; `MISSING_LOCATION` блокирует publish).
 - [ ] **Средний:** Нормализация offers (ACTIVE только для продаваемых; хотя бы один ACTIVE offer в publish-gate).
 - [ ] **Средний:** TEPLOHOD OPEN_DATE — в админке диапазон дат продажи, активность каталога при валидном диапазоне.
@@ -281,11 +290,11 @@
 
 - [ ] **ST-5:** Events Edit — inline-подсказки по улучшению каталога и профиля (отложено).
 - [ ] **ST-6:** Полноценный CRUD для полей **`trustManual*`** на Operator (отдельно от таблицы **`SupplierTrustOverride`**, реализованной 25.03.2026).
-- [ ] **ST-7:** Отдельный документ `docs/SupplierTrustSpec.md` (формулы, сценарии) — по мере усложнения модели.
+- [ ] **ST-7:** Отдельный документ `archive/specs/SupplierTrustSpec.md` (формулы, сценарии) — по мере усложнения модели.
 
 ### UX Admin (UA)
 
-- [x] **MEDIA-1 — Cloudinary + единый upload UX (admin/supplier):** эндпоинты `*/media/images`, shared-ui галерея/обложка, интеграция EventWizard и VenueEdit — см. `docs/media-upload.md` (**24.03.2026**).
+- [x] **MEDIA-1 — Cloudinary + единый upload UX (admin/supplier):** эндпоинты `*/media/images`, shared-ui галерея/обложка, интеграция EventWizard и VenueEdit — см. `runbooks/media-upload.md` (**24.03.2026**).
 - [x] ~~`(позже) DataTableShell, StatusBadge`~~ — используются в list-паттернах (в т.ч. поставщики/события поставщика); пункт снят как выполненный **25.03.2026**.
 - Прочие UA-1…UA-8 — **закрыты**; см. архив.
 - [x] **Template-driven Venue PDP (MUSEUM / ART_SPACE):**
@@ -448,8 +457,8 @@
 ## Checkout + Smart UX (C0–C7) + E2E validation (06.03.2026) ✅
 
 - **C0–C7 реализованы:** контракты ошибок, read API, smart sorting (bestOption зафиксирован), checkout + redirect, holds (в т.ч. AWAITING_PAYMENT), paid = PackageItem + FulfillmentItem, webhook, precomputed stats (soldLast24h), last-customer snapshot.
-- **Правило bestOption** нормализовано и документировано (один сеанс на событие = ближайший по startsAt среди доступных). См. `docs/archive/PR-C0-C7-Final.md` §6.
-- **E2E validation pass (06.03.2026)** выполнен: smoke path (Read API → Checkout → Payment → Webhook → Fulfillment → Stats → Last customer), 5 edge cases (last seats race, duplicate webhook, late payment after expiry, soldLast24h, last-customer). См. `docs/archive/PR-C0-C7-Final.md` §8.
+- **Правило bestOption** нормализовано и документировано. Канон: `docs/core/checkout.md` (история: `docs/archive/PR-C0-C7-Final.md` §6).
+- **E2E validation pass (06.03.2026)** выполнен: smoke path (Read API → Checkout → Payment → Webhook → Fulfillment → Stats → Last customer), 5 edge cases. Канон: `docs/core/checkout.md` (история: `docs/archive/PR-C0-C7-Final.md` §8).
 
 ## Gate 0a — Staging (03.2026) ✅
 
@@ -478,7 +487,7 @@
 ## Canonical Tag Enrichment + Auto Landing Engine (11.03.2026) ✅
 
 - **Enrichment:** `canonical-tag-enrichment.ts` — единый слой тегов по title/description; city-specific правила; 29 unit-тестов. Подключён в retagAll.
-- **Materializer:** TopicDefinition, LandingMaterializerService, POST /admin/landings/materialize. См. [Architecture.md](Architecture.md).
+- **Materializer:** TopicDefinition, LandingMaterializerService, POST /admin/landings/materialize. См. [Architecture.md](core/Architecture.md).
 - **Phase A (staging):** POST /admin/settings/ops/retag-and-materialize — retag + materialize с summary (beforeVisible, visible, hidden, changedSlugs). POST /admin/settings/ops/retag выполняет retagAll.
 - **Phase B (materialize после sync):** sync → retag → materialize. CatalogController sync/all и SyncProcessor sync-full вызывают materializer; результат в ответе. Идемпотентно, fallback при ошибке.
 - **Phase C (Collection salyut):** кросс-городская коллекция salyut в seed; CollectionService.getBySlug поддерживает cityId=null и ?city=; /podborki/salyut и ?city=saint-petersburg; тесты в collection.service.spec.ts.
