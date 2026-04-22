@@ -222,9 +222,7 @@ export type AdminLandingSeoAuditResponse = {
     intentCollision: string[];
     relatedLinks: string[];
   };
-};
-
-export async function fetchAdminLandingSeoAudit(landingId: string) {
+};export async function fetchAdminLandingSeoAudit(landingId: string) {
   return adminApi.get<AdminLandingSeoAuditResponse>(
     `/admin/landings/${encodeURIComponent(landingId)}/seo-audit`,
   );
@@ -253,9 +251,7 @@ export async function postAdminLandingBlock(
   },
 ) {
   return adminApi.post<AdminLandingContentBlock>(`/admin/landings/${encodeURIComponent(landingId)}/blocks`, body);
-}
-
-export async function patchAdminLandingBlock(
+}export async function patchAdminLandingBlock(
   landingId: string,
   blockId: string,
   body: Partial<Pick<AdminLandingContentBlock, 'type' | 'title' | 'subtitle' | 'body' | 'variant' | 'isEnabled' | 'sortOrder'>>,

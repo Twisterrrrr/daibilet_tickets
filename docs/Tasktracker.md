@@ -67,6 +67,17 @@
 | `v2-landing-slug-policy` | Политика slug: canonical **city + slug**, редиректы, уникальность и SEO при нескольких `LandingPage` на тему; согласовать с `product/landings.md` | Высокий | `[ ]` |
 | `landing-composition-system` | **Композиция лендингов:** Prisma `LandingTheme` + `LandingContentBlock`, типы CITY/MULTI_CITY (без отдельного HUB), Admin V3 вкладки, public `LandingRenderer`, SEO audit read-model; источник выборки — фильтры (`buildLandingEventsWhere`), не `collectionId` как вторая правда — см. `product/landings.md` | Высокий | `[ ]` |
 | `v2-marketing-api-gate` | Маркетинг и мультилендинги: не подключать прод-API без стандарта DTO, кеширования и нормализации на клиенте | Критический | `[ ]` |
+
+---
+
+## Backend/UI wiring — contracts freeze (2026‑04)
+
+| ID / якорь | Задача | Приоритет | Статус |
+|--------|-----------|-----------|--------|
+| `contracts-freeze-admin-supplier-integrations` | **Freeze**: `/api/v1/admin/supplier-integrations/**` (list/detail/create/patch/test/run-sync/runs/issues) + DTO keys; secrets only masked | Высокий | `[~]` |
+| `contracts-freeze-finance-settlements-ui` | **Freeze**: finance settlements UI endpoints: `GET /admin/finance/settlements/list`, `GET /admin/finance/settlements/:id`, `.../:id/orders`, `.../:id/reconciliation` + DTO keys | Высокий | `[~]` |
+| `finance-settlements-reconciliation-mismatch-types` | Finance settlements: reconciliation отдаёт mismatch types (missing/duplicate/status mismatch) и summary system vs source (на persisted links) | Высокий | `[x]` **22.04.2026** |
+| `supplier-rbac-orders-actions` | Supplier RBAC: ограничить `GET /supplier/orders*` по ролям и actions confirm/reject до OWNER/MANAGER | Высокий | `[x]` **22.04.2026** |
 | `landings-multicity-family-foundation` | **Landings (эволюция домена):** формализовать “topic hub / multi-city family / city landing” (parent-child, preview resolved, canonical policy) поверх текущих `/cities/:citySlug/:landingSlug` и хабов (`/river-cruises`, `/salute-9-may`) | Высокий | `[x]` **14.04.2026** |
 | `content-links-fk-evolution` | **Контентные связи (эволюция):** `Article↔Landing/Collection` через M2M link‑таблицы с `position/priority`, `LandingPage.filterTagId` (FK на Tag) параллельно slug, `Collection↔Tag` через join‑таблицу; dual‑read + backfill | Высокий | `[x]` **14.04.2026** |
 | `landing-lovable-dinner-parity-doc` | **Док:** чеклист паритета эталона Lovable («ужин на теплоходе») ↔ `LandingClient` / `ComparisonTable` / `FilterBar`, пробелы по данным и SEO — `lovable-dinner-cruise-landing-parity.md`; реализация колонок «Меню»/«Формат», JSON-LD — отдельные задачи по критериям §11 документа | Средний | `[x]` **17.04.2026** |

@@ -49,6 +49,13 @@
 - [`product/landings.md`](product/landings.md)
 - [`product/finance.md`](product/finance.md)
 - [`product/seo.md`](product/seo.md)
+- [`product/lovable-admin-supplier-prompts.md`](product/lovable-admin-supplier-prompts.md) — пошаговые промпты для генерации Admin/Supplier UI (Lovable) + шаблон «один модуль»; в **оглавлении** строка **+** → [v3 §13 Classification UI](product/lovable-prompts-admin-supplier-v3-production-tight.md#13-classification-ui-for-event-and-venue) (Event/Venue, Admin + Supplier)
+- [`product/lovable-prompts-admin-supplier-v2-enriched.md`](product/lovable-prompts-admin-supplier-v2-enriched.md) — **v2 обогащённый** пакет (MASTER, shell, §16–17) + ссылка на модули с DTO
+- [`product/lovable-prompts-admin-supplier-v2-modules-6-15.md`](product/lovable-prompts-admin-supplier-v2-modules-6-15.md) — v2: промпты **§6–§15** (Events, Venues, Cities, Suppliers, Orders, Supplier…)
+- [`product/lovable-prompts-admin-supplier-v3-production-tight.md`](product/lovable-prompts-admin-supplier-v3-production-tight.md) — **v3 production-tight**: 14 блоков — критичные модули + Settings, Promo, SEO Audit, Support + **§13 Classification UI** (Event/Venue, Admin + Supplier) + **§14 Admin Supplier Integrations**
+- [`product/lovable-finance-prompts.md`](product/lovable-finance-prompts.md) — пакет №2: Finance (обзоры, settlement, payout, adjustments, exports)
+- [`product/lovable-finance-shared-contracts.md`](product/lovable-finance-shared-contracts.md) — общие enum/DTO для finance-промптов
+- [`product/lovable-finance-prompts-orders-full.md`](product/lovable-finance-prompts-orders-full.md) — полные промпты Admin/Supplier Orders (finance-aware)
 
 ## Runbooks
 

@@ -127,11 +127,11 @@ export function TagDetailPage() {
       <section className="rounded-lg border bg-card p-5 text-sm space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">name</span>
+            <span className="text-xs text-muted-foreground">Название</span>
             <Input value={v.name} onChange={(e) => setDraft({ ...v, name: e.target.value })} />
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">slug</span>
+            <span className="text-xs text-muted-foreground">Slug</span>
             <Input value={v.slug} onChange={(e) => setDraft({ ...v, slug: e.target.value })} />
           </label>
           <label className="space-y-1">
@@ -149,11 +149,11 @@ export function TagDetailPage() {
             </select>
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">tagKind</span>
+            <span className="text-xs text-muted-foreground">Вид тега</span>
             <Input value={v.tagKind ?? ''} onChange={(e) => setDraft({ ...v, tagKind: e.target.value || null })} />
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">structuralGroup</span>
+            <span className="text-xs text-muted-foreground">Структурная группа</span>
             <Input
               value={v.structuralGroup ?? ''}
               onChange={(e) => setDraft({ ...v, structuralGroup: e.target.value || null })}
@@ -161,14 +161,14 @@ export function TagDetailPage() {
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={Boolean(v.isActive)} onChange={(e) => setDraft({ ...v, isActive: e.target.checked })} />
-            isActive
+            Активен
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={Boolean(v.isFeatured)} onChange={(e) => setDraft({ ...v, isFeatured: e.target.checked })} />
-            isFeatured
+            В избранном
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">sortOrder</span>
+            <span className="text-xs text-muted-foreground">Порядок</span>
             <Input
               type="number"
               value={String(v.sortOrder ?? 0)}
@@ -177,7 +177,7 @@ export function TagDetailPage() {
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">v{v.version}</Badge>
-            <Badge variant="outline">{v.isActive ? 'active' : 'off'}</Badge>
+            <Badge variant="outline">{v.isActive ? 'активен' : 'выкл'}</Badge>
           </div>
         </div>
 
