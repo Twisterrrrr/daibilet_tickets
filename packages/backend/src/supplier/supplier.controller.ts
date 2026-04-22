@@ -1376,7 +1376,8 @@ export class SupplierController {
   }
 
   @Get('orders')
-  @UseGuards(SupplierJwtGuard)
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT', 'ACCOUNTANT')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Список заявок на бронирование для поставщика' })
   async listOrders(
@@ -1471,7 +1472,8 @@ export class SupplierController {
   }
 
   @Get('orders/:id')
-  @UseGuards(SupplierJwtGuard)
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT', 'ACCOUNTANT')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Детали заявки на бронирование' })
   async getOrder(@Req() req: { user: { operatorId: string } }, @Param('id') id: string) {
@@ -1526,7 +1528,8 @@ export class SupplierController {
   }
 
   @Post('orders/:id/confirm')
-  @UseGuards(SupplierJwtGuard)
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER', 'MANAGER')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Подтвердить заявку на бронирование' })
   async confirmOrder(
@@ -1574,7 +1577,8 @@ export class SupplierController {
   }
 
   @Post('orders/:id/reject')
-  @UseGuards(SupplierJwtGuard)
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER', 'MANAGER')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Отклонить заявку на бронирование' })
   async rejectOrder(
