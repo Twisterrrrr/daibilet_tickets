@@ -46,7 +46,7 @@ export function GiftCertificateClient({ denominations, minAmount, maxAmount }: G
     if (isCustom) {
       const kopecks = Math.round(parseFloat(customAmountRub || '0') * 100);
       if (kopecks < minAmount || kopecks > maxAmount) {
-        setError(`Сумма должна быть от ${minAmount / 100} до ${maxAmount / 100} ₽`);
+        setError(`Сумма должна быть от ${formatPrice(minAmount)} до ${formatPrice(maxAmount)}`);
         return;
       }
     }
@@ -170,18 +170,24 @@ export function GiftCertificateClient({ denominations, minAmount, maxAmount }: G
               </button>
             </div>
             {isCustom && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={minAmount / 100}
-                  max={maxAmount / 100}
-                  step={1}
-                  value={customAmountRub}
-                  onChange={(e) => setCustomAmountRub(e.target.value)}
-                  placeholder={`От ${minAmount / 100} до ${maxAmount / 100} ₽`}
-                  className="w-40 rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                />
-                <span className="text-sm text-slate-500">₽</span>
+              <div className="space-y-1.5">
+                <div className="flex max-w-sm items-center gap-2">
+                  <input
+                    type="number"
+                    min={minAmount / 100}
+                    max={maxAmount / 100}
+                    step={1}
+                    value={customAmountRub}
+                    onChange={(e) => setCustomAmountRub(e.target.value)}
+                    placeholder="Сумма в рублях"
+                    title={`Допустимо от ${formatPrice(minAmount)} до ${formatPrice(maxAmount)}`}
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                  />
+                  <span className="shrink-0 text-sm text-slate-500">₽</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Диапазон: от {formatPrice(minAmount)} до {formatPrice(maxAmount)}
+                </p>
               </div>
             )}
           </div>

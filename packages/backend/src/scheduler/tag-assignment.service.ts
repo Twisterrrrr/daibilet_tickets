@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { EventTagAssignmentSource, TagCategory } from '@prisma/client';
+import { EventTagAssignmentSource, TagCategory } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

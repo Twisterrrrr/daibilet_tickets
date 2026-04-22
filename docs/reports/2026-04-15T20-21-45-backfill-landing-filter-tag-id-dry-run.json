@@ -1,0 +1,25 @@
+{
+  "startedAt": "2026-04-15T17:21:45.483Z",
+  "finishedAt": "2026-04-15T17:21:45.939Z",
+  "dryRun": true,
+  "script": "backfill-landing-filter-tag-id",
+  "report": {
+    "scanned": 0,
+    "matched": 0,
+    "created": 0,
+    "updated": 0,
+    "skipped": 0,
+    "unresolvedCount": 0,
+    "errorCount": 1
+  },
+  "unresolved": [],
+  "errors": [
+    {
+      "code": "UNHANDLED",
+      "message": "\nInvalid `prisma.landingPage.findMany()` invocation in\nF:\\coding\\SPBBOATS\\packages\\backend\\scripts\\backfill-landing-filter-tag-id.ts:29:47\n\n  26 \n  27 try {    console.log(JSON.stringify({ script: rep.script, dryRun: cli.dryRun, apply: cli.apply }));\n  28 \n→ 29   const landings = await prisma.landingPage.findMany(\n"
+    }
+  ],
+  "notes": [
+    "Default: dry-run. Writes happen only with --apply."
+  ]
+}

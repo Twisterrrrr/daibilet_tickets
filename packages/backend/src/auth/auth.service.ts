@@ -1,8 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtPayload } from './jwt.strategy';
 import { LoginBruteForceService } from './login-brute-force.service';
@@ -13,6 +15,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly bruteForce: LoginBruteForceService,
+    private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
 
   async login(ip: string | undefined, email: string, password: string) {
@@ -137,6 +141,61 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  /**
+   * Запрос сброса пароля админа: одноразовый токен (храним только SHA-256), письмо со ссылкой.
+   * Не раскрываем наличие email; токены не логируем.
+   */
+  async requestAdminPasswordReset(email: string): Promise<void> {
+    const user = await this.prisma.adminUser.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
+    });
+
+    if (!user?.isActive) return;
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await this.prisma.adminUser.update({
+      where: { id: user.id },
+      data: { passwordResetTokenHash: tokenHash, passwordResetExpiresAt: expiresAt },
+    });
+
+    const adminBase = (this.config.get<string>('ADMIN_APP_URL') || this.config.get<string>('APP_URL') || 'http://localhost:5173').replace(
+      /\/$/,
+      '',
+    );
+    const resetUrl = `${adminBase}/reset-password?token=${rawToken}`;
+
+    await this.mail.sendAdminPasswordReset(user.email, { name: user.name, resetUrl });
+  }
+
+  async resetAdminPassword(token: string, newPassword: string): Promise<void> {
+    const tokenHash = this.hashToken(token.trim());
+    const user = await this.prisma.adminUser.findFirst({
+      where: {
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Ссылка для сброса пароля недействительна или устарела');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.adminUser.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null,
+        refreshTokenHash: null,
+      },
+    });
   }
 
   private hashToken(token: string): string {

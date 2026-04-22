@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -6,22 +6,49 @@ import { PrismaService } from '../prisma/prisma.service';
 export class UserFavoritesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Разрешить slug или UUID события в id (для FK user_favorites.eventId, dual-write с eventSlug). */
+  private async resolveEventId(slugOrId: string): Promise<string | null> {
+    const raw = slugOrId.trim();
+    if (!raw) return null;
+    const looksUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw);
+    if (looksUuid) {
+      const byId = await this.prisma.event.findUnique({
+        where: { id: raw },
+        select: { id: true },
+      });
+      return byId?.id ?? null;
+    }
+    const bySlug = await this.prisma.event.findUnique({
+      where: { slug: raw },
+      select: { id: true },
+    });
+    return bySlug?.id ?? null;
+  }
+
   async getSlugs(userId: string): Promise<string[]> {
     const favs = await this.prisma.userFavorite.findMany({
       where: { userId },
-      select: { eventSlug: true },
+      select: {
+        eventSlug: true,
+        eventId: true,
+        event: { select: { slug: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
-    return favs.map((f) => f.eventSlug);
+
+    // Dual-read: если есть FK eventId и связанный event.slug — это источник правды.
+    // Fallback: legacy eventSlug.
+    return favs.map((f) => f.event?.slug ?? f.eventSlug);
   }
 
   async add(userId: string, slug: string): Promise<string[]> {
+    const eventId = await this.resolveEventId(slug);
     await this.prisma.userFavorite.upsert({
       where: {
         userId_eventSlug: { userId, eventSlug: slug },
       },
-      create: { userId, eventSlug: slug },
-      update: {},
+      create: { userId, eventSlug: slug, ...(eventId ? { eventId } : {}) },
+      update: eventId ? { eventId } : {},
     });
     return this.getSlugs(userId);
   }
@@ -44,12 +71,13 @@ export class UserFavoritesService {
     }
 
     for (const slug of validSlugs) {
+      const eventId = await this.resolveEventId(slug);
       await this.prisma.userFavorite.upsert({
         where: {
           userId_eventSlug: { userId, eventSlug: slug },
         },
-        create: { userId, eventSlug: slug },
-        update: {},
+        create: { userId, eventSlug: slug, ...(eventId ? { eventId } : {}) },
+        update: eventId ? { eventId } : {},
       });
     }
 

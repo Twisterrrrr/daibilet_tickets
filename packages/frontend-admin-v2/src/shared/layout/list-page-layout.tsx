@@ -11,6 +11,8 @@ export function ListPageLayout({
   headerGlyph,
   filters,
   children,
+  /** Нижний блок (например IntegrationBlueprint) — единый шаблон перед подключением API */
+  blueprint,
 }: {
   title: string;
   subtitle?: string;
@@ -18,12 +20,14 @@ export function ListPageLayout({
   headerGlyph?: ReactNode;
   filters?: ReactNode;
   children: ReactNode;
+  blueprint?: ReactNode;
 }) {
   return (
     <PageContainer className="space-y-8">
       <PageHeader title={title} subtitle={subtitle} actions={headerActions} glyph={headerGlyph} />
       {filters}
       <div className="space-y-4">{children}</div>
+      {blueprint ? <div className="pt-2">{blueprint}</div> : null}
     </PageContainer>
   );
 }

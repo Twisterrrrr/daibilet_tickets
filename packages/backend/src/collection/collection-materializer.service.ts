@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CollectionSelectionBasis, CollectionSourceType } from '@prisma/client';
+import { CollectionSelectionBasis, CollectionSourceType } from '@/prisma-client';
 
 import { CollectionSelectionService } from '../catalog/collection-selection.service';
 import { PrismaService } from '../prisma/prisma.service';

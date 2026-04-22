@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EventSource } from '@prisma/client';
+import { EventSource } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

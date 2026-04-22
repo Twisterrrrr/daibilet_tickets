@@ -98,7 +98,7 @@ export class LandingMaterializerService {
       });
 
       const eventsWhere = buildLandingEventsWhere({
-        cityId: landing.cityId,
+        cityId: landing.cityId!,
         now,
         tag,
         additionalFilters: landing.additionalFilters,

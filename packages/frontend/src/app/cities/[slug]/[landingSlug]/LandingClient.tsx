@@ -7,6 +7,7 @@ import type { LandingTimeSlotMode } from '@/app/cities/_landingVm';
 import { ComparisonTable } from '@/components/landing/ComparisonTable';
 import { FilterBar, type FilterState } from '@/components/landing/FilterBar';
 import { VariantCards } from '@/components/landing/VariantCard';
+import type { CatalogEventsUrlParams } from '@/lib/catalog-events-url';
 import type { LandingFilters, LandingVariant } from '../../_landingVm';
 
 type Variant = LandingVariant;
@@ -29,6 +30,11 @@ function matchTimeSlot(iso: string, slot: string, mode: LandingTimeSlotMode, tz:
   if (!slot || mode === 'hidden') return true;
   const { h, m } = getHourMinute(iso, tz);
   const time = h * 60 + m;
+  if (mode === 'dinner') {
+    if (slot === 'sunset') return time >= 18 * 60 && time < 21 * 60;
+    if (slot === 'night') return time >= 21 * 60 || time < 3 * 60;
+    return true;
+  }
   if (mode === 'evening') {
     if (slot === 'ev-17-19') return time >= 17 * 60 && time < 19 * 60;
     if (slot === 'ev-19-21') return time >= 19 * 60 && time < 21 * 60;
@@ -50,6 +56,11 @@ const FILTER_BAR_COPY: Record<
     title: 'Подберите день и время',
     subtitle:
       'Сначала выберите дату (чипы или календарь), затем при необходимости сузьте интервал отправления — строки таблицы соответствуют фильтрам.',
+  },
+  dinner: {
+    title: 'Подберите день и формат',
+    subtitle:
+      'Дата, закат или ночной слот, при необходимости тип меню и формат — строки таблицы соответствуют фильтрам.',
   },
   hidden: {
     title: 'Подберите вариант',
@@ -128,12 +139,18 @@ export function LandingClient({
   filters: apiFilters,
   templateType,
   timeSlotMode = 'night',
+  catalogEventsBaseParams,
+  showGastroColumns = false,
 }: {
   citySlug: string;
   variants: Variant[];
   filters: Filters;
   templateType: 'GENERIC_CARDS' | 'COMPARISON_TABLE' | 'HYBRID' | 'SEASONAL_EVENT';
   timeSlotMode?: LandingTimeSlotMode;
+  /** Тег/категория лендинга для ссылки «Открыть в каталоге». */
+  catalogEventsBaseParams?: CatalogEventsUrlParams;
+  /** Колонки «Меню» / «Формат» и судно из данных события */
+  showGastroColumns?: boolean;
 }) {
   const ianaTimeZone = useMemo(() => getCityTimezone(citySlug), [citySlug]);
   const [filterState, setFilterState] = useState<FilterState>({
@@ -143,6 +160,8 @@ export function LandingClient({
     maxPrice: null,
     showSoldOut: false,
     sort: 'time',
+    menuKind: '',
+    experienceFormat: '',
   });
 
   const filtered = useMemo(() => {
@@ -162,6 +181,14 @@ export function LandingClient({
       // Pier
       if (filterState.pier) {
         if (!v.event.address?.includes(filterState.pier)) return false;
+      }
+      if (filterState.menuKind) {
+        const mk = v.event.catering?.enabled ? (v.event.catering?.type ?? '') : '';
+        if (mk !== filterState.menuKind) return false;
+      }
+      if (filterState.experienceFormat) {
+        const ef = v.event.experienceFormat ?? '';
+        if (ef !== filterState.experienceFormat) return false;
       }
       // Price
       if (filterState.maxPrice) {
@@ -188,6 +215,9 @@ export function LandingClient({
         onFilterChange={setFilterState}
         filterTitle={filterCopy.title}
         filterSubtitle={filterCopy.subtitle}
+        catalogEventsContext={{ citySlug, baseParams: catalogEventsBaseParams }}
+        menuKinds={apiFilters.menuKinds}
+        experienceFormats={apiFilters.experienceFormats}
       />
 
       {/* Количество и подсказка */}
@@ -206,7 +236,12 @@ export function LandingClient({
 
       {/* Таблица: COMPARISON_TABLE и HYBRID — на всех ширинах (горизонтальный скролл на телефоне) */}
       {(templateType === 'COMPARISON_TABLE' || templateType === 'HYBRID') && (
-        <ComparisonTable variants={sorted} bestDealIdx={bestDealIdx} ianaTimeZone={ianaTimeZone} />
+        <ComparisonTable
+          variants={sorted}
+          bestDealIdx={bestDealIdx}
+          ianaTimeZone={ianaTimeZone}
+          showGastroColumns={showGastroColumns}
+        />
       )}
       {/* Карточки: только GENERIC / SEASONAL (без дубля с таблицей в HYBRID) */}
       {(templateType === 'GENERIC_CARDS' || templateType === 'SEASONAL_EVENT') && (

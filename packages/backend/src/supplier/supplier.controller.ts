@@ -28,7 +28,7 @@ import {
   SupplierLegalProfileStatus,
   SupplierRole,
   TaxMode,
-} from '@prisma/client';
+} from '@/prisma-client';
 import { Request, Response } from 'express';
 
 import { CurrentSupplierUser } from '../common/decorators/current-supplier-user.decorator';
@@ -1329,6 +1329,7 @@ export class SupplierController {
       const statuses = items.map((i) => i.status);
       if (statuses.some((s) => s === 'REFUNDED')) return 'REFUNDED';
       if (statuses.some((s) => s === 'FAILED' || s === 'CANCELLED')) return 'FAILED';
+      if (statuses.some((s) => s === 'REFUND_PENDING')) return 'PENDING';
       if (statuses.every((s) => s === 'CONFIRMED')) return 'CONFIRMED';
       return 'PENDING';
     }
@@ -1375,7 +1376,8 @@ export class SupplierController {
   }
 
   @Get('orders')
-  @UseGuards(SupplierJwtGuard)
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT', 'ACCOUNTANT')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Список заявок на бронирование для поставщика' })
   async listOrders(
@@ -1470,7 +1472,8 @@ export class SupplierController {
   }
 
   @Get('orders/:id')
-  @UseGuards(SupplierJwtGuard)
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER', 'MANAGER', 'CONTENT', 'ACCOUNTANT')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Детали заявки на бронирование' })
   async getOrder(@Req() req: { user: { operatorId: string } }, @Param('id') id: string) {
@@ -1525,7 +1528,8 @@ export class SupplierController {
   }
 
   @Post('orders/:id/confirm')
-  @UseGuards(SupplierJwtGuard)
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER', 'MANAGER')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Подтвердить заявку на бронирование' })
   async confirmOrder(
@@ -1573,7 +1577,8 @@ export class SupplierController {
   }
 
   @Post('orders/:id/reject')
-  @UseGuards(SupplierJwtGuard)
+  @UseGuards(SupplierJwtGuard, SupplierRolesGuard)
+  @SupplierRoles('OWNER', 'MANAGER')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Отклонить заявку на бронирование' })
   async rejectOrder(

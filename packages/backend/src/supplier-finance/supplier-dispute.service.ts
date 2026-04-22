@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma, SupplierDisputeStatus, SupplierDisputeReasonCategory } from '@prisma/client';
+import { Prisma, SupplierDisputeStatus, SupplierDisputeReasonCategory } from '@/prisma-client';
 
 import type { FinanceMetaJson } from '../common/finance.types';
 

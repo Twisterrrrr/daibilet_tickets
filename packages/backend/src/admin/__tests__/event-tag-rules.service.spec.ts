@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { TagKind, StructuralTagGroup } from '@prisma/client';
+import { TagKind, StructuralTagGroup } from '@/prisma-client';
 import { describe, expect, it } from 'vitest';
 
 import { EventTagRulesService } from '../event-tag-rules.service';

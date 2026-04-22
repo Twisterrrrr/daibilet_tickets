@@ -4,7 +4,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { DateMode, OfferStatus, PriceMode, Prisma } from '@prisma/client';
+import { DateMode, OfferStatus, PriceMode, Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

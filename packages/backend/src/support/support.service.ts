@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, TicketCategory, TicketPriority, TicketStatus } from '@prisma/client';
+import { ChatConversationStatus, Prisma, TicketCategory, TicketPriority, TicketStatus } from '@/prisma-client';
 
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -213,6 +213,33 @@ export class SupportService {
     }
 
     return response;
+  }
+
+  /**
+   * Счётчики для бейджа в админке: чаты, где клиент написал после последнего ответа оператора, + открытые тикеты.
+   */
+  async getInboxCounts() {
+    const [ticketOpen, conversations] = await Promise.all([
+      this.prisma.supportTicket.count({
+        where: {
+          status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_CUSTOMER] },
+        },
+      }),
+      this.prisma.chatConversation.findMany({
+        where: { status: ChatConversationStatus.OPEN },
+        select: { lastCustomerMessageAt: true, lastAdminMessageAt: true },
+      }),
+    ]);
+    const chatNeedsReply = conversations.filter((c) => {
+      if (!c.lastCustomerMessageAt) return false;
+      if (!c.lastAdminMessageAt) return true;
+      return c.lastCustomerMessageAt > c.lastAdminMessageAt;
+    }).length;
+    return {
+      chatNeedsReply,
+      openTickets: ticketOpen,
+      total: chatNeedsReply + ticketOpen,
+    };
   }
 
   /**

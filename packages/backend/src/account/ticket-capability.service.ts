@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@/prisma-client';
 
 import { computeTicketAvailable } from './purchase-display.util';
 import type { TicketArtifact, TicketCapabilityResult } from './ticket-capability.types';

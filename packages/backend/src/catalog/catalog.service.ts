@@ -6,12 +6,13 @@ import {
   EventCategory,
   EventSource,
   EventSubcategory,
+  LandingStatus,
   LocationType,
   Prisma,
   TagCategory,
   TagKind,
   StructuralTagGroup,
-} from '@prisma/client';
+} from '@/prisma-client';
 
 import { asCatalogEntityLite, asCityLite, toDateSafe } from '../common/typing';
 import { EventOverrideService } from '../admin/event-override.service';
@@ -24,7 +25,9 @@ import { RegionService } from './region.service';
 import { buildEventWhere, buildVenueWhere } from './where-builders';
 import { RefundPolicyResolutionService } from './refund-policy-resolution.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { resolveEventSubcategoryPresentation } from '../subcategories/subcategory-public.mapper';
 import { CatalogGuardService, type CatalogGuardOfferSlice } from './catalog-guard.service';
+import { loadPublicEventRouteBlock } from '../routes/public-event-route.mapper';
 
 /** Сократить адрес до улицы и номера: "Дворцовая наб., 18, Санкт-Петербург" → "Дворцовая наб., 18" */
 function shortenAddressToStreet(addr: string | null | undefined): string {
@@ -69,6 +72,67 @@ export class CatalogService {
 
   /** Макс. число boosted-слотов в блоке «Популярные» (manualBoost > 0 в топе). */
   private static readonly POPULAR_BOOSTED_SLOTS_LIMIT = 4;
+
+  /** M:N links → primary/secondary + совместимый массив enum для фильтров. */
+  private mergeEventSubcategoryFields(ev: Record<string, unknown>): Record<string, unknown> {
+    const links = ev.subcategoryLinks as
+      | { subcategory: { code: string; nameRu: string; layer: string } }[]
+      | undefined;
+    const legacy = ev.subcategories as EventSubcategory[] | undefined;
+    const pres = resolveEventSubcategoryPresentation(
+      links as Parameters<typeof resolveEventSubcategoryPresentation>[0],
+      legacy,
+    );
+    return { ...ev, ...pres };
+  }
+
+  /**
+   * Политика "поставщик отключен":
+   * - страницы/карточки событий НЕ должны превращаться в 404
+   * - покупка должна быть недоступна (убираем offers, а checkout дополнительно режет попытки покупки)
+   *
+   * Источник truth по поставщику:
+   * - Event.supplierId (поставщик события)
+   * - EventOffer.operatorId (поставщик конкретного оффера)
+   */
+  private async applySupplierDisablePolicyToEvents<T extends Record<string, unknown>>(events: T[]): Promise<T[]> {
+    const supplierIds = new Set<string>();
+    const offerOperatorIds = new Set<string>();
+
+    for (const ev of events) {
+      const supplierId = ev.supplierId;
+      if (typeof supplierId === 'string' && supplierId) supplierIds.add(supplierId);
+
+      const offers = (ev.offers as Array<Record<string, unknown>> | undefined) ?? [];
+      for (const o of offers) {
+        const opId = o.operatorId;
+        if (typeof opId === 'string' && opId) offerOperatorIds.add(opId);
+      }
+    }
+
+    if (supplierIds.size === 0 && offerOperatorIds.size === 0) return events;
+
+    const operators = await this.prisma.operator.findMany({
+      where: { id: { in: [...new Set([...supplierIds, ...offerOperatorIds])] } },
+      select: { id: true, isActive: true, status: true },
+    });
+    const operatorById = new Map(operators.map((o) => [o.id, o]));
+
+    return events.map((ev) => {
+      const supplierId = typeof ev.supplierId === 'string' ? ev.supplierId : null;
+      const supplier = supplierId ? operatorById.get(supplierId) : null;
+      const supplierDisabled = !!(supplier && (!supplier.isActive || supplier.status !== 'ACTIVE'));
+
+      const offers = ((ev.offers as Array<Record<string, unknown>> | undefined) ?? []).filter((o) => {
+        const opId = typeof o.operatorId === 'string' ? o.operatorId : null;
+        const op = opId ? operatorById.get(opId) : null;
+        if (!op) return !supplierDisabled;
+        return op.isActive && op.status === 'ACTIVE' && !supplierDisabled;
+      });
+
+      return { ...ev, offers: supplierDisabled ? [] : offers };
+    });
+  }
 
   // --- Города ---
 
@@ -122,7 +186,7 @@ export class CatalogService {
             },
           },
           landingPages: {
-            where: { isActive: true },
+            where: { isActive: true, isDeleted: false, status: LandingStatus.ACTIVE },
             orderBy: { sortOrder: 'asc' },
             select: { slug: true, title: true },
           },
@@ -413,7 +477,7 @@ export class CatalogService {
           },
         },
         landingPages: {
-          where: { isActive: true },
+          where: { isActive: true, isDeleted: false, status: LandingStatus.ACTIVE },
           orderBy: { sortOrder: 'asc' },
           select: { slug: true, title: true, subtitle: true },
         },
@@ -1297,11 +1361,17 @@ export class CatalogService {
               imageUrl: true,
               galleryUrls: true,
               priceFrom: true,
+              supplierId: true,
               rating: true,
               reviewCount: true,
               city: { select: { slug: true, name: true } },
               venue: { select: { title: true, shortTitle: true } },
               override: { select: { manualBoost: true } },
+              subcategoryLinks: {
+                select: {
+                  subcategory: { select: { code: true, nameRu: true, layer: true } },
+                },
+              },
               tags: { include: { tag: true } },
               offers: {
                 where: { isDeleted: false },
@@ -1320,6 +1390,7 @@ export class CatalogService {
                   isDeleted: true,
                   meetingPoint: true,
                   isPrimary: true,
+                  operatorId: true,
                 },
               },
               sessions: {
@@ -1339,6 +1410,11 @@ export class CatalogService {
               city: { select: { slug: true, name: true } },
               venue: { select: { title: true, shortTitle: true } },
               override: { select: { manualBoost: true } },
+              subcategoryLinks: {
+                select: {
+                  subcategory: { select: { code: true, nameRu: true, layer: true } },
+                },
+              },
               tags: { include: { tag: true } },
               offers: {
                 where: { isDeleted: false },
@@ -1357,6 +1433,7 @@ export class CatalogService {
                   isDeleted: true,
                   meetingPoint: true,
                   isPrimary: true,
+                  operatorId: true,
                 },
               },
               sessions: {
@@ -1373,7 +1450,11 @@ export class CatalogService {
     const dbMs = Date.now() - tDb0;
 
     const tOv0 = Date.now();
-    const overridden = await this.overrideService.applyOverrides(rawItems);
+    const overriddenRaw = await this.overrideService.applyOverrides(
+      rawItems as unknown as Array<Record<string, unknown> & { id: string }>,
+    );
+    const overriddenBase = overriddenRaw.map((e) => this.mergeEventSubcategoryFields(e as Record<string, unknown>));
+    const overridden = await this.applySupplierDisablePolicyToEvents(overriddenBase as Record<string, unknown>[]);
     const overrideMs = Date.now() - tOv0;
 
     if (!this.catalogGuard.isCatalogStrictMode()) {
@@ -1500,6 +1581,8 @@ export class CatalogService {
       shortDescription: event.shortDescription ?? null,
       category: event.category ?? null,
       subcategories: event.subcategories ?? [],
+      primarySubcategory: (event as { primarySubcategory?: unknown }).primarySubcategory ?? null,
+      secondarySubcategories: (event as { secondarySubcategories?: unknown[] }).secondarySubcategories ?? [],
       audience: event.audience ?? null,
       city: event.city ?? null,
       venue: event.venue ?? null,
@@ -1588,6 +1671,11 @@ export class CatalogService {
           },
         },
         tags: { include: { tag: true } },
+        subcategoryLinks: {
+          select: {
+            subcategory: { select: { code: true, nameRu: true, layer: true } },
+          },
+        },
       },
     });
 
@@ -1597,44 +1685,46 @@ export class CatalogService {
     }
 
     // Применяем override (мерж title, description, templateData и т.д., фильтр isHidden/UNPUBLISHED только вне preview)
-    const [overridden] = await this.overrideService.applyOverrides([event], { preview });
-    if (!overridden) {
+    const [overriddenRaw] = await this.overrideService.applyOverrides([event], {
+      preview,
+      forPublicEventDetail: !preview,
+    });
+    if (!overriddenRaw) {
       const key = 'slug' in whereUnique ? whereUnique.slug : whereUnique.id;
       throw new NotFoundException(`Событие "${key}" не найдено`);
     }
 
-    // SCHEDULED без активных слотов — показываем страницу (с пустыми сеансами), не 404.
-    // В каталоге такие события не выводятся; но по прямой ссылке — даём контекст («нет сеансов на данный момент»).
-    // OPEN_DATE с истёкшей endDate — не показывать на публичной странице, но разрешать в preview
-    if (
-      !preview &&
-      overridden.dateMode === 'OPEN_DATE' &&
-      overridden.endDate &&
-      new Date(overridden.endDate) < new Date()
-    ) {
-      const key = 'slug' in whereUnique ? whereUnique.slug : whereUnique.id;
-      throw new NotFoundException(`Событие "${key}" не найдено`);
-    }
+    const overridden = this.mergeEventSubcategoryFields(overriddenRaw as Record<string, unknown>) as typeof overriddenRaw;
+    const [overriddenWithPolicy] = await this.applySupplierDisablePolicyToEvents([
+      overridden as unknown as Record<string, unknown>,
+    ]);
+    const eventForPublic = overriddenWithPolicy as typeof overridden;
+
+    // SCHEDULED без активных слотов (все на паузе / нет дат) — показываем страницу (с пустыми сеансами), не 404.
+    // В каталоге такие события не выводятся; по прямой ссылке — контекст без «битой» страницы.
+    // Скрыто из каталога (isHidden) — тоже отдаём карточку по slug, чтобы ссылки и реклама не уходили в 404.
+    // OPEN_DATE с истёкшей endDate — то же: в списках не показываем (см. sessionFilter / SQL), карточку по slug отдаём
+    // «мягко»; покупка по-прежнему режется sellable/checkout по endDate.
 
     // Primary offer для удобства фронтенда
-    const primaryOffer = overridden.offers?.length > 0 ? overridden.offers[0] : null;
+    const primaryOffer = eventForPublic.offers?.length > 0 ? eventForPublic.offers[0] : null;
 
     // Похожие события: город + категория + скоринг по тегам, подкатегории, priceFrom
-    const relatedEvents = await this.fetchRelatedEvents(overridden);
+    const relatedEvents = await this.fetchRelatedEvents(eventForPublic);
 
-    const rc = Number(overridden.reviewCount ?? 0) | 0;
-    const rawR = Number(overridden.rating) || 0;
-    const displayRating = this.getDisplayedEventRating(String(overridden.id || overridden.slug || ''), rawR, rc);
+    const rc = Number(eventForPublic.reviewCount ?? 0) | 0;
+    const rawR = Number(eventForPublic.rating) || 0;
+    const displayRating = this.getDisplayedEventRating(String(eventForPublic.id || eventForPublic.slug || ''), rawR, rc);
 
     const canAcceptReviews = this.reviewCapability.canAcceptReviews({
-      source: overridden.source,
-      supplierId: overridden.supplierId,
-      operatorId: overridden.operatorId,
+      source: eventForPublic.source,
+      supplierId: eventForPublic.supplierId,
+      operatorId: eventForPublic.operatorId,
     });
 
-    const operatorId = overridden.supplierId ?? overridden.venue?.operatorId;
-    const operator = overridden.venue?.operator
-      ? { defaultRefundPolicyText: overridden.venue.operator.defaultRefundPolicyText }
+    const operatorId = eventForPublic.supplierId ?? eventForPublic.venue?.operatorId;
+    const operator = eventForPublic.venue?.operator
+      ? { defaultRefundPolicyText: eventForPublic.venue.operator.defaultRefundPolicyText }
       : operatorId
         ? await this.prisma.operator
             .findUnique({ where: { id: operatorId }, select: { defaultRefundPolicyText: true } })
@@ -1643,17 +1733,20 @@ export class CatalogService {
 
     const refundPolicyResolved = this.refundResolution.resolveEventRefundPolicy(
       {
-        refundPolicyMode: overridden.refundPolicyMode,
-        refundPolicyText: overridden.refundPolicyText,
+        refundPolicyMode: eventForPublic.refundPolicyMode,
+        refundPolicyText: eventForPublic.refundPolicyText,
       },
-      overridden.venue
-        ? { refundPolicyMode: overridden.venue.refundPolicyMode, refundPolicyText: overridden.venue.refundPolicyText }
+      eventForPublic.venue
+        ? {
+            refundPolicyMode: eventForPublic.venue.refundPolicyMode,
+            refundPolicyText: eventForPublic.venue.refundPolicyText,
+          }
         : null,
       operator,
     );
 
-    const tags = Array.isArray((overridden as unknown as { tags?: unknown }).tags)
-      ? ((overridden as unknown as { tags: unknown[] }).tags as unknown[])
+    const tags = Array.isArray((eventForPublic as unknown as { tags?: unknown }).tags)
+      ? ((eventForPublic as unknown as { tags: unknown[] }).tags as unknown[])
       : [];
 
     const structuralTags: { THEME: string[]; AUDIENCE: string[]; FORMAT: string[] } = {
@@ -1707,8 +1800,11 @@ export class CatalogService {
       new Map(legacyTagItems.map((item) => [item.id || `${item.name}:${item.code ?? ''}`, item])).values(),
     );
 
+    const route = await loadPublicEventRouteBlock(this.prisma, eventForPublic.id);
+
     return {
       ...overridden,
+      route,
       rating: displayRating,
       address: overridden.address ? shortenAddressToStreet(overridden.address) : overridden.address,
       primaryOffer,
@@ -1738,18 +1834,36 @@ export class CatalogService {
     subcategories: EventSubcategory[];
     priceFrom: number | null;
     tags?: Array<{ tagId: string }>;
+    subcategoryLinks?: Array<{ subcategory: { code: string; layer?: string } }>;
   }) {
     const eventTagIds = new Set((event.tags ?? []).map((t: { tagId: string }) => t.tagId));
     const eventSubIds = new Set(event.subcategories);
+    const linkCodes = new Set(
+      (event.subcategoryLinks ?? []).map((l) => l.subcategory.code).filter((c): c is string => Boolean(c)),
+    );
     const priceFrom = event.priceFrom ?? 0;
     const priceTolerance = Math.max(50000, Math.floor(priceFrom * 0.5)); // 500₽ или ±50%
 
     const importsEnabled = process.env.IMPORT_SOURCES_ENABLED !== '0';
 
+    const categoryOrLinkedSubcat: Prisma.EventWhereInput =
+      linkCodes.size > 0
+        ? {
+            OR: [
+              { category: event.category as EventCategory },
+              {
+                subcategoryLinks: {
+                  some: { subcategory: { code: { in: [...linkCodes] } } },
+                },
+              },
+            ],
+          }
+        : { category: event.category as EventCategory };
+
     const candidatesRaw = await this.prisma.event.findMany({
       where: {
         cityId: event.cityId,
-        category: event.category as EventCategory,
+        ...categoryOrLinkedSubcat,
         isActive: true,
         isDeleted: false,
         canonicalOfId: null,
@@ -1763,6 +1877,7 @@ export class CatalogService {
       },
       include: {
         tags: { select: { tagId: true } },
+        subcategoryLinks: { select: { subcategory: { select: { code: true, layer: true } } } },
         city: { select: { slug: true, name: true } },
         venue: { select: { title: true, shortTitle: true } },
         sessions: {
@@ -1772,7 +1887,7 @@ export class CatalogService {
           select: { startsAt: true, availableTickets: true },
         },
       },
-      take: 30,
+      take: linkCodes.size > 0 ? 45 : 30,
     });
 
     const overridden = await this.overrideService.applyOverrides(candidatesRaw);
@@ -1786,7 +1901,17 @@ export class CatalogService {
       for (const tid of eventTagIds) {
         if (cTagIds.has(tid)) score += 3;
       }
-      // Подкатегория: +5 за совпадение
+      // Подкатегория (links-first): +8 PRIMARY, +5 SECONDARY за пересечение code
+      const cLinks = (c as { subcategoryLinks?: { subcategory: { code: string; layer?: string } }[] })
+        .subcategoryLinks ?? [];
+      if (linkCodes.size > 0 && cLinks.length > 0) {
+        for (const cl of cLinks) {
+          if (!linkCodes.has(cl.subcategory.code)) continue;
+          const layer = cl.subcategory.layer;
+          score += layer === 'PRIMARY' ? 8 : 5;
+        }
+      }
+      // Legacy enum-массив: +5 за совпадение
       const subs = Array.isArray((c as { subcategories?: EventSubcategory[] }).subcategories)
         ? ((c as { subcategories?: EventSubcategory[] }).subcategories as EventSubcategory[])
         : [];

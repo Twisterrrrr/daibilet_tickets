@@ -2,7 +2,7 @@
  * Утилиты типизации для backend.
  * См. docs/typing-guide.md
  */
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/prisma-client';
 
 /** Проверка, что значение — объект (не null, не примитив). */
 export function isRecord(v: unknown): v is Record<string, unknown> {

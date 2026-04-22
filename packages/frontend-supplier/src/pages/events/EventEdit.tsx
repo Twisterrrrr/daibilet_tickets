@@ -74,6 +74,11 @@ export default function EventEdit() {
           fullDescription: '',
           coverImageUrl: '',
           gallery: [],
+          locationChoice: 'existing',
+          startLocationId: '',
+          locationProposalTitle: '',
+          locationProposalAddress: '',
+          locationProposalType: '',
         },
         schedule: {
           mode: 'single',

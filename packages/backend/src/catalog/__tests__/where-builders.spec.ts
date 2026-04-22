@@ -1,4 +1,4 @@
-import { DateMode, EventSource } from '@prisma/client';
+import { DateMode, EventSource } from '@/prisma-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildEventWhere } from '../where-builders';

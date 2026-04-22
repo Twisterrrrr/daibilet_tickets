@@ -6,6 +6,7 @@ import { CatalogModule } from '../catalog/catalog.module';
 import { CheckoutModule } from '../checkout/checkout.module';
 import { LandingModule } from '../landing/landing.module';
 import { ComboModule } from '../combo/combo.module';
+import { OrdersModule } from '../orders/orders.module';
 import { EmailProcessor } from './email.processor';
 import { FulfillmentProcessor } from './fulfillment.processor';
 import {
@@ -58,6 +59,7 @@ export {
     ComboModule,
     LandingModule,
     forwardRef(() => CheckoutModule),
+    OrdersModule,
   ],
   providers: [EmailProcessor, ReviewTaskProcessor, SyncProcessor, FulfillmentProcessor],
   exports: [BullModule],

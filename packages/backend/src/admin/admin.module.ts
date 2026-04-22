@@ -17,6 +17,7 @@ import { PromoModule } from '../promo/promo.module';
 import { ReportsModule } from '../reports/reports.module';
 import { SupplierModule } from '../supplier/supplier.module';
 import { EdoModule } from '../edo/edo.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
 
 import { AdminArticlesController } from './admin-articles.controller';
 import { AdminAuditController } from './admin-audit.controller';
@@ -31,6 +32,7 @@ import { AdminDiagnosticsService } from './admin-diagnostics.service';
 import { AdminEventsController } from './admin-events.controller';
 import { AdminExternalReviewsController } from './admin-external-reviews.controller';
 import { AdminLandingsController } from './admin-landings.controller';
+import { AdminLandingThemesController } from './admin-landing-themes.controller';
 import { AdminModerationController } from './admin-moderation.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminOrdersController } from './admin-orders.controller';
@@ -38,18 +40,31 @@ import { AdminCacheController } from './admin-cache.controller';
 import { AdminReconciliationController } from './admin-reconciliation.controller';
 import { AdminReviewsController } from './admin-reviews.controller';
 import { AdminSettingsController } from './admin-settings.controller';
+import { AdminAppSettingsController } from './admin-app-settings.controller';
+import { AdminFeatureFlagsController } from './admin-feature-flags.controller';
+import { AdminSiteUsersController } from './admin-site-users.controller';
+import { AdminUsersController } from './admin-users.controller';
+import { AdminUsersService } from './admin-users.service';
 import { AdminSuppliersController } from './admin-suppliers.controller';
 import { AdminSupportController } from './admin-support.controller';
 import { AdminTagsController } from './admin-tags.controller';
 import { AdminUpsellsController } from './admin-upsells.controller';
 import { AdminVenuesController } from './admin-venues.controller';
+import { AdminGeoController } from './admin-geo.controller';
+import { AdminRoutePointsController } from './admin-route-points.controller';
+import { AdminRoutesController } from './admin-routes.controller';
+import { AdminEventRouteController } from './admin-event-route.controller';
+import { AdminEventRouteService } from '../routes/admin-event-route.service';
 import { AdminWidgetsController } from './admin-widgets.controller';
 import { AdminUploadController } from './admin-upload.controller';
 import { AdminCheckoutController } from './admin-checkout.controller';
+import { AdminRefundsController } from './admin-refunds.controller';
 import { AdminSeoAuditController } from './admin-seo-audit.controller';
 import { AdminPreviewsController } from './admin-previews.controller';
 import { AdminPromoBlocksController } from './admin-promo-blocks.controller';
 import { AdminPromoBlocksService } from './admin-promo-blocks.service';
+import { AdminPromoPlacementBlocksController } from './admin-promo-placement-blocks.controller';
+import { AdminPromoPlacementBlocksService } from './admin-promo-placement-blocks.service';
 import { AdminPromoCollectionsController } from './admin-promo-collections.controller';
 import { AdminPromoCollectionsService } from './admin-promo-collections.service';
 import { AdminPromoCodesController } from './admin-promo-codes.controller';
@@ -66,7 +81,9 @@ import { AdminAvailabilityController } from './admin-availability.controller';
 import { AdminSupplierEdoController } from './admin-supplier-edo.controller';
 import { AdminEdoDeliveryController } from './admin-edo-delivery.controller';
 import { AdminSubcategoriesController } from './admin-subcategories.controller';
+import { AdminSubcategoryCollectionsController } from './admin-subcategory-collections.controller';
 import { AdminTicketPdfDebugController } from './admin-ticket-pdf-debug.controller';
+import { AdminSupplierIntegrationsController } from './admin-supplier-integrations.controller';
 import { AuditService } from './audit.service';
 import { EventAdminSummaryService } from './event-admin-summary.service';
 import { VenueAdminSummaryService } from './venue-admin-summary.service';
@@ -74,7 +91,7 @@ import { EventOverrideService } from './event-override.service';
 import { EventTagRulesService } from './event-tag-rules.service';
 import { PaymentMetricsService } from '../checkout/payment-metrics.service';
 import { OperationLatencyTrackerService } from '../common/operation-latency-tracker.service';
-import { SeoAuditService } from './seo-audit/seo-audit.service';
+import { SeoAuditService } from './seo-audit/seo-audit.service';import { AdminContentWriteValidationService } from './admin-content-write-validation.service';
 
 @Module({
   imports: [
@@ -91,13 +108,14 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     ReportsModule,
     SupplierModule,
     EdoModule,
+    IntegrationsModule,
     BullModule.registerQueue(
       { name: QUEUE_EMAILS },
       { name: QUEUE_SYNC },
       { name: QUEUE_ANALYTICS_PREAGG },
     ),
   ],
-  providers: [
+  providers: [    AdminContentWriteValidationService,
     OperationLatencyTrackerService,
     AnalyticsService,
     AnalyticsPreaggProcessor,
@@ -113,26 +131,39 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     TagAssignmentService,
     SeoAuditService,
     AdminPromoBlocksService,
+    AdminPromoPlacementBlocksService,
     AdminPromoCollectionsService,
+    AdminUsersService,
+    AdminEventRouteService,
   ],
   controllers: [
     AdminDashboardController,
     AdminCitiesController,
     AdminEventsController,
+    AdminEventRouteController,
     AdminTagsController,
     AdminLandingsController,
+    AdminLandingThemesController,
     AdminCombosController,
     AdminArticlesController,
     AdminOrdersController,
     AdminSettingsController,
+    AdminAppSettingsController,
+    AdminFeatureFlagsController,
+    AdminUsersController,
+    AdminSiteUsersController,
     AdminAuditController,
     AdminUpsellsController,
     AdminReviewsController,
     AdminExternalReviewsController,
     AdminCheckoutController,
+    AdminRefundsController,
     AdminSuppliersController,
     AdminModerationController,
     AdminVenuesController,
+    AdminGeoController,
+    AdminRoutesController,
+    AdminRoutePointsController,
     AdminWidgetsController,
     AdminCollectionsController,
     AdminSupportController,
@@ -143,6 +174,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminSeoAuditController,
     AdminPreviewsController,
     AdminPromoBlocksController,
+    AdminPromoPlacementBlocksController,
     AdminPromoCollectionsController,
     AdminPromoCodesController,
     AdminSourceCategoriesController,
@@ -155,9 +187,11 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
     AdminAvailabilityController,
     AdminListingHealthController,
     AdminCatalogConsistencyController,
+    AdminSupplierIntegrationsController,
     AdminSupplierEdoController,
     AdminEdoDeliveryController,
     AdminSubcategoriesController,
+    AdminSubcategoryCollectionsController,
     AdminTicketPdfDebugController,
   ],
   exports: [AuditService, EventOverrideService, ReviewService],

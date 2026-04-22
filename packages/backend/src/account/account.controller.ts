@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ReviewStatus } from '@prisma/client';
+import { ReviewStatus } from '@/prisma-client';
 
 import { UserJwtGuard } from '../user/user.guard';
 import { AccountService } from './account.service';
-import { UpdateAccountProfileDto } from './dto/account.dto';
+import { CreateAccountRefundRequestDto, UpdateAccountProfileDto } from './dto/account.dto';
 
 interface RequestWithUser {
   user: { id: string };
@@ -53,6 +53,12 @@ export class AccountController {
   @ApiOperation({ summary: 'Деталь заказа (только свой)' })
   getOrderDetail(@Req() req: RequestWithUser, @Param('id') id: string) {
     return this.account.getOrderDetail(req.user.id, id);
+  }
+
+  @Post('refund-requests')
+  @ApiOperation({ summary: 'Заявка на возврат по позиции заказа (билет)' })
+  createRefundRequest(@Req() req: RequestWithUser, @Body() body: CreateAccountRefundRequestDto) {
+    return this.account.createRefundRequest(req.user.id, body);
   }
 
   @Get('tickets')

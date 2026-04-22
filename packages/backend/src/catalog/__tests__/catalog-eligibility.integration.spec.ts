@@ -4,7 +4,7 @@
  * База не поднимается — Prisma мокируется по месту вызовов.
  */
 
-import { EventCategory, EventSubcategory } from '@prisma/client';
+import { EventCategory, EventSubcategory } from '@/prisma-client';
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildLandingEventsWhere } from '../../landing/landing-event-filter.helper';

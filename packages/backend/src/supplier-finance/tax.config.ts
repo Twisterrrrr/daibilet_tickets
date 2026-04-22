@@ -1,4 +1,4 @@
-import { TaxMode } from '@prisma/client';
+import { TaxMode } from '@/prisma-client';
 
 export interface TaxBehavior {
   requiresVat: boolean;

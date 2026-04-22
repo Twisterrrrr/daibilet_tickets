@@ -6,11 +6,11 @@
  * Требуется: событие test-event-buyer-account уже существует (например после db:seed:buyer-test).
  */
 import * as dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
 dotenv.config({ path: '../../.env' });
 
-const prisma = new PrismaClient();
+const { prisma, pool } = createScriptPrismaClient();
 
 const PRICES = [
   { type: 'adult', price: 150000 }, // 1500₽
@@ -124,4 +124,7 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });

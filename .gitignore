@@ -68,6 +68,7 @@ coverage/
 # Prisma
 # ==============================
 packages/backend/prisma/migrations/**/migration_lock.toml
+packages/backend/src/generated/
 
 # ==============================
 # Docker — данные томов
@@ -87,6 +88,7 @@ backups/
 # Локальные артефакты разработки (не коммитим)
 lint-output.txt
 packages/backend/uploads/
+.tmp-daibilet-admin-ui-replit/
 
 # ==============================
 # Исходники стоковых изображений (не коммитим)

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { EventCategory } from '@prisma/client';
+import { EventCategory } from '@/prisma-client';
 import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
 
 export class UpsertSourceCategoryMappingDto {

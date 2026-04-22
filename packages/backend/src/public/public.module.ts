@@ -6,6 +6,8 @@ import { PublicFeatureFlagsController } from './public-feature-flags.controller'
 import { PromoBlocksPublicController } from './promo-blocks.controller';
 import { PromoBlocksPublicService } from './promo-blocks.service';
 import { PromoCollectionsPublicController } from './promo-collections.controller';
+import { PromoPlacementBlocksPublicController } from './promo-placement-blocks.controller';
+import { PromoPlacementBlocksPublicService } from './promo-placement-blocks.service';
 
 @Module({
   imports: [PrismaModule, PromoModule],
@@ -13,7 +15,8 @@ import { PromoCollectionsPublicController } from './promo-collections.controller
     PublicFeatureFlagsController,
     PromoBlocksPublicController,
     PromoCollectionsPublicController,
+    PromoPlacementBlocksPublicController,
   ],
-  providers: [PromoBlocksPublicService],
+  providers: [PromoBlocksPublicService, PromoPlacementBlocksPublicService],
 })
 export class PublicModule {}

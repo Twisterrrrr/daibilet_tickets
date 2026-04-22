@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ArticleStatus, Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -13,7 +13,7 @@ export class BlogService {
     const { city, tag, page = 1, limit = 12 } = opts || {};
 
     const where: Prisma.ArticleWhereInput = {
-      isPublished: true,
+      status: ArticleStatus.PUBLISHED,
       ...(city && { city: { slug: city } }),
       ...(tag && { articleTags: { some: { tag: { slug: tag } } } }),
     };
@@ -36,8 +36,8 @@ export class BlogService {
   }
 
   async getArticleBySlug(slug: string) {
-    const article = await this.prisma.article.findUnique({
-      where: { slug },
+    const article = await this.prisma.article.findFirst({
+      where: { slug, status: ArticleStatus.PUBLISHED },
       include: {
         city: { select: { slug: true, name: true } },
         articleEvents: {
@@ -56,11 +56,55 @@ export class BlogService {
           },
         },
         articleTags: { include: { tag: { select: { slug: true, name: true } } } },
+        landingLinks: {
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          include: { landing: { select: { id: true } } },
+        },
+        collectionLinks: {
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          include: { collection: { select: { id: true } } },
+        },
       },
     });
 
     if (!article) throw new NotFoundException(`Статья "${slug}" не найдена`);
-    return article;
+
+    const landingIdsFromLinks = (article.landingLinks ?? []).map((l) => l.landing.id);
+    const collectionIdsFromLinks = (article.collectionLinks ?? []).map((l) => l.collection.id);
+    const landingIds = landingIdsFromLinks.length > 0 ? landingIdsFromLinks : article.relatedLandingIds;
+    const collectionIds = collectionIdsFromLinks.length > 0 ? collectionIdsFromLinks : article.relatedCollectionIds;
+
+    const [relatedLandingsRaw, relatedCollectionsRaw] = await Promise.all([
+      landingIds.length
+        ? this.prisma.landingPage.findMany({
+            where: { id: { in: landingIds }, isDeleted: false, isActive: true },
+            select: {
+              id: true,
+              slug: true,
+              title: true,
+              city: { select: { slug: true, name: true } },
+            },
+          })
+        : Promise.resolve([]),
+      collectionIds.length
+        ? this.prisma.collection.findMany({
+            where: { id: { in: collectionIds }, isDeleted: false, isActive: true },
+            select: { id: true, slug: true, title: true, heroImage: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    // Preserve order (join tables use position; legacy uses array order)
+    const landingOrder = new Map(landingIds.map((id, i) => [id, i]));
+    relatedLandingsRaw.sort((a, b) => (landingOrder.get(a.id) ?? 9999) - (landingOrder.get(b.id) ?? 9999));
+    const collectionOrder = new Map(collectionIds.map((id, i) => [id, i]));
+    relatedCollectionsRaw.sort((a, b) => (collectionOrder.get(a.id) ?? 9999) - (collectionOrder.get(b.id) ?? 9999));
+
+    return {
+      ...article,
+      relatedLandings: relatedLandingsRaw,
+      relatedCollections: relatedCollectionsRaw,
+    };
   }
 
   /**
@@ -107,12 +151,11 @@ export class BlogService {
             coverImage: city.heroImage,
             metaTitle: `Что посмотреть в ${city.name} — топ экскурсий и мероприятий | Дайбилет`,
             metaDescription: `Лучшие экскурсии, музеи и мероприятия в ${city.name}. Покупайте билеты онлайн. ${city._count.events} событий в каталоге.`,
-            isPublished: true,
+            status: ArticleStatus.PUBLISHED,
             publishedAt: new Date(),
           },
         });
 
-        // Связать с событиями
         for (const event of city.events.slice(0, 5)) {
           await this.prisma.articleEvent
             .create({
@@ -143,7 +186,7 @@ export class BlogService {
               coverImage: city.heroImage,
               metaTitle: `Экскурсии в ${city.name} — рейтинг, цены, купить билеты | Дайбилет`,
               metaDescription: `Лучшие экскурсии в ${city.name}: обзор, цены от ${this.minPrice(excursions)} ₽. Покупка билетов онлайн на Дайбилет.`,
-              isPublished: true,
+              status: ArticleStatus.PUBLISHED,
               publishedAt: new Date(),
             },
           });

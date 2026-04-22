@@ -154,9 +154,9 @@ function createMockPrisma() {
       }),
     },
     processedWebhookEvent: {
-      findUnique: vi.fn().mockImplementation(({ where }: any) => webhookEvents.get(where.providerEventId) || null),
+      findUnique: vi.fn().mockImplementation(({ where }: any) => webhookEvents.get(where.dedupeKey) || null),
       create: vi.fn().mockImplementation(({ data }: any) => {
-        webhookEvents.set(data.providerEventId, data);
+        webhookEvents.set(data.dedupeKey, data);
         return data;
       }),
     },
@@ -273,7 +273,7 @@ describe('E2E Scenario 2: Duplicate Webhook is no-op', () => {
 
     // First call: should process
     const result1 = await idempotency.processOnce(
-      'yk-evt-123',
+      'payment.succeeded:yk-evt-123',
       'YOOKASSA',
       'payment.succeeded',
       { mock: true },
@@ -285,7 +285,7 @@ describe('E2E Scenario 2: Duplicate Webhook is no-op', () => {
 
     // Second call: should be no-op
     const result2 = await idempotency.processOnce(
-      'yk-evt-123',
+      'payment.succeeded:yk-evt-123',
       'YOOKASSA',
       'payment.succeeded',
       { mock: true },
@@ -309,22 +309,31 @@ describe('E2E Scenario 3: Out-of-order webhook events', () => {
     const idempotency = new WebhookIdempotencyService(prisma as any);
 
     // First: unknown event type — handler returns IGNORED
+    const sharedPaymentId = '22d6d597-000f-5000-9000-145f6df21d6f';
     const result1 = await idempotency.processOnce(
-      'yk-evt-100',
+      `payment.waiting_for_capture:${sharedPaymentId}`,
       'YOOKASSA',
       'payment.waiting_for_capture',
       {},
       async () => 'IGNORED',
+      { providerObjectId: sharedPaymentId },
     );
     expect(result1.processed).toBe(true);
     expect(result1.result).toBe('IGNORED');
 
-    // Second: payment.succeeded — different providerEventId (unique per event)
+    // Second: payment.succeeded — тот же payment.id, другой eventType → отдельный dedupeKey
     let fulfillmentTriggered = false;
-    const result2 = await idempotency.processOnce('yk-evt-101', 'YOOKASSA', 'payment.succeeded', {}, async () => {
-      fulfillmentTriggered = true;
-      return 'PAID';
-    });
+    const result2 = await idempotency.processOnce(
+      `payment.succeeded:${sharedPaymentId}`,
+      'YOOKASSA',
+      'payment.succeeded',
+      {},
+      async () => {
+        fulfillmentTriggered = true;
+        return 'PAID';
+      },
+      { providerObjectId: sharedPaymentId },
+    );
     expect(result2.processed).toBe(true);
     expect(result2.result).toBe('PAID');
     expect(fulfillmentTriggered).toBe(true);

@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { CatalogModule } from '../catalog/catalog.module';
+import { OrdersModule } from '../orders/orders.module';
 import { UserModule } from '../user/user.module';
 import { SupplierModule } from '../supplier/supplier.module';
 import { SupplierLedgerService } from '../ledger/supplier-ledger.service';
@@ -16,11 +17,19 @@ import { PaymentService } from './payment.service';
 import { InternalBookingProvider } from './providers/internal-booking.provider';
 import { PartnerBookingProvider } from './providers/partner-booking.provider';
 import { TcBookingProvider } from './providers/tc-booking.provider';
+import { FulfillmentRefundRequestService } from './fulfillment-refund-request.service';
 import { RefundService } from './refund.service';
 import { WebhookIdempotencyService } from './webhook-idempotency.service';
 
 @Module({
-  imports: [CatalogModule, MailModule, PricingModule, UserModule, SupplierModule],
+  imports: [
+    forwardRef(() => CatalogModule),
+    forwardRef(() => OrdersModule),
+    MailModule,
+    PricingModule,
+    UserModule,
+    SupplierModule,
+  ],
   controllers: [CheckoutController],
   providers: [
     CheckoutService,
@@ -28,6 +37,7 @@ import { WebhookIdempotencyService } from './webhook-idempotency.service';
     PaymentService,
     FulfillmentService,
     RefundService,
+    FulfillmentRefundRequestService,
     WebhookIdempotencyService,
     PaymentEventLogService,
     FeatureFlagService,
@@ -53,6 +63,14 @@ import { WebhookIdempotencyService } from './webhook-idempotency.service';
       inject: [TcBookingProvider, InternalBookingProvider, PartnerBookingProvider],
     },
   ],
-  exports: [CheckoutService, PaymentService, FulfillmentService, RefundService, WebhookIdempotencyService, FeatureFlagService],
+  exports: [
+    CheckoutService,
+    PaymentService,
+    FulfillmentService,
+    RefundService,
+    FulfillmentRefundRequestService,
+    WebhookIdempotencyService,
+    FeatureFlagService,
+  ],
 })
 export class CheckoutModule {}

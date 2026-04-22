@@ -20,7 +20,7 @@ export interface ArticleForJsonLd {
 
 /** Собрать JSON-LD Article schema для статьи */
 export function buildArticleJsonLd(article: ArticleForJsonLd): Record<string, unknown> {
-  const url = `${BASE_URL}/blog/${article.slug}`;
+  const url = `${BASE_URL}/articles/${article.slug}`;
   const imageUrl = article.coverImage || article.imageUrl;
   const image = imageUrl
     ? (imageUrl.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`)

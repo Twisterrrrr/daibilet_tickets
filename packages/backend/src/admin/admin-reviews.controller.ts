@@ -74,6 +74,7 @@ export class AdminReviewsController {
   async list(
     @Query('status') status?: string,
     @Query('eventId') eventId?: string,
+    @Query('lite') lite?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -84,6 +85,7 @@ export class AdminReviewsController {
       eventId,
       page: pg.page,
       limit: pg.limit,
+      lite: lite === '1' || lite === 'true' || lite === 'yes',
     });
   }
 

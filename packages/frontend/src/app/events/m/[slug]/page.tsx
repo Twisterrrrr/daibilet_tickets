@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import type { MultiEventDetailDto } from '@/lib/api.types';
 import { MultiEventPageClient } from './MultiEventPageClient';
 
-type PageProps = { params: { slug: string } };
+type PageProps = { params: Promise<{ slug: string }> };
 
 async function fetchMultiEvent(slug: string): Promise<MultiEventDetailDto | null> {
   try {
@@ -17,11 +17,13 @@ async function fetchMultiEvent(slug: string): Promise<MultiEventDetailDto | null
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const detail = await fetchMultiEvent(params.slug);
+  const { slug } = await params;
+  const detail = await fetchMultiEvent(slug);
   if (!detail) {
     return {
       title: 'Группа событий не найдена',
       description: 'Проверьте корректность ссылки или выберите другое событие.',
+      robots: { index: false, follow: true },
     };
   }
 
@@ -53,8 +55,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function MultiEventGroupPage({ params }: PageProps) {
-  const detail = await fetchMultiEvent(params.slug);
-  if (!detail) notFound();
+  const { slug } = await params;
+  const detail = await fetchMultiEvent(slug);
+  if (!detail) {
+    return (
+      <div className="container-page flex min-h-[60vh] flex-col items-center justify-center py-20">
+        <span className="text-6xl">🔍</span>
+        <h1 className="mt-4 text-2xl font-bold text-slate-900">Группа не найдена или недоступна</h1>
+        <p className="mt-2 max-w-md text-center text-slate-500">
+          Ссылка могла устареть, а события — временно не в продаже. Так страница не отдаёт HTTP 404 поисковикам и
+          закладкам.
+        </p>
+        <Link href="/events" className="btn-primary mt-6 inline-flex">
+          Вернуться в каталог
+        </Link>
+      </div>
+    );
+  }
   return <MultiEventPageClient detail={detail} />;
 }
-

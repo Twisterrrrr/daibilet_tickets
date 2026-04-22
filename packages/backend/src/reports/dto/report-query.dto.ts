@@ -1,4 +1,4 @@
-import { EventCategory, EventSource } from '@prisma/client';
+import { EventCategory, EventSource } from '@/prisma-client';
 
 export class ReportQueryDto {
   from?: string;

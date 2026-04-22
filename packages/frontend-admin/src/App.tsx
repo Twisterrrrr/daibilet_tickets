@@ -16,7 +16,9 @@ import { CombosListPage } from './pages/combos/CombosList';
 import { FailedJobsPage } from './pages/jobs/FailedJobsPage';
 import { LandingEditPage } from './pages/landings/LandingEdit';
 import { LandingsListPage } from './pages/landings/LandingsList';
+import { ForgotPasswordPage } from './pages/ForgotPassword';
 import { LoginPage } from './pages/Login';
+import { ResetPasswordPage } from './pages/ResetPassword';
 import { ModerationQueuePage } from './pages/moderation/ModerationQueue';
 import { OrderDetailPage } from './pages/orders/OrderDetail';
 import { OrdersListPage } from './pages/orders/OrdersList';
@@ -70,6 +72,9 @@ const FinanceDocumentsAdminPage = lazy(() =>
 const EventsListPage = lazy(() =>
   import('./pages/events/EventsList').then((m) => ({ default: m.EventsListPage })),
 );
+const EventSessionsBoardPage = lazy(() =>
+  import('./pages/events/EventSessionsBoardPage').then((m) => ({ default: m.EventSessionsBoardPage })),
+);
 const SuppliersListPage = lazy(() =>
   import('./pages/suppliers/SuppliersList').then((m) => ({ default: m.SuppliersListPage })),
 );
@@ -96,6 +101,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/"
           element={
@@ -106,6 +113,7 @@ export default function App() {
         >
           <Route index element={<DashboardPage />} />
           <Route path="events" element={flags.showEvents ? <EventsListPage /> : <DisabledRoute />} />
+          <Route path="events/sessions" element={flags.showEvents ? <EventSessionsBoardPage /> : <DisabledRoute />} />
           <Route path="events/merge" element={flags.showEvents ? <EventsMergePage /> : <DisabledRoute />} />
           <Route path="events/new" element={flags.showEvents ? <EventCreatePage /> : <DisabledRoute />} />
           <Route path="events/:id" element={flags.showEvents ? <EventEditPage /> : <DisabledRoute />} />

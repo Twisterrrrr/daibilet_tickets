@@ -12,7 +12,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { PromoBgMode, PromoContentMode, PromoContentType, PromoIconSource, PromoSelectionMode, PromoSortMode } from '@prisma/client';
+import { PromoBgMode, PromoContentMode, PromoContentType, PromoIconSource, PromoSelectionMode, PromoSortMode } from '@/prisma-client';
 
 const KEBAB_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 

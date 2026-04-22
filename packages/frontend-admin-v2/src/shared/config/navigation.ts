@@ -11,11 +11,14 @@ import {
   LayoutTemplate,
   MapPin,
   MessageSquare,
+  Percent,
   Search,
   Settings,
   ShieldCheck,
   ShoppingCart,
+  Sparkles,
   Tags,
+  TrendingUp,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -33,7 +36,7 @@ export interface NavSection {
 
 /**
  * Структура как в legacy `packages/frontend-admin/src/config/nav.ts`,
- * без feature flags — все пункты видны (маршруты без экрана ведут на Placeholder).
+ * без feature flags — все пункты ведут на экраны-шаблоны V2 (мок + план интеграции).
  */
 export const ADMIN_NAV_SECTIONS: NavSection[] = [
   {
@@ -58,6 +61,14 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
       { label: 'Подборки', path: '/collections', icon: FolderOpen },
       { label: 'Лендинги', path: '/landings', icon: LayoutTemplate },
       { label: 'Промо-блоки', path: '/promo-blocks', icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Маркетинг',
+    items: [
+      { label: 'Промокоды', path: '/marketing/promo-codes', icon: Percent },
+      { label: 'Промо-подборки', path: '/marketing/promo-collections', icon: Sparkles },
+      { label: 'Апселлы', path: '/marketing/upsells', icon: TrendingUp },
     ],
   },
   {

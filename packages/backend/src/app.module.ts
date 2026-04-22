@@ -38,6 +38,7 @@ import { VenueModule } from './venue/venue.module';
 import { PreviewModule } from './preview/preview.module';
 import { VoucherModule } from './voucher/voucher.module';
 import { ChatModule } from './chat/chat.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { ChatModule } from './chat/chat.module';
     UploadModule,
     MediaModule,
     ChatModule,
+    IntegrationsModule,
     QueueModule,
     PricingModule,
     CatalogModule,

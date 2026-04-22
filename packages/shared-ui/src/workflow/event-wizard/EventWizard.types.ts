@@ -32,6 +32,15 @@ export interface EventWizardRoleConfig {
 // Draft slices
 // ────────────────────────────────────────────────────────────
 
+/** Элемент списка локаций города (GET /admin/locations). */
+export interface EventWizardLocationOption {
+  id: string;
+  title: string;
+  shortTitle?: string | null;
+  type: string;
+  address?: string | null;
+}
+
 export interface EventWizardBasicsDraft {
   title: string;
   slug: string;
@@ -43,6 +52,15 @@ export interface EventWizardBasicsDraft {
   fullDescription: string;
   coverImageUrl: string;
   gallery: string[];
+  /**
+   * Для категории EXCURSION: после выбора города — точка старта из справочника или заявка новой.
+   */
+  locationChoice: 'existing' | 'propose';
+  startLocationId: string;
+  locationProposalTitle: string;
+  locationProposalAddress: string;
+  /** Значение Prisma LocationType или пусто (на бэке по умолчанию OTHER). */
+  locationProposalType: string;
 }
 
 export type EventWizardScheduleMode = 'single' | 'recurring' | 'manual-multiple';

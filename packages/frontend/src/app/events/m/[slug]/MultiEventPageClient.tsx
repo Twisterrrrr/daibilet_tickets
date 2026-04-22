@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import type { MultiEventDetailDto } from '@/lib/api.types';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 import { formatPrice } from '@daibilet/shared';
 
 interface MultiEventPageClientProps {
@@ -57,7 +58,7 @@ export function MultiEventPageClient({ detail }: MultiEventPageClientProps) {
             {cities.map((c) => (
               <Link
                 key={c.slug}
-                href={`/events?city=${c.slug}`}
+                href={catalogEventsHref({ city: c.slug })}
                 className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-primary-300 hover:bg-primary-50"
               >
                 {c.name}

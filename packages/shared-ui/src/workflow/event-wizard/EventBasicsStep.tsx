@@ -5,18 +5,33 @@ import { galleryItemsToUrls, legacyUrlToItem } from '@daibilet/shared';
 
 import { ImageGalleryManager } from '../../media/ImageGalleryManager';
 import { SingleImageUploader } from '../../media/SingleImageUploader';
-import type { EventWizardBasicsDraft, EventWizardSourceMetaDraft } from './EventWizard.types';
+import type {
+  EventWizardBasicsDraft,
+  EventWizardLocationOption,
+  EventWizardSourceMetaDraft,
+} from './EventWizard.types';
 
 export interface EventBasicsStepProps {
   value: EventWizardBasicsDraft;
   onChange: (next: EventWizardBasicsDraft) => void;
   sourceMeta: EventWizardSourceMetaDraft;
   cities?: { id: string; name: string }[];
+  /** Локации выбранного города (после cityId); для экскурсий — точка старта. */
+  locationsForCity?: EventWizardLocationOption[];
+  locationsLoading?: boolean;
   /** Если задан — обложка/галерея через Cloudinary upload pipeline. */
   mediaUpload?: MediaUploadAdapter;
 }
 
-export function EventBasicsStep({ value, onChange, sourceMeta, cities, mediaUpload }: EventBasicsStepProps) {
+export function EventBasicsStep({
+  value,
+  onChange,
+  sourceMeta,
+  cities,
+  locationsForCity,
+  locationsLoading,
+  mediaUpload,
+}: EventBasicsStepProps) {
   const handleChange =
     (key: keyof EventWizardBasicsDraft) =>
     (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -40,6 +55,8 @@ export function EventBasicsStep({ value, onChange, sourceMeta, cities, mediaUplo
         handleChange={handleChange}
         lockedFields={sourceMeta.lockedFields}
         cities={cities}
+        locationsForCity={locationsForCity}
+        locationsLoading={locationsLoading}
       />
       <MediaEditor value={value} onChange={onChange} mediaUpload={mediaUpload} />
     </div>
@@ -54,16 +71,63 @@ interface BasicsFormProps {
   ) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   lockedFields?: string[];
   cities?: { id: string; name: string }[];
+  locationsForCity?: EventWizardLocationOption[];
+  locationsLoading?: boolean;
 }
 
-export function BasicsForm({ value, onChange, handleChange, lockedFields, cities: _cities }: BasicsFormProps) {
+const LOCATION_TYPE_LABELS: Record<string, string> = {
+  PIER: 'Причал',
+  VENUE: 'Площадка',
+  MEETING_POINT: 'Точка встречи',
+  OTHER: 'Другое',
+};
+
+export function BasicsForm({
+  value,
+  onChange,
+  handleChange,
+  lockedFields,
+  cities: _cities,
+  locationsForCity = [],
+  locationsLoading = false,
+}: BasicsFormProps) {
   const locked = new Set(lockedFields ?? []);
+
+  const handleCityChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const cityId = e.target.value;
+    onChange({
+      ...value,
+      cityId,
+      startLocationId: '',
+      locationProposalTitle: '',
+      locationProposalAddress: '',
+    });
+  };
+
+  const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const category = e.target.value;
+    if (category !== 'EXCURSION') {
+      onChange({
+        ...value,
+        category,
+        locationChoice: 'existing',
+        startLocationId: '',
+        locationProposalTitle: '',
+        locationProposalAddress: '',
+        locationProposalType: '',
+      });
+    } else {
+      onChange({ ...value, category });
+    }
+  };
 
   return (
     <div className="rounded-xl border bg-white px-4 py-4 sm:px-6 sm:py-5">
       <div className="mb-4">
         <h2 className="text-sm font-semibold text-slate-900">Основная информация</h2>
-        <p className="mt-1 text-xs text-slate-500">Название, категория, город и площадка события.</p>
+        <p className="mt-1 text-xs text-slate-500">
+          Название, город, категория; для экскурсий — точка старта маршрута после выбора города.
+        </p>
       </div>
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -93,24 +157,10 @@ export function BasicsForm({ value, onChange, handleChange, lockedFields, cities
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-800">Категория *</label>
-            <select
-              value={value.category}
-              onChange={handleChange('category')}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
-              disabled={locked.has('category')}
-            >
-              <option value="">Выберите категорию</option>
-              <option value="EXCURSION">Экскурсии</option>
-              <option value="MUSEUM">Музеи</option>
-              <option value="EVENT">Мероприятия</option>
-            </select>
-          </div>
-          <div>
             <label className="mb-1 block text-sm font-medium text-slate-800">Город *</label>
             <select
               value={value.cityId}
-              onChange={handleChange('cityId')}
+              onChange={handleCityChange}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
               disabled={locked.has('cityId')}
             >
@@ -120,6 +170,20 @@ export function BasicsForm({ value, onChange, handleChange, lockedFields, cities
                   {city.name}
                 </option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-800">Категория *</label>
+            <select
+              value={value.category}
+              onChange={handleCategoryChange}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
+              disabled={locked.has('category')}
+            >
+              <option value="">Выберите категорию</option>
+              <option value="EXCURSION">Экскурсии</option>
+              <option value="MUSEUM">Музеи</option>
+              <option value="EVENT">Мероприятия</option>
             </select>
           </div>
           <div>
@@ -134,6 +198,14 @@ export function BasicsForm({ value, onChange, handleChange, lockedFields, cities
             </select>
           </div>
         </div>
+
+        <ExcursionStartLocationBlock
+          value={value}
+          onChange={onChange}
+          locations={locationsForCity}
+          loading={locationsLoading}
+          typeLabels={LOCATION_TYPE_LABELS}
+        />
 
         <VenueSelector value={value} onChange={onChange} />
 
@@ -276,6 +348,129 @@ export function MediaEditor({ value, onChange, mediaUpload }: MediaEditorProps) 
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface ExcursionStartLocationBlockProps {
+  value: EventWizardBasicsDraft;
+  onChange: (next: EventWizardBasicsDraft) => void;
+  locations: EventWizardLocationOption[];
+  loading: boolean;
+  typeLabels: Record<string, string>;
+}
+
+function ExcursionStartLocationBlock({
+  value,
+  onChange,
+  locations,
+  loading,
+  typeLabels,
+}: ExcursionStartLocationBlockProps) {
+  if (value.category !== 'EXCURSION' || !value.cityId) {
+    return null;
+  }
+
+  const labelForType = (t: string) => typeLabels[t] ?? t;
+
+  return (
+    <div className="space-y-3 rounded-lg border border-sky-100 bg-sky-50/40 px-4 py-4">
+      <div>
+        <div className="text-sm font-medium text-slate-900">Старт маршрута</div>
+        <p className="mt-1 text-xs text-slate-600">
+          Выберите точку из справочника для этого города или отправьте новую локацию на рассмотрение.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-4">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
+          <input
+            type="radio"
+            name="excursion-location-mode"
+            checked={value.locationChoice === 'existing'}
+            onChange={() => onChange({ ...value, locationChoice: 'existing' })}
+            className="border-slate-300 text-sky-600 focus:ring-sky-500"
+          />
+          Из справочника
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-800">
+          <input
+            type="radio"
+            name="excursion-location-mode"
+            checked={value.locationChoice === 'propose'}
+            onChange={() =>
+              onChange({
+                ...value,
+                locationChoice: 'propose',
+                startLocationId: '',
+              })
+            }
+            className="border-slate-300 text-sky-600 focus:ring-sky-500"
+          />
+          Предложить новую
+        </label>
+      </div>
+
+      {value.locationChoice === 'existing' && (
+        <div className="space-y-1">
+          <label className="mb-1 block text-sm font-medium text-slate-800">Локация</label>
+          <select
+            value={value.startLocationId}
+            onChange={(e) => onChange({ ...value, startLocationId: e.target.value })}
+            disabled={loading}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0 disabled:opacity-60"
+          >
+            <option value="">{loading ? 'Загрузка…' : 'Выберите локацию'}</option>
+            {locations.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.shortTitle || loc.title}
+                {loc.type ? ` (${labelForType(loc.type)})` : ''}
+              </option>
+            ))}
+          </select>
+          {!loading && locations.length === 0 && (
+            <p className="text-xs text-amber-800">
+              В этом городе пока нет локаций в справочнике — переключитесь на «Предложить новую».
+            </p>
+          )}
+        </div>
+      )}
+
+      {value.locationChoice === 'propose' && (
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-800">Название точки *</label>
+            <input
+              value={value.locationProposalTitle}
+              onChange={(e) => onChange({ ...value, locationProposalTitle: e.target.value })}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
+              placeholder="Например: причал у Аничкова моста"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-800">Адрес / ориентир</label>
+            <input
+              value={value.locationProposalAddress}
+              onChange={(e) => onChange({ ...value, locationProposalAddress: e.target.value })}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
+              placeholder="Необязательно"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-800">Тип</label>
+            <select
+              value={value.locationProposalType}
+              onChange={(e) => onChange({ ...value, locationProposalType: e.target.value })}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-0"
+            >
+              <option value="">По умолчанию (другое)</option>
+              <option value="PIER">Причал</option>
+              <option value="VENUE">Площадка</option>
+              <option value="MEETING_POINT">Точка встречи</option>
+              <option value="OTHER">Другое</option>
+            </select>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

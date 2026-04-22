@@ -1,6 +1,6 @@
-import type { OrderEntity } from '@/entities/order/types';
+import type { OrderDetail } from '@/entities/order/types';
 
-const ORDERS: OrderEntity[] = [
+const ORDER_DETAILS: OrderDetail[] = [
   {
     id: 'ord-1',
     code: 'DB-104821',
@@ -9,8 +9,17 @@ const ORDERS: OrderEntity[] = [
     currency: 'RUB',
     buyerName: 'Анна Смирнова',
     buyerEmail: 'anna.smirnova@example.com',
+    buyerPhone: '+7 900 ***-**-42',
     eventTitle: 'Речная прогулка по Неве и каналам',
+    eventId: 'evt-1',
     supplierName: 'СПБ Ривер Тур',
+    supplierId: 'sup-1',
+    paymentMethod: 'Банковская карта (эквайринг)',
+    paymentExternalRef: 'pay_live_••••8291',
+    lineItems: [
+      { id: 'li-1', title: 'Взрослый билет', quantity: 2, unitPrice: 2700, currency: 'RUB' },
+    ],
+    internalNote: 'Оплата прошла без 3-D Secure.',
     createdAt: '2025-03-21T09:12:00.000Z',
     updatedAt: '2025-03-21T09:13:00.000Z',
   },
@@ -22,8 +31,14 @@ const ORDERS: OrderEntity[] = [
     currency: 'RUB',
     buyerName: 'Илья Кузнецов',
     buyerEmail: 'i.kuznetsov@example.com',
+    buyerPhone: '+7 903 ***-**-11',
     eventTitle: 'Эрмитаж без очереди: малый групповой тур',
+    eventId: 'evt-2',
     supplierName: 'Дайбилет Экскурсии',
+    supplierId: 'sup-2',
+    paymentMethod: 'Ожидает оплаты',
+    paymentExternalRef: '—',
+    lineItems: [{ id: 'li-2', title: 'Участник группы', quantity: 1, unitPrice: 3200, currency: 'RUB' }],
     createdAt: '2025-03-21T10:40:00.000Z',
     updatedAt: '2025-03-21T10:40:00.000Z',
   },
@@ -35,8 +50,15 @@ const ORDERS: OrderEntity[] = [
     currency: 'RUB',
     buyerName: 'Елена Волкова',
     buyerEmail: 'elena.v@example.com',
+    buyerPhone: '+7 921 ***-**-88',
     eventTitle: 'Ночной дворец Артиллерийского музея',
+    eventId: 'evt-3',
     supplierName: 'Музейные ночи РФ',
+    supplierId: 'sup-4',
+    paymentMethod: 'Банковская карта (эквайринг)',
+    paymentExternalRef: 'pay_live_••••4410 (возврат)',
+    lineItems: [{ id: 'li-3', title: 'Стандартный билет', quantity: 1, unitPrice: 1800, currency: 'RUB' }],
+    internalNote: 'Возврат по запросу клиента, согласовано.',
     createdAt: '2025-03-18T14:00:00.000Z',
     updatedAt: '2025-03-19T08:30:00.000Z',
   },
@@ -48,13 +70,23 @@ const ORDERS: OrderEntity[] = [
     currency: 'RUB',
     buyerName: 'Михаил Петров',
     buyerEmail: 'm.petrov@example.com',
+    buyerPhone: '+7 981 ***-**-03',
     eventTitle: 'Крыши Петербурга: закатный маршрут',
+    eventId: 'evt-4',
     supplierName: 'RoofSPB',
+    supplierId: 'sup-3',
+    paymentMethod: '—',
+    paymentExternalRef: '—',
+    lineItems: [{ id: 'li-4', title: 'Участник экскурсии', quantity: 1, unitPrice: 4500, currency: 'RUB' }],
     createdAt: '2025-03-17T19:05:00.000Z',
     updatedAt: '2025-03-17T19:20:00.000Z',
   },
 ];
 
-export function getMockOrders(): OrderEntity[] {
-  return [...ORDERS];
+export function getMockOrders(): OrderDetail[] {
+  return [...ORDER_DETAILS];
+}
+
+export function getMockOrderById(id: string): OrderDetail | undefined {
+  return ORDER_DETAILS.find((o) => o.id === id);
 }

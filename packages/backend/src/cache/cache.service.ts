@@ -41,6 +41,10 @@ export const CACHE_TTL = {
   ),
   /** Дашборд `GET /admin/dashboard/analytics-tabs` (AN-1). TTL кламп 60–180s. */
   ANALYTICS_TABS: Math.min(180, Math.max(60, parseTtlEnv('CACHE_TTL_ANALYTICS_TABS', 120))),
+  /** SEO Audit (on-the-fly). TTL кламп 60–120s. */
+  SEO_AUDIT: Math.min(120, Math.max(60, parseTtlEnv('CACHE_TTL_SEO_AUDIT', 90))),
+  /** GET /admin/dashboard/summary — агрегат операционной сводки. */
+  DASHBOARD_SUMMARY: Math.min(180, Math.max(60, parseTtlEnv('CACHE_TTL_DASHBOARD_SUMMARY', 90))),
 } as const;
 
 @Injectable()

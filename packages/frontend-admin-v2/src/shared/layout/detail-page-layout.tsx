@@ -12,6 +12,7 @@ export function DetailPageLayout({
   glyph,
   tabs,
   children,
+  blueprint,
 }: {
   title: string;
   subtitle?: string;
@@ -21,12 +22,14 @@ export function DetailPageLayout({
   glyph?: ReactNode;
   tabs?: ReactNode;
   children?: ReactNode;
+  blueprint?: ReactNode;
 }) {
   return (
     <PageContainer className="space-y-8">
       <PageHeader title={title} subtitle={subtitle} actions={actions} meta={meta} glyph={glyph} />
       {tabs}
       {children ? <div>{children}</div> : null}
+      {blueprint ? <div className="pt-2">{blueprint}</div> : null}
     </PageContainer>
   );
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -12,6 +12,45 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';
 @Controller('admin/seo-audit')
 export class AdminSeoAuditController {
   constructor(private readonly seoAudit: SeoAuditService) {}
+
+  @Get('summary')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  @ApiOkResponse({ description: 'Unified SEO audit summary (soft, on-the-fly)' })
+  getSummary() {
+    return this.seoAudit.getUnifiedSummary();
+  }
+
+  @Get('issues')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  @ApiOkResponse({ description: 'Unified SEO audit issues list (soft, on-the-fly)' })
+  getIssues(
+    @Query('entityType') entityType?: string,
+    @Query('severity') severity?: string,
+    @Query('issueCode') issueCode?: string,
+    @Query('search') search?: string,
+    @Query('cityId') cityId?: string,
+    @Query('onlyIssues') onlyIssues?: 'true' | 'false',
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.seoAudit.getUnifiedIssues({
+      entityType,
+      severity,
+      issueCode,
+      search,
+      cityId,
+      onlyIssues,
+      page,
+      limit,
+    });
+  }
+
+  @Get('entity/:entityType/:entityId')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  @ApiOkResponse({ description: 'Unified SEO audit issues for entity (soft, on-the-fly)' })
+  getEntityIssues(@Param('entityType') entityType: string, @Param('entityId') entityId: string) {
+    return this.seoAudit.getUnifiedEntityIssues({ entityType, entityId });
+  }
 
   @Get('events')
   @Roles('ADMIN', 'EDITOR')

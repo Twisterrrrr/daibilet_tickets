@@ -1,7 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { type TcEvent, type TcOrder, type TcTicket, isTcEvent, isTcEventArray } from './tc-api.types';
+import {
+  type TcEvent,
+  type TcOrder,
+  type TcOrdersListResponse,
+  type TcRefundRequestsListResponse,
+  type TcTicket,
+  isTcEvent,
+  isTcEventArray,
+} from './tc-api.types';
 import { runWithLimit, withRetry } from '../common/api-rate-limit.util';
 import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.util';
 
@@ -11,7 +19,7 @@ import { combineAbortSignals, getHttpTimeoutMs } from '../common/http-signal.uti
  * Документация: https://ticketscloud.readthedocs.io/ru/latest/
  *
  * Каталог событий: GET /v1/services/simple/events (REST, deprecated but works)
- * Заказы:          POST /v2/resources/orders (REST v2)
+ * Заказы:          POST /v2/resources/orders, GET /v2/resources/orders (REST v2)
  * Авторизация:     Authorization: key {api_key}
  * Base URL:        https://ticketscloud.com
  */
@@ -232,6 +240,90 @@ export class TcApiService {
    */
   async cancelOrder(orderId: string): Promise<unknown> {
     return this.updateOrder(orderId, { status: 'cancelled' });
+  }
+
+  /**
+   * Список заказов (пагинация).
+   * GET /v2/resources/orders
+   * @see https://ticketscloud.readthedocs.io/ru/latest/extra/orders_list.html
+   */
+  async listOrders(opts?: {
+    /** ISO диапазон `от,до` через запятую */
+    createdAt?: string;
+    /** Статусы через запятую, напр. `done,cancelled` */
+    status?: string;
+    /** id мероприятий TC через запятую */
+    events?: string;
+    onlyWithCustomer?: boolean;
+    page?: number;
+    pageSize?: number;
+    signal?: AbortSignal;
+  }): Promise<TcOrdersListResponse> {
+    const params: Record<string, string> = {};
+    if (opts?.createdAt) params.created_at = opts.createdAt;
+    if (opts?.status) params.status = opts.status;
+    if (opts?.events) params.events = opts.events;
+    if (opts?.onlyWithCustomer === true) params.only_with_customer = 'true';
+    if (opts?.page != null) params.page = String(opts.page);
+    if (opts?.pageSize != null) params.page_size = String(opts.pageSize);
+
+    const raw = await this.request<unknown>('/v2/resources/orders', params, opts?.signal);
+    if (!raw || typeof raw !== 'object') {
+      return { data: [] };
+    }
+    const obj = raw as Record<string, unknown>;
+    const data = Array.isArray(obj.data) ? obj.data : [];
+    const pagination = obj.pagination;
+    const refs = obj.refs;
+    return {
+      data,
+      pagination:
+        pagination && typeof pagination === 'object'
+          ? (pagination as TcOrdersListResponse['pagination'])
+          : undefined,
+      refs: refs && typeof refs === 'object' ? (refs as Record<string, unknown>) : undefined,
+    };
+  }
+
+  /**
+   * Список заявок на возврат (Ticketscloud).
+   * GET /v2/resources/refund_requests
+   * @see https://ticketscloud.readthedocs.io/ru/latest/extra/refunds_list.html
+   */
+  async listRefundRequests(opts?: {
+    createdAt?: string;
+    finishedAt?: string;
+    events?: string;
+    /** new | in_progress | approved | rejected — через запятую */
+    status?: string;
+    page?: number;
+    pageSize?: number;
+    signal?: AbortSignal;
+  }): Promise<TcRefundRequestsListResponse> {
+    const params: Record<string, string> = {};
+    if (opts?.createdAt) params.created_at = opts.createdAt;
+    if (opts?.finishedAt) params.finished_at = opts.finishedAt;
+    if (opts?.events) params.events = opts.events;
+    if (opts?.status) params.status = opts.status;
+    if (opts?.page != null) params.page = String(opts.page);
+    if (opts?.pageSize != null) params.page_size = String(opts.pageSize);
+
+    const raw = await this.request<unknown>('/v2/resources/refund_requests', params, opts?.signal);
+    if (!raw || typeof raw !== 'object') {
+      return { data: [] };
+    }
+    const obj = raw as Record<string, unknown>;
+    const data = Array.isArray(obj.data) ? obj.data : [];
+    const pagination = obj.pagination;
+    const refs = obj.refs;
+    return {
+      data,
+      pagination:
+        pagination && typeof pagination === 'object'
+          ? (pagination as TcRefundRequestsListResponse['pagination'])
+          : undefined,
+      refs: refs && typeof refs === 'object' ? (refs as Record<string, unknown>) : undefined,
+    };
   }
 
   /**

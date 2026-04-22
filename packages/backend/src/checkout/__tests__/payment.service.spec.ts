@@ -819,4 +819,45 @@ describe('PaymentService', () => {
       expect(result.status).toBe('PAID');
     });
   });
+
+  describe('createYookassaRefund', () => {
+    it('passes caller Idempotence-Key unchanged on each call (stable retries)', async () => {
+      CONFIG_DEFAULTS.YOOKASSA_SHOP_ID = 'shop';
+      CONFIG_DEFAULTS.YOOKASSA_SECRET_KEY = 'sec';
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          id: 'refund-uuid',
+          payment_id: 'pay-uuid',
+          status: 'succeeded',
+          amount: { value: '10.00', currency: 'RUB' },
+          created_at: new Date().toISOString(),
+        }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const stableKey = 'refund:intent:int-abc';
+      await service.createYookassaRefund({
+        providerPaymentId: 'yk-pay-1',
+        amount: 1000,
+        idempotencyKey: stableKey,
+      });
+
+      const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+      expect(headers['Idempotence-Key']).toBe(stableKey);
+
+      await service.createYookassaRefund({
+        providerPaymentId: 'yk-pay-1',
+        amount: 1000,
+        idempotencyKey: stableKey,
+      });
+      const headers2 = (fetchMock.mock.calls[1][1] as RequestInit).headers as Record<string, string>;
+      expect(headers2['Idempotence-Key']).toBe(stableKey);
+
+      vi.unstubAllGlobals();
+      CONFIG_DEFAULTS.YOOKASSA_SHOP_ID = '';
+      CONFIG_DEFAULTS.YOOKASSA_SECRET_KEY = '';
+    });
+  });
 });

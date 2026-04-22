@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { StructuralTagGroup, TagKind } from '@prisma/client';
+import { StructuralTagGroup, TagKind } from '@/prisma-client';
 
 type StructuralTagRow = {
   id: string;

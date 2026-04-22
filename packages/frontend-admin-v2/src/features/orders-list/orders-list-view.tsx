@@ -1,4 +1,5 @@
 import { Inbox } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 
 import type { OrderEntity } from '@/entities/order/types';
@@ -11,14 +12,40 @@ import { SearchInput } from '@/shared/ui/search-input';
 import { Select } from '@/shared/ui/select-field';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { StatusBadge } from '@/shared/ui/status-badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
+import { compareSortValues, SortableTableHead, type TableSortDirection } from '@/shared/ui/sortable-table-head';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/shared/ui/table';
 import { DataTableShell } from '@/widgets/data-table-shell/data-table-shell';
 import { PageStateToggle } from '@/widgets/page-state-toggle/page-state-toggle';
+
+type OrderSortColumn = 'code' | 'status' | 'amount' | 'event' | 'buyer' | 'supplier' | 'created';
+
+function orderSortValue(key: OrderSortColumn, o: OrderEntity): string | number {
+  switch (key) {
+    case 'code':
+      return o.code;
+    case 'status':
+      return o.status;
+    case 'amount':
+      return o.amount;
+    case 'event':
+      return o.eventTitle;
+    case 'buyer':
+      return `${o.buyerName} ${o.buyerEmail}`;
+    case 'supplier':
+      return o.supplierName;
+    case 'created':
+      return new Date(o.createdAt).getTime();
+    default:
+      return '';
+  }
+}
 
 export function OrdersListView({ rows }: { rows: OrderEntity[] }) {
   const [demo, setDemo] = useState<PageDataState>('data');
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [sortColumn, setSortColumn] = useState<OrderSortColumn | null>(null);
+  const [sortDir, setSortDir] = useState<TableSortDirection>('asc');
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -28,6 +55,23 @@ export function OrdersListView({ rows }: { rows: OrderEntity[] }) {
       return true;
     });
   }, [rows, q, status]);
+
+  const sortedFiltered = useMemo(() => {
+    if (!sortColumn) return filtered;
+    const mult = sortDir === 'asc' ? 1 : -1;
+    return [...filtered].sort(
+      (a, b) => mult * compareSortValues(orderSortValue(sortColumn, a), orderSortValue(sortColumn, b)),
+    );
+  }, [filtered, sortColumn, sortDir]);
+
+  const toggleSort = (key: OrderSortColumn) => {
+    if (sortColumn !== key) {
+      setSortColumn(key);
+      setSortDir('asc');
+      return;
+    }
+    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+  };
 
   return (
     <DataTableShell
@@ -65,19 +109,58 @@ export function OrdersListView({ rows }: { rows: OrderEntity[] }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Код</TableHead>
-              <TableHead>Статус</TableHead>
-              <TableHead>Сумма</TableHead>
-              <TableHead>Событие</TableHead>
-              <TableHead>Покупатель</TableHead>
-              <TableHead>Поставщик</TableHead>
-              <TableHead>Создан</TableHead>
+              <SortableTableHead
+                label="Код"
+                active={sortColumn === 'code'}
+                direction={sortDir}
+                onToggle={() => toggleSort('code')}
+              />
+              <SortableTableHead
+                label="Статус"
+                active={sortColumn === 'status'}
+                direction={sortDir}
+                onToggle={() => toggleSort('status')}
+              />
+              <SortableTableHead
+                label="Сумма"
+                active={sortColumn === 'amount'}
+                direction={sortDir}
+                onToggle={() => toggleSort('amount')}
+              />
+              <SortableTableHead
+                label="Событие"
+                active={sortColumn === 'event'}
+                direction={sortDir}
+                onToggle={() => toggleSort('event')}
+              />
+              <SortableTableHead
+                label="Покупатель"
+                active={sortColumn === 'buyer'}
+                direction={sortDir}
+                onToggle={() => toggleSort('buyer')}
+              />
+              <SortableTableHead
+                label="Поставщик"
+                active={sortColumn === 'supplier'}
+                direction={sortDir}
+                onToggle={() => toggleSort('supplier')}
+              />
+              <SortableTableHead
+                label="Создан"
+                active={sortColumn === 'created'}
+                direction={sortDir}
+                onToggle={() => toggleSort('created')}
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((o) => (
+            {sortedFiltered.map((o) => (
               <TableRow key={o.id}>
-                <TableCell className="font-mono text-small text-text-primary">{o.code}</TableCell>
+                <TableCell className="font-mono text-small text-text-primary">
+                  <Link className="text-accent underline hover:no-underline" to={`/orders/${o.id}`}>
+                    {o.code}
+                  </Link>
+                </TableCell>
                 <TableCell>
                   <StatusBadge value={o.status} kind="order" />
                 </TableCell>

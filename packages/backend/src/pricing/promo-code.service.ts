@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PromoType } from '@prisma/client';
+import { PromoType } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

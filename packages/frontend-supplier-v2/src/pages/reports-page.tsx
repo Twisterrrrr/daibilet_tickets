@@ -91,6 +91,7 @@ export function ReportsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Отчёт о продажах"
+        subtitle="Сводка и детализация в едином каркасе с балансом и документами."
         glyph={<PageGlyph icon={BarChart3} tone="amber" />}
         actions={
           <a

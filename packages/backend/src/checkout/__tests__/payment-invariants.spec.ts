@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { partitionCart, PaymentFlowType, SnapshotLineItem } from '../cart-partitioning';
 import { PaymentService } from '../payment.service';
+import { buildYookassaWebhookDedupeKey } from '../yookassa.types';
 import { WebhookIdempotencyService } from '../webhook-idempotency.service';
 
 // ============================================================
@@ -106,9 +107,9 @@ function createMockPrisma() {
       update: vi.fn().mockReturnValue(Promise.resolve(null)),
     },
     processedWebhookEvent: {
-      findUnique: vi.fn().mockImplementation(({ where }: any) => webhookEvents.get(where.providerEventId) || null),
+      findUnique: vi.fn().mockImplementation(({ where }: any) => webhookEvents.get(where.dedupeKey) || null),
       create: vi.fn().mockImplementation(({ data }: any) => {
-        webhookEvents.set(data.providerEventId, data);
+        webhookEvents.set(data.dedupeKey, data);
         return data;
       }),
     },
@@ -298,16 +299,16 @@ describe('Invariant 2c: ProcessedWebhookEvent stores paymentIntentId', () => {
     const intentId = 'intent-uuid-123';
 
     await idempotency.processOnce(
-      'yk-evt-500',
+      'payment.succeeded:yk-evt-500',
       'YOOKASSA',
       'payment.succeeded',
       { mock: true },
       async () => 'PAID',
-      intentId, // paymentIntentId
+      { paymentIntentId: intentId, providerObjectId: 'yk-evt-500' },
     );
 
     // Verify the stored event has paymentIntentId
-    const stored = prisma.webhookEvents.get('yk-evt-500');
+    const stored = prisma.webhookEvents.get('payment.succeeded:yk-evt-500');
     expect(stored).toBeDefined();
     expect(stored!.paymentIntentId).toBe(intentId);
     expect(stored!.providerEventId).toBe('yk-evt-500');
@@ -319,15 +320,14 @@ describe('Invariant 2c: ProcessedWebhookEvent stores paymentIntentId', () => {
     const idempotency = new WebhookIdempotencyService(prisma as any);
 
     await idempotency.processOnce(
-      'yk-evt-501',
+      'payment.canceled:yk-evt-501',
       'YOOKASSA',
       'payment.canceled',
       {},
       async () => 'CANCELLED',
-      // No paymentIntentId
     );
 
-    const stored = prisma.webhookEvents.get('yk-evt-501');
+    const stored = prisma.webhookEvents.get('payment.canceled:yk-evt-501');
     expect(stored).toBeDefined();
     expect(stored!.paymentIntentId).toBeUndefined();
     expect(stored!.result).toBe('CANCELLED');
@@ -338,12 +338,19 @@ describe('Invariant 2c: ProcessedWebhookEvent stores paymentIntentId', () => {
     const idempotency = new WebhookIdempotencyService(prisma as any);
 
     // First call
-    await idempotency.processOnce('yk-dup', 'YOOKASSA', 'payment.succeeded', {}, async () => 'PAID', 'intent-1');
+    await idempotency.processOnce(
+      'payment.succeeded:yk-dup',
+      'YOOKASSA',
+      'payment.succeeded',
+      {},
+      async () => 'PAID',
+      { paymentIntentId: 'intent-1', providerObjectId: 'yk-dup' },
+    );
 
     // Second call (duplicate)
     let handlerCalled = false;
     const result = await idempotency.processOnce(
-      'yk-dup',
+      'payment.succeeded:yk-dup',
       'YOOKASSA',
       'payment.succeeded',
       {},
@@ -351,10 +358,24 @@ describe('Invariant 2c: ProcessedWebhookEvent stores paymentIntentId', () => {
         handlerCalled = true;
         return 'PAID';
       },
-      'intent-1',
+      { paymentIntentId: 'intent-1', providerObjectId: 'yk-dup' },
     );
 
     expect(result.processed).toBe(false);
     expect(handlerCalled).toBe(false);
+  });
+});
+
+describe('buildYookassaWebhookDedupeKey', () => {
+  it('returns eventType:object.id', () => {
+    expect(buildYookassaWebhookDedupeKey('payment.succeeded', { id: 'pay-uuid' })).toBe('payment.succeeded:pay-uuid');
+    expect(buildYookassaWebhookDedupeKey('payment.waiting_for_capture', { id: 'pay-uuid' })).toBe(
+      'payment.waiting_for_capture:pay-uuid',
+    );
+  });
+
+  it('returns null without id', () => {
+    expect(buildYookassaWebhookDedupeKey('payment.succeeded', {})).toBeNull();
+    expect(buildYookassaWebhookDedupeKey('payment.succeeded', null)).toBeNull();
   });
 });

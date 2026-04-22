@@ -3,13 +3,15 @@
 // ==============================================
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["filteredRelationCount"]
+  provider = "prisma-client"
+  // Prisma 7 требует явный output. Генерируем в репозиторий,
+  // а код импортирует через shim `@/prisma-client`.
+  // Путь считается относительно папки prisma/ (где лежит schema.prisma).
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ========================
@@ -25,7 +27,9 @@ enum EventSource {
 enum EventCategory {
   EXCURSION // Экскурсии
   MUSEUM // Музеи и выставки
-  EVENT // Мероприятия (концерты, шоу, театр, спорт, фестивали)
+  EVENT // Мероприятия (концерты, шоу, театр, фестивали и т.д.)
+  ACTIVITY // Активный отдых (спорт на воде/суше, экстрим, картинг и т.д.)
+  ENTERTAINMENT // Развлечения (квесты, аттракционы, интерактив, эскейпы и т.д.)
 }
 
 enum EventAudience {
@@ -55,6 +59,7 @@ enum EventSubcategory {
   CONTEMPORARY // Современное искусство
   // EVENT
   CONCERT // Концерт
+  JAZZ // Джаз (отдельный сегмент мероприятий: клубы, фестивали, джаз на теплоходе и т.д.)
   SHOW // Шоу / Представление
   STANDUP // Стендап
   THEATER // Театр / Спектакль
@@ -125,6 +130,7 @@ enum AdminRole {
   ADMIN
   EDITOR
   VIEWER
+  OWNER // Владелец (полный доступ; anti-lockout вместе с ADMIN)
 }
 
 enum SupplierRole {
@@ -168,6 +174,24 @@ enum SubcategoryType {
   VENUE_ONLY
 }
 
+enum SubcategoryLayer {
+  PRIMARY
+  SECONDARY
+}
+
+/// Режим SEO/маршрутизации лендинга по подкатегории (не смешивать с «участием в подборках»).
+enum SubcategoryLandingMode {
+  DISABLED
+  AUTO
+  TOPIC_HUB
+}
+
+/// Цель точки маршрута (FK XOR: venue XOR event)
+enum RoutePointTargetType {
+  VENUE
+  EVENT
+}
+
 /// Режим наследования правил возврата/обмена (Venue)
 enum VenueRefundPolicyMode {
   INHERIT_SUPPLIER
@@ -196,6 +220,53 @@ enum VenueType {
   THEATER // Театр
   PALACE // Дворец / Усадьба
   PARK // Парк / Заповедник
+  // Food & nightlife (manual now, import-ready later)
+  RESTAURANT
+  CAFE
+  BAR
+  FASTFOOD
+}
+
+/// Импортируемые и ручные площадки: DRAFT → модерация → ACTIVE; MERGED → каноническая цель в mergeTargetId
+enum VenueLifecycleStatus {
+  DRAFT
+  ACTIVE
+  MERGED
+  REJECTED
+}
+
+enum VenueSourceType {
+  IMPORTED
+  MANUAL
+}
+
+enum VenueImportSource {
+  TICKETSCLOUD
+  TEPLOHOD
+}
+
+/// Уровень доверия к потоку импорта (Stage 5: авто-модерация).
+enum VenueModerationTrustLevel {
+  LOW
+  MEDIUM
+  HIGH
+  FULL_AUTO
+}
+
+enum VenueModerationAction {
+  APPROVE
+  REJECT
+  MERGE
+}
+
+enum VenueModerationReasonCode {
+  BAD_SOURCE_DATA
+  DUPLICATE_NOT_CONFIRMED
+  WRONG_CITY
+  WRONG_ADDRESS
+  SPAM
+  IRRELEVANT
+  OTHER
 }
 
 enum DateMode {
@@ -205,6 +276,7 @@ enum DateMode {
 
 enum CollectionSourceType {
   MANUAL
+  AUTO
   SUGGESTED
   HYBRID
   ACTIVE
@@ -231,6 +303,65 @@ enum LandingStatus {
   DRAFT
   ACTIVE
   ARCHIVED
+}
+
+enum LandingType {
+  CITY
+  MULTI_CITY
+}
+
+/// Блоки композиции публичного лендинга (Admin → public renderer).
+enum LandingBlockType {
+  HERO
+  TRUST_BADGES
+  VALUE_PROPS
+  QUICK_FILTERS
+  FEATURED_VARIANTS
+  SCHEDULE_PREVIEW
+  CITY_GRID
+  CATEGORY_CHIPS
+  INFO_ICONS
+  STORY
+  HIGHLIGHTS
+  ITINERARY
+  PRICING
+  FAQ
+  REVIEWS
+  GALLERY
+  COMPARISON
+  RELATED_LANDINGS
+  RELATED_COLLECTIONS
+  RELATED_ARTICLES
+  CTA_BANNER
+  SEO_TEXT
+  RAW_RICH_TEXT
+}
+
+/// Режим канонического URL относительно связанного лендинга.
+enum LandingCanonicalMode {
+  SELF
+  ALTERNATE
+  PASS_THROUGH
+}
+
+/// Режим городского каталожного хаба (intent + конфигурация витрины).
+enum CityCatalogHubStatus {
+  DRAFT
+  ACTIVE
+  DISABLED
+}
+
+/// Режим публичной страницы площадки: без хаба / базовая страница / полноценный venue hub.
+enum VenuePageMode {
+  NONE
+  BASIC
+  HUB
+}
+
+enum LandingEventSourceType {
+  AUTO_QUERY
+  PRIMARY_COLLECTION
+  MIXED
 }
 
 enum LandingTemplateType {
@@ -327,18 +458,33 @@ enum CreatedByType {
 // ========================
 
 model AdminUser {
-  id               String    @id @default(uuid()) @db.Uuid
-  email            String    @unique
-  passwordHash     String
-  name             String
-  role             AdminRole @default(EDITOR)
-  isActive         Boolean   @default(true)
-  refreshTokenHash String? // хеш refresh token для инвалидации
-  lastLoginAt      DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                     String    @id @default(uuid()) @db.Uuid
+  email                  String    @unique
+  passwordHash           String
+  name                   String
+  role                   AdminRole @default(EDITOR)
+  isActive               Boolean   @default(true)
+  refreshTokenHash       String? // хеш refresh token для инвалидации
+  /// SHA-256 hex одноразового токена сброса пароля (сырой токен нигде не храним)
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  lastLoginAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  venueModerationDecisions VenueModerationDecision[]
 
   @@map("admin_users")
+}
+
+/// KV-настройки продукта (SEO/System и др.) — без секретов; canonical URL сайта задаётся в ENV.
+model AppSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique @db.VarChar(160)
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
 }
 
 // ========================
@@ -364,15 +510,20 @@ model User {
 }
 
 model UserFavorite {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
+  id        String  @id @default(uuid()) @db.Uuid
+  userId    String  @db.Uuid
+  /// Legacy: slug события; предпочтительно заполнять eventId (dual-write) для FK-целостности.
   eventSlug String
+  eventId   String? @db.Uuid
+
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventSlug])
   @@index([userId])
+  @@index([eventId])
   @@map("user_favorites")
 }
 
@@ -401,21 +552,24 @@ model AuditLog {
 // ========================
 
 model City {
-  id              String   @id @default(uuid()) @db.Uuid
-  slug            String   @unique
-  name            String
-  description     String?  @db.Text
-  heroImage       String?
-  lat             Decimal? @db.Decimal(10, 7)
-  lng             Decimal? @db.Decimal(10, 7)
-  timezone        String   @default("Europe/Moscow")
-  metaTitle       String?
-  metaDescription String?  @db.Text
-  isFeatured      Boolean  @default(false)
-  isActive        Boolean  @default(true)
-  version         Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String               @id @default(uuid()) @db.Uuid
+  slug             String               @unique
+  name             String
+  description      String?              @db.Text
+  heroImage        String?
+  lat              Decimal?             @db.Decimal(10, 7)
+  lng              Decimal?             @db.Decimal(10, 7)
+  timezone         String               @default("Europe/Moscow")
+  metaTitle        String?
+  metaDescription  String?              @db.Text
+  isFeatured       Boolean              @default(false)
+  isActive         Boolean              @default(true)
+  /// Город задуман как основная географическая точка входа в каталог (витринный city hub).
+  isCatalogHub     Boolean              @default(false)
+  catalogHubStatus CityCatalogHubStatus @default(DISABLED)
+  version          Int                  @default(0)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   events       Event[]
   venues       Venue[]
@@ -429,6 +583,10 @@ model City {
   // Регионы: город может быть хабом региона и/или входить в регион
   hubForRegions Region[]     @relation("RegionHub")
   regionLinks   RegionCity[]
+
+  promoPlacementBlocks PromoPlacementBlock[]
+  districts            District[]
+  metroStations        MetroStation[]
 
   @@map("cities")
 }
@@ -468,6 +626,90 @@ model RegionCity {
 }
 
 // ========================
+// Ticket provider / B2B integrations (capability foundation)
+// ========================
+
+enum TicketProviderCode {
+  MANUAL
+  TICKETS_CLOUD
+  TEPLOHOD
+  RADARIO
+  QTICKETS
+  INTICKETS
+  EDINOE_POLE
+  TICKETNET
+  YANDEX_TICKETS
+  MOSRU_RUSSPASS
+  LANIT
+}
+
+enum ProviderProtocolType {
+  REST_JSON
+  SOAP_XML
+  CUSTOM
+}
+
+enum ProviderOperationalClass {
+  CORE_REST
+  ENTERPRISE_GATED
+  LEGACY_SOAP
+  CUSTOM_PARTNER
+}
+
+enum ProviderAccountAuthType {
+  NONE
+  API_KEY
+  BEARER
+  BASIC
+  OAUTH2
+  MUTUAL_TLS
+  CUSTOM
+}
+
+enum ProviderAccountEnvironment {
+  SANDBOX
+  PRODUCTION
+}
+
+enum ProviderLinkStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+enum ProviderSyncMode {
+  PULL
+  PUSH
+  MANUAL
+  DISABLED
+}
+
+/// Статус заказа у провайдера (высокоуровневый). Этап пайплайна — integrationState.
+enum ExternalOrderStatus {
+  OPEN
+  CONFIRMED
+  CANCELLED
+  FAILED
+}
+
+/// Этап интеграции (webhook, сверка, подвисание).
+enum ExternalIntegrationState {
+  CREATED
+  SENT_TO_PROVIDER
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  FAILED
+  RECONCILE_REQUIRED
+}
+
+enum ProviderWebhookProcessingStatus {
+  RECEIVED
+  PROCESSED
+  ERROR
+  NO_OP_UNSUPPORTED
+}
+
+// ========================
 // События (из Ticketscloud / teplohod.info)
 // ========================
 
@@ -484,6 +726,7 @@ model Event {
   description         String?            @db.Text
   shortDescription    String?
   category            EventCategory
+  /// TODO: удалить после полной миграции на EventSubcategoryLink; только fallback чтения, запись новых значений запрещена.
   subcategories       EventSubcategory[] @default([])
   audience            EventAudience      @default(ALL)
   minAge              Int                @default(0)
@@ -529,6 +772,9 @@ model Event {
   /// Default capacity for MANUAL sessions created in admin (Teplohod-style schedule).
   defaultCapacityTotal Int?
 
+  /// Предпочитаемый ticket provider при отсутствии активного EventProviderLink (B2B foundation).
+  defaultProvider TicketProviderCode?
+
   // Дедупликация: если canonicalOfId задан — это дубль, скрывается из каталога
   canonicalOfId String? @db.Uuid
   canonicalOf   Event?  @relation("EventDuplicates", fields: [canonicalOfId], references: [id])
@@ -539,6 +785,8 @@ model Event {
   endLocationId   String? @db.Uuid
   operatorId      String? @db.Uuid
   routeId         String? @db.Uuid
+  /// Маршрут, привязанный к событию как владелец (1:1 MVP, см. Route.eventId)
+  eventOwnedRoute Route?  @relation("RouteOwnerRelation")
 
   // --- Core structured fields (гибридная модель PageTemplateSpecs) ---
   meetingPoint     String?                @db.Text // Точка сбора
@@ -548,12 +796,20 @@ model Event {
   refundPolicyMode EventRefundPolicyMode? @default(INHERIT_SUPPLIER)
   refundPolicyText String?                @db.Text
 
-  city                 City                  @relation(fields: [cityId], references: [id])
-  venue                Venue?                @relation("VenueEvents", fields: [venueId], references: [id])
-  startLocation        Location?             @relation("EventStartLocation", fields: [startLocationId], references: [id])
-  endLocation          Location?             @relation("EventEndLocation", fields: [endLocationId], references: [id])
-  operator             Operator?             @relation(fields: [operatorId], references: [id])
-  route                Route?                @relation(fields: [routeId], references: [id])
+  /// Речные прогулки: структурированные фасеты для таблицы сравнения (публичный read-model).
+  /// Питание (тип + меню) хранится в `EventOverride.contentTemplateData.catering`, а не в событии.
+  vesselName       String?
+  experienceFormat String?
+
+  city                 City                   @relation(fields: [cityId], references: [id])
+  venue                Venue?                 @relation("VenueEvents", fields: [venueId], references: [id])
+  startLocation        Location?              @relation("EventStartLocation", fields: [startLocationId], references: [id])
+  endLocation          Location?              @relation("EventEndLocation", fields: [endLocationId], references: [id])
+  operator             Operator?              @relation(fields: [operatorId], references: [id])
+  /// Поставщик/продавец (B2B); не путать с operatorId (маршрут/перевозчик). Dual-write: supplierId дублирует смысл operator там, где совпадают.
+  supplier             Operator?              @relation("EventSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
+  route                Route?                 @relation("EventCatalogRouteLink", fields: [routeId], references: [id], onDelete: SetNull)
+  userFavorites        UserFavorite[]
   offers               EventOffer[]
   sessions             EventSession[]
   tags                 EventTag[]
@@ -566,9 +822,13 @@ model Event {
   orderRequests        OrderRequest[]
   promoBlockEvents     PromoBlockEvent[]
   promoCollectionItems PromoCollectionItem[]
+  collectionItems      CollectionItem[]
+  promoPlacementBlocks PromoPlacementBlock[]
   promoCodes           PromoCode[]
   subcategoryLinks     EventSubcategoryLink[]
   dailyStats           DailyEventStats[]
+  providerLinks        EventProviderLink[]
+  routePoints          RoutePoint[]
 
   @@unique([source, tcEventId])
   @@index([source, tcEventId])
@@ -633,10 +893,12 @@ model EventSession {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  event        Event              @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  offer        EventOffer?        @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  packageItems PackageItem[]
-  stats        EventSessionStats?
+  event         Event                      @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  offer         EventOffer?                @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  packageItems  PackageItem[]
+  orderRequests OrderRequest[]
+  stats         EventSessionStats?
+  providerLinks EventSessionProviderLink[]
 
   @@unique([eventId, startsAt])
   @@index([startsAt])
@@ -646,6 +908,132 @@ model EventSession {
   @@index([offerId])
   @@index([offerId, startsAt])
   @@map("event_sessions")
+}
+
+/// Связь события с внешним событием у ticket provider.
+model EventProviderLink {
+  id              String             @id @default(uuid()) @db.Uuid
+  eventId         String             @db.Uuid
+  provider        TicketProviderCode
+  externalEventId String
+  syncMode        ProviderSyncMode   @default(PULL)
+  status          ProviderLinkStatus @default(ACTIVE)
+  isPrimary       Boolean            @default(false)
+  priority        Int                @default(0)
+  configJson      Json?
+  rawSnapshotJson Json?
+  lastError       String?            @db.Text
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalEventId])
+  @@index([eventId])
+  @@index([eventId, isPrimary])
+  @@map("event_provider_links")
+}
+
+/// Связь сеанса с внешним сеансом у ticket provider.
+model EventSessionProviderLink {
+  id                String             @id @default(uuid()) @db.Uuid
+  sessionId         String             @db.Uuid
+  provider          TicketProviderCode
+  externalSessionId String
+  syncMode          ProviderSyncMode   @default(PULL)
+  status            ProviderLinkStatus @default(ACTIVE)
+  isPrimary         Boolean            @default(false)
+  priority          Int                @default(0)
+  configJson        Json?
+  rawSnapshotJson   Json?
+  lastError         String?            @db.Text
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  session EventSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalSessionId])
+  @@index([sessionId])
+  @@map("event_session_provider_links")
+}
+
+/// Внешний заказ: integrationState — этап; status — итог у провайдера.
+model ExternalOrderLink {
+  id                String                   @id @default(uuid()) @db.Uuid
+  provider          TicketProviderCode
+  externalOrderId   String
+  status            ExternalOrderStatus      @default(OPEN)
+  integrationState  ExternalIntegrationState @default(CREATED)
+  payloadJson       Json?
+  lastError         String?                  @db.Text
+  checkoutSessionId String?                  @db.Uuid
+  packageId         String?                  @db.Uuid
+  packageItemId     String?                  @db.Uuid
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  checkoutSession CheckoutSession? @relation(fields: [checkoutSessionId], references: [id], onDelete: SetNull)
+  package         Package?         @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  packageItem     PackageItem?     @relation(fields: [packageItemId], references: [id], onDelete: SetNull)
+  tickets         ExternalTicket[]
+
+  @@unique([provider, externalOrderId])
+  @@index([checkoutSessionId])
+  @@index([packageId])
+  @@index([packageItemId])
+  @@index([integrationState])
+  @@map("external_order_links")
+}
+
+model ExternalTicket {
+  id                  String             @id @default(uuid()) @db.Uuid
+  externalOrderLinkId String             @db.Uuid
+  provider            TicketProviderCode
+  externalTicketId    String
+  payloadJson         Json?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  orderLink ExternalOrderLink @relation(fields: [externalOrderLinkId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalTicketId])
+  @@index([externalOrderLinkId])
+  @@map("external_tickets")
+}
+
+model ProviderWebhookLog {
+  id               String                          @id @default(uuid()) @db.Uuid
+  provider         TicketProviderCode
+  processingStatus ProviderWebhookProcessingStatus @default(RECEIVED)
+  payload          Json
+  headersJson      Json?
+  notes            String?                         @db.Text
+  errorMessage     String?                         @db.Text
+  receivedAt       DateTime                        @default(now())
+  processedAt      DateTime?
+
+  @@index([provider, receivedAt])
+  @@map("provider_webhook_logs")
+}
+
+/// Аккаунт партнёрской интеграции. credentialsJson не отдавать в API без mask.
+model ProviderAccountConfig {
+  id                        String                     @id @default(uuid()) @db.Uuid
+  provider                  TicketProviderCode
+  protocolType              ProviderProtocolType
+  operationalClass          ProviderOperationalClass
+  authType                  ProviderAccountAuthType
+  environment               ProviderAccountEnvironment
+  sandboxBaseUrl            String?
+  productionBaseUrl         String?
+  requiresClientCertificate Boolean                    @default(false)
+  credentialsJson           Json?
+  settingsJson              Json?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+
+  @@index([provider, environment])
+  @@map("provider_account_configs")
 }
 
 /// Precomputed stats для read API: POPULAR / sold last 24h (C6). Обновляется cron.
@@ -782,35 +1170,39 @@ model EventOverride {
 // ========================
 
 model Tag {
-  id              String      @id @default(uuid()) @db.Uuid
-  slug            String      @unique
+  id              String              @id @default(uuid()) @db.Uuid
+  slug            String              @unique
   name            String
   nameEn          String?
   category        TagCategory
-  description     String?     @db.Text
+  description     String?             @db.Text
   heroImage       String?
   metaTitle       String?
-  metaDescription String?     @db.Text
+  metaDescription String?             @db.Text
   /// Стабильный идентификатор справочника (используется как основа для будущих SEO/Routing).
   /// На этапе миграции поле nullable, чтобы не ломать существующие строки.
-  code            String?     @unique
+  code            String?             @unique
   tagKind         TagKind?
   structuralGroup StructuralTagGroup?
-  isActive        Boolean     @default(true)
-  isDeleted       Boolean     @default(false)
+  isActive        Boolean             @default(true)
+  isDeleted       Boolean             @default(false)
   deletedAt       DateTime?
-  isFeatured      Boolean     @default(false)
-  sortOrder       Int         @default(0)
-  version         Int         @default(0)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  isFeatured      Boolean             @default(false)
+  sortOrder       Int                 @default(0)
+  version         Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
-  events      EventTag[]
-  articleTags ArticleTag[]
+  events                  EventTag[]
+  articleTags             ArticleTag[]
+  /// LandingPage.filterTagId (эволюция: FK поверх legacy filterTag slug)
+  landingPagesAsFilterTag LandingPage[]         @relation("LandingFilterTag")
+  /// Collection tag filters (эволюция: FK поверх legacy filterTags slug[])
+  collectionTagFilters    CollectionTagFilter[]
 
-  @@map("tags")
   @@index([tagKind])
   @@index([structuralGroup])
+  @@map("tags")
 }
 
 model EventTag {
@@ -818,9 +1210,9 @@ model EventTag {
   tagId   String @db.Uuid
 
   /// Кто назначил/пересчитал тег (для будущего аудита/мягких ограничений).
-  assignedBy        String?                  @db.Uuid
-  assignmentSource  EventTagAssignmentSource?
-  createdAt         DateTime                 @default(now())
+  assignedBy       String?                   @db.Uuid
+  assignmentSource EventTagAssignmentSource?
+  createdAt        DateTime                  @default(now())
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
@@ -858,9 +1250,10 @@ model Package {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  city    City          @relation(fields: [cityId], references: [id])
-  items   PackageItem[]
-  voucher Voucher?
+  city               City                @relation(fields: [cityId], references: [id])
+  items              PackageItem[]
+  voucher            Voucher?
+  externalOrderLinks ExternalOrderLink[]
 
   @@index([email])
   @@index([status])
@@ -886,9 +1279,10 @@ model PackageItem {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
-  package Package      @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  event   Event        @relation(fields: [eventId], references: [id])
-  session EventSession @relation(fields: [sessionId], references: [id])
+  package            Package             @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  event              Event               @relation(fields: [eventId], references: [id])
+  session            EventSession        @relation(fields: [sessionId], references: [id])
+  externalOrderLinks ExternalOrderLink[]
 
   @@index([packageId])
   @@index([eventId])
@@ -934,32 +1328,51 @@ model Voucher {
 }
 
 // ========================
-// Блог
+// Блог / SEO-статьи
 // ========================
 
-model Article {
-  id              String    @id @default(uuid()) @db.Uuid
-  slug            String    @unique
-  title           String
-  content         String    @db.Text // Markdown
-  excerpt         String?
-  cityId          String?   @db.Uuid
-  coverImage      String?
-  metaTitle       String?
-  metaDescription String?   @db.Text
-  isPublished     Boolean   @default(false)
-  publishedAt     DateTime?
-  isDeleted       Boolean   @default(false)
-  deletedAt       DateTime?
-  version         Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
 
-  city          City?          @relation(fields: [cityId], references: [id])
-  articleEvents ArticleEvent[]
-  articleTags   ArticleTag[]
+model Article {
+  id                   String        @id @default(uuid()) @db.Uuid
+  slug                 String        @unique
+  title                String
+  content              String        @db.Text // Markdown
+  excerpt              String?
+  cityId               String?       @db.Uuid
+  coverImage           String?
+  metaTitle            String?
+  metaDescription      String?       @db.Text
+  status               ArticleStatus @default(DRAFT)
+  /**
+   * UUID лендингов (landing_pages.id)
+   */
+  relatedLandingIds    String[]      @default([]) @db.Uuid
+  /**
+   * UUID подборок (collections.id)
+   */
+  relatedCollectionIds String[]      @default([]) @db.Uuid
+  publishedAt          DateTime?
+  version              Int           @default(0)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  city            City?                   @relation(fields: [cityId], references: [id])
+  articleEvents   ArticleEvent[]
+  articleTags     ArticleTag[]
+  /// Эволюция связей: M2M с позициями/приоритетом (вместо String[] без FK)
+  landingLinks    ArticleLandingLink[]
+  collectionLinks ArticleCollectionLink[]
+
+  promoPlacementBlocks       PromoPlacementBlock[]
+  promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetArticle")
 
   @@index([cityId])
+  @@index([status])
   @@map("articles")
 }
 
@@ -985,6 +1398,44 @@ model ArticleTag {
   @@id([articleId, tagId])
   @@index([tagId])
   @@map("article_tags")
+}
+
+/// Article ↔ LandingPage (позиции/приоритеты для перелинковки/виджетов)
+model ArticleLandingLink {
+  articleId String @db.Uuid
+  landingId String @db.Uuid
+
+  /// Позиция в UI (0..N). Чем меньше — тем выше.
+  position  Int      @default(0)
+  /// Доп. приоритет (можно использовать как tie-breaker).
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  article Article     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  landing LandingPage @relation(fields: [landingId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, landingId])
+  @@index([landingId])
+  @@index([articleId, position])
+  @@map("article_landing_links")
+}
+
+/// Article ↔ Collection (позиции/приоритеты для перелинковки/виджетов)
+model ArticleCollectionLink {
+  articleId    String @db.Uuid
+  collectionId String @db.Uuid
+
+  position  Int      @default(0)
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  article    Article    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, collectionId])
+  @@index([collectionId])
+  @@index([articleId, position])
+  @@map("article_collection_links")
 }
 
 // ========================
@@ -1023,52 +1474,152 @@ model ComboPage {
 }
 
 // ========================
+// Тематика лендингов (переиспользование между CITY / MULTI_CITY)
+// ========================
+
+model LandingTheme {
+  id               String   @id @default(uuid()) @db.Uuid
+  slug             String   @unique
+  name             String
+  title            String?
+  subtitle         String?
+  defaultHeroTitle String?
+  defaultHeroBody  String?  @db.Text
+  defaultSeoTitle  String?
+  defaultSeoDesc   String?  @db.Text
+  coverImageUrl    String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  landingPages LandingPage[]
+
+  @@map("landing_themes")
+}
+
+/// Управляемые блоки страницы (композиция UX; не источник выборки событий).
+model LandingContentBlock {
+  id              String           @id @default(uuid()) @db.Uuid
+  landingPageId   String           @db.Uuid
+  type            LandingBlockType
+  variant         String?
+  title           String?
+  subtitle        String?
+  eyebrow         String?
+  body            String?          @db.Text
+  richTextJson    Json?
+  payload         Json?
+  /// URL или storage-key обложки блока (без FK на Media в MVP).
+  assetUrl        String?
+  mobileAssetUrl  String?
+  isEnabled       Boolean          @default(true)
+  sortOrder       Int              @default(0)
+  visibilityRules Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  landingPage LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+
+  @@index([landingPageId, sortOrder])
+  @@map("landing_content_blocks")
+}
+
+// ========================
 // Посадочные страницы (лендинги)
 // ========================
 
 model LandingPage {
-  id                String    @id @default(uuid()) @db.Uuid
-  /** Сегмент URL; уникальность только в паре с городом (@@unique([cityId, slug])). */
-  slug              String
-  cityId            String    @db.Uuid
-  collectionId      String?   @db.Uuid
-  selectionMode     LandingSelectionMode @default(CUSTOM)
-  filterTag         String // slug тега для фильтрации событий
-  additionalFilters Json? // {category?, source?, minDuration?, maxDuration?, features[]?}
-  rankingJson       Json?
-  /** SEASONAL_EVENT и др.: { viewpoints?: [{name, description, isFree}], tips?: string[] } */
-  seasonalPayload   Json?
-  title             String // H1
-  subtitle          String?
-  heroText          String?   @db.Text
-  templateType      LandingTemplateType @default(GENERIC_CARDS)
-  howToChoose       Json? // [{title, text}]
-  infoBlocks        Json? // [{title, text}]
-  faq               Json? // [{question, answer}]
-  reviews           Json? // [{text, author, rating}]
-  stats             Json? // {soldTickets, avgRating}
-  relatedLinks      Json? // [{title, href}]
-  legalText         String?   @db.Text
-  metaTitle         String?
-  metaDescription   String?   @db.Text
-  status            LandingStatus @default(DRAFT)
-  showInCollections Boolean   @default(false)
-  isIndexable       Boolean   @default(true)
-  isActive          Boolean   @default(true)
-  isDeleted         Boolean   @default(false)
-  deletedAt         DateTime?
-  version           Int       @default(0)
-  sortOrder         Int       @default(0)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                   String                 @id @default(uuid()) @db.Uuid
+  /**
+   * Сегмент URL; уникальность только в паре с городом (@@unique([cityId, slug])).
+   */
+  slug                 String
+  /// CITY лендинги обязаны иметь cityId; MULTI_CITY — cityId null (валидация на backend).
+  cityId               String?                @db.Uuid
+  landingType          LandingType            @default(CITY)
+  /// Тематика кластера (общие дефолты hero/SEO); не задаёт выборку событий.
+  themeId              String?                @db.Uuid
+  parentLandingId      String?                @db.Uuid
+  /// Связь с подборкой: навигация/контент, не альтернативный selection engine.
+  collectionId         String?                @db.Uuid
+  selectionMode        LandingSelectionMode   @default(CUSTOM)
+  eventSourceType      LandingEventSourceType @default(PRIMARY_COLLECTION)
+  queryConfig          Json?
+  filterTag            String // slug тега для фильтрации событий
+  /// Эволюция: FK на Tag (параллельно legacy filterTag slug)
+  filterTagId          String?                @db.Uuid
+  additionalFilters    Json? // {category?, source?, minDuration?, maxDuration?, features[]?}
+  rankingJson          Json?
+  /**
+   * SEASONAL_EVENT и др.: { viewpoints?: [{name, description, isFree}], tips?: string[] }
+   */
+  seasonalPayload      Json?
+  title                String // H1
+  subtitle             String?
+  /// Структурированный hero (публичный renderer); при null используются title/subtitle/heroText.
+  heroTitle            String?
+  heroSubtitle         String?
+  heroBadge            String?
+  heroImageUrl         String?
+  heroMobileImageUrl   String?
+  layoutVariant        String?
+  surfaceVariant       String?
+  heroText             String?                @db.Text
+  templateType         LandingTemplateType    @default(GENERIC_CARDS)
+  howToChoose          Json? // [{title, text}]
+  infoBlocks           Json? // [{title, text}]
+  faq                  Json? // [{question, answer}]
+  reviews              Json? // [{text, author, rating}]
+  stats                Json? // {soldTickets, avgRating}
+  relatedLinks         Json? // [{title, href}]
+  relatedArticleIds    String[]               @default([]) @db.Uuid
+  relatedCollectionIds String[]               @default([]) @db.Uuid
+  legalText            String?                @db.Text
+  metaTitle            String?
+  metaDescription      String?                @db.Text
+  /// Предпочтительные SEO-поля; если null — fallback на metaTitle/metaDescription в read-model.
+  seoH1                String?
+  seoTitle             String?
+  seoDescription       String?                @db.Text
+  ogImageUrl           String?
+  canonicalUrl         String?
+  canonicalMode        LandingCanonicalMode   @default(SELF)
+  /// Целевой лендинг для SEO-связи CITY ↔ MULTI_CITY (не parent topic).
+  canonicalLandingId   String?                @db.Uuid
+  publishedAt          DateTime?
+  status               LandingStatus          @default(DRAFT)
+  showInCollections    Boolean                @default(false)
+  isIndexable          Boolean                @default(true)
+  isActive             Boolean                @default(true)
+  isDeleted            Boolean                @default(false)
+  deletedAt            DateTime?
+  version              Int                    @default(0)
+  sortOrder            Int                    @default(0)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
-  city       City        @relation(fields: [cityId], references: [id])
-  collection Collection? @relation(fields: [collectionId], references: [id])
+  city          City?                @relation(fields: [cityId], references: [id])
+  theme         LandingTheme?        @relation(fields: [themeId], references: [id], onDelete: SetNull)
+  collection    Collection?          @relation(fields: [collectionId], references: [id])
+  filterTagRef  Tag?                 @relation("LandingFilterTag", fields: [filterTagId], references: [id], onDelete: SetNull)
+  parentLanding LandingPage?         @relation("LandingParentChild", fields: [parentLandingId], references: [id])
+  childLandings LandingPage[]        @relation("LandingParentChild")
+  canonicalLanding LandingPage?    @relation("LandingCanonical", fields: [canonicalLandingId], references: [id], onDelete: SetNull)
+  canonicalFor     LandingPage[]    @relation("LandingCanonical")
+  contentBlocks    LandingContentBlock[]
+  /// Эволюция связей: M2M к статьям с позициями/приоритетом (вместо Article.relatedLandingIds без FK)
+  articleLinks  ArticleLandingLink[]
 
+  promoPlacementBlocks       PromoPlacementBlock[]
+  promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetLanding")
+
+  @@unique([cityId, slug])
   @@index([cityId])
   @@index([status, showInCollections])
   @@index([collectionId])
-  @@unique([cityId, slug])
+  @@index([filterTagId])
+  @@index([themeId])
+  @@index([canonicalLandingId])
   @@map("landing_pages")
 }
 
@@ -1083,6 +1634,8 @@ model Collection {
 
   // --- Фильтры (динамические события) ---
   filterTags        String[] // slug тегов (OR-логика)
+  /// Эволюция: FK на Tag с позициями/приоритетом (параллельно legacy filterTags slug[])
+  tagFilters        CollectionTagFilter[]
   filterCategory    String? // EventCategory enum value
   filterSubcategory String? // EventSubcategory enum value
   filterAudience    String? // EventAudience enum value
@@ -1112,22 +1665,67 @@ model Collection {
   status             CollectionStatus         @default(DRAFT)
   eventCountCached   Int?
   previewGeneratedAt DateTime?
-  isActive  Boolean   @default(true)
-  isDeleted Boolean   @default(false)
-  deletedAt DateTime?
-  sortOrder Int       @default(0)
-  version   Int       @default(0)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  /// Первая публикация (для витрины и SEO)
+  publishedAt        DateTime?
+  /// Контракт AUTO/HYBRID: фильтры и лимиты (валидация на backend)
+  queryConfig        Json?
+  isActive           Boolean                  @default(true)
+  isDeleted          Boolean                  @default(false)
+  deletedAt          DateTime?
+  sortOrder          Int                      @default(0)
+  version            Int                      @default(0)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 
-  city     City?         @relation(fields: [cityId], references: [id])
-  landings LandingPage[]
+  city         City?                   @relation(fields: [cityId], references: [id])
+  landings     LandingPage[]
+  items        CollectionItem[]
+  /// Эволюция связей: M2M к статьям с позициями/приоритетом (вместо String[] без FK на стороне Article)
+  articleLinks ArticleCollectionLink[]
 
+  promoPlacementBlocks       PromoPlacementBlock[]
+  promoPlacementTargetBlocks PromoPlacementBlock[] @relation("PromoPlacementTargetCollection")
+
+  @@unique([cityId, slug])
   @@index([cityId])
   @@index([status, sourceType])
-  @@unique([cityId, slug])
   @@index([isActive, isDeleted])
   @@map("collections")
+}
+
+/// Collection ↔ Tag (фильтры подборки как FK, с позициями/приоритетом)
+model CollectionTagFilter {
+  collectionId String @db.Uuid
+  tagId        String @db.Uuid
+
+  position  Int      @default(0)
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  tag        Tag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, tagId])
+  @@index([tagId])
+  @@index([collectionId, position])
+  @@map("collection_tag_filters")
+}
+
+/// Явные позиции подборки (ручной и гибридный слой курации)
+model CollectionItem {
+  id           String     @id @default(uuid()) @db.Uuid
+  collectionId String     @db.Uuid
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  eventId      String     @db.Uuid
+  event        Event      @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  sortOrder    Int        @default(0)
+  isPinned     Boolean    @default(false)
+  isExcluded   Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  @@unique([collectionId, eventId])
+  @@index([collectionId, sortOrder])
+  @@map("collection_items")
 }
 
 // ========================
@@ -1236,6 +1834,11 @@ model Venue {
   lng               Float?
   metro             String? // "Адмиралтейская"
   district          String?
+  /// Эволюция географии: справочники (dual-read с legacy строками metro/district)
+  districtId        String?                @map("district_id") @db.Uuid
+  metroStationId    String?                @map("metro_station_id") @db.Uuid
+  /// Operator flag: local favorite / hidden gem (не влияет на публикацию)
+  isHiddenGem       Boolean                @default(false) @map("is_hidden_gem")
   phone             String?
   email             String?
   website           String?
@@ -1266,42 +1869,194 @@ model Venue {
   createdByType     CreatedByType?         @default(ADMIN)
   createdById       String?                @db.Uuid
 
-  city                 City                  @relation(fields: [cityId], references: [id])
-  operator             Operator?             @relation("VenueOperator", fields: [operatorId], references: [id])
-  events               Event[]               @relation("VenueEvents")
-  offers               EventOffer[]          @relation("VenueOffers")
+  /// Статус жизненного цикла (импорт / модерация / merge)
+  lifecycleStatus        VenueLifecycleStatus @default(ACTIVE) @map("lifecycle_status")
+  /// Публичная SEO-страница /venues/:slug (только при ACTIVE + модерации контента)
+  isPublished            Boolean              @default(true) @map("is_published")
+  sourceType             VenueSourceType      @default(MANUAL) @map("source_type")
+  importSource           VenueImportSource?   @map("import_source")
+  externalVenueId        String?              @map("external_venue_id")
+  rawName                String?              @map("raw_name")
+  rawAddress             String?              @map("raw_address")
+  normalizedName         String               @map("normalized_name")
+  normalizedAddress      String?              @map("normalized_address")
+  mergeTargetId          String?              @map("merge_target_id") @db.Uuid
+  confidenceScore        Float?               @map("confidence_score")
+  needsReview            Boolean              @default(false) @map("needs_review")
+  /// Обход порога по количеству событий для публикации страницы площадки
+  isVenuePageWhitelisted Boolean              @default(false) @map("is_venue_page_whitelisted")
+  /// Уровень витринной страницы площадки (NONE / BASIC / HUB).
+  venuePageMode          VenuePageMode        @default(NONE) @map("venue_page_mode")
+
+  districtRef     District?     @relation(fields: [districtId], references: [id], onDelete: SetNull)
+  metroStationRef MetroStation? @relation(fields: [metroStationId], references: [id], onDelete: SetNull)
+
+  mergeTarget Venue?  @relation("VenueMerge", fields: [mergeTargetId], references: [id], onDelete: Restrict)
+  mergedFrom  Venue[] @relation("VenueMerge")
+
+  moderationDecisions VenueModerationDecision[]
+  moderationSignals   VenueModerationSignal[]
+
+  city                 City                   @relation(fields: [cityId], references: [id])
+  operator             Operator?              @relation("VenueOperator", fields: [operatorId], references: [id])
+  events               Event[]                @relation("VenueEvents")
+  offers               EventOffer[]           @relation("VenueOffers")
   reviews              Review[]
   promoBlockVenues     PromoBlockVenue[]
   promoCollectionItems PromoCollectionItem[]
   subcategoryLinks     VenueSubcategoryLink[]
+  routePoints          RoutePoint[]
 
+  @@unique([cityId, importSource, externalVenueId])
   @@index([cityId])
   @@index([venueType])
   @@index([slug])
   @@index([operatorId])
+  @@index([lifecycleStatus])
+  @@index([cityId, lifecycleStatus])
+  @@index([importSource, externalVenueId])
+  @@index([districtId])
+  @@index([metroStationId])
   @@map("venues")
 }
 
-model Subcategory {
-  id               String          @id @default(uuid()) @db.Uuid
-  slug             String          @unique
-  nameRu           String
-  type             SubcategoryType @default(UNIVERSAL)
-  parentId         String?         @db.Uuid
-  isActive         Boolean         @default(true)
-  isLandingEnabled Boolean         @default(false)
-  sortOrder        Int             @default(0)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+// ========================
+// Geo dictionaries (admin-managed)
+// ========================
 
-  parent     Subcategory?          @relation("SubcategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children   Subcategory[]         @relation("SubcategoryTree")
+model District {
+  id          String   @id @default(uuid()) @db.Uuid
+  cityId      String   @db.Uuid
+  name        String
+  slug        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  city   City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  venues Venue[]
+
+  @@unique([cityId, slug])
+  @@index([cityId])
+  @@index([slug])
+  @@map("districts")
+}
+
+model MetroStation {
+  id        String   @id @default(uuid()) @db.Uuid
+  cityId    String   @db.Uuid
+  name      String
+  slug      String
+  lineName  String?
+  lineColor String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  city   City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  venues Venue[]
+
+  @@unique([cityId, slug])
+  @@index([cityId])
+  @@index([slug])
+  @@map("metro_stations")
+}
+
+/// Профиль доверия и лимитов авто-модерации по источнику импорта (Stage 5).
+model ImportSourceModerationProfile {
+  importSource         VenueImportSource         @id @map("import_source")
+  trustLevel           VenueModerationTrustLevel @default(LOW) @map("trust_level")
+  autoApproveEnabled   Boolean                   @default(false) @map("auto_approve_enabled")
+  autoMergeEnabled     Boolean                   @default(false) @map("auto_merge_enabled")
+  maxAutoActionsPerDay Int                       @default(20) @map("max_auto_actions_per_day")
+  /// Kill-switch для конкретного import source.
+  disabled             Boolean                   @default(false)
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+
+  @@map("import_source_moderation_profiles")
+}
+
+/// История решений модерации импортных площадок (traceability + аналитика).
+model VenueModerationDecision {
+  id           String                     @id @default(cuid())
+  venueId      String                     @db.Uuid
+  action       VenueModerationAction
+  reasonCode   VenueModerationReasonCode?
+  reasonText   String?
+  actorAdminId String?                    @db.Uuid
+  createdAt    DateTime                   @default(now())
+  metadata     Json?
+
+  venue      Venue      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  actorAdmin AdminUser? @relation(fields: [actorAdminId], references: [id], onDelete: SetNull)
+
+  @@index([venueId])
+  @@index([createdAt])
+  @@index([actorAdminId])
+  @@index([venueId, createdAt])
+  @@index([action])
+  @@map("venue_moderation_decisions")
+}
+
+/// Детерминированные сигналы для аналитики / будущего обучения (без ML).
+model VenueModerationSignal {
+  id                String                @id @default(cuid())
+  venueId           String                @db.Uuid
+  action            VenueModerationAction
+  decisionHint      String?
+  /// Совпадение рекомендации и действия (MERGE↔MERGE, APPROVE↔APPROVE, REJECT↔REJECT для соответствующих hint).
+  wasHintAccepted   Boolean               @default(false)
+  /// Пользователь выбрал иное действие, чем «прямая» рекомендация (напр. APPROVE при MERGE_RECOMMENDED).
+  wasHintOverridden Boolean               @default(false)
+  confidenceScore   Float?
+  needsReview       Boolean?
+  duplicatesCount   Int?
+  titleSimilarity   Float?
+  addressSimilarity Float?
+  sameCity          Boolean?
+  importSource      VenueImportSource?
+  targetVenueId     String?               @db.Uuid
+  createdAt         DateTime              @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+  @@index([createdAt])
+  @@index([importSource])
+  @@index([decisionHint])
+  @@map("venue_moderation_signals")
+}
+
+model Subcategory {
+  id               String                 @id @default(uuid()) @db.Uuid
+  slug             String                 @unique
+  /// Стабильный код справочника (совпадает с EventSubcategory / API primaryCode в рамках type). Уникальность: code + type.
+  code             String
+  nameRu           String
+  type             SubcategoryType        @default(UNIVERSAL)
+  layer            SubcategoryLayer       @default(SECONDARY)
+  parentId         String?                @db.Uuid
+  isActive         Boolean                @default(true)
+  isLandingEnabled Boolean                @default(false)
+  /// AUTO: generic `/cities/{city}/{slug}`; TOPIC_HUB: канонический тематический хаб (`landingTopicKey`); DISABLED: без auto-SEO-роута.
+  landingMode      SubcategoryLandingMode @default(DISABLED)
+  /// Ключ тематического хаба (например `river-cruises` → `/river-cruises/{citySlug}`).
+  landingTopicKey  String?
+  sortOrder        Int                    @default(0)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  parent     Subcategory?           @relation("SubcategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Subcategory[]          @relation("SubcategoryTree")
   eventLinks EventSubcategoryLink[]
   venueLinks VenueSubcategoryLink[]
 
+  @@unique([code, type])
   @@index([type, isActive])
+  @@index([type, layer, isActive])
   @@index([parentId])
   @@index([isLandingEnabled])
+  @@index([isLandingEnabled, landingMode])
   @@map("subcategories")
 }
 
@@ -1378,6 +2133,43 @@ enum PromoSortMode {
   RANDOM
 }
 
+// ========================
+// Promo Blocks v2 (placement-based distribution layer)
+// ========================
+
+enum PromoBlockStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PromoTargetType {
+  EVENT
+  COLLECTION
+  LANDING
+  ARTICLE
+}
+
+enum PromoPlacementZone {
+  HOME_HERO
+  HOME_FEATURED
+  CITY_HERO
+  CITY_BELOW_HERO
+  LANDING_HERO
+  LANDING_INLINE
+  ARTICLE_INLINE
+  COLLECTION_INLINE
+  CATALOG_INLINE
+}
+
+enum PromoPageScopeType {
+  GLOBAL
+  CITY
+  LANDING
+  COLLECTION
+  ARTICLE
+}
+
 model PromoBlock {
   id          String  @id @default(cuid())
   slug        String  @unique
@@ -1428,6 +2220,71 @@ model PromoBlock {
   @@index([isActive, sortOrder])
   @@index([collectionId])
   @@map("promo_blocks")
+}
+
+model PromoPlacementBlock {
+  id     String           @id @default(uuid()) @db.Uuid
+  title  String
+  status PromoBlockStatus @default(DRAFT)
+
+  placementZone PromoPlacementZone
+  pageScopeType PromoPageScopeType @default(GLOBAL)
+
+  // page context (where to show)
+  cityId       String? @db.Uuid
+  landingId    String? @db.Uuid
+  collectionId String? @db.Uuid
+  articleId    String? @db.Uuid
+
+  city       City?        @relation(fields: [cityId], references: [id])
+  landing    LandingPage? @relation(fields: [landingId], references: [id])
+  collection Collection?  @relation(fields: [collectionId], references: [id])
+  article    Article?     @relation(fields: [articleId], references: [id])
+
+  // target (what to promote)
+  targetType         PromoTargetType
+  targetEventId      String?         @db.Uuid
+  targetCollectionId String?         @db.Uuid
+  targetLandingId    String?         @db.Uuid
+  targetArticleId    String?         @db.Uuid
+
+  targetEvent      Event?       @relation(fields: [targetEventId], references: [id])
+  targetCollection Collection?  @relation("PromoPlacementTargetCollection", fields: [targetCollectionId], references: [id])
+  targetLanding    LandingPage? @relation("PromoPlacementTargetLanding", fields: [targetLandingId], references: [id])
+  targetArticle    Article?     @relation("PromoPlacementTargetArticle", fields: [targetArticleId], references: [id])
+
+  // display overrides
+  customTitle    String?
+  customSubtitle String?
+  customImageUrl String?
+  ctaLabel       String?
+
+  // behavior
+  priority  Int @default(0)
+  sortOrder Int @default(0)
+
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  isIndexableHint Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  @@index([status, placementZone, pageScopeType])
+  @@index([cityId])
+  @@index([landingId])
+  @@index([collectionId])
+  @@index([articleId])
+  @@index([targetType])
+  @@index([targetEventId])
+  @@index([targetCollectionId])
+  @@index([targetLandingId])
+  @@index([targetArticleId])
+  @@index([startsAt, endsAt])
+  @@index([priority, sortOrder, updatedAt])
+  @@map("promo_placement_blocks")
 }
 
 model PromoCollection {
@@ -1602,6 +2459,8 @@ model Operator {
   pspFeeMode         PspFeeMode  @default(PLATFORM_PAYS)
 
   events                  Event[]
+  eventsAsSupplier        Event[]                  @relation("EventSupplier")
+  paymentIntentsSupplier  PaymentIntent[]          @relation("PaymentIntentSupplier")
   venues                  Venue[]                  @relation("VenueOperator")
   reviews                 Review[]
   offers                  EventOffer[]
@@ -1611,11 +2470,12 @@ model Operator {
   reviewDisputes          ReviewDispute[]          @relation("DisputeOperator")
   supplierPayoutRequests  SupplierPayoutRequest[]
 
-  supplierReports    SupplierReport[]
+  supplierReports     SupplierReport[]
   supplierSettlements SupplierSettlement[]
-  supplierDocuments  SupplierDocument[]
-  supplierDisputes   SupplierDispute[]
-  supplierDailyStats SupplierDailyStat[]
+  supplierDocuments   SupplierDocument[]
+  supplierDisputes    SupplierDispute[]
+  supplierDailyStats  SupplierDailyStat[]
+  supplierIntegrations SupplierIntegration[]
 
   legalProfile SupplierLegalProfile?
   edoProfile   SupplierEdoProfile?
@@ -1647,21 +2507,21 @@ model SupplierLegalProfile {
   id         String @id @default(cuid())
   operatorId String @unique @db.Uuid
 
-  legalName      String
-  legalAddress   String?
-  inn            String?
-  kpp            String?
-  ogrn           String?
-  taxMode        TaxMode                    @default(OSNO)
-  isVatPayer     Boolean                    @default(false)
-  defaultVatRate Decimal?                   @db.Decimal(5, 2)
-  signerFullName String?
-  signerPosition String?
-  financeEmail   String?
-  docsEmail      String?
-  generateInvoiceDocuments Boolean                  @default(false)
-  closingDocumentMode      ClosingDocumentMode      @default(UPD)
-  status         SupplierLegalProfileStatus @default(DRAFT)
+  legalName                String
+  legalAddress             String?
+  inn                      String?
+  kpp                      String?
+  ogrn                     String?
+  taxMode                  TaxMode                    @default(OSNO)
+  isVatPayer               Boolean                    @default(false)
+  defaultVatRate           Decimal?                   @db.Decimal(5, 2)
+  signerFullName           String?
+  signerPosition           String?
+  financeEmail             String?
+  docsEmail                String?
+  generateInvoiceDocuments Boolean                    @default(false)
+  closingDocumentMode      ClosingDocumentMode        @default(UPD)
+  status                   SupplierLegalProfileStatus @default(DRAFT)
 
   verifiedBy       String?   @db.Uuid
   verifiedAt       DateTime?
@@ -1765,6 +2625,89 @@ model SupplierInvitation {
 }
 
 // ========================
+// Supplier integrations (admin-managed configs)
+// ========================
+
+/// Конфигурация интеграции поставщика (оператора) с внешним источником инвентаря.
+/// Важно: секреты могут приходить в credentialsJson, но в API отдаём только masked.
+model SupplierIntegration {
+  id          String   @id @default(uuid()) @db.Uuid
+  operatorId  String   @db.Uuid
+
+  /// Внешний адаптер/провайдер (строка, чтобы не ломать enum при добавлении новых)
+  adapterCode String
+  adapterName String?
+
+  /// Человекочитаемое имя интеграции (для админки)
+  name        String
+
+  /// Acquisition mode / status / environment / syncMode — строковые, чтобы контракт был расширяемым без миграций enum.
+  acquisitionMode String?
+  status          String?
+  environment     String?
+  syncMode        String?
+
+  /// Connection & mapping payloads. Никогда не отдавать credentialsJson без mask.
+  connectionJson    Json?
+  mappingJson       Json?
+  capabilitiesJson  Json?
+  healthJson        Json?
+
+  lastSuccessAt           DateTime?
+  lastErrorAt             DateTime?
+  consecutiveErrorCount   Int      @default(0)
+  openIssuesCountCached   Int      @default(0)
+  lastRunSummaryCached    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  runs     SupplierIntegrationRun[]
+  issues   SupplierIntegrationIssue[]
+
+  @@index([operatorId])
+  @@index([adapterCode])
+  @@map("supplier_integrations")
+}
+
+model SupplierIntegrationRun {
+  id             String   @id @default(uuid()) @db.Uuid
+  integrationId  String   @db.Uuid
+
+  status     String
+  summary    String?
+  countersJson Json?
+
+  startedAt  DateTime @default(now())
+  finishedAt DateTime?
+
+  integration SupplierIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, startedAt])
+  @@map("supplier_integration_runs")
+}
+
+model SupplierIntegrationIssue {
+  id             String   @id @default(uuid()) @db.Uuid
+  integrationId  String   @db.Uuid
+
+  entityType        String?
+  severity          String
+  code              String?
+  title             String
+  resolutionStatus  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  integration SupplierIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, severity])
+  @@map("supplier_integration_issues")
+}
+
+// ========================
 // Маршруты
 // ========================
 
@@ -1776,12 +2719,47 @@ model Route {
   pointsOfInterest String[]
   estimatedMinutes Int?
   isActive         Boolean  @default(true)
+  /// Событие-владелец маршрута (MVP: не более одного Route на событие)
+  eventId          String?  @unique @db.Uuid
+  title            String?
+  summary          String?  @db.Text
+  isPublished      Boolean  @default(false) @map("is_published")
+  version          Int      @default(1)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  events Event[]
+  catalogLinkedEvents Event[] @relation("EventCatalogRouteLink")
+  ownerEvent            Event?  @relation("RouteOwnerRelation", fields: [eventId], references: [id], onDelete: Cascade)
+  points                RoutePoint[]
 
+  @@index([eventId])
   @@map("routes")
+}
+
+model RoutePoint {
+  id           String               @id @default(uuid()) @db.Uuid
+  routeId      String               @db.Uuid
+  order        Int
+  targetType   RoutePointTargetType
+  venueId      String?              @db.Uuid
+  eventId      String?              @db.Uuid
+  durationMinutes Int?
+  description     String?  @db.Text
+  titleOverride   String?
+  isOptional      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  route Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  venue Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@unique([routeId, order])
+  @@index([routeId])
+  @@index([routeId, order])
+  @@index([venueId])
+  @@index([eventId])
+  @@map("route_points")
 }
 
 // ========================
@@ -2034,10 +3012,10 @@ enum CheckoutStatus {
 }
 
 model CheckoutSession {
-  id                             String            @id @default(uuid()) @db.Uuid
-  shortCode                      String            @unique // "CS-XXXX" для UI
+  id                             String              @id @default(uuid()) @db.Uuid
+  shortCode                      String              @unique // "CS-XXXX" для UI
   /// Покупатель (ЛК): если заказ оформлен авторизованным пользователем
-  userId                         String?           @db.Uuid
+  userId                         String?             @db.Uuid
   cartSnapshot                   Json // Снимок корзины из localStorage
   validatedSnapshot              Json? // Результат validate (актуальные цены/наличие)
   offersSnapshot                 Json? // Immutable: данные офферов на момент оформления (title, price, type, deeplink, widgetPayload)
@@ -2048,7 +3026,7 @@ model CheckoutSession {
   customerName                   String?
   customerEmail                  String?
   customerPhone                  String?
-  status                         CheckoutStatus    @default(STARTED)
+  status                         CheckoutStatus      @default(STARTED)
   totalPrice                     Int? // Итого в копейках
   expiresAt                      DateTime? // TTL для soft-reserve
   completedAt                    DateTime? // Когда сессия завершена (для аналитики)
@@ -2058,13 +3036,14 @@ model CheckoutSession {
   referrer                       String?
   userAgent                      String?
   ip                             String?
-  createdAt                      DateTime          @default(now())
-  updatedAt                      DateTime          @updatedAt
-  user                           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt                      DateTime            @default(now())
+  updatedAt                      DateTime            @updatedAt
+  user                           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   orderRequests                  OrderRequest[]
   paymentIntents                 PaymentIntent[]
   fulfillmentItems               FulfillmentItem[]
   giftCertificate                GiftCertificate?
+  externalOrderLinks             ExternalOrderLink[]
 
   @@index([status])
   @@index([customerEmail])
@@ -2133,6 +3112,7 @@ model OrderRequest {
   checkoutSession CheckoutSession? @relation(fields: [checkoutSessionId], references: [id])
   event           Event            @relation(fields: [eventId], references: [id])
   eventOffer      EventOffer       @relation(fields: [eventOfferId], references: [id])
+  session         EventSession?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([checkoutSessionId])
   @@index([status])
@@ -2173,14 +3153,16 @@ model PaymentIntent {
   updatedAt         DateTime      @updatedAt
 
   // === Split Payment (маркетплейс) ===
-  supplierId     String?  @db.Uuid
+  supplierId     String?   @db.Uuid
+  supplier       Operator? @relation("PaymentIntentSupplier", fields: [supplierId], references: [id], onDelete: SetNull)
   grossAmount    Int? // Полная сумма от клиента (копейки)
   platformFee    Int? // Комиссия платформы (копейки)
   supplierAmount Int? // Сумма поставщику (копейки)
-  commissionRate Decimal? @db.Decimal(5, 4) // Ставка на момент транзакции
+  commissionRate Decimal?  @db.Decimal(5, 4) // Ставка на момент транзакции
   splitPaymentId String? // ID split-платежа YooKassa
 
   checkoutSession CheckoutSession @relation(fields: [checkoutSessionId], references: [id])
+  refundRequests  RefundRequest[]
 
   @@index([checkoutSessionId])
   @@index([status])
@@ -2203,9 +3185,33 @@ enum FulfillmentStatus {
   RESERVING // В процессе резервирования
   RESERVED // Зарезервировано у провайдера
   CONFIRMED // Подтверждено провайдером
+  REFUND_PENDING // Заявка на возврат (MVP item-level refunds)
   FAILED // Ошибка (исчерпаны ретраи)
   CANCELLED // Отменено
   REFUNDED // Возврат выполнен
+}
+
+/// Статус заявки на возврат по позиции fulfillment (MVP).
+enum RefundRequestStatus {
+  CREATED
+  APPROVED
+  REJECTED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum RefundRequestReason {
+  USER_REQUEST
+  EVENT_CANCELLED
+  SUPPORT
+  OTHER
+}
+
+enum RefundCreatedByType {
+  ADMIN
+  USER
+  SYSTEM
 }
 
 model FulfillmentItem {
@@ -2220,6 +3226,8 @@ model FulfillmentItem {
   externalPaymentUrl String? // Ссылка на оплату у провайдера
   providerData       Json? // Данные от провайдера
   amount             Int // Сумма позиции в копейках
+  /// OPEN_DATE: билет ещё не погашен (MVP eligibility).
+  isRedeemed         Boolean           @default(false)
   refundedAmount     Int               @default(0) // Возвращённая сумма в копейках
   refundId           String? // ID рефанда (YooKassa)
   attemptCount       Int               @default(0) // Количество попыток
@@ -2231,6 +3239,7 @@ model FulfillmentItem {
   updatedAt          DateTime          @updatedAt
 
   checkoutSession CheckoutSession @relation(fields: [checkoutSessionId], references: [id])
+  refundRequests  RefundRequest[]
 
   @@index([checkoutSessionId])
   @@index([offerId])
@@ -2238,6 +3247,75 @@ model FulfillmentItem {
   @@index([status, nextRetryAt]) // Для cron retry
   @@index([status, escalatedAt]) // Для cron auto-compensate
   @@map("fulfillment_items")
+}
+
+/// Заявка на возврат по одной позиции FulfillmentItem (MVP).
+model RefundRequest {
+  id                String              @id @default(uuid()) @db.Uuid
+  fulfillmentItemId String              @db.Uuid
+  paymentIntentId   String              @db.Uuid
+  amount            Int
+  currency          String              @default("RUB")
+  reason            RefundRequestReason @default(OTHER)
+  reasonNote        String?             @db.Text
+  status            RefundRequestStatus @default(CREATED)
+  createdByType     RefundCreatedByType @default(ADMIN)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  processedAt       DateTime?
+
+  fulfillmentItem FulfillmentItem @relation(fields: [fulfillmentItemId], references: [id], onDelete: Restrict)
+  paymentIntent   PaymentIntent   @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+
+  @@index([fulfillmentItemId])
+  @@index([paymentIntentId])
+  @@index([status])
+  @@map("refund_requests")
+}
+
+/// Плоский mirror-заказ (internal + external), не core checkout entity.
+model Order {
+  id String @id @default(cuid())
+
+  source          OrderSource
+  /// Идентификатор заказа во внешней системе (TicketsCloud order.id, Teplohod номер и т.п.)
+  externalOrderId String?
+
+  status OrderStatus
+
+  userId String? @db.Uuid
+  email  String?
+  phone  String?
+
+  eventId       String?   @db.Uuid
+  titleSnapshot String
+  dateSnapshot  DateTime?
+
+  /// Сумма в копейках (если известна)
+  amount   Int?
+  currency String?
+
+  purchasedAt     DateTime?
+  ingestionSource OrderIngestionSource?
+
+  checkoutSessionId String? @db.Uuid
+  packageId         String? @db.Uuid
+  paymentIntentId   String? @db.Uuid
+
+  sourcePayload Json?
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([source, externalOrderId])
+  @@index([checkoutSessionId])
+  @@index([packageId])
+  @@index([paymentIntentId])
+  @@index([email])
+  @@index([phone])
+  @@index([purchasedAt])
+  @@index([status])
 }
 
 // ========================
@@ -2264,7 +3342,10 @@ model PaymentEventLog {
 
 model ProcessedWebhookEvent {
   id              String   @id @default(uuid()) @db.Uuid
-  providerEventId String   @unique // Ключ идемпотентности (payment.id от YK, etc.)
+  /// Составной ключ дедупликации: `eventType:object.id` (ЮKassa), не смешивать разные типы событий одного платежа.
+  dedupeKey       String   @unique
+  /// object.id от провайдера (payment.id / refund.id / и т.д.) — для трассировки и отчётов.
+  providerEventId String
   provider        String // YOOKASSA | TC | PARTNER
   eventType       String // payment.succeeded, payment.canceled, etc.
   payload         Json // Полный payload для аудита
@@ -2274,6 +3355,7 @@ model ProcessedWebhookEvent {
 
   @@index([provider, eventType])
   @@index([paymentIntentId])
+  @@index([providerEventId])
   @@map("processed_webhook_events")
 }
 
@@ -2286,6 +3368,30 @@ enum IdempotencyScope {
   CHECKOUT_CREATE // Создание Package/CheckoutSession
   EMAIL_SEND // Отправка email (dedup по template+recipient)
   EXTERNAL_CALLBACK // Внешние callbacks/partner webhooks
+}
+
+enum OrderSource {
+  INTERNAL
+  TICKETSCLOUD
+  TEPLOHOD
+  MANUAL
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  FAILED
+  REFUND_REQUESTED
+  REFUNDED
+}
+
+enum OrderIngestionSource {
+  CHECKOUT
+  TC_MIRROR
+  TEPLOHOD_EMAIL
+  MANUAL_ADMIN
+  RECONCILIATION
 }
 
 model IdempotencyKey {
@@ -2403,12 +3509,13 @@ enum ChatAuthorType {
 }
 
 model ChatConversation {
-  id        String                 @id @default(uuid()) @db.Uuid
-  status    ChatConversationStatus @default(OPEN)
+  id     String                 @id @default(uuid()) @db.Uuid
+  status ChatConversationStatus @default(OPEN)
 
   // Guest info (optional). For authenticated users use userId.
   guestName  String?
   guestEmail String?
+  guestPhone String?
 
   // If user is authenticated we can bind conversation to userId.
   userId String? @db.Uuid
@@ -2424,7 +3531,8 @@ model ChatConversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages ChatMessage[]
+  messages               ChatMessage[]
+  telegramOperatorStates ChatTelegramOperatorState[]
 
   @@index([status])
   @@index([guestEmail])
@@ -2434,12 +3542,12 @@ model ChatConversation {
 }
 
 model ChatMessage {
-  id             String        @id @default(uuid()) @db.Uuid
-  conversationId String        @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
+  conversationId String         @db.Uuid
   authorType     ChatAuthorType
   authorName     String?
   // for admin messages (optional)
-  authorAdminId String? @db.Uuid
+  authorAdminId  String?        @db.Uuid
 
   text      String   @db.Text
   createdAt DateTime @default(now())
@@ -2449,6 +3557,18 @@ model ChatMessage {
   @@index([conversationId])
   @@index([createdAt])
   @@map("chat_messages")
+}
+
+/// Состояние оператора в Telegram: какой диалог поддержки сейчас «активен» для ответов из бота.
+model ChatTelegramOperatorState {
+  id                   String            @id @default(uuid()) @db.Uuid
+  telegramUserId       String            @unique
+  activeConversationId String?           @db.Uuid
+  activeConversation   ChatConversation? @relation(fields: [activeConversationId], references: [id], onDelete: SetNull)
+  updatedAt            DateTime          @updatedAt
+
+  @@index([activeConversationId])
+  @@map("chat_telegram_operator_states")
 }
 
 enum TicketStatus {
@@ -2836,12 +3956,12 @@ model SupplierDispute {
 }
 
 model SupplierDocument {
-  id         String                 @id @default(cuid())
-  operatorId String                 @db.Uuid
-  reportId   String?
+  id           String                 @id @default(cuid())
+  operatorId   String                 @db.Uuid
+  reportId     String?
   settlementId String?
-  type       SupplierDocumentType
-  status     SupplierDocumentStatus @default(DRAFT)
+  type         SupplierDocumentType
+  status       SupplierDocumentStatus @default(DRAFT)
 
   title       String
   payloadJson Json?
@@ -2852,14 +3972,14 @@ model SupplierDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  operator Operator        @relation(fields: [operatorId], references: [id])
-  report   SupplierReport? @relation(fields: [reportId], references: [id])
+  operator   Operator            @relation(fields: [operatorId], references: [id])
+  report     SupplierReport?     @relation(fields: [reportId], references: [id])
   settlement SupplierSettlement? @relation(fields: [settlementId], references: [id])
 
   template        SupplierDocumentTemplate?        @relation(fields: [templateId], references: [id])
   templateVersion SupplierDocumentTemplateVersion? @relation(fields: [templateVersionId], references: [id])
 
-  files       SupplierDocumentFile[]
+  files         SupplierDocumentFile[]
   edoDeliveries EdoDelivery[]
 
   @@index([operatorId])
@@ -2896,18 +4016,18 @@ model SupplierSettlement {
 
 /// P4: Профиль поставщика в ЭДО (привязка к оператору и провайдеру).
 model SupplierEdoProfile {
-  id         String          @id @default(cuid())
-  operatorId String          @unique @db.Uuid
-  provider   EdoProviderType
-  boxId      String?
-  inn        String
-  kpp        String?
-  isActive   Boolean         @default(true)
+  id           String          @id @default(cuid())
+  operatorId   String          @unique @db.Uuid
+  provider     EdoProviderType
+  boxId        String?
+  inn          String
+  kpp          String?
+  isActive     Boolean         @default(true)
   settingsJson Json?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
-  operator  Operator      @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  operator   Operator      @relation(fields: [operatorId], references: [id], onDelete: Cascade)
   deliveries EdoDelivery[]
 
   @@map("supplier_edo_profiles")
@@ -2915,25 +4035,25 @@ model SupplierEdoProfile {
 
 /// P4: История отправки документа в ЭДО.
 model EdoDelivery {
-  id                    String            @id @default(cuid())
-  supplierDocumentId    String
-  supplierEdoProfileId  String
-  provider              EdoProviderType
-  providerDeliveryId    String?
-  status                EdoDeliveryStatus @default(PENDING)
-  errorCode             String?
-  errorMessage          String?           @db.Text
-  sentAt                DateTime?
-  deliveredAt           DateTime?
-  signedAt              DateTime?
-  rejectedAt            DateTime?
-  lastStatusAt          DateTime?
-  initiatedByAdminUserId String?          @db.Uuid
-  metaJson              Json?
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  id                     String            @id @default(cuid())
+  supplierDocumentId     String
+  supplierEdoProfileId   String
+  provider               EdoProviderType
+  providerDeliveryId     String?
+  status                 EdoDeliveryStatus @default(PENDING)
+  errorCode              String?
+  errorMessage           String?           @db.Text
+  sentAt                 DateTime?
+  deliveredAt            DateTime?
+  signedAt               DateTime?
+  rejectedAt             DateTime?
+  lastStatusAt           DateTime?
+  initiatedByAdminUserId String?           @db.Uuid
+  metaJson               Json?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
-  document SupplierDocument    @relation(fields: [supplierDocumentId], references: [id], onDelete: Restrict)
+  document   SupplierDocument   @relation(fields: [supplierDocumentId], references: [id], onDelete: Restrict)
   edoProfile SupplierEdoProfile @relation(fields: [supplierEdoProfileId], references: [id], onDelete: Restrict)
 
   @@index([supplierDocumentId])

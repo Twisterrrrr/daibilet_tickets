@@ -21,6 +21,7 @@ import { SessionStatsService } from './session-stats.service';
 import { SupplierDailyStatSchedulerService } from './supplier-daily-stat-scheduler.service';
 import { TagAssignmentService } from './tag-assignment.service';
 import { CatalogConsistencySnapshotSchedulerService } from './catalog-consistency-snapshot.scheduler';
+import { TicketscloudMirrorSchedulerService } from './ticketscloud-mirror-scheduler.service';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { CatalogConsistencySnapshotSchedulerService } from './catalog-consistenc
     SessionStatsService,
     SupplierDailyStatSchedulerService,
     CatalogConsistencySnapshotSchedulerService,
+    TicketscloudMirrorSchedulerService,
   ],
   exports: [TagAssignmentService],
 })

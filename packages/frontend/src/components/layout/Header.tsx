@@ -8,16 +8,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useUserAuthOptional } from '@/hooks/useUserAuth';
 import { api } from '@/lib/api';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 
 import { SearchAutocomplete } from './SearchAutocomplete';
 
 const navigation = [
-  { name: 'Экскурсии', href: '/events?category=EXCURSION&page=1' },
-  { name: 'Музеи и Арт', href: '/events?category=MUSEUM&page=1' },
-  { name: 'Мероприятия', href: '/events?category=EVENT&page=1' },
+  { name: 'Экскурсии', href: catalogEventsHref({ category: 'EXCURSION' }) },
+  { name: 'Музеи и Арт', href: catalogEventsHref({ category: 'MUSEUM' }) },
+  { name: 'Мероприятия', href: catalogEventsHref({ category: 'EVENT' }) },
   { name: 'Подборки', href: '/podborki' },
   { name: 'Города', href: '/cities' },
-  { name: 'Блог', href: '/blog' },
+  { name: 'Статьи', href: '/articles' },
 ];
 
 interface HeaderCity {
@@ -161,12 +162,12 @@ export function Header() {
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden items-center gap-0.5 md:flex">
+        <div className="hidden min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {navigation.map((item) => (
             <Link
               key={item.name}
               href={item.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              className="shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
             >
               {item.name}
             </Link>
@@ -266,7 +267,7 @@ export function Header() {
                 key={item.name}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="block rounded-lg px-3 py-2.5 text-base font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                className="block whitespace-nowrap rounded-lg px-3 py-2.5 text-base font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               >
                 {item.name}
               </Link>

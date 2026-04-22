@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { SupplierRole } from '@prisma/client';
+import { SupplierRole } from '@/prisma-client';
 
 /** JWT Guard для поставщиков (стратегия jwt-supplier). Алиас: SupplierJwtAuthGuard */
 @Injectable()

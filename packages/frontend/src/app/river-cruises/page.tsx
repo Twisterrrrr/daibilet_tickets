@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 
 import {
   RIVER_CRUISE_HUB_RELATED,
@@ -59,6 +60,14 @@ export default async function RiverCruisesHubPage() {
           Короткие ссылки <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">/river-cruises/город</code> — сервисный
           редирект на тот же канон; если подборка ещё не активна по числу событий, страница города в сайд-навигации не появится.
         </p>
+        <p className="mt-4">
+          <Link
+            href={catalogEventsHref({ category: 'EXCURSION', subcategory: 'RIVER' })}
+            className="inline-flex text-sm font-semibold text-primary-700 hover:text-primary-900 hover:underline"
+          >
+            Все речные экскурсии в общем каталоге /events →
+          </Link>
+        </p>
       </section>
 
       <section className="mt-10">
@@ -72,17 +81,33 @@ export default async function RiverCruisesHubPage() {
             <p className="mt-1 text-sm text-slate-600">Выберите город — откроется городская подборка.</p>
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {hubCards.map((c) => (
-                <Link
+                <div
                   key={c.key}
-                  href={c.href}
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                  className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300"
                 >
-                  <div className="text-base font-bold text-slate-900">{c.cityName}</div>
-                  <div className="mt-1 text-sm text-slate-500">{c.hint}</div>
-                  <div className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                    Алиас: /river-cruises/{c.citySlug}
+                  <Link
+                    href={c.href}
+                    className="block p-4 hover:bg-slate-50"
+                  >
+                    <div className="text-base font-bold text-slate-900">{c.cityName}</div>
+                    <div className="mt-1 text-sm text-slate-500">{c.hint}</div>
+                    <div className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                      Алиас: /river-cruises/{c.citySlug}
+                    </div>
+                  </Link>
+                  <div className="border-t border-slate-100 bg-slate-50/80 px-4 py-2.5">
+                    <Link
+                      href={catalogEventsHref({
+                        city: c.citySlug,
+                        category: 'EXCURSION',
+                        subcategory: 'RIVER',
+                      })}
+                      className="text-xs font-semibold text-primary-700 hover:text-primary-900 hover:underline"
+                    >
+                      Этот город в каталоге /events →
+                    </Link>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           </>

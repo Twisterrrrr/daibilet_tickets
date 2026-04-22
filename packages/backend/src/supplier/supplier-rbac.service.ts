@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { SupplierRole } from '@prisma/client';
+import { SupplierRole } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 

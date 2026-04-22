@@ -30,7 +30,9 @@ import {
   PurchaseType,
   TagKind,
   EventTagAssignmentSource,
-} from '@prisma/client';
+  SubcategoryLayer,
+  SubcategoryType,
+} from '@/prisma-client';
 import type { Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -40,12 +42,17 @@ import { FuzzyDedupService } from '../catalog/fuzzy-dedup.service';
 import { ReviewService } from '../catalog/review.service';
 import { streamCsv } from '../common/csv-stream.util';
 import { buildPaginatedResult, paginationArgs, parsePagination } from '../common/pagination';
+import { ProviderRegistryService } from '../integrations/routing/provider-registry.service';
+import { ProviderRoutingService } from '../integrations/routing/provider-routing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import {
   AdminCreateSessionDto,
   AdminEventSessionsRangeDto,
+  AdminSessionsBulkDto,
+  AdminSessionsBulkResponseDto,
+  AdminSessionsOverviewDto,
   AdminStopSessionDto,
   AdminUpdateSessionDto,
   AdminCancelSessionDto,
@@ -58,10 +65,13 @@ import {
   EventAdminSummaryDto,
   ExternalRatingDto,
   OverrideEventDto,
+  PatchEventMediaDto,
   PatchEventOfferDto,
   UpdateEventOfferDto,
   VenueSettingsDto,
   BulkUpdateEventsDto,
+  EventLandingTableFacetsDto,
+  EventCateringDto,
 } from './dto/admin.dto';
 import { EventOverrideService } from './event-override.service';
 import { EventAdminSummaryService } from './event-admin-summary.service';
@@ -71,7 +81,33 @@ import { AuditService } from './audit.service';
 import { toJsonValue } from '../common/typing';
 import { EventTagRulesService } from './event-tag-rules.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
 import { CatalogClassificationNormalizerService } from '../catalog/catalog-classification-normalizer.service';
+import { deriveSectionsFromSubcategories, getSubcategorySlugsForSection } from '../catalog-classification/derive-sections';
+import type { SectionSlug } from '../catalog-classification/classification.types';
+import {
+  computeAdminEventQuickHealth,
+  isImportedArchived,
+  mapEventOfferToCategoryPriceDto,
+  readinessFromIssueCodes,
+  readinessScoreFromQuickHealth,
+} from './event-admin-list-health.util';
+
+function parseBool(v: string | undefined): boolean {
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
+function parseIdsParam(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return Array.from(
+    new Set(
+      raw
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    ),
+  );
+}
 
 class UpdateEventTagsDto {
   @IsOptional()
@@ -97,6 +133,36 @@ class UpdateEventSubcategoriesDto {
   subcategorySlugs?: string[];
 }
 
+/** Назначение PRIMARY + SECONDARY по code (источник истины — link-таблица). */
+class AssignEventSubcategoriesDto {
+  @IsString()
+  primaryCode!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  secondaryCodes?: string[];
+}
+
+class BatchArchiveImportedEventsDto {
+  @IsBoolean()
+  dryRun!: boolean;
+
+  @IsString()
+  source!: 'TICKETSCLOUD' | 'TEPLOHOD';
+
+  @IsInt()
+  @Min(1)
+  @Max(3650)
+  olderThanDays!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  take?: number;
+}
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -115,8 +181,87 @@ export class AdminEventsController {
     private readonly eventAdminSummary: EventAdminSummaryService,
     private readonly audit: AuditService,
     private readonly subcategoryPolicy: SubcategoryPolicyService,
+    private readonly subcategoryAssignment: SubcategoryAssignmentService,
     private readonly catalogClassificationNormalizer: CatalogClassificationNormalizerService,
+    private readonly providerRegistry: ProviderRegistryService,
+    private readonly providerRouting: ProviderRoutingService,
   ) {}
+
+  @Get('health/batch')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async batchHealth(@Query('ids') idsRaw?: string) {
+    const ids = parseIdsParam(idsRaw).slice(0, 200);
+    if (ids.length === 0) {
+      return { items: [] as Array<{ id: string; flags: Record<string, boolean>; issueCodes: string[] }> };
+    }
+
+    const now = new Date();
+
+    const [events, futureSessions, pricedOffers, linkCounts] = await Promise.all([
+      this.prisma.event.findMany({
+        where: { id: { in: ids }, isDeleted: false },
+        select: {
+          id: true,
+          imageUrl: true,
+          subcategories: true,
+          override: { select: { imageUrl: true } },
+        },
+      }),
+      this.prisma.eventSession.groupBy({
+        by: ['eventId'],
+        where: {
+          eventId: { in: ids },
+          isActive: true,
+          canceledAt: null,
+          startsAt: { gt: now },
+        },
+        _count: { id: true },
+      }),
+      this.prisma.eventOffer.groupBy({
+        by: ['eventId'],
+        where: {
+          eventId: { in: ids },
+          isDeleted: false,
+          status: OfferStatus.ACTIVE,
+          priceFrom: { gt: 0 },
+        },
+        _count: { id: true },
+      }),
+      this.prisma.eventSubcategoryLink.groupBy({
+        by: ['eventId'],
+        where: { eventId: { in: ids } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const futureById = new Map(futureSessions.map((r) => [r.eventId, r._count.id]));
+    const pricedById = new Map(pricedOffers.map((r) => [r.eventId, r._count.id]));
+    const linksById = new Map(linkCounts.map((r) => [r.eventId, r._count._all]));
+
+    const items = events.map((e) => {
+      const effImage = e.override?.imageUrl ?? e.imageUrl;
+      const hasImage = Boolean(effImage);
+      const hasFutureSessions = (futureById.get(e.id) ?? 0) > 0;
+      const hasPrice = (pricedById.get(e.id) ?? 0) > 0;
+      const linksCount = linksById.get(e.id) ?? 0;
+      const legacyCount = Array.isArray(e.subcategories) ? e.subcategories.length : 0;
+      const { flags, issueCodes } = computeAdminEventQuickHealth({
+        hasImage,
+        hasPrice,
+        hasFutureSessions,
+        linksCount,
+        legacySubcategoryCount: legacyCount,
+      });
+
+      return {
+        id: e.id,
+        flags,
+        issueCodes,
+      };
+    });
+
+    return { items };
+  }
 
   @Get()
   async list(
@@ -126,11 +271,29 @@ export class AdminEventsController {
     @Query('active') active?: string,
     @Query('hidden') hidden?: string,
     @Query('search') search?: string,
+    @Query('isPast') isPast?: string,
+    @Query('isArchived') isArchived?: string,
+    @Query('isIndexable') isIndexable?: string,
+    @Query('pastDays') pastDays?: string,
+    @Query('section') section?: string,
+    @Query('subcategory') subcategory?: string,
+    @Query('hasNoSubcategory') hasNoSubcategory?: string,
+    @Query('hasMultipleSubcategories') hasMultipleSubcategories?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
     @Query('cursor') cursor?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('operator') operatorSlug?: string,
+    @Query('hasFutureSessions') hasFutureSessions?: string,
+    @Query('hasCategoryPrices') hasCategoryPrices?: string,
+    @Query('missingImage') missingImage?: string,
+    @Query('hasOverride') hasOverride?: string,
+    @Query('issuesPreset') issuesPreset?: string,
+    @Query('lite') lite?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
+    const liteMode = lite === '1' || lite === 'true' || lite === 'yes';
     const andParts: Prisma.EventWhereInput[] = [{ isDeleted: false }];
     if (city) andParts.push({ city: { slug: city } });
     if (category) {
@@ -158,27 +321,574 @@ export class AdminEventsController {
         OR: [{ override: null }, { override: { isHidden: false } }],
       });
     }
+
+    const hasOv = hasOverride === '1' || hasOverride === 'true' || hasOverride === 'yes';
+    if (hasOv) {
+      andParts.push({ NOT: { override: null } });
+    }
+
+    const missingImg =
+      missingImage === '1' || missingImage === 'true' || missingImage === 'yes';
+    if (missingImg) {
+      // Effective image is (override.imageUrl ?? event.imageUrl)
+      // Missing iff event.imageUrl is null AND (override is null OR override.imageUrl is null)
+      andParts.push({
+        imageUrl: null,
+        OR: [{ override: null }, { override: { imageUrl: null } }],
+      });
+    }
+
+    // Archive / index policy (legacy schema mode):
+    // - isPast is derived from presence of future active sessions.
+    // - isArchived is derived as (isActive=false) for imported events (source != MANUAL).
+    // Default behavior for admin UX: hide imported past events + imported archived events from the main list.
+    const now = new Date();
+    const pastBool = parseBool(isPast) ? true : isPast === '0' || isPast === 'false' || isPast === 'no' ? false : undefined;
+    const archivedBool =
+      isArchived === '1' || isArchived === 'true' || isArchived === 'yes'
+        ? true
+        : isArchived === '0' || isArchived === 'false' || isArchived === 'no'
+          ? false
+          : undefined;
+    const indexableBool =
+      isIndexable === '1' || isIndexable === 'true' || isIndexable === 'yes'
+        ? true
+        : isIndexable === '0' || isIndexable === 'false' || isIndexable === 'no'
+          ? false
+          : undefined;
+
+    if (archivedBool === true) {
+      andParts.push({ source: { not: EventSource.MANUAL }, isActive: false });
+    } else if (archivedBool === false || archivedBool === undefined) {
+      // default: exclude archived (imported inactive) unless explicitly requested
+      andParts.push({ OR: [{ source: EventSource.MANUAL }, { isActive: true }] });
+    }
+
+    // Past filter is intentionally applied mainly to imported events to keep admin clean without hiding manual drafts.
+    const futureSessionsWhere: Prisma.EventSessionWhereInput = { startsAt: { gt: now }, isActive: true };
+    if (pastBool === true) {
+      andParts.push({
+        OR: [
+          { source: EventSource.MANUAL },
+          { sessions: { none: futureSessionsWhere } },
+        ],
+      });
+    } else if (pastBool === false || pastBool === undefined) {
+      // default: hide past imported events (no future active sessions)
+      andParts.push({
+        OR: [
+          { source: EventSource.MANUAL },
+          { sessions: { some: futureSessionsWhere } },
+        ],
+      });
+    }
+
+    // isIndexable is currently derived: past => false, active future => true.
+    // This param is supported for filtering UX; it does not persist a flag yet.
+    if (indexableBool === true) {
+      andParts.push({ sessions: { some: futureSessionsWhere } });
+    } else if (indexableBool === false) {
+      andParts.push({ sessions: { none: futureSessionsWhere } });
+    }
+
+    const opTrim = operatorSlug?.trim();
+    if (opTrim) {
+      andParts.push({ operator: { slug: opTrim } });
+    }
+
+    const futureSessionsWhereActive: Prisma.EventSessionWhereInput = {
+      startsAt: { gt: now },
+      isActive: true,
+      canceledAt: null,
+    };
+
+    const hasFs =
+      hasFutureSessions === '1' || hasFutureSessions === 'true' || hasFutureSessions === 'yes';
+    const hasFsFalse =
+      hasFutureSessions === '0' || hasFutureSessions === 'false' || hasFutureSessions === 'no';
+    if (hasFs) {
+      andParts.push({ sessions: { some: futureSessionsWhereActive } });
+    } else if (hasFsFalse) {
+      andParts.push({ sessions: { none: futureSessionsWhereActive } });
+    }
+
+    const hasCp =
+      hasCategoryPrices === '1' || hasCategoryPrices === 'true' || hasCategoryPrices === 'yes';
+    const hasCpFalse =
+      hasCategoryPrices === '0' || hasCategoryPrices === 'false' || hasCategoryPrices === 'no';
+    if (hasCp) {
+      andParts.push({
+        offers: {
+          some: { isDeleted: false, status: OfferStatus.ACTIVE, priceFrom: { gt: 0 } },
+        },
+      });
+    } else if (hasCpFalse) {
+      andParts.push({
+        offers: {
+          none: { isDeleted: false, status: OfferStatus.ACTIVE, priceFrom: { gt: 0 } },
+        },
+      });
+    }
+
+    const pastDaysNum = pastDays ? Math.max(1, Math.min(365, parseInt(pastDays, 10) || 0)) : 0;
+    if (pastDaysNum > 0) {
+      const from = new Date(now.getTime() - pastDaysNum * 24 * 60 * 60 * 1000);
+      // Past in window: no future sessions + at least one session in [from, now)
+      andParts.push({
+        sessions: {
+          none: futureSessionsWhere,
+          some: { startsAt: { gte: from, lt: now } },
+        },
+      });
+    }
+
+    const preset = (issuesPreset ?? '').trim().toLowerCase();
+    if (preset === 'api') {
+      // Operational issues that block a storefront-safe publish.
+      andParts.push({
+        OR: [
+          { venueId: null },
+          { subcategoryLinks: { none: {} } },
+          { offers: { none: { isDeleted: false, status: OfferStatus.ACTIVE, priceFrom: { gt: 0 } } } },
+          { sessions: { none: futureSessionsWhereActive } },
+          { imageUrl: null, OR: [{ override: null }, { override: { imageUrl: null } }] },
+        ],
+      });
+    }
+
+    // Derived classification filters (canonical source: event_subcategory_links).
+    const sectionTrim = section?.trim() as SectionSlug | undefined;
+    if (sectionTrim) {
+      const allowed: readonly SectionSlug[] = ['events', 'excursions', 'museums', 'activities', 'entertainment'];
+      if (!allowed.includes(sectionTrim)) {
+        throw new BadRequestException('Invalid "section"');
+      }
+      const slugs = getSubcategorySlugsForSection(sectionTrim);
+      andParts.push({
+        subcategoryLinks: {
+          some: { subcategory: { slug: { in: slugs } } },
+        },
+      });
+    }
+
+    const subcategoryTrim = subcategory?.trim();
+    if (subcategoryTrim) {
+      andParts.push({
+        subcategoryLinks: {
+          // NOTE: we filter by exact slug; the UI selector uses active options only.
+          some: { subcategory: { slug: subcategoryTrim } },
+        },
+      });
+    }
+
+    const hasNo =
+      hasNoSubcategory === '1' || hasNoSubcategory === 'true' || hasNoSubcategory === 'yes';
+    const hasNoExplicitFalse =
+      hasNoSubcategory === '0' || hasNoSubcategory === 'false' || hasNoSubcategory === 'no';
+    if (hasNo) {
+      // "no subcategory" means no links at all (including legacy/inactive)
+      andParts.push({ subcategoryLinks: { none: {} } });
+    } else if (hasNoExplicitFalse) {
+      andParts.push({ subcategoryLinks: { some: {} } });
+    }
+
+    const hasMulti =
+      hasMultipleSubcategories === '1' ||
+      hasMultipleSubcategories === 'true' ||
+      hasMultipleSubcategories === 'yes';
+    const hasMultiExplicitFalse =
+      hasMultipleSubcategories === '0' ||
+      hasMultipleSubcategories === 'false' ||
+      hasMultipleSubcategories === 'no';
+    if (hasMulti) {
+      const preWhere: Prisma.EventWhereInput = andParts.length === 1 ? andParts[0]! : { AND: andParts };
+      const groups = await this.prisma.eventSubcategoryLink.groupBy({
+        by: ['eventId'],
+        where: { event: preWhere },
+        _count: { _all: true },
+        having: { eventId: { _count: { gt: 1 } } } as unknown as Prisma.EventSubcategoryLinkScalarWhereWithAggregatesInput,
+      });
+      const rows = groups as unknown as Array<{ eventId: string }>;
+      const ids = rows.map((g) => g.eventId);
+      andParts.push({ id: { in: ids.length ? ids : ['00000000-0000-0000-0000-000000000000'] } });
+    } else if (hasMultiExplicitFalse) {
+      const preWhere: Prisma.EventWhereInput = andParts.length === 1 ? andParts[0]! : { AND: andParts };
+      const groups = await this.prisma.eventSubcategoryLink.groupBy({
+        by: ['eventId'],
+        where: { event: preWhere },
+        _count: { _all: true },
+        having: { eventId: { _count: { gt: 1 } } } as unknown as Prisma.EventSubcategoryLinkScalarWhereWithAggregatesInput,
+      });
+      const rows = groups as unknown as Array<{ eventId: string }>;
+      const idsMulti = rows.map((g) => g.eventId);
+      if (idsMulti.length) {
+        andParts.push({ NOT: { id: { in: idsMulti } } });
+      }
+    }
+
     const where: Prisma.EventWhereInput = andParts.length === 1 ? andParts[0]! : { AND: andParts };
+
+    const sortDirNorm = sortDir === 'asc' || sortDir === 'desc' ? sortDir : 'desc';
+    const sortByNorm = (sortBy || '').trim();
+    const orderBy: Prisma.EventOrderByWithRelationInput =
+      sortByNorm === 'title'
+        ? { title: sortDirNorm }
+        : sortByNorm === 'source'
+          ? { source: sortDirNorm }
+          : sortByNorm === 'city'
+            ? { city: { name: sortDirNorm } }
+            : { updatedAt: 'desc' };
 
     const [rawItems, total] = await Promise.all([
       this.prisma.event.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          category: true,
+          source: true,
+          rating: true,
+          isActive: true,
+          updatedAt: true,
+          imageUrl: true,
+          priceFrom: true,
+          subcategories: true,
           city: { select: { slug: true, name: true } },
-          _count: { select: { sessions: true, tags: true, offers: true } },
-          override: true,
+          venue: { select: { id: true, title: true, slug: true } },
+          operator: { select: { id: true, name: true, slug: true } },
+          _count: { select: { sessions: true, tags: true, offers: true, subcategoryLinks: true } },
+          override: { select: { isHidden: true, editorStatus: true, imageUrl: true } },
+          ...(liteMode
+            ? {}
+            : {
+                subcategoryLinks: {
+                  select: {
+                    eventId: true,
+                    subcategoryId: true,
+                    subcategory: {
+                      select: { id: true, slug: true, nameRu: true, isActive: true, layer: true, type: true },
+                    },
+                  },
+                },
+              }),
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy,
         ...paginationArgs(pg),
       }),
       this.prisma.event.count({ where }),
     ]);
 
     const result = buildPaginatedResult(rawItems, total, pg.limit);
+
+    const eventIds = result.items.map((e) => e.id);
+    const [lastSessionMax, nextFutureMin, futureSessionCounts, minPricedOffers] = eventIds.length
+      ? await Promise.all([
+          this.prisma.eventSession.groupBy({
+            by: ['eventId'],
+            where: { eventId: { in: eventIds } },
+            _max: { startsAt: true },
+          }),
+          this.prisma.eventSession.groupBy({
+            by: ['eventId'],
+            where: {
+              eventId: { in: eventIds },
+              isActive: true,
+              canceledAt: null,
+              startsAt: { gt: now },
+            },
+            _min: { startsAt: true },
+          }),
+          this.prisma.eventSession.groupBy({
+            by: ['eventId'],
+            where: {
+              eventId: { in: eventIds },
+              isActive: true,
+              canceledAt: null,
+              startsAt: { gt: now },
+            },
+            _count: { id: true },
+          }),
+          this.prisma.eventOffer.groupBy({
+            by: ['eventId'],
+            where: {
+              eventId: { in: eventIds },
+              isDeleted: false,
+              status: OfferStatus.ACTIVE,
+              priceFrom: { gt: 0 },
+            },
+            _min: { priceFrom: true },
+          }),
+        ])
+      : [[], [], [], []];
+
+    const lastSessionAtByEventId = new Map<string, Date>();
+    for (const row of lastSessionMax) {
+      const r = row as unknown as { eventId: string; _max: { startsAt: Date | null } };
+      const d = r._max.startsAt;
+      if (d) lastSessionAtByEventId.set(r.eventId, d);
+    }
+
+    const nextFutureSessionAtByEventId = new Map<string, Date>();
+    for (const row of nextFutureMin as Array<{ eventId: string; _min: { startsAt: Date | null } }>) {
+      const d = row._min.startsAt;
+      if (d) nextFutureSessionAtByEventId.set(row.eventId, d);
+    }
+
+    const futureSessionCountByEventId = new Map<string, number>();
+    for (const row of futureSessionCounts as Array<{ eventId: string; _count: { id: number } }>) {
+      futureSessionCountByEventId.set(row.eventId, row._count.id);
+    }
+
+    const minOfferPriceByEventId = new Map<string, number>();
+    for (const row of minPricedOffers as Array<{ eventId: string; _min: { priceFrom: number | null } }>) {
+      const p = row._min.priceFrom;
+      if (p != null && p > 0) minOfferPriceByEventId.set(row.eventId, p);
+    }
+
+    const items = result.items.map((e) => {
+      const allSubcats = liteMode
+        ? []
+        : (((e as unknown as { subcategoryLinks?: Array<{ subcategory: unknown }> }).subcategoryLinks ?? [])
+            .map((l) => l.subcategory) as Array<unknown>)
+            .filter(
+              (s): s is {
+                id: string;
+                slug: string;
+                nameRu: string;
+                isActive: boolean;
+                layer: SubcategoryLayer;
+                type: SubcategoryType;
+              } => Boolean(s),
+            );
+
+      const lastSessionAt = lastSessionAtByEventId.get(e.id) ?? null;
+      const derivedIsPast = lastSessionAt ? lastSessionAt < now : false;
+      const derivedIsArchived = isImportedArchived({ source: e.source, isActive: e.isActive });
+      const derivedIsIndexable = !derivedIsPast && !derivedIsArchived;
+
+      const nextFutureAt = nextFutureSessionAtByEventId.get(e.id) ?? null;
+      const futureSessionsCount = futureSessionCountByEventId.get(e.id) ?? 0;
+      const offerMin = minOfferPriceByEventId.get(e.id);
+      const eventPf = e.priceFrom != null && e.priceFrom > 0 ? e.priceFrom : null;
+      const priceFromMinKopecks =
+        offerMin != null && eventPf != null
+          ? Math.min(offerMin, eventPf)
+          : offerMin ?? eventPf ?? null;
+
+      const effImage = e.override?.imageUrl ?? e.imageUrl;
+      const hasImage = Boolean(effImage);
+      const hasPricedOffer = (offerMin != null && offerMin > 0) || (e.priceFrom != null && e.priceFrom > 0);
+      const linksCount =
+        typeof (e._count as { subcategoryLinks?: number } | undefined)?.subcategoryLinks === 'number'
+          ? ((e._count as { subcategoryLinks?: number }).subcategoryLinks ?? 0)
+          : (e.subcategoryLinks ?? []).length;
+      const legacyCount = Array.isArray(e.subcategories) ? e.subcategories.length : 0;
+      const quickHealth = computeAdminEventQuickHealth({
+        hasImage,
+        hasPrice: hasPricedOffer,
+        hasFutureSessions: futureSessionsCount > 0,
+        linksCount,
+        legacySubcategoryCount: legacyCount,
+      });
+      const readinessStatus = readinessFromIssueCodes(quickHealth.issueCodes).readinessStatus;
+      const readinessScore = readinessScoreFromQuickHealth({
+        flags: quickHealth.flags,
+        issueCodes: quickHealth.issueCodes,
+      });
+
+      return {
+        id: e.id,
+        title: e.title,
+        slug: e.slug,
+        category: e.category,
+        source: e.source,
+        rating: e.rating as unknown as number,
+        isActive: e.isActive,
+        updatedAt: e.updatedAt,
+        city: e.city,
+        override: e.override,
+        _count: e._count,
+        supplier: e.operator ? { id: e.operator.id, name: e.operator.name, slug: e.operator.slug } : null,
+        venueShort: e.venue ? { id: e.venue.id, name: e.venue.title, slug: e.venue.slug } : null,
+        subcategoriesCanonical: liteMode
+          ? []
+          : allSubcats.map((s) => ({
+              id: s.id,
+              slug: s.slug,
+              name: s.nameRu,
+              isActive: s.isActive,
+              layer: s.layer,
+              subcategoryType: s.type,
+            })),
+        sectionsDerived: liteMode ? [] : deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
+        lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
+        nextSessionAt: nextFutureAt ? nextFutureAt.toISOString() : null,
+        futureSessionsCount,
+        priceFromMin: priceFromMinKopecks,
+        categoriesCount: e._count?.offers ?? 0,
+        readinessSummary: {
+          status: readinessStatus,
+          score: readinessScore,
+          issueCodes: quickHealth.issueCodes,
+        },
+        isPast: derivedIsPast,
+        isArchived: derivedIsArchived,
+        isIndexable: derivedIsIndexable,
+      };
+    });
+
     return {
       ...result,
+      items,
       page: pg.page,
       pages: Math.ceil(total / pg.limit) || 1,
+    };
+  }
+
+  /**
+   * Safe batch archive for imported events (dry-run only).
+   *
+   * Rules:
+   * - only imported sources (TICKETSCLOUD / TEPLOHOD)
+   * - only events without future active sessions
+   * - dryRun обязательный (не архивирует реально в первой версии)
+   * - explicit source filter required
+   */
+  @Post('archive/batch')
+  @Roles('ADMIN', 'EDITOR')
+  async batchArchiveImported(@Body() dto: BatchArchiveImportedEventsDto) {
+    const source = String(dto.source || '').toUpperCase();
+    if (source !== 'TICKETSCLOUD' && source !== 'TEPLOHOD') {
+      throw new BadRequestException('source должен быть TICKETSCLOUD или TEPLOHOD');
+    }
+
+    const now = new Date();
+    const threshold = new Date(now.getTime() - dto.olderThanDays * 24 * 60 * 60 * 1000);
+    const take = Math.min(2000, Math.max(1, dto.take ?? 500));
+
+    const futureSessionsWhere: Prisma.EventSessionWhereInput = { startsAt: { gt: now }, isActive: true };
+
+    // Preselect candidate ids (no future sessions, active now).
+    const candidates = await this.prisma.event.findMany({
+      where: {
+        isDeleted: false,
+        source: source as EventSource,
+        isActive: true,
+        sessions: { none: futureSessionsWhere },
+      },
+      select: { id: true, title: true, source: true },
+      orderBy: { updatedAt: 'desc' },
+      take,
+    });
+
+    const ids = candidates.map((c) => c.id);
+    if (ids.length === 0) {
+      return { count: 0, ids: [], items: [] as Array<{ id: string; title: string; source: EventSource; lastSessionAt: string | null }> };
+    }
+
+    const lastSessionMax = await this.prisma.eventSession.groupBy({
+      by: ['eventId'],
+      where: { eventId: { in: ids } },
+      _max: { startsAt: true },
+    });
+    const lastSessionAtByEventId = new Map<string, Date>();
+    for (const row of lastSessionMax) {
+      const r = row as unknown as { eventId: string; _max: { startsAt: Date | null } };
+      const d = r._max.startsAt;
+      if (d) lastSessionAtByEventId.set(r.eventId, d);
+    }
+
+    const items = candidates
+      .map((e) => {
+        const lastSessionAt = lastSessionAtByEventId.get(e.id) ?? null;
+        return {
+          id: e.id,
+          title: e.title,
+          source: e.source,
+          lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
+        };
+      })
+      .filter((e) => e.lastSessionAt && new Date(e.lastSessionAt) < threshold);
+
+    // Dry-run returns candidates only (no changes).
+    if (dto.dryRun) {
+      return {
+        dryRun: true,
+        source,
+        olderThanDays: dto.olderThanDays,
+        take,
+        count: items.length,
+        ids: items.map((i) => i.id),
+        items,
+      };
+    }
+
+    // Execute: archive those exact candidates (still safe: only imported, no future sessions).
+    // Hard safety cap to avoid accidental large runs.
+    if (items.length > 1000) {
+      throw new BadRequestException('Слишком много кандидатов для execute (лимит 1000). Увеличьте olderThanDays или снизьте take.');
+    }
+
+    const idsToArchive = items.map((i) => i.id);
+    const updated = await this.prisma.event.updateMany({
+      where: {
+        id: { in: idsToArchive },
+        isDeleted: false,
+        source: source as EventSource,
+        isActive: true,
+        sessions: { none: futureSessionsWhere },
+      },
+      data: { isActive: false },
+    });
+
+    // Invalidate caches for updated ids (best-effort).
+    await Promise.all(idsToArchive.map((id) => this.cacheInvalidation.invalidateEventById(id)));
+
+    const postRows = await this.prisma.event.findMany({
+      where: { id: { in: idsToArchive } },
+      select: {
+        id: true,
+        isActive: true,
+        sessions: { where: futureSessionsWhere, select: { id: true }, take: 1 },
+      },
+    });
+    const postById = new Map(postRows.map((r) => [r.id, r]));
+
+    const skipped: Array<{
+      id: string;
+      reason: 'FUTURE_SESSIONS' | 'ALREADY_ARCHIVED' | 'NOT_FOUND' | 'OTHER';
+    }> = [];
+    const archivedIds: string[] = [];
+
+    for (const id of idsToArchive) {
+      const row = postById.get(id);
+      if (!row) {
+        skipped.push({ id, reason: 'NOT_FOUND' });
+        continue;
+      }
+      if (row.sessions.length > 0) {
+        skipped.push({ id, reason: 'FUTURE_SESSIONS' });
+        continue;
+      }
+      if (row.isActive === false) {
+        archivedIds.push(id);
+      } else {
+        skipped.push({ id, reason: 'OTHER' });
+      }
+    }
+
+    return {
+      dryRun: false,
+      source,
+      olderThanDays: dto.olderThanDays,
+      take,
+      count: items.length,
+      ids: idsToArchive,
+      items,
+      archivedCount: updated.count,
+      archivedIds,
+      skipped,
     };
   }
 
@@ -270,6 +980,246 @@ export class AdminEventsController {
       title: e.title,
       cityName: e.city?.name ?? '',
     }));
+  }
+
+  /**
+   * Кросс-событийный обзор сеансов (фильтр по датам и городу).
+   * GET /admin/events/sessions/overview?from&to&city&take&issuesOnly
+   * При issuesOnly=true запрашивается расширенная выборка (до 1500 строк по времени), затем фильтр по непустым issues.
+   */
+  @Get('sessions/overview')
+  @Roles('ADMIN', 'EDITOR')
+  async getSessionsOverview(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('city') citySlug?: string,
+    @Query('take') takeStr?: string,
+    @Query('issuesOnly') issuesOnly?: string,
+  ): Promise<AdminSessionsOverviewDto> {
+    const take = Math.min(500, Math.max(1, parseInt(takeStr ?? '200', 10) || 200));
+    const issuesOnlyBool = issuesOnly === '1' || issuesOnly === 'true' || issuesOnly === 'yes';
+    const fetchLimit = issuesOnlyBool
+      ? Math.min(1500, Math.max(take + 1, take * 6))
+      : take + 1;
+
+    const now = new Date();
+    const fromDate = from ? new Date(from) : now;
+    if (Number.isNaN(fromDate.getTime())) {
+      throw new BadRequestException('Invalid "from" date');
+    }
+    let toDate = to ? new Date(to) : new Date(fromDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(toDate.getTime())) {
+      throw new BadRequestException('Invalid "to" date');
+    }
+    const maxRangeMs = 93 * 24 * 60 * 60 * 1000;
+    if (toDate.getTime() - fromDate.getTime() > maxRangeMs) {
+      toDate = new Date(fromDate.getTime() + maxRangeMs);
+    }
+    if (toDate.getTime() < fromDate.getTime()) {
+      throw new BadRequestException('"to" must be after "from"');
+    }
+
+    const eventWhere: Prisma.EventWhereInput = { isDeleted: false };
+    const cityTrim = citySlug?.trim();
+    if (cityTrim) {
+      eventWhere.city = { slug: cityTrim };
+    }
+
+    const sessions = await this.prisma.eventSession.findMany({
+      where: {
+        startsAt: { gte: fromDate, lte: toDate },
+        event: eventWhere,
+      },
+      take: fetchLimit,
+      orderBy: { startsAt: 'asc' },
+      select: {
+        id: true,
+        startsAt: true,
+        endsAt: true,
+        capacityTotal: true,
+        isActive: true,
+        canceledAt: true,
+        cancelReason: true,
+        offerId: true,
+        prices: true,
+        event: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            source: true,
+            defaultCapacityTotal: true,
+            city: { select: { slug: true, name: true } },
+          },
+        },
+      },
+    });
+
+    const hitFetchCap = sessions.length >= fetchLimit;
+    const sessionIds = sessions.map((s) => s.id);
+
+    const soldBySessionId: Record<string, number> = {};
+    if (sessionIds.length > 0) {
+      const sold = await this.prisma.packageItem.groupBy({
+        by: ['sessionId'],
+        where: {
+          sessionId: { in: sessionIds },
+          status: { in: ['BOOKED', 'CONFIRMED'] },
+        },
+        _sum: {
+          adultTickets: true,
+          childTickets: true,
+        },
+      });
+      for (const row of sold) {
+        soldBySessionId[row.sessionId] = (row._sum.adultTickets ?? 0) + (row._sum.childTickets ?? 0);
+      }
+    }
+
+    const allRows: AdminSessionsOverviewDto['rows'] = sessions.map((s) => {
+      const soldCount = soldBySessionId[s.id] ?? 0;
+      const event = s.event;
+      const base = this.buildAdminSessionRow(
+        {
+          id: s.id,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt ?? null,
+          capacityTotal: s.capacityTotal ?? null,
+          canceledAt: s.canceledAt,
+          cancelReason: s.cancelReason,
+          isActive: s.isActive,
+        },
+        { source: event.source, defaultCapacityTotal: event.defaultCapacityTotal ?? null },
+        soldCount,
+      );
+
+      const cap = base.capacity ?? null;
+      const issues: string[] = [];
+      if (s.canceledAt) {
+        issues.push('CANCELLED');
+      } else {
+        if (!s.isActive) issues.push('PAUSED');
+        if (cap !== null && cap <= 0) issues.push('CAPACITY_ZERO');
+        if (cap !== null && cap > 0 && soldCount >= cap) issues.push('SOLD_OUT');
+      }
+      if (!s.offerId) issues.push('NO_OFFER_LINK');
+      const pricesArr = Array.isArray(s.prices) ? s.prices : [];
+      if (pricesArr.length === 0) issues.push('NO_PRICE');
+
+      return {
+        sessionId: s.id,
+        eventId: event.id,
+        eventTitle: event.title,
+        eventSlug: event.slug,
+        citySlug: event.city.slug,
+        cityName: event.city.name,
+        startsAt: base.startsAt,
+        endsAt: base.endsAt,
+        capacity: base.capacity,
+        soldCount: base.soldCount,
+        locked: base.locked,
+        lockReason: base.lockReason,
+        isCancelled: base.isCancelled,
+        canceledAt: base.canceledAt,
+        cancelReason: base.cancelReason,
+        offerId: s.offerId,
+        eventSource: event.source,
+        sessionIsActive: s.isActive,
+        issues,
+      };
+    });
+
+    let rows: AdminSessionsOverviewDto['rows'];
+    let truncated: boolean;
+    if (issuesOnlyBool) {
+      const withIssues = allRows.filter((r) => r.issues.length > 0);
+      truncated = hitFetchCap || withIssues.length > take;
+      rows = withIssues.slice(0, take);
+    } else {
+      truncated = sessions.length > take;
+      rows = truncated ? allRows.slice(0, take) : allRows;
+    }
+
+    return {
+      from: fromDate.toISOString(),
+      to: toDate.toISOString(),
+      truncated,
+      rows,
+    };
+  }
+
+  /**
+   * Массовая пауза / возобновление продажи слотов (только MANUAL, будущие, не отменённые).
+   * POST /admin/events/sessions/bulk
+   */
+  @Post('sessions/bulk')
+  @Roles('ADMIN', 'EDITOR')
+  async bulkSessions(@Body() body: AdminSessionsBulkDto): Promise<AdminSessionsBulkResponseDto> {
+    const uniqueIds = [...new Set(body.sessionIds.map((id) => id.trim()).filter(Boolean))];
+    const ids = uniqueIds.slice(0, 100);
+    if (ids.length === 0) {
+      throw new BadRequestException('sessionIds обязателен');
+    }
+
+    const results: AdminSessionsBulkResponseDto['results'] = [];
+    const now = new Date();
+
+    for (const id of ids) {
+      try {
+        const { session, event } = await this.getSessionWithEvent(id);
+        if (event.source !== 'MANUAL') {
+          results.push({ id, ok: false, error: 'IMPORTED' });
+          continue;
+        }
+        if (session.canceledAt) {
+          results.push({ id, ok: false, error: 'CANCELLED' });
+          continue;
+        }
+        if (session.startsAt < now) {
+          results.push({ id, ok: false, error: 'PAST' });
+          continue;
+        }
+        if (body.action === 'pause') {
+          const soldCount = await this.getSessionSoldCount(id);
+          const cap = session.capacityTotal ?? event.defaultCapacityTotal ?? null;
+          if (cap != null && cap > 0 && soldCount >= cap) {
+            results.push({ id, ok: false, error: 'SOLD_OUT' });
+            continue;
+          }
+          if (!session.isActive) {
+            results.push({ id, ok: true });
+            continue;
+          }
+          await this.prisma.eventSession.update({
+            where: { id },
+            data: { isActive: false },
+          });
+          results.push({ id, ok: true });
+        } else {
+          if (session.isActive) {
+            results.push({ id, ok: true });
+            continue;
+          }
+          await this.prisma.eventSession.update({
+            where: { id },
+            data: { isActive: true },
+          });
+          results.push({ id, ok: true });
+        }
+      } catch (e) {
+        if (e instanceof NotFoundException) {
+          results.push({ id, ok: false, error: 'NOT_FOUND' });
+        } else {
+          results.push({
+            id,
+            ok: false,
+            error: e instanceof Error ? e.message.slice(0, 200) : 'UNKNOWN',
+          });
+        }
+      }
+    }
+
+    return { results };
   }
 
   /**
@@ -475,6 +1425,32 @@ export class AdminEventsController {
     const city = await this.prisma.city.findUnique({ where: { id: data.cityId } });
     if (!city) throw new NotFoundException('Город не найден');
 
+    let resolvedStartLocationId: string | undefined;
+    if (data.startLocationId) {
+      const loc = await this.prisma.location.findFirst({
+        where: { id: data.startLocationId, cityId: data.cityId, isActive: true },
+        select: { id: true },
+      });
+      if (!loc) {
+        throw new BadRequestException('Локация не найдена или не относится к выбранному городу');
+      }
+      resolvedStartLocationId = loc.id;
+    }
+
+    const templateBase: Record<string, unknown> =
+      typeof data.templateData === 'object' && data.templateData !== null && !Array.isArray(data.templateData)
+        ? { ...data.templateData }
+        : {};
+
+    if (!resolvedStartLocationId && data.locationProposal?.title?.trim()) {
+      templateBase.pendingLocationProposal = {
+        title: data.locationProposal.title.trim(),
+        address: data.locationProposal.address?.trim() || undefined,
+        type: data.locationProposal.type ?? 'OTHER',
+        submittedAt: new Date().toISOString(),
+      };
+    }
+
     // Create in transaction
     const result = await this.prisma.$transaction(async (tx): Promise<{ event: { id: string }; offer: { id: string } | null }> => {
       // Create event — generate a unique tcEventId for manual events
@@ -498,6 +1474,7 @@ export class AdminEventsController {
           imageUrl: data.imageUrl || null,
           galleryUrls: data.galleryUrls || [],
           priceFrom: data.offer?.priceFrom || null,
+          startLocationId: resolvedStartLocationId ?? null,
           isActive: true,
           createdByType: 'ADMIN',
           createdById: req.user.id,
@@ -524,19 +1501,19 @@ export class AdminEventsController {
           });
       }
 
-      // Create override with templateData if provided.
+      // Create override with templateData if provided (включая pendingLocationProposal из createEvent).
       // Важно использовать тот же транзакционный клиент (tx), иначе FK на eventId
       // может сработать до коммита события и дать ошибку `event_overrides_eventId_fkey`.
-      if (data.templateData && Object.keys(data.templateData).length > 0) {
+      if (Object.keys(templateBase).length > 0) {
         await tx.eventOverride.upsert({
           where: { eventId: event.id },
           create: {
             eventId: event.id,
-            templateData: toJsonValue(data.templateData),
+            templateData: toJsonValue(templateBase),
             updatedBy: req.user.id,
           },
           update: {
-            templateData: toJsonValue(data.templateData),
+            templateData: toJsonValue(templateBase),
             updatedBy: req.user.id,
           },
         });
@@ -813,6 +1790,7 @@ export class AdminEventsController {
         offerId: true,
         canceledAt: true,
         cancelReason: true,
+        isActive: true,
       },
       orderBy: { startsAt: 'asc' },
     });
@@ -857,6 +1835,7 @@ export class AdminEventsController {
           capacityTotal: s.capacityTotal ?? null,
           canceledAt: s.canceledAt,
           cancelReason: s.cancelReason,
+          isActive: s.isActive,
         },
         {
           source: event.source,
@@ -1089,6 +2068,44 @@ export class AdminEventsController {
     return { ok: true, issues: [], gate };
   }
 
+  /**
+   * Снять событие с публикации в каталоге (перевести editorStatus в NEEDS_REVIEW).
+   *
+   * POST /admin/events/:id/unpublish
+   */
+  @Post(':id/unpublish')
+  @Roles('ADMIN')
+  async unpublishEvent(@Param('id') eventId: string, @Request() req: { user: { id: string } }) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { id: true },
+    });
+    if (!event) {
+      throw new NotFoundException('Событие не найдено');
+    }
+
+    await this.prisma.eventOverride.upsert({
+      where: { eventId },
+      create: {
+        eventId,
+        editorStatus: 'NEEDS_REVIEW',
+        updatedBy: req.user.id,
+        needsReviewAt: new Date(),
+      },
+      update: {
+        editorStatus: 'NEEDS_REVIEW',
+        updatedBy: req.user.id,
+        needsReviewAt: new Date(),
+      },
+    });
+
+    await this.audit.log(req.user.id, 'UPDATE', 'EventUnpublish', eventId, undefined, {
+      editorStatus: 'NEEDS_REVIEW',
+    });
+
+    return { ok: true };
+  }
+
   private async getSessionWithEvent(sessionId: string) {
     const session = await this.prisma.eventSession.findUnique({
       where: { id: sessionId },
@@ -1151,6 +2168,7 @@ export class AdminEventsController {
       capacityTotal: number | null;
       canceledAt?: Date | null;
       cancelReason?: string | null;
+      isActive?: boolean;
     },
     event: { source: string; defaultCapacityTotal: number | null },
     soldCount: number,
@@ -1176,6 +2194,7 @@ export class AdminEventsController {
     const isCancelled = !!session.canceledAt;
     const canceledAt: Date | null = session.canceledAt ?? null;
     const cancelReason: string | null = session.cancelReason ?? null;
+    const isActive = session.isActive !== false;
 
     return {
       id: session.id,
@@ -1186,6 +2205,7 @@ export class AdminEventsController {
       locked,
       lockReason,
       isCancelled,
+      isActive,
       canceledAt: canceledAt ? canceledAt.toISOString() : null,
       cancelReason,
     };
@@ -1277,11 +2297,13 @@ export class AdminEventsController {
 
   @Get(':id')
   async get(@Param('id') id: string) {
-    return this.prisma.event.findUniqueOrThrow({
+    const now = new Date();
+    const event = await this.prisma.event.findUniqueOrThrow({
       where: { id },
       include: {
         city: { select: { slug: true, name: true } },
         venue: { select: { id: true, title: true, slug: true } },
+        operator: { select: { id: true, name: true, slug: true, trustLevel: true, trustScore: true } },
         sessions: { where: { isActive: true }, orderBy: { startsAt: 'asc' }, take: 20 },
         tags: { include: { tag: true } },
         offers: {
@@ -1292,8 +2314,92 @@ export class AdminEventsController {
           },
         },
         override: true,
+        subcategoryLinks: {
+          include: {
+            subcategory: { select: { id: true, slug: true, nameRu: true, isActive: true, layer: true, type: true } },
+          },
+        },
       },
     });
+
+    const allSubcats = (event.subcategoryLinks ?? [])
+      .map((l) => l.subcategory)
+      .filter(
+        (s): s is {
+          id: string;
+          slug: string;
+          nameRu: string;
+          isActive: boolean;
+          layer: SubcategoryLayer;
+          type: SubcategoryType;
+        } => Boolean(s),
+      );
+
+    const lastSession = await this.prisma.eventSession.aggregate({
+      where: { eventId: id },
+      _max: { startsAt: true },
+    });
+    const lastSessionAt = (lastSession as unknown as { _max: { startsAt: Date | null } })._max.startsAt;
+    const derivedIsPast = lastSessionAt ? lastSessionAt < now : false;
+    const derivedIsArchived = isImportedArchived({ source: event.source, isActive: event.isActive });
+    const derivedIsIndexable = !derivedIsPast && !derivedIsArchived;
+
+    const futureWhere: Prisma.EventSessionWhereInput = {
+      eventId: id,
+      isActive: true,
+      canceledAt: null,
+      startsAt: { gt: now },
+    };
+    const [futureSessionsCount, nextFutureSession] = await Promise.all([
+      this.prisma.eventSession.count({ where: futureWhere }),
+      this.prisma.eventSession.findFirst({
+        where: futureWhere,
+        orderBy: { startsAt: 'asc' },
+        select: { startsAt: true },
+      }),
+    ]);
+
+    const effCover = event.override?.imageUrl ?? event.imageUrl;
+    const categoryPrices = (event.offers ?? [])
+      .filter((o) => !o.isDeleted)
+      .map((o) => mapEventOfferToCategoryPriceDto(o));
+
+    return {
+      ...event,
+      supplier: event.operator
+        ? {
+            id: event.operator.id,
+            name: event.operator.name,
+            slug: event.operator.slug,
+            trustLevel: event.operator.trustLevel,
+            trustScore: event.operator.trustScore,
+          }
+        : null,
+      categoryPrices,
+      scheduleSummary: {
+        nextSessionAt: nextFutureSession?.startsAt.toISOString() ?? null,
+        futureSessionsCount,
+        importedSessionsReadOnly: event.source !== EventSource.MANUAL,
+      },
+      mediaSummary: {
+        hasCover: Boolean(effCover),
+        galleryCount: Array.isArray(event.galleryUrls) ? event.galleryUrls.length : 0,
+      },
+      subcategoriesCanonical: allSubcats.map((s) => ({
+        id: s.id,
+        slug: s.slug,
+        name: s.nameRu,
+        isActive: s.isActive,
+        layer: s.layer,
+        subcategoryType: s.type,
+      })),
+      sectionsDerived: deriveSectionsFromSubcategories(allSubcats.map((s) => ({ slug: s.slug }))),
+      lastSessionAt: lastSessionAt ? lastSessionAt.toISOString() : null,
+      nextSessionAt: nextFutureSession?.startsAt.toISOString() ?? null,
+      isPast: derivedIsPast,
+      isArchived: derivedIsArchived,
+      isIndexable: derivedIsIndexable,
+    };
   }
 
   /**
@@ -1408,6 +2514,7 @@ export class AdminEventsController {
         capacityTotal: number | null;
         canceledAt: Date | null;
         cancelReason: string | null;
+        isActive: boolean;
       }[] = [];
 
       for (const n of toCreate) {
@@ -1432,6 +2539,7 @@ export class AdminEventsController {
             capacityTotal: true,
             canceledAt: true,
             cancelReason: true,
+            isActive: true,
           },
         });
         created.push(session);
@@ -1449,6 +2557,7 @@ export class AdminEventsController {
           capacityTotal: s.capacityTotal,
           canceledAt: s.canceledAt,
           cancelReason: s.cancelReason,
+          isActive: s.isActive,
         },
         {
           source: event.source,
@@ -1499,6 +2608,38 @@ export class AdminEventsController {
   }
 
   /**
+   * Обложка (override.imageUrl) и галерея (event.galleryUrls).
+   *
+   * PATCH /admin/events/:id/media
+   */
+  @Patch(':id/media')
+  @Roles('ADMIN', 'EDITOR')
+  async patchEventMedia(
+    @Param('id') id: string,
+    @Body() body: PatchEventMediaDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    const event = await this.prisma.event.findUnique({ where: { id }, select: { id: true } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    if (body.galleryUrls !== undefined) {
+      await this.prisma.event.update({
+        where: { id },
+        data: { galleryUrls: body.galleryUrls },
+      });
+    }
+
+    if (body.imageUrl !== undefined) {
+      const normalized = body.imageUrl.trim() === '' ? null : body.imageUrl.trim();
+      await this.overrideService.upsert(id, { imageUrl: normalized } as unknown as Record<string, unknown>, req.user.id);
+      await this.cacheInvalidation.invalidateOverride(id);
+    }
+
+    await this.cacheInvalidation.invalidateEventById(id);
+    return { ok: true };
+  }
+
+  /**
    * Удалить override — вернуть к данным из sync.
    */
   @Delete(':id/override')
@@ -1518,6 +2659,34 @@ export class AdminEventsController {
     const result = await this.overrideService.toggleHidden(id, isHidden, req.user.id);
     await this.cacheInvalidation.invalidateOverride(id);
     return result;
+  }
+
+  /**
+   * Archive/unarchive event for admin UX (non-destructive).
+   *
+   * Policy:
+   * - Archived events are excluded from default admin list.
+   * - Record remains доступна по прямому URL.
+   */
+  @Patch(':id/archive')
+  @Roles('ADMIN', 'EDITOR')
+  async setArchived(@Param('id') id: string, @Body('isArchived') isArchived: boolean) {
+    const event = await this.prisma.event.findUnique({ where: { id }, select: { id: true, source: true, isActive: true } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    // Legacy schema: treat "archived" as imported inactive (source != MANUAL && isActive=false).
+    // Unarchive toggles isActive=true (safe: does not auto-publish anything; visibility is controlled elsewhere).
+    if (event.source === EventSource.MANUAL) {
+      throw new BadRequestException('Архивирование доступно только для импортных событий');
+    }
+    const updated = await this.prisma.event.update({
+      where: { id },
+      data: { isActive: isArchived ? false : true },
+      select: { id: true, isActive: true, updatedAt: true },
+    });
+
+    await this.cacheInvalidation.invalidateEventById(id);
+    return updated;
   }
 
   /**
@@ -1559,9 +2728,37 @@ export class AdminEventsController {
       orderBy: [{ subcategory: { sortOrder: 'asc' } }, { subcategory: { nameRu: 'asc' } }],
     });
 
-    return links.map((l) => l.subcategory);
+    const primarySubcategory =
+      links.find((l) => l.subcategory.layer === SubcategoryLayer.PRIMARY)?.subcategory ?? null;
+    const secondarySubcategories = links
+      .filter((l) => l.subcategory.layer === SubcategoryLayer.SECONDARY)
+      .map((l) => l.subcategory);
+
+    return {
+      primarySubcategory,
+      secondarySubcategories,
+      /** @deprecated плоский список для старых клиентов */
+      all: links.map((l) => l.subcategory),
+    };
   }
 
+  @Post(':id/subcategories')
+  @Roles('ADMIN', 'EDITOR')
+  async assignEventSubcategoriesPost(@Param('id') id: string, @Body() dto: AssignEventSubcategoriesDto) {
+    const eventExists = await this.prisma.event.findUnique({ where: { id }, select: { id: true } });
+    if (!eventExists) throw new NotFoundException('Событие не найдено');
+
+    await this.prisma.$transaction((tx) =>
+      this.subcategoryAssignment.assignEventSubcategories(id, dto.primaryCode, dto.secondaryCodes ?? [], tx),
+    );
+
+    await this.cacheInvalidation.invalidateEventById(id);
+    return this.getEventSubcategories(id);
+  }
+
+  /**
+   * @deprecated Используйте POST .../subcategories с primaryCode + secondaryCodes. Не пишет legacy Event.subcategories.
+   */
   @Put(':id/subcategories')
   @Roles('ADMIN', 'EDITOR')
   async setEventSubcategories(@Param('id') id: string, @Body() dto: UpdateEventSubcategoriesDto) {
@@ -1788,6 +2985,117 @@ export class AdminEventsController {
     return updated;
   }
 
+  /**
+   * Узкие фасеты для лендингов с таблицей сравнения (речные / гастро-круизы).
+   * PATCH /admin/events/:id/landing-table-facets
+   */
+  @Patch(':id/landing-table-facets')
+  @Roles('ADMIN', 'EDITOR')
+  async updateLandingTableFacets(@Param('id') id: string, @Body() data: EventLandingTableFacetsDto) {
+    const event = await this.prisma.event.findUnique({ where: { id } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    const riverLink = await this.prisma.eventSubcategoryLink.findFirst({
+      where: { eventId: id, subcategory: { slug: 'river-excursion' } },
+      select: { eventId: true },
+    });
+    if (!riverLink) {
+      throw new BadRequestException(
+        'Фасеты таблицы лендинга (теплоход, меню, формат) доступны только для событий с подкатегорией «Речные прогулки» (river-excursion).',
+      );
+    }
+
+    const norm = (s: string | null | undefined) => {
+      if (s === undefined) return undefined;
+      if (s === null) return null;
+      const t = String(s).trim();
+      return t === '' ? null : t;
+    };
+
+    const updated = await this.prisma.event.update({
+      where: { id },
+      data: {
+        ...(data.vesselName !== undefined && { vesselName: norm(data.vesselName) }),
+        ...(data.experienceFormat !== undefined && { experienceFormat: norm(data.experienceFormat) }),
+      },
+      select: {
+        id: true,
+        vesselName: true,
+        experienceFormat: true,
+      },
+    });
+    await this.cacheInvalidation.invalidateEventById(id);
+    return updated;
+  }
+
+  /**
+   * Питание (тип, включено ли в стоимость, меню) — хранится в override.contentTemplateData.catering.
+   * PATCH /admin/events/:id/catering
+   */
+  @Patch(':id/catering')
+  @Roles('ADMIN', 'EDITOR')
+  async updateCatering(
+    @Param('id') id: string,
+    @Body() data: EventCateringDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    const event = await this.prisma.event.findUnique({ where: { id } });
+    if (!event) throw new NotFoundException('Событие не найдено');
+
+    const riverLink = await this.prisma.eventSubcategoryLink.findFirst({
+      where: { eventId: id, subcategory: { slug: 'river-excursion' } },
+      select: { eventId: true },
+    });
+    if (!riverLink) {
+      throw new BadRequestException(
+        'Блок «Питание» доступен только для событий с подкатегорией «Речные прогулки» (river-excursion).',
+      );
+    }
+
+    const prev = await this.prisma.eventOverride.findUnique({
+      where: { eventId: id },
+      select: { contentTemplateData: true },
+    });
+    const prevCtd =
+      prev?.contentTemplateData && typeof prev.contentTemplateData === 'object'
+        ? (prev.contentTemplateData as Record<string, unknown>)
+        : {};
+
+    const normStr = (s: string | null | undefined) => {
+      if (s === undefined) return undefined;
+      if (s === null) return null;
+      const t = String(s).trim();
+      return t === '' ? null : t;
+    };
+
+    const nextCatering: Record<string, unknown> = {
+      ...(typeof prevCtd.catering === 'object' && prevCtd.catering != null
+        ? (prevCtd.catering as Record<string, unknown>)
+        : {}),
+      ...(data.enabled !== undefined && { enabled: Boolean(data.enabled) }),
+      ...(data.type !== undefined && { type: normStr(data.type) }),
+      ...(data.includedInPrice !== undefined && { includedInPrice: data.includedInPrice }),
+      ...(data.menuMarkdown !== undefined && { menuMarkdown: normStr(data.menuMarkdown) }),
+    };
+
+    const updated = await this.prisma.eventOverride.upsert({
+      where: { eventId: id },
+      create: {
+        eventId: id,
+        updatedBy: req.user.id,
+        contentTemplateData: { ...prevCtd, catering: nextCatering } as Prisma.InputJsonValue,
+      },
+      update: {
+        updatedBy: req.user.id,
+        contentTemplateData: { ...prevCtd, catering: nextCatering } as Prisma.InputJsonValue,
+      },
+      select: { eventId: true, contentTemplateData: true },
+    });
+
+    await this.cacheInvalidation.invalidateEventById(id);
+    return { ok: true, override: updated };
+  }
+
   // --- External rating (ручной ввод из Яндекс/2GIS) ---
 
   @Patch(':id/external-rating')
@@ -1835,6 +3143,37 @@ export class AdminEventsController {
         operator: { select: { id: true, name: true, slug: true, isActive: true } },
       },
     });
+  }
+
+  /**
+   * Ticket provider: ссылки на внешнее событие + диагностика маршрутизации (B2B foundation).
+   */
+  @Get(':id/providers')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async getTicketProviderContext(@Param('id') id: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        source: true,
+        defaultProvider: true,
+        providerLinks: { orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }] },
+      },
+    });
+    if (!event) throw new NotFoundException('Событие не найдено');
+    const routing = await this.providerRouting.resolveProviderDebug(id);
+    const descriptor = this.providerRegistry.getDescriptor(routing.provider);
+    return {
+      event,
+      routing,
+      resolvedDescriptor: {
+        code: descriptor.code,
+        protocolType: descriptor.protocolType,
+        operationalClass: descriptor.operationalClass,
+        authType: descriptor.authType,
+        capabilities: descriptor.capabilities,
+      },
+    };
   }
 
   /**

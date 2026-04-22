@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DateMode } from '@prisma/client';
+import { DateMode } from '@/prisma-client';
 
 import { CATALOG_CONSISTENCY_CACHE_KEY } from '../catalog/catalog-consistency.service';
 import { CacheService } from '../cache/cache.service';

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { EventAudience, EventCategory, EventSource } from '@prisma/client';
+import { EventAudience, EventCategory, EventSource } from '@/prisma-client';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min, IsIn } from 'class-validator';
 

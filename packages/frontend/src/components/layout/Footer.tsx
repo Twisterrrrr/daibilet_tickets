@@ -3,6 +3,7 @@ import { Compass } from 'lucide-react';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,9 +22,9 @@ type FooterSection = 'Каталог' | 'Города' | 'Компания';
 
 const staticFooterLinks = {
   Каталог: [
-    { name: 'Экскурсии', href: '/events?category=EXCURSION&page=1' },
-    { name: 'Музеи', href: '/events?category=MUSEUM&page=1' },
-    { name: 'Мероприятия', href: '/events?category=EVENT&page=1' },
+    { name: 'Экскурсии', href: catalogEventsHref({ category: 'EXCURSION' }) },
+    { name: 'Музеи', href: catalogEventsHref({ category: 'MUSEUM' }) },
+    { name: 'Мероприятия', href: catalogEventsHref({ category: 'EVENT' }) },
     // Хабы по кластерам
     { name: 'Речные прогулки', href: '/river-cruises' },
     { name: 'Автобусные экскурсии', href: '/bus-tours' },
@@ -33,7 +34,7 @@ const staticFooterLinks = {
     { name: 'О сервисе', href: '/about' },
     { name: 'Правовая информация', href: '/legal' },
     { name: 'Стать партнёром', href: '/partner' },
-    { name: 'Блог', href: '/blog' },
+    { name: 'Статьи', href: '/articles' },
     { name: 'Помощь', href: '/help' },
     { name: 'Контакты', href: '/contacts' },
   ],

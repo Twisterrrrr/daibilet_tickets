@@ -8,9 +8,10 @@
     "dev:frontend": "pnpm --filter @daibilet/frontend dev",
     "dev:admin": "pnpm --filter @daibilet/frontend-admin dev",
     "dev:admin-v2": "pnpm --filter @daibilet/frontend-admin-v2 dev",
+    "dev:admin-v3": "pnpm --filter @daibilet/frontend-admin-v3 dev",
     "dev:supplier": "pnpm --filter @daibilet/frontend-supplier dev",
     "dev:supplier-v2": "pnpm --filter @daibilet/frontend-supplier-v2 dev",
-    "dev": "concurrently -n backend,frontend,admin,supplier -c blue,green,magenta,cyan \"pnpm dev:backend\" \"pnpm dev:frontend\" \"pnpm dev:admin\" \"pnpm dev:supplier\"",
+    "dev": "concurrently -n backend,frontend,admin-v3 -c blue,green,magenta \"pnpm dev:backend\" \"pnpm dev:frontend\" \"node scripts/wait-for-backend.mjs && pnpm dev:admin-v3\"",
     "build": "pnpm --filter @daibilet/shared build && pnpm --filter @daibilet/backend build && pnpm --filter @daibilet/frontend build",
     "lint": "npx eslint packages/",
     "lint:next": "pnpm --filter @daibilet/frontend run lint",
@@ -49,7 +50,7 @@
     "typescript-eslint": "^8.55.0"
   },
   "lint-staged": {
-    "packages/frontend/src/**/*.{ts,tsx,js,jsx}": "npx eslint --max-warnings=0"
+    "packages/frontend/src/**/*.{ts,tsx,js,jsx}": "npx eslint --config packages/frontend/eslint.config.mjs --max-warnings=0"
   },
   "engines": {
     "node": ">=20.0.0",

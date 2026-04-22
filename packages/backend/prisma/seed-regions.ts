@@ -2,9 +2,13 @@
  * Seed: Регионы — маппинг городов по зонам транспортной доступности (1–2 часа).
  * Запуск: DATABASE_URL=... npx tsx prisma/seed-regions.ts
  */
-import { PrismaClient } from '@prisma/client';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
-const prisma = new PrismaClient();
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+const { prisma, pool } = createScriptPrismaClient();
 
 interface RegionDef {
   slug: string;
@@ -140,4 +144,7 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });

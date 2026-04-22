@@ -1,6 +1,6 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
-import type { ReviewStatus } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import type { ReviewStatus } from '@/prisma-client';
 
 /** Тип карточки покупки для единого экрана «Мои покупки» */
 export type PurchaseDisplayType =
@@ -152,4 +152,23 @@ export class UpdateAccountProfileDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+}
+
+/** Заявка на возврат по позиции заказа (билет/позиция fulfillment). */
+export class CreateAccountRefundRequestDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  fulfillmentItemId!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  reason?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  reasonNote?: string;
 }

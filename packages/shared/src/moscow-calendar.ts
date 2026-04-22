@@ -73,6 +73,55 @@ export function getTomorrowISO(tz: string = DEFAULT_CALENDAR_TZ, now: Date = new
   return dateToISO(new Date(now.getTime() + 86_400_000), tz);
 }
 
+/** Добавить целые календарные дни к YYYY-MM-DD (Григориан), затем календарный день в `tz`. */
+export function addCalendarDaysISO(iso: string, deltaDays: number, tz: string): string {
+  const parts = iso.split('-').map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  if (!y || !m || !d) return iso;
+  const t = Date.UTC(y, m - 1, d + deltaDays, 12, 0, 0);
+  return dateToISO(new Date(t), tz);
+}
+
+const WEEKDAY_LONG_TO_SUN0: Record<string, number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+};
+
+/** День недели 0=вс … 6=сб для календарной даты `iso` в поясе `tz`. */
+export function getWeekdaySun0FromYmdInTz(iso: string, tz: string): number {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return 0;
+  const inst = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const long = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(inst);
+  return WEEKDAY_LONG_TO_SUN0[long] ?? 0;
+}
+
+/**
+ * Ближайшие суббота–воскресенье в календаре города (как старая логика Date.getDay на локали,
+ * но в IANA-поясе города).
+ */
+export function getNextWeekendSatSunISO(tz: string, now: Date = new Date()): [string, string] {
+  const iso = getTodayISO(tz, now);
+  const dow = getWeekdaySun0FromYmdInTz(iso, tz);
+  const daysToSat = dow === 6 ? 0 : dow === 0 ? 6 : 6 - dow;
+  const satIso = addCalendarDaysISO(iso, daysToSat, tz);
+  const sunIso = addCalendarDaysISO(satIso, 1, tz);
+  return [satIso, sunIso];
+}
+
+/** Диапазон для URL/API: `YYYY-MM-DD..YYYY-MM-DD` */
+export function getNextWeekendRangeISO(tz: string, now: Date = new Date()): string {
+  const [sat, sun] = getNextWeekendSatSunISO(tz, now);
+  return `${sat}..${sun}`;
+}
+
 export function getMoscowTodayISO(now: Date = new Date()): string {
   return getTodayISO(DEFAULT_CALENDAR_TZ, now);
 }

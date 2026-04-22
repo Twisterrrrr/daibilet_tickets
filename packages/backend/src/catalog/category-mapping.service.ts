@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventCategory, Prisma } from '@prisma/client';
+import { EventCategory, Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -16,6 +16,92 @@ export class CategoryMappingService {
   private readonly logger = new Logger(CategoryMappingService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Fallback-эвристики для маппинга внешних категорий в EventCategory.
+   *
+   * Важно: это НЕ “контракт”, а best-effort, чтобы импорт по умолчанию
+   * садил событие в разумную категорию и не требовал ручного маппинга.
+   *
+   * Если нужны точные правила для конкретной пары source+category — используем DB mappings.
+   */
+  private fallbackHeuristicCategory(
+    source: string,
+    externalCategoryNorm: string,
+  ): EventCategory | null {
+    if (!externalCategoryNorm) return null;
+
+    // Сейчас ручной маппинг реально нужен в основном для teplohod.info
+    if (source === 'TEPLOHOD') {
+      const s = externalCategoryNorm;
+
+      // Музейные/выставочные истории
+      if (
+        s.includes('музей') ||
+        s.includes('выстав') ||
+        s.includes('галере') ||
+        s.includes('экспозиц') ||
+        s.includes('арт') ||
+        s.includes('искусств')
+      ) {
+        return EventCategory.MUSEUM;
+      }
+
+      // Экскурсионный класс (включая прогулки/круизы, но без попытки угадать подкатегории)
+      if (
+        s.includes('экскурс') ||
+        s.includes('прогул') ||
+        s.includes('тур') ||
+        s.includes('круиз') ||
+        s.includes('маршрут')
+      ) {
+        return EventCategory.EXCURSION;
+      }
+
+      // “Концерт/шоу/спектакль/фестиваль/вечеринка”
+      if (
+        s.includes('концерт') ||
+        s.includes('шоу') ||
+        s.includes('спектак') ||
+        s.includes('театр') ||
+        s.includes('фестив') ||
+        s.includes('вечерин') ||
+        s.includes('дискот') ||
+        s.includes('stand') ||
+        s.includes('стендап')
+      ) {
+        return EventCategory.EVENT;
+      }
+
+      // Активный отдых / спорт (не речная экскурсия)
+      if (
+        s.includes('картинг') ||
+        s.includes('скалодром') ||
+        s.includes('байк') ||
+        s.includes('велосипед') ||
+        s.includes('сапборд') ||
+        s.includes('сап ') ||
+        s.includes('кайт')
+      ) {
+        return EventCategory.ACTIVITY;
+      }
+
+      // Развлечения / интерактив
+      if (
+        s.includes('квест') ||
+        s.includes('эскейп') ||
+        s.includes('escape') ||
+        s.includes('аттракцион') ||
+        s.includes('игров') ||
+        s.includes('vr ') ||
+        s.includes(' vr')
+      ) {
+        return EventCategory.ENTERTAINMENT;
+      }
+    }
+
+    return null;
+  }
 
   /**
    * Ищет маппинг по source + externalCategoryRaw. Без побочных эффектов.
@@ -37,7 +123,10 @@ export class CategoryMappingService {
       LIMIT 1
     `);
 
-    return mappings.length > 0 ? mappings[0]!.internalCategory : null;
+    if (mappings.length > 0) return mappings[0]!.internalCategory;
+
+    // Fallback: best-effort эвристика, чтобы не требовать ручного маппинга на каждую новую строку.
+    return this.fallbackHeuristicCategory(source, externalCategoryNorm);
   }
 
   /**

@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
-import { PromoType } from '@prisma/client';
+import { PromoType } from '@/prisma-client';
 
 export class CreatePromoCodeDto {
   @ApiProperty({ description: 'Код промо, показываемый пользователю' })

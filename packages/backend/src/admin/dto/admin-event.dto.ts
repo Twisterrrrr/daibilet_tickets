@@ -6,16 +6,19 @@ import {
   EventCategory,
   EventRefundPolicyMode,
   EventSubcategory,
+  LocationType,
   OfferSource,
   OfferStatus,
   PurchaseType,
   SubcategoriesMode,
-} from '@prisma/client';
+} from '@/prisma-client';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsISO8601,
   IsNotEmpty,
@@ -25,6 +28,7 @@ import {
   IsString,
   IsUrl,
   IsUUID,
+  MaxLength,
   Min,
   ValidateIf,
   ValidateNested,
@@ -110,6 +114,10 @@ export class AdminEventSessionRowDto {
   @IsBoolean()
   isCancelled!: boolean;
 
+  @ApiProperty({ description: 'false = сеанс на паузе (не отменён)' })
+  @IsBoolean()
+  isActive!: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -143,6 +151,152 @@ export class AdminEventSessionsRangeDto {
   @ValidateNested({ each: true })
   @Type(() => AdminEventSessionRowDto)
   rows!: AdminEventSessionRowDto[];
+}
+
+/** Строка сводки сеансов (кросс-событийный обзор для админки). */
+export class AdminSessionsOverviewRowDto {
+  @ApiProperty()
+  @IsString()
+  sessionId!: string;
+
+  @ApiProperty()
+  @IsString()
+  eventId!: string;
+
+  @ApiProperty()
+  @IsString()
+  eventTitle!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  eventSlug?: string | null;
+
+  @ApiProperty()
+  @IsString()
+  citySlug!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  cityName?: string | null;
+
+  @ApiProperty()
+  @IsString()
+  startsAt!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  endsAt?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  capacity?: number | null;
+
+  @ApiProperty()
+  @IsInt()
+  soldCount!: number;
+
+  @ApiProperty()
+  @IsBoolean()
+  locked!: boolean;
+
+  @ApiPropertyOptional({ enum: ['SOLD', 'PAST', 'IMPORTED', 'OTHER'] })
+  @IsOptional()
+  @IsString()
+  lockReason?: 'SOLD' | 'PAST' | 'IMPORTED' | 'OTHER';
+
+  @ApiProperty()
+  @IsBoolean()
+  isCancelled!: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  canceledAt?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  cancelReason?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  offerId?: string | null;
+
+  @ApiProperty({ description: 'Источник события (MANUAL — допускаются массовые pause/resume)' })
+  @IsString()
+  eventSource!: string;
+
+  @ApiProperty({ description: 'Флаг isActive у сеанса в БД' })
+  @IsBoolean()
+  sessionIsActive!: boolean;
+
+  @ApiProperty({
+    description:
+      'Диагностические флаги: CANCELLED, PAUSED, CAPACITY_ZERO, SOLD_OUT, NO_OFFER_LINK, NO_PRICE',
+    type: [String],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  issues!: string[];
+}
+
+export class AdminSessionsBulkDto {
+  @ApiProperty({ type: [String], description: 'До 100 id за запрос' })
+  @IsArray()
+  @IsString({ each: true })
+  sessionIds!: string[];
+
+  @ApiProperty({ enum: ['pause', 'resume'] })
+  @IsIn(['pause', 'resume'])
+  action!: 'pause' | 'resume';
+}
+
+export class AdminSessionsBulkResultItemDto {
+  @ApiProperty()
+  @IsString()
+  id!: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  ok!: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  error?: string;
+}
+
+export class AdminSessionsBulkResponseDto {
+  @ApiProperty({ type: [AdminSessionsBulkResultItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdminSessionsBulkResultItemDto)
+  results!: AdminSessionsBulkResultItemDto[];
+}
+
+export class AdminSessionsOverviewDto {
+  @ApiProperty()
+  @IsString()
+  from!: string;
+
+  @ApiProperty()
+  @IsString()
+  to!: string;
+
+  @ApiProperty({ description: 'true если строк больше, чем take (есть ещё данные)' })
+  @IsBoolean()
+  truncated!: boolean;
+
+  @ApiProperty({ type: [AdminSessionsOverviewRowDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdminSessionsOverviewRowDto)
+  rows!: AdminSessionsOverviewRowDto[];
 }
 
 export class AdminCreateSessionDto {
@@ -345,6 +499,23 @@ export class PatchEventOfferDto {
 
 // ─── Create Event (with optional nested offer) ─────────────────────
 
+export class LocationProposalDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  title!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional({ enum: LocationType })
+  @IsOptional()
+  @IsEnum(LocationType)
+  type?: LocationType;
+}
+
 export class CreateEventDto {
   @ApiProperty()
   @IsString()
@@ -428,6 +599,20 @@ export class CreateEventDto {
   @IsOptional()
   @IsObject()
   templateData?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Точка старта маршрута (локация в выбранном городе)' })
+  @IsOptional()
+  @IsUUID()
+  startLocationId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Заявка на новую локацию (если не указан startLocationId)',
+    type: LocationProposalDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocationProposalDto)
+  locationProposal?: LocationProposalDto;
 }
 
 export class UpdateEventSlugDto {
@@ -543,6 +728,52 @@ export class OverrideEventDto {
   editorStatus?: EditorStatus;
 
   @ApiPropertyOptional({
+    description:
+      'Ручной буст для сортировки в каталоге / блоке «Популярные». null = сбросить к значению из sync/override',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsInt()
+  @Min(0)
+  manualBoost?: number | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Подавить показ события в витрине при низком качестве (override.suppressLowQuality = true скрывает событие)',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsBoolean()
+  suppressLowQuality?: boolean | null;
+
+  @ApiPropertyOptional({
+    description: 'Управление показом события в программе площадки. false = скрыть из программы площадки',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsBoolean()
+  showInVenueProgram?: boolean | null;
+
+  @ApiPropertyOptional({
+    description: 'Флаг «избранное событие» в программе площадки (featured). Влияет на сортировку в программе',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsBoolean()
+  isFeaturedInVenue?: boolean | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Явный порядок сортировки события в программе площадки. null = использовать порядок по умолчанию',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsInt()
+  venueProgramSortOrder?: number | null;
+
+  @ApiPropertyOptional({
     enum: SubcategoriesMode,
     description: 'Режим подкатегорий: INHERIT=из sync, OVERRIDE=свой список, CLEAR=пусто',
   })
@@ -557,7 +788,91 @@ export class OverrideEventDto {
   subcategoriesOverride?: EventSubcategory[];
 }
 
+/** PATCH /admin/events/:id/media — обложка (override) и галерея (Event.galleryUrls) */
+export class PatchEventMediaDto {
+  @ApiPropertyOptional({
+    description: 'Обложка в слое редактора (EventOverride.imageUrl). Пустая строка — сбросить override-обложку.',
+  })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Полный список URL галереи на модели Event' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  galleryUrls?: string[];
+}
+
 // ─── Venue Settings ────────────────────────────────────────────────
+
+/** Поля таблицы сравнения для речных событий (храним на Event). */
+export class EventLandingTableFacetsDto {
+  @ApiPropertyOptional({ description: 'Название судна для колонки «теплоход» (без парсинга из title)' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  @MaxLength(160)
+  vesselName?: string | null;
+
+  @ApiPropertyOptional({ enum: ['CLASSIC', 'ROMANTIC', 'VIP', 'PANORAMIC'] })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
+  @IsIn(['CLASSIC', 'ROMANTIC', 'VIP', 'PANORAMIC'])
+  experienceFormat?: string | null;
+}
+
+/** Питание для речных событий (храним в EventOverride.contentTemplateData.catering). */
+export class EventCateringDto {
+  @ApiPropertyOptional({ description: 'Есть питание' })
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @ApiPropertyOptional({
+    enum: [
+      'BREAKFAST',
+      'LUNCH',
+      'DINNER',
+      'BRUNCH',
+      'SUPPER',
+      'BUFFET',
+      'SNACKS',
+      'TASTING',
+      'BAR',
+      'OTHER',
+    ],
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
+  @IsIn([
+    'BREAKFAST',
+    'LUNCH',
+    'DINNER',
+    'BRUNCH',
+    'SUPPER',
+    'BUFFET',
+    'SNACKS',
+    'TASTING',
+    'BAR',
+    'OTHER',
+  ])
+  type?: string | null;
+
+  @ApiPropertyOptional({ description: 'Включено в стоимость' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsBoolean()
+  includedInPrice?: boolean | null;
+
+  @ApiPropertyOptional({ description: 'Меню (Markdown, с тулбаром в админке)' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsString()
+  @MaxLength(5000)
+  menuMarkdown?: string | null;
+}
 
 export class VenueSettingsDto {
   @ApiPropertyOptional()

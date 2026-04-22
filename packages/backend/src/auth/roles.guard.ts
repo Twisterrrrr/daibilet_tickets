@@ -1,9 +1,17 @@
 import { CanActivate, ExecutionContext, Injectable, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AdminRole } from '@prisma/client';
+import { AdminRole } from '@/prisma-client';
 
 export const ROLES_KEY = 'roles';
 export const Roles = (...roles: AdminRole[]) => SetMetadata(ROLES_KEY, roles);
+
+/** Иерархия: OWNER ≥ ADMIN ≥ EDITOR ≥ VIEWER (доступ, если rank(user) ≥ rank(required) для любого required). */
+const ROLE_RANK: Record<AdminRole, number> = {
+  [AdminRole.VIEWER]: 1,
+  [AdminRole.EDITOR]: 2,
+  [AdminRole.ADMIN]: 3,
+  [AdminRole.OWNER]: 4,
+};
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -23,6 +31,9 @@ export class RolesGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
     if (!user || !user.role) return false;
 
-    return requiredRoles.includes(user.role);
+    const ur = ROLE_RANK[user.role as AdminRole];
+    if (ur === undefined) return false;
+
+    return requiredRoles.some((required) => ur >= ROLE_RANK[required]);
   }
 }

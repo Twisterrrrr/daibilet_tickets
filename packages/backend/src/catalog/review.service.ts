@@ -14,7 +14,7 @@ import {
   ReviewDisputeStatus,
   ReviewStatus,
   ReviewSupplierResponseStatus,
-} from '@prisma/client';
+} from '@/prisma-client';
 import { Queue } from 'bullmq';
 import { createHash, randomBytes } from 'crypto';
 
@@ -723,8 +723,15 @@ export class ReviewService {
   /**
    * Список отзывов для админки.
    */
-  async adminList(filters: { status?: string; eventId?: string; venueId?: string; page?: number; limit?: number }) {
-    const { status, eventId, venueId, page = 1, limit = 20 } = filters;
+  async adminList(filters: {
+    status?: string;
+    eventId?: string;
+    venueId?: string;
+    page?: number;
+    limit?: number;
+    lite?: boolean;
+  }) {
+    const { status, eventId, venueId, page = 1, limit = 20, lite = false } = filters;
     const where: Prisma.ReviewWhereInput = {};
     if (status) where.status = status as ReviewStatus;
     if (eventId) where.eventId = eventId;
@@ -739,10 +746,14 @@ export class ReviewService {
         include: {
           event: { select: { id: true, title: true, slug: true } },
           venue: { select: { id: true, title: true, slug: true } },
-          photos: {
-            select: { id: true, url: true, thumbUrl: true },
-            orderBy: { sortOrder: 'asc' },
-          },
+          ...(lite
+            ? {}
+            : {
+                photos: {
+                  select: { id: true, url: true, thumbUrl: true },
+                  orderBy: { sortOrder: 'asc' },
+                },
+              }),
         },
       }),
       this.prisma.review.count({ where }),

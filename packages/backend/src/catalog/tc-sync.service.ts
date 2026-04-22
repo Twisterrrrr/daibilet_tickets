@@ -2,12 +2,16 @@ import { normalizeEventTitle } from '@daibilet/shared';
 import { getCanonicalLandingTags } from './canonical-tag-enrichment';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventTagAssignmentSource, Prisma } from '@prisma/client';
+import { EventSubcategory, EventTagAssignmentSource, Prisma } from '@/prisma-client';
 
 import { toJsonValue } from '../common/typing';
 import { PrismaService } from '../prisma/prisma.service';
 import { classify } from './event-classifier';
+import { pickTicketscloudPrimaryCode } from './ticketscloud-keyword-classifier';
 import { EventTagLifecycleService } from './event-tag-lifecycle.service';
+import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
+import { EVENT_PRIMARY_CODES_BY_CATEGORY } from '../subcategories/subcategory-assignment.constants';
+import { mapTicketscloudLegacyPrimaryToCanonicalPrimaryCode } from './import-mapping/ticketscloud-mapping';
 import { TcApiService } from './tc-api.service';
 import { type TcEvent, type TcTicketSet, type TcTicketSetRule, type TcVenueCity, isTcEvent } from './tc-api.types';
 import {
@@ -56,7 +60,66 @@ export class TcSyncService {
     private readonly tcGrpc: TcGrpcService,
     private readonly config: ConfigService,
     private readonly tagLifecycle: EventTagLifecycleService,
+    private readonly subcategoryAssignment: SubcategoryAssignmentService,
   ) {}
+
+  private pickSecondaryUniversalCodes(
+    text: string,
+    opts?: { category?: string; audience?: string },
+  ): string[] {
+    const t = (text || '').toLowerCase();
+    const out: string[] = [];
+    const add = (code: string) => {
+      if (!out.includes(code)) out.push(code);
+    };
+
+    // В базе сейчас реально сидятся UNIVERSAL: FAMILY / INDOOR / OUTDOOR / WATER.
+    // Держим только их, чтобы не провоцировать ошибки "code not found".
+    if (opts?.audience === 'KIDS' || opts?.audience === 'FAMILY') add('FAMILY');
+
+    if (
+      t.includes('в помещ') ||
+      t.includes('крыт') ||
+      t.includes('indoor') ||
+      t.includes('музей') ||
+      t.includes('выставк')
+    )
+      add('INDOOR');
+    if (t.includes('на улице') || t.includes('outdoor') || t.includes('парк') || t.includes('сад') || t.includes('прогулк'))
+      add('OUTDOOR');
+
+    if (
+      t.includes('теплоход') ||
+      t.includes('речн') ||
+      t.includes('катер') ||
+      t.includes('яхт') ||
+      t.includes('круиз') ||
+      t.includes('по неве') ||
+      t.includes('по реке') ||
+      t.includes('по каналам') ||
+      t.includes('boat') ||
+      t.includes('river')
+    )
+      add('WATER');
+
+    return out.slice(0, 3);
+  }
+
+  private pickPrimarySubcategoryCode(category: string, legacy: EventSubcategory[] | undefined): string {
+    const allowed = EVENT_PRIMARY_CODES_BY_CATEGORY[category as keyof typeof EVENT_PRIMARY_CODES_BY_CATEGORY] ?? [];
+    const legacyArr = Array.isArray(legacy) ? legacy : [];
+    for (const code of allowed) {
+      if (legacyArr.includes(code as EventSubcategory)) return code;
+    }
+    // safe defaults: чтобы импорт “сажал” событие в понятный primary даже без сигналов
+    if (category === 'MUSEUM') return 'MUSEUM_CLASSIC';
+    if (category === 'EXCURSION') return 'WALKING';
+    return 'SHOW'; // EVENT
+  }
+
+  private pickTicketscloudPrimaryCodeFromText(input: { title?: string | null; description?: string | null; organizer?: string | null }) {
+    return pickTicketscloudPrimaryCode(input);
+  }
 
   // ============================================================
   // Публичные методы
@@ -421,6 +484,36 @@ export class TcSyncService {
           lastSyncAt: new Date(),
         },
       });
+    }
+
+    // Авто-проставление подкатегорий в “новом слое” (eventSubcategoryLinks).
+    // Это убирает рутину из модерации: импорт по умолчанию садит событие в PRIMARY.
+    try {
+      const keywordPrimary = this.pickTicketscloudPrimaryCodeFromText({
+        title,
+        description,
+        organizer: (best as unknown as { orgTitle?: string | null }).orgTitle ?? null,
+      });
+      const allowed =
+        EVENT_PRIMARY_CODES_BY_CATEGORY[String(category) as keyof typeof EVENT_PRIMARY_CODES_BY_CATEGORY] ?? [];
+      const mappedPrimary = mapTicketscloudLegacyPrimaryToCanonicalPrimaryCode({
+        category: String(category),
+        legacy: subcategories as EventSubcategory[],
+        allowedPrimaryCodes: allowed,
+        title,
+        description,
+      });
+      const primaryCode =
+        keywordPrimary ?? mappedPrimary ?? this.pickPrimarySubcategoryCode(String(category), subcategories as EventSubcategory[]);
+      const secondaryCodes = this.pickSecondaryUniversalCodes(`${title}\n${description || ''}`, {
+        category: String(category),
+        audience: String(audience),
+      });
+      await this.subcategoryAssignment.assignEventSubcategories(event.id, primaryCode, secondaryCodes);
+    } catch (e) {
+      this.logger.warn(
+        `TC: assignEventSubcategories failed for event=${event.id}: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
 
     // Upsert EventOffer (мульти-офферная архитектура)
@@ -1042,6 +1135,34 @@ export class TcSyncService {
           lastSyncAt: new Date(),
         },
       });
+    }
+
+    // REST fallback тоже должен проставлять links, чтобы модерация не зависела от режима sync.
+    try {
+      const keywordPrimary = this.pickTicketscloudPrimaryCodeFromText({
+        title,
+        description,
+        organizer: (best as unknown as { org?: { name?: string | null } | null }).org?.name ?? null,
+      });
+      const allowed =
+        EVENT_PRIMARY_CODES_BY_CATEGORY[String(category) as keyof typeof EVENT_PRIMARY_CODES_BY_CATEGORY] ?? [];
+      const mappedPrimary = mapTicketscloudLegacyPrimaryToCanonicalPrimaryCode({
+        category: String(category),
+        legacy: subcategories as EventSubcategory[],
+        allowedPrimaryCodes: allowed,
+        title,
+        description,
+      });
+      const primaryCode =
+        keywordPrimary ?? mappedPrimary ?? this.pickPrimarySubcategoryCode(String(category), subcategories as EventSubcategory[]);
+      const secondaryCodes = this.pickSecondaryUniversalCodes(`${title}\n${description || ''}`, {
+        category: String(category),
+      });
+      await this.subcategoryAssignment.assignEventSubcategories(event.id, primaryCode, secondaryCodes);
+    } catch (e) {
+      this.logger.warn(
+        `TC(REST): assignEventSubcategories failed for event=${event.id}: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
 
     let sessionCount = 0;

@@ -94,6 +94,17 @@ export function PreviewPanel({ draft }: PreviewPanelProps) {
             Категория: <span className="font-medium">{basics.category || '—'}</span> • Город:{' '}
             <span className="font-medium">{basics.cityId || '—'}</span>
           </p>
+          {basics.category === 'EXCURSION' && basics.cityId && (
+            <p className="text-xs text-slate-600">
+              Старт маршрута:{' '}
+              {(basics.locationChoice ?? 'existing') === 'propose' &&
+              (basics.locationProposalTitle ?? '').trim()
+                ? `на рассмотрении — ${(basics.locationProposalTitle ?? '').trim()}`
+                : (basics.startLocationId ?? '').trim()
+                  ? 'точка из справочника'
+                  : 'не указана'}
+            </p>
+          )}
         </section>
 
         <section className="space-y-1">

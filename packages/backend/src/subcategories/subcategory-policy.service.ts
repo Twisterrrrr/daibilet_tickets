@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { EventSubcategory, Prisma, SubcategoryType } from '@prisma/client';
+import { EventSubcategory, Prisma, SubcategoryType } from '@/prisma-client';
 
 const LEGACY_EVENT_SUBCATEGORY_TO_SLUG: Partial<Record<EventSubcategory, string>> = {
   RIVER: 'river-excursion',
@@ -17,6 +17,7 @@ const LEGACY_EVENT_SUBCATEGORY_TO_SLUG: Partial<Record<EventSubcategory, string>
   PARK: 'park-reserve',
   ART_SPACE: 'art-space',
   CONCERT: 'concert',
+  JAZZ: 'jazz',
   SHOW: 'show',
   STANDUP: 'standup',
   THEATER: 'theater',
@@ -26,26 +27,62 @@ const LEGACY_EVENT_SUBCATEGORY_TO_SLUG: Partial<Record<EventSubcategory, string>
   PARTY: 'party',
 };
 
+const LEGACY_SLUG_TO_EVENT_SUBCODE: Record<string, string> = Object.fromEntries(
+  Object.entries(LEGACY_EVENT_SUBCATEGORY_TO_SLUG).map(([enumVal, slug]) => [slug, enumVal]),
+);
+
 @Injectable()
 export class SubcategoryPolicyService {
-  /** Лимит для события (publish + API). Площадки — см. MAX_VENUE_SUBCATEGORIES. */
-  static readonly MAX_EVENT_SUBCATEGORIES = 3;
-  static readonly MAX_VENUE_SUBCATEGORIES = 5;
+  /**
+   * Технический потолок числа связей на событие (защита от ошибок/злоупотреблений в одном запросе).
+   * Не продуктовое «N подкатегорий»: в модели есть PRIMARY под выбранную категорию и отдельно общие SECONDARY (UNIVERSAL и др.).
+   */
+  static readonly MAX_EVENT_SUBCATEGORIES = 512;
+  static readonly MAX_VENUE_SUBCATEGORIES = 4;
+
+  /**
+   * Фильтр площадок по подкатегории (links-only; legacy у Venue нет).
+   * Токен — code или legacy slug из URL или enum EventSubcategory.
+   */
+  buildVenueSubcategoryFilter(value: string): Prisma.VenueWhereInput {
+    const token = value.trim();
+    if (!token) return {};
+
+    const asLegacyEnum = Object.values(EventSubcategory).includes(token as EventSubcategory);
+    const code = asLegacyEnum ? token : (LEGACY_SLUG_TO_EVENT_SUBCODE[token] ?? token);
+
+    return {
+      subcategoryLinks: {
+        some: {
+          subcategory: {
+            isActive: true,
+            OR: [{ code }, { slug: token }],
+          },
+        },
+      },
+    };
+  }
 
   buildEventSubcategoryFilter(value: string): Prisma.EventWhereInput {
     const token = value.trim();
     if (!token) return {};
 
-    // source of truth = new links; legacy enum only fallback for not-yet-migrated events.
-    const asLegacy = Object.values(EventSubcategory).includes(token as EventSubcategory);
-    const mappedSlug = asLegacy
-      ? LEGACY_EVENT_SUBCATEGORY_TO_SLUG[token as EventSubcategory] ?? token.toLowerCase()
-      : token;
+    // source of truth = new links (по code); legacy enum / slug — только fallback.
+    const asLegacyEnum = Object.values(EventSubcategory).includes(token as EventSubcategory);
+    const code = asLegacyEnum ? token : (LEGACY_SLUG_TO_EVENT_SUBCODE[token] ?? token);
 
     return {
       OR: [
-        { subcategoryLinks: { some: { subcategory: { slug: mappedSlug } } } },
-        ...(asLegacy
+        {
+          subcategoryLinks: {
+            some: {
+              subcategory: {
+                OR: [{ code }, { slug: token }],
+              },
+            },
+          },
+        },
+        ...(asLegacyEnum
           ? [
               {
                 AND: [

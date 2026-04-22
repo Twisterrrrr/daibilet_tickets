@@ -10,6 +10,7 @@ import { HeroCitySearch } from '@/components/ui/HeroCitySearch';
 import { MultiEventCard } from '@/components/ui/MultiEventCard';
 import { PromoBlock } from '@/components/ui/PromoBlock';
 import { api } from '@/lib/api';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 import { devWarn } from '@/lib/devlog';
 
 // ISR: обновлять каждый час
@@ -253,8 +254,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const totalCities = cities.length;
 
   const cityName = citySlug ? cities.find((c) => c.slug === citySlug)?.name : null;
-  const eventsHref = citySlug ? `/events?city=${citySlug}` : '/events';
-  const nearestHref = citySlug ? `/events?sort=departing_soon&city=${citySlug}` : '/events?sort=departing_soon';
+  const eventsHref = catalogEventsHref({ city: citySlug || undefined });
+  const nearestHref = catalogEventsHref({ city: citySlug || undefined, sort: 'departing_soon' });
 
   return (
     <>
@@ -649,7 +650,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             {categoryMeta.map(({ category, emoji }) => (
               <Link
                 key={category}
-                href={`/events?category=${category}`}
+                href={catalogEventsHref({ category })}
                 className="card flex items-center gap-4 p-6 transition-transform hover:scale-[1.02]"
               >
                 <span className="text-4xl">{emoji}</span>
@@ -661,7 +662,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </Link>
             ))}
             <Link
-              href="/events?audience=KIDS"
+              href={catalogEventsHref({ audience: 'KIDS' })}
               className="card flex items-center gap-4 p-6 transition-transform hover:scale-[1.02]"
             >
               <span className="text-4xl">👶</span>
@@ -680,7 +681,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 {popularTags.map((tag) => (
                   <Link
                     key={tag.slug}
-                    href={`/events?tag=${tag.slug}`}
+                    href={catalogEventsHref({ tag: tag.slug })}
                     className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-primary-300 hover:text-primary-700 hover:shadow-md"
                   >
                     {tag.name}

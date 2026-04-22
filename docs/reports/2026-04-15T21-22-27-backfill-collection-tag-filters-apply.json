@@ -1,0 +1,35 @@
+{
+  "startedAt": "2026-04-15T18:22:27.442Z",
+  "finishedAt": "2026-04-15T18:22:27.973Z",
+  "dryRun": false,
+  "script": "backfill-collection-tag-filters",
+  "report": {
+    "scanned": 3,
+    "matched": 3,
+    "created": 3,
+    "updated": 0,
+    "skipped": 1,
+    "unresolvedCount": 1,
+    "errorCount": 0
+  },
+  "unresolved": [
+    {
+      "type": "slug_not_found",
+      "message": "Collection.filterTags slug was not resolved to Tag",
+      "source_record_ref": {
+        "entity": "Collection",
+        "id": "98852a68-c3d0-4409-89c1-0129301d3219"
+      },
+      "field": "filterTags",
+      "legacy_value": "missing-legacy-tag",
+      "target_hint": {
+        "entity": "Tag",
+        "slug": "missing-legacy-tag"
+      }
+    }
+  ],
+  "errors": [],
+  "notes": [
+    "Default: dry-run. Writes happen only with --apply."
+  ]
+}

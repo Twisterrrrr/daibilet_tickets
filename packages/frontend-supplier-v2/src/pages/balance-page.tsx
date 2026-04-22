@@ -104,7 +104,11 @@ export function BalancePage() {
   if (loading && !balance) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Баланс и вывод средств" glyph={<PageGlyph icon={Wallet} tone="peach" />} />
+        <PageHeader
+          title="Баланс и вывод средств"
+          subtitle="Финансы в том же каркасе, что и остальные разделы кабинета."
+          glyph={<PageGlyph icon={Wallet} tone="peach" />}
+        />
         <LoadingBlock label="Загружаем баланс…" />
       </div>
     );
@@ -113,7 +117,11 @@ export function BalancePage() {
   if (error && !balance) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Баланс и вывод средств" glyph={<PageGlyph icon={Wallet} tone="peach" />} />
+        <PageHeader
+          title="Баланс и вывод средств"
+          subtitle="Финансы в том же каркасе, что и остальные разделы кабинета."
+          glyph={<PageGlyph icon={Wallet} tone="peach" />}
+        />
         <ErrorPanel title="Не удалось загрузить баланс" description={error} onRetry={load} />
       </div>
     );
@@ -121,7 +129,11 @@ export function BalancePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Баланс и вывод средств" glyph={<PageGlyph icon={Wallet} tone="peach" />} />
+      <PageHeader
+        title="Баланс и вывод средств"
+        subtitle="Финансы в том же каркасе, что и остальные разделы кабинета."
+        glyph={<PageGlyph icon={Wallet} tone="peach" />}
+      />
 
       {balance ? (
         <div className="grid gap-3 sm:grid-cols-3">

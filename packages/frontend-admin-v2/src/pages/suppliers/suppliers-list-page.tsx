@@ -1,6 +1,8 @@
 import { Users } from 'lucide-react';
 
 import { SuppliersListView } from '@/features/suppliers-list/suppliers-list-view';
+import { blueprintSuppliersList } from '@/shared/config/admin-v2-blueprints';
+import { IntegrationBlueprint } from '@/shared/layout/admin-v2-blueprint';
 import { ListPageLayout } from '@/shared/layout/list-page-layout';
 import { PageGlyph } from '@/shared/ui/page-glyph';
 import { getMockSuppliers } from '@/shared/mock/suppliers';
@@ -15,6 +17,7 @@ export function SuppliersListPage() {
       subtitle="Партнёры, онбординг и качество каталога."
       headerGlyph={<PageGlyph icon={Users} tone="violet" />}
       headerActions={<Button variant="secondary">Пригласить</Button>}
+      blueprint={<IntegrationBlueprint {...blueprintSuppliersList} />}
     >
       <SuppliersListView rows={suppliers} />
     </ListPageLayout>

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsString, MinLength, ValidateIf } from 'class-validator';
-import { SupplierLegalProfileStatus } from '@prisma/client';
+import { SupplierLegalProfileStatus } from '@/prisma-client';
 
 const ALLOWED_STATUSES: SupplierLegalProfileStatus[] = ['VERIFIED', 'REJECTED'];
 

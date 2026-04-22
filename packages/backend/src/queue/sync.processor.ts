@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { EventSource } from '@prisma/client';
+import { EventSource } from '@/prisma-client';
 
 import { CacheService } from '../cache/cache.service';
 import { PostEditQueueService } from '../catalog/postedit-queue.service';

@@ -2,7 +2,7 @@
  * Универсальный классификатор событий.
  * Используется в tc-sync, tep-sync и скрипте reclassify-events.
  */
-import type { EventAudience, EventCategory, EventSubcategory } from '@prisma/client';
+import type { EventAudience, EventCategory, EventSubcategory } from '@/prisma-client';
 
 export interface ClassifyResult {
   category: EventCategory;

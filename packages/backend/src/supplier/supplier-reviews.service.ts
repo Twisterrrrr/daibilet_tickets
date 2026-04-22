@@ -10,7 +10,7 @@ import {
   ReviewDisputeStatus,
   ReviewStatus,
   ReviewSupplierResponseStatus,
-} from '@prisma/client';
+} from '@/prisma-client';
 import { randomUUID } from 'crypto';
 
 import { PaginatedResult, parsePagination } from '../common/pagination';

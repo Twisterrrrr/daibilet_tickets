@@ -1,6 +1,6 @@
 import { normalizeEventTitle } from '@daibilet/shared';
 import { Injectable, Logger } from '@nestjs/common';
-import { EventAudience, EventCategory, EventSubcategory, EventTagAssignmentSource, Prisma } from '@prisma/client';
+import { EventAudience, EventCategory, EventSubcategory, EventTagAssignmentSource, Prisma } from '@/prisma-client';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -9,6 +9,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CategoryMappingService } from './category-mapping.service';
 import { EventTagLifecycleService } from './event-tag-lifecycle.service';
 import { TepApiService, TepCity, TepEvent } from './tep-api.service';
+import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
+import { EVENT_PRIMARY_CODES_BY_CATEGORY } from '../subcategories/subcategory-assignment.constants';
+import { mapTeplohodExternalCategoryToPrimaryCode } from './import-mapping/teplohod-mapping';
 
 /**
  * Синхронизация событий из teplohod.info → наша БД.
@@ -72,7 +75,64 @@ export class TepSyncService {
     private readonly tepApi: TepApiService,
     private readonly categoryMapping: CategoryMappingService,
     private readonly tagLifecycle: EventTagLifecycleService,
+    private readonly subcategoryAssignment: SubcategoryAssignmentService,
   ) {}
+
+  private pickSecondaryUniversalCodes(
+    text: string,
+    opts?: { category?: EventCategory; audience?: EventAudience },
+  ): string[] {
+    const t = (text || '').toLowerCase();
+    const out: string[] = [];
+    const add = (code: string) => {
+      if (!out.includes(code)) out.push(code);
+    };
+
+    // В базе сейчас реально сидятся UNIVERSAL: FAMILY / INDOOR / OUTDOOR / WATER.
+    // Держим только их, чтобы не провоцировать ошибки "code not found".
+    if (opts?.audience === 'KIDS' || opts?.audience === 'FAMILY') add('FAMILY');
+
+    if (
+      t.includes('в помещ') ||
+      t.includes('крыт') ||
+      t.includes('indoor') ||
+      t.includes('музей') ||
+      t.includes('выставк')
+    )
+      add('INDOOR');
+    if (t.includes('на улице') || t.includes('outdoor') || t.includes('парк') || t.includes('сад') || t.includes('прогулк'))
+      add('OUTDOOR');
+
+    if (
+      t.includes('теплоход') ||
+      t.includes('речн') ||
+      t.includes('катер') ||
+      t.includes('яхт') ||
+      t.includes('круиз') ||
+      t.includes('по неве') ||
+      t.includes('по реке') ||
+      t.includes('по каналам') ||
+      t.includes('boat') ||
+      t.includes('river')
+    )
+      add('WATER');
+
+    return out.slice(0, 3);
+  }
+
+  private pickPrimarySubcategoryCode(category: EventCategory, legacy: EventSubcategory[] | undefined): string {
+    const allowed = EVENT_PRIMARY_CODES_BY_CATEGORY[category] ?? [];
+    const legacyArr = Array.isArray(legacy) ? legacy : [];
+    for (const code of allowed) {
+      if (legacyArr.includes(code as EventSubcategory)) return code;
+    }
+    // safe defaults
+    if (category === EventCategory.MUSEUM) return EventSubcategory.MUSEUM_CLASSIC;
+    if (category === EventCategory.EXCURSION) return EventSubcategory.WALKING;
+    if (category === EventCategory.ACTIVITY) return EventSubcategory.EXTREME;
+    if (category === EventCategory.ENTERTAINMENT) return EventSubcategory.ROOFTOP;
+    return EventSubcategory.SHOW;
+  }
 
   /**
    * Загрузить маппинг tep-XXX → tepWidgetId из teplohod-widgets.json.
@@ -363,12 +423,29 @@ export class TepSyncService {
     // purchaseType = WIDGET — единственный вариант для TEPLOHOD.
     // Если embed не работает, событие будет скрыто (DISABLED) проверкой ниже.
     const eventRecord = existing
-      ? existing
+      ? { id: existing.id }
       : await this.prisma.event.findFirst({
           where: { source: 'TEPLOHOD', tcEventId },
           select: { id: true },
         });
     if (eventRecord) {
+      // Авто-проставление подкатегорий в “новом слое” (eventSubcategoryLinks).
+      // Для модерации важно, чтобы PRIMARY был задан сразу после импорта.
+      try {
+        const mappedPrimary =
+          mapTeplohodExternalCategoryToPrimaryCode({ category, externalCategoryRaw: externalRaw }) ?? null;
+        const primaryCode = mappedPrimary ?? this.pickPrimarySubcategoryCode(category, subcategories);
+        const secondaryCodes = this.pickSecondaryUniversalCodes(
+          `${title}\n${description || ''}\n${externalRaw || ''}`,
+          { category, audience },
+        );
+        await this.subcategoryAssignment.assignEventSubcategories(eventRecord.id, primaryCode, secondaryCodes);
+      } catch (e) {
+        this.logger.warn(
+          `TEP: assignEventSubcategories failed for event=${eventRecord.id}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+
       const offer = await this.prisma.eventOffer.findUnique({
         where: { source_externalEventId: { source: 'TEPLOHOD', externalEventId: sourceId } },
         select: { widgetPayload: true },
@@ -956,7 +1033,7 @@ export class TepSyncService {
       return { category: EventCategory.EVENT, subcategories: [EventSubcategory.FESTIVAL], audience, minAge: 6 };
 
     if (this.hasTep(text, ['танк', 'танке', 'квадроцикл', 'стрельб', 'экстрим', 'броневик']))
-      return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.EXTREME], audience, minAge: 16 };
+      return { category: EventCategory.ACTIVITY, subcategories: [EventSubcategory.EXTREME], audience, minAge: 16 };
     if (this.hasTep(text, ['автобус', 'bus', 'hop-on', 'hop on']) || (this.hasTep(text, ['обзорн']) && !isWater))
       return { category: EventCategory.EXCURSION, subcategories: [EventSubcategory.BUS], audience, minAge: 0 };
 

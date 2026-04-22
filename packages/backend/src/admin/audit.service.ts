@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/prisma-client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -46,16 +46,33 @@ export class AuditService {
     entityId?: string;
     userId?: string;
     action?: string;
+    q?: string;
+    from?: Date;
+    to?: Date;
     page?: number;
     limit?: number;
   }) {
-    const { entity, entityId, userId, action, page = 1, limit = 50 } = filters;
+    const { entity, entityId, userId, action, q, from, to, page = 1, limit = 50 } = filters;
 
     const where: Prisma.AuditLogWhereInput = {};
     if (entity) where.entity = entity;
     if (entityId) where.entityId = entityId;
     if (userId) where.userId = userId;
     if (action) where.action = action;
+    if (from || to) {
+      where.createdAt = {
+        ...(from ? { gte: from } : {}),
+        ...(to ? { lte: to } : {}),
+      };
+    }
+    if (q && q.trim().length > 0) {
+      const term = q.trim();
+      where.OR = [
+        { entity: { contains: term, mode: 'insensitive' } },
+        { entityId: { contains: term, mode: 'insensitive' } },
+        { action: { contains: term, mode: 'insensitive' } },
+      ];
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.auditLog.findMany({

@@ -28,6 +28,24 @@ export function formatDateShort(iso: string): string {
   }
 }
 
+/** Дата и день недели для строки сетки расписания (ru-RU), напр. «6 апр., пн». */
+export function formatScheduleGridDayLabel(date: Date): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    weekday: 'short',
+  }).format(date);
+}
+
+/** Только дата по-русски для подсказок в полях, напр. «15 апр. 2026 г.». */
+export function formatDatePlaceholderLocal(y: number, monthIndex: number, day: number): string {
+  try {
+    return dtfShort.format(new Date(y, monthIndex, day));
+  } catch {
+    return '';
+  }
+}
+
 export function formatMoney(amount: number, currency = 'RUB'): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',

@@ -25,8 +25,9 @@ const SYNC_INCREMENTAL_JOB_ID = 'singleton_sync_incremental';
  * Scheduler Service — автоматическая синхронизация данных.
  *
  * Расписание:
- * - Полная синхронизация TC + TEP + retag + smart populate: каждые 6 часов
- * - Инкрементальная синхронизация TC: каждые 30 минут
+ * - Полная синхронизация TC + **TEP (Teplohod каталог)** + retag + smart populate: каждые 6 часов
+ * - Инкрементальная синхронизация TC: каждый час в :30 (кроме часов полного sync)
+ * - Зеркало заказов/возвратов Ticketscloud (orders + refund_requests API): см. TicketscloudMirrorSchedulerService
  * - Дедупликация: раз в сутки (03:00)
  *
  * Защита от перекрытия (overlap protection):

@@ -1,12 +1,21 @@
 import { resolvePurchaseType } from '@daibilet/shared';
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/prisma-client';
 
 import { TcApiService } from '../catalog/tc-api.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PromoCodeService } from '../pricing/promo-code.service';
+import { OrderProjectionService } from '../orders/order-projection.service';
 import { partitionCart, PaymentFlowType, resolvePaymentFlow, SnapshotLineItem } from './cart-partitioning';
 import {
   calculateExpiresAt,
@@ -18,6 +27,10 @@ import { CartItemDto, CreatePackageDto, CreateTripPlanCheckoutDto } from './dto/
 
 /**
  * Checkout Service — покупка билетов + корзина + заявки.
+ *
+ * TODO(B2B ticket foundation): при внедрении createExternalOrder у ticket provider — связать
+ * CheckoutSession / FulfillmentItem с ExternalOrderLink через ProviderRoutingService.
+ * Не путать с PaymentIntent.provider (это платёжный провайдер, не ticket).
  */
 @Injectable()
 export class CheckoutService {
@@ -29,6 +42,8 @@ export class CheckoutService {
     private readonly mailService: MailService,
     private readonly config: ConfigService,
     private readonly promoCodes: PromoCodeService,
+    @Inject(forwardRef(() => OrderProjectionService))
+    private readonly orderProjection: OrderProjectionService,
   ) {}
 
   /** Domain/host from APP_URL for vendor_data.source (e.g. daibilet.ru). */
@@ -67,6 +82,17 @@ export class CheckoutService {
 
     if (!event) {
       throw new NotFoundException(`Событие не найдено: ${body.eventId}`);
+    }
+
+    // Мягкое отключение поставщика: событие доступно для просмотра, но покупка запрещена.
+    if (event.supplierId) {
+      const supplier = await this.prisma.operator.findUnique({
+        where: { id: event.supplierId },
+        select: { isActive: true, status: true },
+      });
+      if (supplier && (!supplier.isActive || supplier.status !== 'ACTIVE')) {
+        throw new ForbiddenException('Покупка недоступна: поставщик отключен');
+      }
     }
 
     if (event.source !== 'TC') {
@@ -328,6 +354,7 @@ export class CheckoutService {
         where: { id: item.offerId, eventId: item.eventId, status: 'ACTIVE' },
         include: {
           event: { select: { id: true, title: true, slug: true, imageUrl: true, isActive: true } },
+          operator: { select: { id: true, isActive: true, status: true } },
         },
       });
 
@@ -338,6 +365,12 @@ export class CheckoutService {
 
       if (!offer.event.isActive) {
         validated.push({ ...item, valid: false, currentPrice: null, reason: 'Событие неактивно' });
+        continue;
+      }
+
+      // Мягкое отключение поставщика: событие остаётся доступным по ссылке, но покупка запрещена.
+      if (offer.operator && (!offer.operator.isActive || offer.operator.status !== 'ACTIVE')) {
+        validated.push({ ...item, valid: false, currentPrice: null, reason: 'Поставщик отключен' });
         continue;
       }
 
@@ -724,6 +757,12 @@ export class CheckoutService {
         .catch((e) => this.logger.error('Order email failed: ' + e.message));
     }
 
+    try {
+      await this.orderProjection.projectFromCheckoutSession(session.id);
+    } catch (e) {
+      this.logger.warn('Order projection (PENDING) failed', e as Error);
+    }
+
     return {
       sessionId: session.id,
       shortCode,
@@ -865,6 +904,11 @@ export class CheckoutService {
                 event: { select: { id: true, title: true, slug: true, imageUrl: true } },
               },
             },
+            fulfillmentItems: {
+              include: {
+                refundRequests: { orderBy: { createdAt: 'desc' }, take: 1 },
+              },
+            },
           },
         })
       : await this.prisma.checkoutSession.findFirst({
@@ -881,11 +925,38 @@ export class CheckoutService {
                 event: { select: { id: true, title: true, slug: true, imageUrl: true } },
               },
             },
+            fulfillmentItems: {
+              include: {
+                refundRequests: { orderBy: { createdAt: 'desc' }, take: 1 },
+              },
+            },
           },
         });
     if (!session) throw new NotFoundException('Заказ не найден');
     if (session.userId !== userId) throw new ForbiddenException('Доступ запрещён');
-    return this.formatTrackingResult(session as Parameters<typeof this.formatTrackingResult>[0]);
+    const base = await this.formatTrackingResult(session as Parameters<typeof this.formatTrackingResult>[0]);
+    const fulfillmentItems = session.fulfillmentItems.map((fi) => {
+      const rr = fi.refundRequests[0];
+      return {
+        id: fi.id,
+        lineItemIndex: fi.lineItemIndex,
+        amount: fi.amount,
+        status: fi.status,
+        refund: rr
+          ? {
+              id: rr.id,
+              status: rr.status,
+              createdAt: rr.createdAt.toISOString(),
+              updatedAt: rr.updatedAt.toISOString(),
+            }
+          : null,
+      };
+    });
+    return {
+      ...base,
+      checkoutSessionId: session.id,
+      fulfillmentItems,
+    };
   }
 
   private async formatTrackingResult(
@@ -1108,7 +1179,7 @@ export class CheckoutService {
     }
 
     const fulfilled = await this.prisma.fulfillmentItem.findMany({
-      where: { status: 'CONFIRMED' },
+      where: { status: { in: ['CONFIRMED', 'REFUND_PENDING'] } },
       select: { lineItemIndex: true, checkoutSessionId: true },
     });
     if (fulfilled.length > 0) {

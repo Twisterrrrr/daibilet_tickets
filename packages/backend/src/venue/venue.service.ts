@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DateMode, Prisma, VenueType } from '@prisma/client';
+import { DateMode, Prisma, VenueType } from '@/prisma-client';
 import type { VenueProgramItemDto, VenueProgramResponse, VenuePublicTemplate, VenueTemplateData } from '@daibilet/shared';
 import { parseVenueTemplateData } from '@daibilet/shared';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveVenueSubcategoryPresentation } from '../subcategories/subcategory-public.mapper';
 import {
   buildSortMeta,
   buildVenueProgramEventWhere,
@@ -13,6 +14,7 @@ import {
   compareUpcoming,
   computeWindowOpenDate,
 } from './venue-program.logic';
+import { resolveDistrictLabel, resolveMetroLabel } from './venue-geo.labels';
 
 @Injectable()
 export class VenueService {
@@ -48,6 +50,8 @@ export class VenueService {
         take: limit,
         include: {
           city: { select: { name: true, slug: true } },
+          districtRef: { select: { name: true } },
+          metroStationRef: { select: { name: true } },
         },
       }),
       this.prisma.venue.count({ where }),
@@ -63,11 +67,13 @@ export class VenueService {
         imageUrl: v.imageUrl,
         city: v.city,
         address: v.address,
-        metro: v.metro,
+        metro: resolveMetroLabel({ legacyMetro: v.metro, stationName: v.metroStationRef?.name ?? null }),
+        district: resolveDistrictLabel({ legacyDistrict: v.district, districtName: v.districtRef?.name ?? null }),
         priceFrom: v.priceFrom,
         rating: Number(v.rating),
         reviewCount: v.reviewCount,
         isFeatured: v.isFeatured,
+        isHiddenGem: v.isHiddenGem,
       })),
       total,
       page,
@@ -81,6 +87,8 @@ export class VenueService {
       where: { slug, isActive: true, isDeleted: false },
       include: {
         city: { select: { name: true, slug: true } },
+        districtRef: { select: { name: true, slug: true } },
+        metroStationRef: { select: { name: true, slug: true, lineName: true } },
         operator: { select: { id: true, name: true, slug: true, logo: true } },
         offers: {
           where: { status: 'ACTIVE' },
@@ -115,6 +123,11 @@ export class VenueService {
             endDate: true,
             shortDescription: true,
             durationMinutes: true,
+          },
+        },
+        subcategoryLinks: {
+          select: {
+            subcategory: { select: { code: true, nameRu: true, layer: true } },
           },
         },
       },
@@ -272,6 +285,8 @@ export class VenueService {
       where: { id, isDeleted: false },
       include: {
         city: { select: { name: true, slug: true } },
+        districtRef: { select: { name: true, slug: true } },
+        metroStationRef: { select: { name: true, slug: true, lineName: true } },
         operator: { select: { id: true, name: true, slug: true, logo: true } },
         offers: {
           where: { status: 'ACTIVE' },
@@ -308,6 +323,11 @@ export class VenueService {
             durationMinutes: true,
           },
         },
+        subcategoryLinks: {
+          select: {
+            subcategory: { select: { code: true, nameRu: true, layer: true } },
+          },
+        },
       },
     });
 
@@ -333,6 +353,9 @@ export class VenueService {
       lng: number | null;
       metro: string | null;
       district: string | null;
+      isHiddenGem: boolean;
+      districtRef?: { name: string; slug: string } | null;
+      metroStationRef?: { name: string; slug: string; lineName: string | null } | null;
       phone: string | null;
       email: string | null;
       website: string | null;
@@ -379,10 +402,16 @@ export class VenueService {
         shortDescription: string | null;
         durationMinutes: number | null;
       }[];
+      subcategoryLinks?: {
+        subcategory: { code: string; nameRu: string; layer: string };
+      }[];
     },
     _requireActive: boolean,
   ) {
     const events = venue.events;
+    const subPres = resolveVenueSubcategoryPresentation(
+      venue.subcategoryLinks as Parameters<typeof resolveVenueSubcategoryPresentation>[0],
+    );
     // Загрузим последние отзывы: прямые venue-отзывы + по привязанным events
     const eventIds = events.map((e) => e.id);
     const reviewWhere = {
@@ -417,10 +446,21 @@ export class VenueService {
       }
     }
 
+    const metroLabel = resolveMetroLabel({
+      legacyMetro: venue.metro,
+      stationName: venue.metroStationRef?.name ?? null,
+    });
+    const districtLabel = resolveDistrictLabel({
+      legacyDistrict: venue.district,
+      districtName: venue.districtRef?.name ?? null,
+    });
+
     return {
       id: venue.id,
       cityId: venue.cityId,
       slug: venue.slug,
+      primarySubcategory: subPres.primarySubcategory,
+      secondarySubcategories: subPres.secondarySubcategories,
       title: venue.title,
       shortTitle: venue.shortTitle,
       venueType: venue.venueType,
@@ -431,8 +471,9 @@ export class VenueService {
       address: venue.address,
       lat: venue.lat,
       lng: venue.lng,
-      metro: venue.metro,
-      district: venue.district,
+      metro: metroLabel,
+      district: districtLabel,
+      isHiddenGem: venue.isHiddenGem,
       phone: venue.phone,
       email: venue.email,
       website: venue.website,
@@ -667,8 +708,63 @@ export class VenueService {
     return null;
   }
 
-  /** Похожие места: тот же город, тот же тип, исключая текущее */
+  /** Похожие места: приоритет общим подкатегориям (links), затем тот же тип в городе */
   async getRelatedVenues(venueId: string, cityId: string, venueType: string, limit = 6) {
+    const self = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+      select: {
+        subcategoryLinks: { select: { subcategory: { select: { code: true } } } },
+      },
+    });
+    const codes =
+      self?.subcategoryLinks.map((l) => l.subcategory.code).filter((c): c is string => Boolean(c)) ?? [];
+
+    const baseSelect = {
+      id: true,
+      slug: true,
+      title: true,
+      shortTitle: true,
+      venueType: true,
+      imageUrl: true,
+      address: true,
+      priceFrom: true,
+      rating: true,
+      reviewCount: true,
+      city: { select: { slug: true, name: true } },
+    } as const;
+
+    if (codes.length > 0) {
+      const byLinks = await this.prisma.venue.findMany({
+        where: {
+          id: { not: venueId },
+          cityId,
+          isActive: true,
+          isDeleted: false,
+          subcategoryLinks: { some: { subcategory: { code: { in: codes } } } },
+        },
+        orderBy: { rating: 'desc' },
+        take: limit,
+        select: baseSelect,
+      });
+      if (byLinks.length >= limit) return byLinks;
+      const exclude = new Set(byLinks.map((v) => v.id));
+      const fillerIdFilter =
+        exclude.size > 0 ? { not: venueId, notIn: [...exclude] as string[] } : { not: venueId };
+      const filler = await this.prisma.venue.findMany({
+        where: {
+          id: fillerIdFilter,
+          cityId,
+          venueType: venueType as VenueType,
+          isActive: true,
+          isDeleted: false,
+        },
+        orderBy: { rating: 'desc' },
+        take: limit - byLinks.length,
+        select: baseSelect,
+      });
+      return [...byLinks, ...filler];
+    }
+
     return this.prisma.venue.findMany({
       where: {
         id: { not: venueId },
@@ -679,19 +775,7 @@ export class VenueService {
       },
       orderBy: { rating: 'desc' },
       take: limit,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        shortTitle: true,
-        venueType: true,
-        imageUrl: true,
-        address: true,
-        priceFrom: true,
-        rating: true,
-        reviewCount: true,
-        city: { select: { slug: true, name: true } },
-      },
+      select: baseSelect,
     });
   }
 
@@ -699,8 +783,7 @@ export class VenueService {
   async getRelatedArticles(cityId: string, limit = 4) {
     return this.prisma.article.findMany({
       where: {
-        isPublished: true,
-        isDeleted: false,
+        status: 'PUBLISHED',
         cityId,
       },
       orderBy: { publishedAt: 'desc' },

@@ -50,7 +50,7 @@ Events, Orders, Checkout, Payouts, Suppliers, Reviews, Support, Moderation — �
 | C1. Critical Path Supplier | S1–S9 | Логин → Dashboard → Events → Create → Reviews → Reports → Balance → Notifications → Settings |
 | C2. Critical Path Admin | A1–A11 | Логин → Dashboard → Events → Orders → Checkout → Payouts → Suppliers → Moderation → Reviews → Support → Settings |
 | C3. Ошибки | DevTools | Отсутствие 500/404, «висящих» спиннеров, явных JS-ошибок в Console |
-| C4. Чек-лист | `docs/RegressionChecklist.md` | Critical Path зафиксирован, использовать перед коммитом UX |
+| C4. Чек-лист | `docs/runbooks/RegressionChecklist.md` | Critical Path зафиксирован, использовать перед коммитом UX |
 | C5. UI_GUIDE | `packages/shared-ui/UI_GUIDE.md` | StatCard (§10), паттерн списков (§11), ссылка на RegressionChecklist (§12) |
 
 **Definition of Done C:**  
@@ -127,7 +127,7 @@ SupplierInvitation, RBAC, support link, audit.
 
 ## 7. Связанные документы
 
-- `docs/Project.md` — архитектура, Supplier Trust.
+- `docs/ARCHITECTURE.md`, `docs/SYSTEM.md`, `docs/PRODUCT.md` — активный контур; Supplier Trust — в legacy-бэкапе `docs/archive/deprecated-active-merged/Project.md.full-backup-2026-04-22.md` и трекере.
 - `docs/Tasktracker.md` — статус задач.
-- `docs/Diary.md` — технические решения.
+- `docs/process/Diary.md` — технические решения.
 - `docs/UI_GUIDE.md` (shared-ui) — паттерны компонентов.

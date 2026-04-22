@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { sanitizeSvg } from '../common/utils/sanitize-svg';
 import { normalizePromoPeriod } from '../promo/promo-period.util';

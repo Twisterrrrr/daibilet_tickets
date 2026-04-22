@@ -1,21 +1,31 @@
 import * as dotenv from 'dotenv';
 import {
-  PrismaClient,
   TagCategory,
   SubcategoryType,
+  SubcategoryLayer,
+  SubcategoryLandingMode,
+  EventCategory,
   ReviewStatus,
   ReviewSupplierResponseStatus,
   ReviewDisputeStatus,
   ReviewDisputeReasonCode,
   EventTagAssignmentSource,
-} from '@prisma/client';
+} from '../src/prisma-client';
+
+import {
+  EVENT_PRIMARY_CODES_BY_CATEGORY,
+  SEED_SECONDARY_UNIVERSAL,
+  VENUE_PRIMARY_CODES,
+} from '../src/subcategories/subcategory-assignment.constants';
+import { seedCanonicalSubcategories } from './seeds/subcategories-canonical.seed';
 import * as bcrypt from 'bcrypt';
 
 import { SALUTE_9_MAY_LANDING_SEEDS } from './salute-9-may-landings.data';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
 dotenv.config({ path: '../../.env' });
 
-const prisma = new PrismaClient();
+const { prisma, pool } = createScriptPrismaClient();
 
 async function main() {
   console.log('Seeding database...');
@@ -63,6 +73,27 @@ async function main() {
     },
   });
   console.log('  ✓ Test admin/support accounts created');
+
+  // --- Global feature flags (Admin Settings, checkout FeatureFlagService) ---
+  await prisma.featureFlag.upsert({
+    where: {
+      key_scope_scopeValue: {
+        key: 'disable_external_offers',
+        scope: 'global',
+        scopeValue: null,
+      },
+    },
+    update: {},
+    create: {
+      key: 'disable_external_offers',
+      scope: 'global',
+      scopeValue: null,
+      enabled: false,
+      description:
+        'Global: постепенно отключать EXTERNAL офферы. Переопределения: scope=city/category — см. FeatureFlagService.',
+    },
+  });
+  console.log('  ✓ Global feature flag: disable_external_offers');
 
   // --- Test frontend Users (buyers) ---
   const userPasswordHash = await bcrypt.hash('TestUser123!', 10);
@@ -1691,310 +1722,166 @@ async function main() {
     console.log('  ✓ Uzhin-kruiz Moskva demo (tag uzhin-kruiz-msk)');
   }
 
-  // --- Единый справочник подкатегорий (master list) ---
-  const subcategoriesMaster: Array<{
-    slug: string;
-    nameRu: string;
-    type: SubcategoryType;
-    parentSlug: string | null;
-    isLandingEnabled: boolean;
-    sortOrder: number;
-  }> = [
-    // Универсальные корни
-    {
-      slug: 'water',
-      nameRu: 'На воде',
-      type: SubcategoryType.UNIVERSAL,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 10,
-    },
-    {
-      slug: 'indoor',
-      nameRu: 'В помещении',
-      type: SubcategoryType.UNIVERSAL,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 20,
-    },
-    {
-      slug: 'outdoor',
-      nameRu: 'На открытом воздухе',
-      type: SubcategoryType.UNIVERSAL,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 30,
-    },
-    {
-      slug: 'family-friendly',
-      nameRu: 'Для всей семьи',
-      type: SubcategoryType.UNIVERSAL,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 40,
-    },
+  // --- Справочник подкатегорий: code + layer, upsert по (code, type) ---
+  const EVENT_PRIMARY_META: Record<
+    string,
+    { slug: string; nameRu: string; sortOrder: number; isLandingEnabled?: boolean }
+  > = {
+    RIVER: { slug: 'river-excursion', nameRu: 'Речная экскурсия', sortOrder: 100 },
+    WALKING: { slug: 'walking-excursion', nameRu: 'Пешеходная экскурсия', sortOrder: 110 },
+    BUS: { slug: 'bus-excursion', nameRu: 'Автобусная экскурсия', sortOrder: 120 },
+    COMBINED: { slug: 'combined-excursion', nameRu: 'Комбинированная экскурсия', sortOrder: 130, isLandingEnabled: false },
+    QUEST: { slug: 'quest-excursion', nameRu: 'Квест-экскурсия', sortOrder: 140 },
+    GASTRO: { slug: 'gastro-excursion', nameRu: 'Гастро-экскурсия', sortOrder: 150 },
+    ROOFTOP: { slug: 'rooftop', nameRu: 'Крыши', sortOrder: 160 },
+    EXTREME: { slug: 'extreme', nameRu: 'Экстрим', sortOrder: 170, isLandingEnabled: false },
+    MUSEUM_CLASSIC: { slug: 'museum', nameRu: 'Музей', sortOrder: 200 },
+    EXHIBITION: { slug: 'exhibition', nameRu: 'Выставка', sortOrder: 210 },
+    GALLERY: { slug: 'gallery', nameRu: 'Галерея', sortOrder: 220 },
+    PALACE: { slug: 'palace-estate', nameRu: 'Дворец / Усадьба', sortOrder: 230 },
+    PARK: { slug: 'park-reserve', nameRu: 'Парк / Заповедник', sortOrder: 240 },
+    ART_SPACE: { slug: 'art-space', nameRu: 'Арт-пространство', sortOrder: 250 },
+    SCULPTURE: { slug: 'sculpture', nameRu: 'Скульптура', sortOrder: 255 },
+    CONTEMPORARY: { slug: 'contemporary', nameRu: 'Современное искусство', sortOrder: 257 },
+    CONCERT: { slug: 'concert', nameRu: 'Концерт', sortOrder: 300 },
+    SHOW: { slug: 'show', nameRu: 'Шоу / Представление', sortOrder: 310 },
+    STANDUP: { slug: 'standup', nameRu: 'Стендап', sortOrder: 320 },
+    THEATER: { slug: 'theater', nameRu: 'Театр / Спектакль', sortOrder: 330 },
+    SPORT: { slug: 'sport', nameRu: 'Спорт', sortOrder: 340 },
+    FESTIVAL: { slug: 'festival', nameRu: 'Фестиваль', sortOrder: 350 },
+    MASTERCLASS: { slug: 'masterclass', nameRu: 'Мастер-класс', sortOrder: 360 },
+    PARTY: { slug: 'party', nameRu: 'Вечеринка', sortOrder: 370, isLandingEnabled: false },
+  };
 
-    // Event-only корни (наследуют legacy EventSubcategory)
-    {
-      slug: 'river-excursion',
-      nameRu: 'Речная экскурсия',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'water',
-      isLandingEnabled: true,
-      sortOrder: 100,
-    },
-    {
-      slug: 'walking-excursion',
-      nameRu: 'Пешеходная экскурсия',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'outdoor',
-      isLandingEnabled: true,
-      sortOrder: 110,
-    },
-    {
-      slug: 'bus-excursion',
-      nameRu: 'Автобусная экскурсия',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 120,
-    },
-    {
-      slug: 'combined-excursion',
-      nameRu: 'Комбинированная экскурсия',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: null,
-      isLandingEnabled: false,
-      sortOrder: 130,
-    },
-    {
-      slug: 'quest-excursion',
-      nameRu: 'Квест-экскурсия',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'family-friendly',
-      isLandingEnabled: true,
-      sortOrder: 140,
-    },
-    {
-      slug: 'gastro-excursion',
-      nameRu: 'Гастро-экскурсия',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 150,
-    },
-    {
-      slug: 'rooftop',
-      nameRu: 'Крыши',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'outdoor',
-      isLandingEnabled: true,
-      sortOrder: 160,
-    },
-    {
-      slug: 'extreme',
-      nameRu: 'Экстрим',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'outdoor',
-      isLandingEnabled: false,
-      sortOrder: 170,
-    },
-    {
-      slug: 'museum',
-      nameRu: 'Музей',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 200,
-    },
-    {
-      slug: 'exhibition',
-      nameRu: 'Выставка',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 210,
-    },
-    {
-      slug: 'gallery',
-      nameRu: 'Галерея',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 220,
-    },
-    {
-      slug: 'palace-estate',
-      nameRu: 'Дворец / Усадьба',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 230,
-    },
-    {
-      slug: 'park-reserve',
-      nameRu: 'Парк / Заповедник',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'outdoor',
-      isLandingEnabled: true,
-      sortOrder: 240,
-    },
-    {
-      slug: 'art-space',
-      nameRu: 'Арт-пространство',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 250,
-    },
-    {
-      slug: 'concert',
-      nameRu: 'Концерт',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 300,
-    },
-    {
-      slug: 'show',
-      nameRu: 'Шоу / Представление',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 310,
-    },
-    {
-      slug: 'standup',
-      nameRu: 'Стендап',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 320,
-    },
-    {
-      slug: 'theater',
-      nameRu: 'Театр / Спектакль',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 330,
-    },
-    {
-      slug: 'sport',
-      nameRu: 'Спорт',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 340,
-    },
-    {
-      slug: 'festival',
-      nameRu: 'Фестиваль',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 350,
-    },
-    {
-      slug: 'masterclass',
-      nameRu: 'Мастер-класс',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: null,
-      isLandingEnabled: true,
-      sortOrder: 360,
-    },
-    {
-      slug: 'party',
-      nameRu: 'Вечеринка',
-      type: SubcategoryType.EVENT_ONLY,
-      parentSlug: null,
-      isLandingEnabled: false,
-      sortOrder: 370,
-    },
+  const VENUE_PRIMARY_META: Record<string, { slug: string; nameRu: string; sortOrder: number }> = {
+    MUSEUM: { slug: 'museum-venue', nameRu: 'Музей (площадка)', sortOrder: 400 },
+    EXHIBITION: { slug: 'exhibition-venue', nameRu: 'Выставочная площадка', sortOrder: 405 },
+    GALLERY: { slug: 'gallery-venue', nameRu: 'Галерея (площадка)', sortOrder: 410 },
+    PALACE: { slug: 'palace-venue', nameRu: 'Дворец (площадка)', sortOrder: 415 },
+    PARK: { slug: 'park-venue', nameRu: 'Парк (площадка)', sortOrder: 418 },
+    ART_SPACE: { slug: 'art-space-venue', nameRu: 'Арт-пространство (площадка)', sortOrder: 422 },
+    THEATER: { slug: 'theater-venue', nameRu: 'Театральная площадка', sortOrder: 420 },
+  };
 
-    // Venue-only (для площадок)
-    {
-      slug: 'museum-venue',
-      nameRu: 'Музейная площадка',
-      type: SubcategoryType.VENUE_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 400,
-    },
-    {
-      slug: 'gallery-venue',
-      nameRu: 'Галерея',
-      type: SubcategoryType.VENUE_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 410,
-    },
-    {
-      slug: 'theater-venue',
-      nameRu: 'Театральная площадка',
-      type: SubcategoryType.VENUE_ONLY,
-      parentSlug: 'indoor',
-      isLandingEnabled: true,
-      sortOrder: 420,
-    },
-  ];
+  const eventPrimaryCodeSet = new Set<string>();
+  for (const cat of Object.keys(EVENT_PRIMARY_CODES_BY_CATEGORY) as EventCategory[]) {
+    for (const c of EVENT_PRIMARY_CODES_BY_CATEGORY[cat]) {
+      eventPrimaryCodeSet.add(c);
+    }
+  }
 
-  // Сначала upsert корней и всех узлов без parentId.
-  for (const item of subcategoriesMaster.filter((x) => x.parentSlug === null)) {
+  for (const code of eventPrimaryCodeSet) {
+    const meta = EVENT_PRIMARY_META[code];
+    if (!meta) {
+      console.warn(`⚠ Missing EVENT_PRIMARY_META for code ${code} — skipping this subcategory seed row`);
+      continue;
+    }
+    const evLanding = meta.isLandingEnabled ?? true;
     await prisma.subcategory.upsert({
-      where: { slug: item.slug },
+      where: { code_type: { code, type: SubcategoryType.EVENT_ONLY } },
       update: {
-        nameRu: item.nameRu,
-        type: item.type,
+        slug: meta.slug,
+        nameRu: meta.nameRu,
+        layer: SubcategoryLayer.PRIMARY,
         parentId: null,
         isActive: true,
-        isLandingEnabled: item.isLandingEnabled,
-        sortOrder: item.sortOrder,
+        isLandingEnabled: evLanding,
+        landingMode: evLanding ? SubcategoryLandingMode.AUTO : SubcategoryLandingMode.DISABLED,
+        landingTopicKey: null,
+        sortOrder: meta.sortOrder,
       },
       create: {
-        slug: item.slug,
-        nameRu: item.nameRu,
-        type: item.type,
+        slug: meta.slug,
+        code,
+        nameRu: meta.nameRu,
+        type: SubcategoryType.EVENT_ONLY,
+        layer: SubcategoryLayer.PRIMARY,
+        parentId: null,
         isActive: true,
-        isLandingEnabled: item.isLandingEnabled,
-        sortOrder: item.sortOrder,
+        isLandingEnabled: evLanding,
+        landingMode: evLanding ? SubcategoryLandingMode.AUTO : SubcategoryLandingMode.DISABLED,
+        landingTopicKey: null,
+        sortOrder: meta.sortOrder,
       },
     });
   }
 
-  // Затем upsert дочерних узлов с привязкой к родителю.
-  for (const item of subcategoriesMaster.filter((x) => x.parentSlug !== null)) {
-    const parent = await prisma.subcategory.findUnique({
-      where: { slug: item.parentSlug! },
-      select: { id: true },
-    });
-    if (!parent) {
-      throw new Error(`Subcategory parent not found for "${item.slug}": ${item.parentSlug}`);
+  for (const code of VENUE_PRIMARY_CODES) {
+    const meta = VENUE_PRIMARY_META[code];
+    if (!meta) {
+      console.warn(`⚠ Missing VENUE_PRIMARY_META for code ${code} — skipping this subcategory seed row`);
+      continue;
     }
-
     await prisma.subcategory.upsert({
-      where: { slug: item.slug },
+      where: { code_type: { code, type: SubcategoryType.VENUE_ONLY } },
       update: {
-        nameRu: item.nameRu,
-        type: item.type,
-        parentId: parent.id,
+        slug: meta.slug,
+        nameRu: meta.nameRu,
+        layer: SubcategoryLayer.PRIMARY,
+        parentId: null,
         isActive: true,
-        isLandingEnabled: item.isLandingEnabled,
-        sortOrder: item.sortOrder,
+        isLandingEnabled: true,
+        landingMode: SubcategoryLandingMode.AUTO,
+        landingTopicKey: null,
+        sortOrder: meta.sortOrder,
       },
       create: {
-        slug: item.slug,
-        nameRu: item.nameRu,
-        type: item.type,
-        parentId: parent.id,
+        slug: meta.slug,
+        code,
+        nameRu: meta.nameRu,
+        type: SubcategoryType.VENUE_ONLY,
+        layer: SubcategoryLayer.PRIMARY,
+        parentId: null,
         isActive: true,
-        isLandingEnabled: item.isLandingEnabled,
-        sortOrder: item.sortOrder,
+        isLandingEnabled: true,
+        landingMode: SubcategoryLandingMode.AUTO,
+        landingTopicKey: null,
+        sortOrder: meta.sortOrder,
       },
     });
   }
 
-  console.log(`  ✓ ${subcategoriesMaster.length} subcategories (master list)`);
+  for (const row of SEED_SECONDARY_UNIVERSAL) {
+    const slug = row.code.toLowerCase();
+    await prisma.subcategory.upsert({
+      where: { code_type: { code: row.code, type: SubcategoryType.UNIVERSAL } },
+      update: {
+        slug,
+        nameRu: row.nameRu,
+        layer: SubcategoryLayer.SECONDARY,
+        parentId: null,
+        isActive: true,
+        isLandingEnabled: false,
+        landingMode: SubcategoryLandingMode.DISABLED,
+        landingTopicKey: null,
+        sortOrder: row.sortOrder,
+      },
+      create: {
+        slug,
+        code: row.code,
+        nameRu: row.nameRu,
+        type: SubcategoryType.UNIVERSAL,
+        layer: SubcategoryLayer.SECONDARY,
+        parentId: null,
+        isActive: true,
+        isLandingEnabled: false,
+        landingMode: SubcategoryLandingMode.DISABLED,
+        landingTopicKey: null,
+        sortOrder: row.sortOrder,
+      },
+    });
+  }
+
+  await prisma.subcategory.updateMany({
+    where: { slug: 'family-friendly' },
+    data: { code: 'FAMILY', layer: SubcategoryLayer.SECONDARY, parentId: null, type: SubcategoryType.UNIVERSAL },
+  });
+
+  await prisma.subcategory.updateMany({ data: { parentId: null } });
+
+  await seedCanonicalSubcategories(prisma);
+
+  console.log('  ✓ Subcategories (PRIMARY/SECONDARY, upsert by code+type + canonical whitelist)');
 
   // --- Посадочные страницы (лендинги) ---
 
@@ -3799,4 +3686,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

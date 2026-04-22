@@ -52,6 +52,24 @@ export class EventAdminReadinessDto {
   @IsEnum(['READY', 'NEEDS_WORK', 'BLOCKED'] as const)
   status!: 'READY' | 'NEEDS_WORK' | 'BLOCKED';
 
+  @ApiProperty({
+    description: 'Сводный скор готовности 0..100 (derived)',
+    minimum: 0,
+    maximum: 100,
+  })
+  @IsInt()
+  score!: number;
+
+  @ApiProperty({ enum: ['LINKS', 'LEGACY_ENUM', 'NONE'] })
+  @IsEnum(['LINKS', 'LEGACY_ENUM', 'NONE'] as const)
+  classificationSource!: 'LINKS' | 'LEGACY_ENUM' | 'NONE';
+
+  @ApiProperty({
+    description: 'Требуется ручная проверка классификации (derived)',
+  })
+  @IsBoolean()
+  classificationNeedsReview!: boolean;
+
   @ApiProperty({ type: EventAdminReadinessChecklistDto })
   @ValidateNested()
   @Type(() => EventAdminReadinessChecklistDto)

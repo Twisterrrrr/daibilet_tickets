@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Intensity } from '@prisma/client';
+import { Intensity } from '@/prisma-client';
 import { Type } from 'class-transformer';
 import { IsArray, IsDateString, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 

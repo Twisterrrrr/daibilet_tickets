@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 
 import { FaqSection } from '@/components/landing/FaqSection';
 import { api } from '@/lib/api';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 import { toComboDetailVM } from '../_comboVm';
 
 export const revalidate = 21600;
@@ -122,7 +123,7 @@ export default async function ComboDetailPage({ params }: Props) {
               Смотреть программу
             </a>
             <Link
-              href={`/events?city=${data.city.slug}`}
+              href={catalogEventsHref({ city: data.city.slug })}
               className="border border-white/30 text-white px-8 py-3 rounded-xl font-medium hover:bg-white/10 transition-colors"
             >
               Все события
@@ -255,7 +256,7 @@ export default async function ComboDetailPage({ params }: Props) {
               маршрут.
             </p>
             <Link
-              href={`/events?city=${data.city.slug}`}
+              href={catalogEventsHref({ city: data.city.slug })}
               className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition-colors"
             >
               Все события в городе
@@ -297,7 +298,7 @@ export default async function ComboDetailPage({ params }: Props) {
 
             <div className="flex flex-wrap items-center gap-4">
               <Link
-                href={`/events?city=${data.city.slug}`}
+                href={catalogEventsHref({ city: data.city.slug })}
                 className="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-colors"
               >
                 Все события

@@ -1,9 +1,15 @@
 import { ArrowLeft } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { EventWizard, PageHeader, type EventWizardDraft, mapDraftToCreatePayload } from '@daibilet/shared-ui';
+import {
+  EventWizard,
+  PageHeader,
+  type EventWizardDraft,
+  type EventWizardLocationOption,
+  mapDraftToCreatePayload,
+} from '@daibilet/shared-ui';
 
 import { adminApi } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -17,6 +23,9 @@ interface CityOption {
 export function EventCreatePage() {
   const navigate = useNavigate();
   const [cities, setCities] = useState<CityOption[]>([]);
+  const [locationsForCity, setLocationsForCity] = useState<EventWizardLocationOption[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
+  const lastLoadedCityIdRef = useRef<string>('');
 
   useEffect(() => {
     adminApi
@@ -27,6 +36,35 @@ export function EventCreatePage() {
       })
       .catch((e) => {
         console.error('Load cities failed:', e);
+      });
+  }, []);
+
+  const loadLocationsForCity = useCallback((cityId: string) => {
+    if (!cityId) {
+      setLocationsForCity([]);
+      setLocationsLoading(false);
+      return;
+    }
+    const requested = cityId;
+    setLocationsLoading(true);
+    adminApi
+      .get<{ items?: EventWizardLocationOption[] }>(
+        `/admin/locations?cityId=${encodeURIComponent(cityId)}`,
+      )
+      .then((res) => {
+        if (lastLoadedCityIdRef.current !== requested) return;
+        const list = res.items;
+        setLocationsForCity(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (lastLoadedCityIdRef.current === requested) {
+          setLocationsForCity([]);
+        }
+      })
+      .finally(() => {
+        if (lastLoadedCityIdRef.current === requested) {
+          setLocationsLoading(false);
+        }
       });
   }, []);
 
@@ -44,6 +82,11 @@ export function EventCreatePage() {
       fullDescription: '',
       coverImageUrl: '',
       gallery: [],
+      locationChoice: 'existing',
+      startLocationId: '',
+      locationProposalTitle: '',
+      locationProposalAddress: '',
+      locationProposalType: '',
     },
     schedule: {
       mode: 'single',
@@ -122,6 +165,15 @@ export function EventCreatePage() {
         mode="create"
         onSubmit={handleSubmit}
         citiesOptions={cities.map((c) => ({ id: c.id, name: c.name }))}
+        locationsForCity={locationsForCity}
+        locationsLoading={locationsLoading}
+        onDraftChange={(d) => {
+          const cid = d.basics.cityId;
+          if (cid !== lastLoadedCityIdRef.current) {
+            lastLoadedCityIdRef.current = cid;
+            loadLocationsForCity(cid);
+          }
+        }}
       />
     </div>
   );

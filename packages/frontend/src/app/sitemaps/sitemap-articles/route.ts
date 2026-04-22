@@ -6,7 +6,7 @@ import { SITE_URL, type SitemapUrl, toUrlSetXml } from '@/lib/sitemap-xml';
 const LASTMOD = new Date().toISOString().slice(0, 10);
 
 export async function GET() {
-  const urls: SitemapUrl[] = [{ loc: `${SITE_URL}/blog`, lastmod: LASTMOD, changefreq: 'weekly', priority: 0.6 }];
+  const urls: SitemapUrl[] = [{ loc: `${SITE_URL}/articles`, lastmod: LASTMOD, changefreq: 'weekly', priority: 0.6 }];
 
   try {
     const { items: articles } = await api.getArticles({ limit: 500 });
@@ -15,7 +15,7 @@ export async function GET() {
         ? new Date(a.updatedAt as string | number | Date).toISOString().slice(0, 10)
         : LASTMOD;
       urls.push({
-        loc: `${SITE_URL}/blog/${a.slug}`,
+        loc: `${SITE_URL}/articles/${a.slug}`,
         lastmod,
         changefreq: 'monthly',
         priority: 0.5,

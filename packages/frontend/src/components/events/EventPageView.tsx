@@ -8,13 +8,12 @@ import { Calendar, ChevronDown, ChevronRight, Clock, MapPin, Shield, Users, X, T
 import { useState } from 'react';
 
 import { AddToCartButton } from '@/components/ui/AddToCartButton';
-import { BuyButton } from '@/components/ui/BuyModal';
 import { EventCard, type EventCardVM } from '@/components/ui/EventCard';
 import { RequestOfferForm } from '@/components/ui/RequestOfferForm';
 import { RatingBadge, ReviewSection } from '@/components/ui/ReviewSection';
-import { TcSessionSlot, TcWidgetButton } from '@/components/ui/TcWidget';
-import { TepWidgetEmbed } from '@/components/ui/TepWidget';
+import { TcSessionSlot } from '@/components/ui/TcWidget';
 import { shortenAddressToStreet } from '@/lib/address';
+import { isPastOpenDateExhibition } from '@/lib/event-ended';
 
 type EventDetail = EventDetailFrontend;
 type EventOfferLite = EventOffer | null;
@@ -25,6 +24,7 @@ export type EventPageViewProps = {
 };
 
 export function EventPageView({ event }: EventPageViewProps) {
+  const exhibitionEnded = isPastOpenDateExhibition(event);
   const tags = (event.tags ?? []).map((t) => t.tag).filter(Boolean);
   const venueName = getVenueName(event.tcData);
 
@@ -90,15 +90,17 @@ export function EventPageView({ event }: EventPageViewProps) {
               name: 'Дайбилет',
               url: 'https://daibilet.ru',
             },
-            offers: event.priceFrom
-              ? {
-                  '@type': 'Offer',
-                  price: (event.priceFrom / 100).toFixed(0),
-                  priceCurrency: 'RUB',
-                  availability: hasActiveSessions ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
-                  url: `https://daibilet.ru/events/${event.slug}`,
-                }
-              : undefined,
+            ...(event.endDate && { endDate: new Date(event.endDate).toISOString() }),
+            offers:
+              !exhibitionEnded && event.priceFrom
+                ? {
+                    '@type': 'Offer',
+                    price: (event.priceFrom / 100).toFixed(0),
+                    priceCurrency: 'RUB',
+                    availability: hasActiveSessions ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
+                    url: `https://daibilet.ru/events/${event.slug}`,
+                  }
+                : undefined,
             performer: {
               '@type': 'Organization',
               name: venueName || 'Организатор',
@@ -209,6 +211,11 @@ export function EventPageView({ event }: EventPageViewProps) {
                     {label}
                   </span>
                 ))}
+                {exhibitionEnded && (
+                  <span className="inline-flex items-center rounded-full bg-white/25 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                    Период проведения завершён
+                  </span>
+                )}
               </div>
               <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl lg:text-4xl leading-tight">
                 {event.title}
@@ -378,7 +385,10 @@ export function EventPageView({ event }: EventPageViewProps) {
             )}
 
             {/* Mobile buy card — над правилами / контентными блоками */}
-            {(primaryOffer || event.tcEventId || event.offers?.some((o) => o.status === 'ACTIVE')) && (
+            {(exhibitionEnded ||
+              primaryOffer ||
+              event.tcEventId ||
+              event.offers?.some((o) => o.status === 'ACTIVE')) && (
               <div className="mt-6 lg:hidden" id="buy-card">
                 <BuyCard
                   event={event}
@@ -397,6 +407,47 @@ export function EventPageView({ event }: EventPageViewProps) {
                 .contentTemplateData}
               refundPolicyResolved={(event as unknown as { refundPolicyResolved?: string | null }).refundPolicyResolved}
             />
+
+            {/* Маршрут (нормализованный Route / RoutePoint), только при публикации */}
+            {event.route && event.route.points.length > 0 ? (
+              <section className="space-y-4" aria-labelledby="event-route-heading">
+                <h2 id="event-route-heading" className="text-lg font-bold text-slate-900">
+                  {event.route.title?.trim() || 'Маршрут'}
+                </h2>
+                {event.route.summary ? (
+                  <p className="text-sm leading-relaxed text-slate-600">{event.route.summary}</p>
+                ) : null}
+                {/* TODO: schema.org TouristTrip / structured route — follow-up */}
+                <ol className="list-decimal space-y-4 pl-5 text-slate-800">
+                  {event.route.points.map((pt, i) => (
+                    <li key={`${pt.order}-${i}`} className="marker:font-semibold">
+                      <div className="font-medium text-slate-900">
+                        {pt.title}
+                        {pt.isOptional ? (
+                          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal text-slate-600">
+                            по желанию
+                          </span>
+                        ) : null}
+                      </div>
+                      {pt.description ? (
+                        <p className="mt-1 text-sm leading-relaxed text-slate-600">{pt.description}</p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                        {pt.durationMinutes != null ? (
+                          <span className="text-slate-500">{pt.durationMinutes} мин</span>
+                        ) : null}
+                        <Link
+                          href={pt.target.href}
+                          className="font-medium text-primary-600 underline-offset-2 hover:underline"
+                        >
+                          {pt.target.title}
+                        </Link>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
 
             {/* legacy templateData: program, cast, hall (из EventOverride) */}
             {event.templateData && <TemplateDataBlocks templateData={event.templateData} />}
@@ -439,14 +490,19 @@ export function EventPageView({ event }: EventPageViewProps) {
           {/* Right sidebar */}
           <div className="hidden lg:block lg:col-span-1">
             <div className="sticky top-20" id="buy-card">
-              <BuyCard
-                event={event}
-                buyUrl={buyUrl}
-                hasActiveSessions={hasActiveSessions}
-                categoryLabel={categoryLabel}
-                venueName={venueName}
-                primaryOffer={primaryOffer}
-              />
+              {(exhibitionEnded ||
+                primaryOffer ||
+                event.tcEventId ||
+                event.offers?.some((o) => o.status === 'ACTIVE')) && (
+                <BuyCard
+                  event={event}
+                  buyUrl={buyUrl}
+                  hasActiveSessions={hasActiveSessions}
+                  categoryLabel={categoryLabel}
+                  venueName={venueName}
+                  primaryOffer={primaryOffer}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -958,7 +1014,7 @@ function BuyCard({
   buyUrl: _buyUrl,
   hasActiveSessions: _hasActiveSessions,
   categoryLabel: _categoryLabel,
-  venueName,
+  venueName: _venueName,
   primaryOffer,
 }: {
   event: EventDetail;
@@ -968,6 +1024,36 @@ function BuyCard({
   venueName: string | null;
   primaryOffer?: EventOfferLite;
 }) {
+  const [preselectedSessionId, setPreselectedSessionId] = useState<string | null>(null);
+
+  if (isPastOpenDateExhibition(event)) {
+    const endLabel =
+      event.endDate != null && event.endDate !== ''
+        ? new Date(event.endDate).toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        : null;
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-900">Билеты не продаются</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          {endLabel ? `Период проведения завершён (${endLabel}).` : 'Период проведения этого мероприятия завершён.'}
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Страница доступна по ссылке для справки; в каталоге такие события не показываются.
+        </p>
+        <Link
+          href="/events"
+          className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-medium text-primary-800 transition hover:bg-primary-100"
+        >
+          Смотреть актуальные события
+        </Link>
+      </div>
+    );
+  }
+
   const purchaseType = primaryOffer?.purchaseType || (event.source === 'TEPLOHOD' ? 'REDIRECT' : 'WIDGET');
   const isWidget = purchaseType === 'WIDGET';
   const isRequest = purchaseType === 'REQUEST';
@@ -976,25 +1062,8 @@ function BuyCard({
 
   const widgetProvider = primaryOffer?.widgetProvider || primaryOffer?.source || event.source;
   const isTepWidget = widgetProvider === 'TEPLOHOD' || event.source === 'TEPLOHOD';
-  const widgetPayload: Record<string, unknown> = (primaryOffer?.widgetPayload as Record<string, unknown>) ?? {};
-  const offerEventId =
-    (typeof widgetPayload.externalEventId === 'string' ? widgetPayload.externalEventId : null) ||
-    primaryOffer?.externalEventId ||
-    event.tcEventId;
-  const offerMetaId =
-    (typeof widgetPayload.metaEventId === 'string' ? widgetPayload.metaEventId : null) ||
-    primaryOffer?.metaEventId ||
-    event.tcMetaEventId;
   const offerDeeplink = primaryOffer?.deeplink;
   const offerSource = primaryOffer?.source || event.source;
-
-  const tepWidgetId = (typeof widgetPayload.tepWidgetId === 'string' ? widgetPayload.tepWidgetId : null) ?? null;
-  const tepEventId =
-    (typeof widgetPayload.tepEventId === 'string' ? widgetPayload.tepEventId : null) ??
-    primaryOffer?.externalEventId?.match?.(/^tep-(\d+)$/)?.[1] ??
-    (typeof event.tcData === 'object' && event.tcData != null && 'id' in event.tcData
-      ? String((event.tcData as { id?: unknown }).id ?? '')
-      : null);
   const offerBadge = primaryOffer?.badge;
 
   const allOffers = (event.offers ?? []).filter((o) => o.status === 'ACTIVE');
@@ -1011,12 +1080,8 @@ function BuyCard({
   }
   const showFromPrefix = allPrices.size > 1;
 
-  const [buyModalOpen, setBuyModalOpen] = useState(false);
-  const [preselectedSessionId, setPreselectedSessionId] = useState<string | null>(null);
-
-  const handleOpenBuyModal = (sessionId: string | null) => {
+  const handleSelectSession = (sessionId: string | null) => {
     setPreselectedSessionId(sessionId);
-    setBuyModalOpen(true);
   };
 
   const firstSessionPrices =
@@ -1069,36 +1134,28 @@ function BuyCard({
                       : (offer as EventOffer & { operator?: { name?: string } }).operator?.name ?? 'Дайбилет'}
                 </span>
               </div>
-              {offer.source === 'TEPLOHOD' && offer.deeplink ? (
-                <a
-                  href={offer.deeplink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-600"
-                >
-                  Купить
-                </a>
-              ) : offer.purchaseType === 'WIDGET' && offer.externalEventId ? (
-                <TcWidgetButton tcEventId={offer.externalEventId} tcMetaEventId={offer.metaEventId} compact>
-                  Купить
-                </TcWidgetButton>
-              ) : offer.purchaseType === 'REDIRECT' && offer.deeplink ? (
-                <a
-                  href={offer.deeplink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-700"
-                >
-                  Купить
-                </a>
-              ) : offer.purchaseType === 'REQUEST' ? (
+              {offer.purchaseType === 'REQUEST' ? (
                 <a
                   href="#request-form"
                   className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600"
                 >
                   Заявка
                 </a>
-              ) : null}
+              ) : (
+                <AddToCartButton
+                  eventId={event.id}
+                  offerId={offer.id}
+                  eventTitle={event.title}
+                  eventSlug={event.slug}
+                  imageUrl={event.imageUrl ?? undefined}
+                  priceFrom={offer.priceFrom ?? event.priceFrom ?? 0}
+                  purchaseType={offer.purchaseType ?? 'WIDGET'}
+                  source={offer.source ?? 'INTERNAL'}
+                  deeplink={offer.deeplink ?? undefined}
+                  badge={offer.badge ?? undefined}
+                  className="rounded-lg px-3 py-1.5 text-xs"
+                />
+              )}
             </div>
           ))}
         </div>
@@ -1192,7 +1249,7 @@ function BuyCard({
                     <button
                       key={session.id}
                       type="button"
-                      onClick={() => handleOpenBuyModal(session.id)}
+                      onClick={() => handleSelectSession(session.id)}
                       className="w-full rounded-lg border border-slate-200 bg-white text-left transition hover:border-primary-200 hover:bg-primary-50/50 focus:outline-none focus:ring-2 focus:ring-primary-200"
                     >
                       <StaticSessionRow session={session} />
@@ -1208,96 +1265,28 @@ function BuyCard({
         </div>
       )}
 
-      {/* Основная кнопка покупки — после списка сеансов */}
+      {/* Основная кнопка покупки — canonical путь через /checkout (фиксирует CheckoutSession в БД) */}
       {isRequest ? (
         primaryOffer ? <RequestOfferForm eventId={event.id} offerId={primaryOffer.id} /> : null
-      ) : isTepWidget && (tepWidgetId || tepEventId || primaryOffer?.externalEventId) ? (
-        <TepWidgetEmbed
-          tepWidgetId={tepWidgetId}
-          tepEventId={tepEventId}
-          externalEventId={primaryOffer?.externalEventId}
-        />
-      ) : offerEventId ? (
+      ) : primaryOffer ? (
         <div className="mt-5">
-          {isWidget && !isManualEvent ? (
-            <TcWidgetButton tcEventId={offerEventId} tcMetaEventId={offerMetaId}>
-              Купить билет
-            </TcWidgetButton>
-          ) : isManualEvent && (event.sessions?.length ?? 0) > 0 ? (
-            <BuyButton
-              eventTitle={event.title}
-              eventImage={event.imageUrl}
-              tcEventId={offerEventId}
-              source="TC"
-              sessions={(event.sessions || []).map((s) => ({
-                ...s,
-                prices: (s.prices || []).map((p: { type?: string; price?: number; description?: string }) => ({
-                  name: p.type === 'adult' ? 'Взрослый билет' : p.type === 'child' ? 'Детский билет' : p.type === 'concession' ? 'Льготный билет' : p.type ?? 'Стандарт',
-                  price: p.price ?? 0,
-                  setId: s.id,
-                  amount: 1,
-                  amountVacant: s.availableTickets ?? 0,
-                  description:
-                    p.type === 'adult'
-                      ? 'без льгот'
-                      : p.type === 'child'
-                        ? 'от 3 до 14 включительно'
-                        : p.type === 'concession'
-                          ? 'школьники от 15 лет, студенты, пенсионеры и пр. льготные категории'
-                          : (p as { description?: string }).description ?? undefined,
-                })),
-              }))}
-              address={event.address ?? undefined}
-              venueName={venueName ?? undefined}
-              priceFrom={event.priceFrom ?? 0}
-              isOpen={buyModalOpen}
-              onOpenChange={(open) => {
-                setBuyModalOpen(open);
-                if (open) setPreselectedSessionId(null);
-              }}
-              initialSessionId={preselectedSessionId}
-            />
-          ) : purchaseType === 'REDIRECT' && offerDeeplink ? (
-            <a
-              href={offerDeeplink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
-            >
-              Купить на {offerSource === 'TEPLOHOD' ? 'teplohod.info' : 'сайте оператора'}
-            </a>
-          ) : (
-            <BuyButton
-              eventTitle={event.title}
-              eventImage={event.imageUrl}
-              tcEventId={offerEventId}
-              source={offerSource === 'TEPLOHOD' ? 'TEPLOHOD' : 'TC'}
-              sessions={(event.sessions || []).map((s) => ({
-                ...s,
-                prices: (s.prices || []).map((p: { type?: string; price?: number }) => ({
-                  name: p.type ?? 'Стандарт',
-                  price: p.price ?? 0,
-                  setId: s.id,
-                  amount: 1,
-                  amountVacant: s.availableTickets ?? 0,
-                })),
-              }))}
-              address={event.address ?? undefined}
-              venueName={venueName ?? undefined}
-              priceFrom={event.priceFrom ?? 0}
-            />
-          )}
-        </div>
-      ) : primaryOffer?.deeplink && purchaseType === 'REDIRECT' ? (
-        <div className="mt-5">
-          <a
-            href={primaryOffer.deeplink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
-          >
-            Купить на сайте оператора
-          </a>
+          <AddToCartButton
+            eventId={event.id}
+            offerId={primaryOffer.id}
+            sessionId={preselectedSessionId ?? undefined}
+            eventTitle={event.title}
+            eventSlug={event.slug}
+            imageUrl={event.imageUrl ?? undefined}
+            priceFrom={primaryOffer.priceFrom ?? event.priceFrom ?? 0}
+            purchaseType={purchaseType ?? primaryOffer.purchaseType ?? 'WIDGET'}
+            source={offerSource ?? primaryOffer.source ?? 'INTERNAL'}
+            deeplink={offerDeeplink ?? primaryOffer.deeplink ?? undefined}
+            badge={offerBadge ?? primaryOffer.badge ?? undefined}
+            className="rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
+          />
+          <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            Покупка проходит через оформление заказа на сайте — так заказ гарантированно фиксируется и появляется в ЛК/админке.
+          </div>
         </div>
       ) : (
         <button
@@ -1308,26 +1297,7 @@ function BuyCard({
         </button>
       )}
 
-      {primaryOffer &&
-        purchaseType !== 'WIDGET' &&
-        !isRequest &&
-        offerSource !== 'TC' &&
-        offerSource !== 'TEPLOHOD' && (
-          <div className="mt-3">
-            <AddToCartButton
-              eventId={event.id}
-              offerId={primaryOffer.id}
-              eventTitle={event.title}
-              eventSlug={event.slug}
-              imageUrl={event.imageUrl ?? undefined}
-              priceFrom={primaryOffer.priceFrom ?? event.priceFrom ?? 0}
-              purchaseType={purchaseType ?? 'WIDGET'}
-              source={offerSource ?? 'TC'}
-              deeplink={typeof offerDeeplink === 'string' ? offerDeeplink : undefined}
-              badge={typeof offerBadge === 'string' ? offerBadge : undefined}
-            />
-          </div>
-        )}
+      {/* Доп. CTA больше не нужен: основной checkout-CTA выше. */}
 
       <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
         <Shield className="h-4 w-4 text-emerald-500" />

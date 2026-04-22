@@ -33,6 +33,7 @@ const LEGACY_TO_SLUG: Partial<Record<EventSubcategory, string>> = {
   PARK: 'park-reserve',
   ART_SPACE: 'art-space',
   CONCERT: 'concert',
+  JAZZ: 'jazz',
   SHOW: 'show',
   STANDUP: 'standup',
   THEATER: 'theater',

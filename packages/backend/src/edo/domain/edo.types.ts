@@ -1,4 +1,4 @@
-import type { EdoProviderType, EdoDeliveryStatus } from '@prisma/client';
+import type { EdoProviderType, EdoDeliveryStatus } from '@/prisma-client';
 
 /** Провайдер-специфичный профиль для sendDocument. */
 export interface EdoProviderProfile {

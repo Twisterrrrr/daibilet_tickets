@@ -13,7 +13,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { StructuralTagGroup, TagCategory, TagKind } from '@prisma/client';
+import { CityCatalogHubStatus, StructuralTagGroup, TagCategory, TagKind } from '@/prisma-client';
 
 // ── Reconciliation ────────────────────────────────
 
@@ -245,6 +245,16 @@ export class UpdateCityDto {
   @IsBoolean()
   isActive?: boolean;
 
+  @ApiPropertyOptional({ description: 'Город — каталожный хаб (географическая точка входа)' })
+  @IsOptional()
+  @IsBoolean()
+  isCatalogHub?: boolean;
+
+  @ApiPropertyOptional({ enum: CityCatalogHubStatus })
+  @IsOptional()
+  @IsEnum(CityCatalogHubStatus)
+  catalogHubStatus?: CityCatalogHubStatus;
+
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)
@@ -257,6 +267,7 @@ export * from './admin-event-summary.dto';
 export * from './admin-venue.dto';
 export * from './admin-venue-summary.dto';
 export * from './admin-landing.dto';
+export * from './admin-landing-content-block.dto';
 export * from './admin-combo.dto';
 export * from './admin-article.dto';
 export * from './admin-settings.dto';

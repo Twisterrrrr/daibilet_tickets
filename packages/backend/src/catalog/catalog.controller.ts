@@ -17,8 +17,8 @@ import { ApiConsumes, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 
-import { EventSource } from '@prisma/client';
-import { TagKind, StructuralTagGroup } from '@prisma/client';
+import { EventSource } from '@/prisma-client';
+import { TagKind, StructuralTagGroup } from '@/prisma-client';
 import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 

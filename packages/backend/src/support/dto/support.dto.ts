@@ -1,4 +1,4 @@
-import { TicketCategory } from '@prisma/client';
+import { TicketCategory } from '@/prisma-client';
 import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 // ============================================================

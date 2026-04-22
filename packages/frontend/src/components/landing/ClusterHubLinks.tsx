@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { getBusTourCanonicalTarget } from '@/app/bus-tours/bus-tours-routing';
+import { catalogEventsHref } from '@/lib/catalog-events-url';
 import { getRiverCruiseCanonicalTarget } from '@/app/river-cruises/river-cruises-routing';
 
 type Variant = 'chips' | 'inline';
@@ -85,17 +86,57 @@ export function ClusterHubLinks({ citySlug, variant = 'chips' }: Props) {
           </span>
         ))}
         .
+        {citySlug ? (
+          <>
+            {' '}
+            В каталоге:{' '}
+            <Link
+              href={catalogEventsHref({ city: citySlug, category: 'EXCURSION', subcategory: 'RIVER' })}
+              className="font-medium text-primary-700 hover:text-primary-900"
+            >
+              речные прогулки
+            </Link>
+            {', '}
+            <Link
+              href={catalogEventsHref({ city: citySlug, category: 'EXCURSION', subcategory: 'BUS' })}
+              className="font-medium text-primary-700 hover:text-primary-900"
+            >
+              автобусные экскурсии
+            </Link>
+            .
+          </>
+        ) : null}
       </p>
     );
   }
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {links.map((l) => (
-        <Link key={l.href} href={l.href} className={baseClass}>
-          {l.label}
-        </Link>
-      ))}
+    <div className="mt-3">
+      <div className="flex flex-wrap gap-2">
+        {links.map((l) => (
+          <Link key={l.href} href={l.href} className={baseClass}>
+            {l.label}
+          </Link>
+        ))}
+      </div>
+      {citySlug ? (
+        <p className="mt-2 text-xs text-slate-500 sm:text-sm">
+          В каталоге:{' '}
+          <Link
+            href={catalogEventsHref({ city: citySlug, category: 'EXCURSION', subcategory: 'RIVER' })}
+            className="font-medium text-primary-700 hover:text-primary-900"
+          >
+            речные прогулки
+          </Link>
+          {', '}
+          <Link
+            href={catalogEventsHref({ city: citySlug, category: 'EXCURSION', subcategory: 'BUS' })}
+            className="font-medium text-primary-700 hover:text-primary-900"
+          >
+            автобусные экскурсии
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

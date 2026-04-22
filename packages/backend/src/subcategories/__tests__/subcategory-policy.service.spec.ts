@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { SubcategoryType } from '@prisma/client';
+import { SubcategoryType } from '@/prisma-client';
 import { describe, expect, it } from 'vitest';
 
 import { SubcategoryPolicyService } from '../subcategory-policy.service';

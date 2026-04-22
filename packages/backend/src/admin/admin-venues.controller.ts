@@ -16,18 +16,57 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { paginationArgs, parsePagination } from '../common/pagination';
-import { Prisma, SubcategoryType } from '@prisma/client';
+import {
+  Prisma,
+  SubcategoryLayer,
+  SubcategoryType,
+  VenueImportSource,
+  VenueLifecycleStatus,
+  VenueModerationReasonCode,
+  VenueSourceType,
+  VenueType,
+} from '@/prisma-client';
+import { VenueImportService } from '../catalog/venue-import.service';
+import { VenueLifecycleService } from '../catalog/venue-lifecycle.service';
+import { getVenueAutoModerationEnvFlags } from '../catalog/venue-auto-decision.config';
+import { VenueAutoModerationService } from '../catalog/venue-auto-moderation.service';
+import { VenueModerationMetricsService } from '../catalog/venue-moderation-metrics.service';
+import { VenueTrustService } from '../catalog/venue-trust.service';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CreateVenueDto, UpdateVenueDto, VenueAdminSummaryDto } from './dto/admin.dto';
 import { VenueAdminSummaryService } from './venue-admin-summary.service';
 import { SubcategoryPolicyService } from '../subcategories/subcategory-policy.service';
+import { SubcategoryAssignmentService } from '../subcategories/subcategory-assignment.service';
+import { PublishGateService } from '../catalog/publish-gate.service';
+import { buildVenueAdminListOrderBy, parseVenueListSortQuery } from './venue-admin-list-order.util';
+import {
+  computeVenueAdminReadiness,
+  loadVenueListEventStats,
+  venueDisplayAddress,
+} from './venue-admin-readiness.util';
+import { parseVenueReadinessStatusQuery, venueReadinessListWhere } from './venue-admin-list-readiness-where.util';
+import {
+  buildVenueHubReadinessSnapshot,
+  loadVenueStorefrontEventCounts,
+} from './hub-readiness/hub-readiness-snapshot.util';
 
 class UpdateVenueSubcategoriesDto {
   @IsOptional()
@@ -41,17 +80,199 @@ class UpdateVenueSubcategoriesDto {
   subcategorySlugs?: string[];
 }
 
+class AssignVenueSubcategoriesDto {
+  @IsString()
+  primaryCode!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  secondaryCodes?: string[];
+}
+
+class MatchVenueBodyDto {
+  @IsString()
+  targetVenueId!: string;
+
+  @IsOptional()
+  @IsString()
+  expectedSourceUpdatedAt?: string;
+
+  @IsOptional()
+  @IsString()
+  expectedTargetUpdatedAt?: string;
+}
+
+class BatchVenueIdsBodyDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  ids!: string[];
+}
+
+class BatchVenueApproveItemDto {
+  @IsString()
+  id!: string;
+
+  @IsOptional()
+  @IsString()
+  expectedUpdatedAt?: string;
+}
+
+class BatchVenueApproveBodyDto {
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  ids?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  items?: BatchVenueApproveItemDto[];
+}
+
+class BatchRejectVenuesBodyDto {
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  ids?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  items?: BatchVenueApproveItemDto[];
+
+  @IsOptional()
+  @IsString()
+  reason?: string | null;
+
+  @IsOptional()
+  @IsEnum(VenueModerationReasonCode)
+  reasonCode?: VenueModerationReasonCode | null;
+
+  @IsOptional()
+  @IsString()
+  reasonText?: string | null;
+}
+
+class ApproveDraftVenueBodyDto {
+  @IsString()
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  slug?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublished?: boolean;
+
+  @IsOptional()
+  @IsString()
+  expectedUpdatedAt?: string;
+}
+
+class RejectVenueBodyDto {
+  @IsOptional()
+  @IsEnum(VenueModerationReasonCode)
+  reasonCode?: VenueModerationReasonCode | null;
+
+  @IsOptional()
+  @IsString()
+  reasonText?: string | null;
+
+  @IsOptional()
+  @IsString()
+  expectedUpdatedAt?: string;
+}
+
+class AutoModerationDryRunBodyDto {
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @IsEnum(VenueImportSource)
+  importSource?: VenueImportSource;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit?: number;
+}
+
+class AutoModerationRunBodyDto {
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit!: number;
+
+  @IsOptional()
+  @IsEnum(VenueImportSource)
+  importSource?: VenueImportSource;
+
+  @IsOptional()
+  @IsBoolean()
+  onlyHighConfidence?: boolean;
+}
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @UseInterceptors(AuditInterceptor)
 @Controller('admin/venues')
 export class AdminVenuesController {
+  private readonly publicSiteBase = process.env.PUBLIC_SITE_URL?.replace(/\/$/, '') ?? null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly venueAdminSummary: VenueAdminSummaryService,
     private readonly subcategoryPolicy: SubcategoryPolicyService,
+    private readonly subcategoryAssignment: SubcategoryAssignmentService,
+    private readonly publishGate: PublishGateService,
+    private readonly venueImport: VenueImportService,
+    private readonly venueLifecycle: VenueLifecycleService,
+    private readonly venueModerationMetrics: VenueModerationMetricsService,
+    private readonly venueAutoModeration: VenueAutoModerationService,
+    private readonly venueTrust: VenueTrustService,
   ) {}
+
+  private async assertVenueGeoRefsBelongToCity(args: {
+    venueCityId: string;
+    districtId?: string;
+    metroStationId?: string;
+  }): Promise<void> {
+    const { venueCityId, districtId, metroStationId } = args;
+    if (districtId) {
+      const d = await this.prisma.district.findUnique({ where: { id: districtId }, select: { id: true, cityId: true } });
+      if (!d) throw new BadRequestException('districtId: district не найден');
+      if (d.cityId !== venueCityId) throw new BadRequestException('districtId: district принадлежит другому городу');
+    }
+    if (metroStationId) {
+      const m = await this.prisma.metroStation.findUnique({
+        where: { id: metroStationId },
+        select: { id: true, cityId: true },
+      });
+      if (!m) throw new BadRequestException('metroStationId: station не найдена');
+      if (m.cityId !== venueCityId) throw new BadRequestException('metroStationId: station принадлежит другому городу');
+    }
+  }
 
   @Get()
   @Roles('ADMIN', 'EDITOR', 'VIEWER')
@@ -62,13 +283,41 @@ export class AdminVenuesController {
     @Query('city') city?: string,
     @Query('venueType') venueType?: string,
     @Query('search') search?: string,
+    @Query('lifecycleStatus') lifecycleStatus?: string,
+    @Query('importSource') importSource?: string,
+    @Query('sourceType') sourceType?: string,
+    @Query('needsReview') needsReview?: string,
+    @Query('isHiddenGem') isHiddenGem?: string,
+    @Query('sort') sort?: string,
+    @Query('order') order?: string,
+    @Query('includeDecisionHints') includeDecisionHints?: string,
+    @Query('hasMergeTarget') hasMergeTarget?: string,
+    @Query('venuePageWhitelist') venuePageWhitelist?: string,
+    @Query('readinessStatus') readinessStatus?: string,
+    @Query('lite') lite?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit: limit || '20' });
+    const liteMode = lite === '1' || lite === 'true' || lite === 'yes';
+    const { sort: sortField, order: orderDir } = parseVenueListSortQuery(sort, order);
+    // Cursor-pagination требует предсказуемого порядка; кастомный sort только в offset-режиме (page).
+    const orderBy = pg.cursor
+      ? ([{ updatedAt: 'desc' }, { id: 'desc' }] satisfies Prisma.VenueOrderByWithRelationInput[])
+      : buildVenueAdminListOrderBy(sortField, orderDir);
 
-    const where: Record<string, unknown> = {
+    const readinessWhere = parseVenueReadinessStatusQuery(readinessStatus);
+
+    const where: Prisma.VenueWhereInput = {
       isDeleted: false,
+      ...(readinessWhere ? venueReadinessListWhere(readinessWhere) : {}),
       ...(city && { city: { slug: city } }),
-      ...(venueType && { venueType }),
+      ...(venueType && { venueType: venueType as VenueType }),
+      ...(lifecycleStatus && { lifecycleStatus: lifecycleStatus as VenueLifecycleStatus }),
+      ...(importSource && { importSource: importSource as VenueImportSource }),
+      ...(sourceType && { sourceType: sourceType as VenueSourceType }),
+      ...(needsReview === 'true' && { needsReview: true }),
+      ...(needsReview === 'false' && { needsReview: false }),
+      ...(isHiddenGem === 'true' && { isHiddenGem: true }),
+      ...(isHiddenGem === 'false' && { isHiddenGem: false }),
       ...(search && {
         OR: [
           { title: { contains: search, mode: 'insensitive' } },
@@ -76,16 +325,25 @@ export class AdminVenuesController {
           { address: { contains: search, mode: 'insensitive' } },
         ],
       }),
+      ...(hasMergeTarget === 'true' && { mergeTargetId: { not: null } }),
+      ...(hasMergeTarget === 'false' && { mergeTargetId: null }),
+      ...(venuePageWhitelist === 'true' && { isVenuePageWhitelisted: true }),
+      ...(venuePageWhitelist === 'false' && { isVenuePageWhitelisted: false }),
     };
 
     const [items, total] = await Promise.all([
       this.prisma.venue.findMany({
         where,
-        orderBy: { updatedAt: 'desc' },
+        orderBy,
         ...paginationArgs(pg),
         include: {
-          city: { select: { name: true, slug: true } },
-          _count: { select: { events: true, offers: true } },
+          city: { select: { id: true, name: true, slug: true } },
+          ...(liteMode ? {} : { mergeTarget: { select: { id: true, title: true, slug: true } } }),
+          ...(liteMode ? {} : { districtRef: { select: { id: true, name: true, slug: true } } }),
+          ...(liteMode
+            ? {}
+            : { metroStationRef: { select: { id: true, name: true, slug: true, lineName: true, lineColor: true } } }),
+          _count: { select: { events: true, offers: true, mergedFrom: true } },
         },
       }),
       this.prisma.venue.count({ where }),
@@ -95,24 +353,316 @@ export class AdminVenuesController {
     const pageItems = hasMore ? items.slice(0, pg.limit) : items;
     const nextCursor = hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null;
 
+    const venueIdsPage = pageItems.map((v) => v.id);
+    const [eventStats, storefrontEv] = liteMode
+      ? [null, null]
+      : await Promise.all([
+          loadVenueListEventStats(this.prisma, venueIdsPage),
+          loadVenueStorefrontEventCounts(this.prisma, venueIdsPage),
+        ]);
+
+    let hints: Record<string, { decisionHint: string; decisionHintReasons: string[] }> = {};
+    if (!liteMode && includeDecisionHints === 'true' && pageItems.length > 0) {
+      const hintRows = pageItems
+        .filter((v) => v.lifecycleStatus === 'DRAFT' && v.sourceType === 'IMPORTED')
+        .map((v) => ({
+          id: v.id,
+          title: v.title,
+          cityId: v.cityId,
+          isDeleted: v.isDeleted,
+          lifecycleStatus: v.lifecycleStatus,
+          confidenceScore: v.confidenceScore,
+          needsReview: v.needsReview,
+          address: v.address,
+          rawAddress: v.rawAddress,
+        }));
+      if (hintRows.length > 0) {
+        hints = await this.venueLifecycle.decisionHintsForImportedDrafts(hintRows);
+      }
+    }
+
     return {
-      items: pageItems.map((v) => ({
-        id: v.id,
-        slug: v.slug,
-        title: v.title,
-        venueType: v.venueType,
-        city: v.city,
-        rating: Number(v.rating),
-        isActive: v.isActive,
-        isFeatured: v.isFeatured,
-        eventsCount: v._count.events,
-        offersCount: v._count.offers,
-        updatedAt: v.updatedAt,
-      })),
+      items: pageItems.map((v) => {
+        const h = liteMode ? undefined : hints[v.id];
+        const displayAddress = venueDisplayAddress(v);
+        const readiness = computeVenueAdminReadiness({
+          lifecycleStatus: v.lifecycleStatus,
+          needsReview: v.needsReview,
+          confidenceScore: v.confidenceScore,
+          mergeTargetId: v.mergeTargetId,
+          title: v.title,
+          displayAddress,
+          imageUrl: v.imageUrl,
+          shortDescription: v.shortDescription,
+          description: v.description,
+          lat: v.lat,
+          lng: v.lng,
+          isVenuePageWhitelisted: v.isVenuePageWhitelisted,
+          isPublished: v.isPublished,
+        });
+        const activeEventsCount = eventStats ? eventStats.activeEventsByVenue.get(v.id) ?? 0 : 0;
+        const futureEventsCount = eventStats ? eventStats.futureEventsByVenue.get(v.id) ?? 0 : 0;
+        const storefrontActiveEvents = storefrontEv ? storefrontEv.get(v.id) ?? 0 : 0;
+        const hubReadiness = liteMode
+          ? null
+          : buildVenueHubReadinessSnapshot({
+              venueId: v.id,
+              slug: v.slug,
+              title: v.title,
+              cityId: v.cityId,
+              citySlug: v.city?.slug ?? null,
+              venuePageMode: v.venuePageMode,
+              isActive: v.isActive,
+              isPublished: v.isPublished,
+              lifecycleStatus: v.lifecycleStatus,
+              mergeTargetId: v.mergeTargetId,
+              address: v.address,
+              displayAddress,
+              metaTitle: v.metaTitle,
+              metaDescription: v.metaDescription,
+              description: v.description,
+              imageUrl: v.imageUrl,
+              storefrontActiveEvents,
+              siteBaseUrl: this.publicSiteBase,
+            });
+        return {
+          id: v.id,
+          slug: v.slug,
+          title: v.title,
+          venueType: v.venueType,
+          venuePageMode: v.venuePageMode,
+          city: v.city,
+          rating: Number(v.rating),
+          isActive: v.isActive,
+          isFeatured: v.isFeatured,
+          isHiddenGem: v.isHiddenGem,
+          lifecycleStatus: v.lifecycleStatus,
+          isPublished: v.isPublished,
+          sourceType: v.sourceType,
+          importSource: v.importSource,
+          externalVenueId: v.externalVenueId,
+          needsReview: v.needsReview,
+          isVenuePageWhitelisted: v.isVenuePageWhitelisted,
+          districtRef:
+            !liteMode && v.districtRef ? { id: v.districtRef.id, name: v.districtRef.name, slug: v.districtRef.slug } : null,
+          metroStationRef:
+            !liteMode && v.metroStationRef
+              ? {
+                  id: v.metroStationRef.id,
+                  name: v.metroStationRef.name,
+                  slug: v.metroStationRef.slug,
+                  lineName: v.metroStationRef.lineName,
+                  lineColor: v.metroStationRef.lineColor,
+                }
+              : null,
+          district: v.districtRef?.name ?? v.district ?? null,
+          metro: v.metroStationRef?.name ?? v.metro ?? null,
+          eventsCount: v._count.events,
+          relatedEventsCount: v._count.events,
+          activeEventsCount,
+          futureEventsCount,
+          mergedFromCount: v._count.mergedFrom,
+          offersCount: v._count.offers,
+          hasCover: Boolean(v.imageUrl?.trim()),
+          readinessStatus: readiness.status,
+          readinessScore: readiness.score,
+          readinessKeySignals: readiness.keySignals,
+          hubReadiness,
+          mergeTargetSummary: !liteMode && v.mergeTarget
+            ? { id: v.mergeTarget.id, title: v.mergeTarget.title, slug: v.mergeTarget.slug }
+            : null,
+          updatedAt: v.updatedAt,
+          rawName: v.rawName,
+          rawAddress: v.rawAddress,
+          normalizedName: v.normalizedName,
+          normalizedAddress: v.normalizedAddress,
+          confidenceScore: v.confidenceScore,
+          mergeTargetId: v.mergeTargetId,
+          version: v.version,
+          displayAddress,
+          ...(h
+            ? { decisionHint: h.decisionHint, decisionHintReasons: h.decisionHintReasons }
+            : {}),
+        };
+      }),
       total,
       nextCursor,
       hasMore,
     };
+  }
+
+  /**
+   * Пакетный поиск похожих площадок для списка кандидатов (без N+1 на similar-drafts).
+   * GET /admin/venues/batch/similar-drafts?ids=uuid1,uuid2&includeActive=true&limit=10
+   */
+  @Get('batch/similar-drafts')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async similarDraftsBatch(
+    @Query('ids') ids: string,
+    @Query('includeActive') includeActive?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const idList = (ids ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 50);
+    if (idList.length === 0) {
+      throw new BadRequestException({
+        code: 'VENUE_SIMILAR_BATCH_IDS_REQUIRED',
+        message: 'Укажите ids (uuid через запятую), не более 50',
+      });
+    }
+    const lim = limit ? Number.parseInt(limit, 10) : 10;
+    return this.venueLifecycle.findSimilarDraftsBatch(idList, {
+      includeActive: includeActive !== 'false',
+      limit: Number.isFinite(lim) ? lim : 10,
+    });
+  }
+
+  /**
+   * Пакетное подтверждение DRAFT (частичный успех в теле ответа).
+   * POST /admin/venues/batch/approve
+   * Body: `{ ids: string[] }` или `{ items: { id, expectedUpdatedAt? }[] }`.
+   */
+  @Post('batch/approve')
+  @Roles('ADMIN', 'EDITOR')
+  async batchApprove(
+    @Body() body: BatchVenueApproveBodyDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const ids =
+      body.items && body.items.length > 0
+        ? body.items.map((i) => i.id)
+        : body.ids && body.ids.length > 0
+          ? body.ids
+          : [];
+    if (ids.length === 0) {
+      throw new BadRequestException({ code: 'VALIDATION_ERROR', message: 'Укажите ids или items' });
+    }
+    return this.venueLifecycle.approveBatch(ids, {
+      items: body.items,
+      actorAdminId: req.user?.id,
+    });
+  }
+
+  /**
+   * Soft-check перед batch approve (slug collisions).
+   * POST /admin/venues/batch/approve-preview
+   */
+  @Post('batch/approve-preview')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async batchApprovePreview(@Body() body: BatchVenueIdsBodyDto) {
+    return this.venueLifecycle.approveBatchPreview(body.ids);
+  }
+
+  /**
+   * Агрегаты модерации площадок (решения + сигналы).
+   * GET /admin/venues/moderation-metrics
+   */
+  @Get('moderation-metrics')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async moderationMetrics(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('importSource') importSource?: string,
+  ) {
+    return this.venueModerationMetrics.getMetrics({
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      importSource: importSource ? (importSource as VenueImportSource) : undefined,
+    });
+  }
+
+  /**
+   * Разрез модерации по источникам импорта.
+   * GET /admin/venues/moderation-sources
+   */
+  @Get('moderation-sources')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async moderationSources(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('importSource') importSource?: string,
+  ) {
+    return this.venueModerationMetrics.getSourcesBreakdown({
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      importSource: importSource ? (importSource as VenueImportSource) : undefined,
+    });
+  }
+
+  /**
+   * Trust / авто-модерация по источникам импорта (Stage 5).
+   * GET /admin/venues/import-source-trust
+   */
+  @Get('import-source-trust')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async importSourceTrust() {
+    return this.venueTrust.getImportSourceTrustOverview();
+  }
+
+  /**
+   * Dry-run авто-модерации (без изменений в БД).
+   * POST /admin/venues/auto-moderation/dry-run
+   */
+  @Post('auto-moderation/dry-run')
+  @Roles('ADMIN', 'EDITOR')
+  async autoModerationDryRun(@Body() body: AutoModerationDryRunBodyDto) {
+    return this.venueAutoModeration.runDryRun({
+      from: body.from ? new Date(body.from) : undefined,
+      to: body.to ? new Date(body.to) : undefined,
+      importSource: body.importSource,
+      limit: body.limit,
+    });
+  }
+
+  /**
+   * Реальный запуск авто-модерации (только при AUTO_MODERATION_ENABLED=true).
+   * POST /admin/venues/auto-moderation/run
+   */
+  @Post('auto-moderation/run')
+  @Roles('ADMIN')
+  async autoModerationRun(@Body() body: AutoModerationRunBodyDto) {
+    const flags = getVenueAutoModerationEnvFlags();
+    if (!flags.autoModerationEnabled) {
+      throw new BadRequestException({
+        code: 'AUTO_MODERATION_DISABLED',
+        message: 'Авто-модерация отключена (AUTO_MODERATION_ENABLED).',
+      });
+    }
+    return this.venueAutoModeration.runAutoDecisionsForDrafts({
+      limit: body.limit,
+      importSource: body.importSource,
+      onlyHighConfidence: body.onlyHighConfidence,
+    });
+  }
+
+  /**
+   * Пакетный отказ DRAFT.
+   * POST /admin/venues/batch/reject
+   */
+  @Post('batch/reject')
+  @Roles('ADMIN', 'EDITOR')
+  async batchReject(
+    @Body() body: BatchRejectVenuesBodyDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const ids =
+      body.items && body.items.length > 0
+        ? body.items.map((i) => i.id)
+        : body.ids && body.ids.length > 0
+          ? body.ids
+          : [];
+    if (ids.length === 0) {
+      throw new BadRequestException({ code: 'VALIDATION_ERROR', message: 'Укажите ids или items' });
+    }
+    return this.venueLifecycle.rejectBatch(ids, {
+      reasonCode: body.reasonCode,
+      reasonText: body.reasonText ?? body.reason,
+      items: body.items,
+      actorAdminId: req.user?.id,
+    });
   }
 
   /**
@@ -126,6 +676,37 @@ export class AdminVenuesController {
     return this.venueAdminSummary.getSummary(id);
   }
 
+  /**
+   * Похожие площадки в том же городе (модерация дублей).
+   * GET /admin/venues/:id/similar-drafts
+   */
+  @Get(':id/similar-drafts')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async similarDrafts(
+    @Param('id') id: string,
+    @Query('includeActive') includeActive?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const lim = limit ? Number.parseInt(limit, 10) : 10;
+    return this.venueLifecycle.findSimilarDrafts(id, {
+      includeActive: includeActive !== 'false',
+      limit: Number.isFinite(lim) ? lim : 10,
+    });
+  }
+
+  /**
+   * Предпросмотр merge: кандидат vs целевая ACTIVE-площадка.
+   * GET /admin/venues/:id/merge-preview?targetId=
+   */
+  @Get(':id/merge-preview')
+  @Roles('ADMIN', 'EDITOR', 'VIEWER')
+  async mergePreview(@Param('id') id: string, @Query('targetId') targetId?: string) {
+    if (!targetId?.trim()) {
+      throw new BadRequestException('Укажите query-параметр targetId');
+    }
+    return this.venueLifecycle.getMergePreview(id, targetId.trim());
+  }
+
   @Get(':id')
   @Roles('ADMIN', 'EDITOR', 'VIEWER')
   async get(@Param('id') id: string) {
@@ -134,6 +715,8 @@ export class AdminVenuesController {
       include: {
         city: { select: { id: true, name: true, slug: true } },
         operator: { select: { id: true, name: true, slug: true } },
+        districtRef: { select: { id: true, name: true, slug: true } },
+        metroStationRef: { select: { id: true, name: true, slug: true, lineName: true, lineColor: true } },
         events: {
           where: { isActive: true },
           orderBy: [{ isPermanent: 'desc' }, { createdAt: 'desc' }],
@@ -164,10 +747,53 @@ export class AdminVenuesController {
       },
     });
     if (!venue) throw new NotFoundException('Venue not found');
+    const displayAddress = venueDisplayAddress(venue);
+    const readiness = computeVenueAdminReadiness({
+      lifecycleStatus: venue.lifecycleStatus,
+      needsReview: venue.needsReview,
+      confidenceScore: venue.confidenceScore,
+      mergeTargetId: venue.mergeTargetId,
+      title: venue.title,
+      displayAddress,
+      imageUrl: venue.imageUrl,
+      shortDescription: venue.shortDescription,
+      description: venue.description,
+      lat: venue.lat,
+      lng: venue.lng,
+      isVenuePageWhitelisted: venue.isVenuePageWhitelisted,
+      isPublished: venue.isPublished,
+    });
+    const storefrontMap = await loadVenueStorefrontEventCounts(this.prisma, [id]);
+    const storefrontActiveEvents = storefrontMap.get(id) ?? 0;
+    const hubReadiness = buildVenueHubReadinessSnapshot({
+      venueId: venue.id,
+      slug: venue.slug,
+      title: venue.title,
+      cityId: venue.cityId,
+      citySlug: venue.city?.slug ?? null,
+      venuePageMode: venue.venuePageMode,
+      isActive: venue.isActive,
+      isPublished: venue.isPublished,
+      lifecycleStatus: venue.lifecycleStatus,
+      mergeTargetId: venue.mergeTargetId,
+      address: venue.address,
+      displayAddress,
+      metaTitle: venue.metaTitle,
+      metaDescription: venue.metaDescription,
+      description: venue.description,
+      imageUrl: venue.imageUrl,
+      storefrontActiveEvents,
+      siteBaseUrl: this.publicSiteBase,
+    });
     return {
       ...venue,
       rating: Number(venue.rating),
       externalRating: venue.externalRating ? Number(venue.externalRating) : null,
+      district: venue.districtRef?.name ?? venue.district ?? null,
+      metro: venue.metroStationRef?.name ?? venue.metro ?? null,
+      displayAddress,
+      readiness,
+      hubReadiness,
     };
   }
 
@@ -189,9 +815,35 @@ export class AdminVenuesController {
       orderBy: [{ subcategory: { sortOrder: 'asc' } }, { subcategory: { nameRu: 'asc' } }],
     });
 
-    return links.map((l) => l.subcategory);
+    const primarySubcategory =
+      links.find((l) => l.subcategory.layer === SubcategoryLayer.PRIMARY)?.subcategory ?? null;
+    const secondarySubcategories = links
+      .filter((l) => l.subcategory.layer === SubcategoryLayer.SECONDARY)
+      .map((l) => l.subcategory);
+
+    return {
+      primarySubcategory,
+      secondarySubcategories,
+      all: links.map((l) => l.subcategory),
+    };
   }
 
+  @Post(':id/subcategories')
+  @Roles('ADMIN', 'EDITOR')
+  async assignVenueSubcategoriesPost(@Param('id') id: string, @Body() dto: AssignVenueSubcategoriesDto) {
+    const venueExists = await this.prisma.venue.findUnique({ where: { id }, select: { id: true } });
+    if (!venueExists) throw new NotFoundException('Venue not found');
+
+    await this.prisma.$transaction((tx) =>
+      this.subcategoryAssignment.assignVenueSubcategories(id, dto.primaryCode, dto.secondaryCodes ?? [], tx),
+    );
+
+    return this.getVenueSubcategories(id);
+  }
+
+  /**
+   * @deprecated Используйте POST .../subcategories с primaryCode + secondaryCodes.
+   */
   @Patch(':id/subcategories')
   @Roles('ADMIN', 'EDITOR')
   async setVenueSubcategories(@Param('id') id: string, @Body() body: UpdateVenueSubcategoriesDto) {
@@ -251,6 +903,12 @@ export class AdminVenuesController {
       this.validateForPublish(body);
     }
 
+    await this.assertVenueGeoRefsBelongToCity({
+      venueCityId: body.cityId,
+      districtId: body.districtId,
+      metroStationId: body.metroStationId,
+    });
+
     const venue = await this.prisma.venue.create({
       data: {
         slug,
@@ -267,6 +925,9 @@ export class AdminVenuesController {
         lng: body.lng ? Number(body.lng) : null,
         metro: body.metro || null,
         district: body.district || null,
+        districtId: body.districtId || null,
+        metroStationId: body.metroStationId || null,
+        isHiddenGem: body.isHiddenGem ?? false,
         phone: body.phone || null,
         email: body.email || null,
         website: body.website || null,
@@ -285,50 +946,131 @@ export class AdminVenuesController {
         faq: (body.faq ?? undefined) as Prisma.InputJsonValue | undefined,
         features: body.features || [],
         commissionRate: body.commissionRate ? Number(body.commissionRate) : null,
+        lifecycleStatus: 'ACTIVE',
+        isPublished: (body as { isPublished?: boolean }).isPublished !== false,
+        sourceType: 'MANUAL',
+        normalizedName: VenueImportService.normalizeText(body.title),
+        normalizedAddress: body.address ? VenueImportService.normalizeText(body.address) : null,
       },
     });
 
     return venue;
   }
 
+  @Post(':id/merge-into')
+  @Roles('ADMIN', 'EDITOR')
+  async mergeInto(
+    @Param('id') id: string,
+    @Body() body: MatchVenueBodyDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    return this.venueLifecycle.mergeInto(id, body.targetVenueId, {
+      actorAdminId: req.user?.id,
+      expectedSourceUpdatedAt: body.expectedSourceUpdatedAt,
+      expectedTargetUpdatedAt: body.expectedTargetUpdatedAt,
+    });
+  }
+
+  @Post(':id/approve-draft')
+  @Roles('ADMIN', 'EDITOR')
+  async approveDraft(
+    @Param('id') id: string,
+    @Body() body: ApproveDraftVenueBodyDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    return this.venueLifecycle.approveDraft(
+      id,
+      {
+        title: body.title,
+        address: body.address,
+        slug: body.slug,
+        isPublished: body.isPublished,
+      },
+      { actorAdminId: req.user?.id, expectedUpdatedAt: body.expectedUpdatedAt },
+    );
+  }
+
+  @Post(':id/reject')
+  @Roles('ADMIN', 'EDITOR')
+  async rejectImported(
+    @Param('id') id: string,
+    @Body() body: RejectVenueBodyDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    return this.venueLifecycle.rejectVenue(id, {
+      actorAdminId: req.user?.id,
+      expectedUpdatedAt: body.expectedUpdatedAt,
+      reasonCode: body.reasonCode ?? null,
+      reasonText: body.reasonText ?? null,
+    });
+  }
+
+  @Post(':id/venue-page-published')
+  @Roles('ADMIN', 'EDITOR')
+  async setVenuePagePublished(@Param('id') id: string, @Body() body: { published: boolean }) {
+    if (typeof body?.published !== 'boolean') throw new BadRequestException('published boolean required');
+    return this.venueLifecycle.setVenuePagePublished(id, body.published);
+  }
+
   @Patch(':id')
   @Roles('ADMIN', 'EDITOR')
   async update(@Param('id') id: string, @Body() body: UpdateVenueDto) {
-    // Optimistic lock
     const version = body.version;
     if (version === undefined) throw new BadRequestException('version required for update');
 
-    // If activating, validate minimum fields (merge existing data + body)
+    const existing = await this.prisma.venue.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Venue not found');
+
+    await this.assertVenueGeoRefsBelongToCity({
+      venueCityId: existing.cityId,
+      districtId: body.districtId,
+      metroStationId: body.metroStationId,
+    });
+
     if (body.isActive === true) {
-      const existing = await this.prisma.venue.findUnique({ where: { id } });
-      if (existing) {
-        const merged = {
-          title: body.title ?? existing.title,
-          address: body.address ?? existing.address,
-          imageUrl: body.imageUrl ?? existing.imageUrl,
-          priceFrom: body.priceFrom ?? existing.priceFrom,
-          galleryUrls: body.galleryUrls ?? existing.galleryUrls,
-          description: body.description ?? existing.description,
-        };
-        this.validateForPublish(merged);
+      const merged = {
+        title: body.title ?? existing.title,
+        address: body.address ?? existing.address,
+        imageUrl: body.imageUrl ?? existing.imageUrl,
+        priceFrom: body.priceFrom ?? existing.priceFrom,
+        galleryUrls: body.galleryUrls ?? existing.galleryUrls,
+        description: body.description ?? existing.description,
+      };
+      this.validateForPublish(merged);
+      const gate = await this.publishGate.validateVenueForPublish(id);
+      if (gate.result === 'BLOCKING') {
+        const msg = gate.checks
+          .filter((c) => c.status === 'BLOCKING')
+          .map((c) => c.message)
+          .join('; ');
+        throw new BadRequestException(msg || 'Площадка не проходит проверки публикации');
       }
     }
 
     const result = await this.prisma.venue.updateMany({
       where: { id, version: Number(version) },
       data: {
-        ...(body.title !== undefined && { title: body.title }),
+        ...(body.title !== undefined && {
+          title: body.title,
+          normalizedName: VenueImportService.normalizeText(body.title),
+        }),
         ...(body.shortTitle !== undefined && { shortTitle: body.shortTitle || null }),
         ...(body.venueType !== undefined && { venueType: body.venueType }),
         ...(body.description !== undefined && { description: body.description || null }),
         ...(body.shortDescription !== undefined && { shortDescription: body.shortDescription || null }),
         ...(body.imageUrl !== undefined && { imageUrl: body.imageUrl || null }),
         ...(body.galleryUrls !== undefined && { galleryUrls: body.galleryUrls }),
-        ...(body.address !== undefined && { address: body.address || null }),
+        ...(body.address !== undefined && {
+          address: body.address || null,
+          normalizedAddress: body.address?.trim() ? VenueImportService.normalizeText(body.address) : null,
+        }),
         ...(body.lat !== undefined && { lat: body.lat ? Number(body.lat) : null }),
         ...(body.lng !== undefined && { lng: body.lng ? Number(body.lng) : null }),
         ...(body.metro !== undefined && { metro: body.metro || null }),
         ...(body.district !== undefined && { district: body.district || null }),
+        ...(body.districtId !== undefined && { districtId: body.districtId || null }),
+        ...(body.metroStationId !== undefined && { metroStationId: body.metroStationId || null }),
+        ...(body.isHiddenGem !== undefined && { isHiddenGem: body.isHiddenGem }),
         ...(body.phone !== undefined && { phone: body.phone || null }),
         ...(body.email !== undefined && { email: body.email || null }),
         ...(body.website !== undefined && { website: body.website || null }),
@@ -343,7 +1085,6 @@ export class AdminVenuesController {
           externalRating: body.externalRating ? Number(body.externalRating) : null,
         }),
         ...(body.externalSource !== undefined && { externalSource: body.externalSource || null }),
-        // Conversion fields
         ...(body.highlights !== undefined && { highlights: body.highlights }),
         ...(body.faq !== undefined && { faq: body.faq }),
         ...(body.features !== undefined && { features: body.features }),
@@ -353,6 +1094,7 @@ export class AdminVenuesController {
         ...(body.refundPolicyMode !== undefined && { refundPolicyMode: body.refundPolicyMode }),
         ...(body.refundPolicyText !== undefined && { refundPolicyText: body.refundPolicyText || null }),
         ...(body.venueTemplateData !== undefined && { venueTemplateData: body.venueTemplateData }),
+        ...(body.venuePageMode !== undefined && { venuePageMode: body.venuePageMode }),
         version: { increment: 1 },
       } as Parameters<typeof this.prisma.venue.updateMany>[0]['data'],
     });

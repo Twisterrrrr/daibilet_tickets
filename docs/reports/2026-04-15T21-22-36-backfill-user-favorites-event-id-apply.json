@@ -1,0 +1,36 @@
+{
+  "startedAt": "2026-04-15T18:22:35.950Z",
+  "finishedAt": "2026-04-15T18:22:36.435Z",
+  "dryRun": false,
+  "script": "backfill-user-favorites-event-id",
+  "report": {
+    "scanned": 2,
+    "matched": 2,
+    "created": 0,
+    "updated": 1,
+    "skipped": 0,
+    "unresolvedCount": 1,
+    "errorCount": 0
+  },
+  "unresolved": [
+    {
+      "type": "orphan_favorite",
+      "message": "UserFavorite.eventSlug was not resolved to Event",
+      "source_record_ref": {
+        "entity": "UserFavorite",
+        "id": "cd1d68ba-2298-4d2b-99aa-52ad51184ba7",
+        "userId": "b4ab6d76-981c-4e7c-91cd-dbbb5d0e3938"
+      },
+      "field": "eventSlug",
+      "legacy_value": "missing-event-slug",
+      "target_hint": {
+        "entity": "Event",
+        "slug": "missing-event-slug"
+      }
+    }
+  ],
+  "errors": [],
+  "notes": [
+    "Default: dry-run. Writes happen only with --apply."
+  ]
+}

@@ -1,7 +1,9 @@
 import { Controller, Post, Get, Body, UseGuards, Request, Res, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
+import { AdminForgotPasswordDto, AdminResetPasswordDto } from './dto/admin-password-reset.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
@@ -70,6 +72,22 @@ export class AuthController {
   @Get('me')
   async me(@Request() req: { user: { id: string } }) {
     return this.auth.getProfile(req.user.id);
+  }
+
+  @Post('admin/forgot-password')
+  @HttpCode(200)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async adminForgotPassword(@Body() dto: AdminForgotPasswordDto) {
+    await this.auth.requestAdminPasswordReset(dto.email);
+    return { success: true };
+  }
+
+  @Post('admin/reset-password')
+  @HttpCode(200)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async adminResetPassword(@Body() dto: AdminResetPasswordDto) {
+    await this.auth.resetAdminPassword(dto.token, dto.password);
+    return { success: true };
   }
 
   private setRefreshCookie(res: Response, token: string) {

@@ -46,6 +46,37 @@ export class VenueAdminStorefrontDto {
   isFeatured!: boolean;
 }
 
+/** Готовность и модерация площадки (summary для detail) */
+export class VenueAdminReadinessSummaryDto {
+  @ApiProperty({ enum: ['READY', 'NEEDS_WORK', 'NEEDS_REVIEW', 'BLOCKED'] })
+  @IsEnum(['READY', 'NEEDS_WORK', 'NEEDS_REVIEW', 'BLOCKED'] as const)
+  status!: 'READY' | 'NEEDS_WORK' | 'NEEDS_REVIEW' | 'BLOCKED';
+
+  @ApiProperty({ description: '0..100' })
+  @IsInt()
+  score!: number;
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  blockers!: string[];
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  warnings!: string[];
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  moderationSignals!: string[];
+
+  @ApiProperty({ type: [String], description: 'Краткие сигналы для списка' })
+  @IsArray()
+  @IsString({ each: true })
+  keySignals!: string[];
+}
+
 /** Блок «Контент» для VenueAdminSummaryDto */
 export class VenueAdminContentDto {
   @ApiProperty()
@@ -124,6 +155,11 @@ export class VenueAdminSummaryDto {
   @ValidateNested()
   @Type(() => VenueAdminContentDto)
   content!: VenueAdminContentDto;
+
+  @ApiProperty({ type: VenueAdminReadinessSummaryDto })
+  @ValidateNested()
+  @Type(() => VenueAdminReadinessSummaryDto)
+  venueReadiness!: VenueAdminReadinessSummaryDto;
 
   @ApiProperty({ type: [VenueRelatedEventDto] })
   @IsArray()

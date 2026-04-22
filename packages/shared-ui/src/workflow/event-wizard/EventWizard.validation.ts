@@ -39,6 +39,34 @@ export function validateBasics(basics: EventWizardBasicsDraft): EventWizardValid
     issues.push(issue(step, 'CATEGORY_REQUIRED', 'Не выбрана категория события', 'error', 'category'));
   }
 
+  if (basics.category === 'EXCURSION' && basics.cityId) {
+    const choice = basics.locationChoice ?? 'existing';
+    const startId = (basics.startLocationId ?? '').trim();
+    const proposalTitle = (basics.locationProposalTitle ?? '').trim();
+    if (choice === 'existing' && !startId) {
+      issues.push(
+        issue(
+          step,
+          'START_LOCATION',
+          'Выберите точку старта из списка или переключитесь на «Предложить новую»',
+          'warning',
+          'startLocationId',
+        ),
+      );
+    }
+    if (choice === 'propose' && !proposalTitle) {
+      issues.push(
+        issue(
+          step,
+          'LOCATION_PROPOSAL_TITLE',
+          'Укажите название предлагаемой точки старта или выберите из списка',
+          'warning',
+          'locationProposalTitle',
+        ),
+      );
+    }
+  }
+
   if (!basics.slug.trim()) {
     issues.push(issue(step, 'SLUG_MISSING', 'Slug не задан — будет сгенерирован автоматически', 'warning', 'slug'));
   }

@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus, ReviewDisputeStatus, ReviewStatus, Prisma } from '@prisma/client';
+import { PaymentStatus, ReviewDisputeStatus, ReviewStatus, Prisma } from '@/prisma-client';
 
 import { CheckoutService } from '../checkout/checkout.service';
+import { FulfillmentRefundRequestService } from '../checkout/fulfillment-refund-request.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserAuthService } from '../user/user-auth.service';
 import { UserFavoritesService } from '../user/user-favorites.service';
@@ -26,7 +27,20 @@ export class AccountService {
     private readonly userAuth: UserAuthService,
     private readonly userFavorites: UserFavoritesService,
     private readonly purchaseRead: PurchaseReadService,
+    private readonly fulfillmentRefunds: FulfillmentRefundRequestService,
   ) {}
+
+  async createRefundRequest(
+    userId: string,
+    body: { fulfillmentItemId: string; reason?: string; reasonNote?: string | null },
+  ) {
+    return this.fulfillmentRefunds.createForItem({
+      fulfillmentItemId: body.fulfillmentItemId,
+      reason: body.reason,
+      reasonNote: body.reasonNote ?? null,
+      userId,
+    });
+  }
 
   async getSummary(userId: string): Promise<AccountSummaryDto> {
     const [user, ordersCount, paidSessions, favoritesCount] = await Promise.all([

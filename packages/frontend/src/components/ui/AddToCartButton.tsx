@@ -4,7 +4,6 @@ import { CreditCard, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { api } from '@/lib/api';
 import { type CartItem, useCart } from '@/lib/cart';
 
 interface AddToCartButtonProps {
@@ -22,7 +21,12 @@ interface AddToCartButtonProps {
   className?: string;
 }
 
-/** T21: Прямой checkout — создаёт package и редирект на /checkout/[packageId]. Fallback: корзина. */
+/**
+ * MVP vertical slice (orders/refunds): always go through internal checkout (/checkout)
+ * so a CheckoutSession is recorded in DB and becomes visible in account/admin flows.
+ *
+ * Legacy direct package flow is intentionally disabled here to avoid "purchase outside the system".
+ */
 export function AddToCartButton(props: AddToCartButtonProps) {
   const { addItem } = useCart();
   const router = useRouter();
@@ -47,9 +51,6 @@ export function AddToCartButton(props: AddToCartButtonProps) {
     ];
     setLoading(true);
     try {
-      const res = await api.createPackage(items);
-      router.push(`/checkout/${res.packageId}`);
-    } catch {
       const item: CartItem = { ...items[0], quantity: 1 };
       addItem(item);
       router.push('/checkout');

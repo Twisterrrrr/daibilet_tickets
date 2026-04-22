@@ -17,6 +17,7 @@ import type {
 import type {
   ArticleDetail,
   ArticleListItem,
+  CatalogHubLandingResponse,
   CityDetail,
   CollectionDetailResponse,
   FeaturedLandingItem,
@@ -33,6 +34,7 @@ import type {
   MultiEventDetailDto,
   MultiEventListItemDto,
   MultiEventSort,
+  SubcategoryLandingRoutePayload,
 } from './api.types';
 
 /**
@@ -331,10 +333,10 @@ export const api = {
             .map(([k, v]) => [k, String(v)]),
         ).toString()
       : '';
-    return fetchApi<PaginatedResponse<ArticleListItem>>(`/blog${query}`);
+    return fetchApi<PaginatedResponse<ArticleListItem>>(`/articles${query}`);
   },
 
-  getArticleBySlug: (slug: string) => fetchApi<ArticleDetail>(`/blog/${slug}`),
+  getArticleBySlug: (slug: string) => fetchApi<ArticleDetail>(`/articles/${encodeURIComponent(slug)}`),
 
   // Voucher
   getVoucher: (shortCode: string) => fetchApi<VoucherData>(`/vouchers/${shortCode}`),
@@ -396,10 +398,23 @@ export const api = {
   // Лендинги (посадочные страницы)
   getLandings: (city?: string) => fetchApi<LandingItem[]>(city ? `/landings?city=${city}` : '/landings'),
 
-  getLandingBySlug: (slug: string) => fetchApi<LandingPageResponse>(`/landings/${slug}`),
-
   getCatalogLandingByCityAndSlug: (citySlug: string, slug: string) =>
     fetchApi<LandingPageResponse>(`/catalog/landings/${encodeURIComponent(citySlug)}/${encodeURIComponent(slug)}`),
+
+  getCatalogHubLandingBySlug: (slug: string) =>
+    fetchApi<CatalogHubLandingResponse>(`/catalog/landings/hub/${encodeURIComponent(slug)}`),
+
+  /** Резолв: TOPIC_HUB → редирект на тематический хаб; AUTO → можно запрашивать published payload */
+  getSubcategoryLandingRoute: (citySlug: string, subcategorySlug: string) =>
+    fetchApi<SubcategoryLandingRoutePayload>(
+      `/landings/subcategories/${encodeURIComponent(citySlug)}/${encodeURIComponent(subcategorySlug)}/route`,
+    ),
+
+  /** SEO-лендинг по подкатегории + городу (только опубликованные; иначе 404) */
+  getSubcategoryLandingPublished: (citySlug: string, subcategorySlug: string) =>
+    fetchApi<import('./api.types').SubcategoryLandingPublishedPayload>(
+      `/landings/subcategories/${encodeURIComponent(citySlug)}/${encodeURIComponent(subcategorySlug)}`,
+    ),
 
   // Подборки (тематические посадочные страницы)
   getCollections: (city?: string) => fetchApi<LandingItem[]>(city ? `/collections?city=${city}` : '/collections'),
@@ -588,6 +603,16 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 
+  accountCreateRefundRequest: (
+    token: string,
+    body: { fulfillmentItemId: string; reason?: string; reasonNote?: string },
+  ) =>
+    fetchApi<AccountRefundRequestResult>('/account/refund-requests', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }),
+
   accountPurchases: (token: string, params?: { page?: number; limit?: number }) => {
     const search = new URLSearchParams();
     if (params?.page != null) search.set('page', String(params.page));
@@ -773,6 +798,28 @@ export type AccountPurchasesResponse = {
   total: number;
 };
 
+export type AccountFulfillmentRefundInfo = {
+  id: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AccountFulfillmentLine = {
+  id: string;
+  lineItemIndex: number;
+  amount: number;
+  status: string;
+  refund: AccountFulfillmentRefundInfo | null;
+};
+
+export type AccountRefundRequestResult = {
+  refundId: string;
+  status: string;
+  amount: number;
+  currency: string;
+};
+
 export type AccountOrderDetail = {
   id: string;
   shortCode: string;
@@ -786,6 +833,10 @@ export type AccountOrderDetail = {
   completedAt: string | null;
   expiresAt: string | null;
   voucherUrl: string | null;
+  /** UUID сессии оформления (для сопоставления с fulfillment) */
+  checkoutSessionId?: string;
+  /** Позиции исполнения (билеты) и заявки на возврат */
+  fulfillmentItems?: AccountFulfillmentLine[];
   items: Array<{
     id: string;
     status?: string;

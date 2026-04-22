@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
-import { ReviewDisputeStatus } from '@prisma/client';
+import { ReviewDisputeStatus } from '@/prisma-client';
 
 export class RejectSupplierResponseDto {
   @ApiPropertyOptional({ description: 'Причина отклонения' })

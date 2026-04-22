@@ -141,6 +141,24 @@ export async function api<T = any>(path: string, options: RequestInit = {}): Pro
   return res.json() as Promise<T>;
 }
 
+/** POST/PATCH без обязательного Bearer (логин, сброс пароля и т.п.). */
+export async function publicApi<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    },
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    const message: string = (err as { message?: string }).message || `HTTP ${res.status}`;
+    throw new Error(message);
+  }
+  return res.json() as Promise<T>;
+}
+
 export const adminApi = {
   get: <T = any>(path: string) => api<T>(path),
   post: <T = any>(path: string, body?: any) =>

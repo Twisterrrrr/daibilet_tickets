@@ -11,6 +11,7 @@ import {
   SectionCard,
 } from '@/shared/ui/page-primitives';
 import { PageGlyph } from '@/shared/ui/page-glyph';
+import { InlineTabs } from '@/shared/ui/inline-tabs';
 
 const API_BASE = '/api/v1';
 
@@ -214,71 +215,71 @@ function ReviewDetailBody({ review, onReload }: { review: ReviewDetail; onReload
     onReload();
   };
 
-  return (
-    <div className="space-y-6">
-      <PageHeader title="Отзыв" glyph={<PageGlyph icon={MessageSquare} tone="rose" />} />
-
-      <SectionCard>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-lg text-amber-500">
-            {'★'.repeat(review.rating)}
-            {'☆'.repeat(5 - review.rating)}
+  const overviewCard = (
+    <SectionCard>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-lg text-amber-500">
+          {'★'.repeat(review.rating)}
+          {'☆'.repeat(5 - review.rating)}
+        </span>
+        <span className="font-medium text-text-primary">{review.authorName}</span>
+        {review.isVerified ? (
+          <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success">
+            Подтверждён
           </span>
-          <span className="font-medium text-text-primary">{review.authorName}</span>
-          {review.isVerified ? (
-            <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success">
-              Подтверждён
-            </span>
-          ) : null}
+        ) : null}
+      </div>
+      <p className="mt-2 text-small text-text-secondary">{review.text}</p>
+      <p className="mt-2 text-[11px] text-text-muted">
+        {review.event?.title} · {new Date(review.createdAt).toLocaleDateString('ru-RU')}
+      </p>
+
+      {review.photos && review.photos.length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {review.photos.map((p) => (
+            <a
+              key={p.id}
+              href={p.url}
+              target="_blank"
+              rel="noreferrer"
+              className="block overflow-hidden rounded-control border border-border-soft"
+            >
+              <img src={p.thumbUrl || p.url} alt="" className="h-20 w-20 object-cover" />
+            </a>
+          ))}
         </div>
-        <p className="mt-2 text-small text-text-secondary">{review.text}</p>
-        <p className="mt-2 text-[11px] text-text-muted">
-          {review.event?.title} · {new Date(review.createdAt).toLocaleDateString('ru-RU')}
-        </p>
+      ) : null}
 
-        {review.photos && review.photos.length > 0 ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {review.photos.map((p) => (
-              <a
-                key={p.id}
-                href={p.url}
-                target="_blank"
-                rel="noreferrer"
-                className="block overflow-hidden rounded-control border border-border-soft"
-              >
-                <img src={p.thumbUrl || p.url} alt="" className="h-20 w-20 object-cover" />
-              </a>
-            ))}
-          </div>
-        ) : null}
+      {hasDispute ? (
+        <div className="mt-4 flex items-center gap-2 rounded-card border border-warning/30 bg-warning-soft px-3 py-2 text-small text-warning">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Отзыв оспорен и ожидает проверки
+        </div>
+      ) : null}
 
-        {hasDispute ? (
-          <div className="mt-4 flex items-center gap-2 rounded-card border border-warning/30 bg-warning-soft px-3 py-2 text-small text-warning">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            Отзыв оспорен и ожидает проверки
-          </div>
-        ) : null}
+      {hasResponse && responseStatus === 'APPROVED' ? (
+        <div className="mt-4 rounded-card border border-border-soft bg-surface-alt px-3 py-3">
+          <p className="text-label font-medium text-text-muted">Ответ организатора</p>
+          <p className="mt-1 text-small text-text-primary">{review.supplierResponse!.text}</p>
+        </div>
+      ) : null}
 
-        {hasResponse && responseStatus === 'APPROVED' ? (
-          <div className="mt-4 rounded-card border border-border-soft bg-surface-alt px-3 py-3">
-            <p className="text-label font-medium text-text-muted">Ответ организатора</p>
-            <p className="mt-1 text-small text-text-primary">{review.supplierResponse!.text}</p>
-          </div>
-        ) : null}
+      {hasResponse && (responseStatus === 'PENDING_MODERATION' || responseStatus === 'REJECTED') ? (
+        <div className="mt-4 rounded-card border border-border-soft px-3 py-3">
+          <p className="text-label font-medium text-text-muted">
+            {responseStatus === 'PENDING_MODERATION' ? 'На модерации' : 'Отклонён'}
+            {review.supplierResponse?.moderationComment
+              ? ` — ${review.supplierResponse.moderationComment}`
+              : ''}
+          </p>
+          <p className="mt-1 text-small text-text-primary">{review.supplierResponse!.text}</p>
+        </div>
+      ) : null}
+    </SectionCard>
+  );
 
-        {hasResponse && (responseStatus === 'PENDING_MODERATION' || responseStatus === 'REJECTED') ? (
-          <div className="mt-4 rounded-card border border-border-soft px-3 py-3">
-            <p className="text-label font-medium text-text-muted">
-              {responseStatus === 'PENDING_MODERATION' ? 'На модерации' : 'Отклонён'}
-              {review.supplierResponse?.moderationComment
-                ? ` — ${review.supplierResponse.moderationComment}`
-                : ''}
-            </p>
-            <p className="mt-1 text-small text-text-primary">{review.supplierResponse!.text}</p>
-          </div>
-        ) : null}
-      </SectionCard>
-
+  const actionsContent = (
+    <div className="space-y-4">
       {canCreateResponse || canEditResponse ? (
         <SectionCard title="Ответ на отзыв">
           <textarea
@@ -360,9 +361,7 @@ function ReviewDetailBody({ review, onReload }: { review: ReviewDetail; onReload
           <button
             type="button"
             onClick={() => void handleDispute()}
-            disabled={
-              submitting || !disputeReason || disputeClaim.trim().length < 20 || !disputeConfirm
-            }
+            disabled={submitting || !disputeReason || disputeClaim.trim().length < 20 || !disputeConfirm}
             className="mt-3 rounded-control bg-warning-soft px-4 py-2 text-label font-medium text-warning disabled:opacity-50"
           >
             Создать оспаривание
@@ -402,6 +401,32 @@ function ReviewDetailBody({ review, onReload }: { review: ReviewDetail; onReload
             ))}
         </SectionCard>
       ) : null}
+
+      {!canCreateResponse &&
+      !canEditResponse &&
+      !canAccept &&
+      !canDispute &&
+      !(hasDispute && review.disputes) ? (
+        <p className="text-small text-text-muted">Нет доступных действий для этого отзыва.</p>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Отзыв"
+        subtitle={`${review.authorName} · ${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)}`}
+        glyph={<PageGlyph icon={MessageSquare} tone="rose" />}
+      />
+
+      <InlineTabs
+        defaultId="view"
+        items={[
+          { id: 'view', label: 'Обзор', content: overviewCard },
+          { id: 'actions', label: 'Действия', content: actionsContent },
+        ]}
+      />
 
       {msgError ? (
         <div className="rounded-card border border-danger/30 bg-danger-soft px-3 py-2 text-small text-danger">

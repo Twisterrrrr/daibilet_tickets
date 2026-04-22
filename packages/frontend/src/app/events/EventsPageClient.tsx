@@ -4,20 +4,24 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { X, LayoutGrid, List as ListIcon, SlidersHorizontal } from 'lucide-react';
 import { api } from '@/lib/api';
+import { parseCatalogEventsParams } from '@/lib/catalog-events-url';
 import type { CityListItem, EventListItem, CatalogItem } from '@daibilet/shared';
 import type { MultiEventListItemDto } from '@/lib/api.types';
 import { EventCard } from '@/components/ui/EventCard';
 import { MultiEventCard } from '@/components/ui/MultiEventCard';
 import { EventCardHorizontal } from '@/components/ui/EventCardHorizontal';
 import { CatalogCard } from '@/components/ui/CatalogCard';
-import { DateRibbon } from '@/components/ui/DateRibbon';
 import { PromoBlock } from '@/components/ui/PromoBlock';
 import { ClusterHubLinks } from '@/components/landing/ClusterHubLinks';
+import { CatalogAdvancedFilters } from './_components/CatalogAdvancedFilters';
+import { CatalogChip } from './_components/CatalogChip';
+import { QuickDateFilters } from './_components/QuickDateFilters';
 import {
   AUDIENCE_LABELS,
   CATEGORY_LABELS,
   EventAudience,
   EventCategory,
+  getCityTimezone,
   QUICK_FILTERS,
   type QuickFilter,
 } from '@daibilet/shared';
@@ -37,15 +41,6 @@ const sortOptions = [
   { value: 'departing_soon', label: 'Начнутся скоро' },
 ];
 
-const TIME_OF_DAY_OPTIONS = [
-  { value: '', label: 'Любое время' },
-  { value: 'soon', label: '🔥 Скоро' },
-  { value: 'morning', label: '🌅 Утро' },
-  { value: 'day', label: '☀️ День' },
-  { value: 'evening', label: '🌆 Вечер' },
-  { value: 'night', label: '🌙 Ночь' },
-];
-
 const PRICE_OPTIONS = [
   { value: '', label: 'Любая цена' },
   { value: '500', label: 'До 500 ₽' },
@@ -56,57 +51,6 @@ const PRICE_OPTIONS = [
 ];
 
 const LIMIT_OPTIONS = [20, 50, 100] as const;
-
-/** Быстрые chips для mobile — маппятся на date/timeOfDay/priceMax/tag/sort */
-type MobileQuickChip =
-  | {
-      id: string;
-      label: string;
-      active: boolean;
-      date: string | null;
-      timeOfDay: string | null;
-      priceMax: string | null;
-      preset?: undefined;
-    }
-  | { id: 'popular'; label: string; active: boolean; preset: 'popular' }
-  | { id: 'romantic'; label: string; active: boolean; preset: 'romantic' };
-
-function getMobileQuickChips(
-  selectedDate: string | null,
-  timeOfDay: string,
-  priceMax: string,
-  sort: string,
-  urlTag: string,
-  activeQuickFilter: string,
-): MobileQuickChip[] {
-  const today = new Date().toISOString().slice(0, 10);
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  const dayOfWeek = d.getDay();
-  const daysToSat = dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek;
-  const sat = new Date(d);
-  sat.setDate(d.getDate() + daysToSat);
-  const sun = new Date(sat);
-  sun.setDate(sat.getDate() + 1);
-  const weekendRange = `${sat.toISOString().slice(0, 10)}..${sun.toISOString().slice(0, 10)}`;
-
-  const popularActive =
-    sort === 'popular' &&
-    !selectedDate &&
-    !timeOfDay &&
-    !priceMax &&
-    urlTag !== 'romantic' &&
-    !activeQuickFilter;
-
-  return [
-    { id: 'today', label: 'Сегодня', active: selectedDate === today, date: today, timeOfDay: null, priceMax: null },
-    { id: 'weekend', label: 'Выходные', active: selectedDate === weekendRange, date: weekendRange, timeOfDay: null, priceMax: null },
-    { id: 'evening', label: 'Вечер', active: timeOfDay === 'evening', date: null, timeOfDay: 'evening', priceMax: null },
-    { id: '1500', label: 'До 1500 ₽', active: priceMax === '1500', date: null, timeOfDay: null, priceMax: '1500' },
-    { id: 'popular', label: '🔥 Популярное', active: popularActive, preset: 'popular' },
-    { id: 'romantic', label: '❤️ Для свидания', active: urlTag === 'romantic', preset: 'romantic' },
-  ];
-}
 
 type DisplayItem = { type: 'group'; item: MultiEventListItemDto } | { type: 'event'; event: EventListItem };
 
@@ -167,37 +111,16 @@ function buildDisplayItems(events: EventListItem[]): DisplayItem[] {
   return result;
 }
 
-function filtersFromParams(sp: URLSearchParams) {
-  const sort = sp.get('sort') || 'popular';
-  const isSoon = sort === 'departing_soon';
-  const rawLimit = parseInt(sp.get('limit') || '20', 10);
-  const limit = LIMIT_OPTIONS.includes(rawLimit as 20 | 50 | 100) ? rawLimit : 20;
-  return {
-    city: sp.get('city') || '',
-    category: sp.get('category') || '',
-    audience: sp.get('audience') || '',
-    sort,
-    timeOfDay: isSoon ? 'soon' : sp.get('timeOfDay') || '',
-    tag: sp.get('tag') || '',
-    structuralTags: sp.get('structuralTags') || '',
-    popularTags: sp.get('popularTags') || '',
-    date: sp.get('date') || null,
-    pier: sp.get('pier') || '',
-    priceMax: sp.get('priceMax') || '',
-    page: Math.max(1, parseInt(sp.get('page') || '1', 10)),
-    limit,
-    qf: sp.get('qf') || '',
-    q: sp.get('q') || '',
-    venueId: sp.get('venueId') || '',
-    subcategory: sp.get('subcategory') || '',
-  };
-}
-
 function parseCsvSlugs(value: string) {
   return value
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function formatActiveSummary(parts: string[]): string {
+  if (parts.length <= 3) return parts.join(' · ');
+  return `${parts.slice(0, 3).join(' · ')} · +${parts.length - 3}`;
 }
 
 export function EventsPageClient() {
@@ -251,7 +174,7 @@ export function EventsPageClient() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [activeQuickFilter, setActiveQuickFilter] = useState<string>('');
-  const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   type StructuralTagGroup = 'THEME' | 'AUDIENCE' | 'FORMAT';
   type TagKind = 'STRUCTURAL' | 'POPULAR';
@@ -273,7 +196,7 @@ export function EventsPageClient() {
   const [tagOptionsLoaded, setTagOptionsLoaded] = useState(false);
 
   useEffect(() => {
-    const f = filtersFromParams(searchParams);
+    const f = parseCatalogEventsParams(searchParams);
     setCity(f.city);
     setCategory(f.category);
     setAudience(f.audience);
@@ -409,7 +332,7 @@ export function EventsPageClient() {
 
   useEffect(() => {
     setLoading(true);
-    const f = filtersFromParams(searchParams);
+    const f = parseCatalogEventsParams(searchParams);
     const cityFromUrl = f.city;
     const sortFromUrl = f.sort === 'departing_soon' || f.timeOfDay === 'soon' ? 'departing_soon' : f.sort;
     const categoryFromUrl = f.category;
@@ -562,59 +485,93 @@ export function EventsPageClient() {
     return city ? events.map((e) => ({ type: 'event' as const, event: e })) : buildDisplayItems(events);
   }, [events, city]);
 
-  const mobileQuickChips = useMemo(
-    () => getMobileQuickChips(selectedDate, timeOfDay, priceMax, sort, urlTag, activeQuickFilter),
-    [selectedDate, timeOfDay, priceMax, sort, urlTag, activeQuickFilter],
-  );
-
-  const handleMobileChipClick = useCallback(
-    (chip: MobileQuickChip) => {
-      if ('preset' in chip) {
-        if (chip.preset === 'popular') {
-          if (chip.active) {
-            updateUrl({ date: null, timeOfDay: null, priceMax: null, tag: null, qf: null, page: 1 });
-          } else {
-            updateUrl({ sort: 'popular', date: null, timeOfDay: null, priceMax: null, tag: null, qf: null, page: 1 });
-          }
-          return;
-        }
-        if (chip.preset === 'romantic') {
-          if (chip.active) {
-            updateUrl({ tag: null, page: 1 });
-          } else {
-            updateUrl({
-              sort: 'popular',
-              tag: 'romantic',
-              date: null,
-              timeOfDay: null,
-              priceMax: null,
-              qf: null,
-              page: 1,
-            });
-          }
-          return;
-        }
-      }
-      if (chip.active) {
-        updateUrl({ date: null, timeOfDay: null, priceMax: null, page: 1 });
-      } else {
-        updateUrl({
-          date: chip.date || null,
-          timeOfDay: chip.timeOfDay || null,
-          priceMax: chip.priceMax || null,
-          sort: chip.timeOfDay === 'evening' && sort === 'departing_soon' ? 'popular' : sort,
-          page: 1,
-        });
-      }
-    },
-    [updateUrl, sort],
-  );
-
   const showClusterHubs =
     !isMuseumCategory &&
     !audience &&
     !urlTag &&
     !activeQuickFilter;
+
+  const scenarioPopularActive =
+    sort === 'popular' &&
+    !selectedDate &&
+    !timeOfDay &&
+    !priceMax &&
+    !urlTag &&
+    !activeQuickFilter &&
+    !themeTagSlug &&
+    !audienceTagSlug &&
+    !formatTagSlug &&
+    (popularTagSlugs?.length ?? 0) === 0;
+
+  const activeSummaryParts = useMemo(() => {
+    const out: string[] = [];
+    const cityLabel = cities.find((c) => c.slug === city)?.name;
+    if (cityLabel) out.push(cityLabel);
+    if (selectedDate) {
+      if (selectedDate === null) {
+        // noop
+      } else if (selectedDate.includes('..')) {
+        out.push('Выходные');
+      } else {
+        out.push(selectedDate);
+      }
+    }
+    if (priceMax) out.push(`до ${priceMax} ₽`);
+    if (timeOfDay) {
+      const label =
+        timeOfDay === 'soon'
+          ? 'Скоро'
+          : timeOfDay === 'morning'
+            ? 'Утро'
+            : timeOfDay === 'day'
+              ? 'День'
+              : timeOfDay === 'evening'
+                ? 'Вечер'
+                : timeOfDay === 'night'
+                  ? 'Ночь'
+                  : '';
+      if (label) out.push(label);
+    }
+    if (audience === 'KIDS') out.push('С детьми');
+    if (urlTag) {
+      out.push(urlTag === 'water' ? 'С воды' : urlTag);
+    }
+    if (themeTagSlug) {
+      const name = structuralTagOptions.THEME.find((t) => t.slug === themeTagSlug)?.name ?? themeTagSlug;
+      out.push(name);
+    }
+    if (audienceTagSlug) {
+      const name = structuralTagOptions.AUDIENCE.find((t) => t.slug === audienceTagSlug)?.name ?? audienceTagSlug;
+      out.push(name);
+    }
+    if (formatTagSlug) {
+      const name = structuralTagOptions.FORMAT.find((t) => t.slug === formatTagSlug)?.name ?? formatTagSlug;
+      out.push(name);
+    }
+    if (popularTagSlugs.length) {
+      out.push(...popularTagSlugs.slice(0, 2).map((slug) => popularTagOptions.find((t) => t.slug === slug)?.name ?? slug));
+      if (popularTagSlugs.length > 2) out.push(`popular +${popularTagSlugs.length - 2}`);
+    }
+    if (pier) out.push('Причал');
+    if (activeQuickFilter) out.push('Сценарий');
+    return out;
+  }, [
+    cities,
+    city,
+    selectedDate,
+    priceMax,
+    timeOfDay,
+    audience,
+    urlTag,
+    themeTagSlug,
+    audienceTagSlug,
+    formatTagSlug,
+    popularTagSlugs,
+    popularTagOptions,
+    pier,
+    activeQuickFilter,
+    structuralTagOptions,
+  ]);
 
   return (
     <div className="container-page py-6 sm:py-10">
@@ -706,25 +663,167 @@ export function EventsPageClient() {
         </div>
       </div>
 
-      {/* Быстрые chips для mobile: Сегодня, Выходные, Вечер, До 1500 ₽ */}
-      {!isMuseumCategory && (
-        <div className="-mx-4 mb-4 flex md:hidden gap-1.5 overflow-x-auto px-4 scrollbar-hide">
-          {mobileQuickChips.map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              onClick={() => handleMobileChipClick(chip)}
-              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
-                chip.active
-                  ? 'bg-primary-600 text-white shadow-md ring-2 ring-primary-400 ring-offset-2 ring-offset-white'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:border-primary-300 hover:text-slate-800'
-              }`}
+      {/* Новый блок фильтров (как в лендингах): быстрые даты + сценарные чипы + "Все фильтры" */}
+      <div className="mb-4 sm:mb-5 rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50/90 to-white p-4 shadow-sm ring-1 ring-slate-100">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">Дата</div>
+            <div className="mt-2">
+              <QuickDateFilters
+                selectedDate={selectedDate}
+                ianaTimeZone={getCityTimezone(city || null)}
+                onChange={(date) => updateUrl({ date: date || null, page: 1 })}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500 sm:w-full sm:text-right">
+              Сортировка
+            </div>
+            <select
+              value={isSoonMode ? 'departing_soon' : sort}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === 'departing_soon') {
+                  updateUrl({ sort: 'departing_soon', timeOfDay: null, page: 1 });
+                } else {
+                  updateUrl({ sort: v, timeOfDay: timeOfDay === 'soon' ? null : timeOfDay, page: 1 });
+                }
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
             >
-              {chip.label}
-            </button>
-          ))}
+              {sortOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-      )}
+
+        <div className="mt-3">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">Быстрые фильтры</div>
+            {activeFiltersCount > 0 ? (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-[12px] font-semibold text-slate-500 hover:text-slate-700"
+              >
+                Сбросить
+              </button>
+            ) : null}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <select
+                value={city}
+                onChange={(e) => updateUrl({ city: e.target.value || null, page: 1 })}
+                className="min-w-[12rem] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              >
+                <option value="">Все города</option>
+                {dropdownCities.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+
+              {!isMuseumCategory && (
+                <select
+                  value={priceMax}
+                  onChange={(e) => updateUrl({ priceMax: e.target.value || null, page: 1 })}
+                  className="min-w-[10rem] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                >
+                  {PRICE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {!isMuseumCategory ? (
+              <>
+                <CatalogChip
+                  label="🔥 Популярное"
+                  active={scenarioPopularActive}
+                  onClick={() => {
+                    if (scenarioPopularActive) {
+                      updateUrl({ sort: 'popular', page: 1 });
+                    } else {
+                      updateUrl({
+                        sort: 'popular',
+                        date: null,
+                        timeOfDay: null,
+                        priceMax: null,
+                        tag: null,
+                        qf: null,
+                        structuralTags: null,
+                        popularTags: null,
+                        page: 1,
+                      });
+                    }
+                  }}
+                />
+                <CatalogChip
+                  label="Скоро"
+                  active={sort === 'departing_soon' || timeOfDay === 'soon'}
+                  onClick={() =>
+                    updateUrl({ sort: 'departing_soon', timeOfDay: null, page: 1 })
+                  }
+                />
+                <CatalogChip
+                  label="Вечер"
+                  active={timeOfDay === 'evening'}
+                  onClick={() =>
+                    updateUrl({
+                      timeOfDay: timeOfDay === 'evening' ? null : 'evening',
+                      sort: sort === 'departing_soon' ? 'popular' : sort,
+                      page: 1,
+                    })
+                  }
+                />
+                <CatalogChip
+                  label="С детьми"
+                  active={audience === 'KIDS'}
+                  onClick={() =>
+                    updateUrl({ audience: audience === 'KIDS' ? null : 'KIDS', category: null, qf: null, page: 1 })
+                  }
+                />
+                <CatalogChip
+                  label="С воды"
+                  active={urlTag === 'water'}
+                  onClick={() => updateUrl({ tag: urlTag === 'water' ? null : 'water', page: 1 })}
+                />
+              </>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen(true)}
+              className="inline-flex min-h-[2.25rem] items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Все фильтры
+              {activeFiltersCount > 0 ? (
+                <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-bold text-primary-700">
+                  {activeFiltersCount}
+                </span>
+              ) : null}
+            </button>
+          </div>
+
+          {activeSummaryParts.length > 0 ? (
+            <div className="mt-3 rounded-xl bg-slate-100/80 px-3 py-2 text-[13px] text-slate-600">
+              <span className="font-semibold text-slate-700">Активно:</span> {formatActiveSummary(activeSummaryParts)}
+            </div>
+          ) : null}
+        </div>
+      </div>
 
       {visibleQuickFilters.length > 0 && (
         <div className="-mx-4 mb-4 px-4 sm:mx-0 sm:px-0">
@@ -763,243 +862,71 @@ export function EventsPageClient() {
         </div>
       )}
 
-      {/* На mobile: кнопка "Фильтры" + панель; на desktop: всегда видны */}
-      <div className="md:hidden sticky top-0 z-10 -mx-4 mb-2 px-4 py-2 bg-white/95 backdrop-blur-sm border-b border-slate-100">
-        <button
-          type="button"
-          onClick={() => setFiltersPanelOpen((o) => !o)}
-          className="flex items-center gap-2 w-full justify-center rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          Фильтры
-          {activeFiltersCount > 0 && (
-            <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-semibold text-primary-700">
-              {activeFiltersCount}
-            </span>
-          )}
-        </button>
-      </div>
-
-      <div className={`-mx-4 mb-4 px-4 sm:mx-0 sm:mb-5 sm:px-0 ${filtersPanelOpen ? 'block' : 'hidden md:block'}`}>
-        <DateRibbon selected={selectedDate} onChange={(date) => updateUrl({ date: date || null, page: 1 })} />
-      </div>
-
-      <div className={`mb-5 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${filtersPanelOpen ? 'block' : 'hidden md:flex'}`}>
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-          {TIME_OF_DAY_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => {
-                if (opt.value === 'soon') {
-                  updateUrl({ sort: 'departing_soon', timeOfDay: null, page: 1 });
-                } else {
-                  updateUrl({
-                    timeOfDay: opt.value || null,
-                    sort: sort === 'departing_soon' ? 'popular' : sort,
-                    page: 1,
-                  });
-                }
-              }}
-              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                timeOfDay === opt.value
-                  ? opt.value === 'soon'
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-slate-800 text-white'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2 flex-shrink-0">
-          <select
-            value={city}
-            onChange={(e) => updateUrl({ city: e.target.value || null, page: 1 })}
-            className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          >
-            <option value="">Все города</option>
-            {dropdownCities.map((c) => (
-              <option key={c.slug} value={c.slug}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          {city && piers.length > 0 && (
-            <select
-              value={pier}
-              onChange={(e) => updateUrl({ pier: e.target.value || null, page: 1 })}
-              className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            >
-              <option value="">Все причалы</option>
-              {piers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.shortTitle || p.title}
-                </option>
-              ))}
-            </select>
-          )}
-          {!isMuseumCategory && (
-            <select
-              value={priceMax}
-              onChange={(e) => updateUrl({ priceMax: e.target.value || null, page: 1 })}
-              className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            >
-              {PRICE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {!isMuseumCategory && (
-            <>
-              {/* STRUCTURAL layer */}
-              <select
-                value={themeTagSlug}
-                onChange={(e) => {
-                  const next = e.target.value || '';
-                  setThemeTagSlug(next);
-                  const csv = [next, audienceTagSlug, formatTagSlug].filter(Boolean).join(',');
-                  updateUrl({ structuralTags: csv || null, page: 1 });
-                }}
-                disabled={!tagOptionsLoaded}
-                className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              >
-                <option value="">Любая тема</option>
-                {tagOptionsLoaded &&
-                  [...(structuralTagOptions.THEME ?? [])]
-                    .slice()
-                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
-                    .map((t) => (
-                      <option key={t.id} value={t.slug}>
-                        {t.name}
-                      </option>
-                    ))}
-              </select>
-
-              <select
-                value={audienceTagSlug}
-                onChange={(e) => {
-                  const next = e.target.value || '';
-                  setAudienceTagSlug(next);
-                  const csv = [themeTagSlug, next, formatTagSlug].filter(Boolean).join(',');
-                  updateUrl({ structuralTags: csv || null, page: 1 });
-                }}
-                disabled={!tagOptionsLoaded}
-                className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              >
-                <option value="">Любая аудитория</option>
-                {tagOptionsLoaded &&
-                  [...(structuralTagOptions.AUDIENCE ?? [])]
-                    .slice()
-                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
-                    .map((t) => (
-                      <option key={t.id} value={t.slug}>
-                        {t.name}
-                      </option>
-                    ))}
-              </select>
-
-              <select
-                value={formatTagSlug}
-                onChange={(e) => {
-                  const next = e.target.value || '';
-                  setFormatTagSlug(next);
-                  const csv = [themeTagSlug, audienceTagSlug, next].filter(Boolean).join(',');
-                  updateUrl({ structuralTags: csv || null, page: 1 });
-                }}
-                disabled={!tagOptionsLoaded}
-                className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              >
-                <option value="">Любой формат</option>
-                {tagOptionsLoaded &&
-                  [...(structuralTagOptions.FORMAT ?? [])]
-                    .slice()
-                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
-                    .map((t) => (
-                      <option key={t.id} value={t.slug}>
-                        {t.name}
-                      </option>
-                    ))}
-              </select>
-
-              {/* POPULAR layer (multi by AND) */}
-              <select
-                value={popularAddSlug}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  if (!next) {
-                    setPopularAddSlug('');
-                    return;
-                  }
-                  const combined = Array.from(new Set([...popularTagSlugs, next]));
-                  setPopularTagSlugs(combined);
-                  setPopularAddSlug('');
-                  updateUrl({ popularTags: combined.length ? combined.join(',') : null, page: 1 });
-                }}
-                disabled={!tagOptionsLoaded}
-                className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              >
-                <option value="">+ popular</option>
-                {tagOptionsLoaded &&
-                  popularTagOptions
-                    .slice()
-                    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
-                    .map((t) => (
-                      <option key={t.id} value={t.slug} disabled={popularTagSlugs.includes(t.slug)}>
-                        {t.name}
-                      </option>
-                    ))}
-              </select>
-
-              {popularTagSlugs.length > 0 && (
-                <div className="flex flex-wrap gap-1 items-center">
-                  {popularTagSlugs.map((slug) => {
-                    const label = popularTagOptions.find((t) => t.slug === slug)?.name ?? slug;
-                    return (
-                      <span key={slug} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 ring-1 ring-slate-200">
-                        {label}
-                        <button
-                          type="button"
-                          aria-label={`Удалить popular тег ${label}`}
-                          className="rounded-full p-0.5 text-slate-500 hover:text-slate-700"
-                          onClick={() => {
-                            const next = popularTagSlugs.filter((x) => x !== slug);
-                            setPopularTagSlugs(next);
-                            updateUrl({ popularTags: next.length ? next.join(',') : null, page: 1 });
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-          <select
-            value={isSoonMode ? 'departing_soon' : sort}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === 'departing_soon') {
-                updateUrl({ sort: 'departing_soon', timeOfDay: null, page: 1 });
-              } else {
-                updateUrl({ sort: v, timeOfDay: timeOfDay === 'soon' ? null : timeOfDay, page: 1 });
-              }
-            }}
-            className="min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          >
-            {sortOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <CatalogAdvancedFilters
+        open={advancedOpen}
+        onClose={() => setAdvancedOpen(false)}
+        activeCount={activeFiltersCount}
+        cities={cities}
+        city={city}
+        onCity={(slug) => updateUrl({ city: slug || null, page: 1 })}
+        priceMax={priceMax}
+        onPriceMax={(v) => updateUrl({ priceMax: v || null, page: 1 })}
+        timeOfDay={timeOfDay === 'soon' ? '' : timeOfDay}
+        onTimeOfDay={(v) =>
+          updateUrl({
+            timeOfDay: v || null,
+            sort: sort === 'departing_soon' ? 'popular' : sort,
+            page: 1,
+          })
+        }
+        pier={pier}
+        onPier={(v) => updateUrl({ pier: v || null, page: 1 })}
+        piers={city ? piers.map((p) => ({ id: p.id, title: p.title, shortTitle: p.shortTitle })) : []}
+        themeTagSlug={themeTagSlug}
+        onTheme={(next) => {
+          setThemeTagSlug(next);
+          const csv = [next, audienceTagSlug, formatTagSlug].filter(Boolean).join(',');
+          updateUrl({ structuralTags: csv || null, page: 1 });
+        }}
+        audienceTagSlug={audienceTagSlug}
+        onAudienceTag={(next) => {
+          setAudienceTagSlug(next);
+          const csv = [themeTagSlug, next, formatTagSlug].filter(Boolean).join(',');
+          updateUrl({ structuralTags: csv || null, page: 1 });
+        }}
+        formatTagSlug={formatTagSlug}
+        onFormat={(next) => {
+          setFormatTagSlug(next);
+          const csv = [themeTagSlug, audienceTagSlug, next].filter(Boolean).join(',');
+          updateUrl({ structuralTags: csv || null, page: 1 });
+        }}
+        structuralTagOptions={structuralTagOptions}
+        popularTagOptions={popularTagOptions}
+        popularTagSlugs={popularTagSlugs}
+        popularAddSlug={popularAddSlug}
+        onPopularAdd={(next) => {
+          if (!next) {
+            setPopularAddSlug('');
+            return;
+          }
+          const combined = Array.from(new Set([...popularTagSlugs, next]));
+          setPopularTagSlugs(combined);
+          setPopularAddSlug('');
+          updateUrl({ popularTags: combined.length ? combined.join(',') : null, page: 1 });
+        }}
+        onPopularRemove={(slug) => {
+          const next = popularTagSlugs.filter((x) => x !== slug);
+          setPopularTagSlugs(next);
+          updateUrl({ popularTags: next.length ? next.join(',') : null, page: 1 });
+        }}
+        sort={isSoonMode ? 'departing_soon' : sort}
+        onSort={(v) => {
+          if (v === 'departing_soon') updateUrl({ sort: 'departing_soon', timeOfDay: null, page: 1 });
+          else updateUrl({ sort: v, timeOfDay: timeOfDay === 'soon' ? null : timeOfDay, page: 1 });
+        }}
+        sortOptions={sortOptions}
+        clearAll={clearAllFilters}
+      />
 
       {loading ? (
         <div className="grid gap-3 grid-cols-1 min-[361px]:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">

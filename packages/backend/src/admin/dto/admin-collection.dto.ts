@@ -4,7 +4,7 @@ import {
   CollectionSelectionBasis,
   CollectionSourceType,
   CollectionStatus,
-} from '@prisma/client';
+} from '@/prisma-client';
 import {
   IsArray,
   IsBoolean,
@@ -16,7 +16,20 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  ValidateNested,
 } from 'class-validator';
+
+class CollectionTagFilterInputDto {
+  @ApiProperty({ description: 'Tag.id' })
+  @IsUUID()
+  tagId!: string;
+
+  @ApiPropertyOptional({ description: 'Position (0..N)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  position?: number;
+}
 
 export class CreateCollectionDto {
   @ApiProperty({ description: 'URL-slug (уникальный)' })
@@ -56,6 +69,16 @@ export class CreateCollectionDto {
   @IsArray()
   @IsString({ each: true })
   filterTags?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Normalized: CollectionTagFilter (FK на Tag) — canonical для админки',
+    type: [CollectionTagFilterInputDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CollectionTagFilterInputDto)
+  tagFilters?: CollectionTagFilterInputDto[];
 
   @ApiPropertyOptional({ description: 'EventCategory enum value' })
   @IsOptional()

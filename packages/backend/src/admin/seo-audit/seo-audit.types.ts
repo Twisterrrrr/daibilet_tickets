@@ -146,3 +146,43 @@ export interface SeoAuditVenuesResponseDto {
   pages: number;
   summary: SeoAuditEntitySummaryDto;
 }
+
+// ─── Unified (soft) read-model ───────────────────────────────────────────────
+
+export type UnifiedSeoEntityType = 'EVENT' | 'VENUE' | 'CITY' | 'ARTICLE' | 'LANDING' | 'COLLECTION';
+
+export type UnifiedSeoSeverity = 'ERROR' | 'WARN' | 'INFO';
+
+export interface UnifiedSeoIssueListItemDto {
+  entityType: UnifiedSeoEntityType;
+  entityId: string;
+  entityTitle: string;
+  entitySlug?: string | null;
+  cityName?: string | null;
+
+  issueCode: string;
+  severity: UnifiedSeoSeverity;
+  message: string;
+
+  updatedAt?: Date | null;
+  targetUrl?: string | null;
+}
+
+export interface UnifiedSeoAuditSummaryDto {
+  totals: { issues: number; errors: number; warnings: number; info: number };
+  byEntityType: Array<{ entityType: UnifiedSeoEntityType; total: number; errors: number; warnings: number; info: number }>;
+  byIssueCode: Array<{ issueCode: string; total: number }>;
+}
+
+export interface UnifiedSeoAuditIssuesResponseDto {
+  items: UnifiedSeoIssueListItemDto[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export interface UnifiedSeoAuditEntityIssuesResponseDto {
+  entityType: UnifiedSeoEntityType;
+  entityId: string;
+  issues: UnifiedSeoIssueListItemDto[];
+}

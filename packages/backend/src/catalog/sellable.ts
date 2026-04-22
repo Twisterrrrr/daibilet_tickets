@@ -3,7 +3,7 @@
  * PR-3 (A3): нормализация offers + publish-gate.
  */
 
-import { DateMode } from '@prisma/client';
+import { DateMode } from '@/prisma-client';
 
 export interface SellableOffer {
   status: string;

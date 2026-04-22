@@ -1,12 +1,17 @@
-import { PaymentStatus, PrismaClient, SupplierDisputeReasonCategory, SupplierLedgerEntryType } from '@prisma/client';
+import { PaymentStatus, SupplierDisputeReasonCategory, SupplierLedgerEntryType } from '../src/prisma-client';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
 
 import { SupplierReportCalculationService } from '../src/supplier-finance/supplier-report-calculation.service';
 import { SupplierDocumentService } from '../src/supplier-finance/supplier-document.service';
 import { SupplierDisputeService } from '../src/supplier-finance/supplier-dispute.service';
 import { SupplierReconciliationService } from '../src/supplier-finance/supplier-reconciliation.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
-const prisma = new PrismaClient();
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+const { prisma, pool } = createScriptPrismaClient();
 
 async function main() {
   const operator = await prisma.operator.create({
@@ -116,5 +121,6 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });
 

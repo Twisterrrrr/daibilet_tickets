@@ -4,6 +4,7 @@ import type { MediaUploadAdapter } from '@daibilet/shared';
 
 import type {
   EventWizardDraft,
+  EventWizardLocationOption,
   EventWizardMode,
   EventWizardStepKey,
   EventWizardTicketsDraft,
@@ -36,6 +37,9 @@ export interface EventWizardProps {
   onDraftChange?: (draft: EventWizardDraft) => void;
   onSubmit?: (draft: EventWizardDraft, options?: { action?: 'create' | 'saveDraft' | 'update' }) => void;
   citiesOptions?: { id: string; name: string }[];
+  /** Локации для выбранного в черновике города (админ: GET /admin/locations). */
+  locationsForCity?: EventWizardLocationOption[];
+  locationsLoading?: boolean;
   stepOrderOverride?: EventWizardStepKey[];
   /** Загрузка обложки/галереи в Cloudinary (admin или supplier API). */
   mediaUpload?: MediaUploadAdapter;
@@ -47,6 +51,8 @@ export function EventWizard({
   onDraftChange,
   onSubmit,
   citiesOptions,
+  locationsForCity,
+  locationsLoading,
   stepOrderOverride,
   mediaUpload,
 }: EventWizardProps) {
@@ -140,6 +146,8 @@ export function EventWizard({
             onChange={(nextBasics) => updateDraft({ ...draft, basics: nextBasics })}
             sourceMeta={draft.sourceMeta}
             cities={citiesOptions}
+            locationsForCity={locationsForCity}
+            locationsLoading={locationsLoading}
             mediaUpload={mediaUpload}
           />
         );

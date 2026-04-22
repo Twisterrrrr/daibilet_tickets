@@ -11,6 +11,7 @@ declare var console: { warn: (...args: unknown[]) => void; log: (...args: unknow
 
 // --- Widget Payload Validation ---
 export {
+  addCalendarDaysISO,
   calendarDayFromIso,
   CITY_TIMEZONES,
   dateToISO,
@@ -19,8 +20,11 @@ export {
   getCityTimezone,
   getMoscowTodayISO,
   getMoscowTomorrowISO,
+  getNextWeekendRangeISO,
+  getNextWeekendSatSunISO,
   getTodayISO,
   getTomorrowISO,
+  getWeekdaySun0FromYmdInTz,
   moscowCalendarDayFromIso,
 } from './moscow-calendar';
 export { shortenAddressToStreet } from './address-utils';
@@ -104,6 +108,8 @@ export enum EventCategory {
   EXCURSION = 'EXCURSION',
   MUSEUM = 'MUSEUM',
   EVENT = 'EVENT',
+  ACTIVITY = 'ACTIVITY',
+  ENTERTAINMENT = 'ENTERTAINMENT',
 }
 
 export enum EventAudience {
@@ -133,6 +139,7 @@ export enum EventSubcategory {
   CONTEMPORARY = 'CONTEMPORARY',
   // EVENT
   CONCERT = 'CONCERT',
+  JAZZ = 'JAZZ',
   SHOW = 'SHOW',
   STANDUP = 'STANDUP',
   THEATER = 'THEATER',
@@ -298,6 +305,10 @@ export enum VenueType {
   THEATER = 'THEATER',
   PALACE = 'PALACE',
   PARK = 'PARK',
+  RESTAURANT = 'RESTAURANT',
+  CAFE = 'CAFE',
+  BAR = 'BAR',
+  FASTFOOD = 'FASTFOOD',
 }
 
 export enum DateMode {
@@ -313,6 +324,10 @@ export const VENUE_TYPE_LABELS: Record<VenueType, string> = {
   [VenueType.THEATER]: 'Театр',
   [VenueType.PALACE]: 'Дворец',
   [VenueType.PARK]: 'Парк',
+  [VenueType.RESTAURANT]: 'Ресторан',
+  [VenueType.CAFE]: 'Кафе',
+  [VenueType.BAR]: 'Бар',
+  [VenueType.FASTFOOD]: 'Фастфуд',
 };
 
 export const DATE_MODE_LABELS: Record<DateMode, string> = {
@@ -358,6 +373,22 @@ export const VENUE_COMMISSION_DEFAULTS: Record<VenueType, VenueCommissionConfig>
   [VenueType.PARK]: {
     defaultRate: 15,
     label: 'Парк — ориентир 15%',
+  },
+  [VenueType.RESTAURANT]: {
+    defaultRate: 18,
+    label: 'Ресторан — ориентир 18%',
+  },
+  [VenueType.CAFE]: {
+    defaultRate: 18,
+    label: 'Кафе — ориентир 18%',
+  },
+  [VenueType.BAR]: {
+    defaultRate: 18,
+    label: 'Бар — ориентир 18%',
+  },
+  [VenueType.FASTFOOD]: {
+    defaultRate: 18,
+    label: 'Фастфуд — ориентир 18%',
   },
 };
 
@@ -409,12 +440,19 @@ export interface CityListItem {
   museumCount?: number;
 }
 
+/** Публичная ссылка на подкатегорию (источник истины — M:N + code). */
+export type SubcategoryRefPublic = { code: string; nameRu: string };
+
 export interface EventListItem {
   id: string;
   slug: string;
   title: string;
   category: EventCategory;
   subcategories: EventSubcategory[];
+  /** Основной формат (PRIMARY), если задан через link-таблицу. */
+  primarySubcategory?: SubcategoryRefPublic | null;
+  /** Доп. подкатегории (SECONDARY). */
+  secondarySubcategories?: SubcategoryRefPublic[];
   audience: EventAudience;
   imageUrl: string | null;
   priceFrom: number | null;
@@ -476,6 +514,8 @@ export interface CatalogItemEvent extends CatalogItemBase {
   startsAt?: string | null;
   durationMinutes?: number | null;
   subcategories?: EventSubcategory[];
+  primarySubcategory?: SubcategoryRefPublic | null;
+  secondarySubcategories?: SubcategoryRefPublic[];
   audience?: EventAudience;
   tagSlugs?: string[];
   reviewCount?: number;
@@ -695,6 +735,8 @@ export const CATEGORY_LABELS: Record<EventCategory, string> = {
   [EventCategory.EXCURSION]: 'Экскурсии',
   [EventCategory.MUSEUM]: 'Музеи и Арт',
   [EventCategory.EVENT]: 'Мероприятия',
+  [EventCategory.ACTIVITY]: 'Активный отдых',
+  [EventCategory.ENTERTAINMENT]: 'Развлечения',
 };
 
 /** Аудитория → человекочитаемое название */
@@ -726,6 +768,7 @@ export const SUBCATEGORY_LABELS: Record<EventSubcategory, string> = {
   [EventSubcategory.CONTEMPORARY]: 'Современное искусство',
   // EVENT
   [EventSubcategory.CONCERT]: 'Концерт',
+  [EventSubcategory.JAZZ]: 'Джаз',
   [EventSubcategory.SHOW]: 'Шоу',
   [EventSubcategory.STANDUP]: 'Стендап',
   [EventSubcategory.THEATER]: 'Театр',
@@ -744,8 +787,6 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<EventCategory, EventSubcategory[]
     EventSubcategory.COMBINED,
     EventSubcategory.QUEST,
     EventSubcategory.GASTRO,
-    EventSubcategory.ROOFTOP,
-    EventSubcategory.EXTREME,
   ],
   [EventCategory.MUSEUM]: [
     EventSubcategory.MUSEUM_CLASSIC,
@@ -759,6 +800,7 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<EventCategory, EventSubcategory[]
   ],
   [EventCategory.EVENT]: [
     EventSubcategory.CONCERT,
+    EventSubcategory.JAZZ,
     EventSubcategory.SHOW,
     EventSubcategory.STANDUP,
     EventSubcategory.THEATER,
@@ -767,6 +809,8 @@ export const SUBCATEGORIES_BY_CATEGORY: Record<EventCategory, EventSubcategory[]
     EventSubcategory.MASTERCLASS,
     EventSubcategory.PARTY,
   ],
+  [EventCategory.ACTIVITY]: [EventSubcategory.EXTREME],
+  [EventCategory.ENTERTAINMENT]: [EventSubcategory.ROOFTOP, EventSubcategory.QUEST],
 };
 
 // --- Quick Filters per Category/Audience (витрина) ---
@@ -807,6 +851,7 @@ export const QUICK_FILTERS: Record<string, QuickFilter[]> = {
   ],
   EVENT: [
     { id: 'concert', emoji: '🎵', label: 'Концерты', params: { subcategory: 'CONCERT' } },
+    { id: 'jazz', emoji: '🎷', label: 'Джаз', params: { subcategory: 'JAZZ' } },
     { id: 'theater', emoji: '🎭', label: 'Театр', params: { subcategory: 'THEATER' } },
     { id: 'standup', emoji: '😂', label: 'Стендап', params: { subcategory: 'STANDUP' } },
     { id: 'show', emoji: '🎪', label: 'Шоу', params: { subcategory: 'SHOW' } },
@@ -868,10 +913,13 @@ export interface VenueListItem {
   rating: number;
   reviewCount: number;
   isFeatured?: boolean;
+  isHiddenGem?: boolean;
 }
 
 export interface VenueDetail extends VenueListItem {
   cityId?: string;
+  primarySubcategory?: SubcategoryRefPublic | null;
+  secondarySubcategories?: SubcategoryRefPublic[];
   description?: string | null;
   shortDescription?: string | null;
   galleryUrls: string[];

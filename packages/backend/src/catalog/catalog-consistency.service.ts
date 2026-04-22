@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { DateMode, Prisma } from '@prisma/client';
+import { DateMode, Prisma } from '@/prisma-client';
 
 
 
@@ -433,11 +433,8 @@ export class CatalogConsistencyService {
 
 
     const landings = await this.prisma.landingPage.findMany({
-
-      where: { isDeleted: false, isActive: true },
-
+      where: { isDeleted: false, isActive: true, landingType: 'CITY', cityId: { not: null } },
       select: { id: true, cityId: true, filterTag: true, additionalFilters: true },
-
     });
 
 
@@ -454,7 +451,7 @@ export class CatalogConsistencyService {
 
       const eventsWhere = buildLandingEventsWhere({
 
-        cityId: l.cityId,
+        cityId: l.cityId!,
 
         now,
 

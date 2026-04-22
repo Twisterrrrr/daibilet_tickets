@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { SupplierRole } from '@prisma/client';
+import { SupplierRole } from '@/prisma-client';
 import { IsEmail, IsEnum, IsString, MinLength } from 'class-validator';
 
 export class CreateSupplierInvitationDto {

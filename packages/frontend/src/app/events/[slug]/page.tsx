@@ -7,6 +7,7 @@ import type { EventDetailFrontend } from '@/lib/api.types';
 
 import { EventPageView } from '@/components/events/EventPageView';
 import { api } from '@/lib/api';
+import { isPastOpenDateExhibition } from '@/lib/event-ended';
 import { getSeoMeta } from '@/lib/seo/getSeoMeta';
 
 export const revalidate = 3600;
@@ -30,10 +31,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const event = await api.getEventBySlug(slug);
     const seo = await getSeoMeta('EVENT', event.id);
 
-    const title = seo?.title ?? `${event.title} — купить билет | Дайбилет`;
+    const pastOpenDate = isPastOpenDateExhibition(event);
+    const title =
+      seo?.title ??
+      (pastOpenDate ? `${event.title} | Дайбилет` : `${event.title} — купить билет | Дайбилет`);
     const description =
       seo?.description ?? event.shortDescription ?? stripHtml(event.description || '').slice(0, 160);
-    const robots = seo?.robots ?? 'index,follow';
+    /** Завершённые OPEN_DATE: не индексируем (нет мусора в поиске), ссылка живая для людей и follow для краула. */
+    const robots = pastOpenDate ? { index: false, follow: true } : (seo?.robots ?? 'index,follow');
     const canonical = seo?.canonicalUrl ?? undefined;
 
     return {
@@ -49,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     };
   } catch {
-    return { title: 'Событие не найдено' };
+    return { title: 'Событие не найдено', robots: { index: false, follow: true } };
   }
 }
 

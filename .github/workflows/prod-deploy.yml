@@ -64,6 +64,8 @@ jobs:
         run: |
           set -euo pipefail
           ssh "${PROD_USER}@${PROD_HOST}" "cd /opt/daibilet && \
+            # Pre-clean: если на сервере остался неотслеживаемый артефакт, checkout упадёт.
+            rm -rf scripts/setup-ssl-production.sh || true && \
             DEPLOY_BRANCH='${DEPLOY_BRANCH_INPUT}' \
             bash deploy/production/deploy.sh"
 

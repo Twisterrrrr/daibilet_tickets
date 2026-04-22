@@ -16,6 +16,7 @@ import { FulfillmentService } from '../checkout/fulfillment.service';
 import { PaymentService } from '../checkout/payment.service';
 import { RefundService } from '../checkout/refund.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrderProjectionService } from '../orders/order-projection.service';
 import { QUEUE_FULFILLMENT } from './queue.constants';
 
 @Injectable()
@@ -28,6 +29,7 @@ export class FulfillmentProcessor extends WorkerHost {
     private readonly fulfillmentService: FulfillmentService,
     private readonly refundService: RefundService,
     private readonly prisma: PrismaService,
+    private readonly orderProjection: OrderProjectionService,
   ) {
     super();
   }
@@ -113,6 +115,14 @@ export class FulfillmentProcessor extends WorkerHost {
         select: { checkoutSessionId: true },
       });
       if (intent) {
+        try {
+          await this.orderProjection.projectFromCheckoutSession(intent.checkoutSessionId);
+        } catch (e) {
+          this.logger.error(
+            `Order projection (PAID) failed: sessionId=${intent.checkoutSessionId} intentId=${intentId} ` +
+              `error=${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
         await this.fulfillmentService.startFulfillment(intent.checkoutSessionId);
         await this.fulfillmentService.executeFulfillment(intent.checkoutSessionId);
       }
