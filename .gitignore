@@ -88,6 +88,7 @@ backups/
 # Локальные артефакты разработки (не коммитим)
 lint-output.txt
 packages/backend/uploads/
+.tmp-daibilet-admin-ui-replit/
 
 # ==============================
 # Исходники стоковых изображений (не коммитим)

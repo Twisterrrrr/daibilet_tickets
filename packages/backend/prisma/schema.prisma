@@ -2475,6 +2475,7 @@ model Operator {
   supplierDocuments   SupplierDocument[]
   supplierDisputes    SupplierDispute[]
   supplierDailyStats  SupplierDailyStat[]
+  supplierIntegrations SupplierIntegration[]
 
   legalProfile SupplierLegalProfile?
   edoProfile   SupplierEdoProfile?
@@ -2621,6 +2622,89 @@ model SupplierInvitation {
   @@index([operatorId])
   @@index([token])
   @@map("supplier_invitations")
+}
+
+// ========================
+// Supplier integrations (admin-managed configs)
+// ========================
+
+/// Конфигурация интеграции поставщика (оператора) с внешним источником инвентаря.
+/// Важно: секреты могут приходить в credentialsJson, но в API отдаём только masked.
+model SupplierIntegration {
+  id          String   @id @default(uuid()) @db.Uuid
+  operatorId  String   @db.Uuid
+
+  /// Внешний адаптер/провайдер (строка, чтобы не ломать enum при добавлении новых)
+  adapterCode String
+  adapterName String?
+
+  /// Человекочитаемое имя интеграции (для админки)
+  name        String
+
+  /// Acquisition mode / status / environment / syncMode — строковые, чтобы контракт был расширяемым без миграций enum.
+  acquisitionMode String?
+  status          String?
+  environment     String?
+  syncMode        String?
+
+  /// Connection & mapping payloads. Никогда не отдавать credentialsJson без mask.
+  connectionJson    Json?
+  mappingJson       Json?
+  capabilitiesJson  Json?
+  healthJson        Json?
+
+  lastSuccessAt           DateTime?
+  lastErrorAt             DateTime?
+  consecutiveErrorCount   Int      @default(0)
+  openIssuesCountCached   Int      @default(0)
+  lastRunSummaryCached    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  runs     SupplierIntegrationRun[]
+  issues   SupplierIntegrationIssue[]
+
+  @@index([operatorId])
+  @@index([adapterCode])
+  @@map("supplier_integrations")
+}
+
+model SupplierIntegrationRun {
+  id             String   @id @default(uuid()) @db.Uuid
+  integrationId  String   @db.Uuid
+
+  status     String
+  summary    String?
+  countersJson Json?
+
+  startedAt  DateTime @default(now())
+  finishedAt DateTime?
+
+  integration SupplierIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, startedAt])
+  @@map("supplier_integration_runs")
+}
+
+model SupplierIntegrationIssue {
+  id             String   @id @default(uuid()) @db.Uuid
+  integrationId  String   @db.Uuid
+
+  entityType        String?
+  severity          String
+  code              String?
+  title             String
+  resolutionStatus  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  integration SupplierIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, severity])
+  @@map("supplier_integration_issues")
 }
 
 // ========================
