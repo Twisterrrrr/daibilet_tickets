@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "predev": "prisma generate",
     "dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
@@ -25,6 +26,8 @@
     "db:seed:foundation-fixtures": "npx tsx prisma/seed-foundation-fixtures.ts",
     "finance:print-samples": "npx tsx scripts/generate-finance-print-samples.ts",
     "sync:tep": "npx tsx scripts/sync-teplohod.ts",
+    "tep:fixture-bridge": "npx tsx scripts/teplohod-fixture-bridge.ts",
+    "tep:export-fixtures": "npx tsx scripts/export-teplohod-snapshot.ts",
     "sync:tc-orders-mirror": "npx tsx scripts/sync-tc-orders-mirror.ts",
     "sync:tc-refund-requests-mirror": "npx tsx scripts/sync-tc-refund-requests-mirror.ts",
     "parse:teplohod-email": "npx tsx scripts/parse-teplohod-email.ts",
