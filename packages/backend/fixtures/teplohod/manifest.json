@@ -1,0 +1,26 @@
+{
+  "exportedAt": "2026-06-07T14:24:27.118Z",
+  "source": "https://api.teplohod.info/v1",
+  "endpoints": {
+    "cities": "/v1/cities",
+    "eventsCompact": "/v1/events?compact"
+  },
+  "eventsCount": 186,
+  "withEventTimes": 164,
+  "withoutEventTimes": 22,
+  "totalEventTimeSlots": 14401,
+  "files": {
+    "cities.json": {
+      "sha256": "26a3bb1b54c9544d1769ac1157a6f86badcfc31ee37a4bfb251678bf784ea456",
+      "bytes": 1175
+    },
+    "events-compact.json": {
+      "sha256": "c9e3efe742463616f69e39a4c229898891b2885c50b69c4d93dcabc6f22e7747",
+      "bytes": 2770520
+    }
+  },
+  "notes": [
+    "Snapshot for environments without VPN access to api.teplohod.info",
+    "Use with TEP_API_URL pointing to local fixture bridge (see README.md)"
+  ]
+}
