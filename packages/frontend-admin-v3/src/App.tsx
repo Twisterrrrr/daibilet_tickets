@@ -5,7 +5,7 @@ import { RequireAuth } from '@/lib/guards/RequireAuth';
 import { FeatureDisabledPage } from '@/pages/feature-disabled/FeatureDisabledPage';
 import { StubPage } from '@/pages/_stub/StubPage';
 import * as React from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 
 const DashboardPage = React.lazy(() => import('@/pages/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
 const EventsListPage = React.lazy(() => import('@/pages/events/EventsListPage').then((m) => ({ default: m.EventsListPage })));
@@ -98,6 +98,10 @@ const ForgotPasswordPage = React.lazy(() =>
   import('@/pages/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })),
 );
 
+const ImportedSalesRoutes = React.lazy(() =>
+  import('@/modules/imported-sales/routes').then((m) => ({ default: m.ImportedSalesRoutes })),
+);
+
 export default function App() {
   return (
     <QueryProvider>
@@ -177,10 +181,20 @@ export default function App() {
                 path="sales"
                 element={
                   <FeatureRoute feature="SALES">
-                    <StubPage title="Продажи" />
+                    <Outlet />
                   </FeatureRoute>
                 }
-              />
+              >
+                <Route index element={<Navigate to="imported" replace />} />
+                <Route
+                  path="imported/*"
+                  element={
+                    <React.Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Загрузка…</div>}>
+                      <ImportedSalesRoutes />
+                    </React.Suspense>
+                  }
+                />
+              </Route>
               <Route
                 path="finance"
                 element={

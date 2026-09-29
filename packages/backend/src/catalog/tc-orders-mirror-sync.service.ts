@@ -106,10 +106,16 @@ export class TcOrdersMirrorSyncService {
           }
           const tcStatus = extractTcOrderStatus(row);
           const mapped = mapTcOrderStatusToMirror(tcStatus);
+          const customerEmailRaw = (row as { customer?: { email?: string } }).customer?.email;
+          const customerEmail =
+            typeof customerEmailRaw === 'string' && customerEmailRaw.trim().length > 0
+              ? customerEmailRaw.trim().toLowerCase()
+              : null;
           const payloadJson: Prisma.InputJsonValue = {
             source: 'tc_orders_list_sync',
             syncedAt: new Date().toISOString(),
             tcStatus: tcStatus ?? null,
+            customerEmail,
             order: JSON.parse(JSON.stringify(row)) as Prisma.InputJsonValue,
           };
 

@@ -89,6 +89,7 @@ backups/
 lint-output.txt
 packages/backend/uploads/
 .tmp-daibilet-admin-ui-replit/
+artifacts/product-snapshots/
 
 # ==============================
 # Исходники стоковых изображений (не коммитим)

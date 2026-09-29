@@ -48,7 +48,7 @@ const API_BASE = isServer
       (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000') + '/api/v1')
   : process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
-async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   let res: Response;
   try {

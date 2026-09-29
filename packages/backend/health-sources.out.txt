@@ -1,0 +1,2 @@
+[Nest] 22672  - 26.04.2026, 10:17:29     LOG [TcGrpcService] gRPC-╨║╨╗╨╕╨╡╨╜╤В ╨┐╨╛╨┤╨║╨╗╤О╤З╤С╨╜ ╨║ simple.ticketscloud.com:443
+[Nest] 22672  - 26.04.2026, 10:17:31   DEBUG [TcGrpcService] gRPC Events request: {"status":0}

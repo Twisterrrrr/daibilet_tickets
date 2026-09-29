@@ -21,6 +21,17 @@ export interface TeplohodParsedEmail {
   fromTeplohodDomain?: boolean;
 }
 
+export interface TeplohodParsedOrderEmailDetails {
+  customerEmail: string | null;
+  externalOrderId: string | null;
+  pinCode: string | null;
+  walkTitle: string | null;
+  dateRaw: string | null;
+  timeRaw: string | null;
+  /** Локальный ISO без таймзоны: YYYY-MM-DDTHH:mm:ss (чтобы Date() в браузере интерпретировал как local) */
+  eventDateTimeLocalIso: string | null;
+}
+
 const RE_TEP_PREFIX = /\btep-[a-z0-9-]+\b/gi;
 const RE_OBJECT_ID = /\b[0-9a-f]{24}\b/gi;
 const RE_MONEY_RUB = /(\d[\d\s]*[,.]?\d*)\s*(?:₽|руб|RUB)/gi;
@@ -171,5 +182,85 @@ export function parseTeplohodIncomingEmail(raw: string): TeplohodParsedEmail {
     amountsRub: uniq(amountsRub),
     signals,
     ...(fromTeplohodDomain ? { fromTeplohodDomain: true } : {}),
+  };
+}
+
+function nextNonEmptyLineAfterLabel(lines: string[], label: string): string | null {
+  const want = label.trim().toLowerCase();
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]!.trim().toLowerCase() !== want) continue;
+    for (let j = i + 1; j < Math.min(lines.length, i + 12); j++) {
+      const v = lines[j]!.trim();
+      if (v) return v;
+    }
+    return null;
+  }
+  return null;
+}
+
+function readMultilineValueAfterLabel(lines: string[], label: string, stopLabels: string[]): string | null {
+  const want = label.trim().toLowerCase();
+  const stop = new Set(stopLabels.map((s) => s.trim().toLowerCase()));
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]!.trim().toLowerCase() !== want) continue;
+    const acc: string[] = [];
+    for (let j = i + 1; j < Math.min(lines.length, i + 40); j++) {
+      const t = lines[j]!.trim();
+      if (!t) {
+        if (acc.length > 0) break;
+        continue;
+      }
+      if (stop.has(t.toLowerCase())) break;
+      acc.push(t);
+      // Обычно значение в 1-2 строки; но на всякий случай ограничим.
+      if (acc.join(' ').length > 400) break;
+    }
+    const v = acc.join(' ').replace(/\s+/g, ' ').trim();
+    return v || null;
+  }
+  return null;
+}
+
+function parseDateLocalIso(dateRaw: string | null, timeRaw: string | null): string | null {
+  if (!dateRaw || !timeRaw) return null;
+  const d = new Date(`${dateRaw} ${timeRaw}`);
+  if (!Number.isFinite(d.getTime())) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+    d.getMinutes(),
+  )}:00`;
+}
+
+/**
+ * Детальный разбор "Куплен билет номер …" (TEPLOHOD.INFO) → ключевые поля для ExternalOrderLink.
+ * Без внешних библиотек; ориентируемся на plain-text часть письма.
+ */
+export function parseTeplohodOrderEmailDetails(raw: string): TeplohodParsedOrderEmailDetails {
+  const text = looksLikeRawEml(raw) ? extractPlainFromSimpleEml(raw) : coalesceEmailBody(raw);
+  const lines = text.split(/\r?\n/).map((l) => l.replace(/\u00a0/g, ' ').trimEnd());
+
+  const customerEmail = nextNonEmptyLineAfterLabel(lines, 'E-mail');
+  const externalOrderId = nextNonEmptyLineAfterLabel(lines, 'Номер билета');
+  const pinCode = nextNonEmptyLineAfterLabel(lines, 'Пин-код');
+  const dateRaw = nextNonEmptyLineAfterLabel(lines, 'Дата');
+  const timeRaw = nextNonEmptyLineAfterLabel(lines, 'Время');
+  const walkTitle = readMultilineValueAfterLabel(lines, 'Прогулка', [
+    'Теплоход',
+    'Причал',
+    'Дата',
+    'Время',
+    'Организатор',
+    'Сумма заказа',
+    'Билеты в заказе',
+  ]);
+
+  return {
+    customerEmail: customerEmail ? customerEmail.trim().toLowerCase() : null,
+    externalOrderId: externalOrderId ? externalOrderId.trim() : null,
+    pinCode: pinCode ? pinCode.trim() : null,
+    walkTitle: walkTitle ? walkTitle.trim() : null,
+    dateRaw: dateRaw ? dateRaw.trim() : null,
+    timeRaw: timeRaw ? timeRaw.trim() : null,
+    eventDateTimeLocalIso: parseDateLocalIso(dateRaw, timeRaw),
   };
 }

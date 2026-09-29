@@ -11,7 +11,8 @@ import { AddToCartButton } from '@/components/ui/AddToCartButton';
 import { EventCard, type EventCardVM } from '@/components/ui/EventCard';
 import { RequestOfferForm } from '@/components/ui/RequestOfferForm';
 import { RatingBadge, ReviewSection } from '@/components/ui/ReviewSection';
-import { TcSessionSlot } from '@/components/ui/TcWidget';
+import { TcSessionSlot, TcWidgetButton } from '@/components/ui/TcWidget';
+import { TepWidgetEmbed } from '@/components/ui/TepWidget';
 import { shortenAddressToStreet } from '@/lib/address';
 import { isPastOpenDateExhibition } from '@/lib/event-ended';
 
@@ -157,7 +158,7 @@ export function EventPageView({ event }: EventPageViewProps) {
       {/* Hero Section */}
       <div className="relative">
         {/* Hero image */}
-        <div className="min-h-[calc(100vh-6rem)] overflow-hidden bg-slate-900 sm:min-h-0 sm:h-80 lg:h-[420px]">
+        <div className="relative min-h-[calc(100vh-6rem)] overflow-hidden bg-slate-900 sm:min-h-0 sm:h-80 lg:h-[420px]">
           {event.imageUrl ? (
             <Image
               src={event.imageUrl}
@@ -580,6 +581,22 @@ function formatSessionDate(dateStr: string): { date: string; time: string; weekd
 
 function getTcBuyUrl(tcEventId: string): string {
   return `https://ticketscloud.com/v1/services/widget?event=${tcEventId}`;
+}
+
+function normalizeTcWidgetEventId(v: unknown): string | null {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  // tcwidget expects raw event id (24-hex string in our data)
+  return s;
+}
+
+function normalizeTepExternalEventId(v: unknown): string | null {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  // Prefer canonical external id "tep-123"
+  if (/^tep-\d+$/.test(s)) return s;
+  if (/^\d+$/.test(s)) return `tep-${s}`;
+  return s;
 }
 
 function splitTariffLabel(raw: string): { name: string; description: string | null } {
@@ -1084,6 +1101,29 @@ function BuyCard({
     setPreselectedSessionId(sessionId);
   };
 
+  const renderImportedWidgetCta = (offer: EventOffer) => {
+    const src = String(offer.source || '').toUpperCase();
+
+    if (src === 'TC') {
+      const tcEventId = normalizeTcWidgetEventId(offer.metaEventId || offer.externalEventId || event.tcMetaEventId || event.tcEventId);
+      if (tcEventId) {
+        return <TcWidgetButton tcEventId={tcEventId} compact />;
+      }
+    }
+
+    if (src === 'TEPLOHOD') {
+      const externalEventId = normalizeTepExternalEventId(offer.externalEventId || event.tcEventId);
+      return (
+        <TepWidgetEmbed
+          tepEventId={externalEventId}
+          externalEventId={externalEventId}
+        />
+      );
+    }
+
+    return null;
+  };
+
   const firstSessionPrices =
     event.sessions?.length ? ((event.sessions[0].prices as { type?: string; price?: number; name?: string }[] | null) ?? []) : [];
 
@@ -1142,19 +1182,37 @@ function BuyCard({
                   Заявка
                 </a>
               ) : (
-                <AddToCartButton
-                  eventId={event.id}
-                  offerId={offer.id}
-                  eventTitle={event.title}
-                  eventSlug={event.slug}
-                  imageUrl={event.imageUrl ?? undefined}
-                  priceFrom={offer.priceFrom ?? event.priceFrom ?? 0}
-                  purchaseType={offer.purchaseType ?? 'WIDGET'}
-                  source={offer.source ?? 'INTERNAL'}
-                  deeplink={offer.deeplink ?? undefined}
-                  badge={offer.badge ?? undefined}
-                  className="rounded-lg px-3 py-1.5 text-xs"
-                />
+                (String(offer.source || '').toUpperCase() === 'TC' || String(offer.source || '').toUpperCase() === 'TEPLOHOD') ? (
+                  renderImportedWidgetCta(offer as EventOffer) ?? (
+                    <AddToCartButton
+                      eventId={event.id}
+                      offerId={offer.id}
+                      eventTitle={event.title}
+                      eventSlug={event.slug}
+                      imageUrl={event.imageUrl ?? undefined}
+                      priceFrom={offer.priceFrom ?? event.priceFrom ?? 0}
+                      purchaseType={offer.purchaseType ?? 'WIDGET'}
+                      source={offer.source ?? 'INTERNAL'}
+                      deeplink={offer.deeplink ?? undefined}
+                      badge={offer.badge ?? undefined}
+                      className="rounded-lg px-3 py-1.5 text-xs"
+                    />
+                  )
+                ) : (
+                  <AddToCartButton
+                    eventId={event.id}
+                    offerId={offer.id}
+                    eventTitle={event.title}
+                    eventSlug={event.slug}
+                    imageUrl={event.imageUrl ?? undefined}
+                    priceFrom={offer.priceFrom ?? event.priceFrom ?? 0}
+                    purchaseType={offer.purchaseType ?? 'WIDGET'}
+                    source={offer.source ?? 'INTERNAL'}
+                    deeplink={offer.deeplink ?? undefined}
+                    badge={offer.badge ?? undefined}
+                    className="rounded-lg px-3 py-1.5 text-xs"
+                  />
+                )
               )}
             </div>
           ))}
@@ -1270,23 +1328,39 @@ function BuyCard({
         primaryOffer ? <RequestOfferForm eventId={event.id} offerId={primaryOffer.id} /> : null
       ) : primaryOffer ? (
         <div className="mt-5">
-          <AddToCartButton
-            eventId={event.id}
-            offerId={primaryOffer.id}
-            sessionId={preselectedSessionId ?? undefined}
-            eventTitle={event.title}
-            eventSlug={event.slug}
-            imageUrl={event.imageUrl ?? undefined}
-            priceFrom={primaryOffer.priceFrom ?? event.priceFrom ?? 0}
-            purchaseType={purchaseType ?? primaryOffer.purchaseType ?? 'WIDGET'}
-            source={offerSource ?? primaryOffer.source ?? 'INTERNAL'}
-            deeplink={offerDeeplink ?? primaryOffer.deeplink ?? undefined}
-            badge={offerBadge ?? primaryOffer.badge ?? undefined}
-            className="rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
-          />
-          <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            Покупка проходит через оформление заказа на сайте — так заказ гарантированно фиксируется и появляется в ЛК/админке.
-          </div>
+          {String(offerSource || '').toUpperCase() === 'TC' || String(offerSource || '').toUpperCase() === 'TEPLOHOD' ? (
+            renderImportedWidgetCta(primaryOffer as any as EventOffer) ?? (
+              <AddToCartButton
+                eventId={event.id}
+                offerId={primaryOffer.id}
+                sessionId={preselectedSessionId ?? undefined}
+                eventTitle={event.title}
+                eventSlug={event.slug}
+                imageUrl={event.imageUrl ?? undefined}
+                priceFrom={primaryOffer.priceFrom ?? event.priceFrom ?? 0}
+                purchaseType={purchaseType ?? primaryOffer.purchaseType ?? 'WIDGET'}
+                source={offerSource ?? primaryOffer.source ?? 'INTERNAL'}
+                deeplink={offerDeeplink ?? primaryOffer.deeplink ?? undefined}
+                badge={offerBadge ?? primaryOffer.badge ?? undefined}
+                className="rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
+              />
+            )
+          ) : (
+            <AddToCartButton
+              eventId={event.id}
+              offerId={primaryOffer.id}
+              sessionId={preselectedSessionId ?? undefined}
+              eventTitle={event.title}
+              eventSlug={event.slug}
+              imageUrl={event.imageUrl ?? undefined}
+              priceFrom={primaryOffer.priceFrom ?? event.priceFrom ?? 0}
+              purchaseType={purchaseType ?? primaryOffer.purchaseType ?? 'WIDGET'}
+              source={offerSource ?? primaryOffer.source ?? 'INTERNAL'}
+              deeplink={offerDeeplink ?? primaryOffer.deeplink ?? undefined}
+              badge={offerBadge ?? primaryOffer.badge ?? undefined}
+              className="rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
+            />
+          )}
         </div>
       ) : (
         <button

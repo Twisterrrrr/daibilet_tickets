@@ -11,7 +11,9 @@ export default [
   ...rootConfig,
   {
     files: ['**/*.{js,jsx,ts,tsx,mjs}'],
-    plugins: { '@next/next': nextPlugin },
+    // Next.js "next lint" детектит плагин не только по rules, но и по ключу плагина.
+    // Для flat-config добавляем алиас `next`, сохраняя канонический `@next/next`.
+    plugins: { '@next/next': nextPlugin, next: nextPlugin },
     settings: { next: { rootDir: '.' } },
     rules: { ...nextPlugin.configs.recommended.rules },
   },

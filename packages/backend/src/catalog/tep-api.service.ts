@@ -15,7 +15,9 @@ export class TepApiService {
   private readonly baseUrl = process.env.TEP_API_URL || 'https://api.teplohod.info/v1';
 
   private getTimeoutMs(): number {
-    return getHttpTimeoutMs('TEP_HTTP_TIMEOUT_MS', 30_000);
+    // По умолчанию даём больше времени: full endpoints (/events без compact, /events/:id)
+    // могут отвечать заметно дольше.
+    return getHttpTimeoutMs('TEP_HTTP_TIMEOUT_MS', 120_000);
   }
 
   /**
@@ -87,26 +89,58 @@ export class TepApiService {
   }
 
   /**
-   * События с полными данными (включая расписание eventTimes).
+   * События teplohod.info.
+   *
+   * По умолчанию используем compact-вариант (без расписания),
+   * т.к. full (/events) часто требует белый IP и/или отвечает дольше.
+   *
+   * Чтобы принудительно использовать full endpoint (с попыткой получить eventTimes),
+   * установите ENV `TEP_USE_FULL_EVENTS=1`.
    */
   async getEvents(cityId?: number, signal?: AbortSignal): Promise<TepEvent[]> {
+    const compactPath = cityId ? `/events?compact&city_id=${cityId}` : '/events?compact';
+    const useFull = process.env.TEP_USE_FULL_EVENTS === '1';
+    if (!useFull) {
+      return this.request<TepEvent[]>(compactPath, signal);
+    }
+
     const fullPath = cityId ? `/events?city_id=${cityId}` : '/events';
     try {
       const events = await this.request<TepEvent[]>(fullPath, signal);
-      // Проверяем, что получили полные данные (есть eventTimes)
       if (events.length > 0 && events[0].eventTimes !== undefined) {
         this.logger.log(`TEP full API: ${events.length} events with schedules`);
-        return events;
+      } else {
+        this.logger.warn('TEP: eventTimes not found, IP may not be whitelisted.');
       }
-      // Если eventTimes отсутствует — IP не в белом списке
-      this.logger.warn('TEP: eventTimes not found, IP may not be whitelisted. Fallback to compact.');
+      return events;
     } catch (err: unknown) {
-      this.logger.warn(
-        `TEP full API failed: ${err instanceof Error ? err.message : String(err)}. Fallback to compact.`,
-      );
+      this.logger.warn(`TEP full API failed: ${err instanceof Error ? err.message : String(err)}. Fallback to compact.`);
+      return this.request<TepEvent[]>(compactPath, signal);
     }
+  }
+
+  /**
+   * Принудительно получить события через full endpoint `/events` (с расписанием `eventTimes`),
+   * с fallback на compact только если full реально недоступен.
+   *
+   * Это нужно для наших sync job: без расписания импорт Teplohod превращается в "виртуальную" 1-сессию,
+   * что ломает каталог.
+   */
+  async getEventsFull(cityId?: number, signal?: AbortSignal): Promise<TepEvent[]> {
+    const fullPath = cityId ? `/events?city_id=${cityId}` : '/events';
     const compactPath = cityId ? `/events?compact&city_id=${cityId}` : '/events?compact';
-    return this.request<TepEvent[]>(compactPath, signal);
+    try {
+      const events = await this.request<TepEvent[]>(fullPath, signal);
+      if (events.length > 0 && events[0].eventTimes !== undefined) {
+        this.logger.log(`TEP full API: ${events.length} events with schedules`);
+      } else {
+        this.logger.warn('TEP full API returned events without eventTimes.');
+      }
+      return events;
+    } catch (err: unknown) {
+      this.logger.warn(`TEP getEventsFull failed: ${err instanceof Error ? err.message : String(err)}. Fallback to compact.`);
+      return this.request<TepEvent[]>(compactPath, signal);
+    }
   }
 
   /**

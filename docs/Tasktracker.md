@@ -70,6 +70,43 @@
 
 ---
 
+## Admin V4 (Imported Sales Admin) — Lovable parity plan (11 фаз)
+
+> Цель: интегрировать UI от Lovable в `frontend-admin-v4` без архитектурных переписываний, обеспечить работоспособность MVP-модерации (events/cities/venues/landings/taxonomy) и зафиксировать gaps/инциденты для закрытия.
+
+| Фаза | Содержание | Статус | Примечания / gaps |
+|------|------------|--------|------------------|
+| 1 | Аудит текущего состояния (backend/admin UI, контракты, навигация) | `[x]` | инвентаризация роутов/DTO/эндпоинтов, границы систем |
+| 2 | Shell/навигация Lovable в Admin V4 (без второго роутера) | `[x]` | MVP sidebar, без редизайна всей админки |
+| 3 | Typed API boundary по модулям, убрать мок-данные | `[x]` | основные списки/деталки на API; моки в V4 сняты; оставшиеся gap’ы — в `docs/reports/admin-v4-dto-gaps.md` |
+| 4 | VenueType alignment (Lovable 14 значений) + `OTHER` label | `[x]` | миграции + DTO + UI редактирование |
+| 5 | Events wiring (list/detail/filters/moderation) + Lovable-структура экранов | `[x]` | list/detail + URL-state фильтров + `?tab=` на деталке; moderation/media; **externalPurchaseEntry**; редактирование taxonomy через admin API (фаза 6) |
+| 6 | Taxonomy wiring (категории/подкатегории/теги) + Lovable-группы | `[x]` | редактор классификации на EventDetail + типы/THEME/POPULAR; допил длинных списков тегов — см. `docs/reports/admin-v4-dto-gaps.md` |
+| 7 | Landings wiring (list/detail/blocks/readiness/preview), multi-city | `[x]` | list/detail на API; вкладки: блоки из `GET`, подборка через `resolved-events`, диагностика через `seo-audit`, превью/canonical, пагинация списка; редактирование landing PATCH + CRUD блоков + reorder; **важно:** при разных доменах admin/public относительная ссылка ведёт на admin origin → нужен полный `canonicalUrl` (или public base URL в конфиге) |
+| 8 | Backend gap closure (только блокеры MVP) | `[x]` | list: `needsAttention` / `readyToPublish`, query `needsAttention`/`readyToPublish`/`purchaseReadiness` (Prisma-приближение); detail `importMeta` + `readiness`; external-orders list; landings `storefrontPublicUrl` — см. `docs/reports/admin-v4-dto-gaps.md` |
+| 9 | Launch hardening (ошибки, миграции, порты, стабильность dev/prod) | `[x]` | **CI:** typecheck `frontend-admin-v4`. **Локально/стенд:** `pnpm smoke:health` + `pnpm smoke:phase9` (гость); опционально `SMOKE_ADMIN_BEARER` — см. runbook. **Пост-деплой (ops):** миграции + ручной чеклист SPA из runbook — не автоматизируются в CI |
+| 10 | Performance/UX polishing (только измеримые) | `[x]` | **MVP-baseline + follow-up:** пагинация + URL-state (events / external orders / landings), `lite` на events/landings; **серверный** `search` по внешним заказам (согласован с пагинацией). Профайлинг / react-query-кеш — вне MVP до метрики |
+| 11 | Freeze/transition (документация, стабилизация, handoff) | `[x]` | **Handoff:** `admin-v4-dto-gaps.md` §MVP freeze; runbook фазы 9 + **§Фазы 10–11** (чеклист); non-MVP — в gap-отчёте |
+
+#### Декомпозиция фаз 8–11 (черновик backlog)
+
+**Фаза 8 — gap closure (MVP, additive only)** — источник правды по строкам: [`docs/reports/admin-v4-dto-gaps.md`](reports/admin-v4-dto-gaps.md). Основные блокеры закрыты в коде; остаётся «второй темп» контента и точное совпадение Prisma-фильтров `purchaseReadiness` с JS-валидацией виджета (см. gap-отчёт).
+
+- **Events — high:** `GET :id` — `readiness` + **`importMeta`**; list — **`needsAttention` / `readyToPublish`** + query **`needsAttention` / `readyToPublish` / `purchaseReadiness`** (READY \| NOT_READY \| MISSING, Prisma-приближение); UI V4: quick filters + колонка флагов.
+- **External orders — high:** list: агрегаты refund + query + **`search`** (externalOrderId / UUID id); UI: пагинация + URL `q` (debounce).
+- **Landings — high:** `storefrontPublicUrl` + `PUBLIC_STOREFRONT_ORIGIN` на бэке.
+- **Не в фазу 8 без отдельного решения:** типизированные **контент-блоки Event** второго темпа и PATCH — `medium`, волна «content» (см. `admin-v4-imported-sales.md` §6).
+
+**Фаза 9 — launch hardening:** см. [`docs/runbooks/admin-v4-phase9-smoke.md`](runbooks/admin-v4-phase9-smoke.md); статус в таблице фаз — **`[x]`** (автосмоук в репо; пост-деплой — ручной блок runbook).
+
+**Остаток после MVP (Imported Sales, не блокирует `[x]` фаз 1–11):** «второй темп» контента события, выравнивание `purchaseReadiness` Prisma vs виджет, типизированные блоки лендинга/события — см. [`docs/reports/admin-v4-dto-gaps.md`](reports/admin-v4-dto-gaps.md) и [`docs/product/admin-v4-imported-sales.md`](product/admin-v4-imported-sales.md) §6.
+
+**Фаза 10 — performance / UX:** **`[x]`** — зафиксировано как MVP-baseline (см. §MVP freeze в gap-отчёте); отложенный профайлинг без отдельной задачи с метрикой не входит в закрытие плана.
+
+**Фаза 11 — freeze / transition:** **`[x]`** — handoff и границы MVP зафиксированы в gap-отчёте §MVP freeze; продуктовый контракт по-прежнему в `admin-v4-imported-sales.md` + `docs/qa.md`.
+
+---
+
 ## Backend/UI wiring — contracts freeze (2026‑04)
 
 | ID / якорь | Задача | Приоритет | Статус |

@@ -2,6 +2,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Body, Controller, Get, Logger, Patch, Post, Query, Request, UseGuards, UseInterceptors } from '@nestjs/common';
 import { BadRequestException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Queue } from 'bullmq';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -24,6 +25,8 @@ export class AdminSettingsController {
   private readonly logger = new Logger(AdminSettingsController.name);
 
   private static readonly SYNC_FULL_JOB_ID = 'singleton_sync_full';
+  private static readonly SYNC_TEP_JOB_ID = 'singleton_sync_tep';
+  private static readonly SYNC_TC_JOB_ID = 'singleton_sync_tc';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -106,6 +109,27 @@ export class AdminSettingsController {
   @Roles('ADMIN')
   async syncFull() {
     this.logger.log('Admin triggered full sync → queue');
+
+    // BullMQ jobId дедуплицирует задачи. Для "singleton" режима это хорошо,
+    // но при removeOnComplete completed job может ещё оставаться в Redis и
+    // повторный add() вернёт старый job без выполнения.
+    // Здесь мы безопасно удаляем завершённую/упавшую задачу перед постановкой новой.
+    const existing = await this.syncQueue.getJob(AdminSettingsController.SYNC_FULL_JOB_ID);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === 'completed' || state === 'failed') {
+        try {
+          await existing.remove();
+        } catch (e: unknown) {
+          this.logger.warn(
+            `Could not remove previous full sync job (id=${AdminSettingsController.SYNC_FULL_JOB_ID}, state=${state}): ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+          );
+        }
+      }
+    }
+
     const job = await this.syncQueue.add(
       'sync-full',
       {},
@@ -127,8 +151,95 @@ export class AdminSettingsController {
     };
   }
 
+  @Post('ops/sync/tep')
+  @Roles('ADMIN')
+  async syncTep() {
+    this.logger.log('Admin triggered TEP sync → queue');
+
+    const existing = await this.syncQueue.getJob(AdminSettingsController.SYNC_TEP_JOB_ID);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === 'completed' || state === 'failed') {
+        try {
+          await existing.remove();
+        } catch (e: unknown) {
+          this.logger.warn(
+            `Could not remove previous TEP sync job (id=${AdminSettingsController.SYNC_TEP_JOB_ID}, state=${state}): ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+          );
+        }
+      }
+    }
+
+    const job = await this.syncQueue.add(
+      'sync-tep',
+      {},
+      {
+        jobId: AdminSettingsController.SYNC_TEP_JOB_ID,
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 60_000 },
+        removeOnComplete: 50,
+        removeOnFail: 20,
+      },
+    );
+
+    const queued = job?.id != null;
+    return {
+      success: true,
+      message: queued ? 'TEP синхронизация поставлена в очередь' : 'Синхронизация уже выполняется',
+      jobId: AdminSettingsController.SYNC_TEP_JOB_ID,
+      queued,
+    };
+  }
+
+  @Post('ops/sync/tc')
+  @Roles('ADMIN')
+  async syncTc(@Query('mode') mode?: string) {
+    const syncMode = mode === 'full' ? 'full' : 'fast';
+    this.logger.log('Admin triggered TC sync → queue');
+
+    const existing = await this.syncQueue.getJob(AdminSettingsController.SYNC_TC_JOB_ID);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === 'completed' || state === 'failed') {
+        try {
+          await existing.remove();
+        } catch (e: unknown) {
+          this.logger.warn(
+            `Could not remove previous TC sync job (id=${AdminSettingsController.SYNC_TC_JOB_ID}, state=${state}): ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+          );
+        }
+      }
+    }
+
+    const job = await this.syncQueue.add(
+      'sync-tc',
+      { mode: syncMode },
+      {
+        jobId: AdminSettingsController.SYNC_TC_JOB_ID,
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 60_000 },
+        removeOnComplete: 50,
+        removeOnFail: 20,
+      },
+    );
+
+    const queued = job?.id != null;
+    return {
+      success: true,
+      message: queued ? 'TC синхронизация поставлена в очередь' : 'Синхронизация уже выполняется',
+      jobId: AdminSettingsController.SYNC_TC_JOB_ID,
+      queued,
+      mode: syncMode,
+    };
+  }
+
   @Get('ops/sync/progress')
   @Roles('ADMIN')
+  @SkipThrottle()
   async getSyncProgress(@Query('jobId') jobId?: string) {
     const id = jobId || AdminSettingsController.SYNC_FULL_JOB_ID;
     const job = await this.syncQueue.getJob(id);
@@ -150,11 +261,27 @@ export class AdminSettingsController {
   @Roles('ADMIN')
   async syncIncremental() {
     this.logger.log('Admin triggered incremental sync → queue');
+    const id = 'singleton_sync_incremental';
+    const existing = await this.syncQueue.getJob(id);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === 'completed' || state === 'failed') {
+        try {
+          await existing.remove();
+        } catch (e: unknown) {
+          this.logger.warn(
+            `Could not remove previous incremental sync job (id=${id}, state=${state}): ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+          );
+        }
+      }
+    }
     const job = await this.syncQueue.add(
       'sync-incremental',
       {},
       {
-        jobId: 'singleton_sync_incremental',
+        jobId: id,
         attempts: 3,
         backoff: { type: 'exponential', delay: 30_000 },
         removeOnComplete: 50,
@@ -166,7 +293,7 @@ export class AdminSettingsController {
     return {
       success: true,
       message: queued ? 'Инкрементальная синхронизация поставлена в очередь' : 'Синхронизация уже выполняется',
-      jobId: 'singleton_sync_incremental',
+      jobId: id,
       queued,
     };
   }

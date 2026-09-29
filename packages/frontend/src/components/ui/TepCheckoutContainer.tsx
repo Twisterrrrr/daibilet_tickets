@@ -3,20 +3,20 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { TepWidgetEmbed } from './TepWidget';
-
 interface TepCheckoutContainerProps {
-  tepWidgetId?: string | number | null;
   tepEventId?: string | number | null;
   externalEventId?: string | null;
   deeplink?: string | null;
+  label?: string;
+  className?: string;
 }
 
 export function TepCheckoutContainer({
-  tepWidgetId,
   tepEventId,
   externalEventId,
   deeplink,
+  label = 'Купить билет',
+  className,
 }: TepCheckoutContainerProps) {
   const [open, setOpen] = useState(false);
 
@@ -27,18 +27,21 @@ export function TepCheckoutContainer({
         ? String(externalEventId).replace(/^tep-/, '')
         : null;
 
-  const _teplohodUrl =
-    deeplink ||
-    (numericEventId ? `https://teplohod.info/event/${encodeURIComponent(numericEventId)}` : undefined);
+  const widgetSrc = numericEventId
+    ? `/widgets/teplohod?eventId=${encodeURIComponent(numericEventId)}&layout=compact&theme=light`
+    : null;
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700"
+        className={
+          className ||
+          'flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3.5 text-base font-medium text-white transition hover:bg-primary-700'
+        }
       >
-        Купить билет
+        {label}
       </button>
 
       {open &&
@@ -55,11 +58,17 @@ export function TepCheckoutContainer({
                 ✕
               </button>
               <div className="min-h-[220px] rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                <TepWidgetEmbed
-                  tepWidgetId={tepWidgetId}
-                  tepEventId={numericEventId ?? undefined}
-                  externalEventId={externalEventId ?? null}
-                />
+                {widgetSrc ? (
+                  <iframe
+                    title="Teplohod tickets widget"
+                    src={widgetSrc}
+                    className="h-[520px] w-full rounded-xl bg-white"
+                  />
+                ) : (
+                  <div className="py-10 text-center text-sm text-slate-600">
+                    Не удалось открыть виджет: не найден teplohod eventId.
+                  </div>
+                )}
               </div>
             </div>
           </div>,

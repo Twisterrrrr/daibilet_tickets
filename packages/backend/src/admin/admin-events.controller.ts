@@ -73,6 +73,10 @@ import {
   EventLandingTableFacetsDto,
   EventCateringDto,
 } from './dto/admin.dto';
+import {
+  buildAdminExternalPurchaseEntry,
+  slimExternalPurchaseEntryForList,
+} from './build-admin-external-purchase-entry';
 import { EventOverrideService } from './event-override.service';
 import { EventAdminSummaryService } from './event-admin-summary.service';
 import { EventQualityIssue, EventQualityService } from '../catalog/event-quality.service';
@@ -86,6 +90,9 @@ import { CatalogClassificationNormalizerService } from '../catalog/catalog-class
 import { deriveSectionsFromSubcategories, getSubcategorySlugsForSection } from '../catalog-classification/derive-sections';
 import type { SectionSlug } from '../catalog-classification/classification.types';
 import {
+  adminEventsIssuesPresetApiWhere,
+  adminEventsReadyToPublishAndParts,
+  computeAdminEventListQuickPublishFlags,
   computeAdminEventQuickHealth,
   isImportedArchived,
   mapEventOfferToCategoryPriceDto,
@@ -107,6 +114,19 @@ function parseIdsParam(raw: string | undefined): string[] {
         .filter(Boolean),
     ),
   );
+}
+
+function parseEventSourceParam(raw?: string): EventSource | 'IMPORTED' | null {
+  const s = String(raw ?? '').trim().toUpperCase();
+  if (!s) return null;
+  // Backward-compatible admin params:
+  // - legacy: TICKETSCLOUD / TEPLOHOD
+  // - prisma enum: TC / TEPLOHOD / MANUAL
+  if (s === 'IMPORTED') return 'IMPORTED';
+  if (s === 'TICKETSCLOUD' || s === 'TC') return EventSource.TC;
+  if (s === 'TEPLOHOD') return EventSource.TEPLOHOD;
+  if (s === 'MANUAL') return EventSource.MANUAL;
+  return null;
 }
 
 class UpdateEventTagsDto {
@@ -290,6 +310,12 @@ export class AdminEventsController {
     @Query('missingImage') missingImage?: string,
     @Query('hasOverride') hasOverride?: string,
     @Query('issuesPreset') issuesPreset?: string,
+    /** `true` — то же, что `issuesPreset=api` (проблемы витрины). */
+    @Query('needsAttention') needsAttention?: string,
+    /** `true` — приближённый Prisma-фильтр «к публикации» (см. `adminEventsReadyToPublishAndParts`). */
+    @Query('readyToPublish') readyToPublish?: string,
+    /** `READY` | `NOT_READY` | `MISSING` — приближение по офферам (без JS-валидации виджета). */
+    @Query('purchaseReadiness') purchaseReadiness?: string,
     @Query('lite') lite?: string,
   ) {
     const pg = parsePagination({ cursor, page, limit });
@@ -300,7 +326,15 @@ export class AdminEventsController {
       andParts.push({ category: category as EventCategory });
     }
     if (source) {
-      andParts.push({ source: source as EventSource });
+      const parsed = parseEventSourceParam(source);
+      if (!parsed) {
+        throw new BadRequestException('source должен быть IMPORTED|TC|TEPLOHOD|MANUAL (или legacy TICKETSCLOUD)');
+      }
+      if (parsed === 'IMPORTED') {
+        andParts.push({ source: { in: [EventSource.TC, EventSource.TEPLOHOD] } });
+      } else {
+        andParts.push({ source: parsed });
+      }
     }
     if (active !== undefined) andParts.push({ isActive: active === 'true' });
     if (search) {
@@ -309,6 +343,10 @@ export class AdminEventsController {
         OR: [
           { title: { contains: trimmed, mode: 'insensitive' } },
           { slug: { contains: trimmed, mode: 'insensitive' } },
+          { city: { slug: { contains: trimmed, mode: 'insensitive' } } },
+          { city: { name: { contains: trimmed, mode: 'insensitive' } } },
+          { venue: { slug: { contains: trimmed, mode: 'insensitive' } } },
+          { venue: { title: { contains: trimmed, mode: 'insensitive' } } },
           { tcEventId: trimmed },
           { offers: { some: { externalEventId: trimmed } } },
         ],
@@ -443,17 +481,64 @@ export class AdminEventsController {
     }
 
     const preset = (issuesPreset ?? '').trim().toLowerCase();
-    if (preset === 'api') {
-      // Operational issues that block a storefront-safe publish.
+    const needsAttentionQuery =
+      needsAttention === 'true' || needsAttention === '1' || needsAttention === 'yes';
+    const readyToPublishQuery =
+      readyToPublish === 'true' || readyToPublish === '1' || readyToPublish === 'yes';
+    if (needsAttentionQuery && readyToPublishQuery) {
+      throw new BadRequestException('Параметры needsAttention=true и readyToPublish=true взаимоисключающие');
+    }
+    if (preset === 'api' || needsAttentionQuery) {
+      andParts.push(adminEventsIssuesPresetApiWhere(now));
+    }
+
+    if (readyToPublishQuery) {
+      for (const part of adminEventsReadyToPublishAndParts(now)) {
+        andParts.push(part);
+      }
+    }
+
+    const pr = (purchaseReadiness ?? '').trim().toUpperCase();
+    if (pr === 'READY') {
       andParts.push({
         OR: [
-          { venueId: null },
-          { subcategoryLinks: { none: {} } },
-          { offers: { none: { isDeleted: false, status: OfferStatus.ACTIVE, priceFrom: { gt: 0 } } } },
-          { sessions: { none: futureSessionsWhereActive } },
-          { imageUrl: null, OR: [{ override: null }, { override: { imageUrl: null } }] },
+          { source: EventSource.MANUAL },
+          {
+            source: { not: EventSource.MANUAL },
+            offers: {
+              some: {
+                isDeleted: false,
+                status: OfferStatus.ACTIVE,
+                OR: [
+                  { purchaseType: PurchaseType.WIDGET, widgetProvider: { not: null } },
+                  { purchaseType: PurchaseType.REDIRECT, deeplink: { not: null } },
+                ],
+              },
+            },
+          },
         ],
       });
+    } else if (pr === 'MISSING') {
+      andParts.push({ source: { not: EventSource.MANUAL } });
+      andParts.push({ offers: { none: { isDeleted: false, status: OfferStatus.ACTIVE } } });
+    } else if (pr === 'NOT_READY') {
+      andParts.push({ source: { not: EventSource.MANUAL } });
+      andParts.push({
+        NOT: {
+          offers: {
+            some: {
+              isDeleted: false,
+              status: OfferStatus.ACTIVE,
+              OR: [
+                { purchaseType: PurchaseType.WIDGET, widgetProvider: { not: null } },
+                { purchaseType: PurchaseType.REDIRECT, deeplink: { not: null } },
+              ],
+            },
+          },
+        },
+      });
+    } else if (pr.length > 0 && !['READY', 'MISSING', 'NOT_READY'].includes(pr)) {
+      throw new BadRequestException('purchaseReadiness: допустимо READY | NOT_READY | MISSING');
     }
 
     // Derived classification filters (canonical source: event_subcategory_links).
@@ -646,6 +731,44 @@ export class AdminEventsController {
       if (p != null && p > 0) minOfferPriceByEventId.set(row.eventId, p);
     }
 
+    type OfferPurchaseRow = {
+      eventId: string;
+      purchaseType: PurchaseType;
+      deeplink: string | null;
+      widgetPayload: Prisma.JsonValue;
+      status: OfferStatus;
+      isDeleted: boolean;
+      isPrimary: boolean;
+      priority: number;
+      widgetProvider: string | null;
+    };
+    const offersRows: OfferPurchaseRow[] = eventIds.length
+      ? await this.prisma.eventOffer.findMany({
+          where: {
+            eventId: { in: eventIds },
+            isDeleted: false,
+            status: OfferStatus.ACTIVE,
+          },
+          select: {
+            eventId: true,
+            purchaseType: true,
+            deeplink: true,
+            widgetPayload: true,
+            status: true,
+            isDeleted: true,
+            isPrimary: true,
+            priority: true,
+            widgetProvider: true,
+          },
+        })
+      : [];
+    const offersByEventId = new Map<string, OfferPurchaseRow[]>();
+    for (const row of offersRows) {
+      const arr = offersByEventId.get(row.eventId) ?? [];
+      arr.push(row);
+      offersByEventId.set(row.eventId, arr);
+    }
+
     const items = result.items.map((e) => {
       const allSubcats = liteMode
         ? []
@@ -697,6 +820,23 @@ export class AdminEventsController {
         issueCodes: quickHealth.issueCodes,
       });
 
+      const externalPurchaseEntry = slimExternalPurchaseEntryForList(
+        buildAdminExternalPurchaseEntry({
+          source: e.source,
+          offers: offersByEventId.get(e.id) ?? [],
+        }),
+      );
+
+      const overrideHidden = Boolean(e.override?.isHidden);
+      const { needsAttention: needsAttentionFlag, readyToPublish: readyToPublishFlag } =
+        computeAdminEventListQuickPublishFlags({
+          source: e.source,
+          isActive: e.isActive,
+          overrideHidden,
+          readinessListStatus: readinessStatus,
+          externalPurchaseStatus: externalPurchaseEntry.status,
+        });
+
       return {
         id: e.id,
         title: e.title,
@@ -732,6 +872,9 @@ export class AdminEventsController {
           score: readinessScore,
           issueCodes: quickHealth.issueCodes,
         },
+        externalPurchaseEntry,
+        needsAttention: needsAttentionFlag,
+        readyToPublish: readyToPublishFlag,
         isPast: derivedIsPast,
         isArchived: derivedIsArchived,
         isIndexable: derivedIsIndexable,
@@ -762,6 +905,10 @@ export class AdminEventsController {
     if (source !== 'TICKETSCLOUD' && source !== 'TEPLOHOD') {
       throw new BadRequestException('source должен быть TICKETSCLOUD или TEPLOHOD');
     }
+    const parsedSource = parseEventSourceParam(source);
+    if (!parsedSource || parsedSource === 'IMPORTED' || parsedSource === EventSource.MANUAL) {
+      throw new BadRequestException('source должен быть TICKETSCLOUD или TEPLOHOD');
+    }
 
     const now = new Date();
     const threshold = new Date(now.getTime() - dto.olderThanDays * 24 * 60 * 60 * 1000);
@@ -773,7 +920,7 @@ export class AdminEventsController {
     const candidates = await this.prisma.event.findMany({
       where: {
         isDeleted: false,
-        source: source as EventSource,
+        source: parsedSource,
         isActive: true,
         sessions: { none: futureSessionsWhere },
       },
@@ -835,7 +982,7 @@ export class AdminEventsController {
       where: {
         id: { in: idsToArchive },
         isDeleted: false,
-        source: source as EventSource,
+        source: parsedSource,
         isActive: true,
         sessions: { none: futureSessionsWhere },
       },
@@ -2316,7 +2463,7 @@ export class AdminEventsController {
         override: true,
         subcategoryLinks: {
           include: {
-            subcategory: { select: { id: true, slug: true, nameRu: true, isActive: true, layer: true, type: true } },
+            subcategory: { select: { id: true, slug: true, code: true, nameRu: true, isActive: true, layer: true, type: true } },
           },
         },
       },
@@ -2327,6 +2474,7 @@ export class AdminEventsController {
       .filter(
         (s): s is {
           id: string;
+          code: string;
           slug: string;
           nameRu: string;
           isActive: boolean;
@@ -2364,6 +2512,8 @@ export class AdminEventsController {
       .filter((o) => !o.isDeleted)
       .map((o) => mapEventOfferToCategoryPriceDto(o));
 
+    const summaryReadiness = (await this.eventAdminSummary.getSummary(id)).readiness;
+
     return {
       ...event,
       supplier: event.operator
@@ -2375,6 +2525,11 @@ export class AdminEventsController {
             trustScore: event.operator.trustScore,
           }
         : null,
+      /** Additive: готовность внешней покупки (провайдерский виджет / deeplink), не internal checkout. */
+      externalPurchaseEntry: buildAdminExternalPurchaseEntry({
+        source: event.source,
+        offers: event.offers ?? [],
+      }),
       categoryPrices,
       scheduleSummary: {
         nextSessionAt: nextFutureSession?.startsAt.toISOString() ?? null,
@@ -2399,6 +2554,19 @@ export class AdminEventsController {
       isPast: derivedIsPast,
       isArchived: derivedIsArchived,
       isIndexable: derivedIsIndexable,
+      /** Additive: серверная готовность/блокеры (тот же слой, что `GET /admin/events/:id/summary`). */
+      readiness: summaryReadiness,
+      /** Additive: нормализованные поля импорта для админки (Lovable gap). */
+      importMeta: {
+        sourceExternalId: event.tcEventId ?? null,
+        lastSyncedAt: event.lastSyncAt ? event.lastSyncAt.toISOString() : null,
+        syncStatus:
+          event.lastSyncAt == null
+            ? ('NEVER' as const)
+            : Date.now() - event.lastSyncAt.getTime() > 7 * 86400000
+              ? ('STALE' as const)
+              : ('OK' as const),
+      },
     };
   }
 

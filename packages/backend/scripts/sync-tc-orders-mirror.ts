@@ -11,6 +11,7 @@
  *   pnpm run sync:tc-orders-mirror -- --hours 48 --status done,cancelled
  *   pnpm run sync:tc-orders-mirror -- --max-pages 5 --page-size 100 --only-with-customer
  */
+import 'reflect-metadata';
 import 'dotenv/config';
 
 import { NestFactory } from '@nestjs/core';

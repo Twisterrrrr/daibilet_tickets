@@ -115,6 +115,13 @@ Design style:
 - predictable navigation
 - explicit states: loading, empty, error, read-only, partially editable, sync issues, archived, unpublished
 
+Optional UI reference:
+- You may look at `https://github.com/Twisterrrrr/Daibilet-Admin-UI.git` only as a high-level reference for shared layout primitives (PageHeader/FilterBar/DataTable/Detail/Tabs) and “source-aware read-only” patterns.
+- Do NOT copy screens 1:1; adapt to the fixed contracts and existing project components.
+- Do NOT copy its tech stack, routing, or mock data.
+- Do NOT invent or change API endpoints/DTOs based on that repo; only follow the contracts provided in these prompts.
+- Classification UI must follow the strict rules in v3 §13 (1 primary + up to 2 secondary, max 3 total; tags separate), even if any reference UI differs.
+
 Implementation bias:
 - production-oriented React UI
 - modular pages and components
@@ -380,7 +387,7 @@ Generate:
 
 ## 6. PROMPT — Admin Events list + detail
 
-Один из ключевых модулей.
+
 
 ```
 Implement the Admin Events module for Daibilet:
@@ -777,10 +784,19 @@ Generate:
 
 ---
 
-## 12. PROMPT — Supplier Integrations
+## 12. PROMPT — Admin: Supplier Integrations (operational)
 
 ```
 Implement the Supplier Integrations module for Daibilet.
+
+This module belongs to the **Admin application** (internal operator UI), under `/admin/*` routes.
+It is NOT a Supplier cabinet module.
+
+IMPORTANT (fix if you already scaffolded it wrong):
+- If you already created “Integrations” inside the Supplier app (`/supplier/*`), **stop and move it now**:
+  - remove the Supplier navigation entry and any Supplier routes/pages for Integrations
+  - re-create the module under the Admin app only (`/admin/integrations` or `/admin/supplier-integrations`)
+  - keep Supplier side limited to visibility inside Supplier Event/Venue detail forms (classification/sync badges), not an Integrations section
 
 Context:
 - Frontend only

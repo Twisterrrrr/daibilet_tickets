@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import type { ExternalTicketProvider } from './contracts/external-ticket-provider.interface';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AdminIntegrationsReadController } from './admin-integrations-read.controller';
+import { AdminExternalOrdersController } from './admin-external-orders.controller';
 import { EventProviderLinkService } from './event-provider-link.service';
 import { TICKET_EXTERNAL_PROVIDERS } from './integrations.constants';
 import { ManualTicketProviderService } from './providers/manual/manual-ticket-provider.service';
@@ -45,7 +46,7 @@ const ADAPTER_CLASSES = [
 
 @Module({
   imports: [PrismaModule, ConfigModule],
-  controllers: [ProviderInboundWebhookController, AdminIntegrationsReadController],
+  controllers: [ProviderInboundWebhookController, AdminIntegrationsReadController, AdminExternalOrdersController],
   providers: [
     RadarioIntegrationEnv,
     RadarioHttpService,

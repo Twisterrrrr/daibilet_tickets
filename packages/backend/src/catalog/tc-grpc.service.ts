@@ -258,7 +258,7 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
   /**
    * Получить все мероприятия из TC.
    *
-   * @param filter.status 0=ANY, 1=STAND_BY, 2=PUBLIC
+   * @param filter.status EventsRequest.Status: 0=ANY, 1=STAND_BY, 2=PUBLIC
    * @param filter.ids фильтр по ID
    * @param filter.meta фильтр по MetaEvent ID
    * @param filter.org фильтр по организатору
@@ -280,7 +280,9 @@ export class TcGrpcService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.debug(`gRPC Events request: ${JSON.stringify(request)}`);
 
-    const events = await this.collectStream<TcGrpcEvent>('Events', request, 180000);
+    const envTimeout = Number(process.env.TC_GRPC_EVENTS_TIMEOUT_MS);
+    const timeoutMs = Number.isFinite(envTimeout) && envTimeout > 0 ? Math.floor(envTimeout) : 300_000;
+    const events = await this.collectStream<TcGrpcEvent>('Events', request, timeoutMs);
 
     this.logger.log(`gRPC Events: получено ${events.length} мероприятий`);
     return events;

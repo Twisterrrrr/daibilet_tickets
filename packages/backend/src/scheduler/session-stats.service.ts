@@ -77,14 +77,31 @@ export class SessionStatsService {
 
     if (sessionTotals.size === 0) return 0;
 
+    // Защита от FK-ошибок: источники (PackageItem / offersSnapshot) могут содержать sessionId,
+    // которых уже нет в event_sessions (например, после dev reset/очисток/частичных импортов).
+    const sessionIds = [...sessionTotals.keys()];
+    const existingSessions = await this.prisma.eventSession.findMany({
+      where: { id: { in: sessionIds } },
+      select: { id: true },
+    });
+    const existingIds = new Set(existingSessions.map((s) => s.id));
+
     let upserted = 0;
+    let skippedMissing = 0;
     for (const [sessionId, v] of sessionTotals) {
+      if (!existingIds.has(sessionId)) {
+        skippedMissing++;
+        continue;
+      }
       await this.prisma.eventSessionStats.upsert({
         where: { sessionId },
         create: { sessionId, totalPaid: v.totalPaid, soldLast24h: v.soldLast24h },
         update: { totalPaid: v.totalPaid, soldLast24h: v.soldLast24h },
       });
       upserted++;
+    }
+    if (skippedMissing > 0) {
+      this.logger.warn(`Session stats: skipped ${skippedMissing} missing sessions (stale references)`);
     }
     return upserted;
   }

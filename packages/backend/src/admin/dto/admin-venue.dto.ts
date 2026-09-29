@@ -27,6 +27,11 @@ export class CreateVenueDto {
   @IsEnum(VenueType)
   venueType!: VenueType;
 
+  @ApiPropertyOptional({ description: 'Уточнение для типа OTHER' })
+  @IsOptional()
+  @IsString()
+  venueTypeOtherLabel?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

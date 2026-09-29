@@ -1,0 +1,93 @@
+# Admin Flows — UX / navigation map (Imported Sales Admin)
+
+**Назначение:** навигация и потоки экранов Admin V4 для **импортного каталога и внешних продаж**.  
+**Не использовать** как буквальный backend/OpenAPI-контракт: фактические пути и DTO — в [`admin-v4-imported-sales.md`](admin-v4-imported-sales.md) (части A и C), [`docs/qa.md`](../qa.md).
+
+| Контур | Базовый путь |
+|--------|----------------|
+| SPA Admin V4 | `/admin-v4/...` |
+| Admin API | `/api/v1/admin/...` |
+
+**Вердикт по импортным продажам:** витрина ведёт пользователя в **покупку у провайдера** (виджет / deeplink). **Нет** internal checkout / cart / Daibilet order на экране события.  
+**External Orders:** факты провайдера — read-only; операционный слой Daibilet (заявки на ручной возврат, заметки, статусы обработки) — редактируемый (см. принципы).
+
+```mermaid
+graph LR
+    %% ==================== DASHBOARD ====================
+    DASH[/"Dashboard<br/>/admin-v4/dashboard"/]:::page
+    DASH -->|aggregate| API_DASH["GET /api/v1/admin/imported-sales/dashboard"]:::api
+
+    %% ==================== EVENTS ====================
+    EVL[/"Events<br/>/admin-v4/events?..."/]:::page
+    EVD[/"EventDetail<br/>/admin-v4/events/:id?tab=..."/]:::page
+    EVL -->|list| API_EVL["GET /api/v1/admin/events"]:::api
+    EVL -->|row click| EVD
+    EVD -->|core| API_EV["GET/PATCH /api/v1/admin/events/:id"]:::api
+    EVD -->|external purchase readiness| API_EVPUR["additive: externalPurchaseEntry<br/>в GET /api/v1/admin/events/:id"]:::api
+    EVD -->|tab=overview| API_EV
+    EVD -->|tab=classification| API_EVK["classification / tags"]:::api
+    EVD -->|tab=schedule| API_EVS["sessions R/O"]:::ro
+    EVD -->|tab=media| API_EVM["PATCH media"]:::api
+    EVD -->|tab=source| API_EVO["overrides / source R/O"]:::ro
+
+    %% ==================== VENUES / CITIES / LANDINGS (сокращённо) ====================
+    VL[/"Venues<br/>/admin-v4/venues"/]:::page
+    VD[/"VenueDetail<br/>/admin-v4/venues/:id"/]:::page
+    VL --> API_VL["GET /api/v1/admin/venues"]:::api
+    VL --> VD
+    VD --> API_V["GET/PATCH /api/v1/admin/venues/:id"]:::api
+
+    CL[/"Cities<br/>/admin-v4/cities"/]:::page
+    CD[/"CityDetail ..."/]:::page
+    CL --> API_CL["GET /api/v1/admin/cities"]:::api
+    CL --> CD
+    CD --> API_C["GET/PATCH /api/v1/admin/cities/:id"]:::api
+
+    LL[/"Landings<br/>/admin-v4/landings"/]:::page
+    LD[/"LandingDetail ..."/]:::page
+    LL --> API_LL["GET /api/v1/admin/landings"]:::api
+    LL --> LD
+    LD --> API_L["GET/PATCH /api/v1/admin/landings/:id"]:::api
+
+    %% ==================== COLLECTIONS / SEO / LINKING ====================
+    KL[/"Collections"/]:::page
+    SEO[/"SeoDashboard"/]:::page
+    LNK[/"Linking (placeholder)"/]:::page
+    RDR[/"Redirects (placeholder)"/]:::page
+
+    %% ==================== OPS / SYSTEM ====================
+    SRC[/"ImportSources<br/>/admin-v4/sources"/]:::page
+    MAP[/"MappingInbox"/]:::page
+    SH[/"SyncHealth"/]:::page
+    AUD[/"AuditLog"/]:::page
+    TAX[/"Taxonomy"/]:::page
+    SET[/"Settings"/]:::page
+
+    SRC --> API_SRC["GET /api/v1/admin/supplier-integrations ..."]:::api
+    MAP --> API_MAP["mapping / source-categories"]:::api
+    SH --> API_SH["sync-status / ops queues"]:::api
+    AUD --> API_AUD["GET /api/v1/admin/audit"]:::ro
+
+    ORD[/"ExternalOrders<br/>/admin-v4/orders?source&status&refundStatus"/]:::page
+    ORDD[/"ExternalOrderDetail<br/>/admin-v4/orders/:id?tab=overview|refunds|operations|source|audit"/]:::page
+    ORD -->|list| API_ORD["GET /api/v1/admin/external-orders"]:::api
+    ORD -->|row click| ORDD
+    ORDD -->|detail| API_ORDD["GET /api/v1/admin/external-orders/:id"]:::api
+    ORDD -->|tab=refunds| API_REF["POST/PATCH refund-requests<br/>(операционный слой Daibilet)"]:::api
+    ORDD -->|tab=source| API_ORDSRC["R/O provider snapshot"]:::ro
+    ORDD -->|tab=audit| API_ORDAUD["GET /api/v1/admin/audit?entity=..."]:::ro
+
+    TAX --> API_TAX["GET taxonomy endpoints"]:::ro
+    SET --> API_SET["GET/PUT settings"]:::api
+
+    %% ==================== CROSS-LINKS ====================
+    EVD -.->|venue| VD
+    EVD -.->|city| CD
+
+    classDef page fill:#1e3a8a,stroke:#3b82f6,color:#fff,stroke-width:1px;
+    classDef api fill:#064e3b,stroke:#10b981,color:#fff;
+    classDef ro fill:#3f3f46,stroke:#a1a1aa,color:#fff,stroke-dasharray: 4 2;
+```
+
+**Целевые эндпоинты ручного возврата** (план, additive под `/api/v1/admin`):  
+`POST /external-orders/:id/refund-requests`, `PATCH /external-refund-requests/:id`, `GET /external-refund-requests?...` — см. [`admin-v4-dto-gaps.md`](../reports/admin-v4-dto-gaps.md).

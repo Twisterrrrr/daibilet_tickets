@@ -34,6 +34,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const enableMetrika = Boolean(process.env.NEXT_PUBLIC_YM_ID) && process.env.NODE_ENV === 'production';
   return (
     <html lang="ru" data-scroll-behavior="smooth">
       <body className="flex min-h-screen min-w-0 flex-col">
@@ -62,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script src="https://api.teplohod.info/v1/widget/widget.js" strategy="lazyOnload" />
 
         {/* Яндекс Метрика */}
-        {process.env.NEXT_PUBLIC_YM_ID && (
+        {enableMetrika && (
           <>
             <Script id="yandex-metrika" strategy="afterInteractive">
               {`

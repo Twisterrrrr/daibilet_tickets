@@ -21,12 +21,6 @@ interface AddToCartButtonProps {
   className?: string;
 }
 
-/**
- * MVP vertical slice (orders/refunds): always go through internal checkout (/checkout)
- * so a CheckoutSession is recorded in DB and becomes visible in account/admin flows.
- *
- * Legacy direct package flow is intentionally disabled here to avoid "purchase outside the system".
- */
 export function AddToCartButton(props: AddToCartButtonProps) {
   const { addItem } = useCart();
   const router = useRouter();

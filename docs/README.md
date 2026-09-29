@@ -46,6 +46,7 @@
 
 ## Product
 
+- [`product/admin-v4-imported-sales.md`](product/admin-v4-imported-sales.md) — **единый канон Admin V4 Imported Sales**: интеграция с бэкендом (часть A) + UX/product contract MVP (часть B) + карта маршрутов и API (часть C). Старые имена файлов (`admin-v4-integration-principles.md`, `lovable-admin-contract-map.md`, `admin-v4-imported-sales-ux-contract.md`) — короткие указатели на этот документ.
 - [`product/landings.md`](product/landings.md)
 - [`product/finance.md`](product/finance.md)
 - [`product/seo.md`](product/seo.md)

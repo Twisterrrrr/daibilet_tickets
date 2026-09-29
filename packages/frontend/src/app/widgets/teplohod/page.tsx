@@ -1,4 +1,5 @@
 import TeplohodWidgetClient, { type WidgetData } from './TeplohodWidgetClient';
+import { fetchApi } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,26 +25,26 @@ async function fetchEventData<T = unknown>(searchParams: SearchParams): Promise<
   if (searchParams.theme) params.set('theme', searchParams.theme);
   if (searchParams.layout) params.set('layout', searchParams.layout);
 
-  const url = `/api/v1/widgets/teplohod/event?${params.toString()}`;
-
   try {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return { error: `Ошибка загрузки (${res.status})`, data: null };
-    const json = (await res.json()) as T;
+    const json = await fetchApi<T>(`/widgets/teplohod/event?${params.toString()}`, { cache: 'no-store' });
     return { error: null, data: json };
-  } catch {
-    return { error: 'Сервис временно недоступен', data: null };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Сервис временно недоступен';
+    return { error: msg || 'Сервис временно недоступен', data: null };
   }
 }
 
 export default async function TeplohodPage({ searchParams }: { searchParams: SearchParams }) {
-  const { error, data } = await fetchEventData<WidgetData>(searchParams);
+  // Next.js may pass `searchParams` as an async dynamic API in some runtimes.
+  // Normalize to a plain object before reading properties.
+  const sp = (await Promise.resolve(searchParams)) as SearchParams;
+  const { error, data } = await fetchEventData<WidgetData>(sp);
 
   return (
     <TeplohodWidgetClient
       initialError={error}
       initialData={data}
-      eventId={searchParams.eventId}
+      eventId={sp.eventId}
     />
   );
 }

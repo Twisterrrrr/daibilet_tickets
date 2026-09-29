@@ -84,6 +84,8 @@ import { AdminSubcategoriesController } from './admin-subcategories.controller';
 import { AdminSubcategoryCollectionsController } from './admin-subcategory-collections.controller';
 import { AdminTicketPdfDebugController } from './admin-ticket-pdf-debug.controller';
 import { AdminSupplierIntegrationsController } from './admin-supplier-integrations.controller';
+import { AdminImportedSalesDashboardController } from './admin-imported-sales-dashboard.controller';
+import { AdminImportedSalesDashboardService } from './admin-imported-sales-dashboard.service';
 import { AuditService } from './audit.service';
 import { EventAdminSummaryService } from './event-admin-summary.service';
 import { VenueAdminSummaryService } from './venue-admin-summary.service';
@@ -120,6 +122,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';import { AdminCo
     AnalyticsService,
     AnalyticsPreaggProcessor,
     AdminDashboardService,
+    AdminImportedSalesDashboardService,
     AdminDiagnosticsService,
     AuditService,
     EventOverrideService,
@@ -188,6 +191,7 @@ import { SeoAuditService } from './seo-audit/seo-audit.service';import { AdminCo
     AdminListingHealthController,
     AdminCatalogConsistencyController,
     AdminSupplierIntegrationsController,
+    AdminImportedSalesDashboardController,
     AdminSupplierEdoController,
     AdminEdoDeliveryController,
     AdminSubcategoriesController,

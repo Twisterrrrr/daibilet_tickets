@@ -108,12 +108,11 @@ export function TepWidgetEmbed({
 
     const timer = setTimeout(() => {
       const existing = document.querySelector('script[src*="teplohod.info/v1/widget/widget.js"]');
-      if (existing) {
+      if (!existing) {
         const script = document.createElement('script');
         script.src = 'https://api.teplohod.info/v1/widget/widget.js';
         script.defer = true;
         document.body.appendChild(script);
-        script.onload = () => script.remove();
       }
     }, 100);
 

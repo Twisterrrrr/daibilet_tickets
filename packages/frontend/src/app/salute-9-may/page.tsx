@@ -194,15 +194,6 @@ export default async function Salute9MayRootPage() {
               subtitle="Что пишут гости о форматах с салютом"
             />
           ) : null}
-
-          <div className="mx-auto mt-12 max-w-2xl border-t border-slate-100 pt-8 text-center">
-            <div className="flex items-start justify-center gap-2 text-sm text-slate-600">
-              <Shield className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-              <span>
-                Покупка оформляется через билетную систему организатора. Мы помогаем сравнить предложения по городам.
-              </span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

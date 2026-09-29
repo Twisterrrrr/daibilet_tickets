@@ -4,20 +4,12 @@ import type { EventListItem } from '@daibilet/shared';
 import {
   ArrowRight,
   Clock,
-  Headphones,
   MapPin,
-  Mic,
-  Music,
   Ship,
   Star,
-  Sun,
   Users,
-  Utensils,
-  UtensilsCrossed,
 } from 'lucide-react';
 import Link from 'next/link';
-
-import { deriveSaluteServices, type SaluteServices } from '@/lib/salute-service-amenities';
 
 function formatTime(iso: string, timeZone: string): string {
   return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone });
@@ -51,76 +43,6 @@ function shipNameFromTitle(title: string): string | undefined {
   return m ? m[1] : undefined;
 }
 
-const SERVICE_SLOTS: ReadonlyArray<{
-  key: keyof SaluteServices;
-  label: string;
-  labelOff: string;
-  ActiveIcon: typeof Utensils;
-  InactiveIcon: typeof Utensils;
-}> = [
-  {
-    key: 'food',
-    label: 'Еда и напитки',
-    labelOff: 'Без еды и напитков в программе',
-    ActiveIcon: Utensils,
-    InactiveIcon: UtensilsCrossed,
-  },
-  {
-    key: 'music',
-    label: 'Музыка/DJ',
-    labelOff: 'Без музыки/DJ в программе',
-    ActiveIcon: Music,
-    InactiveIcon: Music,
-  },
-  {
-    key: 'guide',
-    label: 'Экскурсовод',
-    labelOff: 'Без экскурсовода',
-    ActiveIcon: Mic,
-    InactiveIcon: Mic,
-  },
-  {
-    key: 'audioguide',
-    label: 'Аудиогид',
-    labelOff: 'Без аудиогида',
-    ActiveIcon: Headphones,
-    InactiveIcon: Headphones,
-  },
-  {
-    key: 'deck',
-    label: 'Открытая палуба',
-    labelOff: 'Без открытой палубы в программе',
-    ActiveIcon: Sun,
-    InactiveIcon: Sun,
-  },
-];
-
-/** Пять пиктограмм: активная — услуга есть, приглушённая — нет (как в макете Lovable). */
-function SaluteServicePictograms({ services }: { services: SaluteServices }) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5" role="list" aria-label="Услуги в программе">
-      {SERVICE_SLOTS.map(({ key, label, labelOff, ActiveIcon, InactiveIcon }) => {
-        const on = services[key];
-        const Icon = on ? ActiveIcon : InactiveIcon;
-        return (
-          <span
-            key={key}
-            role="listitem"
-            title={on ? label : labelOff}
-            className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-slate-600 transition-colors ${
-              on
-                ? 'border-primary-200 bg-primary-50 text-primary-700'
-                : 'border-slate-200 bg-slate-100 text-slate-400 opacity-90'
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 export function SaluteTripCard({
   event: e,
   isBest,
@@ -138,7 +60,6 @@ export function SaluteTripCard({
   const soldOut = seats <= 0;
   const urgencyClass =
     seats <= 5 ? 'text-orange-600' : seats <= 15 ? 'text-primary-700' : 'text-emerald-700';
-  const services = deriveSaluteServices(e);
   const ship = shipNameFromTitle(e.title);
   const rating = Number(e.rating) || 0;
   const rc = e.reviewCount ?? 0;
@@ -191,7 +112,6 @@ export function SaluteTripCard({
               </span>
             ) : null}
           </div>
-          <SaluteServicePictograms services={services} />
         </div>
 
         <div className="flex shrink-0 items-center gap-4 lg:gap-10">
@@ -248,7 +168,6 @@ export function SaluteTripCard({
             </span>
           ) : null}
         </div>
-        <SaluteServicePictograms services={services} />
 
         <div className="flex items-center justify-between gap-3">
           {!soldOut ? (

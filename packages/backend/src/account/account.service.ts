@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentStatus, ReviewDisputeStatus, ReviewStatus, Prisma } from '@/prisma-client';
+import { TicketProviderCode } from '@/prisma-client';
 
 import { CheckoutService } from '../checkout/checkout.service';
 import { FulfillmentRefundRequestService } from '../checkout/fulfillment-refund-request.service';
@@ -84,14 +85,14 @@ export class AccountService {
   ): Promise<{ items: PurchaseListItemDto[]; total: number }> {
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(50, Math.max(1, params.limit ?? 20));
-    const skip = (page - 1) * limit;
+    const takeN = page * limit;
 
-    const [sessions, total] = await Promise.all([
+    const [user, sessions, sessionsTotal] = await Promise.all([
+      this.userAuth.getProfile(userId),
       this.prisma.checkoutSession.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
+        take: takeN,
         include: {
           paymentIntents: { orderBy: { createdAt: 'desc' }, take: 1 },
           fulfillmentItems: true,
@@ -126,7 +127,71 @@ export class AccountService {
       }),
     );
 
-    return { items, total };
+    const email = user?.email?.trim().toLowerCase() || null;
+    if (email) {
+      const [externalLinks, externalTotal] = await Promise.all([
+        this.prisma.externalOrderLink.findMany({
+          where: {
+            provider: { in: [TicketProviderCode.TEPLOHOD, TicketProviderCode.TICKETS_CLOUD] },
+            payloadJson: {
+              path: ['customerEmail'],
+              equals: email,
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: takeN,
+          select: {
+            id: true,
+            provider: true,
+            externalOrderId: true,
+            createdAt: true,
+            payloadJson: true,
+          },
+        }),
+        this.prisma.externalOrderLink.count({
+          where: {
+            provider: { in: [TicketProviderCode.TEPLOHOD, TicketProviderCode.TICKETS_CLOUD] },
+            payloadJson: {
+              path: ['customerEmail'],
+              equals: email,
+            },
+          },
+        }),
+      ]);
+
+      const externalItems: PurchaseListItemDto[] = externalLinks.map((l) => {
+        const payload = (l.payloadJson ?? {}) as any;
+        const title = (payload.walkTitle || payload.eventTitle || 'Покупка') as string;
+        const eventDate =
+          typeof payload.eventDateTimeLocalIso === 'string'
+            ? payload.eventDateTimeLocalIso
+            : typeof payload.eventDateTimeIso === 'string'
+              ? payload.eventDateTimeIso
+              : null;
+        return {
+          purchaseId: l.id,
+          shortCode: l.externalOrderId,
+          eventTitle: title,
+          purchaseDate: l.createdAt.toISOString(),
+          eventDate,
+          displayStatus: 'Билет у вас на email',
+          purchaseType: 'EXTERNAL_VOUCHER',
+          ticketAvailable: false,
+          primaryAction: null,
+          secondaryAction: null,
+        };
+      });
+
+      const merged = [...externalItems, ...items].sort(
+        (a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime(),
+      );
+      const skip = (page - 1) * limit;
+      const window = merged.slice(skip, skip + limit);
+      return { items: window, total: sessionsTotal + externalTotal };
+    }
+
+    const skip = (page - 1) * limit;
+    return { items: items.slice(skip, skip + limit), total: sessionsTotal };
   }
 
   async getReviews(

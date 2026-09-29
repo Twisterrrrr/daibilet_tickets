@@ -3,6 +3,26 @@
 **Проект:** Daibilet  
 **Назначение:** более жёсткий формат, ближе к **прямой вставке без правок** для самых критичных модулей **и кросс-модульной классификации (§13)**. В каждом блоке уже есть: контекст, ограничения, DTO, query params, JSON-примеры, readonly/editable, табы, состояния, UI expectations. **§13** — отдельно от §1–§12: единое семейство UI классификации на detail Event/Venue в Admin и Supplier.
 
+## UI reference (опционально): Daibilet-Admin-UI
+
+Можно использовать как **референс по основным паттернам и композиции** (layout primitives), чтобы Lovable не «изобретал» новые UI-паттерны для админки. **Не копируй UX 1-в-1**: бери основу и адаптируй под наш контракт и компоненты проекта.
+
+**Reference repo:** `https://github.com/Twisterrrrr/Daibilet-Admin-UI.git`
+
+Разрешено брать за основу (как паттерны, не 1-в-1):
+- `PageHeader` / `FilterBar` / `DataTable` / `DetailField` / `Tabs` композицию на list/detail страницах
+- «source-aware» UX: read-only зоны, lock-alert, sync badges/override индикаторы
+- подход к content hubs (Cities/Venues/Landings) как не-C R U D поверхностей
+
+Запрещено копировать / делать по референсу:
+- **не переносить стек/архитектуру** референса (роутинг, библиотеки, UI-kit, state management)
+- **не переносить мок-данные** и не «подгонять» API под мокап
+- **не менять и не изобретать** эндпойнты/DTO/enum’ы (контракт фиксирован в этих промптах)
+- **не брать из референса классификацию** категорий/тегов, если она конфликтует с нашим контрактом: всегда следовать **§13** (1 primary + 0–2 secondary, max 3, tags отдельно)
+
+Как правильно сказать Lovable (1 короткий абзац, вставлять в каждый модуль при необходимости):
+> Use `Daibilet-Admin-UI` repo only as a high-level reference for shared layout primitives and “source-aware read-only” patterns. Do NOT copy screens 1:1; adapt to this prompt’s fixed backend contract and existing project components. Do NOT copy its tech stack or mock APIs. Classification UI must follow §13 (1 primary + up to 2 secondary, max 3 total; tags separate).
+
 **Связь с предыдущими пакетами:**
 
 | Пакет | Файл | Когда использовать |

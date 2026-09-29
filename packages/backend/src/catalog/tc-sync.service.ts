@@ -23,6 +23,13 @@ import {
   TcGrpcVenue,
 } from './tc-grpc.service';
 
+export type TcSyncScope = 'all' | 'public';
+
+export interface TcSyncOptions {
+  scope?: TcSyncScope;
+  skipRetag?: boolean;
+}
+
 /**
  * Сервис синхронизации данных из Ticketscloud в нашу БД.
  *
@@ -41,6 +48,12 @@ import {
 @Injectable()
 export class TcSyncService {
   private readonly logger = new Logger(TcSyncService.name);
+
+  // TC gRPC uses two different status enums:
+  // - EventsRequest.Status filter: 2 = PUBLIC
+  // - Event.EventStatus payload: 1 = PUBLIC
+  private static readonly TC_GRPC_REQUEST_STATUS_PUBLIC = 2;
+  private static readonly TC_GRPC_EVENT_STATUS_PUBLIC = 1;
 
   private readonly CITY_MAP: Record<number, string> = {
     524901: 'moscow',
@@ -150,7 +163,7 @@ export class TcSyncService {
   /**
    * Полная синхронизация — диспатчер по режиму.
    */
-  async syncAll(): Promise<{
+  async syncAll(options: TcSyncOptions = {}): Promise<{
     status: string;
     mode: string;
     tcEventsFound: number;
@@ -165,26 +178,52 @@ export class TcSyncService {
     if (mode === 'grpc' && this.tcGrpc.isReady()) {
       this.logger.log('=== Синхронизация через gRPC tc-simple ===');
       try {
-        return await this.syncAllGrpc();
+        return await this.syncAllGrpc(options);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (options.scope === 'public') {
+          this.logger.warn(`gRPC fast sync failed, REST fallback skipped: ${msg}`);
+          return {
+            status: 'error',
+            mode: 'grpc',
+            tcEventsFound: 0,
+            uniqueEvents: 0,
+            sessionsSynced: 0,
+            citiesTotal: 0,
+            newCitiesCreated: [],
+            errors: [`gRPC fast sync failed: ${msg}`],
+          };
+        }
         this.logger.warn(`gRPC sync failed, fallback на REST: ${msg}`);
-        return await this.syncAllRest();
+        return await this.syncAllRest(options);
       }
     }
 
     if (mode === 'grpc' && !this.tcGrpc.isReady()) {
+      if (options.scope === 'public') {
+        this.logger.warn('gRPC-клиент не готов, fast sync не будет fallback-иться на REST');
+        return {
+          status: 'error',
+          mode: 'grpc',
+          tcEventsFound: 0,
+          uniqueEvents: 0,
+          sessionsSynced: 0,
+          citiesTotal: 0,
+          newCitiesCreated: [],
+          errors: ['gRPC client is not ready for TC fast sync'],
+        };
+      }
       this.logger.warn('gRPC-клиент не готов, fallback на REST v1');
     }
 
-    return await this.syncAllRest();
+    return await this.syncAllRest(options);
   }
 
   // ============================================================
   // gRPC Sync (MetaEvent-based)
   // ============================================================
 
-  private async syncAllGrpc(): Promise<{
+  private async syncAllGrpc(options: TcSyncOptions = {}): Promise<{
     status: string;
     mode: string;
     tcEventsFound: number;
@@ -201,8 +240,13 @@ export class TcSyncService {
     // Step 1: Параллельно загружаем данные из gRPC
     this.logger.log('gRPC: загрузка данных...');
 
+    const publicStatus = Number(
+      this.config.get<string>('TC_GRPC_PUBLIC_STATUS', String(TcSyncService.TC_GRPC_REQUEST_STATUS_PUBLIC)),
+    );
+    const eventStatus = options.scope === 'public' ? publicStatus : 0;
+
     const [grpcEvents, grpcMetas, grpcVenues, grpcCities] = await Promise.all([
-      this.tcGrpc.fetchEvents({ status: 0 }), // 0=ANY — все события (PUBLIC + STAND_BY и др.)
+      this.tcGrpc.fetchEvents({ status: eventStatus }), // 0=ANY; publicStatus defaults to TC PUBLIC
       this.tcGrpc.fetchMetaEvents(),
       this.tcGrpc.fetchVenues(),
       this.tcGrpc.fetchCities(),
@@ -320,13 +364,15 @@ export class TcSyncService {
 
     // Step 7: Retag
     let retagResult = { eventsProcessed: 0, tagsLinked: 0 };
-    try {
-      retagResult = await this.retagAll();
-      this.logger.log(`Retag: ${retagResult.eventsProcessed} событий, ${retagResult.tagsLinked} тегов`);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Retag ошибка (не критично): ${msg}`);
-      errors.push(`retag: ${msg}`);
+    if (!options.skipRetag) {
+      try {
+        retagResult = await this.retagAll();
+        this.logger.log(`Retag: ${retagResult.eventsProcessed} событий, ${retagResult.tagsLinked} тегов`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Retag ошибка (не критично): ${msg}`);
+        errors.push(`retag: ${msg}`);
+      }
     }
 
     return {
@@ -353,8 +399,8 @@ export class TcSyncService {
 
     // Сортируем: PUBLIC и с билетами — первые
     events.sort((a, b) => {
-      if (a.status === 1 && b.status !== 1) return -1; // PUBLIC first
-      if (a.status !== 1 && b.status === 1) return 1;
+      if (a.status === TcSyncService.TC_GRPC_EVENT_STATUS_PUBLIC && b.status !== TcSyncService.TC_GRPC_EVENT_STATUS_PUBLIC) return -1;
+      if (a.status !== TcSyncService.TC_GRPC_EVENT_STATUS_PUBLIC && b.status === TcSyncService.TC_GRPC_EVENT_STATUS_PUBLIC) return 1;
       return (b.tickets_amount_vacant || 0) - (a.tickets_amount_vacant || 0);
     });
 
@@ -401,7 +447,7 @@ export class TcSyncService {
     }
     const priceFrom = allPrices.length > 0 ? Math.min(...allPrices) : null;
 
-    const isActive = events.some((ev) => ev.status === 1); // PUBLIC
+    const isActive = events.some((ev) => ev.status === TcSyncService.TC_GRPC_EVENT_STATUS_PUBLIC);
 
     // Ищем существующее событие: сначала по tcMetaEventId, потом по tcEventId, потом по title+city
     let event = tcMetaEventId ? await this.prisma.event.findFirst({ where: { tcMetaEventId, source: 'TC' } }) : null;
@@ -572,19 +618,22 @@ export class TcSyncService {
     const dates = this.parseGrpcLifetime(ev.lifetime);
     if (!dates.start) return false;
 
+    // Важно: Ticketcloud может вернуть несколько grpc "events" с одинаковым startsAt
+    // (разные ev.id, но один слот времени). В Prisma есть @@unique([eventId, startsAt]),
+    // поэтому upsert нужно делать по composite key, а tcSessionId задавать только при create.
+    const startsAt = this.normalizeSessionDate(dates.start);
+    const endsAt = dates.finish ? this.normalizeSessionDate(dates.finish) : null;
     const tcSessionId = `${ev.id}-main`;
     const availableTickets = ev.tickets_amount_vacant || 0;
     const pricesRaw = this.extractPricesGrpc(ev.sets);
     const prices = toJsonValue(pricesRaw);
-    const isActive = ev.status === 1 && availableTickets > 0; // PUBLIC + есть билеты
+    const isActive = ev.status === TcSyncService.TC_GRPC_EVENT_STATUS_PUBLIC && availableTickets > 0;
 
     await this.prisma.eventSession.upsert({
-      where: { tcSessionId },
+      where: { eventId_startsAt: { eventId, startsAt } },
       update: {
-        eventId,
         offerId: offerId ?? undefined,
-        startsAt: dates.start,
-        endsAt: dates.finish,
+        endsAt: endsAt ?? undefined,
         availableTickets,
         prices,
         isActive,
@@ -593,8 +642,8 @@ export class TcSyncService {
         eventId,
         offerId: offerId ?? undefined,
         tcSessionId,
-        startsAt: dates.start,
-        endsAt: dates.finish,
+        startsAt,
+        endsAt: endsAt ?? undefined,
         availableTickets,
         prices,
         isActive,
@@ -822,7 +871,7 @@ export class TcSyncService {
   // REST v1 Sync (legacy fallback)
   // ============================================================
 
-  private async syncAllRest(): Promise<{
+  private async syncAllRest(options: TcSyncOptions = {}): Promise<{
     status: string;
     mode: string;
     tcEventsFound: number;
@@ -921,10 +970,12 @@ export class TcSyncService {
     }
 
     // Retag
-    try {
-      await this.retagAll();
-    } catch (err: unknown) {
-      errors.push(`retag: ${err instanceof Error ? err.message : String(err)}`);
+    if (!options.skipRetag) {
+      try {
+        await this.retagAll();
+      } catch (err: unknown) {
+        errors.push(`retag: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
     return {
@@ -1188,6 +1239,8 @@ export class TcSyncService {
     const dates = this.parseLifetimeRest(tc.lifetime);
     if (!dates.start) return false;
 
+    const startsAt = this.normalizeSessionDate(dates.start);
+    const endsAt = dates.finish ? this.normalizeSessionDate(dates.finish) : null;
     const tcSessionId = `${tcId}-main`;
     const availableTickets = Number(tc.tickets_amount_vacant) || 0;
     const pricesRaw = this.extractPrices(tc.sets ?? []);
@@ -1195,12 +1248,24 @@ export class TcSyncService {
     const isActive = tc.status === 'public' && availableTickets > 0;
 
     await this.prisma.eventSession.upsert({
-      where: { tcSessionId },
-      update: { eventId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices, isActive },
-      create: { eventId, tcSessionId, startsAt: dates.start, endsAt: dates.finish, availableTickets, prices, isActive },
+      where: { eventId_startsAt: { eventId, startsAt } },
+      update: { availableTickets, prices, isActive, endsAt: endsAt ?? undefined },
+      create: { eventId, tcSessionId, startsAt, endsAt: endsAt ?? undefined, availableTickets, prices, isActive },
     });
 
     return true;
+  }
+
+  /**
+   * Нормализация времени для ключа @@unique([eventId, startsAt]).
+   *
+   * На части окружений `startsAt` мог быть создан/храниться без миллисекунд,
+   * а входные данные могут содержать ms. Если where использует ms, а БД/индекс
+   * фактически сравнивает усечённое значение — получаем false negative → create → unique violation.
+   */
+  private normalizeSessionDate(d: Date): Date {
+    const ms = d.getTime();
+    return new Date(Math.floor(ms / 1000) * 1000); // second precision
   }
 
   // ============================================================

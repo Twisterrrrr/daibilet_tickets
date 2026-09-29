@@ -213,18 +213,28 @@ enum LocationType {
 }
 
 enum VenueType {
+  PIER // Причал
   MUSEUM // Музей
   GALLERY // Галерея
   ART_SPACE // Арт-пространство
   EXHIBITION_HALL // Выставочный зал
   THEATER // Театр
+  CONCERT_HALL // Концертный зал
   PALACE // Дворец / Усадьба
   PARK // Парк / Заповедник
+  VIEWPOINT // Смотровая площадка
+  HISTORIC_BUILDING // Историческое здание
   // Food & nightlife (manual now, import-ready later)
   RESTAURANT
   CAFE
   BAR
   FASTFOOD
+  RESTAURANT_BAR // Ресторан / Бар
+  SPORTS // Спортивный объект
+  AQUARIUM_ZOO // Океанариум / Зоопарк
+  ESCAPE_ROOM // Квест-комната
+  OPEN_AIR // Открытая площадка
+  OTHER // Другое
 }
 
 /// Импортируемые и ручные площадки: DRAFT → модерация → ACTIVE; MERGED → каноническая цель в mergeTargetId
@@ -473,6 +483,8 @@ model AdminUser {
   updatedAt              DateTime  @updatedAt
 
   venueModerationDecisions VenueModerationDecision[]
+  externalRefundRequestsCreated ExternalRefundRequest[] @relation("ExternalRefundRequestCreatedBy")
+  externalRefundRequestsAssigned ExternalRefundRequest[] @relation("ExternalRefundRequestAssignedTo")
 
   @@map("admin_users")
 }
@@ -976,6 +988,7 @@ model ExternalOrderLink {
   package         Package?         @relation(fields: [packageId], references: [id], onDelete: SetNull)
   packageItem     PackageItem?     @relation(fields: [packageItemId], references: [id], onDelete: SetNull)
   tickets         ExternalTicket[]
+  refundRequests  ExternalRefundRequest[]
 
   @@unique([provider, externalOrderId])
   @@index([checkoutSessionId])
@@ -983,6 +996,50 @@ model ExternalOrderLink {
   @@index([packageItemId])
   @@index([integrationState])
   @@map("external_order_links")
+}
+
+/// Операционная заявка на ручной возврат по внешнему заказу (imported sales).
+/// Важно: не меняет "факты провайдера" (ExternalOrderLink.payloadJson/status); это отдельный контур трекинга действий оператора.
+enum ExternalRefundRequestStatus {
+  REQUESTED
+  IN_REVIEW
+  PROVIDER_CONTACTED
+  APPROVED_MANUAL
+  REJECTED
+  COMPLETED
+  CANCELED
+}
+
+enum ExternalRefundRequestReason {
+  OTHER
+  CUSTOMER_REQUEST
+  PROVIDER_CANCELED
+  DUPLICATE
+  WRONG_DATE
+}
+
+model ExternalRefundRequest {
+  id                String                      @id @default(uuid()) @db.Uuid
+  externalOrderLinkId String                    @db.Uuid
+  status            ExternalRefundRequestStatus @default(REQUESTED)
+  reason            ExternalRefundRequestReason @default(OTHER)
+  reasonNote        String?                     @db.Text
+  amount            Int?
+  currency          String                      @default("RUB")
+  createdByAdminId  String?                     @db.Uuid
+  assignedToAdminId String?                     @db.Uuid
+  resolvedAt        DateTime?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  externalOrderLink ExternalOrderLink @relation(fields: [externalOrderLinkId], references: [id], onDelete: Cascade)
+  createdByAdmin    AdminUser?        @relation("ExternalRefundRequestCreatedBy", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  assignedToAdmin   AdminUser?        @relation("ExternalRefundRequestAssignedTo", fields: [assignedToAdminId], references: [id], onDelete: SetNull)
+
+  @@index([externalOrderLinkId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("external_refund_requests")
 }
 
 model ExternalTicket {
@@ -1825,6 +1882,7 @@ model Venue {
   title             String // "Государственный Эрмитаж"
   shortTitle        String? // "Эрмитаж"
   venueType         VenueType
+  venueTypeOtherLabel String?              @map("venue_type_other_label")
   description       String?                @db.Text // Markdown/HTML
   shortDescription  String?
   imageUrl          String?

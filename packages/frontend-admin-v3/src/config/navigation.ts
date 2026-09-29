@@ -88,7 +88,7 @@ export const navigation: NavSection[] = [
       { label: 'География', to: 'geo', icon: MapPin, feature: null },
       { label: 'Настройки', to: 'settings', icon: Settings, feature: null },
       { label: 'Логи', to: 'logs', icon: FileText, feature: null },
-      { label: 'Продажи', to: 'sales', icon: BarChart3, feature: 'SALES' },
+      { label: 'Imported Sales', to: 'sales/imported', icon: BarChart3, feature: 'SALES', end: false },
       { label: 'Финансы', to: 'finance', icon: BarChart3, feature: 'FINANCE' },
       { label: 'Отчеты', to: 'reports', icon: BarChart3, feature: 'REPORTS' },
       { label: 'Команда (админы)', to: 'staff-users', icon: Users, feature: 'USERS' },

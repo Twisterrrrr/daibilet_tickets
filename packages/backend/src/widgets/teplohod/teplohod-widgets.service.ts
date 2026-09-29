@@ -2,8 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import {
-  TeplohodWidgetCheckoutReqDto,
-  TeplohodWidgetCheckoutResDto,
   TeplohodWidgetEventDto,
   TeplohodWidgetEventSessionDto,
   TeplohodWidgetQueryDto,
@@ -79,6 +77,12 @@ export class TeplohodWidgetsService {
         city: event.city?.name ?? undefined,
         imageUrl: event.imageUrl ?? undefined,
         url: `/events/${event.slug}`,
+        deeplink:
+          event.offers?.find((o) => o.isPrimary)?.deeplink ??
+          event.offers?.[0]?.deeplink ??
+          (event.tcEventId
+            ? `https://teplohod.info/event/${normalizeTeplohodExternalId(event.tcEventId)}`
+            : undefined),
         priceFrom: event.priceFrom ?? undefined,
         currency: 'RUB',
       },
@@ -125,16 +129,23 @@ export class TeplohodWidgetsService {
 </html>`;
   }
 
-  async createCheckout(body: TeplohodWidgetCheckoutReqDto): Promise<TeplohodWidgetCheckoutResDto> {
-    const params = new URLSearchParams();
-    params.set('eventId', body.eventId);
-    if (body.sessionId) params.set('sessionId', body.sessionId);
-    if (body.qty != null) params.set('qty', String(body.qty));
-    if (body.returnUrl) params.set('returnUrl', body.returnUrl);
+  async createCheckout(body: {
+    eventId: string;
+    sessionId: string;
+    qty?: number;
+    returnUrl?: string | null;
+  }): Promise<{ checkoutUrl: string }> {
+    const event = await this.findEvent(body.eventId);
+    if (!event) throw new NotFoundException('Event not found');
 
-    return {
-      checkoutUrl: `/checkout?${params.toString()}`,
-    };
+    const deeplink =
+      event.offers?.find((o) => o.isPrimary)?.deeplink ??
+      event.offers?.[0]?.deeplink ??
+      (event.tcEventId ? `https://teplohod.info/event/${normalizeTeplohodExternalId(event.tcEventId)}` : null);
+
+    if (!deeplink) throw new NotFoundException('Checkout is unavailable');
+
+    return { checkoutUrl: deeplink };
   }
 
   private async findEvent(eventId: string) {
@@ -145,6 +156,7 @@ export class TeplohodWidgetsService {
         where: { id: raw, isActive: true, isDeleted: false },
         include: {
           city: true,
+          offers: { where: { source: 'TEPLOHOD' }, orderBy: [{ isPrimary: 'desc' }, { priority: 'asc' }] },
           sessions: {
             where: { isActive: true },
             orderBy: { startsAt: 'asc' },
@@ -169,6 +181,7 @@ export class TeplohodWidgetsService {
       },
       include: {
         city: true,
+        offers: { where: { source: 'TEPLOHOD' }, orderBy: [{ isPrimary: 'desc' }, { priority: 'asc' }] },
         sessions: {
           where: { isActive: true },
           orderBy: { startsAt: 'asc' },

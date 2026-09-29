@@ -214,11 +214,32 @@ export class TepSyncService {
       if (created) newCitiesCreated.push(created);
     }
 
-    // 2. Один запрос — все события (teplohod API игнорирует city_id)
+    // 2. События + расписание
+    //
+    // Важно: `/v1/events` (без compact) может быть тяжёлым/нестабильным.
+    // При этом `/v1/events/:id` стабильно возвращает `eventTimes`.
+    // Поэтому берём "листинг" через compact, а расписание гидратим по одному событию.
     let allEvents: TepEvent[] = [];
     try {
-      allEvents = await this.tepApi.getEvents(undefined, signal);
-      this.logger.log(`TEP: ${allEvents.length} событий загружено`);
+      const compact = await this.tepApi.getEvents(undefined, signal);
+      this.logger.log(`TEP: ${compact.length} событий (compact)`);
+
+      const hydrated: TepEvent[] = [];
+      let withSchedule = 0;
+      for (const ev of compact) {
+        if (signal?.aborted) break;
+        const idNum = typeof ev.id === 'number' ? ev.id : parseInt(String(ev.id), 10);
+        if (Number.isNaN(idNum)) {
+          hydrated.push(ev);
+          continue;
+        }
+        const full = await this.tepApi.getEventFull(idNum, signal);
+        if (full?.eventTimes?.length) withSchedule++;
+        hydrated.push((full as unknown as TepEvent) ?? ev);
+      }
+
+      allEvents = hydrated;
+      this.logger.log(`TEP: ${allEvents.length} событий гидратировано, с расписанием: ${withSchedule}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return {

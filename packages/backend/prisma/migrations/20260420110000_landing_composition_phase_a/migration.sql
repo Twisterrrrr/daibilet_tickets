@@ -1,53 +1,80 @@
 -- Landing composition: themes, content blocks, LandingPage extensions, LandingType without HUB (HUB -> MULTI_CITY).
 
 -- CreateEnum
-CREATE TYPE "LandingBlockType" AS ENUM (
-  'HERO',
-  'TRUST_BADGES',
-  'VALUE_PROPS',
-  'QUICK_FILTERS',
-  'FEATURED_VARIANTS',
-  'SCHEDULE_PREVIEW',
-  'CITY_GRID',
-  'CATEGORY_CHIPS',
-  'INFO_ICONS',
-  'STORY',
-  'HIGHLIGHTS',
-  'ITINERARY',
-  'PRICING',
-  'FAQ',
-  'REVIEWS',
-  'GALLERY',
-  'COMPARISON',
-  'RELATED_LANDINGS',
-  'RELATED_COLLECTIONS',
-  'RELATED_ARTICLES',
-  'CTA_BANNER',
-  'SEO_TEXT',
-  'RAW_RICH_TEXT'
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'LandingBlockType') THEN
+    CREATE TYPE "LandingBlockType" AS ENUM (
+      'HERO',
+      'TRUST_BADGES',
+      'VALUE_PROPS',
+      'QUICK_FILTERS',
+      'FEATURED_VARIANTS',
+      'SCHEDULE_PREVIEW',
+      'CITY_GRID',
+      'CATEGORY_CHIPS',
+      'INFO_ICONS',
+      'STORY',
+      'HIGHLIGHTS',
+      'ITINERARY',
+      'PRICING',
+      'FAQ',
+      'REVIEWS',
+      'GALLERY',
+      'COMPARISON',
+      'RELATED_LANDINGS',
+      'RELATED_COLLECTIONS',
+      'RELATED_ARTICLES',
+      'CTA_BANNER',
+      'SEO_TEXT',
+      'RAW_RICH_TEXT'
+    );
+  END IF;
+END $$;
 
-CREATE TYPE "LandingCanonicalMode" AS ENUM ('SELF', 'ALTERNATE', 'PASS_THROUGH');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'LandingCanonicalMode') THEN
+    CREATE TYPE "LandingCanonicalMode" AS ENUM ('SELF', 'ALTERNATE', 'PASS_THROUGH');
+  END IF;
+END $$;
 
 -- LandingType: remove HUB (data -> MULTI_CITY)
-ALTER TYPE "LandingType" RENAME TO "LandingType_old";
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'LandingType') THEN
+    ALTER TYPE "LandingType" RENAME TO "LandingType_old";
+  END IF;
+END $$;
 
 CREATE TYPE "LandingType" AS ENUM ('CITY', 'MULTI_CITY');
 
-ALTER TABLE "landing_pages" ALTER COLUMN "landingType" DROP DEFAULT;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'landing_pages' AND column_name = 'landingType'
+  ) THEN
+    ALTER TABLE "landing_pages" ALTER COLUMN "landingType" DROP DEFAULT;
 
-ALTER TABLE "landing_pages"
-  ALTER COLUMN "landingType" TYPE "LandingType"
-  USING (
-    CASE
-      WHEN "landingType"::text = 'HUB' THEN 'MULTI_CITY'::"LandingType"
-      WHEN "landingType"::text = 'CITY' THEN 'CITY'::"LandingType"
-      WHEN "landingType"::text = 'MULTI_CITY' THEN 'MULTI_CITY'::"LandingType"
-      ELSE 'MULTI_CITY'::"LandingType"
-    END
-  );
+    ALTER TABLE "landing_pages"
+      ALTER COLUMN "landingType" TYPE "LandingType"
+      USING (
+        CASE
+          WHEN "landingType"::text = 'HUB' THEN 'MULTI_CITY'::"LandingType"
+          WHEN "landingType"::text = 'CITY' THEN 'CITY'::"LandingType"
+          WHEN "landingType"::text = 'MULTI_CITY' THEN 'MULTI_CITY'::"LandingType"
+          ELSE 'MULTI_CITY'::"LandingType"
+        END
+      );
+  ELSE
+    ALTER TABLE "landing_pages"
+      ADD COLUMN "landingType" "LandingType" NOT NULL DEFAULT 'CITY'::"LandingType";
+  END IF;
+END $$;
 
-DROP TYPE "LandingType_old";
+DROP TYPE IF EXISTS "LandingType_old";
 
 ALTER TABLE "landing_pages" ALTER COLUMN "landingType" SET DEFAULT 'CITY'::"LandingType";
 

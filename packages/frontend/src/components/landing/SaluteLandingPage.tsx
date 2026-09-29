@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 import { calendarDayFromIso, type EventListItem, getCityTimezone } from '@daibilet/shared';
 import { Eye, Lightbulb, MapPin, Shield, Star } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { FilterBar, type FilterState } from '@/components/landing/FilterBar';
 import {
@@ -137,8 +137,30 @@ export function SaluteLandingPage({
 }) {
   const ianaTimeZone = useMemo(() => getCityTimezone(city?.slug ?? null), [city?.slug]);
 
-  const [filters, setFilters] = useState<FilterState>({
-    date: '',
+  const uniqueEvents = useMemo(() => {
+    // Backend may return duplicated rows (e.g. multiple variants / provider edges).
+    // Deduplicate by stable event id to keep React keys unique.
+    const seen = new Set<string>();
+    const out: EventListItem[] = [];
+    for (const e of events) {
+      const id = String((e as any)?.id ?? '');
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(e);
+    }
+    return out;
+  }, [events]);
+
+  const defaultDate = useMemo(() => {
+    // For salute-9-may we prefer showing May 9 by default (MSK/city TZ),
+    // otherwise users see unrelated early sessions (e.g. Apr 29).
+    const dates = filterOptions.dates ?? [];
+    const may9 = dates.find((d) => typeof d === 'string' && d.endsWith('-05-09'));
+    return may9 ?? '';
+  }, [filterOptions.dates]);
+
+  const [filters, setFilters] = useState<FilterState>(() => ({
+    date: defaultDate,
     timeSlot: '',
     pier: '',
     maxPrice: null,
@@ -146,10 +168,23 @@ export function SaluteLandingPage({
     sort: 'price',
     transport: 'any',
     facets: { ...DEFAULT_SALUTE_FACETS },
-  });
+  }));
+
+  // If API dates arrive after first render, apply default once (non-destructively).
+  const didSetDefaultDate = useRef(false);
+  useEffect(() => {
+    if (didSetDefaultDate.current) return;
+    if (!defaultDate) return;
+    if (filters.date) {
+      didSetDefaultDate.current = true;
+      return;
+    }
+    didSetDefaultDate.current = true;
+    setFilters((prev) => ({ ...prev, date: defaultDate }));
+  }, [defaultDate, filters.date]);
 
   const filtered = useMemo(() => {
-    let out = events;
+    let out = uniqueEvents;
     if (filters.pier) out = out.filter((e) => (e.address || '').includes(filters.pier));
     out = out.filter((e) => matchesSaluteTransport(e, filters.transport));
     out = out.filter((e) => matchesSaluteToolbarFacets(e, filters.facets));
@@ -169,7 +204,7 @@ export function SaluteLandingPage({
       out = [...out].sort((a, b) => String(a.nextSessionAt ?? '').localeCompare(String(b.nextSessionAt ?? '')));
     }
     return out;
-  }, [events, filters, ianaTimeZone]);
+  }, [uniqueEvents, filters, ianaTimeZone]);
 
   const bestIdx = useMemo(() => pickOptimalSaluteIndex(filtered), [filtered]);
 

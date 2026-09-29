@@ -12,11 +12,12 @@
 import { config as dotenvConfig } from 'dotenv';
 import path from 'path';
 
-import { PrismaClient, TagCategory, type TagKind, type StructuralTagGroup } from '@prisma/client';
+import { TagCategory, type TagKind, type StructuralTagGroup } from '../src/prisma-client';
+import { createScriptPrismaClient } from '../scripts/_prisma';
 
 dotenvConfig({ path: path.resolve(process.cwd(), '../../.env') });
 
-const prisma = new PrismaClient();
+const { prisma, pool } = createScriptPrismaClient();
 
 type SeedTag = {
   code: string;
@@ -145,6 +146,12 @@ const TAGS: SeedTag[] = [
   // ========================
   // STRUCTURAL / AUDIENCE
   // ========================
+  { code: '0plus', slug: '0plus', nameRu: '0+', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE', category: 'AUDIENCE', sortOrder: 20 },
+  { code: '6plus', slug: '6plus', nameRu: '6+', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE', category: 'AUDIENCE', sortOrder: 21 },
+  { code: '12plus', slug: '12plus', nameRu: '12+', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE', category: 'AUDIENCE', sortOrder: 22 },
+  { code: '16plus', slug: '16plus', nameRu: '16+', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE', category: 'AUDIENCE', sortOrder: 23 },
+  { code: '18plus', slug: '18plus', nameRu: '18+', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE', category: 'AUDIENCE', sortOrder: 24 },
+  { code: 'for_kids', slug: 'for-kids', nameRu: 'Для детей', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE', category: 'AUDIENCE', sortOrder: 25 },
   { code: 'adults', slug: 'adults', nameRu: 'Для взрослых', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE', category: 'AUDIENCE', sortOrder: 1 },
   { code: 'kids', slug: 'kids', nameRu: 'Детям', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE', category: 'AUDIENCE', sortOrder: 2 },
   { code: 'family', slug: 'family', nameRu: 'Семейным', tagKind: 'STRUCTURAL', structuralGroup: 'AUDIENCE', category: 'AUDIENCE', sortOrder: 3 },
@@ -195,6 +202,9 @@ const TAGS: SeedTag[] = [
   // ========================
   // POPULAR (marketing / query-demand)
   // ========================
+  { code: 'ru', slug: 'ru', nameRu: 'Русский', tagKind: 'POPULAR', category: 'SPECIAL', sortOrder: 90 },
+  { code: 'en', slug: 'en', nameRu: 'English', tagKind: 'POPULAR', category: 'SPECIAL', sortOrder: 91 },
+  { code: 'bilingual', slug: 'bilingual', nameRu: 'На двух языках', tagKind: 'POPULAR', category: 'SPECIAL', sortOrder: 92 },
   { code: 'salyut', slug: 'salyut', nameRu: 'Салют', description: 'Запросы и подборки про праздничный салют с воды.', tagKind: 'POPULAR', category: 'SPECIAL', sortOrder: 1 },
   { code: 'bridge_opening', slug: 'bridge_opening', nameRu: 'Развод мостов', description: 'Подборки про развод мостов (ночные и праздничные рейсы).', tagKind: 'POPULAR', category: 'SPECIAL', sortOrder: 2 },
   { code: 'white_nights', slug: 'white_nights', nameRu: 'Белые ночи', description: 'Запросы про сезон белых ночей в Петербурге.', tagKind: 'POPULAR', category: 'SPECIAL', sortOrder: 3 },
@@ -221,34 +231,41 @@ async function main() {
   console.log(`Seeding ${TAGS.length} tags...`);
 
   for (const t of TAGS) {
-    await prisma.tag.upsert({
-      where: { code: t.code },
-      create: {
-        code: t.code,
-        slug: t.slug,
-        name: t.nameRu,
-        nameEn: t.nameEn,
-        description: t.description,
-        category: t.category,
-        tagKind: t.tagKind,
-        structuralGroup: t.tagKind === 'STRUCTURAL' ? (t.structuralGroup ?? null) : null,
-        isActive: t.isActive ?? true,
-        isFeatured: t.isFeatured ?? false,
-        sortOrder: t.sortOrder,
-      },
-      update: {
-        slug: t.slug,
-        name: t.nameRu,
-        nameEn: t.nameEn,
-        description: t.description,
-        category: t.category,
-        tagKind: t.tagKind,
-        structuralGroup: t.tagKind === 'STRUCTURAL' ? (t.structuralGroup ?? null) : null,
-        isActive: t.isActive ?? true,
-        isFeatured: t.isFeatured ?? false,
-        sortOrder: t.sortOrder,
-      },
-    });
+    const data = {
+      code: t.code,
+      slug: t.slug,
+      name: t.nameRu,
+      nameEn: t.nameEn,
+      description: t.description,
+      category: t.category,
+      tagKind: t.tagKind,
+      structuralGroup: t.tagKind === 'STRUCTURAL' ? (t.structuralGroup ?? null) : null,
+      isActive: t.isActive ?? true,
+      isFeatured: t.isFeatured ?? false,
+      sortOrder: t.sortOrder,
+    };
+
+    try {
+      await prisma.tag.upsert({
+        where: { code: t.code },
+        create: data,
+        update: data,
+      });
+    } catch (e: any) {
+      // Если в базе уже есть tag с тем же slug, но без code (или с другим code),
+      // корректно "подхватываем" его и дописываем code/группы.
+      if (e?.code === 'P2002') {
+        const existing = await prisma.tag.findUnique({ where: { slug: t.slug } }).catch(() => null);
+        if (existing) {
+          await prisma.tag.update({
+            where: { id: existing.id },
+            data,
+          });
+          continue;
+        }
+      }
+      throw e;
+    }
   }
 
   console.log(`Done.`);
@@ -261,5 +278,6 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });
 

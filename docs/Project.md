@@ -42,6 +42,8 @@
 ## Документы
 
 - Промпты для Lovable: `docs/product/` (v1/v2/v3 + finance).
+- Admin V4 Imported Sales (интеграция, UX-контракт, карта API): `docs/product/admin-v4-imported-sales.md` (части A–C); короткие указатели: `admin-v4-integration-principles.md`, `lovable-admin-contract-map.md`.
 - Дневник решений: `docs/Diary.md`.
 - Трекер задач: `docs/Tasktracker.md`.
+- Вопросы и решения по запуску Admin V4: `docs/qa.md`.
 

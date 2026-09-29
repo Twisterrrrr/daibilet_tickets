@@ -1,11 +1,39 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  computeAdminEventListQuickPublishFlags,
   computeAdminEventQuickHealth,
   mapEventOfferToCategoryPriceDto,
   readinessFromIssueCodes,
   readinessScoreFromQuickHealth,
 } from '../event-admin-list-health.util';
+import { EventSource } from '@/prisma-client';
+
+describe('computeAdminEventListQuickPublishFlags', () => {
+  it('marks readyToPublish when list+purchase ready for imported', () => {
+    const r = computeAdminEventListQuickPublishFlags({
+      source: EventSource.TC,
+      isActive: true,
+      overrideHidden: false,
+      readinessListStatus: 'READY',
+      externalPurchaseStatus: 'READY',
+    });
+    expect(r.readyToPublish).toBe(true);
+    expect(r.needsAttention).toBe(false);
+  });
+
+  it('needsAttention when external purchase not READY', () => {
+    const r = computeAdminEventListQuickPublishFlags({
+      source: EventSource.TC,
+      isActive: true,
+      overrideHidden: false,
+      readinessListStatus: 'READY',
+      externalPurchaseStatus: 'MISSING',
+    });
+    expect(r.readyToPublish).toBe(false);
+    expect(r.needsAttention).toBe(true);
+  });
+});
 
 describe('computeAdminEventQuickHealth', () => {
   it('returns empty issueCodes when all checks pass', () => {

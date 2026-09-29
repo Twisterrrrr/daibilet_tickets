@@ -1,0 +1,2 @@
+export { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
+

@@ -8,7 +8,21 @@
  *   cd packages/backend && npm run sync:tep
  *   cd packages/backend && npm run sync:tep -- --list-only  # только список, без sync
  */
-import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+import { PrismaClient } from '../src/prisma-client';
+
+function createPrisma(): PrismaClient {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+  });
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+  });
+}
 
 const API_BASE = process.env.API_URL || 'http://localhost:4000';
 
@@ -77,7 +91,8 @@ async function listActiveEvents(prisma: PrismaClient) {
 
 async function main() {
   const listOnly = process.argv.includes('--list-only');
-  const prisma = new PrismaClient();
+  const prisma = createPrisma();
+  await prisma.$connect();
 
   if (!listOnly) {
     console.log('\n=== Импорт teplohod.info ===\n');

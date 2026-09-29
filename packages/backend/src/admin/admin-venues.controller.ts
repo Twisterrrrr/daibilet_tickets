@@ -915,6 +915,7 @@ export class AdminVenuesController {
         title: body.title,
         shortTitle: body.shortTitle || null,
         venueType: body.venueType,
+        venueTypeOtherLabel: body.venueType === VenueType.OTHER ? body.venueTypeOtherLabel?.trim() || null : null,
         cityId: body.cityId,
         description: body.description || null,
         shortDescription: body.shortDescription || null,
@@ -1056,6 +1057,14 @@ export class AdminVenuesController {
         }),
         ...(body.shortTitle !== undefined && { shortTitle: body.shortTitle || null }),
         ...(body.venueType !== undefined && { venueType: body.venueType }),
+        ...(body.venueType !== undefined && {
+          venueTypeOtherLabel:
+            body.venueType === VenueType.OTHER ? body.venueTypeOtherLabel?.trim() || null : null,
+        }),
+        ...(body.venueType === undefined && body.venueTypeOtherLabel !== undefined && {
+          venueTypeOtherLabel:
+            existing.venueType === VenueType.OTHER ? body.venueTypeOtherLabel?.trim() || null : existing.venueTypeOtherLabel,
+        }),
         ...(body.description !== undefined && { description: body.description || null }),
         ...(body.shortDescription !== undefined && { shortDescription: body.shortDescription || null }),
         ...(body.imageUrl !== undefined && { imageUrl: body.imageUrl || null }),

@@ -226,9 +226,7 @@ export type AdminLandingSeoAuditResponse = {
   return adminApi.get<AdminLandingSeoAuditResponse>(
     `/admin/landings/${encodeURIComponent(landingId)}/seo-audit`,
   );
-}
-
-export async function fetchAdminLandingThemes() {
+}export async function fetchAdminLandingThemes() {
   return adminApi.get<AdminLandingThemeListItem[]>('/admin/landing-themes');
 }
 
@@ -237,9 +235,7 @@ export async function postAdminLandingBlockReorder(landingId: string, orderedIds
     `/admin/landings/${encodeURIComponent(landingId)}/blocks/reorder`,
     { orderedIds },
   );
-}
-
-export async function postAdminLandingBlock(
+}export async function postAdminLandingBlock(
   landingId: string,
   body: {
     type: AdminLandingBlockType;

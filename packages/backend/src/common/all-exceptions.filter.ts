@@ -10,6 +10,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
 
+    // Если что-то уже начало писать ответ (например, middleware/интерцептор),
+    // нельзя пытаться выставлять статус/заголовки повторно.
+    if (res.headersSent) {
+      const err = exception instanceof Error ? exception : new Error(String(exception));
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.error('[AllExceptionsFilter] headers already sent:', err.message);
+      }
+      if (process.env.SENTRY_DSN) {
+        Sentry.captureException(err, { tags: { env: process.env.NODE_ENV, path: req.url, headersSent: '1' } });
+      }
+      return;
+    }
+
     const status =
       exception instanceof HttpException ? exception.getStatus() : 500;
     let message: string;

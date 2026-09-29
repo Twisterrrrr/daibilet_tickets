@@ -1,15 +1,16 @@
 'use server';
 
+import { fetchApi } from '@/lib/api';
+
 export async function createTeplohodCheckout(input: {
   eventId: string;
   sessionId: string;
   qty?: number;
   returnUrl?: string;
 }) {
-  const res = await fetch('/api/v1/widgets/teplohod/checkout', {
+  const json = await fetchApi<{ checkoutUrl: string }>('/widgets/teplohod/checkout', {
     method: 'POST',
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       eventId: input.eventId,
       sessionId: input.sessionId,
@@ -18,11 +19,6 @@ export async function createTeplohodCheckout(input: {
     }),
   });
 
-  if (!res.ok) {
-    throw new Error(`Checkout error (${res.status})`);
-  }
-
-  const json = (await res.json()) as { checkoutUrl: string };
   if (!json.checkoutUrl) {
     throw new Error('checkoutUrl is missing');
   }

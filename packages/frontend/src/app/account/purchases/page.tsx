@@ -77,6 +77,7 @@ function PurchaseCard({ item }: { item: PurchaseListItem }) {
   const style = CARD_STYLE[item.purchaseType];
   const eventDateStr = formatEventDate(item.eventDate);
   const artifactLabel = ARTIFACT_LABEL[item.purchaseType];
+  const showDetailsLink = item.purchaseType !== 'EXTERNAL_VOUCHER';
 
   return (
     <div
@@ -150,19 +151,23 @@ function PurchaseCard({ item }: { item: PurchaseListItem }) {
           )
         )}
         {!item.primaryAction && !item.secondaryAction && (
+          showDetailsLink ? (
+            <Link
+              href={`/account/orders/${item.purchaseId}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Подробнее
+            </Link>
+          ) : null
+        )}
+        {showDetailsLink ? (
           <Link
             href={`/account/orders/${item.purchaseId}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="ml-auto text-sm text-slate-500 underline hover:text-slate-700"
           >
-            Подробнее
+            Детали заказа
           </Link>
-        )}
-        <Link
-          href={`/account/orders/${item.purchaseId}`}
-          className="ml-auto text-sm text-slate-500 underline hover:text-slate-700"
-        >
-          Детали заказа
-        </Link>
+        ) : null}
       </div>
     </div>
   );

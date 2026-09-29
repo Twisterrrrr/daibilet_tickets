@@ -26,6 +26,7 @@ export class TeplohodWidgetEventInfoDto {
   city?: string;
   imageUrl?: string;
   url!: string;
+  deeplink?: string;
   priceFrom?: number;
   currency?: 'RUB';
 }

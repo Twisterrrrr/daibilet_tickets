@@ -17,11 +17,21 @@ export type SyncFullJobData = Record<string, never>;
 /** Данные задачи sync-incremental (пустой объект) */
 export type SyncIncrementalJobData = Record<string, never>;
 
+/** Данные задачи sync-tep (пустой объект) */
+export type SyncTepJobData = Record<string, never>;
+
+/** Данные задачи sync-tc (пустой объект) */
+export type SyncTcJobData = { mode?: 'full' | 'fast' };
+
 /** Объединение типов данных задач sync-очереди */
-export type SyncJobData = SyncFullJobData | SyncIncrementalJobData;
+export type SyncJobData = SyncFullJobData | SyncIncrementalJobData | SyncTepJobData | SyncTcJobData;
 
 /** Имена задач в sync-очереди */
-export type SyncJobName = 'sync-full' | 'sync-incremental';
+export type SyncJobName = 'sync-full' | 'sync-incremental' | 'sync-tep' | 'sync-tc';
+
+function syncErrors(errors?: string[] | null): string {
+  return errors?.filter(Boolean).join('; ') || 'unknown sync error';
+}
 
 /** Результат full sync — TC, TEP, retag, combo, materialize */
 export interface SyncFullResult {
@@ -37,7 +47,17 @@ export interface SyncIncrementalResult {
   tc: Awaited<ReturnType<TcSyncService['syncAll']>>;
 }
 
-export type SyncJobResult = SyncFullResult | SyncIncrementalResult | null;
+/** Результат sync-tep — только TEP */
+export interface SyncTepResult {
+  tep: Awaited<ReturnType<TepSyncService['syncAll']>>;
+}
+
+/** Результат sync-tc — только TC */
+export interface SyncTcResult {
+  tc: Awaited<ReturnType<TcSyncService['syncAll']>>;
+}
+
+export type SyncJobResult = SyncFullResult | SyncIncrementalResult | SyncTepResult | SyncTcResult | null;
 
 /**
  * Hard timeout для sync-задач (защита от зависания).
@@ -51,6 +71,8 @@ export type SyncJobResult = SyncFullResult | SyncIncrementalResult | null;
  */
 const FULL_SYNC_TIMEOUT_MS = 90 * 60_000; // 90 минут
 const INCREMENTAL_TIMEOUT_MS = 30 * 60_000; // 30 минут
+const TEP_SYNC_TIMEOUT_MS = 60 * 60_000; // 60 минут (расписание может быть тяжёлым)
+const TC_SYNC_TIMEOUT_MS = 45 * 60_000; // 45 минут
 
 /**
  * SyncProcessor — обработчик задач синхронизации.
@@ -91,6 +113,12 @@ export class SyncProcessor extends WorkerHost {
 
         case 'sync-incremental':
           return await this.withTimeout((signal) => this.handleIncrementalSync(signal), INCREMENTAL_TIMEOUT_MS, job);
+
+        case 'sync-tep':
+          return await this.withTimeout((signal) => this.handleTepSync(signal), TEP_SYNC_TIMEOUT_MS, job);
+
+        case 'sync-tc':
+          return await this.withTimeout((signal) => this.handleTcSync(signal, job.data as SyncTcJobData), TC_SYNC_TIMEOUT_MS, job);
 
         default:
           this.logger.warn(`[sync] Unknown job name: ${job.name}`);
@@ -151,13 +179,21 @@ export class SyncProcessor extends WorkerHost {
     const runStartedAt = new Date();
 
     // 1. TC sync (retag встроен в конце syncAll)
-    const tcResult = await this.tcSync.syncAll();
+    const [tcResult, tepResult] = await Promise.all([
+      this.tcSync.syncAll({ skipRetag: true }),
+      this.tepSync.syncAll(signal),
+    ]);
+    if (tcResult.status === 'error') {
+      throw new Error(`TC sync failed: ${syncErrors(tcResult.errors)}`);
+    }
+    if (tepResult.status === 'error') {
+      throw new Error(`TEP sync failed: ${syncErrors(tepResult.errors)}`);
+    }
     this.logger.log(
       `TC sync: ${tcResult.uniqueEvents} событий, ${tcResult.sessionsSynced} сессий, статус: ${tcResult.status}`,
     );
 
     // 2. Teplohod sync
-    const tepResult = await this.tepSync.syncAll(signal);
     this.logger.log(`TEP sync: ${tepResult.eventsSynced} событий, статус: ${tepResult.status}`);
 
     // 2.1 Очередь постредакции: ensure overrides для импортных событий (NEEDS_REVIEW в Directus)
@@ -227,6 +263,9 @@ export class SyncProcessor extends WorkerHost {
   private async handleIncrementalSync(_signal?: AbortSignal) {
     const runStartedAt = new Date();
     const tcResult = await this.tcSync.syncAll();
+    if (tcResult.status === 'error') {
+      throw new Error(`TC incremental sync failed: ${syncErrors(tcResult.errors)}`);
+    }
     this.logger.log(`TC incremental: ${tcResult.uniqueEvents} событий, статус: ${tcResult.status}`);
 
     try {
@@ -241,6 +280,32 @@ export class SyncProcessor extends WorkerHost {
 
     await this.cache.invalidateAfterSync();
 
+    return { tc: tcResult };
+  }
+
+  /**
+   * Teplohod-only sync: только TEP + cache invalidation.
+   */
+  private async handleTepSync(signal?: AbortSignal) {
+    const tepResult = await this.tepSync.syncAll(signal);
+    if (tepResult.status === 'error') {
+      throw new Error(`TEP sync failed: ${syncErrors(tepResult.errors)}`);
+    }
+    this.logger.log(`TEP sync: ${tepResult.eventsSynced} событий, ${tepResult.sessionsCreated} сессий, статус: ${tepResult.status}`);
+    await this.cache.invalidateAfterSync();
+    return { tep: tepResult };
+  }
+
+  /**
+   * Ticketscloud-only sync: только TC + cache invalidation.
+   */
+  private async handleTcSync(_signal?: AbortSignal, data?: SyncTcJobData) {
+    const tcResult = await this.tcSync.syncAll(data?.mode === 'fast' ? { scope: 'public' } : undefined);
+    if (tcResult.status === 'error') {
+      throw new Error(`TC sync failed: ${syncErrors(tcResult.errors)}`);
+    }
+    this.logger.log(`TC sync: ${tcResult.uniqueEvents} событий, ${tcResult.sessionsSynced} сессий, статус: ${tcResult.status}`);
+    await this.cache.invalidateAfterSync();
     return { tc: tcResult };
   }
 }

@@ -53,7 +53,7 @@ export function deriveSaluteServices(e: EventListItem): SaluteServices {
     subs.has(EventSubcategory.PARTY) ||
     subs.has(EventSubcategory.FESTIVAL) ||
     subs.has(EventSubcategory.GASTRO) ||
-    /музык|концерт|dj|живой\s+звук|оркестр|вечеринк/i.test(lower);
+    /музык|концерт|dj|живой\s+звук|оркестр|вечеринк|дискотек|танц/i.test(lower);
 
   const guide =
     subs.has(EventSubcategory.BUS) ||

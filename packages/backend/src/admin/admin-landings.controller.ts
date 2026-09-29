@@ -55,7 +55,9 @@ import { buildLandingHubReadinessSnapshot } from './hub-readiness/hub-readiness-
 @UseInterceptors(AuditInterceptor)
 @Controller('admin/landings')
 export class AdminLandingsController {
-  private readonly publicSiteBase = process.env.PUBLIC_SITE_URL?.replace(/\/$/, '') ?? null;
+  /** Витрина: `PUBLIC_STOREFRONT_ORIGIN` (контракт docs) или legacy `PUBLIC_SITE_URL`. */
+  private readonly publicSiteBase =
+    (process.env.PUBLIC_STOREFRONT_ORIGIN ?? process.env.PUBLIC_SITE_URL)?.replace(/\/$/, '') ?? null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -114,7 +116,25 @@ export class AdminLandingsController {
       }),
       this.prisma.landingPage.count({ where }),
     ]);
-    return buildPaginatedResult(rawItems, total, pg.limit);
+    const base = this.publicSiteBase;
+    const mapped = rawItems.map((landing) => {
+      const path = this.landingStorefrontPath(landing);
+      const storefrontPublicUrl =
+        (typeof landing.canonicalUrl === 'string' && landing.canonicalUrl.trim()) ||
+        (base ? `${base}${path}` : null);
+      return { ...landing, storefrontPublicUrl };
+    });
+    return buildPaginatedResult(mapped, total, pg.limit);
+  }
+
+  private landingStorefrontPath(landing: {
+    landingType: string;
+    slug: string;
+    city?: { slug: string } | null;
+  }): string {
+    return landing.landingType === 'CITY' && landing.city?.slug
+      ? `/cities/${landing.city.slug}/l/${landing.slug}`
+      : `/l/${landing.slug}`;
   }
 
   @Get(':id/resolved-events')
@@ -284,7 +304,13 @@ export class AdminLandingsController {
       siteBaseUrl: this.publicSiteBase,
     });
 
-    return { ...landing, hubReadiness };
+    const path = this.landingStorefrontPath(landing);
+    const base = this.publicSiteBase;
+    const storefrontPublicUrl =
+      (typeof landing.canonicalUrl === 'string' && landing.canonicalUrl.trim()) ||
+      (base ? `${base}${path}` : null);
+
+    return { ...landing, hubReadiness, storefrontPublicUrl };
   }
 
   @Post()

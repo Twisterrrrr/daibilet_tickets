@@ -19,6 +19,7 @@ type EventInfo = {
   city?: string;
   imageUrl?: string;
   url: string;
+  deeplink?: string;
   priceFrom?: number;
   currency?: 'RUB';
 };
@@ -81,12 +82,14 @@ export default function TeplohodWidgetClient({ initialError, initialData, eventI
     setLoading(true);
 
     try {
-      const checkoutUrl = await createTeplohodCheckout({
-        eventId,
-        sessionId: selectedSessionId,
-        qty: 1,
-        returnUrl: window.location.href,
-      });
+      const checkoutUrl =
+        data.event.deeplink ??
+        (await createTeplohodCheckout({
+          eventId,
+          sessionId: selectedSessionId,
+          qty: 1,
+          returnUrl: window.location.href,
+        }));
 
       if (typeof window !== 'undefined' && window.top) {
         window.top.location.href = checkoutUrl;

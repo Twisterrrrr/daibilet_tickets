@@ -46,6 +46,10 @@ jobs:
         run: npx tsc --noEmit
         working-directory: packages/frontend
 
+      - name: Type check admin v4
+        run: npx tsc --noEmit
+        working-directory: packages/frontend-admin-v4
+
       - name: Run tests
         run: npx vitest run
         working-directory: packages/backend
